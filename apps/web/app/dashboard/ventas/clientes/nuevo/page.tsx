@@ -14,7 +14,7 @@ export default function NuevoClientePage() {
   const handleSubmit = async (data: any) => {
     try {
       const response = await post('/api/ventas/clientes', data)
-      
+
       const clienteCreado = response?.data || response;
 
       if (clienteCreado?.id) {
@@ -45,7 +45,7 @@ export default function NuevoClientePage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
-          href="/dashboard/ventas/clientes" className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
+          href="/dashboard/ventas/clientes" className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-card/80 border cursor-pointer transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--primary-50)'
             e.currentTarget.style.borderColor = 'var(--primary-300)'
@@ -61,8 +61,8 @@ export default function NuevoClientePage() {
           Volver
         </Link>
         <div>
-          <h1 className="text-8 font-bold text-[var(--primary-900)] m-0">Nuevo Cliente</h1>
-          <p className="text-4 text-[var(--primary-600)] mt-1 mr-0 mb-0 ml-0">Registra un nuevo cliente en el sistema</p>
+          <h1 className="text-[2rem] font-bold text-[var(--primary-900)] m-0">Nuevo Cliente</h1>
+          <p className="text-base text-[var(--primary-600)] mt-1 mr-0 mb-0 ml-0">Registra un nuevo cliente en el sistema</p>
         </div>
       </div>
 

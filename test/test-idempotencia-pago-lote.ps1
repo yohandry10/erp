@@ -11,7 +11,7 @@ Write-Host ""
 Write-Host "1. Obteniendo token de autenticación..." -ForegroundColor Yellow
 $loginBody = @{
     email = "admin@vierdes.com"
-    password = "Admin123!"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json
 
 try {
@@ -228,4 +228,3 @@ Write-Host "- Se procesó un lote de pagos con referencia única" -ForegroundCol
 Write-Host "- Se intentó procesar el mismo lote nuevamente" -ForegroundColor Gray
 Write-Host "- El sistema debería haber detectado la duplicación y retornado el resultado original" -ForegroundColor Gray
 Write-Host "- Las CxP y la cuenta bancaria NO deberían haberse actualizado en el segundo intento" -ForegroundColor Gray
-

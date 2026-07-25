@@ -26,18 +26,18 @@ interface NotificationBannerProps {
 const bannerConfig = {
   info: {
     icon: Info,
-    className: 'border-cyan-300/20 bg-cyan-400/10 text-cyan-50',
-    iconClassName: 'border-cyan-300/20 bg-cyan-300/10 text-cyan-200',
+    className: 'border-cyan-300/20 bg-cyan-400/10 text-primary',
+    iconClassName: 'border-cyan-300/20 bg-cyan-300/10 text-primary',
   },
   warning: {
     icon: AlertTriangle,
-    className: 'border-blue-300/20 bg-blue-400/10 text-blue-50',
-    iconClassName: 'border-blue-300/20 bg-blue-300/10 text-blue-100',
+    className: 'border-blue-300/20 bg-blue-400/10 text-primary dark:text-blue-200',
+    iconClassName: 'border-blue-300/20 bg-blue-300/10 text-primary dark:text-blue-200',
   },
   error: {
     icon: AlertCircle,
-    className: 'border-cyan-200/25 bg-slate-900 text-cyan-50',
-    iconClassName: 'border-cyan-200/20 bg-cyan-200/10 text-cyan-100',
+    className: 'border-cyan-200/25 bg-card text-primary',
+    iconClassName: 'border-cyan-200/20 bg-cyan-200/10 text-primary',
   },
 }
 
@@ -84,14 +84,14 @@ export function NotificationBanner({ notification, onDismiss }: NotificationBann
 
         <div className="min-w-0 flex-1">
           <h4 className="text-sm font-bold text-white">{notification.title}</h4>
-          <p className="mt-1 text-sm leading-5 text-slate-300">{notification.message}</p>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">{notification.message}</p>
 
           {notification.actionUrl && notification.actionLabel && (
             <Button
               type="button"
               size="sm"
               onClick={() => router.push(notification.actionUrl!)}
-              className="mt-3 bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+              className="mt-3 bg-cyan-400 text-foreground hover:bg-cyan-300"
             >
               {notification.actionLabel}
             </Button>
@@ -105,7 +105,7 @@ export function NotificationBanner({ notification, onDismiss }: NotificationBann
             variant="ghost"
             aria-label="Cerrar notificación"
             onClick={handleDismiss}
-            className="h-8 w-8 shrink-0 text-slate-400 hover:bg-cyan-400/10 hover:text-cyan-100"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-cyan-400/10 hover:text-primary"
           >
             <X className="h-4 w-4" />
           </Button>

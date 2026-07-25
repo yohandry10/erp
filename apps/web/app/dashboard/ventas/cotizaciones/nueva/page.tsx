@@ -14,13 +14,13 @@ export default function NuevaCotizacionPage() {
   const handleSubmit = async (data: CotizacionFormData) => {
     try {
       const response = await post('/api/ventas/cotizaciones', data)
-      
+
       if (response?.success) {
         toast({
           title: 'Éxito',
           description: 'Cotización creada correctamente'
         })
-        
+
         // Redirect to detail page
         if (response.data?.id) {
           router.push(`/dashboard/ventas/cotizaciones/${response.data.id}`)
@@ -46,7 +46,7 @@ export default function NuevaCotizacionPage() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => router.back()}
-          aria-label="Volver a cotizaciones" className="inline-flex items-center justify-center p-2 text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
+          aria-label="Volver a cotizaciones" className="inline-flex items-center justify-center p-2 text-[var(--primary-700)] bg-card/80 border cursor-pointer transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--primary-50)'
             e.currentTarget.style.borderColor = 'var(--primary-300)'
@@ -61,10 +61,10 @@ export default function NuevaCotizacionPage() {
           <ArrowLeft className="w-[1.125rem] h-[1.125rem]" />
         </button>
         <div>
-          <h1 className="text-8 font-bold text-[var(--primary-900)] m-0">
+          <h1 className="text-[2rem] font-bold text-[var(--primary-900)] m-0">
             Nueva Cotización
           </h1>
-          <p className="text-4 text-[var(--primary-600)] mt-1 mr-0 mb-0 ml-0">
+          <p className="text-base text-[var(--primary-600)] mt-1 mr-0 mb-0 ml-0">
             Crea una nueva cotización de venta
           </p>
         </div>

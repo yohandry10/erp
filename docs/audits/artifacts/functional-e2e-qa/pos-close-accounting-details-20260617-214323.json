@@ -1,0 +1,43 @@
+{
+  "tenantId": "c0af84b5-5ea6-44a9-9e6e-a869f119b013",
+  "asiento": {
+    "id": "b661e541-5189-474f-9ae5-68c97cfe7488",
+    "tipo_asiento": "POS_CIERRE",
+    "referencia": "SESION:0d367e81-1293-4e91-988a-1e3f81369883",
+    "total_debe": 11.8,
+    "total_haber": 11.8,
+    "estado": "BORRADOR",
+    "created_at": "2026-06-18T02:42:57.827943+00:00"
+  },
+  "detallesCount": 3,
+  "totalDebe": 11.8,
+  "totalHaber": 11.8,
+  "cuadrado": true,
+  "detalles": [
+    {
+      "id": "9555e5b8-1495-401b-90f8-38206228dd43",
+      "asiento_id": "b661e541-5189-474f-9ae5-68c97cfe7488",
+      "cuenta_id": "58869068-65a0-46ee-88f7-cc4b530fb904",
+      "debe": 11.8,
+      "haber": 0,
+      "concepto": "Cierre diario/turno POS - sesión 0d367e81-1293-4e91-988a-1e3f81369883"
+    },
+    {
+      "id": "d336727b-9502-4d13-aded-47727f9b2a96",
+      "asiento_id": "b661e541-5189-474f-9ae5-68c97cfe7488",
+      "cuenta_id": "73fbc931-94a6-4ff6-8e31-55fe220d29e9",
+      "debe": 0,
+      "haber": 1.8,
+      "concepto": "Cierre diario/turno POS - sesión 0d367e81-1293-4e91-988a-1e3f81369883"
+    },
+    {
+      "id": "069800f2-e0e7-4501-a3ea-bbe22a1f6cda",
+      "asiento_id": "b661e541-5189-474f-9ae5-68c97cfe7488",
+      "cuenta_id": "e230c201-87ab-45ac-b5ae-72a954136176",
+      "debe": 0,
+      "haber": 10,
+      "concepto": "Cierre diario/turno POS - sesión 0d367e81-1293-4e91-988a-1e3f81369883"
+    }
+  ],
+  "passed": true
+}

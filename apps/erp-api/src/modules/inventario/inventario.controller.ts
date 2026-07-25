@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, Logger } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common';
@@ -11,6 +11,7 @@ import { InventarioService } from './inventario.service';
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
 import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
+import { randomUUID } from 'node:crypto';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -352,6 +353,9 @@ export class InventarioController {
       const sucursalId = productData.sucursal_id || null;
       const almacenId = productData.almacen_id || null;
       const stockInicial = controlaStock ? parseFloat(productData.stock || 0) : 0;
+      if (controlaStock && (stockInicial > 0 || stockReservado > 0) && !almacenId) {
+        throw new BadRequestException('almacen_id es obligatorio para inicializar stock físico');
+      }
 
       const nuevoProducto = {
         tenant_id: tenantId,
@@ -360,12 +364,13 @@ export class InventarioController {
         descripcion: productData.descripcion || null,
         precio_venta: precioVenta,
         precio_compra: precioCompra,
-        stock_actual: stockInicial,
+        stock_actual: 0,
+        stock: 0,
         categoria: productData.categoria,
         activo: true,
         codigo_barras: productData.codigoBarras || productData.codigo,
         stock_minimo: stockMinimo,
-        stock_reservado: stockReservado,
+        stock_reservado: 0,
         impuesto: impuestoPorcentaje,
         es_servicio: esServicio,
         controla_stock: controlaStock,
@@ -385,21 +390,35 @@ export class InventarioController {
       if (error) throw error;
 
       if (controlaStock && stockInicial > 0) {
-        try {
-          await this.supabase.getClient()
-            .from('stock_movimientos')
-            .insert([{
-              tenant_id: tenantId,
-              producto_id: insertedProduct.id,
-              tipo_movimiento: 'ENTRADA',
-              cantidad: stockInicial,
-              motivo: 'Stock inicial del producto',
-              referencia: 'INICIAL',
-              created_at: new Date().toISOString()
-            }]);
-        } catch (movError) {
-          this.logger.warn(`⚠️ No se pudo registrar movimiento inicial: ${(movError as Error).message}`); // HARDENING: mantiene registro de inconsistencias iniciales.
-        }
+        const { error: initialStockError } = await this.supabase.getClient().rpc(
+          'aplicar_movimiento_inventario_tx',
+          {
+            p_tenant_id: tenantId,
+            p_producto_id: insertedProduct.id,
+            p_almacen_id: almacenId,
+            p_tipo: 'ENTRADA',
+            p_cantidad: stockInicial,
+            p_referencia_tipo: 'PRODUCTO_STOCK_INICIAL',
+            p_referencia_id: insertedProduct.id,
+            p_notas: 'Stock inicial del producto',
+            p_metadata: { source: 'inventario_producto_create', costo_unitario: precioCompra },
+          },
+        );
+        if (initialStockError) throw initialStockError;
+      }
+
+      if (controlaStock && stockReservado > 0) {
+        const { error: reserveError } = await this.supabase.getClient().rpc('reservar_stock_en_almacen_tx', {
+          p_tenant_id: tenantId,
+          p_producto_id: insertedProduct.id,
+          p_almacen_id: almacenId,
+          p_cantidad: stockReservado,
+          p_referencia_tipo: 'PRODUCTO_RESERVA_INICIAL',
+          p_referencia_id: insertedProduct.id,
+          p_notas: 'Reserva inicial del producto',
+          p_metadata: { source: 'inventario_producto_create' },
+        });
+        if (reserveError) throw reserveError;
       }
 
       // Guardar precios por sucursal (acepta arreglo o sucursal_id individual)
@@ -429,40 +448,24 @@ export class InventarioController {
         }
       }
 
-      // Guardar stock por sucursal/almacén si controla stock
-      const stockSucursal = Array.isArray(productData.stock_sucursal) ? productData.stock_sucursal : [];
-      if (controlaStock && sucursalId) {
-        stockSucursal.push({
-          sucursal_id: sucursalId,
-          almacen_id: almacenId,
-          stock_actual: stockInicial,
-          reservado: stockReservado,
-          minimo: stockMinimo,
-        });
-      }
-      if (controlaStock && stockSucursal.length > 0) {
-        const stockPayload = stockSucursal
-          .filter((s: any) => s?.sucursal_id)
-          .map((s: any) => ({
-            producto_id: insertedProduct.id,
-            sucursal_id: s.sucursal_id,
-            almacen_id: s.almacen_id || null,
-            stock_actual: parseFloat(s.stock ?? 0),
-            reservado: parseFloat(s.reservado ?? 0),
-            minimo: parseFloat(s.minimo ?? 0),
-          }));
-        if (stockPayload.length > 0) {
-          await this.supabase.getClient()
-            .from('producto_stock_sucursal')
-            .upsert(stockPayload, { onConflict: 'producto_id,sucursal_id,almacen_id' });
-        }
+      const { data: productoCreado, error: reloadError } = await this.supabase
+        .getClient()
+        .from('productos')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('id', insertedProduct.id)
+        .single();
+      if (reloadError || !productoCreado) {
+        throw reloadError ?? new Error('No se pudo recargar el producto creado');
       }
 
       this.logger.log(`✅ Producto creado exitosamente: ${insertedProduct.id}`); // HARDENING: confirma alta.
 
       return {
         success: true,
-        data: insertedProduct,
+        // El RPC de stock inicial actualiza la proyección del producto. Devolver
+        // el INSERT original exponía stock=0 aunque el ledger ya tuviera saldo.
+        data: productoCreado,
         message: 'Producto creado exitosamente'
       };
     } catch (error) {
@@ -780,15 +783,11 @@ export class InventarioController {
       if (productData.codigoBarras !== undefined) updateData.codigo_barras = productData.codigoBarras;
       if (productData.impuesto !== undefined) updateData.impuesto = parseFloat(productData.impuesto);
       if (productData.activo !== undefined) updateData.activo = productData.activo;
-      if (productData.stockReservado !== undefined || productData.stock_reservado !== undefined) {
-        updateData.stock_reservado = parseFloat(productData.stockReservado ?? productData.stock_reservado);
-      }
       if (productData.es_servicio !== undefined) {
         const esServicio = productData.es_servicio === true || `${productData.es_servicio}`.toLowerCase() === 'true';
         updateData.es_servicio = esServicio;
         if (esServicio) {
           updateData.controla_stock = false;
-          updateData.stock_actual = 0;
         }
       }
       if (productData.controla_stock !== undefined) {
@@ -810,8 +809,42 @@ export class InventarioController {
       if (productData.imagen_url !== undefined || productData.imagenUrl !== undefined) {
         updateData.imagen_url = productData.imagen_url ?? productData.imagenUrl;
       }
-      if (productData.stock !== undefined) {
-        updateData.stock_actual = parseFloat(productData.stock);
+
+      const solicitaStock = productData.stock !== undefined
+        || productData.stockActual !== undefined
+        || productData.stock_actual !== undefined
+        || productData.stockReservado !== undefined
+        || productData.stock_reservado !== undefined;
+      const almacenId = productData.almacen_id || null;
+      if (solicitaStock && !almacenId) {
+        throw new BadRequestException('almacen_id es obligatorio para ajustar stock físico');
+      }
+
+      if (solicitaStock) {
+        const stockObjetivo = parseFloat(
+          productData.stock ?? productData.stockActual ?? productData.stock_actual ?? existingProduct.stock_actual ?? 0,
+        );
+        const reservadoObjetivo = parseFloat(
+          productData.stockReservado ?? productData.stock_reservado ?? existingProduct.stock_reservado ?? 0,
+        );
+        if (!Number.isFinite(stockObjetivo) || !Number.isFinite(reservadoObjetivo)) {
+          throw new BadRequestException('stock y stock_reservado deben ser números válidos');
+        }
+        const { error: stockError } = await this.supabase.getClient().rpc(
+          'establecer_stock_en_almacen_tx',
+          {
+            p_tenant_id: tenantId,
+            p_producto_id: id,
+            p_almacen_id: almacenId,
+            p_stock_objetivo: stockObjetivo,
+            p_reservado_objetivo: reservadoObjetivo,
+            p_referencia_tipo: 'PRODUCTO_AJUSTE_MANUAL',
+            p_referencia_id: randomUUID(),
+            p_notas: 'Ajuste desde edición de producto',
+            p_metadata: { source: 'inventario_producto_update' },
+          },
+        );
+        if (stockError) throw stockError;
       }
 
       // Actualizar producto
@@ -827,12 +860,7 @@ export class InventarioController {
 
       // Manejo de precio/stock por sucursal en update
       const sucursalId = productData.sucursal_id || null;
-      const almacenId = productData.almacen_id || null;
       const precioVenta = parseFloat(productData.precioVenta ?? productData.precio_venta ?? updatedProduct.precio_venta ?? 0);
-      const stockMinimo = parseFloat(productData.stockMinimo ?? productData.stock_minimo ?? updatedProduct.stock_minimo ?? 0);
-      const stockReservado = parseFloat(productData.stockReservado ?? productData.stock_reservado ?? updatedProduct.stock_reservado ?? 0);
-      const stockCantidad = parseFloat(productData.stock ?? (updatedProduct as any).stock_actual ?? 0);
-      let controlaStock = updateData.controla_stock ?? updatedProduct.controla_stock ?? true;
 
       // Upsert precios por sucursal (acepta arreglo o sucursal_id individual)
       const preciosSucursal = Array.isArray(productData.precios_sucursal) ? productData.precios_sucursal : [];
@@ -858,39 +886,6 @@ export class InventarioController {
           await this.supabase.getClient()
             .from('producto_precios_sucursal')
             .upsert(preciosPayload, { onConflict: 'producto_id,sucursal_id,moneda' });
-        }
-      }
-
-      // Upsert stock por sucursal/almacén si controla stock (acepta arreglo)
-      const stockSucursal = Array.isArray(productData.stock_sucursal) ? productData.stock_sucursal : [];
-      // Si es servicio, nunca tocamos stock
-      if (updateData.es_servicio === true) {
-        controlaStock = false;
-      }
-      if (controlaStock && sucursalId) {
-        stockSucursal.push({
-          sucursal_id: sucursalId,
-          almacen_id: almacenId,
-          stock_actual: stockCantidad,
-          reservado: stockReservado,
-          minimo: stockMinimo,
-        });
-      }
-      if (controlaStock && stockSucursal.length > 0) {
-        const stockPayload = stockSucursal
-          .filter((s: any) => s?.sucursal_id)
-          .map((s: any) => ({
-            producto_id: id,
-            sucursal_id: s.sucursal_id,
-            almacen_id: s.almacen_id || null,
-            stock_actual: parseFloat(s.stock ?? 0),
-            reservado: parseFloat(s.reservado ?? 0),
-            minimo: parseFloat(s.minimo ?? 0),
-          }));
-        if (stockPayload.length > 0) {
-          await this.supabase.getClient()
-            .from('producto_stock_sucursal')
-            .upsert(stockPayload, { onConflict: 'producto_id,sucursal_id,almacen_id' });
         }
       }
 

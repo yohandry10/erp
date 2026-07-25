@@ -14,7 +14,7 @@ Write-Host "PASO 1: Obteniendo token de autenticación..." -ForegroundColor Yell
 
 $loginData = @{
     email = "superadmin@neon.com"
-    password = "[REMOVED]"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json
 
 try {

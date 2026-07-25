@@ -24,7 +24,7 @@ interface CashMovementsTableProps {
 }
 
 export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTableProps) {
-    const api = useApi();
+    const { get } = useApi();
     const [movimientos, setMovimientos] = useState<MovimientoCaja[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTa
     const cargarMovimientos = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await api.get(`/cajas/movimientos/${sesionId}`);
+            const response = await get(`/cajas/movimientos/${sesionId}`);
             if (response?.success) {
                 setMovimientos(response.data || []);
             } else {
@@ -44,7 +44,7 @@ export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTa
         } finally {
             setLoading(false);
         }
-    }, [api, sesionId]);
+    }, [get, sesionId]);
 
     useEffect(() => {
         if (sesionId) {
@@ -64,21 +64,21 @@ export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTa
         switch (tipo) {
             case 'APERTURA':
             case 'INGRESO':
-                return 'text-green-600 bg-green-50';
+                return 'text-emerald-400 bg-emerald-500/10';
             case 'VENTA':
-                return 'text-blue-600 bg-blue-50';
+                return 'text-primary bg-primary/10';
             case 'RETIRO':
             case 'GASTO':
-                return 'text-red-600 bg-red-50';
+                return 'text-destructive bg-destructive/10';
             case 'CIERRE':
-                return 'text-gray-600 bg-gray-50';
+                return 'text-foreground/80 bg-muted/30';
             default:
-                return 'text-gray-600 bg-gray-50';
+                return 'text-foreground/80 bg-muted/30';
         }
     };
 
     if (loading) {
-        return <div className="p-8 text-center text-gray-500">Cargando movimientos...</div>;
+        return <div className="p-8 text-center text-muted-foreground">Cargando movimientos...</div>;
     }
 
     if (error) {
@@ -86,44 +86,44 @@ export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTa
     }
 
     if (movimientos.length === 0) {
-        return <div className="p-8 text-center text-gray-500">No hay movimientos registrados en esta sesión.</div>;
+        return <div className="p-8 text-center text-muted-foreground">No hay movimientos registrados en esta sesión.</div>;
     }
 
     return (
         <div className={`overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg ${className}`}>
             <table className="min-w-full divide-y divide-gray-300">
-                <thead className="bg-gray-50">
+                <thead className="bg-muted/30">
                     <tr>
-                        <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+                        <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:pl-6">
                             #
                         </th>
-                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-foreground">
                             Hora
                         </th>
-                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-foreground">
                             Tipo
                         </th>
-                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-foreground">
                             Referencia / Motivo
                         </th>
-                        <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+                        <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-foreground">
                             Monto
                         </th>
-                        <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+                        <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-foreground">
                             Saldo
                         </th>
-                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-foreground">
                             Usuario
                         </th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 bg-card">
                     {movimientos.map((mov) => (
                         <tr key={mov.id}>
-                            <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                            <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-foreground sm:pl-6">
                                 {mov.secuencia}
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-muted-foreground">
                                 {formatearHora(mov.timestamp)}
                             </td>
                             <td className="whitespace-nowrap px-3 py-4 text-sm">
@@ -131,21 +131,21 @@ export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTa
                                     {mov.tipo_movimiento}
                                 </span>
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-muted-foreground">
                                 {mov.referencia_tipo && (
-                                    <span className="font-medium text-gray-700 mr-2">
+                                    <span className="font-medium text-foreground/85 mr-2">
                                         {mov.referencia_tipo}: {mov.referencia_documento}
                                     </span>
                                 )}
-                                {mov.motivo && <span className="text-gray-500 italic">{mov.motivo}</span>}
+                                {mov.motivo && <span className="text-muted-foreground italic">{mov.motivo}</span>}
                             </td>
-                            <td className={`whitespace-nowrap px-3 py-4 text-sm text-right font-medium ${mov.monto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <td className={`whitespace-nowrap px-3 py-4 text-sm text-right font-medium ${mov.monto >= 0 ? 'text-emerald-400' : 'text-destructive'}`}>
                                 {mov.monto >= 0 ? '+' : ''}S/ {mov.monto.toFixed(2)}
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-right text-gray-900 font-medium">
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-right text-foreground font-medium">
                                 S/ {mov.saldo_nuevo.toFixed(2)}
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-muted-foreground">
                                 {mov.usuario?.nombres}
                             </td>
                         </tr>

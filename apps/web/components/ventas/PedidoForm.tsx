@@ -273,7 +273,7 @@ const hasStockShortage = stockAlerts.length > 0
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {hasStockShortage && (
-        <div className="border bg-[rgba(254,_226,_226,_0.6)] text-red-700 py-3 px-4 rounded-3 text-3.5">
+        <div className="border bg-destructive/10 text-destructive py-3 px-4 rounded-xl text-sm">
           <strong>Stock insuficiente</strong>
           <ul className="mt-2 mr-0 mb-0 ml-5 p-0">
             {stockAlerts.map((a, idx) => (
@@ -298,9 +298,9 @@ const hasStockShortage = stockAlerts.length > 0
       {/* Productos Section */}
       <div className="p-6 shadow border">
         {stockAlerts.length > 0 && (
-          <div className="bg-[rgba(239,_68,_68,_0.08)] border text-[var(--red-700)] py-3 px-4 mb-3">
+          <div className="bg-destructive/10 border text-[var(--red-700)] py-3 px-4 mb-3">
             <strong className="block mb-1">⚠️ Stock insuficiente</strong>
-            <ul className="m-0 pl-4 text-3.5">
+            <ul className="m-0 pl-4 text-sm">
               {stockAlerts.map((s, i) => (
                 <li key={i}>
                   {s.descripcion}: solicitado {s.solicitado}, disponible {s.disponible} (reservado {s.reservado})
@@ -314,7 +314,13 @@ const hasStockShortage = stockAlerts.length > 0
           <button
             type="button"
             onClick={handleAddItem}
-            disabled={disabled || loadingProductos} className="inline-flex items-center gap-2 py-2.5 px-5 text-[0.875rem] font-semibold text-white bg-[var(--gradient-primary)] border-0 transition shadow"
+            disabled={disabled || loadingProductos}
+            title={loadingProductos
+              ? 'Cargando productos disponibles'
+              : disabled
+                ? 'El formulario está procesando otra operación'
+                : 'Agregar un producto al pedido'}
+            className="inline-flex items-center gap-2 py-2.5 px-5 text-[0.875rem] font-semibold text-white bg-[var(--gradient-primary)] border-0 transition shadow"
             onMouseEnter={(e) => {
               if (!disabled && !loadingProductos) {
                 e.currentTarget.style.transform = 'translateY(-2px)'
@@ -344,7 +350,7 @@ const hasStockShortage = stockAlerts.length > 0
         ) : (
           <div className="flex flex-col gap-4">
             {detalle.map((item, index) => (
-              <div key={index} className="border p-4 bg-[rgba(255,_255,_255,_0.5)]">
+              <div key={index} className="border p-4 bg-card/50">
                 <div className="grid grid-cols-[repeat(12,_1fr)] gap-4">
                   {/* Producto Selector */}
                   <div>
@@ -354,7 +360,7 @@ const hasStockShortage = stockAlerts.length > 0
                     <select
                       value={item.producto_id}
                       onChange={(e) => handleProductoChange(index, e.target.value)}
-                      disabled={disabled} className="w-[100%] py-3 px-4 text-4 bg-white text-[var(--primary-800)] cursor-pointer"
+                      disabled={disabled} className="w-[100%] py-3 px-4 text-base bg-card text-[var(--primary-800)] cursor-pointer"
                     >
                       <option value="">Seleccionar producto...</option>
                       {productos.map(producto => {
@@ -370,7 +376,7 @@ const hasStockShortage = stockAlerts.length > 0
                       })}
                     </select>
                     {errors[`producto_${index}`] && (
-                      <p className="text-3 text-[var(--red-600)] mt-1">
+                      <p className="text-xs text-[var(--red-600)] mt-1">
                         {errors[`producto_${index}`]}
                       </p>
                     )}
@@ -390,7 +396,7 @@ const hasStockShortage = stockAlerts.length > 0
                       disabled={disabled}
                     />
                     {errors[`cantidad_${index}`] && (
-                      <p className="text-3 text-[var(--red-600)] mt-1">
+                      <p className="text-xs text-[var(--red-600)] mt-1">
                         {errors[`cantidad_${index}`]}
                       </p>
                     )}
@@ -400,7 +406,7 @@ const hasStockShortage = stockAlerts.length > 0
                         const disponible = (item.producto.stock ?? 0) - reservado
                         const warn = item.cantidad > disponible
                         return (
-                          <p className="text-3 mt-[0.15rem]">
+                          <p className="text-xs mt-[0.15rem]">
                             {warn ? '⚠️ ' : ''}
                             Stock: {item.producto.stock ?? 0} • Reservado: {reservado} • Disponible: {disponible}
                           </p>
@@ -423,7 +429,7 @@ const hasStockShortage = stockAlerts.length > 0
                       disabled={disabled}
                     />
                     {errors[`precio_${index}`] && (
-                      <p className="text-3 text-[var(--red-600)] mt-1">
+                      <p className="text-xs text-[var(--red-600)] mt-1">
                         {errors[`precio_${index}`]}
                       </p>
                     )}
@@ -510,14 +516,14 @@ const hasStockShortage = stockAlerts.length > 0
         type="button"
         onClick={onCancel}
         disabled={submitting}
-        className="btn btn-outline"
+        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold leading-5 text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
       >
         Cancelar
       </button>
       <button
         type="submit"
         disabled={disabled || submitting || stockAlerts.length > 0}
-        className="btn btn-primary"
+        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
       >
         {submitting ? 'Guardando...' : pedido ? 'Actualizar Pedido' : 'Crear Pedido'}
       </button>

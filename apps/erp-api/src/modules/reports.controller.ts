@@ -32,20 +32,24 @@ export class ReportsController {
       const fechaFin = query?.fechaFin;
       const estado = query?.estado;
       const moneda = query?.moneda;
+      // La tabla `ventas` no la puebla ningún flujo; las ventas reales viven en
+      // `documentos` (comprobantes emitidos). Se alias-ean columnas para conservar
+      // el shape esperado por el frontend (fecha, numero_documento, igv).
       let listQuery = this.supabaseService
         .getClient()
-        .from('ventas')
+        .from('documentos')
         .select(`
-          id, fecha, estado, numero_documento, tipo_documento,
-          subtotal, igv, total, moneda, cliente_id, vendedor_id, sucursal_id, metodo_pago,
+          id, fecha:fecha_emision, estado, numero_documento:numero, tipo_documento,
+          subtotal, igv:impuesto_igv, total, moneda, cliente_id, metodo_pago,
           clientes(nombre, numero_documento, tipo_documento)
         `)
         .eq('tenant_id', tenantId)
-        .order('fecha', { ascending: false });
+        .in('tipo_documento', ['FACTURA', 'BOLETA'])
+        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")')
+        .order('fecha_emision', { ascending: false });
 
-      if (fechaInicio) listQuery = listQuery.gte('fecha', fechaInicio);
-      if (fechaFin) listQuery = listQuery.lte('fecha', fechaFin);
-      if (estado) listQuery = listQuery.eq('estado', estado);
+      if (fechaInicio) listQuery = listQuery.gte('fecha_emision', fechaInicio);
+      if (fechaFin) listQuery = listQuery.lte('fecha_emision', fechaFin);
       if (moneda) listQuery = listQuery.eq('moneda', moneda);
 
       const { data: ventas, error: listError } = await listQuery;
@@ -98,20 +102,24 @@ export class ReportsController {
       const estado = query?.estado;
       const moneda = query?.moneda;
 
+      // La tabla `ventas` no la puebla ningún flujo; las ventas reales viven en
+      // `documentos` (comprobantes emitidos). Se alias-ean columnas para conservar
+      // el shape esperado por el frontend (fecha, numero_documento, igv).
       let listQuery = this.supabaseService
         .getClient()
-        .from('ventas')
+        .from('documentos')
         .select(`
-          id, fecha, estado, numero_documento, tipo_documento,
-          subtotal, igv, total, moneda, cliente_id, vendedor_id, sucursal_id, metodo_pago,
+          id, fecha:fecha_emision, estado, numero_documento:numero, tipo_documento,
+          subtotal, igv:impuesto_igv, total, moneda, cliente_id, metodo_pago,
           clientes(nombre, numero_documento, tipo_documento)
         `)
         .eq('tenant_id', tenantId)
-        .order('fecha', { ascending: false });
+        .in('tipo_documento', ['FACTURA', 'BOLETA'])
+        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")')
+        .order('fecha_emision', { ascending: false });
 
-      if (fechaInicio) listQuery = listQuery.gte('fecha', fechaInicio);
-      if (fechaFin) listQuery = listQuery.lte('fecha', fechaFin);
-      if (estado) listQuery = listQuery.eq('estado', estado);
+      if (fechaInicio) listQuery = listQuery.gte('fecha_emision', fechaInicio);
+      if (fechaFin) listQuery = listQuery.lte('fecha_emision', fechaFin);
       if (moneda) listQuery = listQuery.eq('moneda', moneda);
 
       const { data: ventas, error: listError } = await listQuery;

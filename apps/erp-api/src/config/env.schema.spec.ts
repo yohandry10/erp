@@ -5,9 +5,12 @@ describe('env.schema', () => {
 
   const baseConfig = {
     NODE_ENV: 'production',
+    DEPLOYMENT_ENV: 'PROD',
+    EXPECTED_SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+    DEMO_API_ENABLED: false,
     PORT: 3002,
     LOG_LEVEL: 'info',
-    SUPABASE_URL: 'https://example.supabase.co',
+    SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co',
     SUPABASE_SERVICE_ROLE_KEY: strongSecret,
     SUPABASE_ANON_KEY: 'b'.repeat(40),
     JWT_SECRET: strongSecret,
@@ -54,6 +57,7 @@ describe('env.schema', () => {
       ...baseConfig,
       PORT: undefined,
       NODE_ENV: 'development',
+      DEPLOYMENT_ENV: 'DEV',
       JWT_SECRET: strongSecret,
       JWT_REFRESH_SECRET: 'C'.repeat(40),
     });
@@ -125,10 +129,97 @@ describe('env.schema', () => {
     const result = envSchema.validate({
       ...baseConfig,
       NODE_ENV: 'development',
+      DEPLOYMENT_ENV: 'DEV',
       PFX_PATH: undefined,
       PFX_PASS: undefined,
     });
 
     expect(result.error).toBeUndefined();
   });
-}); 
+
+  it('requiere RUC esperado para SUNAT produccion', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      SUNAT_ENVIRONMENT: 'produccion',
+      EMPRESA_RUC: undefined,
+      SUNAT_CERT_EXPECTED_RUC: undefined,
+    });
+
+    expect(result.error?.message).toContain('SUNAT produccion requiere SUNAT_CERT_EXPECTED_RUC');
+  });
+
+  it('acepta EMPRESA_RUC como RUC esperado en SUNAT produccion', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      SUNAT_ENVIRONMENT: 'produccion',
+      EMPRESA_RUC: '20616053575',
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.value.EMPRESA_RUC).toBe('20616053575');
+  });
+
+  it('requiere razon documentada para confirmar mismatch de RUC del certificado', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      SUNAT_ENVIRONMENT: 'produccion',
+      EMPRESA_RUC: '20616053575',
+      SUNAT_CERT_RUC_MISMATCH_CONFIRMED: 'true',
+      SUNAT_CERT_RUC_MISMATCH_REASON: '',
+    });
+
+    expect(result.error?.message).toContain('SUNAT_CERT_RUC_MISMATCH_CONFIRMED requiere');
+  });
+
+  it('requiere credenciales API SUNAT cuando GRE usa transporte REST', () => {
+    const missingCredentials = envSchema.validate({
+      ...baseConfig,
+      SUNAT_GRE_TRANSPORT: 'rest',
+    });
+    const valid = envSchema.validate({
+      ...baseConfig,
+      SUNAT_GRE_TRANSPORT: 'rest',
+      SUNAT_GRE_CLIENT_ID: 'client-id-gre',
+      SUNAT_GRE_CLIENT_SECRET: 'example-gre-api-placeholder',
+    });
+
+    expect(missingCredentials.error?.message).toContain('SUNAT_GRE_TRANSPORT=rest requiere');
+    expect(valid.error).toBeUndefined();
+  });
+
+  it('rechaza una URL Supabase distinta al project_ref esperado', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      SUPABASE_URL: 'https://zyxwvutsrqponmlkjihg.supabase.co',
+    });
+
+    expect(result.error?.message).toContain('EXPECTED_SUPABASE_PROJECT_REF');
+  });
+
+  it('rechaza habilitar demos en PROD', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      DEMO_API_ENABLED: true,
+    });
+
+    expect(result.error?.message).toContain('prohibe DEMO_API_ENABLED=true');
+  });
+
+  it('rechaza usar PROD con un proceso de desarrollo', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      NODE_ENV: 'development',
+    });
+
+    expect(result.error?.message).toContain('requiere NODE_ENV=production');
+  });
+
+  it('requiere declarar project_ref en production', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      EXPECTED_SUPABASE_PROJECT_REF: undefined,
+    });
+
+    expect(result.error?.message).toContain('requiere EXPECTED_SUPABASE_PROJECT_REF');
+  });
+});

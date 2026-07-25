@@ -6,6 +6,7 @@ import { ArrowLeft, AlertCircle } from 'lucide-react'
 import { ProveedorForm } from '@/components/compras/ProveedorForm'
 import { useApi } from '@/hooks/use-api'
 import { CreateProveedorDto } from '@/types/compras'
+import toast from 'react-hot-toast'
 
 interface Proveedor {
   id: string
@@ -62,13 +63,13 @@ export default function EditProveedorPage() {
       const response = await put(`/compras/proveedores/${params.id}`, data)
 
       if (response.success || response.data) {
-        alert('Proveedor actualizado exitosamente')
+        toast.success('Proveedor actualizado exitosamente')
         router.push(`/dashboard/compras/proveedores/${params.id}`)
       } else {
-        alert(`Error: ${response.error || 'No se pudo actualizar el proveedor'}`)
+        toast.error(`Error: ${response.error || 'No se pudo actualizar el proveedor'}`)
       }
     } catch (err: any) {
-      alert(`Error: ${err.message || 'Error al actualizar el proveedor'}`)
+      toast.error(`Error: ${err.message || 'Error al actualizar el proveedor'}`)
     } finally {
       setSubmitting(false)
     }
@@ -91,12 +92,12 @@ export default function EditProveedorPage() {
   if (error || !proveedor) {
     return (
       <div className="p-8">
-        <div className="activity-card bg-[#fef2f2]">
-          <p className="text-red-800">{error || 'Proveedor no encontrado'}</p>
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl bg-[#fef2f2]">
+          <p className="text-destructive">{error || 'Proveedor no encontrado'}</p>
         </div>
         <button
           onClick={() => router.push('/dashboard/compras/proveedores')}
-          className="refresh-btn mt-4"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 mt-4"
         >
           <ArrowLeft size={16} />
           Volver a Proveedores
@@ -110,7 +111,7 @@ export default function EditProveedorPage() {
       {/* Header */}
       <div className="mb-8">
         <button
-          onClick={() => router.push(`/dashboard/compras/proveedores/${params.id}`)} className="inline-flex items-center gap-2 py-2 px-4 bg-transparent border rounded-2 text-gray-700 text-[0.875rem] cursor-pointer mb-4"
+          onClick={() => router.push(`/dashboard/compras/proveedores/${params.id}`)} className="inline-flex items-center gap-2 py-2 px-4 bg-transparent border rounded-lg text-foreground/85 text-[0.875rem] cursor-pointer mb-4"
         >
           <ArrowLeft size={16} />
           Volver al Detalle
@@ -119,14 +120,14 @@ export default function EditProveedorPage() {
         <h1 className="text-[1.875rem] font-bold mb-2">
           Editar Proveedor
         </h1>
-        <p className="text-gray-500 text-[0.875rem]">
+        <p className="text-muted-foreground text-[0.875rem]">
           Actualice la información del proveedor {proveedor.razon_social}
         </p>
       </div>
 
       {/* Info Banner */}
       <div
-        className="activity-card mb-8 bg-[#eff6ff]"
+        className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8 bg-muted"
       >
         <div className="flex gap-3">
           <AlertCircle size={20} className="text-blue-500 shrink-0 mt-0.5" />

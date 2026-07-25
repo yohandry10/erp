@@ -25,10 +25,10 @@ export default function FinanzasFilters({
   return (
     <div className="flex gap-4 flex-wrap items-end">
       {children}
-      
+
       {isActive && (
         <button
-          onClick={onClear} className="py-3 px-4 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium text-red-500 transition"
+          onClick={onClear} className="py-3 px-4 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium text-red-500 transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#fee2e2'
             e.currentTarget.style.borderColor = '#ef4444'
@@ -45,7 +45,7 @@ export default function FinanzasFilters({
 
       {showExport && onExport && (
         <button
-          onClick={onExport} className="py-3 px-4 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium text-gray-700 transition"
+          onClick={onExport} className="py-3 px-4 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium text-foreground/85 transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#f3f4f6'
             e.currentTarget.style.borderColor = '#9ca3af'

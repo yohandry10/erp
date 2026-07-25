@@ -384,6 +384,42 @@ describe('RecepcionesService', () => {
       expect(eventBusService.emitCompraEntregada).not.toHaveBeenCalled();
     });
 
+    it('prioriza el crédito pactado en la orden sobre la condición por defecto del proveedor', async () => {
+      const recepcion = {
+        ...mockRecepcion,
+        fecha_recepcion: '2026-07-15',
+        items: [{
+          ...mockRecepcion.items[0],
+          detalle: { descripcion: 'Producto Test', precio_unitario: 100 },
+        }],
+      };
+      const orden = {
+        id: 'orden-1',
+        numero: 'OC-2026-0001',
+        subtotal: 100,
+        igv: 18,
+        total: 118,
+        moneda: 'PEN',
+        condiciones_pago: 'CREDITO_30',
+        dias_credito: 30,
+        proveedor: {
+          id: 'prov-1',
+          razon_social: 'Proveedor Demo',
+          condiciones_pago: 'CONTADO',
+          dias_credito: 0,
+        },
+      };
+
+      await (service as any).emitirEventoRecepcionRegistrada(recepcion, orden, 'tenant-1');
+
+      expect(eventBusService.emitRecepcionRegistrada).toHaveBeenCalledWith(
+        expect.objectContaining({
+          condicionesPago: 'CREDITO_30',
+          diasCredito: 30,
+        }),
+      );
+    });
+
     it('lanza BadRequestException si la recepción no está en BORRADOR (sin invocar la RPC)', async () => {
       jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue({ ...mockRecepcion, estado: 'CERRADA' } as any);
 

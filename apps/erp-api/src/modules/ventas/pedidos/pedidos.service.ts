@@ -747,7 +747,7 @@ export class PedidosService {
       dias_vencimiento_factura: data?.dias_vencimiento_factura != null
         ? Number(data.dias_vencimiento_factura)
         : 30,
-      gre_automatico_habilitado: data?.gre_automatico_habilitado ?? true,
+      gre_automatico_habilitado: data?.gre_automatico_habilitado ?? false,
       umbral_gre_automatico: data?.umbral_gre_automatico != null ? Number(data.umbral_gre_automatico) : undefined,
       aplicar_retencion: data?.aplicar_retencion ?? false,
       retencion_tasa: data?.retencion_tasa != null ? Number(data.retencion_tasa) : undefined,
@@ -1294,28 +1294,13 @@ export class PedidosService {
     const client = this.supabase.getClient();
 
     try {
-      const { data: reservasCreadas } = await client
-        .from('movimientos_inventario')
-        .select('producto_id, cantidad')
-        .eq('referencia_tipo', 'PEDIDO')
-        .eq('referencia_id', pedidoId)
-        .eq('tipo', 'RESERVA')
-        .eq('tenant_id', tenantId);
-
-      for (const reserva of reservasCreadas ?? []) {
-        await client.rpc('decrementar_stock_reservado', {
-          p_producto_id: reserva.producto_id,
-          p_cantidad: reserva.cantidad,
-        });
-      }
-
-      await client
-        .from('movimientos_inventario')
-        .delete()
-        .eq('referencia_tipo', 'PEDIDO')
-        .eq('referencia_id', pedidoId)
-        .eq('tipo', 'RESERVA')
-        .eq('tenant_id', tenantId);
+      const { error: liberarError } = await client.rpc('liberar_reservas_pedido_tx', {
+        p_pedido_id: pedidoId,
+        p_tenant_id: tenantId,
+        p_referencia_tipo: 'PEDIDO_ROLLBACK',
+        p_notas: 'Liberación atómica por fallo posterior a la reserva del pedido',
+      });
+      if (liberarError) throw liberarError;
 
       if (estadoAnterior) {
         await client
@@ -1370,51 +1355,17 @@ export class PedidosService {
       pedido.estado === EstadoPedido.LISTO_DESPACHO ||
       pedido.estado === EstadoPedido.LISTO_FACTURAR
     ) {
+      const { error: liberarReservasError } = await client.rpc('liberar_reservas_pedido_tx', {
+        p_pedido_id: id,
+        p_tenant_id: tenantId,
+        p_referencia_tipo: 'PEDIDO_CANCELACION',
+        p_notas: `Liberación por cancelación de pedido ${pedido.numero}. Motivo: ${motivo || 'No especificado'}`,
+      });
+      if (liberarReservasError) {
+        throw new BadRequestException(`No se pudo liberar el inventario del pedido: ${liberarReservasError.message}`);
+      }
+
       for (const item of pedido.detalle) {
-        const { data: liberacionExistente, error: liberacionExistenteError } = await client
-          .from('movimientos_inventario')
-          .select('id')
-          .eq('tenant_id', tenantId)
-          .eq('referencia_tipo', 'PEDIDO')
-          .eq('referencia_id', id)
-          .eq('tipo', 'LIBERACION')
-          .eq('producto_id', item.producto_id)
-          .limit(1);
-
-        if (liberacionExistenteError) {
-          throw new BadRequestException('No se pudo verificar si ya se registró la liberación de inventario');
-        }
-
-        const yaTieneLiberacion = Array.isArray(liberacionExistente) && liberacionExistente.length > 0;
-
-        if (!yaTieneLiberacion) {
-          // Crear movimiento de LIBERACION
-          const { error: movimientoError } = await client.from('movimientos_inventario').insert({
-            tenant_id: tenantId,
-            producto_id: item.producto_id,
-            tipo: 'LIBERACION',
-            cantidad: item.cantidad,
-            referencia_tipo: 'PEDIDO',
-            referencia_id: id,
-            notas: `Liberación por cancelación de pedido ${pedido.numero}. Motivo: ${motivo || 'No especificado'}`,
-          });
-
-          if (movimientoError) {
-            throw new BadRequestException('No se pudo registrar el movimiento de liberación de inventario');
-          }
-
-          // Decrementar stock_reservado
-          const { error: liberarError } = await client.rpc('decrementar_stock_reservado', {
-            p_producto_id: item.producto_id,
-            p_cantidad: item.cantidad,
-          });
-
-          if (liberarError) {
-            console.error('Error liberando reserva:', liberarError);
-            throw new BadRequestException('No se pudo liberar el stock reservado');
-          }
-        }
-
         const { error: resetDetalleError } = await client
           .from('pedidos_venta_detalle')
           .update({
@@ -1669,6 +1620,9 @@ export class PedidosService {
       fechaVencimiento: fechaVencimientoFactura,
       idempotencyKey: facturaIdempotencyKey,
       source: 'ventas',
+      // El canal Ventas/Pedidos es venta a crédito (genera CxC). Explícito para
+      // que el guard de contado del listener de CxC nunca lo omita.
+      esCredito: true,
       ajustes: ajustesTributarios,
       costoVentas: Number(costoVentasEstimado) || 0,
     });

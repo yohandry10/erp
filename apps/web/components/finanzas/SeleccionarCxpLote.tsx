@@ -309,7 +309,7 @@ export function SeleccionarCxpLote({
                       </div>
                       <div>
                         <div className="text-muted-foreground">Saldo</div>
-                        <div className="font-semibold text-orange-600">
+                        <div className="font-semibold text-amber-400">
                           {cxp.moneda} {cxp.saldo.toFixed(2)}
                         </div>
                       </div>

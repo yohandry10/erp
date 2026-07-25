@@ -14,13 +14,13 @@ export default function NuevoPedidoPage() {
   const handleSubmit = async (data: PedidoFormData) => {
     try {
       const response = await post('/ventas/pedidos', data)
-      
+
       if (response?.success) {
         toast({
           title: 'Pedido creado',
           description: `El pedido ${response.data.numero} ha sido creado exitosamente`,
         })
-        
+
         // Redirect to pedido detail
         router.push(`/dashboard/ventas/pedidos/${response.data.id}`)
       } else {
@@ -37,10 +37,10 @@ export default function NuevoPedidoPage() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       <div className="mb-6">
         <button
-          onClick={handleCancel} className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition mb-4"
+          onClick={handleCancel} className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-card/80 border cursor-pointer transition mb-4"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--primary-50)'
             e.currentTarget.style.borderColor = 'var(--primary-300)'
@@ -55,10 +55,10 @@ export default function NuevoPedidoPage() {
           <ArrowLeft className="w-4 h-4" />
           Volver a Pedidos
         </button>
-        
+
         <div>
-          <h1 className="dashboard-title">Nuevo Pedido de Venta</h1>
-          <p className="dashboard-subtitle">
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Nuevo Pedido de Venta</h1>
+          <p className="mt-2 text-base text-muted-foreground">
             Crea un nuevo pedido de venta para un cliente
           </p>
         </div>

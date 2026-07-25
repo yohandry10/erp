@@ -1,132 +1,145 @@
-'use client'
+"use client";
 
-import { useState, useCallback, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { useApi } from '@/hooks/use-api'
-import { ArrowLeft, Package, Save } from 'lucide-react'
+import { useState, useCallback, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useApi } from "@/hooks/use-api";
+import { ArrowLeft, Package, Save } from "lucide-react";
 
 export default function EditarProductoPage() {
-  const router = useRouter()
-  const params = useParams()
-  const { get, put } = useApi()
-  const productoId = params.id as string | undefined
-  const [isLoading, setIsLoading] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const router = useRouter();
+  const params = useParams();
+  const { get, put } = useApi();
+  const productoId = params.id as string | undefined;
+  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
-    codigo: '',
-    nombre: '',
-    descripcion: '',
-    categoria: '',
-    precioVenta: '',
-    precioCompra: '',
-    stockMinimo: '',
-    codigoBarras: '',
-    impuesto: '18',
-    activo: true
-  })
+    codigo: "",
+    nombre: "",
+    descripcion: "",
+    categoria: "",
+    precioVenta: "",
+    precioCompra: "",
+    stockMinimo: "",
+    codigoBarras: "",
+    impuesto: "18",
+    activo: true,
+  });
 
   const loadProducto = useCallback(async () => {
-    if (!productoId) return
+    if (!productoId) return;
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await get(`/inventario/productos/${productoId}`)
+      const response = await get(`/inventario/productos/${productoId}`);
       if (response?.success && response.data) {
-        const p = response.data
+        const p = response.data;
         setFormData({
-          codigo: p.codigo || '',
-          nombre: p.nombre || '',
-          descripcion: p.descripcion || '',
-          categoria: p.categoria || '',
-          precioVenta: p.precio_venta?.toString() || '',
-          precioCompra: p.precio_compra?.toString() || '',
-          stockMinimo: p.stock_minimo?.toString() || '',
-          codigoBarras: p.codigo_barras || '',
-          impuesto: p.impuesto?.toString() || '18',
-          activo: p.activo !== false
-        })
+          codigo: p.codigo || "",
+          nombre: p.nombre || "",
+          descripcion: p.descripcion || "",
+          categoria: p.categoria || "",
+          precioVenta: p.precio_venta?.toString() || "",
+          precioCompra: p.precio_compra?.toString() || "",
+          stockMinimo: p.stock_minimo?.toString() || "",
+          codigoBarras: p.codigo_barras || "",
+          impuesto: p.impuesto?.toString() || "18",
+          activo: p.activo !== false,
+        });
       }
     } catch (error) {
-      console.error('Error cargando producto:', error)
-      alert('Error al cargar el producto')
+      console.error("Error cargando producto:", error);
+      alert("Error al cargar el producto");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [get, productoId])
+  }, [get, productoId]);
 
   useEffect(() => {
-    loadProducto()
-  }, [loadProducto])
+    loadProducto();
+  }, [loadProducto]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!formData.codigo || !formData.nombre || !formData.categoria) {
-      alert('Por favor complete los campos obligatorios')
-      return
+      alert("Por favor complete los campos obligatorios");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const response = await put(`/inventario/productos/${params.id}`, formData)
+      const response = await put(
+        `/inventario/productos/${params.id}`,
+        formData,
+      );
 
       if (response?.success) {
-        alert('✅ Producto actualizado exitosamente')
-        router.push('/dashboard/inventario/productos')
+        alert("✅ Producto actualizado exitosamente");
+        router.push("/dashboard/inventario/productos");
       } else {
-        throw new Error(response?.message || 'Error al actualizar producto')
+        throw new Error(response?.message || "Error al actualizar producto");
       }
     } catch (error: any) {
-      console.error('Error:', error)
-      alert(`❌ Error: ${error.message}`)
+      console.error("Error:", error);
+      alert(`❌ Error: ${error.message}`);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target
-    setFormData(prev => ({
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
+    const { name, value, type } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }))
-  }
+      [name]:
+        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+    }));
+  };
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando producto...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
           <button
-            onClick={() => router.push('/dashboard/inventario/productos')} className="inline-flex items-center gap-2 text-gray-500 text-[0.875rem] mb-2 border-0 cursor-pointer py-1 px-0"
+            onClick={() => router.push("/dashboard/inventario/productos")}
+            className="inline-flex items-center gap-2 text-muted-foreground text-[0.875rem] mb-2 border-0 cursor-pointer py-1 px-0"
           >
             <ArrowLeft size={16} />
             Volver a Productos
           </button>
-          <h1 className="dashboard-title flex items-center gap-3">
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground flex items-center gap-3">
             <Package size={32} />
             Editar Producto
           </h1>
-          <p className="dashboard-subtitle">Modifique la información del producto</p>
+          <p className="mt-2 text-base text-muted-foreground">
+            Modifique la información del producto
+          </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="activity-card mb-8">
-          <h2 className="activity-title">Información Básica</h2>
-          <div className="modal-grid">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
+          <h2 className="m-0 text-lg font-bold text-foreground">Información Básica</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label>Código <span className="text-[var(--red-500)]">*</span></label>
+              <label>
+                Código <span className="text-[var(--red-500)]">*</span>
+              </label>
               <input
                 type="text"
                 name="codigo"
@@ -149,7 +162,9 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>Nombre <span className="text-[var(--red-500)]">*</span></label>
+            <label>
+              Nombre <span className="text-[var(--red-500)]">*</span>
+            </label>
             <input
               type="text"
               name="nombre"
@@ -172,7 +187,9 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>Categoría <span className="text-[var(--red-500)]">*</span></label>
+            <label>
+              Categoría <span className="text-[var(--red-500)]">*</span>
+            </label>
             <select
               name="categoria"
               value={formData.categoria}
@@ -202,9 +219,9 @@ export default function EditarProductoPage() {
           </div>
         </div>
 
-        <div className="activity-card mb-8">
-          <h2 className="activity-title">Precios e Impuestos</h2>
-          <div className="modal-grid">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
+          <h2 className="m-0 text-lg font-bold text-foreground">Precios e Impuestos</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label>Precio de Compra</label>
               <input
@@ -218,7 +235,9 @@ export default function EditarProductoPage() {
               />
             </div>
             <div>
-              <label>Precio de Venta <span className="text-[var(--red-500)]">*</span></label>
+              <label>
+                Precio de Venta <span className="text-[var(--red-500)]">*</span>
+              </label>
               <input
                 type="number"
                 name="precioVenta"
@@ -246,14 +265,15 @@ export default function EditarProductoPage() {
           </div>
         </div>
 
-        <div className="activity-card mb-8">
-          <h2 className="activity-title">Inventario</h2>
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
+          <h2 className="m-0 text-lg font-bold text-foreground">Inventario</h2>
           <div className="bg-[var(--amber-50)] border p-4 mb-4">
             <p className="m-0 text-[0.875rem] text-[var(--amber-700)]">
-              ⚠️ El stock actual no se puede modificar desde aquí. Use movimientos de inventario para ajustar el stock.
+              ⚠️ El stock actual no se puede modificar desde aquí. Use
+              movimientos de inventario para ajustar el stock.
             </p>
           </div>
-          <div className="modal-grid">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label>Stock Mínimo</label>
               <input
@@ -271,20 +291,20 @@ export default function EditarProductoPage() {
         <div className="flex gap-4 justify-end">
           <button
             type="button"
-            onClick={() => router.push('/dashboard/inventario/productos')}
-            className="btn btn-secondary"
+            onClick={() => router.push("/dashboard/inventario/productos")}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold leading-5 text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
             disabled={isLoading}
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="btn btn-primary"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             disabled={isLoading}
           >
             {isLoading ? (
               <>
-                <div className="loading-spinner w-4 h-4"></div>
+                <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary w-4 h-4"></div>
                 Guardando...
               </>
             ) : (
@@ -297,6 +317,5 @@ export default function EditarProductoPage() {
         </div>
       </form>
     </div>
-  )
+  );
 }
-

@@ -5,6 +5,11 @@ import { useApi } from '@/hooks/use-api';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import PromptDialog from '@/components/ui/PromptDialog';
 import { fetchApi } from '@/lib/api-fetch';
+import { AlertTriangle, CheckCircle2, DollarSign, Download, FilePlus2, FileText, MessageSquare, RefreshCw, User, XCircle } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ContractFormDialog } from './ContractFormDialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const ContratosPage = () => {
   const [contratos, setContratos] = useState<any[]>([]);
@@ -13,7 +18,6 @@ const ContratosPage = () => {
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [contratoEdit, setContratoEdit] = useState<any>(null);
   const [contratoDetail, setContratoDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { get, post, put } = useApi();
@@ -60,7 +64,7 @@ const ContratosPage = () => {
     }
     try {
       setLoading(true);
-      
+
       // Cargar contratos
       const contratosData = await get('/api/rrhh/contratos');
       if (contratosData && Array.isArray(contratosData)) {
@@ -130,7 +134,7 @@ const ContratosPage = () => {
   const generarContrato = async (contratoId: string) => {
     try {
       const response = await fetchApi(`/api/rrhh/contratos/${contratoId}/generar`);
-      
+
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -149,37 +153,37 @@ const ContratosPage = () => {
 
   const filtrarContratos = () => {
     let filtrados = contratos;
-    
+
     if (filtroEstado !== 'todos') {
       filtrados = filtrados.filter(c => c.estado === filtroEstado);
     }
-    
+
     if (filtroTipo !== 'todos') {
       filtrados = filtrados.filter(c => c.tipo_contrato === filtroTipo);
     }
-    
+
     return filtrados;
   };
 
   const getEstadoColor = (estado: string) => {
     const colores: Record<string, string> = {
-      'activo': 'bg-green-100 text-green-800',
-      'vencido': 'bg-red-100 text-red-800',
-      'renovado': 'bg-blue-100 text-blue-800',
-      'finalizado': 'bg-gray-100 text-gray-800',
-      'en_periodo_prueba': 'bg-yellow-100 text-yellow-800'
+      'activo': 'bg-emerald-500/10 text-emerald-400',
+      'vencido': 'bg-destructive/10 text-destructive',
+      'renovado': 'bg-primary/10 text-primary',
+      'finalizado': 'bg-muted text-foreground',
+      'en_periodo_prueba': 'bg-amber-500/10 text-amber-400'
     };
-    return colores[estado] || 'bg-gray-100 text-gray-800';
+    return colores[estado] || 'bg-muted text-foreground';
   };
 
   const getTipoColor = (tipo: string) => {
     const colores: Record<string, string> = {
-      'indefinido': 'bg-blue-100 text-blue-800',
-      'temporal': 'bg-orange-100 text-orange-800',
-      'practicas': 'bg-purple-100 text-purple-800',
-      'locacion_servicios': 'bg-pink-100 text-pink-800'
+      'indefinido': 'bg-primary/10 text-primary',
+      'temporal': 'bg-amber-500/10 text-amber-400',
+      'practicas': 'bg-violet-500/10 text-violet-400',
+      'locacion_servicios': 'bg-violet-500/10 text-violet-400'
     };
-    return colores[tipo] || 'bg-gray-100 text-gray-800';
+    return colores[tipo] || 'bg-muted text-foreground';
   };
 
   const calcularEstadisticas = () => {
@@ -193,7 +197,7 @@ const ContratosPage = () => {
       const diasParaVencer = Math.ceil((fechaFin.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
       return diasParaVencer <= 30 && diasParaVencer > 0;
     }).length;
-    
+
     return { total, activos, vencidos, porVencer };
   };
 
@@ -212,10 +216,10 @@ const ContratosPage = () => {
 
   if (!rrhhEnabled) {
     return (
-      <div className="dashboard-container">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
         <div className="alert alert-warning">
           <h1 className="text-xl font-semibold">RRHH deshabilitado</h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-foreground/80">
             {/* // HARDENING: contratos bloqueados hasta finalizar validaciones legales. */}
             La gestión de contratos estará disponible cuando el módulo de RRHH se habilite en este entorno.
           </p>
@@ -228,116 +232,110 @@ const ContratosPage = () => {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
           <div>
-            <h1 className="dashboard-title">Gestión de Contratos</h1>
-            <p className="dashboard-subtitle">Cargando contratos laborales, empleados vinculados y estados de renovación.</p>
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Gestión de Contratos</h1>
+            <p className="mt-2 text-base text-muted-foreground">Cargando contratos laborales, empleados vinculados y estados de renovación.</p>
           </div>
         </div>
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando contratos...</p>
+        <div className="flex min-h-48 items-center justify-center gap-3 rounded-2xl border border-border/70 bg-card/70 text-muted-foreground shadow-sm">
+          <div className="inline-block size-7 animate-spin rounded-full border-[3px] border-muted border-t-primary" aria-hidden="true"></div>
+          <p className="text-sm font-medium">Cargando contratos...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">Gestión de Contratos</h1>
-          <p className="dashboard-subtitle">Control de contratos laborales y renovaciones</p>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Gestión de Contratos</h1>
+          <p className="mt-2 text-base text-muted-foreground">Control de contratos laborales y renovaciones</p>
         </div>
         <div className="flex gap-4">
-          <button 
-            className="refresh-btn"
+          <button
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             onClick={() => setShowModal(true)}
           >
-            📄 Nuevo Contrato
+            <FilePlus2 className="size-4" aria-hidden="true" /> Nuevo Contrato
           </button>
-          <button className="refresh-btn" onClick={loadData}>
-            🔄 Actualizar
+          <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50" onClick={loadData}>
+            <RefreshCw className="size-4" aria-hidden="true" /> Actualizar
           </button>
         </div>
       </div>
 
       {/* Estadísticas */}
-      <div className="stats-grid mb-6">
-        <div className="stat-card">
-          <div className="stat-header">
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 mb-6">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Total Contratos</h3>
-            <div className="stat-icon">📋</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><FileText className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-blue-600">{stats.total}</div>
-          <div className="stat-subtitle">Contratos registrados</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-primary">{stats.total}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Contratos registrados</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Activos</h3>
-            <div className="stat-icon">✅</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><CheckCircle2 className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-green-600">{stats.activos}</div>
-          <div className="stat-subtitle">Contratos vigentes</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-emerald-400">{stats.activos}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Contratos vigentes</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Por Vencer</h3>
-            <div className="stat-icon">⚠️</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><AlertTriangle className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-yellow-600">{stats.porVencer}</div>
-          <div className="stat-subtitle">Próximos 30 días</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-amber-400">{stats.porVencer}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Próximos 30 días</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Vencidos</h3>
-            <div className="stat-icon">❌</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><XCircle className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-red-600">{stats.vencidos}</div>
-          <div className="stat-subtitle">Requieren renovación</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-destructive">{stats.vencidos}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Requieren renovación</div>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-4 mb-6 p-4 bg-[#f8f9fa] rounded-2">
-        <div>
-          <label className="block mb-2 font-medium">
-            Estado:
-          </label>
-          <select 
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
-            className="form-control w-[150px]"
-          >
-            <option value="todos">Todos</option>
-            <option value="activo">Activo</option>
-            <option value="vencido">Vencido</option>
-            <option value="renovado">Renovado</option>
-            <option value="finalizado">Finalizado</option>
-            <option value="en_periodo_prueba">En Período Prueba</option>
-          </select>
+      <div className="mb-6 grid gap-4 rounded-2xl border border-border bg-card/80 p-4 sm:grid-cols-2">
+        <div className="min-w-0">
+          <Label htmlFor="filtro-estado-contratos" className="mb-2">Estado</Label>
+          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+            <SelectTrigger id="filtro-estado-contratos" aria-label="Filtrar contratos por estado"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="activo">Activo</SelectItem>
+              <SelectItem value="vencido">Vencido</SelectItem>
+              <SelectItem value="renovado">Renovado</SelectItem>
+              <SelectItem value="finalizado">Finalizado</SelectItem>
+              <SelectItem value="en_periodo_prueba">En Período Prueba</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        <div>
-          <label className="block mb-2 font-medium">
-            Tipo:
-          </label>
-          <select 
-            value={filtroTipo}
-            onChange={(e) => setFiltroTipo(e.target.value)}
-            className="form-control w-[180px]"
-          >
-            <option value="todos">Todos</option>
-            <option value="indefinido">Indefinido</option>
-            <option value="temporal">Temporal</option>
-            <option value="practicas">Prácticas</option>
-            <option value="locacion_servicios">Locación Servicios</option>
-          </select>
+        <div className="min-w-0">
+          <Label htmlFor="filtro-tipo-contratos" className="mb-2">Tipo</Label>
+          <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+            <SelectTrigger id="filtro-tipo-contratos" aria-label="Filtrar contratos por tipo"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="indefinido">Indefinido</SelectItem>
+              <SelectItem value="temporal">Temporal</SelectItem>
+              <SelectItem value="practicas">Prácticas</SelectItem>
+              <SelectItem value="locacion_servicios">Locación Servicios</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -366,8 +364,8 @@ const ContratosPage = () => {
                 const diasRestantes = calcularDiasRestantes(contrato.fecha_fin);
                 let alertaVencimiento = '';
                 if (diasRestantes !== null) {
-                  if (diasRestantes < 0) alertaVencimiento = 'text-red-600 font-bold';
-                  else if (diasRestantes <= 30) alertaVencimiento = 'text-yellow-600 font-bold';
+                  if (diasRestantes < 0) alertaVencimiento = 'text-destructive font-bold';
+                  else if (diasRestantes <= 30) alertaVencimiento = 'text-amber-400 font-bold';
                 }
 
                 return (
@@ -375,7 +373,7 @@ const ContratosPage = () => {
                     <td>
                       <div>
                         <div className="font-medium">{getEmpleadoNombre(contrato.empleado_id)}</div>
-                        <div className="text-sm text-gray-500">ID: {contrato.id.substring(0, 8)}...</div>
+                        <div className="text-sm text-muted-foreground">ID: {contrato.id.substring(0, 8)}...</div>
                       </div>
                     </td>
                     <td>
@@ -388,7 +386,7 @@ const ContratosPage = () => {
                     <td>{contrato.fecha_fin ? new Date(contrato.fecha_fin).toLocaleDateString('es-PE') : 'Indefinido'}</td>
                     <td className={alertaVencimiento}>
                       {diasRestantes !== null ? (
-                        diasRestantes < 0 ? 
+                        diasRestantes < 0 ?
                           `Vencido hace ${Math.abs(diasRestantes)} días` :
                           `${diasRestantes} días`
                       ) : 'Indefinido'}
@@ -407,7 +405,7 @@ const ContratosPage = () => {
                         >
                           📄
                         </button>
-                        
+
                         {contrato.estado === 'activo' && (
                           <>
                             <button
@@ -426,7 +424,7 @@ const ContratosPage = () => {
                             </button>
                           </>
                         )}
-                        
+
                         <button
                           onClick={() => {
                             setContratoDetail(contrato);
@@ -446,7 +444,7 @@ const ContratosPage = () => {
           </table>
 
           {filtrarContratos().length === 0 && (
-            <div className="text-center p-8 text-gray-500">
+            <div className="text-center p-8 text-muted-foreground">
               No hay contratos que coincidan con los filtros seleccionados.
             </div>
           )}
@@ -455,12 +453,12 @@ const ContratosPage = () => {
 
       {/* Alertas de vencimiento */}
       {stats.porVencer > 0 && (
-        <div className="mt-8 p-4 bg-[#fef3c7] border rounded-2">
+        <div className="mt-8 p-4 bg-[#fef3c7] border rounded-lg">
           <h3 className="text-[#92400e] mt-0 mr-0 mb-2 ml-0">
             ⚠️ Contratos por Vencer
           </h3>
           <p className="text-[#92400e] m-0">
-            Hay {stats.porVencer} contrato(s) que vencen en los próximos 30 días. 
+            Hay {stats.porVencer} contrato(s) que vencen en los próximos 30 días.
             Revisar la tabla para tomar las acciones necesarias.
           </p>
         </div>
@@ -488,8 +486,8 @@ const ContratosPage = () => {
                 const contratosTipo = contratos.filter(c => c.tipo_contrato === tipo);
                 const activos = contratosTipo.filter(c => c.estado === 'activo').length;
                 const vencidos = contratosTipo.filter(c => c.estado === 'vencido').length;
-                const salarioPromedio = contratosTipo.length > 0 
-                  ? contratosTipo.reduce((sum, c) => sum + (c.salario || 0), 0) / contratosTipo.length 
+                const salarioPromedio = contratosTipo.length > 0
+                  ? contratosTipo.reduce((sum, c) => sum + (c.salario || 0), 0) / contratosTipo.length
                   : 0;
 
                 return (
@@ -500,8 +498,8 @@ const ContratosPage = () => {
                       </span>
                     </td>
                     <td className="text-center">{contratosTipo.length}</td>
-                    <td className="text-center text-green-600">{activos}</td>
-                    <td className="text-center text-red-600">{vencidos}</td>
+                    <td className="text-center text-emerald-400">{activos}</td>
+                    <td className="text-center text-destructive">{vencidos}</td>
                     <td className="text-right">S/ {salarioPromedio.toLocaleString()}</td>
                   </tr>
                 );
@@ -512,61 +510,44 @@ const ContratosPage = () => {
       </div>
 
       {/* Modal de Detalle del Contrato */}
-      {showDetailModal && contratoDetail && (
-        <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.75)] flex items-center justify-center z-[99999] p-4"
-          onClick={() => {
+      <Dialog
+        open={showDetailModal && Boolean(contratoDetail)}
+        onOpenChange={(open) => {
+          setShowDetailModal(open);
+          if (!open) {
             setShowDetailModal(false);
             setContratoDetail(null);
-          }}
-        >
-          <div className="bg-white rounded-3 w-[100%] max-w-[700px] overflow-y-auto shadow"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="pt-8 pr-8 pb-4 pl-8 text-white">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-7 font-bold m-0">
-                    📄 Detalle del Contrato
-                  </h2>
-                  <p className="text-[0.875rem] opacity-[0.9] mt-2 mr-0 mb-0 ml-0">
-                    Información completa del contrato laboral
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    setContratoDetail(null);
-                  }} className="w-10 h-10 rounded-full bg-[rgba(255,_255,_255,_0.2)] text-white border-0 cursor-pointer text-5"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
+          }
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-1rem)] max-w-3xl gap-0 overflow-y-auto p-0 sm:max-h-[calc(100dvh-2rem)]">
+          <DialogHeader className="sticky top-0 z-10 border-b border-border bg-background px-5 py-5 pr-12 sm:px-6">
+            <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl"><FileText className="size-5 text-primary" aria-hidden="true" /> Detalle del contrato</DialogTitle>
+            <DialogDescription>Información completa del contrato laboral.</DialogDescription>
+          </DialogHeader>
 
             {/* Contenido */}
-            <div className="p-8">
+            {contratoDetail && <div className="p-4 sm:p-6">
               {/* Información del Empleado */}
-              <div className="mb-6 p-6 bg-slate-50 rounded-2 border">
-                <h3 className="text-[1.125rem] font-semibold text-slate-800 mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
-                  👤 Información del Empleado
+              <div className="mb-6 rounded-lg border border-border bg-muted/30 p-4 sm:p-6">
+                <h3 className="text-[1.125rem] font-semibold text-foreground mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
+                  <User className="size-5 text-primary" aria-hidden="true" /> Información del Empleado
                 </h3>
-                
-                <div className="grid grid-cols-[1fr_1fr] gap-4">
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-3 font-semibold text-gray-500 mb-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       EMPLEADO
                     </label>
-                    <div className="text-4 font-semibold text-gray-700">
+                    <div className="text-base font-semibold text-foreground/85">
                       {getEmpleadoNombre(contratoDetail?.empleado_id || '')}
                     </div>
                   </div>
                   <div>
-                    <label className="block text-3 font-semibold text-gray-500 mb-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       ID CONTRATO
                     </label>
-                    <div className="text-[0.875rem] text-gray-500">
+                    <div className="text-[0.875rem] text-muted-foreground">
                       {contratoDetail?.id}
                     </div>
                   </div>
@@ -574,14 +555,14 @@ const ContratosPage = () => {
               </div>
 
               {/* Detalles del Contrato */}
-              <div className="mb-6 p-6 bg-[#f0fdf4] rounded-2 border">
-                <h3 className="text-[1.125rem] font-semibold text-[#14532d] mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
-                  📋 Detalles del Contrato
+              <div className="mb-6 rounded-lg border border-border bg-accent/35 p-4 sm:p-6">
+                <h3 className="m-0 mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+                  <FileText className="size-5 text-primary" aria-hidden="true" /> Detalles del Contrato
                 </h3>
-                
-                <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
+
+                <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-3 font-semibold text-gray-500 mb-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       TIPO DE CONTRATO
                     </label>
                     <span className="inline-block py-2 px-4 rounded-[6px] text-[0.875rem] font-semibold">
@@ -589,7 +570,7 @@ const ContratosPage = () => {
                     </span>
                   </div>
                   <div>
-                    <label className="block text-3 font-semibold text-gray-500 mb-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       ESTADO
                     </label>
                     <span className="inline-block py-2 px-4 rounded-[6px] text-[0.875rem] font-semibold">
@@ -598,36 +579,36 @@ const ContratosPage = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[1fr_1fr_1fr] gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="block text-3 font-semibold text-gray-500 mb-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       FECHA INICIO
                     </label>
-                    <div className="text-[0.875rem] font-medium text-gray-700">
-                      {new Date(contratoDetail.fecha_inicio).toLocaleDateString('es-PE', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
+                    <div className="text-[0.875rem] font-medium text-foreground/85">
+                      {new Date(contratoDetail.fecha_inicio).toLocaleDateString('es-PE', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
                       })}
                     </div>
                   </div>
                   <div>
-                    <label className="block text-3 font-semibold text-gray-500 mb-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       FECHA FIN
                     </label>
-                    <div className="text-[0.875rem] font-medium text-gray-700">
-                      {contratoDetail.fecha_fin ? 
-                        new Date(contratoDetail.fecha_fin).toLocaleDateString('es-PE', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        }) : 
+                    <div className="text-[0.875rem] font-medium text-foreground/85">
+                      {contratoDetail.fecha_fin ?
+                        new Date(contratoDetail.fecha_fin).toLocaleDateString('es-PE', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        }) :
                         'Indefinido'
                       }
                     </div>
                   </div>
                   <div>
-                    <label className="block text-3 font-semibold text-gray-500 mb-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       DÍAS RESTANTES
                     </label>
                     <div className="text-[0.875rem] font-semibold">
@@ -643,25 +624,25 @@ const ContratosPage = () => {
               </div>
 
               {/* Información Económica */}
-              <div className="mb-6 p-6 bg-[#fef3c7] rounded-2 border">
-                <h3 className="text-[1.125rem] font-semibold text-[#92400e] mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
-                  💰 Información Económica
+              <div className="mb-6 rounded-lg border border-amber-500/25 bg-amber-500/10 p-4 sm:p-6">
+                <h3 className="m-0 mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+                  <DollarSign className="size-5 text-amber-400 dark:text-amber-400" aria-hidden="true" /> Información Económica
                 </h3>
-                
-                <div className="grid grid-cols-[1fr_1fr] gap-4">
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-3 font-semibold text-gray-500 mb-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       SALARIO MENSUAL
                     </label>
-                    <div className="text-6 font-bold text-[#16a34a]">
+                    <div className="text-2xl font-bold text-emerald-400 dark:text-emerald-400">
                       S/ {(contratoDetail.salario || 0).toLocaleString('es-PE')}
                     </div>
                   </div>
                   <div>
-                    <label className="block text-3 font-semibold text-gray-500 mb-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
                       BENEFICIOS
                     </label>
-                    <div className="text-[0.875rem] font-medium text-gray-700">
+                    <div className="text-[0.875rem] font-medium text-foreground/85">
                       {contratoDetail.beneficios || 'Beneficios estándar según ley'}
                     </div>
                   </div>
@@ -670,36 +651,42 @@ const ContratosPage = () => {
 
               {/* Observaciones */}
               {contratoDetail.observaciones && (
-                <div className="mb-6 p-6 bg-slate-100 rounded-2 border">
-                  <h3 className="text-[1.125rem] font-semibold text-slate-600 mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
-                    📝 Observaciones
+                <div className="mb-6 p-6 bg-muted rounded-lg border">
+                  <h3 className="m-0 mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+                    <MessageSquare className="size-5 text-primary" aria-hidden="true" /> Observaciones
                   </h3>
-                  <div className="text-[0.875rem] text-slate-600 leading-6">
+                  <div className="text-[0.875rem] text-foreground/80 leading-6">
                     {contratoDetail.observaciones}
                   </div>
                 </div>
               )}
 
               {/* Botones de Acción */}
-              <div className="flex justify-end gap-4 pt-4 border-t">
+              <div className="flex flex-col-reverse gap-3 border-t border-border pt-4 sm:flex-row sm:justify-end">
                 <button
                   onClick={() => generarContrato(contratoDetail.id)} className="py-3 px-6 border-0 rounded-[6px] bg-blue-500 text-white cursor-pointer font-medium flex items-center gap-2"
                 >
-                  📄 Descargar PDF
+                  <Download className="size-4" aria-hidden="true" /> Descargar PDF
                 </button>
                 <button
                   onClick={() => {
                     setShowDetailModal(false);
                     setContratoDetail(null);
-                  }} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-medium"
+                  }} className="py-3 px-6 border rounded-[6px] bg-card text-foreground/85 cursor-pointer font-medium"
                 >
                   Cerrar
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </div>}
+        </DialogContent>
+      </Dialog>
+
+      <ContractFormDialog
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSuccess={loadData}
+        empleados={empleados}
+      />
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}

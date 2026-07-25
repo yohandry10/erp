@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable @next/next/no-img-element -- La impresion termica clona HTML en una ventana nueva y usa QR/logo dinamicos o data URLs; next/image no aplica en ese documento impreso. */
+
 import { useCallback, useEffect, useRef } from 'react'
 import { useCountryContext } from '@/hooks/use-country-context'
 
@@ -11,7 +13,16 @@ interface TicketPrintProps {
     impuestos: number
     tipo_comprobante?: '01' | '03'
     cliente_nombre?: string
+    cliente_documento?: string
+    cliente_tipo_documento?: string
     fecha?: string
+    hash?: string
+    hash_firma?: string
+    sunat_qr_content?: string
+    sunat_qr_data_url?: string
+    representacion_fiscal?: boolean
+    cpe_emitido?: boolean
+    estado_sunat?: string
     items?: Array<{
       nombre: string
       cantidad: number
@@ -35,13 +46,17 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
   const taxLabel = country.impuesto || 'IGV (18%)'
   const currencySymbol = country.simboloMoneda || 'S/'
   const documentoLabel = getDocumentoLabel(country.paisCodigo, ventaData.tipo_comprobante)
+  const fiscalLegend = getFiscalLegend(ventaData)
+  const receiverDocLabel = getReceiverDocLabel(ventaData.cliente_tipo_documento)
+  const qrUrl = safeImageUrl(ventaData.sunat_qr_data_url)
+  const hashValue = ventaData.hash_firma || ventaData.hash
 
   const handlePrint = useCallback(() => {
     if (!ticketRef.current) return
 
     const printContent = ticketRef.current.innerHTML
     const printWindow = window.open('', '_blank', 'width=300,height=600')
-    
+
     if (!printWindow) {
       alert('Por favor permite las ventanas emergentes para imprimir')
       return
@@ -61,7 +76,7 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
     `)
 
     printWindow.document.close()
-    
+
     printWindow.onload = () => {
       printWindow.focus()
       printWindow.print()
@@ -101,6 +116,9 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
         {/* Cliente */}
         <div className="cliente">
           <strong>Cliente:</strong> {ventaData.cliente_nombre || 'Cliente General'}
+          {ventaData.cliente_documento && (
+            <div>{receiverDocLabel}: {ventaData.cliente_documento}</div>
+          )}
         </div>
 
         {/* Items */}
@@ -140,6 +158,14 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
 
         {/* Footer */}
         <div className="footer">
+          {qrUrl && (
+            <div className="qr">
+              <img src={qrUrl} alt="Código QR SUNAT" />
+            </div>
+          )}
+          {hashValue && <div className="hash">Valor resumen/Hash: {hashValue}</div>}
+          {ventaData.estado_sunat && <div className="fiscal-status">Estado SUNAT: {ventaData.estado_sunat}</div>}
+          <div className="fiscal-note">{fiscalLegend}</div>
           <div>¡Gracias por su compra!</div>
           <div>Conserve este ticket</div>
         </div>
@@ -163,6 +189,9 @@ export function printTicket(
   const taxLabel = context?.taxLabel ?? 'IGV (18%)'
   const documentoFiscal = context?.documentoFiscal ?? 'RUC'
   const documentoLabel = context?.documentoLabel ?? getDocumentoLabel('PE', ventaData.tipo_comprobante)
+  const fiscalLegend = getFiscalLegend(ventaData)
+  const receiverDocLabel = getReceiverDocLabel(ventaData.cliente_tipo_documento)
+  const hashValue = ventaData.hash_firma || ventaData.hash
   const formatMoney = (value: number) => `${currencySymbol} ${value.toFixed(2)}`
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return new Date().toLocaleString('es-PE')
@@ -182,7 +211,7 @@ export function printTicket(
        </div>`
 
   const printWindow = window.open('', '_blank', 'width=350,height=500')
-  
+
   if (!printWindow) {
     alert('Por favor permite las ventanas emergentes para imprimir')
     return
@@ -192,6 +221,22 @@ export function printTicket(
   const logoUrl = safeImageUrl(empresaData?.logo_url)
   const logoHtml = logoUrl
     ? `<img src="${escapeHtml(logoUrl)}" alt="Logo" />`
+    : ''
+  const qrUrl = safeImageUrl(ventaData.sunat_qr_data_url)
+  const qrHtml = qrUrl
+    ? `<div class="qr"><img src="${escapeHtml(qrUrl)}" alt="Código QR SUNAT" /></div>`
+    : ''
+  const receiverDocHtml = ventaData.cliente_documento
+    ? `<div>${escapeHtml(receiverDocLabel)}: ${escapeHtml(ventaData.cliente_documento)}</div>`
+    : ''
+  const hashHtml = hashValue
+    ? `<div class="hash">Valor resumen/Hash: ${escapeHtml(hashValue)}</div>`
+    : ''
+  const qrContentHtml = ventaData.sunat_qr_content
+    ? `<div class="qr-content">${escapeHtml(ventaData.sunat_qr_content)}</div>`
+    : ''
+  const estadoSunatHtml = ventaData.estado_sunat
+    ? `<div class="fiscal-status">Estado SUNAT: ${escapeHtml(ventaData.estado_sunat)}</div>`
     : ''
 
   printWindow.document.write(`
@@ -210,7 +255,7 @@ export function printTicket(
         <div class="ticket-numero">${escapeHtml(documentoLabel)}: ${escapeHtml(ventaData.numero_ticket)}</div>
         <div class="fecha">${escapeHtml(formatDate(ventaData.fecha))}</div>
       </div>
-      <div class="cliente"><strong>Cliente:</strong> ${escapeHtml(ventaData.cliente_nombre || 'Cliente General')}</div>
+      <div class="cliente"><strong>Cliente:</strong> ${escapeHtml(ventaData.cliente_nombre || 'Cliente General')}${receiverDocHtml}</div>
       <div class="items">${itemsHtml}</div>
       <div class="totales">
         <div class="total-row"><span>Subtotal:</span><span>${escapeHtml(formatMoney(ventaData.subtotal))}</span></div>
@@ -218,6 +263,11 @@ export function printTicket(
         <div class="total-row total-final"><span>TOTAL:</span><span>${escapeHtml(formatMoney(ventaData.total))}</span></div>
       </div>
       <div class="footer">
+        ${qrHtml}
+        ${hashHtml}
+        ${qrContentHtml}
+        ${estadoSunatHtml}
+        <div class="fiscal-note">${escapeHtml(fiscalLegend)}</div>
         <div>¡Gracias por su compra!</div>
         <div>Conserve este ticket</div>
       </div>
@@ -237,6 +287,32 @@ function getDocumentoLabel(countryCode?: string, tipoComprobante?: string): stri
   if (tipoComprobante === '01') return 'FACTURA'
   if (tipoComprobante === '03') return 'BOLETA'
   return 'TICKET'
+}
+
+function getFiscalLegend(ventaData: TicketPrintProps['ventaData']): string {
+  if (ventaData.representacion_fiscal && ventaData.sunat_qr_data_url) {
+    if (ventaData.tipo_comprobante === '01') return 'Representación impresa de la Factura Electrónica'
+    if (ventaData.tipo_comprobante === '03') return 'Representación impresa de la Boleta de Venta Electrónica'
+    return 'Representación impresa del comprobante electrónico'
+  }
+
+  if (ventaData.cpe_emitido) {
+    return 'CPE generado. QR SUNAT no disponible para impresión fiscal.'
+  }
+
+  if (ventaData.tipo_comprobante === '01' || ventaData.tipo_comprobante === '03') {
+    return 'Comprobante interno de caja. CPE pendiente de emisión fiscal.'
+  }
+
+  return 'Comprobante interno de caja'
+}
+
+function getReceiverDocLabel(tipoDocumento?: string): string {
+  if (tipoDocumento === '6') return 'RUC'
+  if (tipoDocumento === '1') return 'DNI'
+  if (tipoDocumento === '4') return 'Carné de extranjería'
+  if (tipoDocumento === '7') return 'Pasaporte'
+  return 'Documento'
 }
 
 function escapeHtml(value: unknown): string {
@@ -290,5 +366,10 @@ function getTicketPrintStyles(): string {
     .totales { margin-top: 6px; }
     .total-final { border-top: 1px solid #111; padding-top: 4px; font-weight: 700; font-size: 13px; }
     .footer { margin-top: 8px; border-top: 1px dashed #333; padding-top: 5px; }
+    .qr { text-align: center; margin: 7px 0 4px; }
+    .qr img { width: 28mm; height: 28mm; object-fit: contain; image-rendering: pixelated; }
+    .hash, .qr-content, .fiscal-status, .fiscal-note { overflow-wrap: anywhere; word-break: break-word; }
+    .hash, .qr-content, .fiscal-status { font-size: 8px; }
+    .fiscal-note { margin-top: 4px; font-weight: 700; }
   `
 }

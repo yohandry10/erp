@@ -7,6 +7,7 @@ import { PedidoVenta, EstadoPedido } from '@/types/ventas'
 import { Plus, Search, Filter, Eye, FileText, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { parseDateLocal } from '@/lib/date-utils'
 
 const ESTADO_COLORS: Record<EstadoPedido, { bg: string, text: string }> = {
   [EstadoPedido.PENDIENTE]: { bg: 'rgba(234, 179, 8, 0.1)', text: '#ca8a04' },
@@ -54,7 +55,11 @@ export default function PedidosPage() {
       setLoading(true)
       const response = await get('/api/ventas/pedidos')
       if (response?.success) {
-        setPedidos(response.data || [])
+        // El API expone el join como `clientes` (singular embebido de PostgREST); se normaliza a `cliente`.
+        setPedidos((response.data || []).map((pedido: any) => ({
+          ...pedido,
+          cliente: pedido.cliente || pedido.clientes,
+        })))
       }
     } catch (error) {
       console.error('Error loading pedidos:', error)
@@ -98,7 +103,7 @@ export default function PedidosPage() {
 
   const formatFecha = (fecha: string) => {
     try {
-      return format(new Date(fecha), 'dd/MM/yyyy', { locale: es })
+      return format(parseDateLocal(fecha), 'dd/MM/yyyy', { locale: es })
     } catch {
       return fecha
     }
@@ -138,59 +143,59 @@ export default function PedidosPage() {
   }
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">Pedidos de Venta</h1>
-          <p className="dashboard-subtitle">Gestiona pedidos y controla el flujo de ventas</p>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Pedidos de Venta</h1>
+          <p className="mt-2 text-base text-muted-foreground">Gestiona pedidos y controla el flujo de ventas</p>
         </div>
-        <button className="refresh-btn" onClick={handleNuevoPedido}>
+        <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50" onClick={handleNuevoPedido}>
           <Plus size={20} />
           Nuevo Pedido
         </button>
       </div>
 
       {/* Stats */}
-      <div className="stats-grid ventas-stats-grid mb-8">
-        <div className="stat-card">
-          <div className="stat-header">
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5  mb-8">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>TOTAL PEDIDOS</h3>
-            <span className="stat-icon stat-icon-blue">
+            <span className="inline-flex size-11 items-center justify-center rounded-xl bg-blue-500/15 text-blue-500">
               <FileText />
             </span>
           </div>
-          <div className="stat-value">{pedidos.length}</div>
-          <div className="stat-subtitle">Pedidos registrados</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none">{pedidos.length}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Pedidos registrados</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>FILTRADOS</h3>
-            <span className="stat-icon stat-icon-emerald">
+            <span className="inline-flex size-11 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500">
               <Filter />
             </span>
           </div>
-          <div className="stat-value">{filteredPedidos.length}</div>
-          <div className="stat-subtitle">Pedidos mostrados</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none">{filteredPedidos.length}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Pedidos mostrados</div>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="activity-section">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="flex gap-4 mb-4 flex-wrap">
           <div className="flex-[1] min-w-[300px] relative">
             <Search
-              size={20} className="absolute left-4 top-[50%] -translate-y-1/2 text-gray-400"
+              size={20} className="absolute left-4 top-[50%] -translate-y-1/2 text-muted-foreground"
             />
             <input
               type="text"
               placeholder="Buscar por número o cliente..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)} className="w-[100%] pt-3 pr-4 pb-3 pl-12 rounded-2 border text-[0.875rem]"
+              onChange={(e) => setSearchTerm(e.target.value)} className="w-[100%] pt-3 pr-4 pb-3 pl-12 rounded-lg border text-[0.875rem]"
             />
           </div>
 
           <button
-            onClick={() => setShowFilters(!showFilters)} className="py-3 px-4 rounded-2 border cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
+            onClick={() => setShowFilters(!showFilters)} className="py-3 px-4 rounded-lg border cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
           >
             <Filter size={16} />
             Filtros
@@ -198,7 +203,7 @@ export default function PedidosPage() {
 
           <button
             onClick={loadPedidos}
-            className="refresh-btn py-3 px-4"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 py-3 px-4"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -207,9 +212,9 @@ export default function PedidosPage() {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-6 p-4 bg-[#f9fafb] rounded-2 border">
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-6 p-4 bg-muted rounded-lg border">
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Estado
               </label>
               <select
@@ -224,7 +229,7 @@ export default function PedidosPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Cliente
               </label>
               <input
@@ -236,7 +241,7 @@ export default function PedidosPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha Desde
               </label>
               <input
@@ -247,7 +252,7 @@ export default function PedidosPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha Hasta
               </label>
               <input
@@ -260,15 +265,15 @@ export default function PedidosPage() {
         )}
 
         {/* Table */}
-        <div className="activity-card">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           {loading ? (
-            <div className="loading">
-              <div className="loading-spinner"></div>
+            <div className="flex min-h-48 items-center justify-center">
+              <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
               <p>Cargando pedidos...</p>
             </div>
           ) : filteredPedidos.length === 0 ? (
-            <div className="text-center p-12 text-gray-500">
-              <FileText size={48} className="text-gray-400" />
+            <div className="text-center p-12 text-muted-foreground">
+              <FileText size={48} className="text-muted-foreground" />
               <h3 className="text-[1.125rem] font-semibold mb-2">
                 No se encontraron pedidos
               </h3>
@@ -283,25 +288,25 @@ export default function PedidosPage() {
               <table className="w-[100%]">
                 <thead>
                   <tr>
-                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
+                    <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
                       Número
                     </th>
-                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
+                    <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
                       Cliente
                     </th>
-                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
+                    <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
                       Fecha
                     </th>
-                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
+                    <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
                       Estado
                     </th>
-                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
+                    <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
                       Estado Crédito
                     </th>
-                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
+                    <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
                       Total
                     </th>
-                    <th className="text-right p-4 font-semibold text-3 text-gray-500">
+                    <th className="text-right p-4 font-semibold text-xs text-muted-foreground">
                       Acciones
                     </th>
                   </tr>
@@ -315,18 +320,18 @@ export default function PedidosPage() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="text-[0.875rem] font-semibold text-gray-900">
+                        <div className="text-[0.875rem] font-semibold text-foreground">
                           {pedido.cliente?.razon_social || 'N/A'}
                         </div>
-                        <div className="text-3 text-gray-500">
-                          {pedido.cliente?.documento_numero || ''}
+                        <div className="text-xs text-muted-foreground">
+                          {pedido.cliente?.numero_documento || pedido.cliente?.ruc || ''}
                         </div>
                       </td>
-                      <td className="p-4 text-[0.875rem] text-gray-500">
+                      <td className="p-4 text-[0.875rem] text-muted-foreground">
                         {formatFecha(pedido.fecha_pedido)}
                       </td>
                       <td className="p-4">
-                        <span className="py-1 px-3 rounded-full text-3 font-medium">
+                        <span className="py-1 px-3 rounded-full text-xs font-medium">
                           {ESTADO_LABELS[pedido.estado]}
                         </span>
                       </td>
@@ -339,7 +344,7 @@ export default function PedidosPage() {
                       <td className="p-4">
                         <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => handleVerDetalle(pedido.id)} className="p-2 rounded-[6px] border-0 bg-blue-500 text-white cursor-pointer"
+                            onClick={() => handleVerDetalle(pedido.id)} className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground"
                             title="Ver detalle"
                           >
                             <Eye size={16} />
@@ -356,7 +361,7 @@ export default function PedidosPage() {
 
         {/* Results Summary */}
         {!loading && filteredPedidos.length > 0 && (
-          <div className="mt-4 text-[0.875rem] text-gray-500">
+          <div className="mt-4 text-[0.875rem] text-muted-foreground">
             Mostrando {filteredPedidos.length} de {pedidos.length} pedidos
           </div>
         )}

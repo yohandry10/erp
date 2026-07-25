@@ -25,7 +25,7 @@ export default function FinanzasStatusBadge({
   
   if (!statusConfig) {
     return (
-      <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-medium bg-gray-500 text-white">
+      <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-xs font-medium bg-gray-500 text-white">
         {status}
       </span>
     )
@@ -34,7 +34,7 @@ export default function FinanzasStatusBadge({
   const Icon = statusConfig.icon
 
   return (
-    <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-medium text-white">
+    <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-xs font-medium text-white">
       {Icon && <Icon size={14} />}
       {statusConfig.label}
     </span>

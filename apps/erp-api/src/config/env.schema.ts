@@ -2,6 +2,9 @@ import * as Joi from 'joi';
 
 export interface AppEnvironment {
   NODE_ENV: string;
+  DEPLOYMENT_ENV: 'DEV' | 'PROD';
+  EXPECTED_SUPABASE_PROJECT_REF?: string;
+  DEMO_API_ENABLED: boolean;
   PORT: number;
   LOG_LEVEL: string;
   JWT_EXPIRES_IN: string;
@@ -38,6 +41,26 @@ export interface AppEnvironment {
   PFX_PATH?: string;
   PFX_PASS?: string;
   REQUIRE_REAL_FISCAL_CERTIFICATE?: boolean;
+  EMPRESA_RUC?: string;
+  SUNAT_ENVIRONMENT?: 'homologacion' | 'produccion' | 'sandbox';
+  SUNAT_CPE_URL?: string;
+  SUNAT_GRE_URL?: string;
+  SUNAT_GRE_TRANSPORT?: 'soap' | 'rest';
+  SUNAT_GRE_REST_BASE_URL?: string;
+  SUNAT_GRE_AUTH_URL?: string;
+  SUNAT_GRE_CLIENT_ID?: string;
+  SUNAT_GRE_CLIENT_SECRET?: string;
+  SUNAT_SUMMARY_URL?: string;
+  SUNAT_QUERY_URL?: string;
+  SUNAT_USERNAME?: string;
+  SUNAT_PASSWORD?: string;
+  SUNAT_CERT_EXPECTED_RUC?: string;
+  SUNAT_CERT_RUC_MISMATCH_CONFIRMED?: boolean;
+  SUNAT_CERT_RUC_MISMATCH_REASON?: string;
+  OSE_URL?: string;
+  OSE_USERNAME?: string;
+  OSE_USUARIO?: string;
+  OSE_PASSWORD?: string;
 }
 
 const secretPattern = /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+=[\]{}|\\:;"'<>,.?/~`-])/;
@@ -50,6 +73,9 @@ const requiredInProduction = (schema: Joi.StringSchema) => Joi.when('NODE_ENV', 
 
 export const envSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'staging', 'production').default('development'),
+  DEPLOYMENT_ENV: Joi.string().valid('DEV', 'PROD').default('DEV'),
+  EXPECTED_SUPABASE_PROJECT_REF: Joi.string().pattern(/^[a-z]{20}$/).optional(),
+  DEMO_API_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
   PORT: Joi.number().port().default(3002),
   LOG_LEVEL: Joi.string().optional().default('info'),
   JWT_EXPIRES_IN: Joi.string().optional().default('8h'),
@@ -97,7 +123,61 @@ export const envSchema = Joi.object({
   PFX_PATH: Joi.string().allow('').optional(),
   PFX_PASS: Joi.string().allow('').min(8).optional(),
   REQUIRE_REAL_FISCAL_CERTIFICATE: Joi.boolean().truthy('true').falsy('false').default(false),
+  EMPRESA_RUC: Joi.string().pattern(/^\d{11}$/).allow('').optional(),
+  SUNAT_ENVIRONMENT: Joi.string().valid('homologacion', 'produccion', 'sandbox').default('homologacion'),
+  SUNAT_CPE_URL: Joi.string().uri().allow('').optional(),
+  SUNAT_GRE_URL: Joi.string().uri().allow('').optional(),
+  SUNAT_GRE_TRANSPORT: Joi.string().valid('soap', 'rest').default('soap'),
+  SUNAT_GRE_REST_BASE_URL: Joi.string().uri().allow('').optional(),
+  SUNAT_GRE_AUTH_URL: Joi.string().uri().allow('').optional(),
+  SUNAT_GRE_CLIENT_ID: Joi.string().allow('').optional(),
+  SUNAT_GRE_CLIENT_SECRET: Joi.string().allow('').optional(),
+  SUNAT_SUMMARY_URL: Joi.string().uri().allow('').optional(),
+  SUNAT_QUERY_URL: Joi.string().uri().allow('').optional(),
+  SUNAT_USERNAME: Joi.string().allow('').optional(),
+  SUNAT_PASSWORD: Joi.string().allow('').optional(),
+  SUNAT_CERT_EXPECTED_RUC: Joi.string().pattern(/^\d{11}$/).allow('').optional(),
+  SUNAT_CERT_RUC_MISMATCH_CONFIRMED: Joi.boolean().truthy('true').falsy('false').default(false),
+  SUNAT_CERT_RUC_MISMATCH_REASON: Joi.string().allow('').optional(),
+  OSE_URL: Joi.string().uri().allow('').optional(),
+  OSE_USERNAME: Joi.string().allow('').optional(),
+  OSE_USUARIO: Joi.string().allow('').optional(),
+  OSE_PASSWORD: Joi.string().allow('').optional(),
 }).custom((value, helpers) => {
+  const actualProjectRef = value.SUPABASE_URL
+    ? new URL(value.SUPABASE_URL).hostname.split('.')[0]
+    : undefined;
+
+  if (value.EXPECTED_SUPABASE_PROJECT_REF && actualProjectRef !== value.EXPECTED_SUPABASE_PROJECT_REF) {
+    return helpers.message({
+      custom: `SUPABASE_URL apunta a ${actualProjectRef || 'un host desconocido'}, no al EXPECTED_SUPABASE_PROJECT_REF declarado.`,
+    });
+  }
+
+  if (value.NODE_ENV === 'production' && value.DEPLOYMENT_ENV !== 'PROD') {
+    return helpers.message({
+      custom: 'NODE_ENV=production requiere DEPLOYMENT_ENV=PROD.',
+    });
+  }
+
+  if (value.NODE_ENV === 'production' && !value.EXPECTED_SUPABASE_PROJECT_REF) {
+    return helpers.message({
+      custom: 'NODE_ENV=production requiere EXPECTED_SUPABASE_PROJECT_REF.',
+    });
+  }
+
+  if (value.DEPLOYMENT_ENV === 'PROD' && value.NODE_ENV !== 'production') {
+    return helpers.message({
+      custom: 'DEPLOYMENT_ENV=PROD requiere NODE_ENV=production.',
+    });
+  }
+
+  if (value.DEPLOYMENT_ENV === 'PROD' && value.DEMO_API_ENABLED) {
+    return helpers.message({
+      custom: 'DEPLOYMENT_ENV=PROD prohibe DEMO_API_ENABLED=true.',
+    });
+  }
+
   if (!value.ENCRYPTION_KEY && !value.CERT_ENCRYPTION_KEY) {
     return helpers.message({
       custom: 'Debe definir ENCRYPTION_KEY o CERT_ENCRYPTION_KEY.',
@@ -117,6 +197,29 @@ export const envSchema = Joi.object({
     return helpers.message({
       custom: 'Produccion fiscal requiere PFX_PATH y PFX_PASS, o un certificado fiscal valido por tenant antes de emitir.',
     });
+  }
+
+  if (value.SUNAT_ENVIRONMENT === 'produccion') {
+    const expectedRuc = value.SUNAT_CERT_EXPECTED_RUC || value.EMPRESA_RUC;
+    if (!expectedRuc || !/^\d{11}$/.test(expectedRuc)) {
+      return helpers.message({
+        custom: 'SUNAT produccion requiere SUNAT_CERT_EXPECTED_RUC o EMPRESA_RUC con 11 digitos.',
+      });
+    }
+
+    if (value.SUNAT_CERT_RUC_MISMATCH_CONFIRMED && !value.SUNAT_CERT_RUC_MISMATCH_REASON?.trim()) {
+      return helpers.message({
+        custom: 'SUNAT_CERT_RUC_MISMATCH_CONFIRMED requiere SUNAT_CERT_RUC_MISMATCH_REASON con referencia escrita del proveedor/SUNAT.',
+      });
+    }
+  }
+
+  if (value.SUNAT_GRE_TRANSPORT === 'rest') {
+    if (!value.SUNAT_GRE_CLIENT_ID?.trim() || !value.SUNAT_GRE_CLIENT_SECRET?.trim()) {
+      return helpers.message({
+        custom: 'SUNAT_GRE_TRANSPORT=rest requiere SUNAT_GRE_CLIENT_ID y SUNAT_GRE_CLIENT_SECRET de API SUNAT GRE.',
+      });
+    }
   }
 
   return value;

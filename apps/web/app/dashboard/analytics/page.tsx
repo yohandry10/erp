@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -56,18 +56,18 @@ const CATEGORY_PALETTE = ['#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#fb7185',
 
 // Surface — dark gradient sutil + soporte light theme
 const surface =
-  'rounded-2xl border border-cyan-400/15 bg-gradient-to-br from-[#040c1c] via-[#020817] to-[#050d1f] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:from-white group-data-[erp-theme=light]/dashboard:via-white group-data-[erp-theme=light]/dashboard:to-slate-50 group-data-[erp-theme=light]/dashboard:shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
+  'rounded-2xl border border-cyan-400/15 bg-gradient-to-br from-[#040c1c] via-[#020817] to-[#050d1f] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:from-white group-data-[erp-theme=light]/dashboard:via-white group-data-[erp-theme=light]/dashboard:to-slate-50 group-data-[erp-theme=light]/dashboard:shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
 
 const eyebrow =
-  'text-[0.65rem] font-medium uppercase tracking-[0.18em] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500'
+  'text-[0.65rem] font-medium uppercase tracking-[0.18em] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground'
 
 const cardTitle =
-  'text-base font-semibold tracking-tight text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-900'
+  'text-base font-semibold tracking-tight text-foreground group-data-[erp-theme=light]/dashboard:text-foreground'
 
 const tabularNum = 'font-bold tabular-nums tracking-tight'
 
 const inputClass =
-  'h-10 min-w-0 rounded-md border border-cyan-400/20 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950 group-data-[erp-theme=light]/dashboard:placeholder:text-slate-400'
+  'h-10 min-w-0 rounded-md border border-cyan-400/20 bg-card/60 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground group-data-[erp-theme=light]/dashboard:placeholder:text-muted-foreground'
 
 // ============================================================================
 // TYPES & STORAGE
@@ -161,9 +161,9 @@ const toneClasses = {
     bar: 'bg-gradient-to-r from-rose-400 to-rose-500',
   },
   neutral: {
-    text: 'text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500',
-    bg: 'bg-slate-400/10 group-data-[erp-theme=light]/dashboard:bg-slate-100',
-    border: 'border-slate-400/20 group-data-[erp-theme=light]/dashboard:border-slate-300',
+    text: 'text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground',
+    bg: 'bg-slate-400/10 group-data-[erp-theme=light]/dashboard:bg-muted',
+    border: 'border-border/20 group-data-[erp-theme=light]/dashboard:border-border',
     bar: 'bg-gradient-to-r from-slate-500 to-slate-400',
   },
 } as const
@@ -201,24 +201,24 @@ function MetricTile({
       </div>
       <div className="flex items-baseline gap-2">
         <span
-          className={`${tabularNum} text-4xl text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}
+          className={`${tabularNum} text-4xl text-foreground group-data-[erp-theme=light]/dashboard:text-foreground`}
         >
           {noData ? '—' : formatNumber(valor)}
         </span>
         {!noData && (
-          <span className="text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <span className="text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             / {formatNumber(objetivo)}
           </span>
         )}
       </div>
       <div className="mt-auto flex flex-col gap-1.5">
-        <div className="flex items-center justify-between text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+        <div className="flex items-center justify-between text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
           <span>Avance al objetivo</span>
           <span className={`${tabularNum} text-xs ${cls.text}`}>
             {noData ? '—' : `${pct.toFixed(0)}%`}
           </span>
         </div>
-        <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-800/80 group-data-[erp-theme=light]/dashboard:bg-slate-100">
+        <div className="relative h-1.5 overflow-hidden rounded-full bg-muted/80 group-data-[erp-theme=light]/dashboard:bg-muted">
           <span
             className={`absolute inset-y-0 left-0 ${cls.bar} transition-all duration-700 ease-out`}
             style={{ width: noData ? '0%' : `${pct}%` }}
@@ -244,27 +244,27 @@ function EfficiencyTile({
     <div className={`${surface} flex h-full flex-col gap-3 p-5`}>
       <div className="flex items-start justify-between gap-2">
         <span className={eyebrow}>Eficiencia operativa</span>
-        <span className="flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-cyan-300 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50 group-data-[erp-theme=light]/dashboard:text-cyan-700">
+        <span className="flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-primary group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50 group-data-[erp-theme=light]/dashboard:text-cyan-700">
           <Activity size={11} strokeWidth={2.5} />
           Composite
         </span>
       </div>
       <div className="flex items-baseline gap-2">
-        <span className={`${tabularNum} text-4xl text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}>
+        <span className={`${tabularNum} text-4xl text-foreground group-data-[erp-theme=light]/dashboard:text-foreground`}>
           {rotacion !== undefined ? `${rotacion.toFixed(1)}x` : '—'}
         </span>
-        <span className="text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+        <span className="text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
           rotación / año
         </span>
       </div>
       <div className="mt-auto flex flex-col gap-1.5">
-        <div className="flex items-center justify-between text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+        <div className="flex items-center justify-between text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
           <span>Ciclo de efectivo</span>
           <span className={`${tabularNum} text-xs text-violet-300 group-data-[erp-theme=light]/dashboard:text-violet-700`}>
             {ciclo !== undefined ? `${ciclo.toFixed(0)} días` : '—'}
           </span>
         </div>
-        <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-800/80 group-data-[erp-theme=light]/dashboard:bg-slate-100">
+        <div className="relative h-1.5 overflow-hidden rounded-full bg-muted/80 group-data-[erp-theme=light]/dashboard:bg-muted">
           <span
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-400 to-violet-400 transition-all duration-700 ease-out"
             style={{ width: hasData ? `${pct}%` : '0%' }}
@@ -294,7 +294,7 @@ function ChartEmptyState({
 }) {
   return (
     <div
-      className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-cyan-400/15 bg-slate-950/30 px-6 text-center group-data-[erp-theme=light]/dashboard:border-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-cyan-50/30"
+      className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-cyan-400/15 bg-card/30 px-6 text-center group-data-[erp-theme=light]/dashboard:border-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-cyan-50/30"
       style={{ height }}
     >
       <Icon
@@ -302,11 +302,11 @@ function ChartEmptyState({
         strokeWidth={1.6}
         className="text-cyan-400/55 group-data-[erp-theme=light]/dashboard:text-cyan-600/70"
       />
-      <p className="text-sm font-medium text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+      <p className="text-sm font-medium text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
         {title}
       </p>
       {subtitle && (
-        <p className="max-w-[36ch] text-xs leading-5 text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+        <p className="max-w-[36ch] text-xs leading-5 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
           {subtitle}
         </p>
       )}
@@ -343,7 +343,7 @@ function SalesEvolutionChart({
       <header className="flex items-start justify-between gap-4">
         <div>
           <h3 className={cardTitle}>Evolución de ventas</h3>
-          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             Tendencia del periodo vs. ciclo anterior
           </p>
         </div>
@@ -444,7 +444,7 @@ function StatChip({
   const map = {
     cyan: {
       border: 'border-cyan-400/20',
-      text: 'text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700',
+      text: 'text-primary group-data-[erp-theme=light]/dashboard:text-cyan-700',
     },
     violet: {
       border: 'border-violet-400/20',
@@ -465,7 +465,7 @@ function StatChip({
   }
   const cls = map[tone]
   return (
-    <div className={`rounded-xl border ${cls.border} bg-slate-950/60 px-3.5 py-3 group-data-[erp-theme=light]/dashboard:bg-slate-50`}>
+    <div className={`rounded-xl border ${cls.border} bg-card/60 px-3.5 py-3 group-data-[erp-theme=light]/dashboard:bg-muted/30`}>
       <div className={eyebrow}>{label}</div>
       <div className={`${tabularNum} mt-1 flex items-center gap-1.5 text-lg ${cls.text}`}>
         {Icon ? <Icon size={16} strokeWidth={2.5} /> : null}
@@ -501,7 +501,7 @@ function CategoryRankList({ data }: { data?: { labels?: string[]; data?: number[
       <header className="flex items-start justify-between gap-2">
         <div>
           <h3 className={cardTitle}>Ventas por categoría</h3>
-          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             Mix de ingresos rankeado por participación
           </p>
         </div>
@@ -544,7 +544,7 @@ function CategoryRankList({ data }: { data?: { labels?: string[]; data?: number[
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className={eyebrow}>Total</span>
               <span
-                className={`${tabularNum} mt-0.5 text-2xl text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}
+                className={`${tabularNum} mt-0.5 text-2xl text-foreground group-data-[erp-theme=light]/dashboard:text-foreground`}
               >
                 S/ {total.toLocaleString('es-PE')}
               </span>
@@ -555,25 +555,25 @@ function CategoryRankList({ data }: { data?: { labels?: string[]; data?: number[
             {ranked.map((item, idx) => (
               <li
                 key={item.label}
-                className="flex items-center justify-between gap-2 rounded-lg border border-cyan-400/10 bg-slate-950/40 px-2.5 py-1.5 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+                className="flex items-center justify-between gap-2 rounded-lg border border-cyan-400/10 bg-card/40 px-2.5 py-1.5 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30"
               >
                 <span className="flex min-w-0 items-center gap-2 text-sm">
                   <span
                     className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ background: item.color, boxShadow: `0 0 10px ${item.color}88` }}
                   />
-                  <span className="truncate font-medium text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-800">
+                  <span className="truncate font-medium text-foreground/90 group-data-[erp-theme=light]/dashboard:text-foreground">
                     {item.label}
                   </span>
                   <span className={`${eyebrow} shrink-0 tabular-nums`}>#{idx + 1}</span>
                 </span>
                 <span className="flex shrink-0 items-baseline gap-1.5 tabular-nums">
                   <span
-                    className={`${tabularNum} text-sm text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}
+                    className={`${tabularNum} text-sm text-foreground group-data-[erp-theme=light]/dashboard:text-foreground`}
                   >
                     {item.pct.toFixed(1)}%
                   </span>
-                  <span className="text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                  <span className="text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                     S/ {item.value.toLocaleString('es-PE')}
                   </span>
                 </span>
@@ -636,11 +636,11 @@ function AgingComposite({
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h3 className={cardTitle}>Maduración de cuentas (CxC vs CxP)</h3>
-          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             Edad de saldos por tramo, con diferencial neto de caja
           </p>
         </div>
-        <div className="flex items-center gap-4 text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-cyan-400" />
             Por cobrar
@@ -753,7 +753,7 @@ function SummaryStat({
   const map = {
     cyan: {
       border: 'border-cyan-400/20',
-      text: 'text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700',
+      text: 'text-primary group-data-[erp-theme=light]/dashboard:text-cyan-700',
     },
     rose: {
       border: 'border-rose-400/20',
@@ -771,14 +771,14 @@ function SummaryStat({
   const cls = map[tone]
   return (
     <div
-      className={`rounded-xl border ${cls.border} bg-slate-950/60 px-4 py-3 group-data-[erp-theme=light]/dashboard:bg-slate-50`}
+      className={`rounded-xl border ${cls.border} bg-card/60 px-4 py-3 group-data-[erp-theme=light]/dashboard:bg-muted/30`}
     >
       <div className={eyebrow}>{label}</div>
       <div className={`${tabularNum} mt-1 flex items-center gap-1.5 text-xl ${cls.text}`}>
         {Icon ? <Icon size={16} strokeWidth={2.5} /> : null}
         {value}
       </div>
-      <div className="mt-1 text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+      <div className="mt-1 text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
         {sublabel}
       </div>
     </div>
@@ -801,7 +801,7 @@ function InsightCard({
   items: { strong?: string; text: string }[]
 }) {
   const accentMap = {
-    cyan: 'text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700 bg-cyan-400/10 border-cyan-400/20 group-data-[erp-theme=light]/dashboard:bg-cyan-50 group-data-[erp-theme=light]/dashboard:border-cyan-200',
+    cyan: 'text-primary group-data-[erp-theme=light]/dashboard:text-cyan-700 bg-cyan-400/10 border-cyan-400/20 group-data-[erp-theme=light]/dashboard:bg-cyan-50 group-data-[erp-theme=light]/dashboard:border-cyan-200',
     emerald: 'text-emerald-300 group-data-[erp-theme=light]/dashboard:text-emerald-700 bg-emerald-400/10 border-emerald-400/20 group-data-[erp-theme=light]/dashboard:bg-emerald-50 group-data-[erp-theme=light]/dashboard:border-emerald-200',
     rose: 'text-rose-300 group-data-[erp-theme=light]/dashboard:text-rose-700 bg-rose-400/10 border-rose-400/20 group-data-[erp-theme=light]/dashboard:bg-rose-50 group-data-[erp-theme=light]/dashboard:border-rose-200',
   }
@@ -813,13 +813,13 @@ function InsightCard({
         </span>
         <h4 className={cardTitle}>{title}</h4>
       </div>
-      <ul className="space-y-2.5 text-sm leading-6 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+      <ul className="space-y-2.5 text-sm leading-6 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
         {items.map((item, i) => (
           <li key={i} className="flex gap-2">
             <span className={`mt-2 inline-block h-1.5 w-1.5 shrink-0 rounded-full ${accentMap[accent]}`} />
             <span>
               {item.strong && (
-                <strong className="font-semibold text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-900">
+                <strong className="font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">
                   {item.strong}:
                 </strong>
               )}{' '}
@@ -840,12 +840,12 @@ function MetricTileSkeleton() {
   return (
     <div className={`${surface} flex h-[156px] flex-col gap-3 p-5`}>
       <div className="flex justify-between">
-        <Skeleton className="h-3 w-16 bg-slate-700/40" />
-        <Skeleton className="h-4 w-14 rounded-full bg-slate-700/40" />
+        <Skeleton className="h-3 w-16 bg-muted/40" />
+        <Skeleton className="h-4 w-14 rounded-full bg-muted/40" />
       </div>
-      <Skeleton className="h-10 w-24 bg-slate-700/40" />
+      <Skeleton className="h-10 w-24 bg-muted/40" />
       <div className="mt-auto space-y-2">
-        <Skeleton className="h-2 w-full rounded-full bg-slate-700/40" />
+        <Skeleton className="h-2 w-full rounded-full bg-muted/40" />
       </div>
     </div>
   )
@@ -854,9 +854,9 @@ function MetricTileSkeleton() {
 function ChartCardSkeleton({ height = 420 }: { height?: number }) {
   return (
     <div className={`${surface} p-6`} style={{ minHeight: height }}>
-      <Skeleton className="h-5 w-44 bg-slate-700/40" />
-      <Skeleton className="mt-2 h-3 w-60 bg-slate-700/40" />
-      <Skeleton className="mt-5 h-[260px] w-full rounded-xl bg-slate-700/40" />
+      <Skeleton className="h-5 w-44 bg-muted/40" />
+      <Skeleton className="mt-2 h-3 w-60 bg-muted/40" />
+      <Skeleton className="mt-5 h-[260px] w-full rounded-xl bg-muted/40" />
     </div>
   )
 }
@@ -870,12 +870,14 @@ export default function AnalyticsPage() {
   // hidratación desde localStorage ocurre en el useEffect de abajo.
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>(EMPTY_ANALYTICS_DATA)
   const [hasLoaded, setHasLoaded] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
   const [, setIsRefreshing] = useState(false)
   const [periodo, setPeriodo] = useState('mensual')
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
   const [fechaDesdeAplicada, setFechaDesdeAplicada] = useState('')
   const [fechaHastaAplicada, setFechaHastaAplicada] = useState('')
+  const rangoAplicadoRef = useRef({ desde: '', hasta: '' })
   const [error, setError] = useState<string | null>(null)
 
   const { get } = useApiCall({ throwOnError: true, showErrorToast: false, retries: 1, timeoutMs: 15000 })
@@ -926,6 +928,10 @@ export default function AnalyticsPage() {
   }, [get, periodo, fechaDesdeAplicada, fechaHastaAplicada])
 
   useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  useEffect(() => {
     const cached = getCachedAnalytics()
     if (hasAnalyticsData(cached)) {
       setAnalyticsData(cached)
@@ -938,6 +944,10 @@ export default function AnalyticsPage() {
   }, [cargarDatos])
 
   const exportarCsv = () => {
+    // El usuario puede exportar inmediatamente después de pulsar "Aplicar".
+    // El ref se actualiza de forma síncrona y evita leer el render anterior de
+    // React (que producía analytics_mensual_actual.csv).
+    const { desde, hasta } = rangoAplicadoRef.current
     const filas = [
       ['metrica', 'valor'],
       ['ventas_actuales', analyticsData.ventasTiempo?.totales?.ventasActuales ?? 0],
@@ -956,7 +966,7 @@ export default function AnalyticsPage() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `analytics_${fechaDesdeAplicada || periodo}_${fechaHastaAplicada || 'actual'}.csv`
+    link.download = `analytics_${desde || periodo}_${hasta || 'actual'}.csv`
     link.className = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -975,6 +985,7 @@ export default function AnalyticsPage() {
     }
 
     setError(null)
+    rangoAplicadoRef.current = { desde, hasta }
     setFechaDesdeAplicada(desde)
     setFechaHastaAplicada(hasta)
   }
@@ -982,6 +993,7 @@ export default function AnalyticsPage() {
   const limpiarFiltrosFecha = () => {
     setFechaDesde('')
     setFechaHasta('')
+    rangoAplicadoRef.current = { desde: '', hasta: '' }
     setFechaDesdeAplicada('')
     setFechaHastaAplicada('')
   }
@@ -993,9 +1005,11 @@ export default function AnalyticsPage() {
       actions={
         <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:flex xl:w-auto xl:items-center">
           <select
+            disabled={!isHydrated}
             value={periodo}
             onChange={(e) => {
               setPeriodo(e.target.value)
+              rangoAplicadoRef.current = { desde: '', hasta: '' }
               setFechaDesdeAplicada('')
               setFechaHastaAplicada('')
             }}
@@ -1008,6 +1022,7 @@ export default function AnalyticsPage() {
           </select>
           <Input
             type="text"
+            disabled={!isHydrated}
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
             placeholder="YYYY-MM-DD"
@@ -1017,6 +1032,7 @@ export default function AnalyticsPage() {
           />
           <Input
             type="text"
+            disabled={!isHydrated}
             value={fechaHasta}
             onChange={(e) => setFechaHasta(e.target.value)}
             placeholder="YYYY-MM-DD"
@@ -1024,13 +1040,13 @@ export default function AnalyticsPage() {
             aria-label="Fecha hasta"
             className={`min-w-0 xl:w-32 ${inputClass}`}
           />
-          <Button className="min-w-0" onClick={aplicarFiltrosFecha}>
+          <Button className="min-w-0" disabled={!isHydrated} onClick={aplicarFiltrosFecha}>
             Aplicar
           </Button>
-          <Button className="min-w-0" variant="secondary" onClick={limpiarFiltrosFecha}>
+          <Button className="min-w-0" disabled={!isHydrated} variant="secondary" onClick={limpiarFiltrosFecha}>
             Limpiar
           </Button>
-          <Button className="col-span-2 min-w-0 sm:col-span-1" onClick={exportarCsv}>
+          <Button className="col-span-2 min-w-0 sm:col-span-1" disabled={!isHydrated} onClick={exportarCsv}>
             Exportar CSV
           </Button>
         </div>

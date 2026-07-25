@@ -63,9 +63,9 @@ interface ReporteGastos {
 }
 
 const inputClass =
-  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/70 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+  'w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-3 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
-const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function CentroCostoDetailPage() {
   const router = useRouter()
@@ -209,11 +209,11 @@ export default function CentroCostoDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
-        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-card/70 text-foreground">
           <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
-            <Loader2 className="h-7 w-7 animate-spin text-cyan-200" />
-            <span className="text-sm font-medium text-slate-300">Cargando centro de costo...</span>
+            <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            <span className="text-sm font-medium text-muted-foreground">Cargando centro de costo...</span>
           </CardContent>
         </Card>
       </div>
@@ -222,11 +222,11 @@ export default function CentroCostoDetailPage() {
 
   if (error && !centro) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
-        <Card className="mx-auto max-w-[1200px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
+        <Card className="mx-auto max-w-[1200px] border-cyan-400/20 bg-card/70 text-foreground">
           <CardContent className="flex min-h-[220px] flex-col items-center justify-center gap-4 p-6 text-center">
-            <AlertCircle className="h-8 w-8 text-cyan-100" />
-            <p className="text-sm text-slate-300">{error}</p>
+            <AlertCircle className="h-8 w-8 text-primary" />
+            <p className="text-sm text-muted-foreground">{error}</p>
             <Button onClick={() => router.push('/dashboard/contabilidad/centros-costo')} className="bg-blue-600 text-white hover:bg-blue-500">
               Volver
             </Button>
@@ -238,9 +238,9 @@ export default function CentroCostoDetailPage() {
 
   if (!centro) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
-        <Card className="mx-auto max-w-[1200px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
-          <CardContent className="flex min-h-[220px] items-center justify-center p-6 text-center text-sm text-slate-300">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
+        <Card className="mx-auto max-w-[1200px] border-cyan-400/20 bg-card/70 text-foreground">
+          <CardContent className="flex min-h-[220px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
             Centro de costo no encontrado
           </CardContent>
         </Card>
@@ -249,31 +249,31 @@ export default function CentroCostoDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+        <section className="rounded-2xl border border-cyan-400/20 bg-card/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
           <Button
             type="button"
             onClick={() => router.push('/dashboard/contabilidad/centros-costo')}
             variant="outline"
-            className="mb-4 gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+            className="mb-4 gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Volver
           </Button>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-primary">
                 <Building2 className="h-6 w-6" />
               </span>
               <div>
-                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
                   {centro.activo ? 'Centro activo' : 'Centro inactivo'}
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight text-white">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">
                   {centro.codigo} - {centro.nombre}
                 </h1>
-                {centro.descripcion && <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{centro.descripcion}</p>}
+                {centro.descripcion && <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{centro.descripcion}</p>}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -282,7 +282,7 @@ export default function CentroCostoDetailPage() {
                 onClick={() => router.push(`/dashboard/contabilidad/presupuestos/comparacion?centroId=${centro.id}&periodoId=${selectedPeriodoId}`)}
                 disabled={!selectedPeriodoId}
                 variant="outline"
-                className="gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white disabled:opacity-50"
+                className="gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground disabled:opacity-50"
               >
                 <BarChart3 className="h-4 w-4" />
                 Comparacion
@@ -301,7 +301,7 @@ export default function CentroCostoDetailPage() {
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-4">
-            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-end">
                 <label className="space-y-2">
                   <span className={labelClass}>Periodo</span>
@@ -327,7 +327,7 @@ export default function CentroCostoDetailPage() {
                         'flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition',
                         activeTab === value
                           ? 'border-cyan-300/40 bg-cyan-400/15 text-white'
-                          : 'border-cyan-400/15 bg-white/[0.03] text-slate-300 hover:bg-white/[0.07]',
+                          : 'border-cyan-400/15 bg-white/[0.03] text-muted-foreground hover:bg-white/[0.07]',
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -355,9 +355,9 @@ export default function CentroCostoDetailPage() {
           </div>
 
           <aside className="space-y-4">
-            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-                <CardTitle className="text-base text-white">Resumen</CardTitle>
+                <CardTitle className="text-base text-foreground">Resumen</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 p-5">
                 {[
@@ -368,14 +368,14 @@ export default function CentroCostoDetailPage() {
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-center justify-between rounded-xl border border-cyan-400/15 bg-white/[0.03] px-3 py-3">
                     <span className={labelClass}>{label}</span>
-                    <span className="text-sm font-bold text-white">{value}</span>
+                    <span className="text-sm font-bold text-foreground">{value}</span>
                   </div>
                 ))}
               </CardContent>
             </Card>
 
             {error && (
-              <Card className="border-cyan-400/20 bg-cyan-400/10 text-cyan-50">
+              <Card className="border-cyan-400/20 bg-cyan-400/10 text-primary">
                 <CardContent className="flex items-center gap-3 p-4 text-sm font-medium">
                   <AlertCircle className="h-5 w-5" />
                   {error}
@@ -391,14 +391,14 @@ export default function CentroCostoDetailPage() {
 
 function EmptyPanel({ icon: Icon, title, description }: { icon: typeof Calendar; title: string; description: string }) {
   return (
-    <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+    <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
       <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8 text-center">
         <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4">
-          <Icon className="h-10 w-10 text-cyan-100" />
+          <Icon className="h-10 w-10 text-primary" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
-          <p className="mt-2 text-sm text-slate-400">{description}</p>
+          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+          <p className="mt-2 text-sm text-muted-foreground">{description}</p>
         </div>
       </CardContent>
     </Card>
@@ -426,12 +426,12 @@ function BudgetPanel({
 
   if (presupuestos.length === 0) {
     return (
-      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+      <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
         <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8 text-center">
-          <FileText className="h-10 w-10 text-cyan-100" />
+          <FileText className="h-10 w-10 text-primary" />
           <div>
-            <h3 className="text-lg font-semibold text-white">Sin presupuestos configurados</h3>
-            <p className="mt-2 text-sm text-slate-400">No hay presupuesto para este centro en el periodo seleccionado.</p>
+            <h3 className="text-lg font-semibold text-foreground">Sin presupuestos configurados</h3>
+            <p className="mt-2 text-sm text-muted-foreground">No hay presupuesto para este centro en el periodo seleccionado.</p>
           </div>
           <Button type="button" onClick={onCreate} className="bg-blue-600 text-white hover:bg-blue-500">
             Crear presupuesto
@@ -442,15 +442,15 @@ function BudgetPanel({
   }
 
   return (
-    <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+    <Card className="overflow-hidden border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
       <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-        <CardTitle className="text-base text-white">Presupuesto vs real</CardTitle>
+        <CardTitle className="text-base text-foreground">Presupuesto vs real</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[920px] border-collapse">
             <thead className="bg-cyan-400/10">
-              <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+              <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
                 <th className="px-4 py-3">Cuenta</th>
                 <th className="px-4 py-3 text-right">Presupuestado</th>
                 <th className="px-4 py-3 text-right">Ejecutado</th>
@@ -461,17 +461,17 @@ function BudgetPanel({
             </thead>
             <tbody>
               {presupuestos.map((item) => (
-                <tr key={item.id} className="border-b border-cyan-400/10 text-sm text-slate-200 transition hover:bg-cyan-400/10">
+                <tr key={item.id} className="border-b border-cyan-400/10 text-sm text-foreground/90 transition hover:bg-cyan-400/10">
                   <td className="px-4 py-3">
-                    <div className="font-semibold text-white">{item.cuenta_codigo}</div>
-                    <div className="mt-1 text-xs text-slate-400">{item.cuenta_nombre}</div>
+                    <div className="font-semibold text-foreground">{item.cuenta_codigo}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{item.cuenta_nombre}</div>
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(item.monto_presupuestado)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(item.monto_ejecutado)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-cyan-100">{formatCurrency(item.monto_disponible)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-blue-100">{formatPercentage(item.porcentaje_ejecutado)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(item.monto_presupuestado)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(item.monto_ejecutado)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-primary">{formatCurrency(item.monto_disponible)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-primary dark:text-blue-200">{formatPercentage(item.porcentaje_ejecutado)}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                    <span className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-primary">
                       {getAlertText(item.alerta)}
                     </span>
                   </td>
@@ -510,24 +510,24 @@ function ExpensesPanel({
           ['Movimientos', reporteGastos.resumen.total_movimientos],
           ['Mayor gasto', reporteGastos.resumen.cuenta_mayor_gasto?.codigo || 'Sin datos'],
         ].map(([label, value]) => (
-          <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
             <CardContent className="p-4">
               <div className={labelClass}>{label}</div>
-              <div className="mt-3 text-2xl font-bold text-white">{value}</div>
+              <div className="mt-3 text-2xl font-bold text-foreground">{value}</div>
             </CardContent>
           </Card>
         ))}
       </section>
 
-      <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+      <Card className="overflow-hidden border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
         <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-          <CardTitle className="text-base text-white">Gastos por cuenta</CardTitle>
+          <CardTitle className="text-base text-foreground">Gastos por cuenta</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] border-collapse">
               <thead className="bg-cyan-400/10">
-                <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+                <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
                   <th className="px-4 py-3">Cuenta</th>
                   <th className="px-4 py-3 text-right">Debe</th>
                   <th className="px-4 py-3 text-right">Haber</th>
@@ -537,15 +537,15 @@ function ExpensesPanel({
               </thead>
               <tbody>
                 {reporteGastos.gastos_por_cuenta.map((gasto, index) => (
-                  <tr key={index} className="border-b border-cyan-400/10 text-sm text-slate-200 transition hover:bg-cyan-400/10">
+                  <tr key={index} className="border-b border-cyan-400/10 text-sm text-foreground/90 transition hover:bg-cyan-400/10">
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-white">{gasto.cuenta_codigo}</div>
-                      <div className="mt-1 text-xs text-slate-400">{gasto.cuenta_nombre}</div>
+                      <div className="font-semibold text-foreground">{gasto.cuenta_codigo}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{gasto.cuenta_nombre}</div>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(gasto.total_debe)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(gasto.total_haber)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-cyan-100">{formatCurrency(Math.abs(gasto.saldo))}</td>
-                    <td className="px-4 py-3 text-center text-slate-300">{gasto.cantidad_movimientos}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(gasto.total_debe)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(gasto.total_haber)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-primary">{formatCurrency(Math.abs(gasto.saldo))}</td>
+                    <td className="px-4 py-3 text-center text-muted-foreground">{gasto.cantidad_movimientos}</td>
                   </tr>
                 ))}
               </tbody>

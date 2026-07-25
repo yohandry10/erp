@@ -62,28 +62,29 @@ if (!validation.isValid) {
 ```
 
 ### `boleta-validation.ts`
-Validación de requisito de GRE para boletas sin RUC > S/ 700.
+Validación de identificación del adquirente/usuario para boletas > S/ 700.
 
 **Regla SUNAT:**
-Boletas emitidas a clientes sin RUC con monto mayor a S/ 700 requieren Guía de Remisión Electrónica (GRE).
+Boletas con monto mayor a S/ 700 deben consignar apellidos y nombres o razón social, y número de documento del adquirente o usuario. Este umbral no genera una GRE automática por sí solo.
 
 **Funciones:**
-- `validateBoletaGRERequirement(documentoTipo, total)` - Valida si requiere GRE
+- `validateBoletaBuyerIdentityRequirement(documentoTipo, total)` - Valida si requiere identificar al adquirente o usuario
+- `validateBoletaGRERequirement(documentoTipo, total)` - Alias legacy; no marca GRE por el umbral de S/ 700
 - `clientHasRUC(documentoTipo)` - Verifica si cliente tiene RUC
 - `getBoletaWarningMessage(documentoTipo, total)` - Obtiene mensaje de advertencia
-- `getGREActionMessage(requiresGRE)` - Obtiene mensaje de acción
+- `getBuyerIdentityActionMessage(requiresBuyerIdentity)` - Obtiene mensaje de acción
 
 **Uso:**
 ```typescript
-import { validateBoletaGRERequirement } from '@/lib/validations/boleta-validation'
+import { validateBoletaBuyerIdentityRequirement } from '@/lib/validations/boleta-validation'
 
-const validation = validateBoletaGRERequirement(
+const validation = validateBoletaBuyerIdentityRequirement(
   cliente.documento_tipo,
   pedido.total
 )
 
-if (validation.requiresGRE) {
-  // Mostrar advertencia de GRE requerida
+if (validation.requiresBuyerIdentity) {
+  // Mostrar advertencia de identificación requerida
 }
 ```
 
@@ -125,7 +126,7 @@ const { validation, canAddMore, warningMessage } = useItemLimit(items.length)
 ```
 
 ### `use-boleta-validation.ts`
-Hook para validar requisito de GRE en boletas.
+Hook para validar identificación del adquirente en boletas.
 
 ```typescript
 import { useBoletaValidation } from '@/hooks/use-boleta-validation'
@@ -161,25 +162,27 @@ Badge que muestra el conteo de ítems con código de colores.
 <ItemCountBadge itemCount={items.length} />
 ```
 
-### `BoletaGREWarning`
-Muestra advertencia cuando una boleta sin RUC requiere GRE.
+### `BoletaBuyerIdentityWarning`
+Muestra advertencia cuando una boleta requiere identificación del adquirente o usuario.
 
 ```tsx
-<BoletaGREWarning
+<BoletaBuyerIdentityWarning
   documentoTipo={cliente.documento_tipo}
   total={pedido.total}
 />
 ```
 
-### `GRERequirementBadge`
-Badge que indica si se requiere GRE.
+### `BuyerIdentityRequirementBadge`
+Badge que indica si se requiere identificación del adquirente o usuario.
 
 ```tsx
-<GRERequirementBadge
+<BuyerIdentityRequirementBadge
   documentoTipo={cliente.documento_tipo}
   total={pedido.total}
 />
 ```
+
+Los exports legacy `BoletaGREWarning` y `GRERequirementBadge` se mantienen por compatibilidad, pero el texto visible ya no afirma que el umbral de S/ 700 exija GRE.
 
 ### `CertificateValidationAlert`
 Muestra el estado de validación del certificado digital.
@@ -223,10 +226,10 @@ Checklist de todas las validaciones pre-emisión.
 - Muestra advertencia cuando quedan menos de 10 ítems disponibles
 - Bloquea agregar más ítems cuando se alcanza el límite de 999
 
-### 3. Validación de Boleta sin RUC
+### 3. Validación de identificación en boleta
 - Se ejecuta al calcular totales en pedidos
 - Muestra advertencia cuando se acerca al umbral de S/ 700
-- Requiere GRE cuando se supera el umbral
+- Requiere consignar datos de identificación cuando se supera el umbral
 
 ### 4. Validación de Certificado Digital
 - Se ejecuta antes de generar factura
@@ -239,11 +242,11 @@ Checklist de todas las validaciones pre-emisión.
 - ✅ **15.1** - Validación de precio > 0
 - ✅ **15.2** - Validación de cantidad > 0
 - ✅ **15.3** - Validación de límite de 999 ítems
-- ✅ **15.4** - Validación de boleta sin RUC > S/ 700
+- ✅ **15.4** - Validación de identificación en boleta > S/ 700
 - ✅ **15.5** - Validación de certificado digital antes de facturar
 - ✅ **19.1** - Validación de RUC (11 dígitos) y DNI (8 dígitos)
 - ✅ **19.2** - Validación de RUC (11 dígitos) y DNI (8 dígitos)
-- ✅ **19.4** - Validación de boleta sin RUC
+- ✅ **19.4** - Validación de identificación en boleta
 - ✅ **19.5** - Validación de límite de ítems
 - ✅ **19.6** - Validación de certificado vigente
 - ✅ **19.7** - Mensaje claro si certificado ausente o vencido
@@ -280,10 +283,11 @@ expect(validation.isValid).toBe(true)
 const validation2 = validateItemLimit(1000)
 expect(validation2.isValid).toBe(false)
 
-// Test de boleta GRE
-const validation3 = validateBoletaGRERequirement(
+// Test de identificación en boleta
+const validation3 = validateBoletaBuyerIdentityRequirement(
   TipoDocumento.DNI,
   750
 )
-expect(validation3.requiresGRE).toBe(true)
+expect(validation3.requiresBuyerIdentity).toBe(true)
+expect(validation3.requiresGRE).toBe(false)
 ```

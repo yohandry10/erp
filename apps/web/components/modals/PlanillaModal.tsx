@@ -44,12 +44,12 @@ const VALOR_HORA_NORMAL = (sueldo: number) => sueldo / DIAS_LABORABLES_MES / HOR
 
 export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaModalProps) {
   console.log('🔥 PlanillaModal RENDERED - isOpen:', isOpen)
-  
+
   const { get, post } = useApi()
   const [loading, setLoading] = useState(false)
   const [empleados, setEmpleados] = useState<EmpleadoPlanilla[]>([])
 
-  
+
   const [formData, setFormData] = useState({
     periodo: '',
     tipo: 'mensual',
@@ -66,7 +66,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     const fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1)
     const fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0)
     const fechaPago = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 5)
-    
+
     setFormData({
       periodo,
       tipo: 'mensual',
@@ -82,15 +82,15 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     console.log('🔥 loadEmpleados INICIADO')
     try {
       setLoading(true)
-      
+
       console.log('🔥 Haciendo GET a /api/rrhh/empleados')
       const empleadosResponse = await get('/api/rrhh/empleados')
       console.log('🔥 Respuesta empleados:', empleadosResponse)
-      
+
       if (empleadosResponse && empleadosResponse.success && empleadosResponse.data) {
         const empleadosActivos = empleadosResponse.data.filter((emp: any) => emp.estado === 'activo')
         console.log('🔥 Empleados activos encontrados:', empleadosActivos.length)
-        
+
         const empleadosConDatos = empleadosActivos.map((emp: any) => {
           const sueldoBase = emp.contratos?.[0]?.sueldo_bruto || 0
           return {
@@ -111,7 +111,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
             sueldo_bruto_total: sueldoBase
           }
         })
-        
+
         console.log('🔥 Empleados procesados para planilla:', empleadosConDatos.length)
         setEmpleados(empleadosConDatos)
       } else {
@@ -150,21 +150,21 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
   const calcularValoresEmpleado = (empleado: EmpleadoPlanilla) => {
     const sueldoDiario = empleado.sueldo_base / DIAS_LABORABLES_MES
     const valorHoraNormal = empleado.sueldo_base / DIAS_LABORABLES_MES / HORAS_DIA
-    
+
     // Descuentos por tardanzas (proporcional por minuto)
     const descuentoTardanzas = (empleado.tardanzas_minutos * valorHoraNormal) / 60
-    
+
     // Descuentos por faltas (día completo)
     const descuentoFaltas = empleado.faltas * sueldoDiario
-    
+
     // Pago por horas extras
     const pagoHorasExtras25 = empleado.horas_extras_25 * valorHoraNormal * 1.25
     const pagoHorasExtras35 = empleado.horas_extras_35 * valorHoraNormal * 1.35
     const pagoHorasExtras = pagoHorasExtras25 + pagoHorasExtras35
-    
+
     // Sueldo bruto total
     const sueldoBrutoTotal = empleado.sueldo_base + empleado.bonos_adicionales + pagoHorasExtras - descuentoTardanzas - descuentoFaltas
-    
+
     return {
       sueldo_diario: sueldoDiario,
       descuento_tardanzas: descuentoTardanzas,
@@ -199,7 +199,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     try {
       console.log('🔥 Empleados seleccionados:', empleadosSeleccionados.length)
       console.log('🔥 Form data:', formData)
-      
+
       if (empleadosSeleccionados.length === 0) {
         console.error('🔥 ERROR: No hay empleados seleccionados')
         toast({
@@ -279,29 +279,29 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     console.log('🔥 Modal NO ESTÁ ABIERTO - retornando null')
     return null
   }
-  
+
   console.log('🔥 Modal SÍ ESTÁ ABIERTO - renderizando contenido')
-  
+
   const modalContent = (
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center p-4 z-[99999]"
     >
-      <div className="bg-white rounded-3 shadow w-[100%] max-w-[1280px] overflow-hidden z-[100000]"
+      <div className="bg-card rounded-xl shadow w-[100%] max-w-[1280px] overflow-hidden z-[100000]"
       >
-        
+
         {/* Header */}
         <div className="p-6 border-b">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-6 font-bold text-gray-800 flex items-center gap-2 m-0">
+              <h2 className="text-2xl font-bold text-foreground flex items-center gap-2 m-0">
                 💰 Nueva Planilla de Sueldos
               </h2>
-              <p className="text-3.5 text-gray-500 mt-[4px] m-0">
+              <p className="text-sm text-muted-foreground mt-[4px] m-0">
                 Configure el período y seleccione empleados para generar la planilla
               </p>
             </div>
 
             <button
-              onClick={handleClose} className="w-8 h-8 rounded-full bg-red-500 text-white border-0 cursor-pointer flex items-center justify-center font-bold text-4"
+              onClick={handleClose} className="w-8 h-8 rounded-full bg-red-500 text-white border-0 cursor-pointer flex items-center justify-center font-bold text-base"
             >
               ✕
             </button>
@@ -312,51 +312,51 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
         <div className="p-6 overflow-y-auto">
           <form id="planilla-form" onSubmit={handleSubmit} className="flex flex-col gap-6">
             {/* Configuración de Planilla */}
-            <div className="bg-[#f9fafb] p-4 rounded-2">
-              <h3 className="text-[18px] font-medium text-gray-800 mb-4 m-0">⚙️ Configuración</h3>
+            <div className="bg-muted p-4 rounded-lg">
+              <h3 className="text-[18px] font-medium text-foreground mb-4 m-0">⚙️ Configuración</h3>
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Período</label>
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Período</label>
                   <input
                     type="text"
                     value={formData.periodo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, periodo: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
+                    onChange={(e) => setFormData(prev => ({ ...prev, periodo: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
                     placeholder="2025-06"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Fecha Inicio</label>
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Fecha Inicio</label>
                   <input
                     type="date"
                     value={formData.fecha_inicio}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_inicio: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
+                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_inicio: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Fecha Fin</label>
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Fecha Fin</label>
                   <input
                     type="date"
                     value={formData.fecha_fin}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_fin: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
+                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_fin: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Fecha Pago</label>
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Fecha Pago</label>
                   <input
                     type="date"
                     value={formData.fecha_pago}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_pago: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
+                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_pago: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
                   />
                 </div>
               </div>
               <div className="mt-4">
-                <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Observaciones</label>
+                <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Observaciones</label>
                 <textarea
                   value={formData.observaciones}
-                  onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
+                  onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
                   rows={2}
                 />
               </div>
@@ -364,20 +364,20 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
 
             {/* Gestión de Empleados */}
             <div>
-              <h3 className="text-[18px] font-medium text-gray-800 mb-4 m-0">👥 Empleados para Planilla</h3>
-              
-              <div className="border rounded-2 overflow-hidden">
+              <h3 className="text-[18px] font-medium text-foreground mb-4 m-0">👥 Empleados para Planilla</h3>
+
+              <div className="border rounded-lg overflow-hidden">
                 {/* Header con explicaciones claras */}
-                <div className="bg-[#f9fafb] py-3 px-4 grid grid-cols-[40px_200px_120px_80px_80px_80px_80px_80px_120px] gap-2 text-3 font-semibold text-gray-700 border-b">
+                <div className="bg-muted py-3 px-4 grid grid-cols-[40px_200px_120px_80px_80px_80px_80px_80px_120px] gap-2 text-xs font-semibold text-foreground/85 border-b">
                   <div>✓</div>
                   <div>👤 EMPLEADO</div>
-                  <div>💰 SUELDO BASE<br/><span className="text-2.5 text-gray-500">Mensual S/</span></div>
-                  <div>📅 DÍAS<br/><span className="text-2.5 text-gray-500">Trabajados</span></div>
-                  <div>⏰ HE 25%<br/><span className="text-2.5 text-gray-500">Primeras 2h</span></div>
-                  <div>⏰ HE 35%<br/><span className="text-2.5 text-gray-500">Siguientes</span></div>
-                  <div>⏱️ TARDANZAS<br/><span className="text-2.5 text-gray-500">Minutos</span></div>
-                  <div>❌ FALTAS<br/><span className="text-2.5 text-gray-500">Días</span></div>
-                  <div>💵 BONOS<br/><span className="text-2.5 text-gray-500">Adicionales S/</span></div>
+                  <div>💰 SUELDO BASE<br/><span className="text-[0.625rem] text-muted-foreground">Mensual S/</span></div>
+                  <div>📅 DÍAS<br/><span className="text-[0.625rem] text-muted-foreground">Trabajados</span></div>
+                  <div>⏰ HE 25%<br/><span className="text-[0.625rem] text-muted-foreground">Primeras 2h</span></div>
+                  <div>⏰ HE 35%<br/><span className="text-[0.625rem] text-muted-foreground">Siguientes</span></div>
+                  <div>⏱️ TARDANZAS<br/><span className="text-[0.625rem] text-muted-foreground">Minutos</span></div>
+                  <div>❌ FALTAS<br/><span className="text-[0.625rem] text-muted-foreground">Días</span></div>
+                  <div>💵 BONOS<br/><span className="text-[0.625rem] text-muted-foreground">Adicionales S/</span></div>
                 </div>
 
                 {/* Filas de empleados con explicaciones */}
@@ -385,7 +385,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                   {empleados.map((empleado) => {
                     const valores = calcularValoresEmpleado(empleado)
                     return (
-                    <div 
+                    <div
                       key={empleado.id} className="py-3 px-4 grid grid-cols-[40px_200px_120px_80px_80px_80px_80px_80px_120px] gap-2 text-[13px] border-b"
                     >
                       {/* Checkbox selección */}
@@ -396,13 +396,13 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                           onChange={(e) => actualizarEmpleado(empleado.id, 'incluir', e.target.checked)} className="w-4 h-4 cursor-pointer"
                         />
                       </div>
-                      
+
                       {/* Datos del empleado */}
                       <div>
-                        <div className="font-semibold text-gray-800 mb-[2px]">
+                        <div className="font-semibold text-foreground mb-[2px]">
                           {empleado.nombres} {empleado.apellidos}
                         </div>
-                        <div className="text-[11px] text-gray-500">
+                        <div className="text-[11px] text-muted-foreground">
                           {empleado.puesto} • DNI: {empleado.numero_documento}
                         </div>
                       </div>
@@ -412,100 +412,100 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                           type="number"
                           value={empleado.sueldo_base}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'sueldo_base', parseFloat(e.target.value) || 0)}
-                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-xs border rounded-[4px] text-center"
                           min="0"
                           step="0.01"
                           placeholder="0.00"
                         />
-                        <div className="text-2.5 text-emerald-600 font-semibold mt-[2px]">
+                        <div className="text-[0.625rem] text-emerald-400 font-semibold mt-[2px]">
                           S/ {empleado.sueldo_base.toFixed(0)}
                         </div>
                       </div>
-                      
+
                       {/* Días Trabajados */}
                       <div className="text-center">
                         <input
                           type="number"
                           value={empleado.dias_trabajados}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'dias_trabajados', parseInt(e.target.value) || 0)}
-                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-xs border rounded-[4px] text-center"
                           min="0"
                           max="31"
                         />
-                        <div className="text-2.5 text-blue-600 font-semibold mt-[2px]">
+                        <div className="text-[0.625rem] text-primary font-semibold mt-[2px]">
                           de 30 días
                         </div>
                       </div>
-                      
+
                       {/* Horas Extras 25% */}
                       <div className="text-center">
                         <input
                           type="number"
                           value={empleado.horas_extras_25}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_25', parseFloat(e.target.value) || 0)}
-                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-xs border rounded-[4px] text-center"
                           min="0"
                           step="0.5"
                         />
-                        <div className="text-2.5 text-red-600 font-semibold mt-[2px]">
+                        <div className="text-[0.625rem] text-destructive font-semibold mt-[2px]">
                           +25%
                         </div>
                       </div>
-                      
+
                       {/* Horas Extras 35% */}
                       <div className="text-center">
                         <input
                           type="number"
                           value={empleado.horas_extras_35}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_35', parseFloat(e.target.value) || 0)}
-                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-xs border rounded-[4px] text-center"
                           min="0"
                           step="0.5"
                         />
-                        <div className="text-2.5 text-red-600 font-semibold mt-[2px]">
+                        <div className="text-[0.625rem] text-destructive font-semibold mt-[2px]">
                           +35%
                         </div>
                       </div>
-                      
+
                       {/* Tardanzas */}
                       <div className="text-center">
                         <input
                           type="number"
                           value={empleado.tardanzas_minutos}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'tardanzas_minutos', parseInt(e.target.value) || 0)}
-                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-xs border rounded-[4px] text-center"
                           min="0"
                         />
-                        <div className="text-2.5 text-amber-500 font-semibold mt-[2px]">
+                        <div className="text-[0.625rem] text-amber-500 font-semibold mt-[2px]">
                           -S/ {(empleado.tardanzas_minutos * (empleado.sueldo_base / 30 / 8) / 60).toFixed(0)}
                         </div>
                       </div>
-                      
+
                       {/* Faltas */}
                       <div className="text-center">
                         <input
                           type="number"
                           value={empleado.faltas}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'faltas', parseInt(e.target.value) || 0)}
-                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-xs border rounded-[4px] text-center"
                           min="0"
                         />
-                        <div className="text-2.5 text-red-500 font-semibold mt-[2px]">
+                        <div className="text-[0.625rem] text-red-500 font-semibold mt-[2px]">
                           -S/ {(empleado.faltas * (empleado.sueldo_base / 30)).toFixed(0)}
                         </div>
                       </div>
-                      
+
                       {/* Bonos Adicionales */}
                       <div className="text-center">
                         <input
                           type="number"
                           value={empleado.bonos_adicionales}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'bonos_adicionales', parseFloat(e.target.value) || 0)}
-                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-xs border rounded-[4px] text-center"
                           min="0"
                           step="0.01"
                         />
-                        <div className="text-2.5 text-emerald-600 font-semibold mt-[2px]">
+                        <div className="text-[0.625rem] text-emerald-400 font-semibold mt-[2px]">
                           Total: S/ {valores.sueldo_bruto_total.toFixed(0)}
                         </div>
                       </div>
@@ -516,45 +516,45 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
               </div>
 
               {/* Resumen Empresarial Claro */}
-              <div className="mt-4 p-4 bg-[#eff6ff] rounded-2 border">
+              <div className="mt-4 p-4 bg-muted rounded-lg border">
                 <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4 text-center">
                   <div>
-                    <div className="text-6 font-bold text-blue-700">
+                    <div className="text-2xl font-bold text-primary">
                       {empleadosSeleccionados.length}
                     </div>
-                    <div className="text-3 text-[#1e40af] font-medium">
+                    <div className="text-xs text-[#1e40af] font-medium">
                       EMPLEADOS INCLUIDOS
                     </div>
                   </div>
-                  
+
                   <div>
-                    <div className="text-6 font-bold text-emerald-600">
+                    <div className="text-2xl font-bold text-emerald-400">
                       S/ {totalPlanilla.toFixed(0)}
                     </div>
-                    <div className="text-3 text-emerald-700 font-medium">
+                    <div className="text-xs text-emerald-400 font-medium">
                       TOTAL BRUTO PLANILLA
                     </div>
                   </div>
-                  
+
                   <div>
-                    <div className="text-6 font-bold text-violet-600">
+                    <div className="text-2xl font-bold text-violet-400">
                       S/ {empleadosSeleccionados.length > 0 ? (totalPlanilla / empleadosSeleccionados.length).toFixed(0) : '0'}
                     </div>
-                    <div className="text-3 text-violet-700 font-medium">
+                    <div className="text-xs text-violet-400 font-medium">
                       PROMEDIO POR EMPLEADO
                     </div>
                   </div>
-                  
+
                   <div>
-                    <div className="text-6 font-bold text-red-600">
+                    <div className="text-2xl font-bold text-destructive">
                       {formData.periodo}
                     </div>
-                    <div className="text-3 text-red-700 font-medium">
+                    <div className="text-xs text-destructive font-medium">
                       PERÍODO PLANILLA
                     </div>
                   </div>
                 </div>
-                
+
                 {empleadosSeleccionados.length > 0 && (
                   <div className="mt-3 py-2 px-3 bg-[#dcfce7] rounded-[6px] text-[13px] text-[#166534] text-center font-medium">
                     ✅ Planilla lista para procesar con {empleadosSeleccionados.length} empleados
@@ -567,19 +567,19 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
         </div>
 
         {/* Footer */}
-        <div className="py-4 px-6 border-t bg-[#f9fafb] flex justify-end items-center gap-3">
+        <div className="py-4 px-6 border-t bg-muted flex justify-end items-center gap-3">
           <button
             type="button"
             onClick={handleClose}
-            disabled={loading} className="py-2 px-6 text-gray-500 border rounded-2 bg-white text-3.5"
+            disabled={loading} className="py-2 px-6 text-muted-foreground border rounded-lg bg-card text-sm"
           >
             Cancelar
           </button>
-          
+
           <button
             type="submit"
             form="planilla-form"
-            disabled={loading || empleadosSeleccionados.length === 0 || !formData.periodo} className="py-2 px-8 text-white rounded-2 border-0 flex items-center gap-2 text-3.5 font-medium"
+            disabled={loading || empleadosSeleccionados.length === 0 || !formData.periodo} className="py-2 px-8 text-white rounded-lg border-0 flex items-center gap-2 text-sm font-medium"
           >
             {loading ? (
               <>
@@ -589,7 +589,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
             ) : (
               <>
                 ✅ Crear Planilla
-                <span className="bg-blue-700 py-[2px] px-2 rounded-[4px] text-3">
+                <span className="bg-blue-700 py-[2px] px-2 rounded-[4px] text-xs">
                   {empleadosSeleccionados.length} empleados
                 </span>
               </>
@@ -608,4 +608,4 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     console.log('🔥 Window undefined - no creando portal')
     return null
   }
-} 
+}

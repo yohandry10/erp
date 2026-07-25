@@ -31,6 +31,7 @@ export interface MovimientoAlmacenParams {
 export interface MovimientoInventario {
   tenant_id: string;
   producto_id: string;
+  almacen_id: string;
   tipo: TipoMovimiento;
   cantidad: number;
   referencia_tipo?: string;
@@ -131,28 +132,48 @@ export class InventarioService {
     try {
       console.log(`📝 [Tenant: ${movimiento.tenant_id}] Creando movimiento tipo ${movimiento.tipo} para producto ${movimiento.producto_id}`);
 
-      const { data, error } = await this.supabase.getClient()
-        .from('movimientos_inventario')
-        .insert({
-          tenant_id: movimiento.tenant_id,
-          producto_id: movimiento.producto_id,
-          tipo: movimiento.tipo,
-          cantidad: movimiento.cantidad,
-          referencia_tipo: movimiento.referencia_tipo || null,
-          referencia_id: movimiento.referencia_id || null,
-          notas: movimiento.notas || null,
-          created_by: movimiento.created_by || null,
-          created_at: new Date().toISOString()
-        })
-        .select('id')
-        .single();
+      if (!movimiento.almacen_id) {
+        throw new BadRequestException('almacen_id es obligatorio para crear movimientos físicos');
+      }
+      const referenciaId = movimiento.referencia_id || null;
+      if (referenciaId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(referenciaId)) {
+        throw new BadRequestException('referencia_id debe ser UUID para garantizar idempotencia');
+      }
+
+      const rpc = movimiento.tipo === TipoMovimiento.AJUSTE
+        ? 'ajustar_stock_en_almacen_tx'
+        : 'aplicar_movimiento_inventario_tx';
+      const payload = movimiento.tipo === TipoMovimiento.AJUSTE
+        ? {
+            p_tenant_id: movimiento.tenant_id,
+            p_producto_id: movimiento.producto_id,
+            p_almacen_id: movimiento.almacen_id,
+            p_delta: movimiento.cantidad,
+            p_referencia_tipo: movimiento.referencia_tipo || 'AJUSTE',
+            p_referencia_id: referenciaId,
+            p_notas: movimiento.notas || null,
+            p_metadata: { source: 'inventario_service_crear_movimiento' },
+          }
+        : {
+            p_tenant_id: movimiento.tenant_id,
+            p_producto_id: movimiento.producto_id,
+            p_almacen_id: movimiento.almacen_id,
+            p_tipo: movimiento.tipo,
+            p_cantidad: movimiento.cantidad,
+            p_referencia_tipo: movimiento.referencia_tipo || null,
+            p_referencia_id: referenciaId,
+            p_notas: movimiento.notas || null,
+            p_created_by: movimiento.created_by || null,
+            p_metadata: { source: 'inventario_service_crear_movimiento' },
+          };
+      const { data, error } = await this.supabase.getClient().rpc(rpc, payload);
 
       if (error) {
         console.error('❌ Error creando movimiento:', error);
         throw new BadRequestException(`Error creando movimiento: ${error.message}`);
       }
 
-      console.log(`✅ Movimiento creado: ${data.id}`);
+      console.log(`✅ Movimiento creado: ${data}`);
 
       // 🔴 CRÍTICO FIX: Emitir evento MovimientoStockEvent para contabilidad
       // Solo emitir para movimientos que afectan stock real (ENTRADA, SALIDA, AJUSTE)
@@ -266,7 +287,7 @@ export class InventarioService {
         }
       }
 
-      return data.id;
+      return String(data);
     } catch (error) {
       console.error('❌ Error en crearMovimiento:', error);
       throw error;
@@ -312,45 +333,23 @@ export class InventarioService {
         throw new NotFoundException(`Producto ${producto_id} no encontrado`);
       }
 
-      const stockActual = parseFloat((producto as any).stock_actual || '0');
-      const stockReservado = parseFloat(producto.stock_reservado || '0');
-      const stockDisponible = stockActual - stockReservado;
-
-      console.log(`📊 Stock actual: ${stockActual}, reservado: ${stockReservado}, disponible: ${stockDisponible}`);
-
-      // Advertencia si stock insuficiente (pero permitir continuar)
-      if (stockDisponible < cantidad) {
-        console.warn(`⚠️ Stock insuficiente: disponible ${stockDisponible}, solicitado ${cantidad}`);
+      const { data: movimientoId, error: reservaError } = await this.supabase.getClient().rpc(
+        'reservar_stock_atomico',
+        {
+          p_producto_id: producto_id,
+          p_cantidad: cantidad,
+          p_referencia_tipo: referencia_tipo ?? null,
+          p_referencia_id: referencia_id ?? null,
+          p_notas: `Reserva de ${cantidad} unidades`,
+        },
+      );
+      if (reservaError) {
+        throw new BadRequestException(`No se pudo reservar el stock físico: ${reservaError.message}`);
       }
 
-      // Operación atómica: actualizar stock_reservado
-      const nuevoStockReservado = stockReservado + cantidad;
+      console.log(`✅ Stock reservado atómicamente. Movimiento: ${movimientoId}`);
 
-      const { error: updateError } = await this.supabase.getClient()
-        .from('productos')
-        .update({ stock_reservado: nuevoStockReservado })
-        .eq('tenant_id', tenant_id)
-        .eq('id', producto_id);
-
-      if (updateError) {
-        console.error('❌ Error actualizando stock_reservado:', updateError);
-        throw new BadRequestException(`Error actualizando stock: ${updateError.message}`);
-      }
-
-      // Crear movimiento de RESERVA
-      const movimientoId = await this.crearMovimiento({
-        tenant_id,
-        producto_id,
-        tipo: TipoMovimiento.RESERVA,
-        cantidad,
-        referencia_tipo,
-        referencia_id,
-        notas: `Reserva de ${cantidad} unidades`
-      });
-
-      console.log(`✅ Stock reservado exitosamente. Nuevo stock_reservado: ${nuevoStockReservado}`);
-
-      return movimientoId;
+      return String(movimientoId);
     } catch (error) {
       console.error('❌ Error reservando stock:', error);
       throw error;
@@ -396,45 +395,23 @@ export class InventarioService {
         throw new NotFoundException(`Producto ${producto_id} no encontrado`);
       }
 
-      const stockReservado = parseFloat(producto.stock_reservado || '0');
-
-      console.log(`📊 Stock reservado actual: ${stockReservado}`);
-
-      // Validar que hay suficiente stock reservado para liberar
-      if (stockReservado < cantidad) {
-        console.warn(`⚠️ Intentando liberar más de lo reservado: reservado ${stockReservado}, a liberar ${cantidad}`);
-        // Ajustar a lo máximo disponible
-        cantidad = stockReservado;
+      const { data: movimientoId, error: liberacionError } = await this.supabase.getClient().rpc(
+        'liberar_stock_atomico',
+        {
+          p_producto_id: producto_id,
+          p_cantidad: cantidad,
+          p_referencia_tipo: referencia_tipo ?? null,
+          p_referencia_id: referencia_id ?? null,
+          p_notas: `Liberación de ${cantidad} unidades`,
+        },
+      );
+      if (liberacionError) {
+        throw new BadRequestException(`No se pudo liberar la reserva física: ${liberacionError.message}`);
       }
 
-      // Operación atómica: decrementar stock_reservado
-      const nuevoStockReservado = Math.max(0, stockReservado - cantidad);
+      console.log(`✅ Reserva liberada atómicamente. Movimiento: ${movimientoId}`);
 
-      const { error: updateError } = await this.supabase.getClient()
-        .from('productos')
-        .update({ stock_reservado: nuevoStockReservado })
-        .eq('tenant_id', tenant_id)
-        .eq('id', producto_id);
-
-      if (updateError) {
-        console.error('❌ Error actualizando stock_reservado:', updateError);
-        throw new BadRequestException(`Error actualizando stock: ${updateError.message}`);
-      }
-
-      // Crear movimiento de LIBERACION
-      const movimientoId = await this.crearMovimiento({
-        tenant_id,
-        producto_id,
-        tipo: TipoMovimiento.LIBERACION,
-        cantidad,
-        referencia_tipo,
-        referencia_id,
-        notas: `Liberación de ${cantidad} unidades`
-      });
-
-      console.log(`✅ Reserva liberada exitosamente. Nuevo stock_reservado: ${nuevoStockReservado}`);
-
-      return movimientoId;
+      return String(movimientoId);
     } catch (error) {
       console.error('❌ Error liberando reserva:', error);
       throw error;
@@ -965,7 +942,7 @@ export class InventarioService {
 
       let salidasQuery = client
         .from('movimientos_inventario')
-        .select('id, tenant_id, producto_id, tipo, cantidad, created_at, referencia_tipo, referencia_id, notas, metadata')
+        .select('id, tenant_id, producto_id, tipo, cantidad, created_at, referencia_tipo, referencia_id, notas, metadata, almacen_id')
         .eq('tenant_id', tenantId)
         .in('tipo', ['SALIDA', 'AJUSTE', 'DEVOLUCION']);
 
@@ -989,10 +966,46 @@ export class InventarioService {
         throw salidasError;
       }
 
+      // Resolver nombres de producto para las salidas (movimientos_inventario no trae el join)
+      const salidaProductoIds = Array.from(
+        new Set((salidasData ?? []).map((m: any) => m.producto_id).filter(Boolean)),
+      );
+      const productosSalidaMap = new Map<string, any>();
+      if (salidaProductoIds.length > 0) {
+        const { data: productosSalida } = await client
+          .from('productos')
+          .select('id, nombre, codigo, sku')
+          .eq('tenant_id', tenantId)
+          .in('id', salidaProductoIds);
+        for (const p of productosSalida ?? []) {
+          productosSalidaMap.set(p.id, p);
+        }
+      }
+
+      // Resolver nombres de almacén para las salidas
+      const salidaAlmacenIds = Array.from(
+        new Set((salidasData ?? []).map((m: any) => m.almacen_id).filter(Boolean)),
+      );
+      const almacenesSalidaMap = new Map<string, any>();
+      if (salidaAlmacenIds.length > 0) {
+        const { data: almacenesSalida } = await client
+          .from('almacenes')
+          .select('id, nombre, codigo')
+          .eq('tenant_id', tenantId)
+          .in('id', salidaAlmacenIds);
+        for (const a of almacenesSalida ?? []) {
+          almacenesSalidaMap.set(a.id, a);
+        }
+      }
+
       const movimientosSalida = (salidasData ?? []).map((movimiento: any) => {
         const cantidad = Number(movimiento.cantidad ?? 0);
         const costoUnitario = this.round2(Number(movimiento.metadata?.costo_unitario ?? 0));
         const valorTotal = this.round2(Number(movimiento.metadata?.valor_total ?? costoUnitario * cantidad));
+        const productoInfo = productosSalidaMap.get(movimiento.producto_id);
+        const almacenInfo = movimiento.almacen_id
+          ? almacenesSalidaMap.get(movimiento.almacen_id)
+          : null;
         return {
           id: movimiento.id,
           tipo: movimiento.tipo ?? 'SALIDA',
@@ -1005,11 +1018,17 @@ export class InventarioService {
           moneda: 'PEN',
           producto: {
             id: movimiento.producto_id,
-            nombre: 'Producto',
-            codigo: null,
-            sku: null,
+            nombre: productoInfo?.nombre ?? 'Producto',
+            codigo: productoInfo?.codigo ?? null,
+            sku: productoInfo?.sku ?? null,
           },
-          almacen: null,
+          almacen: almacenInfo
+            ? {
+                id: almacenInfo.id,
+                nombre: almacenInfo.nombre ?? 'Almacén',
+                codigo: almacenInfo.codigo ?? null,
+              }
+            : null,
           ubicacion: null,
           lote: null,
           serie: null,

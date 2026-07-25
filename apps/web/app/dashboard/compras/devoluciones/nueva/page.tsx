@@ -239,23 +239,23 @@ export default function NuevaDevolucionPage() {
       {/* Header */}
       <div className="mb-6">
         <button
-          onClick={() => step === 1 ? router.back() : setStep(1)} className="flex items-center gap-2 py-2 px-4 bg-white border rounded-2 cursor-pointer text-3.5 font-medium mb-4"
+          onClick={() => step === 1 ? router.back() : setStep(1)} className="flex items-center gap-2 py-2 px-4 bg-card border rounded-lg cursor-pointer text-sm font-medium mb-4"
         >
           <ArrowLeft size={18} />
           Volver
         </button>
 
-        <h1 className="text-6 font-bold mb-[4px]">
+        <h1 className="text-2xl font-bold mb-[4px]">
           Nueva Devolución a Proveedor
         </h1>
-        <p className="text-[var(--text-secondary)] text-3.5">
+        <p className="text-[var(--text-secondary)] text-sm">
           {step === 1 ? 'Seleccione la recepción' : 'Configure los items a devolver'}
         </p>
       </div>
 
       {/* Progress */}
       {formError && (
-        <div className="py-3 px-4 border bg-[var(--red-50)] text-[var(--red-700)] rounded-2 mb-5 text-3.5 font-medium">
+        <div className="py-3 px-4 border bg-[var(--red-50)] text-[var(--red-700)] rounded-lg mb-5 text-sm font-medium">
           {formError}
         </div>
       )}
@@ -289,13 +289,13 @@ export default function NuevaDevolucionPage() {
                 type="text"
                 placeholder="Buscar por número de recepción, orden o proveedor..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)} className="w-[100%] pt-3 pr-3 pb-3 pl-10 border rounded-2 text-3.5"
+                onChange={(e) => setSearchTerm(e.target.value)} className="w-[100%] pt-3 pr-3 pb-3 pl-10 border rounded-lg text-sm"
               />
             </div>
           </div>
 
           {/* Lista de Recepciones */}
-          <div className="bg-white border rounded-3 overflow-hidden">
+          <div className="bg-card border rounded-xl overflow-hidden">
             {loading ? (
               <div className="p-[60px] text-center text-[var(--text-secondary)]">
                 Cargando recepciones...
@@ -319,17 +319,17 @@ export default function NuevaDevolucionPage() {
                     <div className="flex justify-between">
                       <div>
                         <div className="flex gap-3 items-center mb-2">
-                          <span className="text-4 font-semibold">
+                          <span className="text-base font-semibold">
                             {recepcion.numero}
                           </span>
                           <span className="py-[4px] px-2 rounded-[6px] text-[11px] font-semibold bg-[var(--emerald-100)] text-[var(--emerald-800)]">
                             {recepcion.estado}
                           </span>
                         </div>
-                        <p className="text-3.5 text-[var(--text-secondary)] mb-[4px]">
+                        <p className="text-sm text-[var(--text-secondary)] mb-[4px]">
                           Orden: {recepcion.orden?.numero}
                         </p>
-                        <p className="text-3.5 font-medium">
+                        <p className="text-sm font-medium">
                           {recepcion.orden?.proveedor?.razon_social}
                         </p>
                         <p className="text-[13px] text-[var(--text-secondary)]">
@@ -354,14 +354,14 @@ export default function NuevaDevolucionPage() {
       {step === 2 && selectedRecepcion && (
         <div>
           {/* Info de Recepción */}
-          <div className="bg-[var(--blue-50)] border rounded-3 p-4 mb-6">
+          <div className="bg-[var(--blue-50)] border rounded-xl p-4 mb-6">
             <div className="flex gap-2 mb-3">
               <AlertCircle size={20} className="text-[var(--blue-600)] shrink-0 mt-[2px]" />
               <div>
                 <p className="font-semibold mb-[4px] text-[var(--blue-900)]">
                   Recepción: {selectedRecepcion.numero}
                 </p>
-                <p className="text-3.5 text-[var(--blue-800)]">
+                <p className="text-sm text-[var(--blue-800)]">
                   Orden: {selectedRecepcion.orden?.numero} | Proveedor: {selectedRecepcion.orden?.proveedor?.razon_social}
                 </p>
               </div>
@@ -369,8 +369,8 @@ export default function NuevaDevolucionPage() {
           </div>
 
           {/* Motivo General */}
-          <div className="bg-white border rounded-3 p-5 mb-5">
-            <h3 className="text-4 font-semibold mb-4">
+          <div className="bg-card border rounded-xl p-5 mb-5">
+            <h3 className="text-base font-semibold mb-4">
               Información General
             </h3>
 
@@ -380,7 +380,7 @@ export default function NuevaDevolucionPage() {
               </label>
               <select
                 value={motivoGeneral}
-                onChange={(e) => setMotivoGeneral(e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-2 text-3.5"
+                onChange={(e) => setMotivoGeneral(e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-lg text-sm"
               >
                 <option value="">Seleccione un motivo</option>
                 <option value="DEFECTUOSO">Producto Defectuoso</option>
@@ -398,16 +398,16 @@ export default function NuevaDevolucionPage() {
               <textarea
                 value={observacionesGenerales}
                 onChange={(e) => setObservacionesGenerales(e.target.value)}
-                rows={3} className="w-[100%] py-2.5 px-3 border rounded-2 text-3.5"
+                rows={3} className="w-[100%] py-2.5 px-3 border rounded-lg text-sm"
                 placeholder="Detalles adicionales sobre la devolución..."
               />
             </div>
           </div>
 
           {/* Items */}
-          <div className="bg-white border rounded-3 p-5">
+          <div className="bg-card border rounded-xl p-5">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-4 font-semibold">
+              <h3 className="text-base font-semibold">
                 Items a Devolver ({items.length})
               </h3>
               <button
@@ -426,17 +426,17 @@ export default function NuevaDevolucionPage() {
               <div className="flex flex-col gap-3">
                 {items.map((item, index) => (
                   <div
-                    key={index} className="p-4 border rounded-2 bg-[var(--gray-50)]"
+                    key={index} className="p-4 border rounded-lg bg-[var(--gray-50)]"
                   >
                     <div className="grid grid-cols-[2fr_1fr_1.5fr_0.5fr] gap-3">
                       <div>
-                        <label className="block mb-[6px] text-3 font-medium">
+                        <label className="block mb-[6px] text-xs font-medium">
                           Producto *
                         </label>
                         {item.producto ? (
-                          <div className="py-2.5 px-3 bg-white border rounded-[6px]">
-                            <div className="font-medium text-3.5">{item.producto.nombre}</div>
-                            <div className="text-3 text-[var(--text-secondary)]">
+                          <div className="py-2.5 px-3 bg-card border rounded-[6px]">
+                            <div className="font-medium text-sm">{item.producto.nombre}</div>
+                            <div className="text-xs text-[var(--text-secondary)]">
                               Código: {item.producto.codigo}
                             </div>
                           </div>
@@ -445,13 +445,13 @@ export default function NuevaDevolucionPage() {
                             type="text"
                             placeholder="ID del producto"
                             value={item.producto_id}
-                            onChange={(e) => updateItem(index, 'producto_id', e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-3.5"
+                            onChange={(e) => updateItem(index, 'producto_id', e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-sm"
                           />
                         )}
                       </div>
 
                       <div>
-                        <label className="block mb-[6px] text-3 font-medium">
+                        <label className="block mb-[6px] text-xs font-medium">
                           Cantidad *
                         </label>
                         <input
@@ -459,17 +459,17 @@ export default function NuevaDevolucionPage() {
                           min="0"
                           step="1"
                           value={item.cantidad}
-                          onChange={(e) => updateItem(index, 'cantidad', parseFloat(e.target.value) || 0)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-3.5"
+                          onChange={(e) => updateItem(index, 'cantidad', parseFloat(e.target.value) || 0)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-sm"
                         />
                       </div>
 
                       <div>
-                        <label className="block mb-[6px] text-3 font-medium">
+                        <label className="block mb-[6px] text-xs font-medium">
                           Motivo *
                         </label>
                         <select
                           value={item.motivo}
-                          onChange={(e) => updateItem(index, 'motivo', e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-3.5"
+                          onChange={(e) => updateItem(index, 'motivo', e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-sm"
                         >
                           <option value="DEFECTUOSO">Defectuoso</option>
                           <option value="INCORRECTO">Incorrecto</option>
@@ -489,7 +489,7 @@ export default function NuevaDevolucionPage() {
                     </div>
 
                     <div className="mt-3">
-                      <label className="block mb-[6px] text-3 font-medium">
+                      <label className="block mb-[6px] text-xs font-medium">
                         Observaciones del Item
                       </label>
                       <input
@@ -509,13 +509,13 @@ export default function NuevaDevolucionPage() {
           <div className="flex gap-3 justify-end mt-6">
             <button
               onClick={() => setStep(1)}
-              disabled={loading} className="py-3 px-6 bg-white text-[var(--text-primary)] border rounded-2 text-3.5 font-medium"
+              disabled={loading} className="py-3 px-6 bg-card text-[var(--text-primary)] border rounded-lg text-sm font-medium"
             >
               Volver
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || items.length === 0 || !motivoGeneral} className="py-3 px-8 bg-[var(--primary-600)] text-white border-0 rounded-2 text-3.5 font-semibold"
+              disabled={loading || items.length === 0 || !motivoGeneral} className="py-3 px-8 bg-[var(--primary-600)] text-white border-0 rounded-lg text-sm font-semibold"
             >
               {loading ? 'Creando...' : 'Crear Devolución'}
             </button>

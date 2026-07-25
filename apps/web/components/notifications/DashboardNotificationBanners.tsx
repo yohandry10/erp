@@ -54,20 +54,9 @@ export function DashboardNotificationBanners() {
       })
     }
 
-    // Check for incomplete configuration
-    if (!status.isComplete) {
-      newBanners.push({
-        id: 'configuration-incomplete',
-        type: 'configuration_incomplete',
-        severity: 'warning',
-        title: 'Configuración Incompleta',
-        message: `Tu configuración está ${status.completionPercentage}% completa. Completa la configuración para usar todas las funcionalidades del sistema.`,
-        actionUrl: '/dashboard/wizard',
-        actionLabel: 'Completar Configuración',
-        dismissible: true,
-        persistent: true,
-      })
-    }
+    // Nota: la configuración incompleta ya la muestran ConfigurationBanner +
+    // ConfigurationModal en el dashboard; duplicarla aquí generaba dos banners
+    // apilados con el mismo mensaje.
 
     return newBanners
   }, [status])

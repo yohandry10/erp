@@ -18,8 +18,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { parseDateLocal } from '@/lib/date-utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import toast from 'react-hot-toast'
 
 interface OrdenCompra {
   id: string
@@ -40,7 +42,7 @@ interface OrdenCompra {
   detalles?: any[]
 }
 
-type EstadoOrden = 'BORRADOR' | 'APROBACION' | 'APROBADA' | 'PARCIAL' | 'RECIBIDA' | 'CERRADA' | 'ANULADA'
+type EstadoOrden = 'BORRADOR' | 'PENDIENTE' | 'APROBACION' | 'APROBADA' | 'PARCIAL' | 'RECIBIDA' | 'CERRADA' | 'ANULADA'
 
 type EstadoConfig = {
   label: string
@@ -54,28 +56,35 @@ const ESTADOS_CONFIG: Record<EstadoOrden, EstadoConfig> = {
   BORRADOR: {
     label: 'Borrador',
     icon: Edit,
-    badge: 'border-slate-400/30 bg-slate-400/10 text-slate-200',
+    badge: 'border-border/30 bg-slate-400/10 text-foreground/90',
     panel: 'from-slate-500/15 to-slate-500/5',
-    border: 'border-slate-400/25',
+    border: 'border-border/25',
+  },
+  PENDIENTE: {
+    label: 'Pendiente',
+    icon: Clock,
+    badge: 'border-orange-300/30 bg-orange-300/10 text-amber-400 dark:text-orange-200',
+    panel: 'from-orange-300/15 to-orange-300/5',
+    border: 'border-orange-300/25',
   },
   APROBACION: {
     label: 'En aprobacion',
     icon: Clock,
-    badge: 'border-amber-300/30 bg-amber-300/10 text-amber-100',
+    badge: 'border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200',
     panel: 'from-amber-300/15 to-amber-300/5',
     border: 'border-amber-300/25',
   },
   APROBADA: {
     label: 'Aprobada',
     icon: CheckCircle,
-    badge: 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
+    badge: 'border-cyan-300/30 bg-cyan-300/10 text-primary',
     panel: 'from-cyan-300/15 to-cyan-300/5',
     border: 'border-cyan-300/25',
   },
   PARCIAL: {
     label: 'Parcial',
     icon: Package,
-    badge: 'border-blue-300/30 bg-blue-300/10 text-blue-100',
+    badge: 'border-blue-300/30 bg-blue-300/10 text-primary dark:text-blue-200',
     panel: 'from-blue-300/15 to-blue-300/5',
     border: 'border-blue-300/25',
   },
@@ -89,22 +98,23 @@ const ESTADOS_CONFIG: Record<EstadoOrden, EstadoConfig> = {
   CERRADA: {
     label: 'Cerrada',
     icon: FileText,
-    badge: 'border-cyan-400/25 bg-cyan-400/10 text-cyan-100',
+    badge: 'border-cyan-400/25 bg-cyan-400/10 text-primary',
     panel: 'from-cyan-400/15 to-cyan-400/5',
     border: 'border-cyan-400/20',
   },
   ANULADA: {
     label: 'Anulada',
     icon: XCircle,
-    badge: 'border-slate-300/30 bg-slate-300/10 text-slate-100',
+    badge: 'border-border/30 bg-slate-300/10 text-foreground',
     panel: 'from-slate-300/15 to-slate-300/5',
-    border: 'border-slate-300/20',
+    border: 'border-border/20',
   },
 }
 
 const ESTADO_QUICK_FILTERS: Array<{ label: string; value: '' | EstadoOrden }> = [
   { label: 'Todas', value: '' },
   { label: 'Borrador', value: 'BORRADOR' },
+  { label: 'Pendiente', value: 'PENDIENTE' },
   { label: 'En aprobacion', value: 'APROBACION' },
   { label: 'Aprobada', value: 'APROBADA' },
   { label: 'Parcial', value: 'PARCIAL' },
@@ -113,9 +123,9 @@ const ESTADO_QUICK_FILTERS: Array<{ label: string; value: '' | EstadoOrden }> = 
 ]
 
 const inputClass =
-  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+  'w-full rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
-const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 const toNumber = (value: unknown) => {
   const numeric = Number(value)
@@ -134,7 +144,7 @@ const normalizeOrden = (raw: any): OrdenCompra => ({
   total: toNumber(raw?.total),
   moneda: raw?.moneda || 'PEN',
   observaciones: raw?.observaciones,
-  proveedores: raw?.proveedores,
+  proveedores: raw?.proveedores || raw?.proveedor,
   detalles: Array.isArray(raw?.detalles) ? raw.detalles : [],
 })
 
@@ -182,7 +192,7 @@ export default function OrdenesCompraPage() {
       }
     } catch (error) {
       console.error('Error loading ordenes:', error)
-      alert('Error: No se pudieron cargar las ordenes de compra')
+      toast.error('Error: No se pudieron cargar las ordenes de compra')
     } finally {
       setLoading(false)
     }
@@ -219,7 +229,7 @@ export default function OrdenesCompraPage() {
   }
 
   const handleExport = () => {
-    alert('Funcionalidad de exportacion proximamente')
+    toast('Funcionalidad de exportacion proximamente')
   }
 
   const formatCurrency = (amount: number | undefined) => {
@@ -231,7 +241,7 @@ export default function OrdenesCompraPage() {
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return '-'
-    const parsed = new Date(dateString)
+    const parsed = parseDateLocal(dateString)
     if (Number.isNaN(parsed.getTime())) return '-'
     return parsed.toLocaleDateString('es-PE', {
       year: 'numeric',
@@ -268,29 +278,29 @@ export default function OrdenesCompraPage() {
       key={orden.id}
       type="button"
       onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}`)}
-      className={`group w-full rounded-2xl border ${config.border} bg-slate-950/70 p-4 text-left shadow-xl shadow-blue-950/20 transition hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-slate-900/90`}
+      className={`group w-full rounded-2xl border ${config.border} bg-card/70 p-4 text-left shadow-xl shadow-blue-950/20 transition hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-card/90`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate font-mono text-sm font-bold text-white">{orden.numero}</div>
-          <div className="mt-1 text-xs text-slate-400">{formatDate(orden.fecha_orden)}</div>
+          <div className="truncate font-mono text-sm font-bold text-foreground">{orden.numero}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{formatDate(orden.fecha_orden)}</div>
         </div>
         {getEstadoBadge(orden.estado)}
       </div>
 
       <div className="mt-4 min-h-14">
-        <div className="line-clamp-2 text-sm font-semibold text-slate-100">{orden.proveedores?.razon_social || 'Proveedor N/A'}</div>
-        {orden.proveedores?.ruc && <div className="mt-1 text-xs text-cyan-200/60">RUC: {orden.proveedores.ruc}</div>}
+        <div className="line-clamp-2 text-sm font-semibold text-foreground">{orden.proveedores?.razon_social || 'Proveedor N/A'}</div>
+        {orden.proveedores?.ruc && <div className="mt-1 text-xs text-primary/70">RUC: {orden.proveedores.ruc}</div>}
       </div>
 
       <div className={`mt-4 rounded-xl border ${config.border} bg-gradient-to-br ${config.panel} p-3`}>
         <div className={labelClass}>Total</div>
-        <div className="mt-1 text-xl font-bold text-cyan-50">{formatCurrency(orden.total)}</div>
+        <div className="mt-1 text-xl font-bold text-primary">{formatCurrency(orden.total)}</div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3 border-t border-cyan-400/10 pt-3 text-xs text-slate-400">
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-cyan-400/10 pt-3 text-xs text-muted-foreground">
         <span>{orden.fecha_entrega_esperada ? `Entrega: ${formatDate(orden.fecha_entrega_esperada)}` : 'Sin entrega programada'}</span>
-        <span className="inline-flex items-center gap-1 text-cyan-200">
+        <span className="inline-flex items-center gap-1 text-primary">
           <Eye className="h-3.5 w-3.5" />
           Ver
         </span>
@@ -308,23 +318,23 @@ export default function OrdenesCompraPage() {
         <div className={`rounded-2xl border ${config.border} bg-gradient-to-br ${config.panel} p-4 shadow-xl shadow-blue-950/20`}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className={`rounded-xl border ${config.border} bg-slate-950/70 p-3 text-cyan-100`}>
+              <span className={`rounded-xl border ${config.border} bg-card/70 p-3 text-primary`}>
                 <Icon className="h-5 w-5" />
               </span>
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-white">{config.label}</h3>
-                <p className="text-xs text-cyan-100/60">{ordenesEstado.length} ordenes</p>
+                <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-foreground">{config.label}</h3>
+                <p className="text-xs text-muted-foreground">{ordenesEstado.length} {ordenesEstado.length === 1 ? 'orden' : 'órdenes'}</p>
               </div>
             </div>
             <span className={`rounded-full border px-3 py-1 text-sm font-bold ${config.badge}`}>{ordenesEstado.length}</span>
           </div>
         </div>
 
-        <div className="flex max-h-[64vh] min-h-[300px] flex-col gap-3 overflow-y-auto rounded-2xl border border-cyan-400/10 bg-slate-950/35 p-3">
+        <div className="flex max-h-[64vh] min-h-[300px] flex-col gap-3 overflow-y-auto rounded-2xl border border-cyan-400/10 bg-card/35 p-3">
           {ordenesEstado.length === 0 ? (
-            <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-slate-950/45 p-5 text-center text-slate-400">
+            <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-card/45 p-5 text-center text-muted-foreground">
               <Icon className="mb-2 h-7 w-7 text-cyan-200/40" />
-              <p className="text-sm">Sin ordenes en {config.label.toLowerCase()}</p>
+              <p className="text-sm">Sin órdenes en esta etapa</p>
             </div>
           ) : (
             ordenesEstado.map((orden) => renderOrderCard(orden, config))
@@ -335,25 +345,25 @@ export default function OrdenesCompraPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+        <section className="rounded-3xl border border-cyan-400/20 bg-card/80 p-5 shadow-2xl shadow-blue-950/30">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 ERP Purchasing Board
               </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Ordenes de Compra</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-300">
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">Órdenes de Compra</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 Seguimiento compacto de ordenes, aprobaciones, recepciones y proveedores activos.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <div className="flex rounded-2xl border border-cyan-400/20 bg-slate-950/70 p-1">
+              <div className="flex rounded-2xl border border-cyan-400/20 bg-card/70 p-1">
                 <Button
                   type="button"
                   onClick={() => setViewMode('kanban')}
-                  className={`gap-2 rounded-xl ${viewMode === 'kanban' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-transparent text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                  className={`gap-2 rounded-xl ${viewMode === 'kanban' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground'}`}
                 >
                   <LayoutGrid className="h-4 w-4" />
                   Kanban
@@ -361,13 +371,13 @@ export default function OrdenesCompraPage() {
                 <Button
                   type="button"
                   onClick={() => setViewMode('list')}
-                  className={`gap-2 rounded-xl ${viewMode === 'list' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-transparent text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                  className={`gap-2 rounded-xl ${viewMode === 'list' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground'}`}
                 >
                   <List className="h-4 w-4" />
                   Lista
                 </Button>
               </div>
-              <Button type="button" onClick={loadOrdenes} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+              <Button type="button" onClick={loadOrdenes} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
@@ -381,14 +391,14 @@ export default function OrdenesCompraPage() {
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {statCards.map(({ label, value, icon: Icon }) => (
-            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
                 <div>
                   <div className={labelClass}>{label}</div>
-                  <div className="mt-3 text-2xl font-bold text-white">{value}</div>
-                  <div className="mt-1 text-xs text-cyan-100/55">Ordenes</div>
+                  <div className="mt-3 text-2xl font-bold text-foreground">{value}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Órdenes</div>
                 </div>
-                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
                   <Icon className="h-5 w-5" />
                 </span>
               </CardContent>
@@ -396,7 +406,7 @@ export default function OrdenesCompraPage() {
           ))}
         </section>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="flex flex-col gap-4 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className={labelClass}>Estados</span>
@@ -408,7 +418,7 @@ export default function OrdenesCompraPage() {
                     type="button"
                     onClick={() => handleEstadoFilterChange(filter.value)}
                     variant="outline"
-                    className={`h-9 rounded-full border-cyan-400/20 px-4 text-xs ${isActive ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-slate-950/50 text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                    className={`h-9 rounded-full border-cyan-400/20 px-4 text-xs ${isActive ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-card/50 text-muted-foreground hover:bg-muted/40 hover:text-foreground'}`}
                   >
                     {filter.label}
                   </Button>
@@ -449,12 +459,12 @@ export default function OrdenesCompraPage() {
                   <input className={inputClass} type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
                 </label>
                 {isFilterActive && (
-                  <Button type="button" onClick={handleClearFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                  <Button type="button" onClick={handleClearFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                     <XCircle className="h-4 w-4" />
                     Limpiar
                   </Button>
                 )}
-                <Button type="button" onClick={handleExport} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                <Button type="button" onClick={handleExport} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                   <Download className="h-4 w-4" />
                   Exportar
                 </Button>
@@ -463,16 +473,19 @@ export default function OrdenesCompraPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="p-4">
             {loading ? (
-              <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-slate-300">
-                <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
+              <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-muted-foreground">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
                 <p>Cargando ordenes de compra...</p>
               </div>
             ) : viewMode === 'kanban' ? (
-              <div className="grid gap-3 xl:grid-cols-4 2xl:grid-cols-7">
+              // flex + overflow-x: con grid de tracks fijos las columnas min-w-[280px]
+              // desbordaban su celda y las cabeceras se montaban unas sobre otras.
+              <div className="flex gap-3 overflow-x-auto pb-2">
                 {renderKanbanColumn('BORRADOR')}
+                {renderKanbanColumn('PENDIENTE')}
                 {renderKanbanColumn('APROBACION')}
                 {renderKanbanColumn('APROBADA')}
                 {renderKanbanColumn('PARCIAL')}
@@ -481,10 +494,10 @@ export default function OrdenesCompraPage() {
                 {renderKanbanColumn('ANULADA')}
               </div>
             ) : ordenes.length === 0 ? (
-              <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-slate-950/45 p-8 text-center">
+              <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-card/45 p-8 text-center">
                 <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
-                <h3 className="text-lg font-bold text-white">No hay ordenes de compra</h3>
-                <p className="mt-2 text-sm text-slate-400">
+                <h3 className="text-lg font-bold text-foreground">No hay órdenes de compra</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
                   {isFilterActive ? 'No se encontraron ordenes con los filtros aplicados.' : 'Comienza creando tu primera orden de compra.'}
                 </p>
                 {!isFilterActive && (
@@ -498,7 +511,7 @@ export default function OrdenesCompraPage() {
               <div className="overflow-hidden rounded-2xl border border-cyan-400/10">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[960px] border-collapse text-sm">
-                    <thead className="bg-slate-950/80 text-xs uppercase tracking-[0.12em] text-cyan-200/70">
+                    <thead className="bg-card/80 text-xs uppercase tracking-[0.12em] text-primary/80">
                       <tr>
                         <th className="px-4 py-3 text-left">N Orden</th>
                         <th className="px-4 py-3 text-left">Proveedor</th>
@@ -511,15 +524,15 @@ export default function OrdenesCompraPage() {
                     </thead>
                     <tbody className="divide-y divide-cyan-400/10">
                       {ordenes.map((orden) => (
-                        <tr key={orden.id} className="bg-slate-950/35 text-slate-200 transition hover:bg-slate-900/70">
-                          <td className="px-4 py-3 font-mono font-semibold text-white">{orden.numero}</td>
+                        <tr key={orden.id} className="bg-card/35 text-foreground/90 transition hover:bg-card/70">
+                          <td className="px-4 py-3 font-mono font-semibold text-foreground">{orden.numero}</td>
                           <td className="px-4 py-3">
-                            <div className="font-semibold text-slate-100">{orden.proveedores?.razon_social || 'N/A'}</div>
-                            {orden.proveedores?.ruc && <div className="text-xs text-cyan-100/55">RUC: {orden.proveedores.ruc}</div>}
+                            <div className="font-semibold text-foreground">{orden.proveedores?.razon_social || 'N/A'}</div>
+                            {orden.proveedores?.ruc && <div className="text-xs text-muted-foreground">RUC: {orden.proveedores.ruc}</div>}
                           </td>
-                          <td className="px-4 py-3 text-slate-300">{formatDate(orden.fecha_orden)}</td>
-                          <td className="px-4 py-3 text-slate-300">{formatDate(orden.fecha_entrega_esperada)}</td>
-                          <td className="px-4 py-3 text-right font-bold text-cyan-50">{formatCurrency(orden.total)}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{formatDate(orden.fecha_orden)}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{formatDate(orden.fecha_entrega_esperada)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-primary">{formatCurrency(orden.total)}</td>
                           <td className="px-4 py-3 text-center">{getEstadoBadge(orden.estado)}</td>
                           <td className="px-4 py-3">
                             <div className="flex justify-end gap-2">
@@ -532,7 +545,7 @@ export default function OrdenesCompraPage() {
                                 <Eye className="h-4 w-4" />
                               </Button>
                               {orden.estado === 'BORRADOR' && (
-                                <Button type="button" size="sm" onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/editar`)} variant="outline" className="border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white" title="Editar">
+                                <Button type="button" size="sm" onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/editar`)} variant="outline" className="border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground" title="Editar">
                                   <Edit className="h-4 w-4" />
                                 </Button>
                               )}
@@ -545,13 +558,13 @@ export default function OrdenesCompraPage() {
                 </div>
 
                 {totalPages > 1 && (
-                  <div className="flex flex-col gap-3 border-t border-cyan-400/10 bg-slate-950/70 p-4 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-col gap-3 border-t border-cyan-400/10 bg-card/70 p-4 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
                     <div>
                       Mostrando <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> a{' '}
                       <strong>{Math.min(currentPage * itemsPerPage, totalOrdenes)}</strong> de <strong>{totalOrdenes}</strong> ordenes
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} variant="outline" className="border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                      <Button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} variant="outline" className="border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                         Anterior
                       </Button>
                       {Array.from({ length: Math.min(5, totalPages) }, (_, index) => {
@@ -566,13 +579,13 @@ export default function OrdenesCompraPage() {
                             key={pageNum}
                             type="button"
                             onClick={() => setCurrentPage(pageNum)}
-                            className={currentPage === pageNum ? 'bg-blue-600 text-white hover:bg-blue-500' : 'border border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white'}
+                            className={currentPage === pageNum ? 'bg-blue-600 text-white hover:bg-blue-500' : 'border border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground'}
                           >
                             {pageNum}
                           </Button>
                         )
                       })}
-                      <Button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} variant="outline" className="border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                      <Button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} variant="outline" className="border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                         Siguiente
                       </Button>
                     </div>

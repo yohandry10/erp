@@ -22,7 +22,7 @@ export function HelpIcon({ helpKey, position = 'top', className }: HelpIconProps
       aria-label={`Ayuda: ${helpItem.title}`}
     >
       <HelpCircle
-        className="h-4 w-4 text-slate-400 transition hover:text-blue-500"
+        className="h-4 w-4 text-muted-foreground transition hover:text-blue-500"
         aria-hidden="true"
       />
       <HelpTooltipContent content={helpItem} position={position} />

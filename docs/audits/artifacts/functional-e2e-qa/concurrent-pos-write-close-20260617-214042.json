@@ -1,0 +1,92 @@
+{
+  "startedAt": "2026-06-18T02:41:15.687Z",
+  "apiUrl": "http://localhost:3002",
+  "tenantId": "c0af84b5-5ea6-44a9-9e6e-a869f119b013",
+  "runId": "750442647",
+  "idempotencyKey": "pos-concurrent-750442647",
+  "sesionId": "05be9295-dd7a-4a1b-b604-ec8d12a431cd",
+  "reusedExistingSession": false,
+  "requests": 5,
+  "okResponses": 5,
+  "failedResponses": [],
+  "responseVentaIds": [
+    "90db8ea2-51f3-45ca-acaa-4525c48f0b54",
+    "90db8ea2-51f3-45ca-acaa-4525c48f0b54",
+    "90db8ea2-51f3-45ca-acaa-4525c48f0b54",
+    "90db8ea2-51f3-45ca-acaa-4525c48f0b54",
+    "90db8ea2-51f3-45ca-acaa-4525c48f0b54"
+  ],
+  "uniqueResponseVentaIds": [
+    "90db8ea2-51f3-45ca-acaa-4525c48f0b54"
+  ],
+  "dbVentasCount": 1,
+  "dbVentaIds": [
+    "90db8ea2-51f3-45ca-acaa-4525c48f0b54"
+  ],
+  "dbTicket": "B001-00000001",
+  "stockInicial": 5,
+  "stockFinal": 4,
+  "movimientosCount": 1,
+  "movimientosCantidades": [
+    1
+  ],
+  "closeStatus": 201,
+  "closeOk": true,
+  "closeWarning": "Corte/asiento de cierre no registrado: Could not find the 'referencia' column of 'detalle_asientos' in the schema cache",
+  "montoCierre": 111.8,
+  "sesionCerrada": {
+    "id": "05be9295-dd7a-4a1b-b604-ec8d12a431cd",
+    "estado": "CERRADA",
+    "monto_esperado": 111.8,
+    "monto_contado": 111.8,
+    "diferencia": 0,
+    "fecha_cierre": "2026-06-18T02:41:09.899+00:00"
+  },
+  "cortesCount": 1,
+  "asientosCierreCount": 1,
+  "asientosCierre": [
+    {
+      "id": "9d6bb3c2-946a-45f1-9f36-3c5114f83658",
+      "tipo_asiento": "POS_CIERRE",
+      "referencia": "SESION:05be9295-dd7a-4a1b-b604-ec8d12a431cd",
+      "total_debe": 11.8,
+      "total_haber": 11.8,
+      "estado": "BORRADOR"
+    }
+  ],
+  "assertions": [
+    {
+      "name": "todas_respuestas_ok",
+      "ok": true
+    },
+    {
+      "name": "un_solo_id_respuesta",
+      "ok": true
+    },
+    {
+      "name": "una_sola_venta_db",
+      "ok": true
+    },
+    {
+      "name": "stock_reducido_una_vez",
+      "ok": true
+    },
+    {
+      "name": "un_solo_movimiento_inventario",
+      "ok": true
+    },
+    {
+      "name": "cierre_caja_ok",
+      "ok": true
+    },
+    {
+      "name": "corte_caja_registrado",
+      "ok": true
+    },
+    {
+      "name": "asiento_cierre_registrado",
+      "ok": true
+    }
+  ],
+  "passed": true
+}

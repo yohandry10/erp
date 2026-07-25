@@ -35,23 +35,23 @@ interface GreStats {
 }
 
 const inputClass =
-  'rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+  'rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
-const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 const getStatusClass = (estado: string) => {
   switch (estado) {
     case 'ACEPTADO':
-      return 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100'
+      return 'border-cyan-300/30 bg-cyan-300/10 text-primary'
     case 'EMITIDO':
-      return 'border-blue-300/30 bg-blue-300/10 text-blue-100'
+      return 'border-blue-300/30 bg-blue-300/10 text-primary dark:text-blue-200'
     case 'PENDIENTE':
-      return 'border-sky-300/30 bg-sky-300/10 text-sky-100'
+      return 'border-sky-300/30 bg-sky-300/10 text-primary dark:text-sky-200'
     case 'RECHAZADO':
     case 'ANULADO':
-      return 'border-slate-300/30 bg-slate-300/10 text-slate-100'
+      return 'border-border/30 bg-slate-300/10 text-foreground'
     default:
-      return 'border-slate-400/30 bg-slate-400/10 text-slate-200'
+      return 'border-border/30 bg-slate-400/10 text-foreground/90'
   }
 }
 
@@ -170,29 +170,29 @@ export default function GREPage() {
 
   if (loading && documents.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-950 p-5 text-slate-100">
-        <div className="mx-auto flex min-h-[420px] max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-blue-950/30">
-          <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
-          <p className="text-sm text-slate-300">Cargando guias de remision...</p>
+      <div className="min-h-screen bg-background p-5 text-foreground">
+        <div className="mx-auto flex min-h-[420px] max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-card/75 shadow-2xl shadow-blue-950/30">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Cargando guias de remision...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+        <section className="rounded-3xl border border-cyan-400/20 bg-card/80 p-5 shadow-2xl shadow-blue-950/30">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 ERP Logistics Center
               </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Guias de Remision Electronica</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-300">Gestion de transporte, trazabilidad GRE y documentos logisticos.</p>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">Guías de Remisión Electrónica</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Gestion de transporte, trazabilidad GRE y documentos logisticos.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={generateReport} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+              <Button type="button" onClick={generateReport} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
                 <Download className="h-4 w-4" />
                 Generar reporte
               </Button>
@@ -211,14 +211,14 @@ export default function GREPage() {
             ['En transito', stats?.enTransito || 0, 'Transportes activos'],
             ['Completados', stats?.completados || 0, 'Entregas exitosas'],
           ].map(([label, value, description]) => (
-            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
                 <div>
                   <div className={labelClass}>{label}</div>
-                  <div className="mt-3 text-3xl font-black text-white">{value}</div>
-                  <div className="mt-1 text-xs text-cyan-100/55">{description}</div>
+                  <div className="mt-3 text-3xl font-black text-foreground">{value}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{description}</div>
                 </div>
-                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
                   <Truck className="h-5 w-5" />
                 </span>
               </CardContent>
@@ -226,11 +226,11 @@ export default function GREPage() {
           ))}
         </section>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-            <CardTitle className="text-base text-white">Filtros GRE</CardTitle>
+            <CardTitle className="text-base text-foreground">Filtros GRE</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 p-4 lg:grid-cols-[220px_180px_160px_160px_auto] lg:items-end">
+          <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 lg:items-end">
             <select
               value={filters.modalidad}
               onChange={(event) => setFilters(prev => ({ ...prev, modalidad: event.target.value }))}
@@ -263,23 +263,23 @@ export default function GREPage() {
               onChange={(event) => setFilters(prev => ({ ...prev, fechaHasta: event.target.value }))}
               className={inputClass}
             />
-            <Button type="button" onClick={loadData} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+            <Button type="button" onClick={loadData} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
               <RefreshCw className="h-4 w-4" />
               Actualizar
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-            <CardTitle className="text-base text-white">Lista de guias de remision</CardTitle>
+            <CardTitle className="text-base text-foreground">Lista de guías de remisión</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {Array.isArray(documents) && documents.length === 0 && !loading ? (
               <div className="flex min-h-[320px] flex-col items-center justify-center p-8 text-center">
                 <Truck className="mb-3 h-12 w-12 text-cyan-200/50" />
-                <h3 className="text-lg font-bold text-white">No hay guias de remision</h3>
-                <p className="mt-2 text-sm text-slate-400">Comienza creando tu primera guia electronica.</p>
+                <h3 className="text-lg font-bold text-foreground">No hay guías de remisión</h3>
+                <p className="mt-2 text-sm text-muted-foreground">Comienza creando tu primera guia electronica.</p>
                 <Button type="button" onClick={() => setIsModalOpen(true)} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
                   <Plus className="h-4 w-4" />
                   Crear primera GRE
@@ -287,37 +287,37 @@ export default function GREPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="!m-0 w-full min-w-full table-fixed border-collapse !bg-slate-950/80 text-sm !shadow-none">
-                  <thead className="!bg-slate-900/90 text-xs uppercase tracking-[0.12em] text-cyan-200/70">
+                <table className="!m-0 w-full min-w-full table-fixed border-collapse !bg-card/80 text-sm !shadow-none">
+                  <thead className="!bg-card/90 text-xs uppercase tracking-[0.12em] text-primary/80">
                     <tr>
-                      <th className="w-[12%] !border-cyan-400/10 !bg-slate-900/90 px-4 py-3 text-left text-cyan-200/70">Serie</th>
-                      <th className="w-[28%] !border-cyan-400/10 !bg-slate-900/90 px-4 py-3 text-left text-cyan-200/70">Destinatario</th>
-                      <th className="w-[12%] !border-cyan-400/10 !bg-slate-900/90 px-4 py-3 text-left text-cyan-200/70">Traslado</th>
-                      <th className="w-[18%] !border-cyan-400/10 !bg-slate-900/90 px-4 py-3 text-left text-cyan-200/70">Modalidad</th>
-                      <th className="w-[10%] !border-cyan-400/10 !bg-slate-900/90 px-4 py-3 text-right text-cyan-200/70">Peso</th>
-                      <th className="w-[10%] !border-cyan-400/10 !bg-slate-900/90 px-4 py-3 text-center text-cyan-200/70">Estado</th>
-                      <th className="w-[10%] !border-cyan-400/10 !bg-slate-900/90 px-4 py-3 text-right text-cyan-200/70">Acciones</th>
+                      <th className="w-[12%] !border-cyan-400/10 !bg-card/90 px-4 py-3 text-left text-primary/80">Serie</th>
+                      <th className="w-[28%] !border-cyan-400/10 !bg-card/90 px-4 py-3 text-left text-primary/80">Destinatario</th>
+                      <th className="w-[12%] !border-cyan-400/10 !bg-card/90 px-4 py-3 text-left text-primary/80">Traslado</th>
+                      <th className="w-[18%] !border-cyan-400/10 !bg-card/90 px-4 py-3 text-left text-primary/80">Modalidad</th>
+                      <th className="w-[10%] !border-cyan-400/10 !bg-card/90 px-4 py-3 text-right text-primary/80">Peso</th>
+                      <th className="w-[10%] !border-cyan-400/10 !bg-card/90 px-4 py-3 text-center text-primary/80">Estado</th>
+                      <th className="w-[10%] !border-cyan-400/10 !bg-card/90 px-4 py-3 text-right text-primary/80">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-cyan-400/10">
                     {Array.isArray(documents) && documents.map((doc) => (
-                      <tr className="!bg-slate-950/50 text-slate-200 transition hover:!bg-slate-900/80" key={doc.id}>
-                        <td className="break-words !border-cyan-400/10 !bg-transparent px-4 py-3 font-mono font-semibold text-white">{doc.numero}</td>
+                      <tr className="!bg-card/50 text-foreground/90 transition hover:!bg-card/80" key={doc.id}>
+                        <td className="break-words !border-cyan-400/10 !bg-transparent px-4 py-3 font-mono font-semibold text-foreground">{doc.numero}</td>
                         <td className="!border-cyan-400/10 !bg-transparent px-4 py-3">
                           <div className="space-y-1">
-                            <div className="truncate font-semibold text-slate-100">{doc.destinatario}</div>
-                            <div className="max-w-sm truncate text-xs text-cyan-100/55">{doc.direccionDestino}</div>
+                            <div className="truncate font-semibold text-foreground">{doc.destinatario}</div>
+                            <div className="max-w-sm truncate text-xs text-muted-foreground">{doc.direccionDestino}</div>
                           </div>
                         </td>
-                        <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-slate-300">{new Date(doc.fechaTraslado).toLocaleDateString('es-PE')}</td>
+                        <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-muted-foreground">{new Date(doc.fechaTraslado).toLocaleDateString('es-PE')}</td>
                         <td className="!border-cyan-400/10 !bg-transparent px-4 py-3">
                           <div className="space-y-1">
-                            <div className="truncate text-slate-100">{getModalidadText(doc.modalidad)}</div>
-                            {doc.transportista ? <div className="text-xs text-cyan-100/55">{doc.transportista}</div> : null}
-                            {doc.placaVehiculo ? <div className="text-xs text-cyan-100/55">Placa: {doc.placaVehiculo}</div> : null}
+                            <div className="truncate text-foreground">{getModalidadText(doc.modalidad)}</div>
+                            {doc.transportista ? <div className="text-xs text-muted-foreground">{doc.transportista}</div> : null}
+                            {doc.placaVehiculo ? <div className="text-xs text-muted-foreground">Placa: {doc.placaVehiculo}</div> : null}
                           </div>
                         </td>
-                        <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-right font-bold text-cyan-50">{doc.pesoTotal} Kg</td>
+                        <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-right font-bold text-primary">{doc.pesoTotal} Kg</td>
                         <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-center">
                           <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(doc.estado)}`}>
                             {getStatusText(doc.estado)}
@@ -330,7 +330,7 @@ export default function GREPage() {
                               size="sm"
                               onClick={() => viewDocument(doc.id)}
                               variant="outline"
-                              className="gap-1 border-cyan-400/20 bg-cyan-400/10 px-2 text-cyan-50 hover:bg-cyan-400/15 hover:text-white"
+                              className="gap-1 border-cyan-400/20 bg-cyan-400/10 px-2 text-primary hover:bg-cyan-400/15 hover:text-foreground"
                             >
                               <Eye className="h-4 w-4" />
                               Ver
@@ -342,7 +342,7 @@ export default function GREPage() {
                               title="Representacion PDF GRE no disponible en este entorno"
                               aria-label="PDF GRE no disponible"
                               variant="outline"
-                              className="gap-1 border-slate-400/20 bg-slate-400/10 px-2 text-slate-300"
+                              className="gap-1 border-border/20 bg-slate-400/10 px-2 text-muted-foreground"
                             >
                               <FileText className="h-4 w-4" />
                               PDF

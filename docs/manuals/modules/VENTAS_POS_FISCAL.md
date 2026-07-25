@@ -619,6 +619,8 @@ async cerrarSesionesAbandonadas() {
 
 Motor de facturación electrónica que abstrae la complejidad de XML/UBL, firma digital y comunicación con OSE/SUNAT.
 
+Desde 2026-07-15, `CpeService` es una fachada menor a 1000 líneas. UBL, certificados, entrega, anulación, reportes, sincronización con Documentos y registro de XML de escritorio viven en colaboradores separados. El mapa canónico y sus invariantes están en `docs/architecture/CPE_SERVICE_BOUNDARIES.md`.
+
 ### 3.1. Ciclo de Vida del CPE
 
 ```
@@ -1032,6 +1034,20 @@ async generarNotaCredito(tenantId, userId, rmaId, dto: GenerarNotaCreditoDto) {
 ---
 
 ## 6. Patrones Técnicos Transversales
+
+### 6.0. Baseline operativo de interfaz POS (2026-07-22)
+
+- La superficie principal mantiene sólo dos zonas persistentes: catálogo y venta actual.
+- El modo caja oculta visualmente la navegación general con un fondo opaco y conserva los controles de la venta.
+- Los productos sin imagen usan una presentación compacta y neutra, sin placeholder grande ni categoría superpuesta; el grid usa `auto-fit` para no reservar columnas vacías y no asigna colores decorativos por categoría.
+- El carrito no fuerza la altura del viewport: artículos, totales y acción de cobro permanecen juntos, con scroll limitado únicamente en listas extensas.
+- El cierre de caja muestra monto inicial y ventas en efectivo como datos informativos; la diferencia definitiva se delega al backend porque debe considerar ventas, retiros y otros movimientos.
+- Los atajos operativos son `F2` para búsqueda, `F4` para código de barras y `F8` para abrir el cobro cuando cliente y carrito son válidos.
+- El cobro en efectivo registra importe recibido, calcula faltante o vuelto y usa el total monetario redondeado a dos decimales, idéntico al total mostrado.
+- La selección de medio de pago no confirma por sí sola una venta. El stock cambia únicamente al confirmar el cobro y aceptar la transacción backend.
+- La vista previa previa al cobro es un borrador explícito (`SIN EMITIR`) y no reserva numeración ni muta inventario. Sirve para revisar ventas extensas antes de confirmar.
+- La salida de impresión no usa `window.print()` sobre el dashboard: replica únicamente el documento en un frame aislado. Boleta/ticket usa rollo térmico de 80 mm con altura automática; factura usa A4. La vista previa y el contenido enviado a imprimir comparten la misma representación, por lo que códigos, descripciones, cantidades, precios y totales no divergen.
+- El historial normaliza nombres y códigos combinando snapshot de observaciones, detalle POS y catálogo actual. Ninguna línea se presenta con la descripción vacía; si todas las fuentes faltan, se muestra `Producto sin descripción` de forma explícita.
 
 ### 6.1. Idempotencia
 

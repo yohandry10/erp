@@ -1,0 +1,4 @@
+{
+  "passed": false,
+  "error": "Error: abrir caja fallo 400: {\"statusCode\":400,\"message\":\"Ya tiene una caja abierta: \\\"Caja POS 747507900\\\" desde 17/6/2026, 8:51:58 p. m.. ID de sesión: c68b19fc-5748-4a2d-b356-e516d3251505. Debe cerrarla antes de abrir otra. Si la sesión quedó colgada (ej: corte de luz), use el endpoint de cierre administrativo.\",\"error\":\"Bad Request\",\"timestamp\":\"2026-06-18T02:33:06.465Z\",\"path\":\"/api/pos/caja/abrir\"}\n    at main (file:///C:/Users/PC/AppData/Local/Temp/erp-concurrent-pos-write-20260617-213259.mjs:139:23)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)"
+}

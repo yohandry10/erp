@@ -46,8 +46,13 @@ async function hasValidJwt(request: NextRequest): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const protectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/superadmin');
-  const loginRoute = pathname === '/login';
+  const normalizedPathname = pathname.length > 1 && pathname.endsWith('/')
+    ? pathname.slice(0, -1)
+    : pathname;
+  const protectedRoute =
+    normalizedPathname.startsWith('/dashboard') ||
+    normalizedPathname.startsWith('/superadmin');
+  const loginRoute = normalizedPathname === '/login';
 
   if (!protectedRoute && !loginRoute) {
     return NextResponse.next();
@@ -57,7 +62,7 @@ export async function middleware(request: NextRequest) {
 
   if (!authenticated && protectedRoute) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
+    loginUrl.searchParams.set('redirect', normalizedPathname);
     return NextResponse.redirect(loginUrl);
   }
 

@@ -8,10 +8,10 @@ const Label = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <LabelPrimitive.Root
     ref={ref}
-    className={cn("mb-3 block cursor-pointer text-[0.9rem] font-bold leading-tight text-slate-800 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-70", className)}
+    className={cn("mb-3 block cursor-pointer text-[0.9rem] font-bold leading-tight text-foreground data-[disabled]:cursor-not-allowed data-[disabled]:opacity-70", className)}
     {...props}
   />
 ))
 Label.displayName = LabelPrimitive.Root.displayName
 
-export { Label } 
+export { Label }

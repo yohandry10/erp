@@ -10,7 +10,7 @@
 > Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
 <!-- DOC-NAV:END -->
 
-Este documento detalla los flujos financieros, gestión de tesorería, motor contable automatizado, y módulos de cuentas por cobrar/pagar del ERP.
+Este documento detalla los flujos financieros, gestión de tesorería, motor contable automatizado, y módulos de cuentas por cobrar/pagar del ERP. La distribución canónica de las 63 rutas de Contabilidad está en `docs/architecture/CONTABILIDAD_CONTROLLER_BOUNDARIES.md`.
 
 ---
 

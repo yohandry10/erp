@@ -1,26 +1,35 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CreateFacturaDto, FacturaDto, PaginationDto, PaginatedResponseDto } from '@erp-suite/dtos';
 import { XmlSigner } from '@erp-suite/crypto';
 import { ConfigService } from '@nestjs/config';
 import { EventBusService } from '../../shared/events/event-bus.service';
-import { OseService } from '../ose/ose.service';
 import { ValidationService } from '../validations/validation.service';
 import { Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
-import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import { PdfGeneratorService } from './pdf-generator.service';
 import { FiscalAdapterService } from './fiscal-adapter.service';
+import { CpeXmlBuilder } from './cpe-xml.builder';
+import { CpeCertificateService } from './cpe-certificate.service';
+import { CpeReportingService } from './cpe-reporting.service';
+import { CpeCancellationService } from './cpe-cancellation.service';
+import { CpeDeliveryService } from './cpe-delivery.service';
+import { CpeOperationalDocumentService } from './cpe-operational-document.service';
+import { CpeRegistrationService } from './cpe-registration.service';
 import { DocumentoFiscal } from '../documentos/interfaces/documento-fiscal.interface';
-import { normalizeCertificateInput } from '../../shared/utils/certificate.utils';
-import * as crypto from 'crypto';
 
 @Injectable()
 export class CpeService {
   private readonly logger = new Logger(CpeService.name);
-  private readonly estadosAnulables = new Set(['FIRMADO', 'ACEPTADO', 'ENVIADO']);
+  private readonly xmlBuilder = new CpeXmlBuilder();
+  private readonly certificateService: CpeCertificateService;
+  private readonly reportingService: CpeReportingService;
+  private readonly cancellationService: CpeCancellationService;
+  private readonly deliveryService: CpeDeliveryService;
+  private readonly operationalDocumentService: CpeOperationalDocumentService;
+  private readonly registrationService: CpeRegistrationService;
   private readonly sunatStatuses = {
     NOT_SENT: 'NOT_SENT',
     READY: 'READY',
@@ -29,73 +38,44 @@ export class CpeService {
     REJECTED: 'REJECTED',
     ERROR: 'ERROR',
   } as const;
-
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
     private readonly eventBus: EventBusService,
-    private readonly oseService: OseService,
     private readonly validationService: ValidationService,
     private readonly auditService: AuditService,
     private readonly cacheInvalidation: CacheInvalidationService,
     private readonly pdfGenerator: PdfGeneratorService,
     private readonly fiscalAdapter: FiscalAdapterService, // 🌍 Adaptador multi-país
-  ) {}
-
+  ) {
+    this.certificateService = new CpeCertificateService(supabaseService, configService);
+    this.reportingService = new CpeReportingService(supabaseService);
+    this.cancellationService = new CpeCancellationService(supabaseService, auditService);
+    this.deliveryService = new CpeDeliveryService(supabaseService, fiscalAdapter, pdfGenerator, this.certificateService);
+    this.operationalDocumentService = new CpeOperationalDocumentService(
+      supabaseService,
+      configService,
+      this.deliveryService,
+      this.xmlBuilder,
+    );
+    this.registrationService = new CpeRegistrationService(
+      supabaseService,
+      eventBus,
+      auditService,
+      cacheInvalidation,
+      this.operationalDocumentService,
+      this.xmlBuilder,
+    );
+  }
   /**
    * Obtiene el XmlSigner configurado para el tenant
    * Si el tenant tiene certificado propio, lo usa. Si no, usa la configuración global válida.
    */
-  private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
-    try {
-      // Obtener certificado del tenant desde la BD
-      const { data: empresa, error } = await this.supabaseService.getClient()
-        .from('empresa_config')
-        .select('certificado_pfx, certificado_password')
-        .eq('tenant_id', tenantId)
-        .single();
-
-      const typedEmpresa = empresa as any;
-      if (!error && typedEmpresa && typedEmpresa.certificado_pfx) {
-        console.log('🔐 Usando certificado del tenant:', tenantId);
-
-        const certificadoBuffer = this.normalizeCertificateBuffer(typedEmpresa.certificado_pfx, typedEmpresa.certificado_password);
-
-        if (!certificadoBuffer || certificadoBuffer.length === 0) {
-          this.logger.warn(
-            `El certificado almacenado para el tenant ${tenantId} no tiene un formato válido (string/base64/Buffer). Se intentará fallback de configuración global.`,
-          );
-        } else {
-          // Crear XmlSigner con el certificado del tenant
-          return new XmlSigner({
-            pfxBuffer: certificadoBuffer, // Buffer del certificado
-            pfxPassword: this.decryptText(typedEmpresa.certificado_password) || '',
-          });
-        }
-      }
-    } catch (error) {
-      console.warn('⚠️ Error obteniendo certificado del tenant:', error.message);
-    }
-
-    const demoSignerConfig = this.resolveDemoSignerConfig(tenantId);
-    this.logger.warn(`🔐 Usando certificado de configuración global para tenant ${tenantId}`);
-
-    return new XmlSigner(demoSignerConfig);
+private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
+    return this.certificateService.getXmlSigner(tenantId);
   }
 
-  private resolveDemoSignerConfig(tenantId: string): { pfxPath: string; pfxPassword: string } {
-    const pfxPath = this.configService.get<string>('PFX_PATH');
-    const pfxPassword = this.configService.get<string>('PFX_PASS');
 
-    if (!pfxPath || !pfxPassword) {
-      throw new BadRequestException(
-        `No hay configuración de certificado fiscal para el tenant ${tenantId}. ` +
-          'Configure PFX_PATH y PFX_PASS para fallback global o cargue el certificado del tenant.',
-      );
-    }
-
-    return { pfxPath, pfxPassword };
-  }
 
   private recalculateTotals(createFacturaDto: CreateFacturaDto) {
     if (!Array.isArray(createFacturaDto.items) || createFacturaDto.items.length === 0) {
@@ -185,316 +165,34 @@ export class CpeService {
   /**
    * Normaliza el certificado recibido desde Supabase (puede llegar como base64, Buffer JSON o ArrayBuffer)
    */
-  private normalizeCertificateBuffer(certificado: any, encryptedPassword?: string): Buffer | null {
-    const buffer = this.decryptCertificate(certificado);
 
-    if (!buffer) {
-      this.logger.warn('Formato de certificado no soportado o vacío');
-    }
 
-    return buffer;
-  }
 
-  private getCertKeys(): Buffer[] {
-    const keys: Buffer[] = [];
-    const main =
-      this.configService.get<string>('CERT_ENCRYPTION_KEY') ??
-      this.configService.get<string>('ENCRYPTION_KEY');
-    const old = this.configService.get<string>('CERT_ENCRYPTION_KEY_OLD');
 
-    if (main && main.length >= 32) {
-      keys.push(crypto.createHash('sha256').update(main).digest());
-    }
-    if (old && old.length >= 32) {
-      keys.push(crypto.createHash('sha256').update(old).digest());
-    }
+  /** Mapea el estado del CPE al estado del documento operativo del módulo Documentos. */
 
-    if (!keys.length) {
-      throw new Error('CERT_ENCRYPTION_KEY no configurada o demasiado corta (min 32 chars)');
-    }
 
-    return keys;
-  }
 
-  private decryptCertificate(input: any): Buffer | null {
-    const raw = normalizeCertificateInput(input);
-    if (!raw || raw.length < 12 + 16) {
-      return normalizeCertificateInput(input); // fallback
-    }
 
-    const iv = raw.subarray(0, 12);
-    const tag = raw.subarray(12, 28);
-    const data = raw.subarray(28);
-
-    const keys = this.getCertKeys();
-    for (const key of keys) {
-      try {
-        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-        decipher.setAuthTag(tag);
-        const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
-        return decrypted;
-      } catch {
-        /* intentar siguiente clave */
-      }
-    }
-
-    this.logger.warn('⚠️ No se pudo descifrar certificado con las claves configuradas, se usará valor crudo.');
-    return normalizeCertificateInput(input);
-  }
-
-  private decryptText(input: string | null | undefined): string {
-    if (!input) return '';
-    const raw = Buffer.from(input, 'base64');
-    if (raw.length < 12 + 16) return input;
-    const iv = raw.subarray(0, 12);
-    const tag = raw.subarray(12, 28);
-    const data = raw.subarray(28);
-
-    const keys = this.getCertKeys();
-    for (const key of keys) {
-      try {
-        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-        decipher.setAuthTag(tag);
-        const decrypted = Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
-        return decrypted;
-      } catch {
-        /* intentar siguiente clave */
-      }
-    }
-
-    this.logger.warn('⚠️ No se pudo descifrar contraseña de certificado, se usará tal cual.');
-    return input;
-  }
-
-  private getDocumentoKeyFromCpe(cpeRecord: any) {
-    const tipoDocumentoSunat = this.normalizeTipoDocumentoSunat(cpeRecord.tipo_documento);
-    if (!['01', '03'].includes(tipoDocumentoSunat)) {
-      throw new BadRequestException(
-        `No se puede crear documento operativo directo para tipo CPE ${tipoDocumentoSunat}`,
-      );
-    }
-    const tipoDocumento = tipoDocumentoSunat === '03' ? 'BOLETA' : 'FACTURA';
-    const numero =
-      cpeRecord.numero != null
-        ? String(cpeRecord.numero).padStart(8, '0')
-        : '';
-
-    if (!cpeRecord.serie || !numero) {
-      throw new BadRequestException('El CPE requiere serie y número para crear el documento operativo');
-    }
-
-    return {
-      tipoDocumento,
-      serie: String(cpeRecord.serie).trim().toUpperCase(),
-      numero,
-    };
-  }
-
-  private assertDocumentoOperativoCoincideConCpe(documento: any, cpeRecord: any): void {
-    const totalDocumentoCents = Math.round(Number(documento?.total ?? 0) * 100);
-    const totalCpeCents = Math.round(Number(cpeRecord?.total_venta ?? 0) * 100);
-    const receptorDocumento = String(
-      documento?.receptor_numero_doc ??
-      documento?.receptor_documento ??
-      '',
-    ).trim();
-    const receptorCpe = String(cpeRecord?.documento_receptor ?? '').trim();
-
-    if (Math.abs(totalDocumentoCents - totalCpeCents) > 1 || (receptorDocumento && receptorCpe && receptorDocumento !== receptorCpe)) {
-      throw new BadRequestException(
-        `Conflicto de numeración CPE ${cpeRecord.serie}-${String(cpeRecord.numero).padStart(8, '0')}: ` +
-          'ya existe un documento operativo con total o receptor distinto',
-      );
-    }
-  }
-
-  private async findDocumentoOperativoParaCpe(client: any, tenantId: string, cpeRecord: any): Promise<string | null> {
-    const key = this.getDocumentoKeyFromCpe(cpeRecord);
-    const { data, error } = await client
-      .from('documentos')
-      .select('id,total,receptor_numero_doc,receptor_documento')
-      .eq('tenant_id', tenantId)
-      .eq('tipo_documento', key.tipoDocumento)
-      .eq('serie', key.serie)
-      .eq('numero', key.numero)
-      .maybeSingle();
-
-    if (error) {
-      throw new BadRequestException(`No se pudo consultar documento operativo del CPE: ${error.message}`);
-    }
-
-    if (data?.id) {
-      this.assertDocumentoOperativoCoincideConCpe(data, cpeRecord);
-    }
-
-    return data?.id ?? null;
-  }
-
-  private async vincularDocumentoCpe(client: any, cpeId: string, documentoId: string): Promise<void> {
-    const { error } = await client
-      .from('cpe')
-      .update({ documento_id: documentoId })
-      .eq('id', cpeId);
-
-    if (error) {
-      throw new BadRequestException(`No se pudo vincular CPE con documento operativo: ${error.message}`);
-    }
-  }
 
   /**
    * Garantiza que exista un documento operativo real e idempotente para el CPE.
    * No usa el ID del CPE como sustituto de factura/documento.
    */
   private async ensureDocumentoParaCpe(cpeRecord: any, tenantId: string): Promise<string | null> {
-    if (!cpeRecord?.id) {
-      return null;
-    }
-
-    if (cpeRecord.documento_id) {
-      return cpeRecord.documento_id;
-    }
-
-    const client = this.supabaseService.getClient();
-
-    try {
-      const documentoExistente = await this.findDocumentoOperativoParaCpe(client, tenantId, cpeRecord);
-      if (documentoExistente) {
-        await this.vincularDocumentoCpe(client, cpeRecord.id, documentoExistente);
-        return documentoExistente;
-      }
-
-      const emisorInfo = await this.getEmpresaEmisorInfo(tenantId);
-      const safeEmisorRuc = this.pickFirstNonEmpty(
-        [cpeRecord.ruc_emisor, emisorInfo.ruc, this.configService.get<string>('EMPRESA_RUC')],
-        '20000000000',
-      );
-      const safeEmisorRazon = this.pickFirstNonEmpty(
-        [cpeRecord.razon_social_emisor, emisorInfo.razonSocial],
-        'EMISOR',
-      );
-      const safeEmisorDireccion = this.pickFirstNonEmpty(
-        [cpeRecord.direccion_emisor, emisorInfo.direccion],
-        'DIRECCION NO DEFINIDA',
-      );
-      const documentoKey = this.getDocumentoKeyFromCpe(cpeRecord);
-
-      const documentoOperativo = {
-        tenant_id: tenantId,
-        tipo_documento: documentoKey.tipoDocumento,
-        serie: documentoKey.serie,
-        numero: documentoKey.numero,
-        fecha_emision: cpeRecord.fecha_emision ?? new Date().toISOString(),
-        fecha_vencimiento: cpeRecord.fecha_vencimiento ?? cpeRecord.fecha_emision ?? null,
-        emisor_ruc: safeEmisorRuc,
-        emisor_razon_social: safeEmisorRazon,
-        emisor_direccion: safeEmisorDireccion,
-        receptor_tipo_doc: cpeRecord.tipo_documento_receptor ?? 'RUC',
-        receptor_numero_doc: cpeRecord.documento_receptor ?? '00000000000',
-        receptor_razon_social: cpeRecord.razon_social_receptor ?? 'CLIENTE',
-        receptor_direccion: cpeRecord.direccion_receptor ?? null,
-        moneda: cpeRecord.moneda ?? 'PEN',
-        tipo_cambio: 1,
-        subtotal: cpeRecord.total_gravadas ?? 0,
-        impuesto_igv: cpeRecord.total_igv ?? 0,
-        total: cpeRecord.total_venta ?? 0,
-        estado: 'BORRADOR',
-        observaciones: `Documento generado automáticamente desde CPE ${cpeRecord.serie}-${cpeRecord.numero}`,
-        created_at: cpeRecord.created_at ?? new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      const { data: documentoInsertado, error: insertError } = await client
-        .from('documentos')
-        .insert(documentoOperativo)
-        .select('id')
-        .single();
-
-      if (insertError) {
-        if ((insertError as any)?.code === '23505') {
-          const documentoCreadoPorOtroProceso = await this.findDocumentoOperativoParaCpe(client, tenantId, cpeRecord);
-          if (documentoCreadoPorOtroProceso) {
-            await this.vincularDocumentoCpe(client, cpeRecord.id, documentoCreadoPorOtroProceso);
-            return documentoCreadoPorOtroProceso;
-          }
-        }
-
-        throw new BadRequestException(`No se pudo crear documento operativo para CPE: ${insertError.message}`);
-      }
-
-      const documentoId = documentoInsertado?.id ?? null;
-
-      if (documentoId) {
-        await this.vincularDocumentoCpe(client, cpeRecord.id, documentoId);
-      }
-
-      return documentoId;
-    } catch (documentError) {
-      this.logger.error(
-        `❌ [CPE] Error creando documento operativo para CPE ${cpeRecord.id}:`,
-        documentError,
-      );
-      throw documentError;
-    }
+    return this.operationalDocumentService.ensureDocumentoParaCpe(cpeRecord, tenantId);
   }
 
-  private async getEmpresaEmisorInfo(tenantId: string) {
-    const { data } = await this.supabaseService
-      .getClient()
-      .from('empresa_config')
-      .select([
-        'ruc',
-        'razon_social',
-        'direccion_fiscal',
-        'ubigeo',
-        'departamento',
-        'provincia',
-        'dian_regimen_fiscal',
-        'dian_tipo_contribuyente',
-      ].join(','))
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-
-    const typedData = data as any;
-    return {
-      ruc: typedData?.ruc ?? '20000000000',
-      razonSocial: typedData?.razon_social ?? 'EMPRESA',
-      direccion: typedData?.direccion_fiscal ?? 'DIRECCION NO DEFINIDA',
-      ciudad: typedData?.provincia ?? '',
-      departamento: typedData?.departamento ?? '',
-      codigoUbigeo: typedData?.ubigeo ?? '',
-      codigoDepartamento: '',
-      regimenFiscal: typedData?.dian_regimen_fiscal ?? '',
-      tipoContribuyente: typedData?.dian_tipo_contribuyente ?? '',
-    };
+  private mapCpeEstadoADocumento(cpeEstado?: string | null): string {
+    return this.operationalDocumentService.mapCpeEstadoADocumento(cpeEstado);
   }
 
-  private async getEmpresaEmisorInfoStrict(tenantId: string) {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empresa_config')
-      .select('ruc, razon_social, direccion_fiscal, ubigeo, departamento, provincia')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
+private async getEmpresaEmisorInfo(tenantId: string) {
+    return this.deliveryService.getEmpresaEmisorInfo(tenantId);
+  }
 
-    if (error) {
-      throw new BadRequestException(`No se pudo leer la configuracion fiscal de la empresa: ${error.message}`);
-    }
-
-    const typedData = data as any;
-    const ruc = String(typedData?.ruc || '').trim();
-    const razonSocial = String(typedData?.razon_social || '').trim();
-    if (!/^\d{11}$/.test(ruc) || !razonSocial) {
-      throw new BadRequestException('No se puede crear el CPE: faltan RUC o razon social reales en empresa_config');
-    }
-
-    return {
-      ruc,
-      razonSocial,
-      direccion: typedData?.direccion_fiscal ?? '',
-      ciudad: typedData?.provincia ?? '',
-      departamento: typedData?.departamento ?? '',
-      codigoUbigeo: typedData?.ubigeo ?? '',
-    };
+private getEmpresaEmisorInfoStrict(tenantId: string) {
+    return this.registrationService.getEmpresaEmisorInfoStrict(tenantId);
   }
 
   async create(createFacturaDto: CreateFacturaDto, tenantId: string, userId?: string): Promise<FacturaDto> {
@@ -502,6 +200,7 @@ export class CpeService {
       const supabaseClient = this.supabaseService.getClient();
       const eventId = randomUUID();
       const emissionDate = this.resolveEmissionDate((createFacturaDto as any).fecha_emision);
+      const issueTime = this.resolveIssueTime((createFacturaDto as any).fecha_emision);
       const dueDate = this.resolveDueDate(emissionDate, (createFacturaDto as any).fecha_vencimiento);
       const { subtotal, totalIgv, total } = this.recalculateTotals(createFacturaDto);
       this.assertProvidedTotalsMatch(createFacturaDto, { subtotal, totalIgv, total });
@@ -514,6 +213,7 @@ export class CpeService {
       (createFacturaDto as any).total_venta = total;
 
       (createFacturaDto as any).fecha_emision = emissionDate;
+      (createFacturaDto as any).hora_emision = issueTime;
       (createFacturaDto as any).fecha_vencimiento = dueDate;
       (createFacturaDto as any).idempotency_key = idempotencyKey;
 
@@ -725,6 +425,11 @@ export class CpeService {
         fechaEmision: emissionDate,
         fechaVencimiento: dueDate,
         source: 'cpe.api',
+        // Solo las ventas a crédito generan cuenta por cobrar. Una boleta/factura
+        // pagada al contado (POS/efectivo) no es una deuda del cliente.
+        esCredito:
+          (createFacturaDto as any).condicion_pago === 'CREDITO' ||
+          (createFacturaDto as any).es_credito === true,
         sunatStatus: sunatStatusForEvent,
         hashFirma: hash,
         hash: hash,
@@ -886,183 +591,11 @@ export class CpeService {
     return this.create(dto, tenantId, userId);
   }
 
-  async registerDesktopSignedXml(payload: any, tenantId: string, userId?: string) {
-    const signedXml = String(payload?.signed_xml ?? payload?.signedXml ?? '').trim();
-    if (!signedXml) {
-      throw new BadRequestException('El XML firmado desktop es requerido');
-    }
-
-    const client = this.supabaseService.getClient();
-    const hash = crypto.createHash('sha256').update(signedXml).digest('base64');
-    const providedHash = String(payload?.hash ?? '').trim();
-    if (providedHash && providedHash !== hash) {
-      throw new BadRequestException('El hash del XML firmado no coincide con el contenido recibido');
-    }
-
-    const idempotencyKey = String(payload?.idempotency_key ?? payload?.idempotencyKey ?? `desktop.signed:${tenantId}:${hash}`).trim();
-    const { data: existing, error: existingError } = await client
-      .from('cpe')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
-
-    if (existingError && existingError.code && existingError.code !== 'PGRST116') {
-      throw new BadRequestException('No se pudo validar idempotencia del XML desktop');
-    }
-    if (existing) {
-      return { success: true, data: existing, message: 'XML firmado desktop ya registrado' };
-    }
-
-    const emisor = await this.getEmpresaEmisorInfoStrict(tenantId);
-    const xmlId = this.extractXmlTag(signedXml, 'ID');
-    const [serieFromXml, numeroFromXml] = xmlId.includes('-') ? xmlId.split('-', 2) : ['', ''];
-    const tipoDocumento = this.normalizeTipoDocumentoSunat(
-      payload?.tipo_documento ?? payload?.document_type ?? this.extractXmlTag(signedXml, 'InvoiceTypeCode') ?? '01',
-    );
-    const serie = String(payload?.serie ?? serieFromXml ?? this.defaultSerieForTipo(tipoDocumento)).trim().toUpperCase();
-    const numero = Number(payload?.numero ?? numeroFromXml ?? 1);
-    const totalVenta = this.roundMoney(
-      payload?.total_venta ?? payload?.total ?? this.extractXmlNumber(signedXml, 'PayableAmount') ?? 0,
-    );
-    const totalIgv = this.roundMoney(payload?.total_igv ?? payload?.igv ?? 0);
-    const totalGravadas = this.roundMoney(payload?.total_gravadas ?? payload?.subtotal ?? Math.max(totalVenta - totalIgv, 0));
-    const documentoReceptor = String(payload?.documento_receptor ?? payload?.cliente_ruc ?? '00000000').replace(/\D/g, '');
-    const tipoDocumentoReceptor = this.resolveTipoDocumentoReceptor(
-      tipoDocumento,
-      payload?.tipo_documento_receptor ?? payload?.clienteTipoDocumento,
-      documentoReceptor,
-    );
-    const eventId = randomUUID();
-
-    const cpePayload = {
-      tenant_id: tenantId,
-      tipo_documento: tipoDocumento,
-      serie,
-      numero: Number.isFinite(numero) && numero > 0 ? numero : 1,
-      fecha_emision: new Date().toISOString(),
-      fecha_vencimiento: new Date().toISOString(),
-      ruc_emisor: emisor.ruc,
-      razon_social_emisor: emisor.razonSocial,
-      tipo_documento_receptor: tipoDocumentoReceptor,
-      documento_receptor: documentoReceptor,
-      razon_social_receptor: String(payload?.razon_social_receptor ?? payload?.cliente_nombre ?? 'Cliente desktop offline'),
-      direccion_receptor: String(payload?.direccion_receptor ?? ''),
-      moneda: String(payload?.moneda ?? 'PEN'),
-      total_gravadas: totalGravadas,
-      total_igv: totalIgv,
-      total_venta: totalVenta,
-      items: Array.isArray(payload?.items) ? payload.items : [],
-      idempotency_key: idempotencyKey,
-      event_id: eventId,
-      estado: 'FIRMADO',
-      hash,
-      hash_firma: hash,
-      sunat_status: this.sunatStatuses.NOT_SENT,
-      xml_firmado: signedXml,
-    };
-
-    const { data, error } = await client
-      .from('cpe')
-      .insert(cpePayload)
-      .select()
-      .single();
-
-    if (error) {
-      this.logger.error(`❌ [CPE] Error registrando XML firmado desktop: ${error.message}`, error);
-      throw new BadRequestException('No se pudo registrar el XML firmado desktop');
-    }
-
-    const createdCpe = Array.isArray(data) ? data[0] : data;
-    const documentoId = await this.ensureDocumentoParaCpe(createdCpe, tenantId);
-    if (documentoId) {
-      (createdCpe as any).documento_id = documentoId;
-    } else {
-      throw new BadRequestException(`CPE desktop ${createdCpe.id} no tiene documento operativo asociado`);
-    }
-
-    await this.eventBus.emitComprobanteCreadoEvent({
-      eventId: randomUUID(),
-      tenantId,
-      idempotencyKey: `desktop.cpe.creado:${tenantId}:${createdCpe.id}`,
-      cpeId: createdCpe.id,
-      tipoDocumento,
-      serie,
-      numero: createdCpe.numero,
-      clienteId: createdCpe.documento_receptor,
-      total: createdCpe.total_venta,
-      esCredito: false,
-      ventaId: undefined,
-      requiereTransporte: false,
-      moneda: createdCpe.moneda,
-    });
-
-    await this.eventBus.emitFacturaEmitidaEvent({
-      eventId,
-      tenantId,
-      idempotencyKey,
-      cpeId: createdCpe.id,
-      facturaId: documentoId,
-      serie,
-      numero: String(createdCpe.numero),
-      clienteId: createdCpe.documento_receptor,
-      subtotal: createdCpe.total_gravadas,
-      impuestos: createdCpe.total_igv,
-      total: createdCpe.total_venta,
-      moneda: createdCpe.moneda,
-      fechaEmision: createdCpe.fecha_emision,
-      fechaVencimiento: createdCpe.fecha_vencimiento,
-      source: 'cpe.desktop',
-      sunatStatus: this.sunatStatuses.NOT_SENT,
-      hashFirma: hash,
-      hash,
-    });
-
-    try {
-      await this.auditService.registrarCambio(
-        'cpe',
-        'INSERT',
-        userId ?? null,
-        {
-          new: {
-            tipo_documento: tipoDocumento,
-            serie,
-            numero: createdCpe.numero,
-            total_venta: createdCpe.total_venta,
-            estado: 'FIRMADO',
-            source: 'desktop_offline',
-          },
-        },
-        tenantId,
-        createdCpe.id,
-        { accion: 'REGISTRAR_CPE_DESKTOP', tipo_documento: tipoDocumento },
-      );
-    } catch (auditError) {
-      this.logger.warn('⚠️ No se pudo registrar auditoria de CPE desktop:', auditError);
-    }
-
-    try {
-      await this.cacheInvalidation.onCpeCreated(tenantId);
-    } catch (cacheError) {
-      this.logger.warn('⚠️ No se pudo invalidar cache despues de CPE desktop:', cacheError);
-    }
-
-    return {
-      success: true,
-      data: createdCpe,
-      message: 'XML firmado desktop registrado; envio SUNAT/OSE pendiente de confirmacion externa',
-    };
+async registerDesktopSignedXml(payload: any, tenantId: string, userId?: string) {
+    return this.registrationService.registerDesktopSignedXml(payload, tenantId, userId);
   }
 
-  private extractXmlTag(xml: string, tag: string): string {
-    const pattern = new RegExp(`<(?:\\w+:)?${tag}[^>]*>([^<]+)</(?:\\w+:)?${tag}>`, 'i');
-    return pattern.exec(xml)?.[1]?.trim() ?? '';
-  }
 
-  private extractXmlNumber(xml: string, tag: string): number | null {
-    const value = Number(this.extractXmlTag(xml, tag));
-    return Number.isFinite(value) ? value : null;
-  }
 
   async crearCPEDesdeDocumento(documento: DocumentoFiscal, tenantId: string) {
     const client = this.supabaseService.getClient();
@@ -1223,222 +756,44 @@ export class CpeService {
     }
   }
 
-  async findOne(id: string, tenantId: string): Promise<FacturaDto> {
-    try {
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('cpe')
-        .select('*')
-        .eq('id', id)
-        .eq('tenant_id', tenantId)
-        .single();
-
-      if (error || !data) {
-        throw new NotFoundException('CPE not found');
-      }
-
-      return this.mapToDto(data);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new BadRequestException('Error fetching CPE');
-    }
+async findOne(id: string, tenantId: string): Promise<FacturaDto> {
+    return this.deliveryService.findOne(id, tenantId);
   }
 
-  async getCpeById(id: string, tenantId: string): Promise<any> {
-    try {
-      console.log(`📄 Obteniendo CPE con ID: ${id}`);
-      
-      const { data: cpeData, error } = await this.supabaseService.getClient()
-        .from('cpe')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error || !cpeData) {
-        console.error('❌ CPE no encontrado:', error);
-        throw new Error('CPE no encontrado');
-      }
-
-      // Obtener logo_url de empresa_config
-      const { data: empresaConfig } = await this.supabaseService.getClient()
-        .from('empresa_config')
-        .select('logo_url')
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-
-      const typedEmpresaConfig = empresaConfig as any;
-      console.log('✅ CPE encontrado para vista:', cpeData);
-      return {
-        ...cpeData,
-        logo_url: typedEmpresaConfig?.logo_url || null,
-      };
-    } catch (error) {
-      console.error('❌ Error obteniendo CPE:', error);
-      throw new Error(`Error obteniendo CPE: ${error.message}`);
-    }
+async getCpeById(id: string, tenantId: string): Promise<any> {
+    return this.deliveryService.getCpeById(id, tenantId);
   }
 
-  async generatePdf(id: string, tenantId: string): Promise<Buffer> {
-    try {
-      this.logger.log(`📄 Generando PDF con formato SUNAT para CPE: ${id}`);
-      
-      // Usar el nuevo generador de PDF con formato oficial SUNAT
-      // ✅ Incluye código QR obligatorio
-      // ✅ Diseño visual estándar SUNAT
-      // ✅ Leyendas obligatorias
-      const pdfBuffer = await this.pdfGenerator.generateSunatCompliantPdf(id, tenantId);
-      
-      this.logger.log(`✅ PDF generado exitosamente para CPE: ${id}`);
-      return pdfBuffer;
-      
-    } catch (error) {
-      this.logger.error(`❌ Error generando PDF para CPE ${id}:`, error);
-      throw new Error(`Error generando PDF: ${error.message}`);
-    }
+async generatePdf(id: string, tenantId: string): Promise<Buffer> {
+    return this.deliveryService.generatePdf(id, tenantId);
   }
 
-  async getSignedXml(id: string, tenantId: string): Promise<string> {
-    const cpe = await this.findOne(id, tenantId);
-    
-    if (!cpe.xml_firmado) {
-      throw new BadRequestException('XML not available for this CPE');
-    }
-
-    return cpe.xml_firmado;
+async getSignedXml(id: string, tenantId: string): Promise<string> {
+    return this.deliveryService.getSignedXml(id, tenantId);
   }
 
-  async resendToOse(id: string, tenantId: string, options?: { idempotencyKey?: string }) {
-    const cpe = await this.findOne(id, tenantId);
-    
-    // Obtener XML firmado del CPE
-    const fileName = `${cpe.ruc_emisor}-${cpe.tipo_documento}-${cpe.serie}-${cpe.numero}`;
-    
-    await this.sendToOse(id, cpe.xml_firmado, fileName, options);
-    
-    return { message: 'CPE resent to OSE successfully' };
+async resendToOse(id: string, tenantId: string, options?: { idempotencyKey?: string }) {
+    return this.deliveryService.resendToOse(id, tenantId, options);
   }
 
   /**
    * Enviar manualmente CPE firmado a SUNAT
    */
-  async sendToOseManual(
+async sendToOseManual(
     id: string,
     xmlFirmado: string,
     fileName: string,
     options?: { idempotencyKey?: string },
   ): Promise<void> {
-    console.log(`🚀 [CPE] Enviando manualmente CPE ${id} a SUNAT...`);
-    await this.sendToOse(id, xmlFirmado, fileName, options);
+    return this.deliveryService.sendToOseManual(id, xmlFirmado, fileName, options);
   }
 
-  async checkOseStatus(id: string, tenantId: string) {
-    const cpe = await this.findOne(id, tenantId);
-    
-    // 🌍 Consultar estado en servicio fiscal correcto (SUNAT o DIAN)
-    const servicioFiscal = await this.fiscalAdapter.obtenerNombreServicioFiscal(tenantId);
-    console.log(`🔍 Consultando estado en ${servicioFiscal} para CPE ${id}`);
-    
-    const response = await this.fiscalAdapter.consultarEstado(
-      tenantId,
-      cpe.tipo_documento,
-      cpe.serie,
-      cpe.numero.toString(),
-      cpe.hash
-    );
-    
-    // Actualizar estado en BD si es necesario
-    if (response.success) {
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'ACEPTADO',
-          sunat_status: this.sunatStatuses.ACCEPTED,
-          cdr_sunat: response.cdr || 'CDR_RECEIVED',
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpe.id }
-      );
-    } else {
-      await this.supabaseService.update(
-        'cpe',
-        {
-          sunat_status: this.sunatStatuses.REJECTED,
-          error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpe.id }
-      );
-    }
-    
-    return {
-      id: cpe.id,
-      estado: response.success ? 'ACEPTADO' : cpe.estado,
-      codigoSunat: response.codigoRespuesta,
-      descripcionSunat: response.descripcionRespuesta,
-      timestamp: new Date(),
-    };
+async checkOseStatus(id: string, tenantId: string) {
+    return this.deliveryService.checkOseStatus(id, tenantId);
   }
 
   private buildXmlFromDocumentoFiscal(documento: DocumentoFiscal): string {
-    const itemsXml = documento.detalles
-      .map((detalle, index) => {
-        return `
-  <cac:InvoiceLine>
-    <cbc:ID>${index + 1}</cbc:ID>
-    <cbc:InvoicedQuantity>${detalle.cantidad.toFixed(2)}</cbc:InvoicedQuantity>
-    <cbc:LineExtensionAmount currencyID="${documento.moneda}">${detalle.valor_venta.toFixed(2)}</cbc:LineExtensionAmount>
-    <cac:PricingReference>
-      <cac:AlternativeConditionPrice>
-        <cbc:PriceAmount currencyID="${documento.moneda}">${detalle.precio_unitario.toFixed(2)}</cbc:PriceAmount>
-      </cac:AlternativeConditionPrice>
-    </cac:PricingReference>
-    <cac:Item>
-      <cbc:Description><![CDATA[${detalle.descripcion}]]></cbc:Description>
-    </cac:Item>
-    <cac:Price>
-      <cbc:PriceAmount currencyID="${documento.moneda}">${detalle.precio_unitario.toFixed(2)}</cbc:PriceAmount>
-    </cac:Price>
-  </cac:InvoiceLine>`;
-      })
-      .join('\n');
-
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
-         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
-  <cbc:ID>${documento.serie}-${documento.numero}</cbc:ID>
-  <cbc:IssueDate>${documento.fecha_emision.substring(0, 10)}</cbc:IssueDate>
-  <cbc:InvoiceTypeCode>${documento.tipo_documento}</cbc:InvoiceTypeCode>
-  <cbc:DocumentCurrencyCode>${documento.moneda}</cbc:DocumentCurrencyCode>
-  <cac:AccountingSupplierParty>
-    <cac:Party>
-      <cac:PartyIdentification>
-        <cbc:ID>${documento.emisor.ruc}</cbc:ID>
-      </cac:PartyIdentification>
-      <cac:PartyName>
-        <cbc:Name><![CDATA[${documento.emisor.razon_social}]]></cbc:Name>
-      </cac:PartyName>
-    </cac:Party>
-  </cac:AccountingSupplierParty>
-  <cac:AccountingCustomerParty>
-    <cac:Party>
-      <cac:PartyIdentification>
-        <cbc:ID>${documento.cliente.numero_documento}</cbc:ID>
-      </cac:PartyIdentification>
-      <cac:PartyName>
-        <cbc:Name><![CDATA[${documento.cliente.razon_social}]]></cbc:Name>
-      </cac:PartyName>
-    </cac:Party>
-  </cac:AccountingCustomerParty>
-  <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="${documento.moneda}">${documento.subtotal.toFixed(2)}</cbc:LineExtensionAmount>
-    <cbc:TaxInclusiveAmount currencyID="${documento.moneda}">${documento.total.toFixed(2)}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${documento.moneda}">${documento.total.toFixed(2)}</cbc:PayableAmount>
-  </cac:LegalMonetaryTotal>
-${itemsXml}
-</Invoice>`;
+    return this.xmlBuilder.buildXmlFromDocumentoFiscal(documento);
   }
 
   /**
@@ -1447,302 +802,31 @@ ${itemsXml}
    * NOTA: El envío automático a SUNAT está DESACTIVADO por ahora.
    * Para enviar manualmente usar el endpoint: POST /api/cpe/:id/enviar-sunat
    */
-  private async prepareXmlForSunat(cpeId: string, xmlContent: string, tenantId: string): Promise<boolean> {
-    try {
-      console.log(`📄 [CPE] Preparando XML para CPE ${cpeId}...`);
-      
-      // Obtener el XmlSigner configurado para el tenant
-      const xmlSigner = await this.getXmlSigner(tenantId);
-      console.log('📜 [CPE] Certificado configurado');
-      
-      // Firmar el XML con certificado real
-      const xmlSigned = xmlSigner.signXml(xmlContent);
-      const hash = xmlSigner.generateHash(xmlSigned);
-
-      // Validar la firma generada
-      const isValid = xmlSigner.validateSignature(xmlSigned);
-      if (!isValid) {
-        console.warn('⚠️ [CPE] La firma generada no pasó la validación');
-      }
-
-      // Actualizar CPE con XML firmado
-      console.log('🔧 [CPE] Actualizando estado a: FIRMADO');
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'FIRMADO', // Estado que indica listo para SUNAT
-          hash: hash,
-          hash_firma: hash,
-          xml_firmado: xmlSigned,
-          sunat_status: this.sunatStatuses.READY,
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpeId }
-      );
-
-      console.log(`✅ [CPE] XML firmado para CPE ${cpeId}`);
-      console.log(`📊 [CPE] Hash: ${hash}`);
-      console.log(`📊 [CPE] Firma válida: ${isValid ? '✅' : '⚠️'}`);
-      console.log(`📊 [CPE] Modo certificado: DEMO`);
-
-      return true;
-    } catch (error) {
-      console.error(`❌ [CPE] Error preparando XML para CPE ${cpeId}:`, error);
-      
-      // Marcar como ERROR
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'RECHAZADO',
-          sunat_status: this.sunatStatuses.ERROR,
-          error_message: `Error preparando XML: ${error.message}`,
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpeId }
-      );
-
-      return false;
-    }
+private async prepareXmlForSunat(cpeId: string, xmlContent: string, tenantId: string): Promise<boolean> {
+    return this.deliveryService.prepareXmlForSunat(cpeId, xmlContent, tenantId);
   }
 
   /**
    * Reintentar envío de CPE (método público para SunatRetryService)
    */
-  async retrySendToOse(
+async retrySendToOse(
     cpeId: string,
     options?: { idempotencyKey?: string },
   ): Promise<void> {
-    return this.sendToOse(cpeId, undefined, undefined, options);
+    return this.deliveryService.retrySendToOse(cpeId, options);
   }
 
-  private async sendToOse(
-    cpeId: string,
-    xmlContent?: string,
-    fileName?: string,
-    options?: { idempotencyKey?: string },
-  ): Promise<void> {
-    try {
-      // 🔍 PASO 1: Obtener datos del CPE incluyendo tenant_id
-      const { data: cpeData, error: cpeError } = await this.supabaseService.getClient()
-        .from('cpe')
-        .select('*, tenant_id, xml_firmado, ruc_emisor, tipo_documento, serie, numero')
-        .eq('id', cpeId)
-        .single();
-
-      if (cpeError || !cpeData) {
-        throw new Error('No se pudo obtener datos del CPE');
-      }
-
-      const tenantId = cpeData.tenant_id;
-      const effectiveIdempotencyKey =
-        String(options?.idempotencyKey ?? '').trim() ||
-        String((cpeData as any).idempotency_key ?? '').trim() ||
-        `cpe.send:${tenantId}:${cpeId}`;
-
-      // HARDENING: evitar doble envío concurrente si ya está en flight.
-      if (
-        (cpeData as any).estado === 'ENVIADO' &&
-        (cpeData as any).sunat_status === this.sunatStatuses.SENDING
-      ) {
-        this.logger.warn(
-          `♻️ [CPE] Envío ya en progreso para ${cpeId} (idempotencyKey=${effectiveIdempotencyKey}); omitiendo duplicado.`,
-        );
-        return;
-      }
-      
-      // 🌍 PASO 2: Detectar servicio fiscal según país del tenant
-      const servicioFiscal = await this.fiscalAdapter.obtenerNombreServicioFiscal(tenantId);
-      console.log(`📤 [CPE] Enviando CPE ${cpeId} a ${servicioFiscal}...`);
-      
-      // PASO 3: Marcar como ENVIADO
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'ENVIADO',
-          sunat_status: this.sunatStatuses.SENDING,
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpeId }
-      );
-
-      // PASO 4: Preparar XML si no se proporcionó
-      if (!xmlContent || !fileName) {
-        xmlContent = cpeData.xml_firmado;
-        fileName = `${cpeData.ruc_emisor}-${cpeData.tipo_documento}-${cpeData.serie}-${cpeData.numero}`;
-      }
-
-      // 🚀 PASO 5: ENVIAR AL SERVICIO FISCAL CORRECTO (SUNAT o DIAN)
-      // Construir documento electrónico desde CPE
-      const paisCodigo = (await this.fiscalAdapter.obtenerCodigoPais(tenantId)).toUpperCase();
-      const fiscalConfig = await this.fiscalAdapter.obtenerConfiguracionFiscal(tenantId);
-      const emisorInfo = await this.getEmpresaEmisorInfo(tenantId);
-      const emisorTipoDocumento = paisCodigo === 'CO' ? '31' : '6';
-      const receptorTipoDocumento =
-        cpeData.tipo_documento_receptor ||
-        cpeData.tipo_documento_cliente ||
-        (paisCodigo === 'CO' ? '31' : '6');
-      const emisorNumeroDocumento = this.pickFirstNonEmpty(
-        [cpeData.ruc_emisor, emisorInfo.ruc],
-        '20000000000',
-      );
-      const emisorRazonSocial = this.pickFirstNonEmpty(
-        [cpeData.razon_social_emisor, emisorInfo.razonSocial],
-        'Emisor',
-      );
-      const emisorDireccion = this.pickFirstNonEmpty(
-        [cpeData.direccion_emisor, emisorInfo.direccion],
-        '',
-      );
-      const subtotalValue = parseFloat(cpeData.subtotal || cpeData.total_gravadas || '0');
-      const impuestosValue = parseFloat(cpeData.igv || cpeData.total_igv || '0');
-      const totalValue = parseFloat(cpeData.total || cpeData.total_venta || '0');
-      const documento = {
-        id: cpeData.id,
-        tipoDocumento: cpeData.tipo_documento,
-        serie: cpeData.serie,
-        numero: cpeData.numero?.toString() || '',
-        fechaEmision: cpeData.fecha_emision,
-        fechaVencimiento: cpeData.fecha_vencimiento,
-        emisor: {
-          tipoDocumento: emisorTipoDocumento,
-          numeroDocumento: emisorNumeroDocumento,
-          razonSocial: emisorRazonSocial,
-          direccion: emisorDireccion,
-          ciudad: emisorInfo.ciudad || '',
-          departamento: emisorInfo.departamento || '',
-          codigoUbigeo: emisorInfo.codigoUbigeo || '',
-          codigoDepartamento: emisorInfo.codigoDepartamento || '',
-          regimenFiscal: emisorInfo.regimenFiscal || '',
-          tipoContribuyente: emisorInfo.tipoContribuyente || '',
-        },
-        receptor: {
-          tipoDocumento: receptorTipoDocumento,
-          numeroDocumento: cpeData.documento_receptor || cpeData.numero_documento_cliente || '',
-          razonSocial: cpeData.razon_social_receptor || cpeData.razon_social_cliente || 'Cliente',
-          direccion: cpeData.direccion_receptor || cpeData.direccion_cliente || '',
-        },
-        moneda: cpeData.moneda || 'PEN',
-        subtotal: subtotalValue,
-        totalImpuestos: impuestosValue,
-        importeTotal: totalValue,
-        tasaImpuesto: fiscalConfig?.tasaImpuesto,
-        items: cpeData.items || [],
-        xmlContent: xmlContent
-      };
-
-      const response = await this.fiscalAdapter.enviarDocumento(documento, tenantId);
-
-      if (response.success) {
-        console.log(`✅ [CPE] CPE ${cpeId} enviado exitosamente a ${servicioFiscal}`);
-        
-        // Actualizar como ACEPTADO
-        await this.supabaseService.update(
-          'cpe',
-          {
-            estado: 'ACEPTADO',
-            sunat_status: this.sunatStatuses.ACCEPTED,
-            cdr_sunat: response.cdr || 'CDR_RECEIVED',
-            hash: response.hash || response.numeroComprobante || null,
-            hash_firma: response.hash || null,
-            numero_comprobante_sunat: response.numeroComprobante,
-            updated_at: new Date().toISOString(),
-          },
-          { id: cpeId }
-        );
-      } else {
-        console.error(`❌ [CPE] Error enviando CPE ${cpeId} a ${servicioFiscal}: ${response.descripcionRespuesta}`);
-        
-        // 🔴 CRÍTICO FIX: Determinar si es error técnico recuperable o error de validación
-        const isTechnicalError = this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta);
-        
-        // Marcar como RECHAZADO
-        await this.supabaseService.update(
-          'cpe',
-          {
-            estado: 'RECHAZADO',
-            sunat_status: isTechnicalError ? this.sunatStatuses.ERROR : this.sunatStatuses.REJECTED,
-            error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
-            retry_count: isTechnicalError ? 0 : null, // Solo reintentar errores técnicos
-            next_retry_at: null,
-            updated_at: new Date().toISOString(),
-          },
-          { id: cpeId }
-        );
-      }
-
-    } catch (error) {
-      console.error(`❌ [CPE] Error técnico enviando CPE ${cpeId}:`, error);
-      
-      // 🔴 CRÍTICO FIX: Marcar como RECHAZADO con información de reintento
-      const retryCount = 0; // Primera vez que falla
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'RECHAZADO',
-          sunat_status: this.sunatStatuses.ERROR,
-          error_message: `Error técnico: ${error.message}`,
-          retry_count: retryCount,
-          next_retry_at: null, // El servicio de reintentos lo programará
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpeId }
-      );
-    }
-  }
 
   /**
    * 🔴 CRÍTICO FIX: Determina si un error de SUNAT es técnico (reintentable) o de validación (no reintentable)
    */
-  private isTechnicalError(codigoRespuesta: string, descripcionRespuesta: string): boolean {
-    // Códigos de error técnicos de SUNAT que se pueden reintentar
-    const technicalErrorCodes = ['99', '98', '97']; // Errores técnicos genéricos
-    
-    // Si el código indica error técnico
-    if (technicalErrorCodes.includes(codigoRespuesta)) {
-      return true;
-    }
-
-    // Si el mensaje indica error técnico de red/conexión
-    const errorMessage = descripcionRespuesta?.toLowerCase() || '';
-    const technicalKeywords = [
-      'timeout',
-      'connection',
-      'network',
-      'técnico',
-      'servicio no disponible',
-      'temporalmente',
-      'unavailable',
-    ];
-
-    return technicalKeywords.some(keyword => errorMessage.includes(keyword));
-  }
 
   private resolveEmissionDate(fechaEmision?: string): string {
-    if (!fechaEmision) {
-      return this.formatDate(new Date());
-    }
-
-    const parsed = new Date(fechaEmision);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new BadRequestException(`fecha_emision inválida: ${fechaEmision}`);
-    }
-
-    return this.formatDate(parsed);
+    return this.xmlBuilder.resolveEmissionDate(fechaEmision);
   }
 
   private resolveDueDate(emissionDate: string, fechaVencimiento?: string): string {
-    if (fechaVencimiento) {
-      const parsed = new Date(fechaVencimiento);
-      if (Number.isNaN(parsed.getTime())) {
-        throw new BadRequestException(`fecha_vencimiento inválida: ${fechaVencimiento}`);
-      }
-      return this.formatDate(parsed);
-    }
-
-    const emission = new Date(emissionDate);
-    const due = new Date(emission);
-    due.setDate(due.getDate() + 30);
-    return this.formatDate(due);
+    return this.xmlBuilder.resolveDueDate(emissionDate, fechaVencimiento);
   }
 
   private resolveIdempotencyKey(dto: CreateFacturaDto, tenantId: string): string {
@@ -1754,190 +838,39 @@ ${itemsXml}
     return `${tenantId}:${dto.tipo_documento}:${dto.serie}:${dto.numero}`;
   }
 
-  private formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
-  }
+
+
+
 
   private generateXmlContent(factura: CreateFacturaDto): string {
-    // Generate basic UBL 2.1 XML structure (simplified)
-    const issueDate = (factura as any).fecha_emision || this.formatDate(new Date());
-    const dueDateTag = (factura as any).fecha_vencimiento ? `\n  <cbc:DueDate>${(factura as any).fecha_vencimiento}</cbc:DueDate>` : '';
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
-         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
-         xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
-  
-  <ext:UBLExtensions>
-    <ext:UBLExtension>
-      <ext:ExtensionContent></ext:ExtensionContent>
-    </ext:UBLExtension>
-  </ext:UBLExtensions>
-  
-  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
-  <cbc:CustomizationID>2.0</cbc:CustomizationID>
-  <cbc:ID>${factura.serie}-${factura.numero}</cbc:ID>
-  <cbc:IssueDate>${issueDate}</cbc:IssueDate>${dueDateTag}
-  <cbc:InvoiceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${factura.tipo_documento}</cbc:InvoiceTypeCode>
-  <cbc:DocumentCurrencyCode listID="ISO 4217 Alpha" listName="Currency" listAgencyName="United Nations Economic Commission for Europe">${factura.moneda}</cbc:DocumentCurrencyCode>
-
-  <!-- Supplier Party -->
-  <cac:AccountingSupplierParty>
-    <cac:Party>
-      <cac:PartyIdentification>
-        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${factura.ruc_emisor}</cbc:ID>
-      </cac:PartyIdentification>
-      <cac:PartyName>
-        <cbc:Name><![CDATA[${factura.razon_social_emisor}]]></cbc:Name>
-      </cac:PartyName>
-    </cac:Party>
-  </cac:AccountingSupplierParty>
-
-  <!-- Customer Party -->
-  <cac:AccountingCustomerParty>
-    <cac:Party>
-      <cac:PartyIdentification>
-        <cbc:ID schemeID="${factura.tipo_documento_receptor}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${factura.documento_receptor}</cbc:ID>
-      </cac:PartyIdentification>
-      <cac:PartyLegalEntity>
-        <cbc:RegistrationName><![CDATA[${factura.razon_social_receptor}]]></cbc:RegistrationName>
-      </cac:PartyLegalEntity>
-    }
-  </cac:AccountingCustomerParty>
-
-  <!-- Tax Total -->
-  <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="${factura.moneda}">${factura.total_igv.toFixed(2)}</cbc:TaxAmount>
-    <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${factura.moneda}">${factura.total_gravadas.toFixed(2)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${factura.moneda}">${factura.total_igv.toFixed(2)}</cbc:TaxAmount>
-      <cac:TaxCategory>
-        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">S</cbc:ID>
-        <cac:TaxScheme>
-          <cbc:ID schemeID="UN/ECE 5153" schemeAgencyName="United Nations Economic Commission for Europe">1000</cbc:ID>
-          <cbc:Name>IGV</cbc:Name>
-          <cbc:TaxTypeCode>VAT</cbc:TaxTypeCode>
-        </cac:TaxScheme>
-      </cac:TaxCategory>
-    </cac:TaxSubtotal>
-  </cac:TaxTotal>
-
-  <!-- Legal Monetary Total -->
-  <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="${factura.moneda}">${factura.total_gravadas.toFixed(2)}</cbc:LineExtensionAmount>
-    <cbc:TaxInclusiveAmount currencyID="${factura.moneda}">${factura.total_venta.toFixed(2)}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${factura.moneda}">${factura.total_venta.toFixed(2)}</cbc:PayableAmount>
-  </cac:LegalMonetaryTotal>
-
-  <!-- Invoice Lines -->
-  ${factura.items.map((item, index) => `
-  <cac:InvoiceLine>
-    <cbc:ID>${index + 1}</cbc:ID>
-    <cbc:InvoicedQuantity unitCode="${item.unidad}">${item.cantidad}</cbc:InvoicedQuantity>
-    <cbc:LineExtensionAmount currencyID="${factura.moneda}">${item.valor_venta.toFixed(2)}</cbc:LineExtensionAmount>
-    <cac:Item>
-      <cbc:Description><![CDATA[${item.descripcion}]]></cbc:Description>
-      <cac:SellersItemIdentification>
-        <cbc:ID>${item.codigo}</cbc:ID>
-      </cac:SellersItemIdentification>
-    </cac:Item>
-    <cac:Price>
-      <cbc:PriceAmount currencyID="${factura.moneda}">${item.precio_unitario.toFixed(2)}</cbc:PriceAmount>
-    </cac:Price>
-  </cac:InvoiceLine>
-  `).join('')}
-
-</Invoice>`;
+    return this.xmlBuilder.generateXmlContent(factura);
   }
 
-  private generateSimplePdfContent(cpe: any): string {
-    const fechaEmision = cpe.fecha_emision ? new Date(cpe.fecha_emision).toLocaleDateString() : new Date(cpe.created_at).toLocaleDateString();
-    const fechaVencimiento = cpe.fecha_vencimiento ? new Date(cpe.fecha_vencimiento).toLocaleDateString() : 'No definido';
-    const sunatStatus = cpe.sunat_status ?? this.sunatStatuses.NOT_SENT;
-    const hashFirma = cpe.hash_firma ?? cpe.hash ?? 'N/A';
-    return `
-FACTURA ELECTRÓNICA
-===================
 
-Serie: ${cpe.serie}
-Número: ${cpe.numero}
-Fecha emisión: ${fechaEmision}
-Fecha vencimiento: ${fechaVencimiento}
 
-EMISOR:
-${cpe.razon_social_emisor}
-RUC: ${cpe.ruc_emisor}
 
-RECEPTOR:
-${cpe.razon_social_receptor}
-${cpe.tipo_documento_receptor}: ${cpe.documento_receptor}
 
-DETALLE:
-${cpe.items.map(item => 
-  `${item.descripcion} - Cant: ${item.cantidad} - Precio: ${item.precio_unitario}`
-).join('\n')}
 
-TOTALES:
-Subtotal: ${cpe.total_gravadas}
-IGV: ${cpe.total_igv}
-Total: ${cpe.total_venta}
 
-Estado: ${cpe.estado}
-SUNAT Status: ${sunatStatus}
-Hash firma: ${hashFirma}
 
----
-Documento generado por ERP Suite
-`;
+
+
+
+
+
+  private resolveIssueTime(fechaEmision?: string): string {
+    return this.xmlBuilder.resolveIssueTime(fechaEmision);
   }
 
-  private generateSimplePdfContentFromData(cpeData: any): string {
-    const items = Array.isArray(cpeData.items) ? cpeData.items : [];
-    const fechaEmision = cpeData.fecha_emision
-      ? new Date(cpeData.fecha_emision).toLocaleDateString()
-      : (cpeData.created_at ? new Date(cpeData.created_at).toLocaleDateString() : new Date().toLocaleDateString());
-    const fechaVencimiento = cpeData.fecha_vencimiento
-      ? new Date(cpeData.fecha_vencimiento).toLocaleDateString()
-      : 'No definido';
-    const sunatStatus = cpeData.sunat_status ?? this.sunatStatuses.NOT_SENT;
-    const hashFirma = cpeData.hash_firma ?? cpeData.hash ?? 'N/A';
-    
-    return `
-COMPROBANTE ELECTRÓNICO
-======================
 
-Serie: ${cpeData.serie || 'N/A'}
-Número: ${cpeData.numero || 'N/A'}
-Fecha emisión: ${fechaEmision}
-Fecha vencimiento: ${fechaVencimiento}
 
-EMISOR:
-${cpeData.razon_social_emisor || 'ERP KAME'}
-RUC: ${cpeData.ruc_emisor || '12345678901'}
 
-RECEPTOR:
-${cpeData.razon_social_receptor || 'Cliente General'}
-Documento: ${cpeData.documento_receptor || 'Sin documento'}
 
-DETALLE:
-${items.length > 0 ? items.map((item, index) => 
-  `${index + 1}. ${item.nombre_producto || item.descripcion || 'Producto'} - Cant: ${item.cantidad || 1} - Precio: S/${item.precio_unitario || 0}`
-).join('\n') : 'No hay items disponibles'}
 
-TOTALES:
-Subtotal: S/${parseFloat(cpeData.total_gravadas || 0).toFixed(2)}
-IGV: S/${parseFloat(cpeData.total_igv || 0).toFixed(2)}
-Total: S/${parseFloat(cpeData.total_venta || 0).toFixed(2)}
 
-Estado: ${cpeData.estado || 'EMITIDO'}
-SUNAT Status: ${sunatStatus}
-Hash firma: ${hashFirma}
 
----
-Documento generado por ERP KAME
-${new Date().toLocaleString()}
-`;
-  }
+
+
 
   private evaluarSiRequiereTransporte(createFacturaDto: CreateFacturaDto): boolean {
     // Lógica para determinar si el comprobante requiere transporte
@@ -1961,1079 +894,89 @@ ${new Date().toLocaleString()}
   }
 
   private mapToDto(cpeData: any): FacturaDto {
-    const dto: FacturaDto & { documento_id?: string | null; documentoId?: string | null } = {
-      id: cpeData.id,
-      documento_id: cpeData.documento_id ?? null,
-      documentoId: cpeData.documento_id ?? null,
-      tipo_documento: cpeData.tipo_documento,
-      serie: cpeData.serie,
-      numero: cpeData.numero,
-      ruc_emisor: cpeData.ruc_emisor,
-      razon_social_emisor: cpeData.razon_social_emisor,
-      tipo_documento_receptor: cpeData.tipo_documento_receptor,
-      documento_receptor: cpeData.documento_receptor,
-      razon_social_receptor: cpeData.razon_social_receptor,
-      direccion_receptor: cpeData.direccion_receptor,
-      moneda: cpeData.moneda,
-      items: cpeData.items,
-      total_gravadas: parseFloat(cpeData.total_gravadas),
-      total_igv: parseFloat(cpeData.total_igv),
-      total_venta: parseFloat(cpeData.total_venta),
-      estado: cpeData.estado,
-      hash: cpeData.hash,
-      xml_firmado: cpeData.xml_firmado,
-      cdr_sunat: cpeData.cdr_sunat,
-      error_message: cpeData.error_message,
-      tenant_id: cpeData.tenant_id,
-      created_at: new Date(cpeData.created_at),
-      updated_at: new Date(cpeData.updated_at),
-    };
-
-    return dto;
+    return this.deliveryService.mapToDto(cpeData);
   }
 
   private pickFirstNonEmpty(values: Array<string | null | undefined>, fallback = ''): string {
-    for (const value of values) {
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed.length > 0) {
-          return trimmed;
-        }
-      }
-    }
-    return fallback;
+    return this.deliveryService.pickFirstNonEmpty(values, fallback);
   }
 
-  async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
-    try {
-      console.log('📄 Consultando tabla CPE en Supabase...', filters, 'tenantId:', tenantId);
 
-      const client = this.supabaseService.getClient();
-      if (!client) {
-        console.error('❌ Cliente de Supabase no disponible');
-        return {
-          success: false,
-          message: 'Cliente de Supabase no configurado',
-          data: []
-        };
-      }
-
-      // Paginación y rango
-      const page = Number(filters.page || 1);
-      const pageSize = Math.min(Number(filters.pageSize || 50), 200);
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      // Construir query base
-      let query = client
-        .from('cpe')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      // Filtrar por tenant_id si se proporciona
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
-
-      // Aplicar filtros si existen
-      if (filters.tipoComprobante) {
-        query = query.eq('tipo_documento', filters.tipoComprobante);
-      }
-
-      if (filters.estado) {
-        query = query.eq('estado', filters.estado);
-      }
-
-      if (filters.serie) {
-        query = query.eq('serie', filters.serie);
-      }
-
-      if (filters.moneda) {
-        query = query.eq('moneda', filters.moneda);
-      }
-
-      if (filters.fechaDesde) {
-        query = query.gte('created_at', `${filters.fechaDesde}T00:00:00`);
-      }
-
-      if (filters.fechaHasta) {
-        query = query.lte('created_at', `${filters.fechaHasta}T23:59:59`);
-      }
-
-      if (filters.cliente) {
-        query = query.ilike('razon_social_receptor', `%${filters.cliente}%`);
-      }
-
-      const { data: cpeData, error, count } = await query;
-
-      if (error) {
-        console.error('❌ Error consultando CPE:', error);
-        console.error('📊 Detalles completos del error:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw error;
-      }
-
-      console.log(`📊 Datos CPE encontrados:`, cpeData?.length || 0);
-
-      // Transformar datos al formato esperado por el frontend
-      const comprobantesFormateados = (cpeData || []).map(cpe => ({
-        id: cpe.id,
-        tipoDocumento: cpe.tipo_documento,
-        tipoComprobante: this.getTipoComprobanteText(cpe.tipo_documento),
-        serie: cpe.serie,
-        numero: cpe.numero,
-        fechaEmision: cpe.created_at ? new Date(cpe.created_at).toISOString().split('T')[0] : '',
-        cliente: cpe.razon_social_receptor || 'Cliente General',
-        clienteRuc: cpe.documento_receptor || '',
-        total: parseFloat(cpe.total_venta || 0),
-        moneda: cpe.moneda || 'PEN',
-        estado: cpe.estado || 'BORRADOR',
-        estadoSunat: cpe.estado,
-        observaciones: cpe.error_message || '',
-        fechaCreacion: cpe.created_at
-      }));
-
-      console.log(`✅ Se formatearon ${comprobantesFormateados.length} comprobantes`);
-
-      return {
-        success: true,
-        data: comprobantesFormateados,
-        message: `Se encontraron ${comprobantesFormateados.length} comprobantes`,
-        meta: {
-          total: count ?? comprobantesFormateados.length,
-          page,
-          pageSize,
-        }
-      };
-
-    } catch (error) {
-      console.error('❌ Error general en getComprobantesFromDatabase:', error);
-      return {
-        success: false,
-        data: [],
-        message: `Error consultando comprobantes: ${error.message}`,
-        error: error.message
-      };
-    }
+async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
+    return this.reportingService.getComprobantesFromDatabase(filters, tenantId);
   }
 
-  async exportComprobantesCsv(filters: any = {}, tenantId?: string) {
-    const response = await this.getComprobantesFromDatabase(
-      { ...filters, page: 1, pageSize: 5000 },
-      tenantId,
-    );
-    if (!response.success) {
-      return { success: false, content: '', filename: '', message: response.message };
-    }
-
-    const headers = [
-      'tipoComprobante',
-      'serie',
-      'numero',
-      'fechaEmision',
-      'cliente',
-      'clienteRuc',
-      'moneda',
-      'total',
-      'estado',
-      'estadoSunat',
-    ];
-
-    const rows = (response.data || []).map((c: any) => [
-      c.tipoComprobante,
-      c.serie,
-      c.numero,
-      c.fechaEmision,
-      c.cliente,
-      c.clienteRuc,
-      c.moneda,
-      c.total,
-      c.estado,
-      c.estadoSunat,
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const filename = `comprobantes_${new Date().toISOString().slice(0, 10)}.csv`;
-
-    return { success: true, content: csvContent, filename };
+async exportComprobantesCsv(filters: any = {}, tenantId?: string) {
+    return this.reportingService.exportComprobantesCsv(filters, tenantId);
   }
 
-  private getTipoComprobanteText(tipo: string): string {
-    switch (this.normalizeTipoDocumentoSunat(tipo, false) || tipo) {
-      case '01':
-        return 'Factura';
-      case '03':
-        return 'Boleta';
-      case '07':
-        return 'Nota Crédito';
-      case '08':
-        return 'Nota Débito';
-      case 'TICKET':
-        return 'Ticket';
-      default:
-        return tipo || 'Desconocido';
-    }
-  }
 
   private normalizeTipoDocumentoSunat(
     tipo: string | null | undefined,
     throwOnUnknown = true,
   ): string {
-    const normalized = String(tipo || '').trim().toUpperCase();
-    const map: Record<string, string> = {
-      '01': '01',
-      FACTURA: '01',
-      'FACTURA ELECTRONICA': '01',
-      'FACTURA ELECTRÓNICA': '01',
-      '03': '03',
-      BOLETA: '03',
-      'BOLETA DE VENTA': '03',
-      'BOLETA DE VENTA ELECTRONICA': '03',
-      'BOLETA DE VENTA ELECTRÓNICA': '03',
-      '07': '07',
-      NOTA_CREDITO: '07',
-      'NOTA CREDITO': '07',
-      'NOTA CRÉDITO': '07',
-      'NOTA DE CREDITO': '07',
-      'NOTA DE CRÉDITO': '07',
-      '08': '08',
-      NOTA_DEBITO: '08',
-      'NOTA DEBITO': '08',
-      'NOTA DÉBITO': '08',
-      'NOTA DE DEBITO': '08',
-      'NOTA DE DÉBITO': '08',
-    };
-
-    const sunatCode = map[normalized];
-    if (!sunatCode && throwOnUnknown) {
-      throw new BadRequestException(`Tipo de documento CPE no soportado: ${tipo || '(vacio)'}`);
-    }
-
-    return sunatCode || '';
+    return this.xmlBuilder.normalizeTipoDocumentoSunat(tipo, throwOnUnknown);
   }
 
-  private defaultSerieForTipo(tipoDocumento: string): string {
-    switch (tipoDocumento) {
-      case '01':
-        return 'F001';
-      case '03':
-        return 'B001';
-      case '07':
-        return 'FC01';
-      case '08':
-        return 'FD01';
-      default:
-        return 'F001';
-    }
+private defaultSerieForTipo(tipoDocumento: string): string {
+    return this.registrationService.defaultSerieForTipo(tipoDocumento);
   }
 
-  private async resolveNumeroCpe(
-    tenantId: string,
-    tipoDocumento: string,
-    serie: string,
-    provided?: any,
-  ): Promise<number> {
-    const numericProvided = Number(provided);
-    if (Number.isFinite(numericProvided) && numericProvided > 0) {
-      return Math.trunc(numericProvided);
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .rpc('obtener_siguiente_numero_documento', {
-        p_tenant_id: tenantId,
-        p_tipo_documento: tipoDocumento,
-        p_serie: serie,
-      });
-
-    if (error) {
-      throw new BadRequestException(`No se pudo obtener el correlativo CPE: ${error.message}`);
-    }
-
-    const next = Number(Array.isArray(data) ? data[0] : data);
-    if (!Number.isFinite(next) || next <= 0) {
-      throw new BadRequestException(`Correlativo CPE invalido para ${tipoDocumento}-${serie}: ${data}`);
-    }
-
-    return Math.trunc(next);
+private resolveNumeroCpe(tenantId: string, tipoDocumento: string, serie: string, provided?: any): Promise<number> {
+    return this.registrationService.resolveNumeroCpe(tenantId, tipoDocumento, serie, provided);
   }
 
-  private resolveTipoDocumentoReceptor(
-    tipoDocumentoCpe: string,
-    provided: any,
-    documentoReceptor: string,
-  ): string {
-    const normalized = String(provided || '').trim().toUpperCase();
-    const map: Record<string, string> = {
-      '1': '1',
-      DNI: '1',
-      '6': '6',
-      RUC: '6',
-      '4': '4',
-      CE: '4',
-      CARNET_EXTRANJERIA: '4',
-      '7': '7',
-      PASAPORTE: '7',
-    };
-    const resolved = map[normalized] || (documentoReceptor.length === 11 ? '6' : '1');
-
-    if (tipoDocumentoCpe === '01' && resolved !== '6') {
-      throw new BadRequestException('La factura requiere receptor con RUC');
-    }
-
-    return resolved;
+private resolveTipoDocumentoReceptor(tipoDocumento: string, provided: any, documento: string): string {
+    return this.registrationService.resolveTipoDocumentoReceptor(tipoDocumento, provided, documento);
   }
 
-  private normalizeComprobanteItems(items: any[]): any[] {
-    if (!Array.isArray(items) || items.length === 0) {
-      throw new BadRequestException('El comprobante debe incluir al menos un item');
-    }
-
-    return items.map((item, index) => {
-      const cantidad = this.roundMoney(item?.cantidad ?? 0, 6);
-      const valorUnitario = this.roundMoney(
-        item?.valor_unitario ?? item?.valorUnitario ?? item?.precio_unitario ?? item?.precioUnitario ?? 0,
-        6,
-      );
-      const valorVenta = this.roundMoney(
-        item?.valor_venta ?? item?.valorVenta ?? cantidad * valorUnitario,
-      );
-      const igv = this.roundMoney(item?.igv ?? item?.impuesto_igv ?? item?.total_impuestos ?? 0);
-      const total = this.roundMoney(item?.total ?? item?.precio_venta ?? valorVenta + igv);
-      const precioUnitario = this.roundMoney(item?.precio_unitario ?? item?.precioUnitario ?? valorUnitario, 6);
-
-      if (cantidad <= 0) {
-        throw new BadRequestException(`El item ${index + 1} debe tener cantidad > 0`);
-      }
-      if (!String(item?.descripcion || '').trim()) {
-        throw new BadRequestException(`El item ${index + 1} requiere descripcion`);
-      }
-
-      return {
-        codigo: String(item?.codigo ?? item?.codigo_producto ?? `ITEM-${index + 1}`).trim(),
-        descripcion: String(item.descripcion).trim(),
-        cantidad,
-        unidad: String(item?.unidad ?? item?.unidad_medida ?? item?.unidadMedida ?? 'NIU').trim().toUpperCase(),
-        precio_unitario: precioUnitario,
-        valor_venta: valorVenta,
-        igv,
-        precio_venta: total,
-        total,
-      };
-    });
+private normalizeComprobanteItems(itemsInput: any): any[] {
+    return this.registrationService.normalizeComprobanteItems(itemsInput);
   }
 
-  private roundMoney(value: any, decimals = 2): number {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-      return 0;
-    }
-
-    return Number(numeric.toFixed(decimals));
+private roundMoney(value: any): number {
+    return this.registrationService.roundMoney(value);
   }
 
-  async getStatsFromDatabase(tenantId?: string) {
-    try {
-      console.log('📊 Calculando estadísticas CPE desde BD para tenant:', tenantId);
-
-      const client = this.supabaseService.getClient();
-      if (!client) {
-        throw new Error('Cliente de Supabase no disponible');
-      }
-
-      const hoy = new Date().toISOString().split('T')[0];
-      const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-
-      // CPE emitidos hoy
-      let queryHoy = client
-        .from('cpe')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', `${hoy}T00:00:00Z`)
-        .lte('created_at', `${hoy}T23:59:59Z`);
-
-      if (tenantId) {
-        queryHoy = queryHoy.eq('tenant_id', tenantId);
-      }
-
-      const { count: cpeHoy } = await queryHoy;
-
-      // CPE del mes
-      let queryMes = client
-        .from('cpe')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', inicioMes);
-
-      if (tenantId) {
-        queryMes = queryMes.eq('tenant_id', tenantId);
-      }
-
-      const { count: cpeMes } = await queryMes;
-
-      // Monto facturado del mes
-      let queryMonto = client
-        .from('cpe')
-        .select('total_venta')
-        .gte('created_at', inicioMes);
-
-      if (tenantId) {
-        queryMonto = queryMonto.eq('tenant_id', tenantId);
-      }
-
-      const { data: montoData } = await queryMonto;
-
-      const montoFacturado = (montoData || []).reduce((sum, cpe) => 
-        sum + parseFloat(cpe.total_venta || 0), 0
-      );
-
-      // CPE rechazados
-      let queryRechazados = client
-        .from('cpe')
-        .select('id', { count: 'exact', head: true })
-        .eq('estado', 'RECHAZADO');
-
-      if (tenantId) {
-        queryRechazados = queryRechazados.eq('tenant_id', tenantId);
-      }
-
-      const { count: rechazados } = await queryRechazados;
-
-      const stats = {
-        cpeEmitidosHoy: cpeHoy || 0,
-        cpeDelMes: cpeMes || 0,
-        montoFacturado: Math.round(montoFacturado * 100) / 100,
-        rechazados: rechazados || 0
-      };
-
-      console.log('✅ Estadísticas calculadas:', stats);
-
-      return {
-        success: true,
-        data: stats
-      };
-
-    } catch (error) {
-      console.error('❌ Error calculando estadísticas:', error);
-      return {
-        success: false,
-        data: {
-          cpeEmitidosHoy: 0,
-          cpeDelMes: 0,
-          montoFacturado: 0,
-          rechazados: 0
-        },
-        error: error.message
-      };
-    }
+async getStatsFromDatabase(tenantId?: string) {
+    return this.reportingService.getStatsFromDatabase(tenantId);
   }
 
   /**
    * Anular un comprobante CPE
    * Genera nota de crédito y emite eventos para reversión de operaciones
    */
-  async anularComprobante(
+async anularComprobante(
     cpeId: string,
     motivo: string,
     tenantId: string,
     userId?: string,
-    tipoNota: string = '01' // 01 = Anulación de la operación
+    tipoNota: string = '01',
   ): Promise<any> {
-    const client = this.supabaseService.getClient();
-
-    // 1. Obtener el CPE a anular
-    const { data: cpe, error: cpeError } = await client
-      .from('comprobantes_electronicos')
-      .select('*')
-      .eq('id', cpeId)
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (cpeError || !cpe) {
-      throw new NotFoundException('Comprobante electrónico no encontrado');
-    }
-
-    const estadoCpe = String(cpe.estado || '').toUpperCase();
-
-    // 2. Validar que el CPE puede ser anulado
-    if (estadoCpe === 'ANULADO') {
-      throw new BadRequestException('El comprobante ya está anulado');
-    }
-
-    if (cpe.nota_credito_id) {
-      throw new BadRequestException('El comprobante ya tiene una nota de crédito asociada');
-    }
-
-    if (!this.estadosAnulables.has(estadoCpe)) {
-      throw new BadRequestException(
-        `No se puede anular un comprobante en estado ${cpe.estado}. ` +
-        `Solo se pueden anular comprobantes FIRMADOS, ACEPTADOS o ENVIADOS.`
-      );
-    }
-
-    await this.assertCpeOriginalAccountingReady(client, tenantId, cpe, userId, motivo);
-
-    const contextoOperacion = await this.resolveOperacionReversaContext(client, tenantId, cpe);
-
-    // 3. Generar nota de crédito
-    console.log(`📝 [CPE] Generando nota de crédito para CPE ${cpeId}...`);
-    const serieNotaCredito = this.resolveSerieNotaCredito(cpe.serie);
-    
-    const notaCreditoData = {
-      tipo_documento: '07',
-      serie: serieNotaCredito,
-      numero: await this.obtenerSiguienteNumeroNotaCredito(tenantId, serieNotaCredito),
-      documento_referencia_tipo: cpe.tipo_documento,
-      documento_referencia_serie: cpe.serie,
-      documento_referencia_numero: cpe.numero,
-      tipo_nota_credito: tipoNota,
-      motivo_nota: motivo,
-      ruc_emisor: cpe.ruc_emisor,
-      razon_social_emisor: cpe.razon_social_emisor,
-      tipo_documento_receptor: cpe.tipo_documento_receptor,
-      documento_receptor: cpe.documento_receptor,
-      razon_social_receptor: cpe.razon_social_receptor,
-      moneda: cpe.moneda,
-      total_gravadas: -cpe.total_gravadas, // Negativo para revertir
-      total_igv: -cpe.total_igv,
-      total_venta: -cpe.total_venta,
-      tenant_id: tenantId,
-      estado: 'BORRADOR',
-      created_by: userId,
-    };
-
-    const { data: notaCredito, error: notaError } = await client
-      .from('comprobantes_electronicos')
-      .insert(notaCreditoData)
-      .select()
-      .single();
-
-    if (notaError) {
-      console.error('Error creando nota de crédito:', notaError);
-      throw new BadRequestException('No se pudo crear la nota de crédito');
-    }
-
-    // 4. Actualizar estado del CPE original
-    const { error: updateError } = await client
-      .from('comprobantes_electronicos')
-      .update({
-        estado: 'ANULADO',
-        nota_credito_id: notaCredito.id,
-        motivo_anulacion: motivo,
-        anulado_por: userId,
-        anulado_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', cpeId)
-      .eq('tenant_id', tenantId);
-
-    if (updateError) {
-      console.error('Error actualizando estado del CPE:', updateError);
-      throw new BadRequestException('No se pudo anular el comprobante');
-    }
-
-    await this.aplicarReversionOperativa(client, tenantId, cpe, notaCredito, contextoOperacion, motivo, userId);
-
-    // 5. Emitir evento CPEAnulado para que otros módulos reviertan operaciones
-    // Este evento será escuchado por:
-    // - Contabilidad: Revertir asiento contable
-    // - Finanzas: Liberar CxC
-    // - Inventario: Restaurar stock (si aplica)
-    try {
-      const eventToInsert = OutboxEventBuilder.build({
-        tenantId,
-        eventType: 'cpe.anulado',
-        aggregateType: 'cpe',
-        aggregateId: cpeId,
-        idempotencyKey: `cpe.anulado:${tenantId}:${cpeId}:${notaCredito.id}`,
-        eventData: {
-          cpe_id: cpeId,
-          nota_credito_id: notaCredito.id,
-          serie: cpe.serie,
-          numero: cpe.numero,
-          total: cpe.total_venta,
-          motivo: motivo,
-          anulado_por: userId,
-          anulado_at: new Date().toISOString(),
-          source: contextoOperacion.source,
-          venta_pos_id: contextoOperacion.ventaPos?.id,
-          pedido_id: contextoOperacion.pedido?.id,
-          documento_id: contextoOperacion.documento?.id,
-          cxc_id: contextoOperacion.cxc?.id,
-          items: contextoOperacion.items.map((item) => ({
-            producto_id: item.producto_id,
-            cantidad: item.cantidad,
-            precio_unitario: item.precio_unitario,
-          })),
-        },
-      });
-
-      await client
-        .from('outbox_events')
-        .insert(eventToInsert);
-
-      console.log(`✅ [CPE] Evento CPEAnulado emitido para CPE ${cpeId}`);
-    } catch (error) {
-      console.error('Error emitiendo evento CPEAnulado:', error);
-      // No fallar la anulación si el evento no se puede emitir
-    }
-
-    console.log(`✅ [CPE] Comprobante ${cpe.serie}-${cpe.numero} anulado exitosamente`);
-
-    return {
-      success: true,
-      message: 'Comprobante anulado exitosamente',
-      cpe_anulado: {
-        id: cpeId,
-        serie: cpe.serie,
-        numero: cpe.numero,
-        estado: 'ANULADO',
-      },
-      nota_credito: {
-        id: notaCredito.id,
-        serie: notaCredito.serie,
-        numero: notaCredito.numero,
-        estado: notaCredito.estado,
-      },
-    };
+    return this.cancellationService.anularComprobante(cpeId, motivo, tenantId, userId, tipoNota);
   }
 
-  private resolveSerieNotaCredito(serie: string): string {
-    const normalized = String(serie || '').trim().toUpperCase();
-    if (normalized.startsWith('F')) return normalized.replace(/^F/, 'FC');
-    if (normalized.startsWith('B')) return normalized.replace(/^B/, 'BC');
-    return `NC${normalized}`.slice(0, 4);
-  }
 
-  private formatCpeNumero(cpe: any): string {
-    return `${cpe.serie}-${String(cpe.numero).padStart(8, '0')}`;
-  }
 
-  private async assertCpeOriginalAccountingReady(
+private async assertCpeOriginalAccountingReady(
     client: any,
     tenantId: string,
     cpe: any,
     userId: string | undefined,
     motivo: string,
   ): Promise<void> {
-    const sourceEventId = await this.resolveCpeOriginalSourceEventId(client, tenantId, cpe);
-
-    const block = async (reason: string): Promise<never> => {
-      await this.registrarIntentoAnulacionCpeBloqueado(client, tenantId, cpe, userId, motivo, reason);
-      throw new ConflictException(reason);
-    };
-
-    if (!sourceEventId) {
-      return block(
-        'No se puede anular el CPE porque no conserva el evento contable original. Revise la trazabilidad antes de emitir una nota de crédito.',
-      );
-    }
-
-    const { data: asientos, error: asientosError } = await client
-      .from('asientos_contables')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('source_event_id', sourceEventId)
-      .limit(2);
-
-    if (asientosError) {
-      throw new BadRequestException(`No se pudo validar el asiento contable original: ${asientosError.message}`);
-    }
-
-    if ((asientos?.length ?? 0) !== 1) {
-      return block(
-        `No se puede anular el CPE porque se esperaban 1 asiento contable original y se encontraron ${asientos?.length ?? 0}.`,
-      );
-    }
-
-    const { data: detalles, error: detallesError } = await client
-      .from('detalle_asientos')
-      .select('id')
-      .eq('asiento_id', asientos[0].id)
-      .limit(1);
-
-    if (detallesError) {
-      throw new BadRequestException(`No se pudo validar el detalle del asiento contable original: ${detallesError.message}`);
-    }
-
-    if (!detalles?.length) {
-      return block('No se puede anular el CPE porque el asiento contable original no tiene detalle.');
-    }
+    return this.cancellationService.assertCpeOriginalAccountingReady(client, tenantId, cpe, userId, motivo);
   }
 
-  private async registrarIntentoAnulacionCpeBloqueado(
-    _client: any,
-    tenantId: string,
-    cpe: any,
-    userId: string | undefined,
-    motivo: string,
-    reason: string,
-  ): Promise<void> {
-    try {
-      await this.auditService.registrarCambio(
-        'comprobantes_electronicos',
-        'UPDATE',
-        userId ?? 'system',
-        {
-          old: { id: cpe.id, estado: cpe.estado, nota_credito_id: cpe.nota_credito_id ?? null },
-          new: { anulacion_bloqueada: true, motivo_anulacion: motivo, motivo_bloqueo: reason },
-        },
-        tenantId,
-        cpe.id,
-        {
-          accion: 'ANULACION_CPE_BLOQUEADA',
-          source_event_id: cpe.event_id || cpe.source_event_id || null,
-        },
-      );
-    } catch (auditError) {
-      this.logger.warn(`No se pudo auditar intento bloqueado de anulación CPE ${cpe.id}: ${(auditError as Error).message}`);
-    }
-  }
 
-  private async resolveCpeOriginalSourceEventId(client: any, tenantId: string, cpe: any): Promise<string | null> {
-    const direct = cpe.event_id || cpe.source_event_id;
-    if (direct) return direct;
 
-    const { data, error } = await client
-      .from('cpe')
-      .select('event_id')
-      .eq('tenant_id', tenantId)
-      .eq('id', cpe.id)
-      .maybeSingle();
 
-    if (error) {
-      throw new BadRequestException(`No se pudo resolver el evento contable original del CPE: ${error.message}`);
-    }
 
-    return data?.event_id || null;
-  }
 
-  private async resolveOperacionReversaContext(client: any, tenantId: string, cpe: any): Promise<any> {
-    const numeroDocumento = this.formatCpeNumero(cpe);
-    const numeroVariants = Array.from(new Set([
-      String(cpe.numero),
-      String(cpe.numero).padStart(8, '0'),
-    ]));
 
-    const { data: ventaPos } = await client
-      .from('ventas_pos')
-      .select('id, numero_ticket, total, estado, sesion_caja_id')
-      .eq('tenant_id', tenantId)
-      .eq('cpe_id', cpe.id)
-      .maybeSingle();
 
-    const { data: pedido } = await client
-      .from('pedidos_venta')
-      .select('id, numero, estado, factura_id')
-      .eq('tenant_id', tenantId)
-      .eq('factura_id', cpe.id)
-      .maybeSingle();
-
-    let documento: any = null;
-    const { data: documentos } = await client
-      .from('documentos')
-      .select('id, serie, numero, estado, total, created_at')
-      .eq('tenant_id', tenantId)
-      .eq('serie', cpe.serie)
-      .in('numero', numeroVariants)
-      .limit(20);
-    documento = this.pickOperationalDocument(documentos ?? [], cpe);
-
-    let cxc: any = null;
-    if (documento?.id) {
-      const { data } = await client
-        .from('cuentas_por_cobrar')
-        .select('id, documento_id, numero_documento, monto_total, monto_pendiente, estado')
-        .eq('tenant_id', tenantId)
-        .eq('documento_id', documento.id)
-        .maybeSingle();
-      cxc = data ?? null;
-    }
-    if (!cxc) {
-      const { data } = await client
-        .from('cuentas_por_cobrar')
-        .select('id, documento_id, numero_documento, monto_total, monto_pendiente, estado')
-        .eq('tenant_id', tenantId)
-        .eq('numero_documento', numeroDocumento)
-        .limit(20);
-      cxc = this.pickCuentaPorCobrar(data ?? [], cpe);
-    }
-
-    let items: Array<{ producto_id: string; cantidad: number; precio_unitario?: number }> = [];
-    if (ventaPos?.id) {
-      const { data } = await client
-        .from('detalle_ventas_pos')
-        .select('producto_id, cantidad, precio_unitario')
-        .eq('tenant_id', tenantId)
-        .eq('venta_pos_id', ventaPos.id);
-      items = (data ?? []).map((item: any) => ({
-        producto_id: item.producto_id,
-        cantidad: Number(item.cantidad ?? 0),
-        precio_unitario: Number(item.precio_unitario ?? 0),
-      }));
-    } else if (pedido?.id) {
-      const { data } = await client
-        .from('pedidos_venta_detalle')
-        .select('producto_id, cantidad_despachada, cantidad, precio_unitario')
-        .eq('tenant_id', tenantId)
-        .eq('pedido_id', pedido.id);
-      items = (data ?? []).map((item: any) => ({
-        producto_id: item.producto_id,
-        cantidad: Number(item.cantidad_despachada ?? item.cantidad ?? 0),
-        precio_unitario: Number(item.precio_unitario ?? 0),
-      }));
-    }
-
-    return {
-      source: ventaPos?.id ? 'POS' : pedido?.id ? 'PEDIDO' : 'CPE',
-      ventaPos,
-      pedido,
-      documento,
-      cxc,
-      items: items.filter((item) => item.producto_id && item.cantidad > 0),
-    };
-  }
-
-  private pickOperationalDocument(documentos: any[], cpe: any): any | null {
-    if (!documentos.length) return null;
-    const totalCpe = Number(cpe.total_venta ?? 0);
-    return documentos
-      .map((documento) => ({
-        documento,
-        totalDiff: Math.abs(Number(documento.total ?? 0) - totalCpe),
-        createdAt: new Date(documento.created_at ?? 0).getTime(),
-      }))
-      .sort((a, b) => a.totalDiff - b.totalDiff || b.createdAt - a.createdAt)[0]?.documento ?? null;
-  }
-
-  private pickCuentaPorCobrar(cuentas: any[], cpe: any): any | null {
-    if (!cuentas.length) return null;
-    const totalCpe = Number(cpe.total_venta ?? 0);
-    return cuentas
-      .map((cuenta) => ({
-        cuenta,
-        totalDiff: Math.abs(Number(cuenta.monto_total ?? 0) - totalCpe),
-      }))
-      .sort((a, b) => a.totalDiff - b.totalDiff)[0]?.cuenta ?? null;
-  }
-
-  private async aplicarReversionOperativa(
-    client: any,
-    tenantId: string,
-    cpe: any,
-    notaCredito: any,
-    contexto: any,
-    motivo: string,
-    userId?: string,
-  ): Promise<void> {
-    if (contexto.documento?.id) {
-      const { error } = await client
-        .from('documentos')
-        .update({
-          estado: 'ANULADO',
-          motivo_anulacion: motivo,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('tenant_id', tenantId)
-        .eq('id', contexto.documento.id);
-      if (error) throw new BadRequestException(`No se pudo anular el documento operativo: ${error.message}`);
-    }
-
-    if (contexto.cxc?.id && !['ANULADA', 'REVERTIDA'].includes(String(contexto.cxc.estado || '').toUpperCase())) {
-      const { error } = await client
-        .from('cuentas_por_cobrar')
-        .update({
-          estado: 'ANULADA',
-          monto_pendiente: 0,
-          observaciones: `REVERTIDA: CPE ${cpe.serie}-${cpe.numero} anulado con NC ${notaCredito.serie}-${notaCredito.numero}. Motivo: ${motivo}`,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('tenant_id', tenantId)
-        .eq('id', contexto.cxc.id);
-      if (error) throw new BadRequestException(`No se pudo revertir CxC: ${error.message}`);
-    }
-
-    if (contexto.pedido?.id) {
-      const { error } = await client
-        .from('pedidos_venta')
-        .update({
-          estado: 'ANULADO',
-          updated_at: new Date().toISOString(),
-          metadata: {
-            ...(contexto.pedido.metadata ?? {}),
-            reverso_cpe_id: cpe.id,
-            nota_credito_id: notaCredito.id,
-            motivo_anulacion: motivo,
-          },
-        })
-        .eq('tenant_id', tenantId)
-        .eq('id', contexto.pedido.id);
-      if (error) throw new BadRequestException(`No se pudo marcar el pedido como anulado: ${error.message}`);
-    }
-
-    if (contexto.ventaPos?.id) {
-      const { error } = await client
-        .from('ventas_pos')
-        .update({
-          estado: 'ANULADA',
-          updated_at: new Date().toISOString(),
-          metadata: {
-            reverso_cpe_id: cpe.id,
-            nota_credito_id: notaCredito.id,
-            motivo_anulacion: motivo,
-          },
-        })
-        .eq('tenant_id', tenantId)
-        .eq('id', contexto.ventaPos.id);
-      if (error) throw new BadRequestException(`No se pudo marcar la venta POS como anulada: ${error.message}`);
-
-      await this.registrarReversionCajaPos(client, tenantId, contexto.ventaPos, cpe, notaCredito, motivo, userId);
-    }
-
-    await this.revertirStockVenta(client, tenantId, contexto, cpe, notaCredito, motivo, userId);
-  }
-
-  private async revertirStockVenta(
-    client: any,
-    tenantId: string,
-    contexto: any,
-    cpe: any,
-    notaCredito: any,
-    motivo: string,
-    userId?: string,
-  ): Promise<void> {
-    for (const item of contexto.items) {
-      const { data: movimientoExistente, error: lookupError } = await client
-        .from('movimientos_inventario')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('producto_id', item.producto_id)
-        .eq('referencia_id', notaCredito.id)
-        .eq('referencia_tipo', 'REVERSO_VENTA')
-        .maybeSingle();
-      if (lookupError && lookupError.code !== 'PGRST116') {
-        throw new BadRequestException(`No se pudo verificar reverso de inventario: ${lookupError.message}`);
-      }
-      if (movimientoExistente) continue;
-
-      const { data: producto, error: productoError } = await client
-        .from('productos')
-        .select('id, stock_actual, stock, stock_reservado, controla_stock, es_servicio')
-        .eq('tenant_id', tenantId)
-        .eq('id', item.producto_id)
-        .single();
-      if (productoError || !producto) {
-        throw new BadRequestException(`Producto ${item.producto_id} no encontrado para reverso`);
-      }
-
-      if (producto.es_servicio === true || producto.controla_stock === false) continue;
-
-      const stockActual = Number(producto.stock_actual ?? producto.stock ?? 0);
-      const nuevoStock = Number((stockActual + Number(item.cantidad)).toFixed(2));
-      const { error: updateStockError } = await client
-        .from('productos')
-        .update({
-          stock_actual: nuevoStock,
-          stock: String(nuevoStock),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('tenant_id', tenantId)
-        .eq('id', item.producto_id);
-      if (updateStockError) throw new BadRequestException(`No se pudo restaurar stock: ${updateStockError.message}`);
-
-      const { error: movimientoError } = await client.from('movimientos_inventario').insert({
-        tenant_id: tenantId,
-        producto_id: item.producto_id,
-        tipo: 'ENTRADA',
-        cantidad: item.cantidad,
-        referencia_tipo: 'REVERSO_VENTA',
-        referencia_id: notaCredito.id,
-        created_by: userId,
-        motivo: `Reverso de venta ${cpe.serie}-${cpe.numero}`,
-        notas: `Entrada por nota de crédito ${notaCredito.serie}-${notaCredito.numero}. Motivo: ${motivo}`,
-        stock_actual: String(nuevoStock),
-        stock_reservado: String(producto.stock_reservado ?? 0),
-        activo: true,
-        estado: 'ACTIVO',
-        metadata: {
-          source: contexto.source,
-          cpe_id: cpe.id,
-          nota_credito_id: notaCredito.id,
-        },
-      });
-      if (movimientoError) throw new BadRequestException(`No se pudo registrar Kardex de reverso: ${movimientoError.message}`);
-    }
-  }
-
-  private async registrarReversionCajaPos(
-    client: any,
-    tenantId: string,
-    ventaPos: any,
-    cpe: any,
-    notaCredito: any,
-    motivo: string,
-    userId?: string,
-  ): Promise<void> {
-    const { data: efectivo } = await client
-      .from('movimientos_caja')
-      .select('id, monto, sesion_caja_id')
-      .eq('tenant_id', tenantId)
-      .eq('referencia_tipo', 'venta_pos')
-      .eq('referencia_documento', ventaPos.id)
-      .eq('tipo_movimiento', 'VENTA')
-      .maybeSingle();
-
-    if (!efectivo?.id || Number(efectivo.monto ?? 0) <= 0) return;
-
-    const { data: reversoExistente } = await client
-      .from('movimientos_caja')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('referencia_tipo', 'reverso_venta_pos')
-      .eq('referencia_documento', notaCredito.id)
-      .maybeSingle();
-    if (reversoExistente) return;
-
-    const { error } = await client.rpc('registrar_movimiento_caja', {
-      p_sesion_caja_id: efectivo.sesion_caja_id,
-      p_tipo_movimiento: 'AJUSTE',
-      p_monto: -Math.abs(Number(efectivo.monto)),
-      p_referencia_documento: notaCredito.id,
-      p_referencia_tipo: 'reverso_venta_pos',
-      p_motivo: `Reverso POS ${cpe.serie}-${cpe.numero}: ${motivo}`,
-      p_usuario_id: userId ?? null,
-      p_metadata: {
-        cpe_id: cpe.id,
-        nota_credito_id: notaCredito.id,
-        venta_pos_id: ventaPos.id,
-      },
-    });
-    if (error) throw new BadRequestException(`No se pudo registrar reverso de caja POS: ${error.message}`);
-  }
 
   /**
    * Obtiene el siguiente número de nota de crédito
    */
-  private async obtenerSiguienteNumeroNotaCredito(tenantId: string, serie: string): Promise<number> {
-    const client = this.supabaseService.getClient();
-    
-    const { data, error } = await client
-      .from('comprobantes_electronicos')
-      .select('numero')
-      .eq('tenant_id', tenantId)
-      .eq('serie', serie)
-      .eq('tipo_documento', 'NOTA_CREDITO')
-      .order('numero', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('Error obteniendo último número de nota de crédito:', error);
-      return 1;
-    }
-
-    return data && data.length > 0 ? data[0].numero + 1 : 1;
-  }
 }

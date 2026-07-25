@@ -71,7 +71,7 @@ export function CompletionStep() {
           <CheckCircle size={60} className="text-white" />
         </div>
 
-        <h3 className="text-8 font-bold text-[var(--primary-900)] mb-3">
+        <h3 className="text-[2rem] font-bold text-[var(--primary-900)] mb-3">
           ¡Configuración Completada!
         </h3>
 
@@ -81,12 +81,12 @@ export function CompletionStep() {
       </div>
 
       <div className="grid gap-4 mt-8 mb-8">
-        <div className="flex gap-4 p-5 bg-[rgba(16,_185,_129,_0.05)] rounded-3 border">
-          <div className="w-12 h-12 rounded-3 bg-[var(--success-100)] flex items-center justify-center shrink-0">
+        <div className="flex gap-4 p-5 bg-[rgba(16,_185,_129,_0.05)] rounded-xl border">
+          <div className="w-12 h-12 rounded-xl bg-[var(--success-100)] flex items-center justify-center shrink-0">
             <CheckCircle size={24} className="text-[var(--success-600)]" />
           </div>
           <div>
-            <h4 className="text-4 font-semibold text-[var(--primary-900)] mb-1">
+            <h4 className="text-base font-semibold text-[var(--primary-900)] mb-1">
               Datos Empresariales Configurados
             </h4>
             <p className="text-[0.875rem] text-[var(--primary-600)] leading-6 m-0">
@@ -95,12 +95,12 @@ export function CompletionStep() {
           </div>
         </div>
 
-        <div className="flex gap-4 p-5 bg-[rgba(16,_185,_129,_0.05)] rounded-3 border">
-          <div className="w-12 h-12 rounded-3 bg-[var(--success-100)] flex items-center justify-center shrink-0">
+        <div className="flex gap-4 p-5 bg-[rgba(16,_185,_129,_0.05)] rounded-xl border">
+          <div className="w-12 h-12 rounded-xl bg-[var(--success-100)] flex items-center justify-center shrink-0">
             <CheckCircle size={24} className="text-[var(--success-600)]" />
           </div>
           <div>
-            <h4 className="text-4 font-semibold text-[var(--primary-900)] mb-1">
+            <h4 className="text-base font-semibold text-[var(--primary-900)] mb-1">
               Certificado Digital Activo
             </h4>
             <p className="text-[0.875rem] text-[var(--primary-600)] leading-6 m-0">
@@ -109,12 +109,12 @@ export function CompletionStep() {
           </div>
         </div>
 
-        <div className="flex gap-4 p-5 bg-[rgba(16,_185,_129,_0.05)] rounded-3 border">
-          <div className="w-12 h-12 rounded-3 bg-[var(--success-100)] flex items-center justify-center shrink-0">
+        <div className="flex gap-4 p-5 bg-[rgba(16,_185,_129,_0.05)] rounded-xl border">
+          <div className="w-12 h-12 rounded-xl bg-[var(--success-100)] flex items-center justify-center shrink-0">
             <CheckCircle size={24} className="text-[var(--success-600)]" />
           </div>
           <div>
-            <h4 className="text-4 font-semibold text-[var(--primary-900)] mb-1">
+            <h4 className="text-base font-semibold text-[var(--primary-900)] mb-1">
               Validaciones Exitosas
             </h4>
             <p className="text-[0.875rem] text-[var(--primary-600)] leading-6 m-0">
@@ -125,15 +125,15 @@ export function CompletionStep() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-[#fee2e2] border rounded-2 text-red-600 text-[0.875rem]">
+        <div className="mb-6 p-4 bg-[#fee2e2] border rounded-lg text-destructive text-[0.875rem]">
           {error}
         </div>
       )}
 
-        <div className="mt-8 p-6 rounded-3 border text-center">
+        <div className="mt-8 p-6 rounded-xl border text-center">
         <div className="flex items-center justify-center gap-2 mb-3">
           <Sparkles size={20} className="text-[var(--primary-600)]" />
-          <h4 className="text-4 font-semibold text-[var(--primary-900)] m-0">
+          <h4 className="text-base font-semibold text-[var(--primary-900)] m-0">
             ¿Qué sigue?
           </h4>
         </div>
@@ -146,7 +146,7 @@ export function CompletionStep() {
           <Button
             onClick={handleComplete}
             disabled={isCompleting || isResetting}
-            size="lg" className="inline-flex items-center gap-2 text-4 py-3 px-8"
+            size="lg" className="inline-flex items-center gap-2 text-base py-3 px-8"
           >
             {isCompleting ? (
               <>Finalizando...</>
@@ -162,7 +162,7 @@ export function CompletionStep() {
             onClick={handleReset}
             disabled={isCompleting || isResetting}
             variant="outline"
-            size="lg" className="inline-flex items-center gap-2 text-4 py-3 px-8"
+            size="lg" className="inline-flex items-center gap-2 text-base py-3 px-8"
           >
             {isResetting ? (
               <>Reiniciando...</>

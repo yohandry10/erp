@@ -12,21 +12,11 @@ export class DemoController {
   constructor(private readonly demoService: DemoService) {}
 
   private ensureDemoApiEnabled() {
-    if (process.env.DEMO_API_ENABLED !== 'true') {
-      throw new ForbiddenException('Demo endpoints are disabled in this environment');
-    }
-  }
+    const isProduction =
+      process.env.NODE_ENV === 'production' || process.env.DEPLOYMENT_ENV === 'PROD';
 
-  // Anti-abuso básico: requiere token captcha compartido si está configurado
-  private ensureCaptchaPassed(req: any) {
-    const captchaSecret = process.env.DEMO_CAPTCHA_SECRET;
-    if (!captchaSecret) return; // sin secreto configurado, no se valida
-    const token =
-      req.headers['x-demo-captcha-token'] ||
-      req.headers['x-demo-captcha'] ||
-      req.body?.captchaToken;
-    if (!token || token !== captchaSecret) {
-      throw new ForbiddenException('Captcha/anti-abuse validation failed');
+    if (isProduction || process.env.DEMO_API_ENABLED !== 'true') {
+      throw new ForbiddenException('Demo endpoints are disabled in this environment');
     }
   }
 
@@ -36,9 +26,8 @@ export class DemoController {
   @ApiOperation({ summary: 'Crear tenant demo con datos seed (14 días)' })
   @ApiResponse({ status: 201, description: 'Tenant demo creado exitosamente' })
   @ApiResponse({ status: 429, description: 'Límite de demos alcanzado (5/hora)' })
-  async createDemo(@Req() req: any, @Body() dto: CreateDemoTenantDto) {
+  async createDemo(@Body() dto: CreateDemoTenantDto) {
     this.ensureDemoApiEnabled();
-    this.ensureCaptchaPassed(req);
     return this.demoService.createDemoTenant(dto);
   }
 

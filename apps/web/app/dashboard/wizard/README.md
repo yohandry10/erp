@@ -20,6 +20,10 @@ The Configuration Wizard guides new users through the initial setup process, inc
 - Configuration validation
 - Setup completion
 
+## Initial Country Scope
+
+The initial operational scope is Peru/SUNAT only. The wizard persists `pais=PE`, `pais_id=1` and `PEN`; DIAN/other country fields remain roadmap scaffolding and must not be exposed or accepted as active runtime until there is a country-specific legal, fiscal and E2E validation.
+
 ## Structure
 
 ```
@@ -160,6 +164,7 @@ The wizard uses inline styles consistent with the existing dashboard design:
 
 ## Future Enhancements
 
+- Country expansion roadmap (CO/CL/MX/EC) after country-specific fiscal validation
 - Multi-language support
 - Step-by-step tooltips
 - Keyboard navigation

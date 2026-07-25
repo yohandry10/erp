@@ -20,14 +20,13 @@ export function DashboardThemeToggle({ theme, onToggle, className }: DashboardTh
       variant="outline"
       onClick={onToggle}
       className={cn(
-        'fixed right-5 top-5 z-50 gap-2 border-cyan-400/25 bg-slate-950/85 text-cyan-50 shadow-xl shadow-blue-950/25 backdrop-blur hover:bg-slate-900 hover:text-white',
-        !isDark && 'border-blue-200 bg-white/90 text-blue-800 shadow-slate-300/40 hover:bg-slate-50 hover:text-blue-950',
+        'h-11 shrink-0 gap-2 rounded-xl border-border/80 bg-card text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground',
         className,
       )}
       aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
     >
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-      {isDark ? 'Light' : 'Dark'}
+      <span className="hidden sm:inline">{isDark ? 'Claro' : 'Oscuro'}</span>
     </Button>
   )
 }

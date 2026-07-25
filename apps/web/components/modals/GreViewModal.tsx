@@ -24,8 +24,13 @@ interface GreData {
   estado: 'PENDIENTE' | 'EMITIDO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO'
   observaciones?: string
   transportista?: string
+  transportistaDocumento?: string
   placaVehiculo?: string
   licenciaConducir?: string
+  conductorDocumentoTipo?: string
+  conductorDocumentoNumero?: string
+  conductorNombres?: string
+  conductorApellidos?: string
 }
 
 export default function GreViewModal({ isOpen, onClose, documentId }: GreViewModalProps) {
@@ -116,11 +121,14 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
           <div><span class="label">FECHA TRASLADO:</span><span class="valor">${escapeHtml(new Date(greData.fechaTraslado).toLocaleDateString('es-PE'))}</span></div>
         </div>
 
-        ${greData.transportista || greData.placaVehiculo ? `
+        ${greData.transportista || greData.placaVehiculo || greData.conductorDocumentoNumero ? `
         <div class="seccion">
           ${greData.transportista ? `<div><span class="label">TRANSPORTISTA:</span><span class="valor">${escapeHtml(greData.transportista)}</span></div>` : ''}
+          ${greData.transportistaDocumento ? `<div><span class="label">RUC TRANSPORTISTA:</span><span class="valor">${escapeHtml(greData.transportistaDocumento)}</span></div>` : ''}
           ${greData.placaVehiculo ? `<div><span class="label">PLACA:</span><span class="valor">${escapeHtml(greData.placaVehiculo)}</span></div>` : ''}
           ${greData.licenciaConducir ? `<div><span class="label">LICENCIA:</span><span class="valor">${escapeHtml(greData.licenciaConducir)}</span></div>` : ''}
+          ${greData.conductorDocumentoNumero ? `<div><span class="label">CONDUCTOR:</span><span class="valor">${escapeHtml([greData.conductorNombres, greData.conductorApellidos].filter(Boolean).join(' '))}</span></div>` : ''}
+          ${greData.conductorDocumentoNumero ? `<div><span class="label">DOC. CONDUCTOR:</span><span class="valor">${escapeHtml(greData.conductorDocumentoNumero)}</span></div>` : ''}
         </div>
         ` : ''}
 
@@ -195,33 +203,33 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
         }
       }}
     >
-      <div className="bg-white rounded-2 w-[95%] max-w-[1200px] overflow-auto shadow relative"
+      <div className="bg-card rounded-lg w-[95%] max-w-[1200px] overflow-auto shadow relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="text-white p-4">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-5 font-semibold m-0">
+              <h2 className="text-xl font-semibold m-0">
                 GUÍA DE REMISIÓN ELECTRÓNICA
               </h2>
-              <p className="text-3.5 mt-[4px] mr-0 mb-0 ml-0 opacity-[0.9]">
+              <p className="text-sm mt-[4px] mr-0 mb-0 ml-0 opacity-[0.9]">
                 {greData?.numero}
               </p>
             </div>
             <div className="flex gap-2 items-center">
               <button
-                onClick={handleDownloadPdf} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-3.5 cursor-pointer flex items-center gap-[4px]"
+                onClick={handleDownloadPdf} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm cursor-pointer flex items-center gap-[4px]"
               >
                 💾 Descargar
               </button>
               <button
-                onClick={handlePrint} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-3.5 cursor-pointer flex items-center gap-[4px]"
+                onClick={handlePrint} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm cursor-pointer flex items-center gap-[4px]"
               >
                 🖨️ Imprimir
               </button>
               <button
-                onClick={onClose} className="border-0 text-white text-6 font-bold cursor-pointer p-0 w-[30px] h-[30px] flex items-center justify-center"
+                onClick={onClose} className="border-0 text-white text-2xl font-bold cursor-pointer p-0 w-[30px] h-[30px] flex items-center justify-center"
               >
                 ×
               </button>
@@ -234,10 +242,10 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
           {loading ? (
             <div className="flex justify-center items-center h-[400px] flex-col gap-4">
               <div className="w-10 h-10 rounded-full"></div>
-              <p className="text-gray-500 text-4">Cargando guía de remisión...</p>
+              <p className="text-muted-foreground text-base">Cargando guía de remisión...</p>
             </div>
           ) : greData ? (
-            <div className="text-3.5 leading-6 text-[#000] bg-white">
+            <div className="text-sm leading-6 text-[#000] bg-card">
 
               {/* ENCABEZADO EMPRESARIAL */}
               <div className="mb-6">
@@ -246,19 +254,19 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                     <tr>
                       <td className="border p-4 w-[65%]">
                         <div className="text-center">
-                          <h1 className="text-6 font-bold mb-2 mt-0 mr-0 ml-0">
+                          <h1 className="text-2xl font-bold mb-2 mt-0 mr-0 ml-0">
                             NEON SYSTEM
                           </h1>
-                          <p className="text-3.5 mb-[4px] my-[4px] mx-0">
+                          <p className="text-sm mb-[4px] my-[4px] mx-0">
                             Sistema Empresarial Integrado
                           </p>
-                          <p className="text-3.5 mb-[4px] my-[4px] mx-0">
+                          <p className="text-sm mb-[4px] my-[4px] mx-0">
                             <strong>RUC:</strong> 12345678901
                           </p>
-                          <p className="text-3.5 mb-[4px] my-[4px] mx-0">
+                          <p className="text-sm mb-[4px] my-[4px] mx-0">
                             <strong>Razón Social:</strong> NEON SYSTEM SAC
                           </p>
-                          <p className="text-3.5 my-[4px] mx-0">
+                          <p className="text-sm my-[4px] mx-0">
                             Dirección: Lima, Perú
                           </p>
                         </div>
@@ -266,14 +274,14 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                       <td className="border p-4 w-[35%]">
                         <div className="text-center">
                           <div className="p-3 mb-3">
-                            <h2 className="text-4 font-bold mb-2 mt-0 mr-0 ml-0">
+                            <h2 className="text-base font-bold mb-2 mt-0 mr-0 ml-0">
                               GUÍA DE REMISIÓN ELECTRÓNICA
                             </h2>
                             <p className="text-[18px] font-bold m-0">
                               {greData.numero}
                             </p>
                           </div>
-                          <div className="text-3.5">
+                          <div className="text-sm">
                             <p className="mb-[4px] my-[4px] mx-0">
                               <strong>Fecha Emisión:</strong> {new Date(greData.fechaCreacion).toLocaleDateString('es-PE')}
                             </p>
@@ -296,7 +304,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                 <table className="w-[100%] border">
                   <thead>
                     <tr>
-                      <th className="border bg-[#f3f4f6] p-2 text-left font-bold">
+                      <th className="border bg-muted p-2 text-left font-bold">
                         DATOS DEL DESTINATARIO Y TRASLADO
                       </th>
                     </tr>
@@ -304,7 +312,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                   <tbody>
                     <tr>
                       <td className="border p-3">
-                        <div className="grid grid-cols-[1fr_1fr] gap-4 text-3.5">
+                        <div className="grid grid-cols-[1fr_1fr] gap-4 text-sm">
                           <div>
                             <p className="my-[4px] mx-0">
                               <strong>Destinatario:</strong> {greData.destinatario}
@@ -336,10 +344,10 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
 
               {/* DATOS DEL TRANSPORTE */}
               <div className="mb-6">
-                <table className="w-[100%] border text-3.5">
+                <table className="w-[100%] border text-sm">
                   <thead>
                     <tr>
-                      <th className="border bg-[#f3f4f6] p-2 text-left font-bold">
+                      <th className="border bg-muted p-2 text-left font-bold">
                         INFORMACIÓN DEL TRANSPORTE
                       </th>
                     </tr>
@@ -354,6 +362,11 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                                 <strong>Transportista:</strong> {greData.transportista}
                               </p>
                             )}
+                            {greData.transportistaDocumento && (
+                              <p className="my-[4px] mx-0">
+                                <strong>RUC Transportista:</strong> {greData.transportistaDocumento}
+                              </p>
+                            )}
                             {greData.placaVehiculo && (
                               <p className="my-[4px] mx-0">
                                 <strong>Placa del Vehículo:</strong> {greData.placaVehiculo}
@@ -366,13 +379,23 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                                 <strong>Licencia de Conducir:</strong> {greData.licenciaConducir}
                               </p>
                             )}
+                            {greData.conductorDocumentoNumero && (
+                              <p className="my-[4px] mx-0">
+                                <strong>Conductor:</strong> {[greData.conductorNombres, greData.conductorApellidos].filter(Boolean).join(' ')}
+                              </p>
+                            )}
+                            {greData.conductorDocumentoNumero && (
+                              <p className="my-[4px] mx-0">
+                                <strong>Doc. Conductor:</strong> {greData.conductorDocumentoNumero}
+                              </p>
+                            )}
                             <p className="my-[4px] mx-0">
                               <strong>Modalidad:</strong> {getModalidadText(greData.modalidad)}
                             </p>
                           </div>
                         </div>
-                        {!greData.transportista && !greData.placaVehiculo && !greData.licenciaConducir && (
-                          <p className="m-0 text-gray-500">
+                        {!greData.transportista && !greData.placaVehiculo && !greData.licenciaConducir && !greData.conductorDocumentoNumero && (
+                          <p className="m-0 text-muted-foreground">
                             No se registraron datos adicionales de transporte
                           </p>
                         )}
@@ -385,10 +408,10 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
               {/* OBSERVACIONES */}
               {greData.observaciones && (
                 <div className="mb-6">
-                  <table className="w-[100%] border text-3.5">
+                  <table className="w-[100%] border text-sm">
                     <thead>
                       <tr>
-                        <th className="border bg-[#f3f4f6] p-2 text-left font-bold">
+                        <th className="border bg-muted p-2 text-left font-bold">
                           OBSERVACIONES
                         </th>
                       </tr>
@@ -405,7 +428,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
               )}
 
               {/* FOOTER */}
-              <div className="text-center text-3 text-gray-700 border-t pt-4">
+              <div className="text-center text-xs text-foreground/85 border-t pt-4">
                 <p className="font-bold mt-0 mr-0 mb-[4px] ml-0">
                   NEON SYSTEM - Sistema Empresarial Integrado
                 </p>
@@ -418,8 +441,8 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
               </div>
             </div>
           ) : (
-            <div className="text-center p-12 text-gray-500">
-              <p className="text-4">No se pudo cargar la guía de remisión</p>
+            <div className="text-center p-12 text-muted-foreground">
+              <p className="text-base">No se pudo cargar la guía de remisión</p>
             </div>
           )}
         </div>

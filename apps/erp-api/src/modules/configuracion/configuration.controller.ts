@@ -24,6 +24,13 @@ import {
   ValidateWizardCertificateDto,
 } from './configuration.types';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import {
+  INITIAL_ACTIVE_COUNTRY_CODE,
+  INITIAL_ACTIVE_COUNTRY_ID,
+  INITIAL_ACTIVE_COUNTRY_MESSAGE,
+  isInitialActiveCountryCode,
+  isInitialActiveCountryId,
+} from '../paises/initial-country';
 
 @ApiTags('configuration')
 @Controller('configuration')
@@ -38,6 +45,21 @@ export class ConfigurationController {
     private readonly supabaseService: SupabaseService,
     private readonly auditService: AuditService,
   ) {}
+
+  private assertInitialActiveCountry(paisId?: number | null, paisCodigo?: string | null): void {
+    if (paisId !== undefined && paisId !== null && !isInitialActiveCountryId(paisId)) {
+      throw new HttpException(
+        { success: false, message: INITIAL_ACTIVE_COUNTRY_MESSAGE },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (paisCodigo && !isInitialActiveCountryCode(paisCodigo)) {
+      throw new HttpException(
+        { success: false, message: INITIAL_ACTIVE_COUNTRY_MESSAGE },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 
   /**
    * GET /api/configuration/status
@@ -448,6 +470,7 @@ export class ConfigurationController {
    * Get GRE automatic creation thresholds
    */
   @Get('gre-thresholds')
+  @RequirePermission('pos.read')
   @ApiOperation({ summary: 'Get GRE thresholds' })
   @ApiResponse({ status: 200, description: 'GRE thresholds retrieved successfully' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
@@ -583,22 +606,27 @@ export class ConfigurationController {
           oseApiHeader: data.ose_api_header,
           oseBearerToken: data.ose_bearer_token,
           emisionCpeModo: data.emision_cpe_modo,
-          dianActivo: data.dian_activo,
-          dianUrl: data.dian_url,
-          dianUsuario: data.dian_usuario,
-          dianPassword: data.dian_password,
-          dianSoftwareId: data.dian_software_id,
-          dianSoftwarePin: data.dian_software_pin,
-          dianTestSetId: data.dian_test_set_id,
-          dianEnvironment: data.dian_environment,
-          dianRegimenFiscal: data.dian_regimen_fiscal,
-          dianTipoContribuyente: data.dian_tipo_contribuyente,
-          dianResolucionNumero: data.dian_resolucion_numero,
-          dianResolucionPrefijo: data.dian_resolucion_prefijo,
-          dianResolucionDesde: data.dian_resolucion_desde,
-          dianResolucionHasta: data.dian_resolucion_hasta,
-          dianResolucionFechaInicio: data.dian_resolucion_fecha_inicio,
-          dianResolucionFechaFin: data.dian_resolucion_fecha_fin,
+          sunatEnvironment: data.sunat_environment,
+          sunatUsernameConfigured: !!data.sunat_username,
+          sunatGreTransport: data.sunat_gre_transport,
+          sunatGreClientConfigured: !!data.sunat_gre_client_id && !!data.sunat_gre_client_secret,
+          // DIAN/otros paises quedan en roadmap; no exponerlos como runtime activo.
+          dianActivo: false,
+          dianUrl: null,
+          dianUsuario: null,
+          dianPassword: null,
+          dianSoftwareId: null,
+          dianSoftwarePin: null,
+          dianTestSetId: null,
+          dianEnvironment: null,
+          dianRegimenFiscal: null,
+          dianTipoContribuyente: null,
+          dianResolucionNumero: null,
+          dianResolucionPrefijo: null,
+          dianResolucionDesde: null,
+          dianResolucionHasta: null,
+          dianResolucionFechaInicio: null,
+          dianResolucionFechaFin: null,
         },
       };
     } catch (error) {
@@ -645,6 +673,7 @@ export class ConfigurationController {
 
       if (typeof datosEmpresa.pais === 'string' && datosEmpresa.pais.trim()) {
         resolvedPaisCodigo = datosEmpresa.pais.trim().toUpperCase();
+        this.assertInitialActiveCountry(null, resolvedPaisCodigo);
       }
 
       if (datosEmpresa.pais_id !== undefined) {
@@ -655,6 +684,7 @@ export class ConfigurationController {
             HttpStatus.BAD_REQUEST,
           );
         }
+        this.assertInitialActiveCountry(parsedPaisId, null);
         resolvedPaisId = parsedPaisId;
       }
 
@@ -663,7 +693,7 @@ export class ConfigurationController {
           .getClient()
           .from('paises')
           .select('id')
-          .eq('codigo_iso', resolvedPaisCodigo)
+          .eq('codigo_iso', INITIAL_ACTIVE_COUNTRY_CODE)
           .maybeSingle();
 
         if (paisError || !paisData?.id) {
@@ -681,7 +711,7 @@ export class ConfigurationController {
           .getClient()
           .from('paises')
           .select('codigo_iso')
-          .eq('id', resolvedPaisId)
+          .eq('id', INITIAL_ACTIVE_COUNTRY_ID)
           .maybeSingle();
 
         if (paisError || !paisData?.codigo_iso) {
@@ -692,6 +722,7 @@ export class ConfigurationController {
         }
 
         resolvedPaisCodigo = paisData.codigo_iso.toUpperCase();
+        this.assertInitialActiveCountry(resolvedPaisId, resolvedPaisCodigo);
       }
 
       if (!resolvedPaisId) {
@@ -703,11 +734,42 @@ export class ConfigurationController {
           .maybeSingle();
 
         if (!currentEmpresa?.pais_id) {
-          throw new HttpException(
-            { success: false, message: 'Debes configurar el país antes de actualizar la empresa' },
-            HttpStatus.BAD_REQUEST,
-          );
+          resolvedPaisId = INITIAL_ACTIVE_COUNTRY_ID;
+          resolvedPaisCodigo = INITIAL_ACTIVE_COUNTRY_CODE;
+        } else {
+          this.assertInitialActiveCountry(Number(currentEmpresa.pais_id), null);
         }
+      }
+
+      const dianPayloadFields = [
+        'dianActivo',
+        'dianUrl',
+        'dianUsuario',
+        'dianPassword',
+        'dianSoftwareId',
+        'dianSoftwarePin',
+        'dianTestSetId',
+        'dianEnvironment',
+        'dianRegimenFiscal',
+        'dianTipoContribuyente',
+        'dianResolucionNumero',
+        'dianResolucionPrefijo',
+        'dianResolucionDesde',
+        'dianResolucionHasta',
+        'dianResolucionFechaInicio',
+        'dianResolucionFechaFin',
+        'dian_activo',
+        'dian_regimen_fiscal',
+        'dian_tipo_contribuyente',
+      ];
+      if (dianPayloadFields.some((field) => {
+        const value = datosEmpresa[field];
+        return value !== undefined && value !== null && value !== '' && value !== false;
+      })) {
+        throw new HttpException(
+          { success: false, message: INITIAL_ACTIVE_COUNTRY_MESSAGE },
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       // Mapear campos camelCase a snake_case

@@ -77,7 +77,7 @@ export function ValidationStep() {
         {isValidating ? (
           <div className="flex flex-col items-center gap-4 p-8">
             <Loader2 className="animate-spin text-[var(--primary-600)]" size={48} />
-            <p className="text-4 text-[var(--primary-700)] font-medium">
+            <p className="text-base text-[var(--primary-700)] font-medium">
               Validando tu configuración...
             </p>
             <p className="text-[0.875rem] text-[var(--primary-500)]">
@@ -91,10 +91,10 @@ export function ValidationStep() {
                 <div className="w-[80px] h-[80px] rounded-full bg-[var(--success-100)] flex items-center justify-center">
                   <CheckCircle size={48} className="text-[var(--success-600)]" />
                 </div>
-                <h3 className="text-6 font-bold text-[var(--success-700)] m-0">
+                <h3 className="text-2xl font-bold text-[var(--success-700)] m-0">
                   ¡Validación Exitosa!
                 </h3>
-                <p className="text-4 text-[var(--primary-600)] m-0">
+                <p className="text-base text-[var(--primary-600)] m-0">
                   Tu configuración está lista para usar
                 </p>
               </>
@@ -103,10 +103,10 @@ export function ValidationStep() {
                 <div className="w-[80px] h-[80px] rounded-full bg-[var(--error-100)] flex items-center justify-center">
                   <XCircle size={48} className="text-[var(--error-600)]" />
                 </div>
-                <h3 className="text-6 font-bold text-[var(--error-700)] m-0">
+                <h3 className="text-2xl font-bold text-[var(--error-700)] m-0">
                   Se encontraron problemas
                 </h3>
-                <p className="text-4 text-[var(--primary-600)] m-0">
+                <p className="text-base text-[var(--primary-600)] m-0">
                   Revisa los detalles a continuación
                 </p>
               </>
@@ -118,14 +118,14 @@ export function ValidationStep() {
       {hasValidated && (
         <div className="flex flex-col gap-4">
           {/* Certificate Validation Result */}
-          <div className="p-5 rounded-2">
+          <div className="p-5 rounded-lg">
             <div className="flex items-center gap-3 mb-3">
               {certificateResult?.isValid ? (
                 <CheckCircle size={24} className="text-[var(--success-600)]" />
               ) : (
                 <XCircle size={24} className="text-[var(--error-600)]" />
               )}
-              <h4 className="text-4 font-semibold m-0">
+              <h4 className="text-base font-semibold m-0">
                 Certificado Digital
               </h4>
             </div>
@@ -136,17 +136,17 @@ export function ValidationStep() {
                   ✓ Certificado válido y activo
                 </p>
                 {certificateResult.subject && (
-                  <p className="text-3.5 text-[var(--primary-600)] mt-0 mr-0 mb-1 ml-0">
+                  <p className="text-sm text-[var(--primary-600)] mt-0 mr-0 mb-1 ml-0">
                     <strong>Entidad:</strong> {certificateResult.subject}
                   </p>
                 )}
                 {certificateResult.issuer && (
-                  <p className="text-3.5 text-[var(--primary-600)] mt-0 mr-0 mb-1 ml-0">
+                  <p className="text-sm text-[var(--primary-600)] mt-0 mr-0 mb-1 ml-0">
                     <strong>Emisor:</strong> {certificateResult.issuer}
                   </p>
                 )}
                 {certificateResult.serialNumber && (
-                  <p className="text-3.5 text-[var(--primary-600)] mt-0 mr-0 mb-1 ml-0">
+                  <p className="text-sm text-[var(--primary-600)] mt-0 mr-0 mb-1 ml-0">
                     <strong>Serie:</strong> {certificateResult.serialNumber}
                   </p>
                 )}
@@ -189,14 +189,14 @@ export function ValidationStep() {
           </div>
 
           {/* Documento Fiscal Validation Result */}
-          <div className="p-5 rounded-2">
+          <div className="p-5 rounded-lg">
             <div className="flex items-center gap-3 mb-3">
               {rucResult?.isValid ? (
                 <CheckCircle size={24} className="text-[var(--success-600)]" />
               ) : (
                 <XCircle size={24} className="text-[var(--error-600)]" />
               )}
-              <h4 className="text-4 font-semibold m-0">
+              <h4 className="text-base font-semibold m-0">
                 Configuración {documentoFiscal}
               </h4>
             </div>
@@ -249,7 +249,7 @@ export function ValidationStep() {
       )}
 
       {allValid && (
-        <div className="mt-6 p-4 bg-[rgba(16,_185,_129,_0.1)] rounded-2 border">
+        <div className="mt-6 p-4 bg-[rgba(16,_185,_129,_0.1)] rounded-lg border">
           <p className="text-[0.875rem] text-[var(--success-700)] m-0 leading-6">
             <strong>✓ Todo listo:</strong> Puedes continuar al siguiente paso para finalizar la configuración.
           </p>

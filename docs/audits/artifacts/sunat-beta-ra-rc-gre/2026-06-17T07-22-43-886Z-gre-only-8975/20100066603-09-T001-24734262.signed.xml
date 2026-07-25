@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DespatchAdvice xmlns="urn:oasis:names:specification:ubl:schema:xsd:DespatchAdvice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
+  <ext:UBLExtensions>
+    <ext:UBLExtension>
+      <ext:ExtensionContent><ds:Signature Id="SignatureSP" xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><ds:Reference URI=""><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><ds:Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue>7X4svtHnizDdTeBeKGQYEjWPU5H9iXUkunIlhFGR3YA=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>s8hPkQe/8L5ocyBv0Hms0rY+SNGXKJ85foUEtjRGdXO/ygEdpKzwfeEMSSRiPtFQrZYnOQcw/3aQSe5jTsDhHEcVvDemgPwCoFV2JLpOfppQ78DMK9IJrjqjGQ/YouV1rkYyzVDWfVKG3mXd/PKi63bd0A4nI/fRF2dnw65JgmH+KxNR/LtDrzRbZmQhlyVvAn8hU3d+EPr1ENiDVq7CnWUGpqRVzLbQi3kfpM+Mu5QaOxaEA+ePat3k00jPcNUqa4s9jDrPHP/6SYmNQY5SnsVEh0ui8abEVFjJnTu/2aOfxysNplKw3GAB/J1adK1rYSihQg7gJTGAXXHM1KYWBw==</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>MIIFCDCCA/CgAwIBAgIJAMctSZyHdWZKMA0GCSqGSIb3DQEBCwUAMIIBDTEbMBkGCgmSJomT8ixkARkWC0xMQU1BLlBFIFNBMQswCQYDVQQGEwJQRTENMAsGA1UECAwETElNQTENMAsGA1UEBwwETElNQTEYMBYGA1UECgwPVFUgRU1QUkVTQSBTLkEuMUUwQwYDVQQLDDxETkkgOTk5OTk5OSBSVUMgMTIzNDU2Nzg5MTAgLSBDRVJUSUZJQ0FETyBQQVJBIERFTU9TVFJBQ0nDk04xRDBCBgNVBAMMO05PTUJSRSBSRVBSRVNFTlRBTlRFIExFR0FMIC0gQ0VSVElGSUNBRE8gUEFSQSBERU1PU1RSQUNJw5NOMRwwGgYJKoZIhvcNAQkBFg1kZW1vQGxsYW1hLnBlMB4XDTI1MTAxOTAwMTgyMFoXDTI3MTAxOTAwMTgyMFowggENMRswGQYKCZImiZPyLGQBGRYLTExBTUEuUEUgU0ExCzAJBgNVBAYTAlBFMQ0wCwYDVQQIDARMSU1BMQ0wCwYDVQQHDARMSU1BMRgwFgYDVQQKDA9UVSBFTVBSRVNBIFMuQS4xRTBDBgNVBAsMPEROSSA5OTk5OTk5IFJVQyAxMjM0NTY3ODkxMCAtIENFUlRJRklDQURPIFBBUkEgREVNT1NUUkFDScOTTjFEMEIGA1UEAww7Tk9NQlJFIFJFUFJFU0VOVEFOVEUgTEVHQUwgLSBDRVJUSUZJQ0FETyBQQVJBIERFTU9TVFJBQ0nDk04xHDAaBgkqhkiG9w0BCQEWDWRlbW9AbGxhbWEucGUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDf7iAhDXy8E7avUDAqpFeWtSrfWTikkhxO/Nxz1jhbnwRCc02xv+ICt0r/Z9braht8qkMdtpOQPCFh02B7hDSe9omDe63uz7dEiEMTIro0z8k9sMpmf7DUPFrROnV/WdvQPYG4QxBLyzi/S1AFeCyvv36I8xb/iW1pITW3HZyAEGqGglBUHoB4JWdKgw7x5w0HjpiBrB+8JCWfqFXw5AZqgWejA6TQyM/3h1taDkVuVYdZJd8CVSilxxZAsMINsrnj7DdrrzNeTWguPNsXfu0s0rLUF3jlQrOWLBgtEHqwUjRmQgfrU69ou5dxpBDK7HPX9nUF5+QEDQIuXfvcPVhFAgMBAAGjZzBlMB0GA1UdDgQWBBRoUt3JImMc5hA9nhHNvyaM/ehLZTAfBgNVHSMEGDAWgBRoUt3JImMc5hA9nhHNvyaM/ehLZTATBgNVHSUEDDAKBggrBgEFBQcDATAOBgNVHQ8BAf8EBAMCB4AwDQYJKoZIhvcNAQELBQADggEBAKPb20TZgmrJn+CWWlY6cH51mzQ3Fm8lN62dm0OZKzhPbFaGzgdwUdVoXG7PNGEF15YM427zYP6yOvF1O6amRh7rDJMs0qjHOEGp684iONilw7grL/b8M+UkbIc8hXN9g7zW28RS6oBNHv6HC7BJRL/dHUL6YLMKATD9tMrdL6Qehq4R99jiSg7OGUhnwpg06RawZsgSSZ++zE1PLYVkgsxjmfaAD5Zn8mrFMu+OzFs+LGg3LxJY4xKpVHdOsdKrg//3z3HsMRpX7YKGck42D8UJn+NssqWTHwdu7/oe3JmQvOdh8yZIcCQ0qCqLF1nzIDWCIawS5SSzxMW4glYN2iU=</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature></ext:ExtensionContent>
+    </ext:UBLExtension>
+  </ext:UBLExtensions>
+  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+  <cbc:CustomizationID>2.0</cbc:CustomizationID>
+  <cbc:ID>T001-24734262</cbc:ID>
+  <cbc:IssueDate>2026-06-17</cbc:IssueDate>
+  <cbc:IssueTime>02:22:43</cbc:IssueTime>
+  <cbc:DespatchAdviceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">09</cbc:DespatchAdviceTypeCode>
+  <cac:Signature>
+    <cbc:ID>IDSignSP</cbc:ID>
+    <cac:SignatoryParty>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">20100066603</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name><![CDATA[EMPRESA DEMO SUNAT]]></cbc:Name>
+      </cac:PartyName>
+    </cac:SignatoryParty>
+    <cac:DigitalSignatureAttachment>
+      <cac:ExternalReference>
+        <cbc:URI>#SignatureSP</cbc:URI>
+      </cac:ExternalReference>
+    </cac:DigitalSignatureAttachment>
+  </cac:Signature>
+  <cac:DespatchSupplierParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">20100066603</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name><![CDATA[EMPRESA DEMO]]></cbc:Name>
+      </cac:PartyName>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName><![CDATA[EMPRESA DEMO SUNAT]]></cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:DespatchSupplierParty>
+  <cac:DeliveryCustomerParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">20600600600</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName><![CDATA[CLIENTE DEMO SAC]]></cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:DeliveryCustomerParty>
+  <cac:Shipment>
+    <cbc:ID>SUNAT_Envio</cbc:ID>
+    <cbc:HandlingCode listAgencyName="PE:SUNAT" listName="Motivo de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo20">01</cbc:HandlingCode>
+    <cbc:GrossWeightMeasure unitCode="KGM">12.50</cbc:GrossWeightMeasure>
+    <cac:ShipmentStage>
+      <cbc:TransportModeCode listAgencyName="PE:SUNAT" listName="Modalidad de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo18">01</cbc:TransportModeCode>
+      <cac:TransitPeriod>
+        <cbc:StartDate>2026-06-18</cbc:StartDate>
+      </cac:TransitPeriod>
+      <cac:CarrierParty>
+        <cac:PartyIdentification>
+          <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">20555555555</cbc:ID>
+        </cac:PartyIdentification>
+        <cac:PartyLegalEntity>
+          <cbc:RegistrationName><![CDATA[TRANSPORTES DEMO SAC]]></cbc:RegistrationName>
+        </cac:PartyLegalEntity>
+      </cac:CarrierParty>
+      
+    </cac:ShipmentStage>
+    <cac:Delivery>
+      <cac:DeliveryAddress>
+        <cbc:ID schemeAgencyName="PE:INEI">150102</cbc:ID>
+        <cac:AddressLine>
+          <cbc:Line><![CDATA[AV DESTINO 456]]></cbc:Line>
+        </cac:AddressLine>
+        <cac:Country>
+          <cbc:IdentificationCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 3166-1">PE</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:DeliveryAddress>
+    </cac:Delivery>
+    <cac:OriginAddress>
+      <cbc:ID schemeAgencyName="PE:INEI">150101</cbc:ID>
+      <cac:AddressLine>
+        <cbc:Line><![CDATA[AV ORIGEN 123]]></cbc:Line>
+      </cac:AddressLine>
+      <cac:Country>
+        <cbc:IdentificationCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 3166-1">PE</cbc:IdentificationCode>
+      </cac:Country>
+    </cac:OriginAddress>
+  </cac:Shipment>
+
+  <cac:DespatchLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:DeliveredQuantity unitCode="NIU" unitCodeListID="UN/ECE rec 20" unitCodeListAgencyName="United Nations Economic Commission for Europe">1.00</cbc:DeliveredQuantity>
+    <cac:OrderLineReference>
+      <cbc:LineID>1</cbc:LineID>
+    </cac:OrderLineReference>
+    <cac:Item>
+      <cbc:Description><![CDATA[Producto prueba GRE beta CustomizationID simple]]></cbc:Description>
+    </cac:Item>
+  </cac:DespatchLine>
+</DespatchAdvice>

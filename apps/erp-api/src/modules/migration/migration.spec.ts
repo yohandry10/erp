@@ -271,10 +271,33 @@ describe('StockInicialImporter.validate', () => {
   const { service } = makeFakeSupabase();
   const importer = new StockInicialImporter(service, {} as any);
 
-  it('rechaza sucursal_id no UUID', () => {
+  it('exige almacen_id en el contrato y en la plantilla CSV', () => {
     const csv = [
       'external_id_producto,sucursal_id,cantidad,costo_unitario',
-      'PROD-1,no-es-uuid,10,5.5',
+      'PROD-1,00000000-0000-0000-0000-000000000000,10,5.5',
+    ].join('\n');
+
+    expect(importer.requiredHeaders).toContain('almacen_id');
+    expect(importer.getTemplate().content.split('\n')[0].split(',')).toContain('almacen_id');
+    expect(importer.validate(parseCsv(csv))).toContainEqual({
+      rowIndex: 1,
+      message: 'Falta columna obligatoria: almacen_id',
+    });
+  });
+
+  it('rechaza almacen_id vacío', () => {
+    const csv = [
+      'external_id_producto,sucursal_id,almacen_id,cantidad,costo_unitario',
+      'PROD-1,00000000-0000-0000-0000-000000000000,,10,5.5',
+    ].join('\n');
+    const errs = importer.validate(parseCsv(csv));
+    expect(errs.some((e) => e.field === 'almacen_id')).toBe(true);
+  });
+
+  it('rechaza sucursal_id no UUID', () => {
+    const csv = [
+      'external_id_producto,sucursal_id,almacen_id,cantidad,costo_unitario',
+      'PROD-1,no-es-uuid,33333333-3333-3333-3333-333333333333,10,5.5',
     ].join('\n');
     const errs = importer.validate(parseCsv(csv));
     expect(errs.some((e) => e.field === 'sucursal_id')).toBe(true);
@@ -282,8 +305,8 @@ describe('StockInicialImporter.validate', () => {
 
   it('rechaza cantidad negativa', () => {
     const csv = [
-      'external_id_producto,sucursal_id,cantidad,costo_unitario',
-      'PROD-1,00000000-0000-0000-0000-000000000000,-5,1',
+      'external_id_producto,sucursal_id,almacen_id,cantidad,costo_unitario',
+      'PROD-1,00000000-0000-0000-0000-000000000000,33333333-3333-3333-3333-333333333333,-5,1',
     ].join('\n');
     const errs = importer.validate(parseCsv(csv));
     expect(errs.some((e) => e.field === 'cantidad')).toBe(true);
@@ -322,16 +345,19 @@ describe('StockInicialImporter.run', () => {
         if (table === 'movimientos_inventario') return movimientosBuilder;
         throw new Error(`tabla inesperada: ${table}`);
       }),
+      // run() aplica el movimiento vía RPC atómica aplicar_movimiento_inventario_tx.
+      rpc: jest.fn().mockResolvedValue({ data: 'mov-1', error: null }),
     };
     const importer = new StockInicialImporter(
       { getClient: jest.fn().mockReturnValue(client) } as any,
       { recordRow: jest.fn() } as any,
     );
 
+    const almacenId = '33333333-3333-3333-3333-333333333333';
     const parsed = parseCsv(
       [
-        'external_id_producto,sucursal_id,cantidad,costo_unitario',
-        `PROD-1,${sucursalId},10,2.5`,
+        'external_id_producto,sucursal_id,almacen_id,cantidad,costo_unitario',
+        `PROD-1,${sucursalId},${almacenId},10,2.5`,
       ].join('\n'),
     );
 
@@ -345,7 +371,7 @@ describe('StockInicialImporter.run', () => {
     expect(movimientosBuilder.contains).toHaveBeenCalledWith('metadata', {
       fecha_corte: fechaCorte,
       sucursal_id: sucursalId,
-      almacen_id: null,
+      almacen_id: almacenId,
     });
   });
 });

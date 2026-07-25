@@ -23,6 +23,13 @@ describe('CPE Integration Verification', () => {
     let cpeIntegrationService: CPEIntegrationService;
     let cpeService: CpeService;
     let supabaseService: SupabaseService;
+    let mockSupabaseUpdate: jest.Mock;
+    let mockFiscalAdapter: {
+        obtenerNombreServicioFiscal: jest.Mock;
+        obtenerCodigoPais: jest.Mock;
+        obtenerConfiguracionFiscal: jest.Mock;
+        enviarDocumento: jest.Mock;
+    };
 
     const mockSupabaseClient = {
         from: jest.fn().mockReturnThis(),
@@ -36,11 +43,30 @@ describe('CPE Integration Verification', () => {
     };
 
     beforeEach(async () => {
+        jest.clearAllMocks();
+        mockSupabaseUpdate = jest.fn().mockResolvedValue({ data: {}, error: null });
+        mockFiscalAdapter = {
+            obtenerNombreServicioFiscal: jest.fn().mockResolvedValue('SUNAT'),
+            obtenerCodigoPais: jest.fn().mockResolvedValue('PE'),
+            obtenerConfiguracionFiscal: jest.fn().mockResolvedValue({ tasaImpuesto: 0.18 }),
+            enviarDocumento: jest.fn().mockResolvedValue({
+                success: true,
+                codigoRespuesta: '0',
+                descripcionRespuesta: 'Aceptado',
+                cdr: 'CDR_TEST',
+                hash: 'hash-sunat-test',
+                numeroComprobante: 'F001-101',
+            }),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 CPEIntegrationService,
                 CpeService,
-                FiscalAdapterService,
+                {
+                    provide: FiscalAdapterService,
+                    useValue: mockFiscalAdapter,
+                },
                 SunatFiscalService,
                 FiscalServiceFactory,
                 {
@@ -55,7 +81,7 @@ describe('CPE Integration Verification', () => {
                     provide: SupabaseService,
                     useValue: {
                         getClient: jest.fn().mockReturnValue(mockSupabaseClient),
-                        update: jest.fn().mockResolvedValue({ data: {}, error: null }),
+                        update: mockSupabaseUpdate,
                     },
                 },
                 {
@@ -211,8 +237,19 @@ describe('CPE Integration Verification', () => {
         // 7. CpeService: insert CPE
         const mockCreatedCpe = {
             id: 'cpe-123',
+            tipo_documento: '01',
             serie: 'F001',
             numero: 101,
+            ruc_emisor: '20987654321',
+            razon_social_emisor: 'Mi Empresa SAC',
+            tipo_documento_receptor: '6',
+            documento_receptor: '20123456789',
+            razon_social_receptor: 'Cliente Test SAC',
+            direccion_receptor: 'Av. Test 123',
+            moneda: 'PEN',
+            total_gravadas: 100,
+            total_igv: 18,
+            total_venta: 118,
             estado: 'FIRMADO',
             xml_firmado: '<xml>signed</xml>',
             hash: 'hash-123',
@@ -225,48 +262,47 @@ describe('CPE Integration Verification', () => {
             error: null,
         });
 
-        // 8. CpeService: ensureDocumentoParaCpe -> insert documento operativo
+        // 8. CpeService: ensureDocumentoParaCpe -> no existe documento operativo previo
+        mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+
+        // 9. CpeService: ensureDocumentoParaCpe -> empresa_config para datos de emisor
+        mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+            data: {
+                ruc: '20987654321',
+                razon_social: 'Mi Empresa SAC',
+                direccion_fiscal: 'Av. Empresa 456',
+            },
+            error: null,
+        });
+
+        // 10. CpeService: ensureDocumentoParaCpe -> insert documento operativo
         mockSupabaseClient.single.mockResolvedValueOnce({
             data: { id: 'doc-123' },
             error: null,
         });
 
-        // 9. CpeService: update CPE with document_id
+        // 11. CpeService: update CPE with document_id
         mockSupabaseClient.update.mockReturnThis();
 
-        // 10. CpeService: getXmlSigner (again for prepareXmlForSunat)
+        // 12. CpeService: getXmlSigner (again for prepareXmlForSunat)
         mockSupabaseClient.single.mockResolvedValueOnce({
             data: { certificado_pfx: null },
             error: null,
         });
 
-        // 11. CpeService: update CPE (FIRMADO)
+        // 13. CpeService: update CPE (FIRMADO)
         mockSupabaseClient.update.mockReturnThis();
 
-        // 12. CpeService: refresh CPE persisted after events
+        // 14. CpeService: refresh CPE persisted after events
         mockSupabaseClient.single.mockResolvedValueOnce({
             data: { ...mockCreatedCpe, documento_id: 'doc-123' },
             error: null,
         });
 
-        // 13. FiscalAdapter: obtenerPaisTenant
-        mockSupabaseClient.single.mockResolvedValueOnce({ data: { pais_id: 1 }, error: null });
-
-        // 14. FiscalAdapter: obtenerPaisTenant (again inside sendToOse if needed, or cached)
-        // Note: sendToOse does a select first
-        mockSupabaseClient.single.mockResolvedValueOnce({
-            data: { ...mockCreatedCpe, tenant_id: tenantId, ruc_emisor: '20987654321', tipo_documento: '01' },
-            error: null
-        });
-
-        // 15. FiscalAdapter: obtenerPaisTenant (inside sendToOse -> obtenerNombreServicioFiscal)
-        // It might be cached, but let's mock just in case
-        // mockSupabaseClient.single.mockResolvedValueOnce({ data: { pais_id: 1 }, error: null });
-
-        // 16. CpeService: update CPE (ENVIADO)
+        // 15. CpeService: update CPE (ENVIADO)
         mockSupabaseClient.update.mockReturnThis();
 
-        // 17. CpeService: update CPE (ACEPTADO)
+        // 16. CpeService: update CPE (ACEPTADO)
         mockSupabaseClient.update.mockReturnThis();
 
         // Execute
@@ -295,6 +331,14 @@ describe('CPE Integration Verification', () => {
             },
             error: null
         });
+        mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+            data: {
+                ruc: '20987654321',
+                razon_social: 'Mi Empresa SAC',
+                direccion_fiscal: 'Av. Empresa 456',
+            },
+            error: null,
+        });
 
         // Mock for sendToOse -> update(ENVIADO)
         mockSupabaseClient.update.mockReturnThis();
@@ -306,8 +350,25 @@ describe('CPE Integration Verification', () => {
           idempotencyKey: 'test-idempotency',
         });
 
-        // If no error thrown, it means success (since sendToOseManual returns void but logs success)
-        console.log('Manual Send Executed Successfully');
+        expect(mockFiscalAdapter.enviarDocumento).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: 'cpe-123',
+            tipoDocumento: '01',
+            serie: 'F001',
+            numero: '101',
+            xmlContent: '<xml>signed</xml>',
+          }),
+          tenantId,
+        );
+        expect(mockSupabaseUpdate).toHaveBeenCalledWith(
+          'cpe',
+          expect.objectContaining({
+            estado: 'ACEPTADO',
+            sunat_status: 'ACCEPTED',
+            cdr_sunat: 'CDR_TEST',
+          }),
+          { id: 'cpe-123' },
+        );
     });
 
 });

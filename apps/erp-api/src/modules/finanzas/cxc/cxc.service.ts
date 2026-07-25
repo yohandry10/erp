@@ -154,6 +154,17 @@ export class CxcService {
     };
   }
   async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<void> {
+    // Una venta al contado (POS/efectivo) ya está pagada: no genera cuenta por
+    // cobrar. Solo se salta cuando el emisor lo marca explícitamente como NO
+    // crédito; si viene undefined (flujos legacy) se conserva el comportamiento
+    // anterior para no romper ventas a crédito.
+    if (evento.esCredito === false) {
+      this.logger.log(
+        `ℹ️ [CXC] Factura ${evento.serie}-${evento.numero} es venta al contado, no se genera CxC.`,
+      );
+      return;
+    }
+
     const tenantId = evento.tenantId;
     const cpeReferenciaId = evento.cpeId ?? null;
     let documentoReferenciaId = evento.facturaId ?? null;
@@ -1044,12 +1055,21 @@ export class CxcService {
         code === '42883' ||
         message.includes('registrar_cxc_pago_tx') ||
         message.includes('Could not find the function');
+      const rpcShapeMismatch =
+        code === '42703' ||
+        message.includes('has no field') ||
+        message.includes('record "v_cuenta"') ||
+        (message.includes('column') && message.includes('does not exist'));
 
-      if (rpcMissing) {
+      if (rpcMissing || rpcShapeMismatch) {
         this.logger.warn(
-          'RPC registrar_cxc_pago_tx no disponible; se usa flujo legacy de CxC.',
+          `RPC registrar_cxc_pago_tx no disponible o no alineada con el esquema; se usa flujo legacy de CxC. code=${code || 'N/A'} message=${message || 'sin detalle'}`,
         );
         return null;
+      }
+
+      if (message.includes('Cuenta por cobrar no encontrada')) {
+        throw new NotFoundException('Cuenta por cobrar no encontrada');
       }
 
       this.logger.error('Error en registrar_cxc_pago_tx:', error);

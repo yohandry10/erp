@@ -118,12 +118,12 @@ export class SunatRetryService implements OnModuleInit {
   private async processFailedGres(): Promise<void> {
     const client = this.supabase.getClient();
 
-    // Buscar GREs rechazadas que tengan errores técnicos recuperables
+    // ERROR identifica fallas técnicas recuperables. RECHAZADO queda reservado
+    // para rechazos fiscales y nunca debe entrar al reintento automático.
     const { data: failedGres, error } = await client
       .from('gre_guias')
       .select('id, tenant_id, estado, error_message, retry_count, updated_at, next_retry_at')
-      .eq('estado', 'RECHAZADO')
-      .not('retry_count', 'is', null) // Solo documentos con retry_count (errores técnicos)
+      .eq('estado', 'ERROR')
       .lt('retry_count', this.MAX_RETRIES)
       .gte('updated_at', new Date(Date.now() - this.MAX_RETRY_AGE_HOURS * 60 * 60 * 1000).toISOString())
       .order('updated_at', { ascending: true })
@@ -302,7 +302,7 @@ export class SunatRetryService implements OnModuleInit {
         await client
           .from('gre_guias')
           .update({
-            estado: 'RECHAZADO',
+            estado: 'ERROR',
             retry_count: newRetryCount,
             next_retry_at: nextRetryAt.toISOString(),
             error_message: `Error técnico (reintento ${newRetryCount}): ${error.message}`,
@@ -319,7 +319,7 @@ export class SunatRetryService implements OnModuleInit {
         await client
           .from('gre_guias')
           .update({
-            estado: 'RECHAZADO',
+            estado: 'ERROR',
             retry_count: newRetryCount,
             next_retry_at: null,
             error_message: `Error técnico: Máximo de reintentos alcanzado (${this.MAX_RETRIES}). ${error.message}`,
@@ -396,8 +396,8 @@ export class SunatRetryService implements OnModuleInit {
         return { success: false, message: 'GRE no encontrada' };
       }
 
-      if (gre.estado !== 'RECHAZADO') {
-        return { success: false, message: `GRE no está en estado RECHAZADO (estado actual: ${gre.estado})` };
+      if (!['ERROR', 'RECHAZADO'].includes(String(gre.estado).toUpperCase())) {
+        return { success: false, message: `GRE no está en estado ERROR/RECHAZADO (estado actual: ${gre.estado})` };
       }
 
       await this.retryGre(greId, tenantId, gre.retry_count || 0);

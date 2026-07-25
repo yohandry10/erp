@@ -23,6 +23,10 @@ function createQueryBuilder(rows: any[]) {
       filters.push((row) => String(row[column]) === String(value));
       return builder;
     },
+    neq(column: string, value: any) {
+      filters.push((row) => String(row[column]) !== String(value));
+      return builder;
+    },
     gte(column: string, value: any) {
       filters.push((row) => new Date(row[column]).getTime() >= new Date(value).getTime());
       return builder;
@@ -32,6 +36,9 @@ function createQueryBuilder(rows: any[]) {
       return builder;
     },
     order() {
+      return builder;
+    },
+    limit() {
       return builder;
     },
     then(resolve: (value: any) => void) {
@@ -114,5 +121,39 @@ describe('DashboardMetricsService', () => {
     expect(stats.totalSire).toBe(1);
     expect(stats.totalUsers).toBe(1);
     expect(stats.tasaConversionCotizaciones).toBe(50);
+  });
+
+  it('nombra las actividades CPE según el tipo de documento SUNAT', async () => {
+    const createdAt = new Date().toISOString();
+    const service = createService({
+      cpe: [
+        {
+          id: 'boleta-1',
+          tenant_id: tenantId,
+          tipo_documento: '03',
+          serie: 'B001',
+          numero: 12,
+          total_venta: 25,
+          estado: 'PENDIENTE',
+          created_at: createdAt,
+        },
+        {
+          id: 'factura-1',
+          tenant_id: tenantId,
+          tipo_documento: '01',
+          serie: 'F001',
+          numero: 7,
+          total_venta: 118,
+          estado: 'ACEPTADA',
+          created_at: createdAt,
+        },
+      ],
+    });
+
+    const activities = await service.getActivities(tenantId);
+
+    expect(activities.map((activity) => activity.description)).toEqual(
+      expect.arrayContaining(['Boleta B001-00000012', 'Factura F001-00000007']),
+    );
   });
 });

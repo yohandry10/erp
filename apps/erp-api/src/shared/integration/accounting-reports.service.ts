@@ -16,12 +16,21 @@ export class AccountingReportsService {
     try {
       const { fechaDesde, fechaHasta } = filtros;
 
+      // La tabla `ventas` no la puebla ningún flujo; las ventas reales viven en
+      // `documentos` (comprobantes emitidos). Se alias-ean las columnas para no
+      // cambiar el mapeo downstream (fecha, numero_documento, igv).
       let query = this.supabase
         .getClient()
-        .from('ventas')
+        .from('documentos')
         .select(
           `
-          *,
+          fecha:fecha_emision,
+          tipo_documento,
+          numero_documento:numero,
+          subtotal,
+          igv:impuesto_igv,
+          total,
+          moneda,
           clientes(
             nombre,
             numero_documento,
@@ -29,11 +38,12 @@ export class AccountingReportsService {
           )
         `,
         )
-        .eq('estado', 'CONFIRMADA')
-        .order('fecha', { ascending: true });
+        .in('tipo_documento', ['FACTURA', 'BOLETA'])
+        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")')
+        .order('fecha_emision', { ascending: true });
 
-      if (fechaDesde) query = query.gte('fecha', fechaDesde);
-      if (fechaHasta) query = query.lte('fecha', fechaHasta);
+      if (fechaDesde) query = query.gte('fecha_emision', fechaDesde);
+      if (fechaHasta) query = query.lte('fecha_emision', fechaHasta);
 
       const { data: ventas, error } = await query;
       if (error) throw error;

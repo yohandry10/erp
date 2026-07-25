@@ -1,0 +1,76 @@
+{
+  "routes": [
+    {
+      "theme": "dark",
+      "route": "/dashboard/documentos/",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "route": "/dashboard/ventas/reportes/",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "route": "/dashboard/compras/recepciones/",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "route": "/dashboard/contabilidad/asientos/",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "route": "/dashboard/rrhh/planillas/",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "route": "/dashboard/cpe/",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "route": "/dashboard/pos/",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "route": "/dashboard/documentos/",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "route": "/dashboard/ventas/reportes/",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "route": "/dashboard/compras/recepciones/",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "route": "/dashboard/contabilidad/asientos/",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "route": "/dashboard/rrhh/planillas/",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "route": "/dashboard/cpe/",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "route": "/dashboard/pos/",
+      "violations": []
+    }
+  ],
+  "console_errors": [],
+  "page_errors": []
+}

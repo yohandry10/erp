@@ -44,7 +44,7 @@ interface SaldosConsolidados {
   total_cuentas_activas: number
 }
 
-const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 const toNumber = (value: unknown) => {
   const numeric = Number(value)
@@ -128,19 +128,19 @@ export default function BancosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+        <section className="rounded-3xl border border-cyan-400/20 bg-card/80 p-5 shadow-2xl shadow-blue-950/30">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 ERP Treasury Bank
               </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Cuentas Bancarias</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-300">Saldos, cuentas activas y trazabilidad bancaria para tesoreria.</p>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">Cuentas Bancarias</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Saldos, cuentas activas y trazabilidad bancaria para tesoreria.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={refresh} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+              <Button type="button" onClick={refresh} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
@@ -154,28 +154,28 @@ export default function BancosPage() {
 
         {!loadingSaldos && saldosConsolidados && (
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
                 <div>
                   <div className={labelClass}>Total cuentas</div>
-                  <div className="mt-3 text-2xl font-bold text-white">{saldosConsolidados.total_cuentas}</div>
-                  <div className="mt-1 text-xs text-cyan-100/55">{saldosConsolidados.total_cuentas_activas} activas</div>
+                  <div className="mt-3 text-2xl font-bold text-foreground">{saldosConsolidados.total_cuentas}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{saldosConsolidados.total_cuentas_activas} activas</div>
                 </div>
-                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
                   <CreditCard className="h-5 w-5" />
                 </span>
               </CardContent>
             </Card>
 
             {saldosConsolidados.por_moneda.map((consolidado) => (
-              <Card key={consolidado.moneda} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <Card key={consolidado.moneda} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
                 <CardContent className="flex items-start justify-between gap-3 p-4">
                   <div>
                     <div className={labelClass}>Saldo {consolidado.moneda}</div>
-                    <div className="mt-3 text-xl font-bold text-cyan-50">{formatCurrency(consolidado.saldo_activas, consolidado.moneda)}</div>
-                    <div className="mt-1 text-xs text-cyan-100/55">{consolidado.cantidad_activas} cuentas activas</div>
+                    <div className="mt-3 text-xl font-bold text-primary">{formatCurrency(consolidado.saldo_activas, consolidado.moneda)}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{consolidado.cantidad_activas} cuentas activas</div>
                   </div>
-                  <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                  <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
                     <DollarSign className="h-5 w-5" />
                   </span>
                 </CardContent>
@@ -184,24 +184,24 @@ export default function BancosPage() {
           </section>
         )}
 
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/65 p-5 shadow-xl shadow-blue-950/20">
+        <section className="rounded-3xl border border-cyan-400/20 bg-card/65 p-5 shadow-xl shadow-blue-950/20">
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-white">Cuentas activas</h2>
-              <p className="text-sm text-slate-400">{cuentasActivas.length} cuentas disponibles</p>
+              <h2 className="text-xl font-bold text-foreground">Cuentas activas</h2>
+              <p className="text-sm text-muted-foreground">{cuentasActivas.length} cuentas disponibles</p>
             </div>
           </div>
 
           {loading ? (
-            <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-slate-300">
-              <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
+            <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-muted-foreground">
+              <RefreshCw className="h-8 w-8 animate-spin text-primary" />
               <p>Cargando cuentas bancarias...</p>
             </div>
           ) : cuentasActivas.length === 0 ? (
-            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-slate-950/45 p-8 text-center">
+            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-card/45 p-8 text-center">
               <CreditCard className="mb-3 h-12 w-12 text-cyan-200/50" />
-              <h3 className="text-lg font-bold text-white">No hay cuentas bancarias activas</h3>
-              <p className="mt-2 text-sm text-slate-400">Crea una nueva cuenta bancaria para comenzar.</p>
+              <h3 className="text-lg font-bold text-foreground">No hay cuentas bancarias activas</h3>
+              <p className="mt-2 text-sm text-muted-foreground">Crea una nueva cuenta bancaria para comenzar.</p>
               <Button type="button" onClick={() => router.push('/dashboard/finanzas/bancos/nueva')} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
                 Nueva cuenta bancaria
@@ -222,11 +222,11 @@ export default function BancosPage() {
         </section>
 
         {cuentasInactivas.length > 0 && (
-          <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/50 p-5 shadow-xl shadow-blue-950/20">
+          <section className="rounded-3xl border border-cyan-400/20 bg-card/50 p-5 shadow-xl shadow-blue-950/20">
             <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-xl font-bold text-white">Cuentas inactivas</h2>
-                <p className="text-sm text-slate-400">{cuentasInactivas.length} cuentas archivadas</p>
+                <h2 className="text-xl font-bold text-foreground">Cuentas inactivas</h2>
+                <p className="text-sm text-muted-foreground">{cuentasInactivas.length} cuentas archivadas</p>
               </div>
             </div>
             <div className="grid gap-4 opacity-75 md:grid-cols-2 2xl:grid-cols-3">

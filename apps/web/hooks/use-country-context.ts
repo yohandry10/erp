@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/lib/api-fetch';
+import { INITIAL_ACTIVE_COUNTRY_CODE, INITIAL_ACTIVE_COUNTRY_ID } from '@/lib/initial-country';
 
 interface CountryContext {
   paisId: number;
   paisCodigo: string;
   paisNombre: string;
-  servicioFiscal: string; // SUNAT, DIAN, etc.
-  documentoFiscal: string; // RUC, NIT, etc.
+  servicioFiscal: string;
+  documentoFiscal: string;
   moneda: string;
   simboloMoneda: string;
   impuesto: string; // IGV, IVA, etc.
@@ -36,8 +37,9 @@ const INITIAL_CONTEXT: CountryContext = {
   loading: true,
 };
 
+// Scope inicial: Peru/SUNAT. CO/CL/MX/EC quedan en roadmap, no en runtime activo.
 const CONTEXT_MAP: Record<string, Omit<CountryContext, 'paisId' | 'paisCodigo' | 'loading' | 'requiresSetup'>> = {
-  'PE': {
+  [INITIAL_ACTIVE_COUNTRY_CODE]: {
     paisNombre: 'Perú',
     servicioFiscal: 'SUNAT',
     documentoFiscal: 'RUC',
@@ -45,42 +47,6 @@ const CONTEXT_MAP: Record<string, Omit<CountryContext, 'paisId' | 'paisCodigo' |
     simboloMoneda: 'S/',
     impuesto: 'IGV (18%)',
     impuestoRate: 0.18,
-  },
-  'CO': {
-    paisNombre: 'Colombia',
-    servicioFiscal: 'DIAN',
-    documentoFiscal: 'NIT',
-    moneda: 'COP',
-    simboloMoneda: 'COP',
-    impuesto: 'IVA (19%)',
-    impuestoRate: 0.19,
-  },
-  'CL': {
-    paisNombre: 'Chile',
-    servicioFiscal: 'SII',
-    documentoFiscal: 'RUT',
-    moneda: 'CLP',
-    simboloMoneda: 'CLP',
-    impuesto: 'IVA (19%)',
-    impuestoRate: 0.19,
-  },
-  'MX': {
-    paisNombre: 'México',
-    servicioFiscal: 'SAT',
-    documentoFiscal: 'RFC',
-    moneda: 'MXN',
-    simboloMoneda: 'MXN',
-    impuesto: 'IVA (16%)',
-    impuestoRate: 0.16,
-  },
-  'EC': {
-    paisNombre: 'Ecuador',
-    servicioFiscal: 'SRI',
-    documentoFiscal: 'RUC',
-    moneda: 'USD',
-    simboloMoneda: 'USD',
-    impuesto: 'IVA (12%)',
-    impuestoRate: 0.12,
   },
 };
 
@@ -97,10 +63,10 @@ const resolveCurrencySymbol = (currencyCode: string, fallbackSymbol: string) => 
 function buildCountryContext(empresaConfig: any): CountryContext {
   if (!empresaConfig) return EMPTY_CONTEXT;
 
-  const paisId = empresaConfig.pais_id ? Number(empresaConfig.pais_id) : 0;
+  const paisId = empresaConfig.pais_id ? Number(empresaConfig.pais_id) : Number(INITIAL_ACTIVE_COUNTRY_ID);
   const paisCodigo = typeof empresaConfig.pais === 'string'
     ? empresaConfig.pais.toUpperCase()
-    : '';
+    : INITIAL_ACTIVE_COUNTRY_CODE;
   const monedaDefecto = typeof empresaConfig.monedaDefecto === 'string'
     ? empresaConfig.monedaDefecto.toUpperCase()
     : '';

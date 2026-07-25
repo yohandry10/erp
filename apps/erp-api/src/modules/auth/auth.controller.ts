@@ -88,6 +88,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Login exitoso' })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
   @ApiResponse({ status: 429, description: 'Demasiados intentos' })
+  @ApiResponse({ status: 503, description: 'Servicio de autenticación temporalmente no disponible' })
   async login(@Body() loginDto: LoginDto, @Request() req, @NestResponse({ passthrough: true }) response: ExpressResponse) {
     // ✅ A5: Extraer IP y user-agent para registro de intentos
     const clientIp = req.ip || req.connection?.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';

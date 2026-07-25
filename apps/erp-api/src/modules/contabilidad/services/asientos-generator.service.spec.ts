@@ -203,10 +203,7 @@ describe('AsientosGeneratorService', () => {
 
       await service.generarAsiento(tenantId, fecha, concepto, detalles, 'REF-LOCK', sourceEventId);
 
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('obtener_siguiente_numero_asiento', {
-        p_tenant_id: tenantId,
-        p_fecha: fecha.toISOString(),
-      });
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith('obtener_siguiente_numero_asiento', expect.anything());
       expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith('acquire_pos_lock', expect.anything());
       expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith('release_pos_lock', expect.anything());
     });
@@ -539,7 +536,8 @@ describe('AsientosGeneratorService', () => {
       expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
       expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith(
         evento.tenant_id,
-        ['12', '70', '40', '69', '20']
+        // '10' (Caja) se agregó para poder debitar Caja en ventas al contado.
+        ['12', '70', '40', '69', '20', '10']
       );
     });
 
@@ -926,7 +924,9 @@ describe('AsientosGeneratorService', () => {
 
       const mockCuentas = new Map([
         ['621', createMockPlanCuenta('621', 'Remuneraciones', 'GASTO')],
+        ['627', createMockPlanCuenta('627', 'Seguridad y prevision social', 'GASTO')],
         ['403', createMockPlanCuenta('403', 'Instituciones publicas', 'PASIVO')],
+        ['407', createMockPlanCuenta('407', 'Aportes patronales por pagar', 'PASIVO')],
         ['411', createMockPlanCuenta('411', 'Remuneraciones por Pagar', 'PASIVO')]
       ]);
       planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(mockCuentas);
@@ -934,8 +934,8 @@ describe('AsientosGeneratorService', () => {
       const asientoCreado = {
         id: 'asiento-planilla-1',
         numero_asiento: 'A-202410-0008',
-        total_debe: 10000,
-        total_haber: 10000
+        total_debe: 10930,
+        total_haber: 10930
       };
 
       mockSupabaseClient.single.mockResolvedValueOnce({
@@ -959,12 +959,14 @@ describe('AsientosGeneratorService', () => {
       expect(resultado.id).toBe('asiento-planilla-1');
       expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith(
         evento.tenant_id,
-        ['621', '403', '411']
+        ['621', '627', '403', '407', '411']
       );
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ cuenta_id: 'cuenta-621', debe: 10000, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-627', debe: 930, haber: 0 }),
           expect.objectContaining({ cuenta_id: 'cuenta-403', debe: 0, haber: 1300 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-407', debe: 0, haber: 930 }),
           expect.objectContaining({ cuenta_id: 'cuenta-411', debe: 0, haber: 8700 }),
         ])
       );
@@ -1274,7 +1276,9 @@ describe('AsientosGeneratorService', () => {
 
       const mockCuentas = new Map([
         ['621', createMockPlanCuenta('621', 'Remuneraciones', 'GASTO')],
+        ['627', createMockPlanCuenta('627', 'Seguridad y prevision social', 'GASTO')],
         ['403', createMockPlanCuenta('403', 'Instituciones publicas', 'PASIVO')],
+        ['407', createMockPlanCuenta('407', 'Aportes patronales por pagar', 'PASIVO')],
         ['411', createMockPlanCuenta('411', 'Remuneraciones por Pagar', 'PASIVO')]
       ]);
       planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(mockCuentas);
@@ -1542,7 +1546,9 @@ describe('AsientosGeneratorService', () => {
 
       const mockCuentas = new Map([
         ['621', createMockPlanCuenta('621', 'Remuneraciones', 'GASTO')],
+        ['627', createMockPlanCuenta('627', 'Seguridad y prevision social', 'GASTO')],
         ['403', createMockPlanCuenta('403', 'Instituciones publicas', 'PASIVO')],
+        ['407', createMockPlanCuenta('407', 'Aportes patronales por pagar', 'PASIVO')],
         ['411', createMockPlanCuenta('411', 'Remuneraciones por Pagar', 'PASIVO')]
       ]);
       planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(mockCuentas);

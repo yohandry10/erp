@@ -37,9 +37,9 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
       const params = new URLSearchParams()
       if (fechaDesde) params.append('fecha_desde', fechaDesde)
       if (fechaHasta) params.append('fecha_hasta', fechaHasta)
-      
+
       const response = await get(`/api/finanzas/bancos/movimientos/periodo?${params.toString()}`)
-      
+
       if (response?.success) {
         setMovimientos(response.data || [])
       }
@@ -94,31 +94,31 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
 
   if (loading) {
     return (
-      <div className="activity-card p-8 text-center">
-        <div className="loading-spinner"></div>
-        <p className="text-gray-500">Cargando movimientos bancarios...</p>
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8 text-center">
+        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
+        <p className="text-muted-foreground">Cargando movimientos bancarios...</p>
       </div>
     )
   }
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       {/* Header */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b">
         <div className="flex items-center gap-3">
           <FileText size={24} className="text-amber-500" />
           <div>
-            <h3 className="text-[1.125rem] font-semibold text-gray-900">
+            <h3 className="text-[1.125rem] font-semibold text-foreground">
               Movimientos Bancarios por Período
             </h3>
-            <p className="text-[0.875rem] text-gray-500 mt-1">
+            <p className="text-[0.875rem] text-muted-foreground mt-1">
               {movimientosFiltrados.length} movimiento{movimientosFiltrados.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={loadMovimientos} className="py-2 px-4 rounded-[6px] border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
+            onClick={loadMovimientos} className="py-2 px-4 rounded-[6px] border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -129,7 +129,7 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
       {/* Filters */}
       <div className="flex gap-4 mb-6 flex-wrap">
         <div>
-          <label className="text-3 font-semibold text-gray-500 block mb-1">
+          <label className="text-xs font-semibold text-muted-foreground block mb-1">
             Tipo
           </label>
           <select
@@ -142,7 +142,7 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
           </select>
         </div>
         <div>
-          <label className="text-3 font-semibold text-gray-500 block mb-1">
+          <label className="text-xs font-semibold text-muted-foreground block mb-1">
             Conciliado
           </label>
           <select
@@ -159,17 +159,17 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
       {/* Summary Cards */}
       <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-8">
         {Object.entries(totales).map(([moneda, datos]) => (
-          <div key={moneda} className="p-4 rounded-2 text-white">
-            <div className="text-3 font-semibold opacity-[0.9]">
+          <div key={moneda} className="p-4 rounded-lg text-white">
+            <div className="text-xs font-semibold opacity-[0.9]">
               Flujo Neto {moneda}
             </div>
-            <div className="text-7 font-bold mt-2">
+            <div className="text-[1.75rem] font-bold mt-2">
               {formatCurrency(datos.neto, moneda)}
             </div>
-            <div className="text-3 mt-2 opacity-[0.9]">
+            <div className="text-xs mt-2 opacity-[0.9]">
               Abonos: {formatCurrency(datos.abonos, moneda)}
             </div>
-            <div className="text-3 opacity-[0.9]">
+            <div className="text-xs opacity-[0.9]">
               Cargos: {formatCurrency(datos.cargos, moneda)}
             </div>
           </div>
@@ -179,30 +179,30 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
       {/* Movements Table */}
       {movimientosFiltrados.length === 0 ? (
         <div className="p-12 text-center">
-          <FileText size={48} className="text-gray-400" />
-          <p className="text-gray-500">No hay movimientos en el período seleccionado</p>
+          <FileText size={48} className="text-muted-foreground" />
+          <p className="text-muted-foreground">No hay movimientos en el período seleccionado</p>
         </div>
       ) : (
         <div className="overflow-auto">
           <table className="w-[100%]">
             <thead>
               <tr>
-                <th className="text-left p-3 font-semibold text-3 text-gray-500">
+                <th className="text-left p-3 font-semibold text-xs text-muted-foreground">
                   Fecha
                 </th>
-                <th className="text-left p-3 font-semibold text-3 text-gray-500">
+                <th className="text-left p-3 font-semibold text-xs text-muted-foreground">
                   Cuenta / Banco
                 </th>
-                <th className="text-left p-3 font-semibold text-3 text-gray-500">
+                <th className="text-left p-3 font-semibold text-xs text-muted-foreground">
                   Descripción
                 </th>
-                <th className="text-center p-3 font-semibold text-3 text-gray-500">
+                <th className="text-center p-3 font-semibold text-xs text-muted-foreground">
                   Tipo
                 </th>
-                <th className="text-right p-3 font-semibold text-3 text-gray-500">
+                <th className="text-right p-3 font-semibold text-xs text-muted-foreground">
                   Monto
                 </th>
-                <th className="text-center p-3 font-semibold text-3 text-gray-500">
+                <th className="text-center p-3 font-semibold text-xs text-muted-foreground">
                   Estado
                 </th>
               </tr>
@@ -217,7 +217,7 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
                     <div className="text-[0.875rem] font-medium">
                       {mov.cuenta_nombre}
                     </div>
-                    <div className="text-3 text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {mov.banco}
                     </div>
                   </td>
@@ -226,13 +226,13 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
                       {mov.descripcion}
                     </div>
                     {mov.referencia && (
-                      <div className="text-3 text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         Ref: {mov.referencia}
                       </div>
                     )}
                   </td>
                   <td className="p-3 text-center">
-                    <span className="py-1 px-3 rounded-full text-3 font-semibold">
+                    <span className="py-1 px-3 rounded-full text-xs font-semibold">
                       {mov.tipo}
                     </span>
                   </td>
@@ -240,7 +240,7 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
                     {mov.tipo === 'ABONO' ? '+' : '-'}{formatCurrency(mov.monto, mov.moneda)}
                   </td>
                   <td className="p-3 text-center">
-                    <span className="py-1 px-3 rounded-full text-3 font-semibold">
+                    <span className="py-1 px-3 rounded-full text-xs font-semibold">
                       {mov.conciliado ? 'Conciliado' : 'Pendiente'}
                     </span>
                   </td>

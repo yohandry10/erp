@@ -185,14 +185,14 @@ export function CotizacionForm() {
 }
 ```
 
-## 3. Validación de Boleta sin RUC en Pedido
+## 3. Validación de identificación en boleta
 
 ```tsx
 'use client'
 
 import { useMemo } from 'react'
 import { useBoletaValidation } from '@/hooks/use-boleta-validation'
-import { BoletaGREWarning, GRERequirementBadge } from '@/components/ventas'
+import { BoletaBuyerIdentityWarning, BuyerIdentityRequirementBadge } from '@/components/ventas'
 import type { PedidoVenta } from '@/types/ventas'
 
 interface PedidoDetailProps {
@@ -209,15 +209,15 @@ export function PedidoDetail({ pedido }: PedidoDetailProps) {
     <div>
       <div className="flex items-center justify-between">
         <h2>Pedido {pedido.numero}</h2>
-        {validation.requiresGRE && (
-          <GRERequirementBadge
+        {validation.requiresBuyerIdentity && (
+          <BuyerIdentityRequirementBadge
             documentoTipo={pedido.cliente?.documento_tipo}
             total={pedido.total}
           />
         )}
       </div>
 
-      <BoletaGREWarning
+      <BoletaBuyerIdentityWarning
         documentoTipo={pedido.cliente?.documento_tipo}
         total={pedido.total}
       />
@@ -285,7 +285,7 @@ import { useState } from 'react'
 import { useBoletaValidation } from '@/hooks/use-boleta-validation'
 import { useCertificateValidation } from '@/hooks/use-certificate-validation'
 import {
-  BoletaGREWarning,
+  BoletaBuyerIdentityWarning,
   CertificateValidationAlert,
   PreInvoiceValidation
 } from '@/components/ventas'
@@ -298,7 +298,7 @@ interface PedidoPageProps {
 export function PedidoPage({ pedido }: PedidoPageProps) {
   const [isGenerating, setIsGenerating] = useState(false)
 
-  // Validación de boleta sin RUC
+  // Validación de identificación requerida en boleta
   const boletaValidation = useBoletaValidation(
     pedido.cliente?.documento_tipo,
     pedido.total
@@ -319,7 +319,8 @@ export function PedidoPage({ pedido }: PedidoPageProps) {
 
         toast.success('Factura generada exitosamente')
 
-        // Si requiere GRE, mostrar sugerencia
+        // Si la operación logística requiere GRE, mostrar sugerencia según configuración.
+        // La identificación por S/ 700 no genera GRE automática.
         if (data.sugerir_gre) {
           // Mostrar modal de GRE
         }
@@ -344,8 +345,8 @@ export function PedidoPage({ pedido }: PedidoPageProps) {
 
       {/* Advertencias */}
       <div className="space-y-4">
-        {/* Advertencia de boleta sin RUC */}
-        <BoletaGREWarning
+        {/* Advertencia de identificación en boleta */}
+        <BoletaBuyerIdentityWarning
           documentoTipo={pedido.cliente?.documento_tipo}
           total={pedido.total}
         />
@@ -490,7 +491,7 @@ export function DocumentoValidationField() {
 1. **Importar desde el índice:**
    ```typescript
    import { clienteSchema, validateItemLimit } from '@/lib/validations'
-   import { ItemLimitWarning, BoletaGREWarning } from '@/components/ventas'
+   import { ItemLimitWarning, BoletaBuyerIdentityWarning } from '@/components/ventas'
    ```
 
 2. **Usar zodResolver con React Hook Form:**

@@ -2,6 +2,7 @@ import * as forge from 'node-forge';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SignedXml } from 'xml-crypto';
 
 export interface SigningOptions {
   pfxPath?: string;
@@ -10,6 +11,9 @@ export interface SigningOptions {
   referenceUri?: string;
   useDemoMode?: boolean; // Para testing sin certificado real
   allowDemoFallback?: boolean;
+  expectedRuc?: string;
+  enforceRucInCertificate?: boolean;
+  allowRucMismatchWithConfirmation?: boolean;
 }
 
 export class XmlSigner {
@@ -70,10 +74,50 @@ export class XmlSigner {
     if (certBags[forge.pki.oids.certBag] && keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]) {
       this.certificate = certBags[forge.pki.oids.certBag]![0].cert!;
       this.privateKey = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]![0].key!;
+      this.assertCertificateRuc();
       console.log('✅ Certificado real cargado exitosamente');
     } else {
       throw new Error('No se pudo extraer certificado o clave privada del archivo .pfx');
     }
+  }
+
+  private assertCertificateRuc(): void {
+    if (!this.options.enforceRucInCertificate) {
+      return;
+    }
+
+    const expectedRuc = this.options.expectedRuc?.replace(/\D/g, '');
+    if (!expectedRuc) {
+      throw new Error('SUNAT producción requiere configurar el RUC esperado del certificado.');
+    }
+
+    const certificateText = this.getCertificateIdentityText().replace(/\D/g, '');
+    if (certificateText.includes(expectedRuc)) {
+      return;
+    }
+
+    if (this.options.allowRucMismatchWithConfirmation) {
+      console.warn(
+        `⚠️ El certificado no contiene el RUC esperado ${expectedRuc}; se permite solo por confirmación explícita configurada.`,
+      );
+      return;
+    }
+
+    throw new Error(
+      `El certificado fiscal no contiene el RUC esperado ${expectedRuc}. ` +
+        'SUNAT producción para persona jurídica requiere un certificado asociado al contribuyente; ' +
+        'use un PFX con el RUC de la empresa o configure una confirmación explícita documentada.',
+    );
+  }
+
+  private getCertificateIdentityText(): string {
+    const subject = this.certificate.subject?.attributes ?? [];
+    const issuer = this.certificate.issuer?.attributes ?? [];
+    const attrs = [...subject, ...issuer]
+      .map((attr) => `${attr.name || attr.type || ''}=${attr.value || ''}`)
+      .join(', ');
+
+    return `${attrs}, serialNumber=${this.certificate.serialNumber || ''}`;
   }
 
   private resolveCertificatePath(configuredPath: string): string | null {
@@ -125,35 +169,49 @@ export class XmlSigner {
   signXml(xmlContent: string): string {
     try {
       console.log('🔐 Firmando XML con certificado...');
-      
-      // Generar hash SHA256 del contenido
-      const hash = crypto.createHash('sha256').update(xmlContent).digest('base64');
-      
-      // Crear la firma usando la clave privada
+
       const privateKeyPem = forge.pki.privateKeyToPem(this.privateKey);
-      const sign = crypto.createSign('SHA256');
-      sign.update(xmlContent);
-      const signature = sign.sign(privateKeyPem, 'base64');
-      
-      // Obtener información del certificado
       const certPem = forge.pki.certificateToPem(this.certificate);
-      const certBase64 = certPem
-        .replace('-----BEGIN CERTIFICATE-----', '')
-        .replace('-----END CERTIFICATE-----', '')
-        .replace(/\n/g, '');
-      
-      // Construir XML con firma digital real
-      const timestamp = new Date().toISOString();
-      const signedXml = this.insertSignatureIntoXml(xmlContent, {
-        hash,
-        signature,
-        certificate: certBase64,
-        timestamp,
-        serialNumber: this.certificate.serialNumber || '01'
+      const xmlWithExtension = this.ensureExtensionContent(xmlContent);
+
+      const signer = new SignedXml({
+        privateKey: privateKeyPem,
+        publicCert: certPem,
+        signatureAlgorithm: 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+        canonicalizationAlgorithm: 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315',
+        getKeyInfoContent: (args) => {
+          const prefix = args?.prefix || 'ds';
+          const certBase64 = this.getCertificateBase64();
+          return `<${prefix}:X509Data><${prefix}:X509Certificate>${certBase64}</${prefix}:X509Certificate></${prefix}:X509Data>`;
+        },
       });
-      
+
+      signer.addReference({
+        xpath: '/*',
+        transforms: [
+          'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+          'http://www.w3.org/TR/2001/REC-xml-c14n-20010315',
+        ],
+        digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
+        uri: '',
+        isEmptyUri: true,
+      });
+
+      signer.computeSignature(xmlWithExtension, {
+        prefix: 'ds',
+        attrs: { Id: 'SignatureSP' },
+        location: {
+          reference: "//*[local-name(.)='ExtensionContent']",
+          action: 'append',
+        },
+      });
+
+      const signedXml = signer.getSignedXml();
+      const signature = this.extractXmlTag(signedXml, 'SignatureValue');
+      const digest = this.extractXmlTag(signedXml, 'DigestValue');
+
       console.log('✅ XML firmado exitosamente');
-      console.log(`📊 Hash: ${hash.substring(0, 20)}...`);
+      console.log(`📊 Digest: ${digest.substring(0, 20)}...`);
       console.log(`📊 Firma: ${signature.substring(0, 20)}...`);
       
       return signedXml;
@@ -161,6 +219,38 @@ export class XmlSigner {
       console.error('❌ Error firmando XML:', error);
       throw new Error(`Error signing XML: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  private ensureExtensionContent(xmlContent: string): string {
+    if (/<(?:\w+:)?ExtensionContent\b/i.test(xmlContent)) {
+      return xmlContent;
+    }
+
+    const extensionXml = `
+  <ext:UBLExtensions>
+    <ext:UBLExtension>
+      <ext:ExtensionContent></ext:ExtensionContent>
+    </ext:UBLExtension>
+  </ext:UBLExtensions>`;
+
+    const firstBusinessTag = xmlContent.match(/<cbc:UBLVersionID\b/i);
+    if (firstBusinessTag?.index != null) {
+      return `${xmlContent.slice(0, firstBusinessTag.index)}${extensionXml}\n  ${xmlContent.slice(firstBusinessTag.index)}`;
+    }
+
+    return xmlContent.replace(/(<(?:\w+:)?(?:Invoice|CreditNote|DebitNote|DespatchAdvice|SummaryDocuments|VoidedDocuments)\b[^>]*>)/i, `$1${extensionXml}`);
+  }
+
+  private getCertificateBase64(): string {
+    return forge.pki.certificateToPem(this.certificate)
+      .replace('-----BEGIN CERTIFICATE-----', '')
+      .replace('-----END CERTIFICATE-----', '')
+      .replace(/\r?\n/g, '');
+  }
+
+  private extractXmlTag(xml: string, tag: string): string {
+    const match = xml.match(new RegExp(`<(?:\\w+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?${tag}>`, 'i'));
+    return match?.[1]?.trim() || '';
   }
 
   private insertSignatureIntoXml(xmlContent: string, signatureData: any): string {
@@ -345,7 +435,11 @@ export class XmlSigner {
         serialNumber: this.certificate.serialNumber || 'N/A',
         validFrom: this.certificate.validity?.notBefore || 'N/A',
         validTo: this.certificate.validity?.notAfter || 'N/A',
-        demoMode: this.demoMode
+        demoMode: this.demoMode,
+        expectedRuc: this.options.expectedRuc || undefined,
+        rucMatches: this.options.expectedRuc
+          ? this.getCertificateIdentityText().replace(/\D/g, '').includes(this.options.expectedRuc.replace(/\D/g, ''))
+          : undefined,
       };
     } catch (error) {
       return { error: 'No se pudo obtener información del certificado', demoMode: this.demoMode };

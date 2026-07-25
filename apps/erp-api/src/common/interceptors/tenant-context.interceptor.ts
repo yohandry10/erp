@@ -23,7 +23,11 @@ export class TenantContextInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    const headerTenant = (request.headers['x-tenant-id'] || request.headers['x-tenantid']) as
+    const headerTenant = (
+      request.headers['x-tenant-id'] ||
+      request.headers['x-tenantid'] ||
+      request.headers['x-erp-tenant-id']
+    ) as
       | string
       | undefined;
 

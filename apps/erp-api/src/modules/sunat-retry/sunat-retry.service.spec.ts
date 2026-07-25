@@ -81,5 +81,13 @@ describe('SunatRetryService', () => {
       idempotencyKey: 'gre.send:tenant-1:gre-1',
     });
   });
-});
 
+  it('solo selecciona GRE en ERROR para reintento automático', async () => {
+    mockSupabaseClient.limit.mockResolvedValueOnce({ data: [], error: null });
+
+    await (service as any).processFailedGres();
+
+    expect(mockSupabaseClient.eq).toHaveBeenCalledWith('estado', 'ERROR');
+    expect(mockSupabaseClient.eq).not.toHaveBeenCalledWith('estado', 'RECHAZADO');
+  });
+});

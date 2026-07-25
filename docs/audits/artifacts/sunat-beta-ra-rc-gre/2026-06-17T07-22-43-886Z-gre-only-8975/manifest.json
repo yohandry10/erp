@@ -1,0 +1,18 @@
+{
+  "runId": "2026-06-17T07-22-43-886Z-gre-only-8975",
+  "executedAt": "2026-06-17T07:22:44.076Z",
+  "environment": "homologacion",
+  "productionUsed": false,
+  "ruc": "20100066603",
+  "username": "20100066603MODDATOS",
+  "fileName": "20100066603-09-T001-24734262",
+  "signedXmlSha256": "9B8641D3319D949323BE90EB22F0C4F0E73A090F96AB184E4B0B7282DF2ADEBA",
+  "signedXmlHashCpe": "9B8641D3319D949323BE90EB22F0C4F0",
+  "customizationId": "2.0",
+  "customizationIdHasAttributes": false,
+  "response": {
+    "success": false,
+    "codigoRespuesta": "2112",
+    "descripcionRespuesta": "2112"
+  }
+}

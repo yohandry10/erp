@@ -11,7 +11,7 @@ Write-Host ""
 Write-Host "1. Obteniendo token de autenticación..." -ForegroundColor Yellow
 $loginResponse = Invoke-RestMethod -Uri "$baseUrl/api/auth/login" -Method Post -Body (@{
     email = "admin@vierdes.com"
-    password = "admin123"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json) -ContentType "application/json"
 
 $token = $loginResponse.access_token

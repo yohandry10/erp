@@ -10,7 +10,7 @@
 > Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
 <!-- DOC-NAV:END -->
 
-Última actualización: 2026-05-26
+Última actualización: 2026-07-24
 
 Este runbook describe el proceso exacto para migrar la data operativa de un
 cliente desde su ERP anterior hacia este ERP. Se ejecuta una sola vez por
@@ -31,7 +31,12 @@ Cubre el camino feliz (golden path) y los rollbacks razonables. Lo que
 
 ## Prerequisitos
 
-1. Migraciones de BD aplicadas hasta `336__client_data_migration_external_id_and_audit.sql`.
+1. Migraciones de BD `336__client_data_migration_external_id_and_audit.sql`
+   y `337__client_migration_rls_rpc_hardening.sql` aplicadas. Para importar
+   stock inicial también deben estar promovidas `347..352`, incluido el writer
+   canónico `aplicar_movimiento_inventario_tx`. Al 2026-07-24, `347..352`
+   están aplicadas solo en DEV; no ejecutar stock inicial en PROD antes de su
+   promoción controlada.
 2. Usuario con rol ADMIN en el tenant destino (los permisos `migration.*` se
    asignan automáticamente a ADMIN al aplicar la migración 336).
 3. Token JWT del usuario ADMIN para llamadas a la API.
@@ -216,13 +221,27 @@ Análogo a CxC, contra `proveedores` vía `external_id_proveedor`.
 
 #### 2.4 Stock inicial valorizado
 
-CSV referencia productos por `external_id_producto`. Crea:
+CSV:
 
-- Upsert en `producto_stock_sucursal` para el `(producto, sucursal, almacen)`.
-- Movimiento `INGRESO_APERTURA` en `movimientos_inventario` con
-  `referencia_tipo='MIGRACION_APERTURA_{fechaCorte}'`.
+```csv
+external_id_producto,sucursal_id,almacen_id,cantidad,costo_unitario,descripcion
+PROD-00001,00000000-0000-0000-0000-000000000000,00000000-0000-0000-0000-000000000000,120,8.50,Stock inicial
+```
 
-Idempotente: re-ejecutar omite filas ya importadas para la misma fecha.
+`external_id_producto`, `sucursal_id`, `almacen_id`, `cantidad` y
+`costo_unitario` son obligatorios. `almacen_id` debe ser un UUID válido del
+almacén físico destino; no existe almacén implícito ni fallback a `null`.
+Cuando un producto tenga stock en más de un almacén, se carga una fila por
+almacén.
+
+El importer llama a `aplicar_movimiento_inventario_tx`, que actualiza
+atómicamente la existencia física en `producto_existencias`, los agregados
+derivados y el movimiento `ENTRADA` en `movimientos_inventario`, con
+`referencia_tipo='MIGRACION_APERTURA_{fechaCorte}'`. No escribe directamente
+en `producto_stock_sucursal`.
+
+Idempotente: re-ejecutar omite filas ya importadas para la misma combinación
+`(tenant, producto, sucursal, almacen, fecha_corte)`.
 
 > El valor (`cantidad × costo_unitario`) debe estar reflejado en el asiento
 > de apertura en la cuenta de existencias (típicamente 20 / 24).
@@ -263,7 +282,7 @@ Cada paso tiene rollback distinto:
 | Maestros | `DELETE FROM clientes WHERE tenant_id = '<t>' AND external_id IS NOT NULL`. **Cuidado**: cascada borra cotizaciones/pedidos/CxC asociados. Solo válido en pre-go-live. |
 | Balance apertura | Re-ejecutar el import con un CSV vacío de filas para la misma `fechaCorte` no es suficiente; usar `DELETE FROM asientos_contables WHERE tenant_id='<t>' AND external_id='APERTURA-{fechaCorte}'` (el detalle cae por la operación). |
 | CxC/CxP | `DELETE FROM cuentas_por_cobrar WHERE tenant_id='<t>' AND metadata->>'origen'='migracion_apertura'`. Idem CxP. |
-| Stock inicial | `DELETE FROM movimientos_inventario WHERE tenant_id='<t>' AND motivo='INGRESO_APERTURA' AND referencia_tipo='MIGRACION_APERTURA_{fechaCorte}'`. Recalcular stock en `producto_stock_sucursal`. |
+| Stock inicial | No borrar movimientos ni recalcular proyecciones directamente. Si todavía no hubo operación posterior, revertir cada fila mediante un movimiento canónico `SALIDA` en el mismo `almacen_id`, ejecutado con `aplicar_movimiento_inventario_tx` y evidencia de la referencia de rollback. Si ya hubo operaciones, detener el rollback y conciliar inventario/contabilidad antes de ajustar. |
 | CPE histórico | `DELETE FROM cpe WHERE tenant_id='<t>' AND estado='MIGRADO' AND metadata->>'origen'='migracion_historica'`. |
 
 > Estos DELETEs son destructivos. Hacerlos solo si la migración aún no entró
@@ -274,7 +293,8 @@ Cada paso tiene rollback distinto:
 - Importer dedicado solo para los tipos listados. `plan_cuentas`,
   `cuentas_bancarias` no tienen importer todavía — usar API individual.
 - `movimientos_inventario` no tiene columna `external_id` (la idempotencia
-  va por `(producto, sucursal, fecha_corte, motivo)`).
+  de stock inicial va por `(tenant, producto, sucursal, almacen, fecha_corte)`
+  usando referencia y metadata).
 - `cpe.external_id` no existe como columna; la idempotencia va por
   `(tipo_documento, serie, numero)` y `external_id` se guarda en `metadata`.
 - No hay UI dedicada en `apps/web` — se opera por API directa o por scripts.

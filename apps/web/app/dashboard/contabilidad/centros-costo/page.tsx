@@ -20,9 +20,9 @@ interface CentroCosto {
 }
 
 const inputClass =
-  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/70 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+  'w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
-const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function CentrosCostoPage() {
   const router = useRouter()
@@ -61,7 +61,7 @@ export default function CentrosCostoPage() {
   const getEstadoBadge = (activo: boolean) => {
     const Icon = activo ? CheckCircle : XCircle
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+      <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-primary">
         <Icon className="h-3 w-3" />
         {activo ? 'Activo' : 'Inactivo'}
       </span>
@@ -95,11 +95,11 @@ export default function CentrosCostoPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
-        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-card/70 text-foreground">
           <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
-            <Loader2 className="h-7 w-7 animate-spin text-cyan-200" />
-            <span className="text-sm font-medium text-slate-300">Cargando centros de costo...</span>
+            <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            <span className="text-sm font-medium text-muted-foreground">Cargando centros de costo...</span>
           </CardContent>
         </Card>
       </div>
@@ -107,20 +107,20 @@ export default function CentrosCostoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+        <section className="rounded-2xl border border-cyan-400/20 bg-card/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-primary">
                 <Building2 className="h-6 w-6" />
               </span>
               <div>
-                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
                   ERP Cost Center
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight text-white">Centros de Costo</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Centros de Costo</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                   Control presupuestal y análisis de gastos por unidad operativa.
                 </p>
               </div>
@@ -130,7 +130,7 @@ export default function CentrosCostoPage() {
                 type="button"
                 onClick={loadCentrosCosto}
                 variant="outline"
-                className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
+                className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
               >
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
@@ -153,19 +153,19 @@ export default function CentrosCostoPage() {
             ['Activos', stats.activos],
             ['Inactivos', stats.inactivos],
           ].map(([label, value]) => (
-            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="p-4">
                 <div className={labelClass}>{label}</div>
-                <div className="mt-3 text-3xl font-bold text-white">{value}</div>
+                <div className="mt-3 text-3xl font-bold text-foreground">{value}</div>
               </CardContent>
             </Card>
           ))}
         </section>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-            <CardTitle className="flex items-center gap-2 text-base text-white">
-              <Filter className="h-5 w-5 text-cyan-200" />
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
+              <Filter className="h-5 w-5 text-primary" />
               Filtros
             </CardTitle>
           </CardHeader>
@@ -173,7 +173,7 @@ export default function CentrosCostoPage() {
             <label className="space-y-2">
               <span className={labelClass}>Buscar</span>
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-200/60" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70" />
                 <input
                   type="text"
                   value={searchTerm}
@@ -200,23 +200,23 @@ export default function CentrosCostoPage() {
                 setEstadoFilter('TODOS')
               }}
               variant="outline"
-              className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+              className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
             >
               Limpiar
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="overflow-hidden border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-            <CardTitle className="text-base text-white">Lista de centros</CardTitle>
-            <p className="text-xs text-slate-400">
+            <CardTitle className="text-base text-foreground">Lista de centros</CardTitle>
+            <p className="text-xs text-muted-foreground">
               Mostrando {filteredCentros.length} de {centros.length} centros de costo.
             </p>
           </CardHeader>
           <CardContent className="p-0">
             {error && (
-              <div className="m-4 flex items-center gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-100">
+              <div className="m-4 flex items-center gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-primary">
                 <AlertCircle className="h-5 w-5" />
                 {error}
               </div>
@@ -225,11 +225,11 @@ export default function CentrosCostoPage() {
             {filteredCentros.length === 0 ? (
               <div className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8 text-center">
                 <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4">
-                  <Building2 className="h-10 w-10 text-cyan-100" />
+                  <Building2 className="h-10 w-10 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">No hay centros de costo</h3>
-                  <p className="mt-2 text-sm text-slate-400">
+                  <h3 className="text-lg font-semibold text-foreground">No hay centros de costo</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
                     {centros.length === 0 ? 'Aun no se han creado centros de costo.' : 'Los filtros actuales no devuelven resultados.'}
                   </p>
                 </div>
@@ -248,7 +248,7 @@ export default function CentrosCostoPage() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[860px] border-collapse">
                   <thead className="bg-cyan-400/10">
-                    <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+                    <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
                       <th className="px-4 py-3">Codigo</th>
                       <th className="px-4 py-3">Nombre</th>
                       <th className="px-4 py-3">Descripcion</th>
@@ -260,12 +260,12 @@ export default function CentrosCostoPage() {
                     {filteredCentros.map((centro) => (
                       <tr
                         key={centro.id}
-                        className="cursor-pointer border-b border-cyan-400/10 text-sm text-slate-200 transition hover:bg-cyan-400/10"
+                        className="cursor-pointer border-b border-cyan-400/10 text-sm text-foreground/90 transition hover:bg-cyan-400/10"
                         onClick={() => router.push(`/dashboard/contabilidad/centros-costo/${centro.id}`)}
                       >
-                        <td className="px-4 py-3 font-semibold text-white">{centro.codigo}</td>
-                        <td className="px-4 py-3 font-semibold text-white">{centro.nombre}</td>
-                        <td className="max-w-[360px] truncate px-4 py-3 text-slate-300">{centro.descripcion || '-'}</td>
+                        <td className="px-4 py-3 font-semibold text-foreground">{centro.codigo}</td>
+                        <td className="px-4 py-3 font-semibold text-foreground">{centro.nombre}</td>
+                        <td className="max-w-[360px] truncate px-4 py-3 text-muted-foreground">{centro.descripcion || '-'}</td>
                         <td className="px-4 py-3 text-center">{getEstadoBadge(centro.activo)}</td>
                         <td className="px-4 py-3">
                           <div className="flex justify-center gap-2">
@@ -277,7 +277,7 @@ export default function CentrosCostoPage() {
                                 e.stopPropagation()
                                 router.push(`/dashboard/contabilidad/centros-costo/${centro.id}`)
                               }}
-                              className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+                              className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
                               title="Ver detalles"
                             >
                               <BarChart3 className="h-4 w-4" />
@@ -290,7 +290,7 @@ export default function CentrosCostoPage() {
                                 e.stopPropagation()
                                 router.push(`/dashboard/contabilidad/centros-costo/${centro.id}/editar`)
                               }}
-                              className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+                              className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
                               title="Editar"
                             >
                               <Edit className="h-4 w-4" />

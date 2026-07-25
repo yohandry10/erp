@@ -18,24 +18,24 @@ export function WelcomeStep() {
         <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center">
           <Rocket size={40} className="text-white" />
         </div>
-        
-        <h3 className="text-6 font-bold text-[var(--primary-900)] mb-3">
+
+        <h3 className="text-2xl font-bold text-[var(--primary-900)] mb-3">
           ¡Bienvenido al Asistente de Configuración!
         </h3>
-        
-        <p className="text-4 text-[var(--primary-600)] max-w-[600px] my-0 mx-auto leading-7">
+
+        <p className="text-base text-[var(--primary-600)] max-w-[600px] my-0 mx-auto leading-7">
           Este asistente te guiará paso a paso para configurar tu sistema y comenzar a emitir
           comprobantes electrónicos de forma rápida y segura.
         </p>
       </div>
 
       <div className="grid gap-4 mt-8">
-        <div className="flex gap-4 p-5 bg-[rgba(255,_255,_255,_0.5)] rounded-3 border">
-          <div className="w-12 h-12 rounded-3 bg-[var(--primary-100)] flex items-center justify-center shrink-0">
+        <div className="flex gap-4 p-5 bg-card/50 rounded-xl border">
+          <div className="w-12 h-12 rounded-xl bg-[var(--primary-100)] flex items-center justify-center shrink-0">
             <FileCheck size={24} className="text-[var(--primary-600)]" />
           </div>
           <div>
-            <h4 className="text-4 font-semibold text-[var(--primary-900)] mb-1">
+            <h4 className="text-base font-semibold text-[var(--primary-900)] mb-1">
               Configuración de Datos Empresariales
             </h4>
             <p className="text-[0.875rem] text-[var(--primary-600)] leading-6">
@@ -45,12 +45,12 @@ export function WelcomeStep() {
           </div>
         </div>
 
-        <div className="flex gap-4 p-5 bg-[rgba(255,_255,_255,_0.5)] rounded-3 border">
-          <div className="w-12 h-12 rounded-3 bg-[var(--success-100)] flex items-center justify-center shrink-0">
+        <div className="flex gap-4 p-5 bg-card/50 rounded-xl border">
+          <div className="w-12 h-12 rounded-xl bg-[var(--success-100)] flex items-center justify-center shrink-0">
             <Shield size={24} className="text-[var(--success-600)]" />
           </div>
           <div>
-            <h4 className="text-4 font-semibold text-[var(--primary-900)] mb-1">
+            <h4 className="text-base font-semibold text-[var(--primary-900)] mb-1">
               Carga de Certificado Digital
             </h4>
             <p className="text-[0.875rem] text-[var(--primary-600)] leading-6">
@@ -60,12 +60,12 @@ export function WelcomeStep() {
           </div>
         </div>
 
-        <div className="flex gap-4 p-5 bg-[rgba(255,_255,_255,_0.5)] rounded-3 border">
-          <div className="w-12 h-12 rounded-3 bg-[var(--warning-100)] flex items-center justify-center shrink-0">
+        <div className="flex gap-4 p-5 bg-card/50 rounded-xl border">
+          <div className="w-12 h-12 rounded-xl bg-[var(--warning-100)] flex items-center justify-center shrink-0">
             <CheckCircle size={24} className="text-[var(--warning-600)]" />
           </div>
           <div>
-            <h4 className="text-4 font-semibold text-[var(--primary-900)] mb-1">
+            <h4 className="text-base font-semibold text-[var(--primary-900)] mb-1">
               Validación y Verificación
             </h4>
             <p className="text-[0.875rem] text-[var(--primary-600)] leading-6">
@@ -76,7 +76,7 @@ export function WelcomeStep() {
         </div>
       </div>
 
-      <div className="mt-8 p-4 bg-[rgba(59,_130,_246,_0.1)] rounded-2 border">
+      <div className="mt-8 p-4 bg-[rgba(59,_130,_246,_0.1)] rounded-lg border">
         <p className="text-[0.875rem] text-[var(--primary-700)] m-0 leading-6">
           <strong>💡 Consejo:</strong> Ten a mano tu certificado digital y los datos de tu empresa.
           El proceso tomará aproximadamente 5 minutos.

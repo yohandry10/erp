@@ -99,7 +99,7 @@ function NuevaGreContent() {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="inline-flex items-center gap-3 rounded-xl border border-cyan-300/20 bg-slate-950/70 px-4 py-3 text-sm font-semibold text-cyan-100">
+        <div className="inline-flex items-center gap-3 rounded-xl border border-cyan-300/20 bg-card/70 px-4 py-3 text-sm font-semibold text-primary">
           <Loader2 className="h-5 w-5 animate-spin" />
           Cargando pedido origen...
         </div>
@@ -110,12 +110,12 @@ function NuevaGreContent() {
   if (error || !pedido || !pedidoContext) {
     return (
       <div className="grid gap-4 p-6">
-        <div className="rounded-xl border border-cyan-300/20 bg-slate-950/80 p-4 font-semibold text-cyan-50">
+        <div className="rounded-xl border border-cyan-300/20 bg-card/80 p-4 font-semibold text-primary">
           {error || 'No se pudo preparar la GRE.'}
         </div>
         <Button
           onClick={() => router.push('/dashboard/gre')}
-          className="w-fit gap-2 bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+          className="w-fit gap-2 bg-cyan-400 text-foreground hover:bg-cyan-300"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver a GRE
@@ -126,15 +126,15 @@ function NuevaGreContent() {
 
   return (
     <div className="grid gap-5 p-6">
-      <div className="rounded-2xl border border-cyan-300/20 bg-slate-950/80 p-5 text-cyan-50 shadow-xl shadow-blue-950/20">
+      <div className="rounded-2xl border border-cyan-300/20 bg-card/80 p-5 text-primary shadow-xl shadow-blue-950/20">
         <h1 className="text-2xl font-black tracking-tight text-white">
           Nueva Guía de Remisión Electrónica
         </h1>
-        <p className="mt-2 text-sm text-slate-300">
+        <p className="mt-2 text-sm text-muted-foreground">
           Pedido origen {pedido.numero}. Los ítems y cantidades se tomarán del pedido para generar el detalle real de la GRE.
         </p>
         {pedido.detalle?.length ? (
-          <ul className="mt-3 grid gap-1 text-sm text-slate-300">
+          <ul className="mt-3 grid gap-1 text-sm text-muted-foreground">
             {pedido.detalle.map((item, index) => (
               <li key={`${item.descripcion || 'item'}-${index}`} className="rounded-lg border border-cyan-300/10 bg-cyan-400/5 px-3 py-2">
                 {item.descripcion || 'Producto'} x {Number(item.cantidad || 0)}

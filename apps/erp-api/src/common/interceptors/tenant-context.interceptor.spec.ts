@@ -59,5 +59,25 @@ describe('TenantContextInterceptor', () => {
       complete: done,
     });
   });
-});
 
+  it('accepts desktop x-erp-tenant-id alias for tenant context', (done) => {
+    const tenantContext = makeTenantContext();
+    const interceptor = new TenantContextInterceptor(tenantContext);
+    const next = makeNext();
+
+    const request: any = {
+      headers: { 'x-erp-tenant-id': 'tenant-a' },
+      user: { tenant_id: 'tenant-a', id: 'user-1', is_super_admin: false },
+      path: '/api/test',
+    };
+
+    interceptor.intercept(makeContext(request), next as any).subscribe({
+      next: () => {
+        expect(request.tenantId).toBe('tenant-a');
+        expect(request.tenant_id).toBe('tenant-a');
+      },
+      error: done,
+      complete: done,
+    });
+  });
+});

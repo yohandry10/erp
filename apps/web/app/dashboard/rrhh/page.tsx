@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import {
   BadgeDollarSign,
@@ -34,12 +35,10 @@ const formatDate = (dateString?: string) => {
 }
 
 export default function RrhhPage() {
-  const [empleados, setEmpleados] = useState<any[]>([])
-  const [departamentos, setDepartamentos] = useState<any[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [empleadoEditando, setEmpleadoEditando] = useState<any | null>(null)
-  const [loading, setLoading] = useState(true)
   const { get, post, put, delete: del } = useApi()
+  const queryClient = useQueryClient()
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean
@@ -57,45 +56,31 @@ export default function RrhhPage() {
 
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
 
-  const loadData = useCallback(async () => {
-    if (!rrhhEnabled) {
-      setLoading(false)
-      setEmpleados([])
-      setDepartamentos([])
-      return
-    }
+  const toList = (d: any): any[] =>
+    d?.success && Array.isArray(d.data) ? d.data : Array.isArray(d) ? d : []
 
-    try {
-      setLoading(true)
-      const empleadosData = await get('/rrhh/empleados')
-      setEmpleados(
-        empleadosData?.success && Array.isArray(empleadosData.data)
-          ? empleadosData.data
-          : Array.isArray(empleadosData)
-            ? empleadosData
-            : [],
-      )
+  // React Query cachea por 60s (config global): al volver a RRHH se muestran los
+  // datos cacheados al instante y se revalidan en segundo plano, en vez de
+  // recargar de cero con spinner de pantalla completa cada vez.
+  const { data, isLoading } = useQuery({
+    queryKey: ['rrhh-dashboard'],
+    enabled: rrhhEnabled,
+    queryFn: async () => {
+      const [empleadosData, departamentosData] = await Promise.all([
+        get('/rrhh/empleados'),
+        get('/rrhh/departamentos'),
+      ])
+      return { empleados: toList(empleadosData), departamentos: toList(departamentosData) }
+    },
+  })
 
-      const departamentosData = await get('/rrhh/departamentos')
-      setDepartamentos(
-        departamentosData?.success && Array.isArray(departamentosData.data)
-          ? departamentosData.data
-          : Array.isArray(departamentosData)
-            ? departamentosData
-            : [],
-      )
-    } catch (error) {
-      console.error('Error cargando datos:', error)
-      setEmpleados([])
-      setDepartamentos([])
-    } finally {
-      setLoading(false)
-    }
-  }, [get, rrhhEnabled])
+  const empleados = useMemo(() => data?.empleados ?? [], [data?.empleados])
+  const departamentos = useMemo(() => data?.departamentos ?? [], [data?.departamentos])
+  const loading = rrhhEnabled && isLoading
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  const loadData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['rrhh-dashboard'] })
+  }, [queryClient])
 
   const stats = useMemo(() => {
     const activos = empleados.filter((emp: any) => emp?.estado === 'activo').length
@@ -141,7 +126,7 @@ export default function RrhhPage() {
   if (loading) {
     return (
       <PageShell title="Recursos Humanos" description="Cargando empleados, departamentos, contratos y planillas operativas.">
-        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-card/60 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
           <div className="text-center">
             <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
             <p className="text-sm font-semibold">Cargando datos de RRHH...</p>
@@ -154,8 +139,8 @@ export default function RrhhPage() {
   if (!rrhhEnabled) {
     return (
       <PageShell title="Recursos Humanos" description="El módulo de RRHH está deshabilitado en este entorno.">
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
-          <CardContent className="p-8 text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
+          <CardContent className="p-8 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
             Activa la bandera de RRHH para usar empleados, asistencia, contratos y planillas.
           </CardContent>
         </Card>
@@ -181,14 +166,14 @@ export default function RrhhPage() {
           const Icon = module.icon
           return (
             <Link key={module.href} href={module.href} className="block">
-              <Card className="h-full border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 transition hover:-translate-y-0.5 hover:border-cyan-300/40 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950 group-data-[erp-theme=light]/dashboard:shadow-slate-200/70">
+              <Card className="h-full border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 transition hover:-translate-y-0.5 hover:border-cyan-300/40 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground group-data-[erp-theme=light]/dashboard:shadow-slate-200/70">
                 <CardContent className="flex items-center gap-4 p-5">
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
                     <Icon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0">
-                    <h3 className="font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{module.title}</h3>
-                    <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">{module.description}</p>
+                    <h3 className="font-bold text-white group-data-[erp-theme=light]/dashboard:text-foreground">{module.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">{module.description}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -197,24 +182,24 @@ export default function RrhhPage() {
         })}
       </div>
 
-      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+      <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
         <CardHeader>
-          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Lista de Empleados</CardTitle>
-          <p className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">Lista de Empleados</CardTitle>
+          <p className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             Última actualización: {new Date().toLocaleString('es-PE')}
           </p>
         </CardHeader>
         <CardContent>
           {!Array.isArray(empleados) || empleados.length === 0 ? (
-            <div className="rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-8 text-center group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50">
-              <h3 className="text-lg font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">No hay empleados registrados</h3>
-              <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Comienza agregando el primer empleado al sistema.</p>
+            <div className="rounded-2xl border border-cyan-400/15 bg-card/50 p-8 text-center group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30">
+              <h3 className="text-lg font-bold text-white group-data-[erp-theme=light]/dashboard:text-foreground">No hay empleados registrados</h3>
+              <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">Comienza agregando el primer empleado al sistema.</p>
               <Button className="mt-4" onClick={() => setIsModalOpen(true)}>Agregar primer empleado</Button>
             </div>
           ) : (
-            <div className="overflow-auto rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:border-slate-200">
+            <div className="overflow-auto rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:border-border">
               <table className="w-full min-w-[980px] text-sm">
-                <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.12em] text-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.12em] text-primary/80 group-data-[erp-theme=light]/dashboard:bg-muted/30 group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 text-left">Nombre</th>
                     <th className="px-4 py-3 text-left">Documento</th>
@@ -228,17 +213,17 @@ export default function RrhhPage() {
                 </thead>
                 <tbody className="divide-y divide-cyan-400/10 group-data-[erp-theme=light]/dashboard:divide-slate-100">
                   {empleados.map((empleado: any) => (
-                    <tr key={empleado.id} className="transition hover:bg-white/[0.03] group-data-[erp-theme=light]/dashboard:hover:bg-slate-50">
-                      <td className="px-4 py-3 font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                    <tr key={empleado.id} className="transition hover:bg-white/[0.03] group-data-[erp-theme=light]/dashboard:hover:bg-muted/30">
+                      <td className="px-4 py-3 font-semibold text-white group-data-[erp-theme=light]/dashboard:text-foreground">
                         {empleado.nombres} {empleado.apellidos}
                       </td>
-                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{empleado.tipo_documento}: {empleado.numero_documento}</td>
-                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{empleado.email || 'Sin email'}</td>
-                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{empleado.puesto || 'Sin asignar'}</td>
-                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{empleado.departamentos?.nombre || 'Sin departamento'}</td>
-                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{formatDate(empleado.fecha_ingreso)}</td>
+                      <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{empleado.tipo_documento}: {empleado.numero_documento}</td>
+                      <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{empleado.email || 'Sin email'}</td>
+                      <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{empleado.puesto || 'Sin asignar'}</td>
+                      <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{empleado.departamentos?.nombre || 'Sin departamento'}</td>
+                      <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{formatDate(empleado.fecha_ingreso)}</td>
                       <td className="px-4 py-3">
-                        <Badge className={empleado.estado === 'activo' ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700' : 'border-slate-300/25 bg-slate-300/10 text-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700'}>
+                        <Badge className={empleado.estado === 'activo' ? 'border-cyan-300/30 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700' : 'border-border/25 bg-slate-300/10 text-foreground/90 group-data-[erp-theme=light]/dashboard:bg-muted group-data-[erp-theme=light]/dashboard:text-foreground/85'}>
                           {empleado.estado}
                         </Badge>
                       </td>

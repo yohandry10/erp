@@ -10,17 +10,17 @@ interface UsersTableProps {
   onCreateFirst: () => void
 }
 
-export default function UsersTable({ 
-  usuarios, 
-  currentUserId, 
-  onEdit, 
+export default function UsersTable({
+  usuarios,
+  currentUserId,
+  onEdit,
   onChangeStatus,
-  onCreateFirst 
+  onCreateFirst
 }: UsersTableProps) {
   if (usuarios.length === 0) {
     return (
       <div className="px-0 py-10 text-center">
-        <p className="mb-4 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+        <p className="mb-4 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
           No hay usuarios registrados en el sistema
         </p>
         <button className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
@@ -33,9 +33,9 @@ export default function UsersTable({
   }
 
   return (
-    <div className="overflow-auto rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:border-slate-200">
-      <table className="w-full min-w-[900px] text-sm">
-        <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.12em] text-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-500">
+    <div className="overflow-auto rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:border-border">
+      <table className="w-full min-w-[760px] text-sm">
+        <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.12em] text-primary/80 group-data-[erp-theme=light]/dashboard:bg-muted/30 group-data-[erp-theme=light]/dashboard:text-muted-foreground">
           <tr>
             <th className="text-left p-4 font-semibold">Usuario</th>
             <th className="text-left p-4 font-semibold">Email</th>

@@ -27,13 +27,13 @@ interface ConciliacionWizardProps {
   onComplete: () => void
 }
 
-const panelClass = 'overflow-hidden rounded-2xl border border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-xl shadow-blue-950/20'
+const panelClass = 'overflow-hidden rounded-2xl border border-cyan-400/20 bg-card/70 text-foreground shadow-xl shadow-blue-950/20'
 const stepPanelClass = 'p-6 text-center md:p-8'
-const metricClass = 'rounded-xl border border-cyan-400/15 bg-slate-950/45 p-5'
-const metricLabelClass = 'text-sm font-semibold text-cyan-200/70'
+const metricClass = 'rounded-xl border border-cyan-400/15 bg-card/45 p-5'
+const metricLabelClass = 'text-sm font-semibold text-primary/80'
 const metricValueClass = 'mt-2 text-2xl font-black text-white'
 const primaryButtonClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50'
-const outlineButtonClass = 'inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-5 py-2.5 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-45'
+const outlineButtonClass = 'inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-45'
 
 function StepIntro({
   icon: Icon,
@@ -46,9 +46,9 @@ function StepIntro({
 }) {
   return (
     <div className="mb-6 text-center">
-      <Icon className="mx-auto mb-4 h-14 w-14 text-cyan-200" />
+      <Icon className="mx-auto mb-4 h-14 w-14 text-primary" />
       <h3 className="text-2xl font-black text-white">{title}</h3>
-      <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-400">{description}</p>
+      <p className="mx-auto mt-2 max-w-2xl text-sm text-muted-foreground">{description}</p>
     </div>
   )
 }
@@ -150,7 +150,7 @@ export default function ConciliacionWizard({
             <button type="button" onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacionId}`)} className={primaryButtonClass}>
               Ir a Importar CSV
             </button>
-            {extractoImportado ? <div className="mx-auto mt-6 max-w-md rounded-xl border border-cyan-300/30 bg-cyan-300/10 p-4 text-cyan-100">Extracto importado correctamente</div> : null}
+            {extractoImportado ? <div className="mx-auto mt-6 max-w-md rounded-xl border border-cyan-300/30 bg-cyan-300/10 p-4 text-primary">Extracto importado correctamente</div> : null}
           </div>
         )
 
@@ -177,10 +177,10 @@ export default function ConciliacionWizard({
           <div className={stepPanelClass}>
             <StepIntro icon={Eye} title="Ajustes Manuales" description="Revisa los movimientos y realiza ajustes manuales si es necesario." />
             {estadisticas ? (
-              <div className="mx-auto mb-6 max-w-lg rounded-xl border border-cyan-400/20 bg-slate-950/45 p-5 text-left">
-                <div className="mb-3 font-semibold text-cyan-100">Pendientes de conciliar</div>
-                <div className="flex justify-between text-sm text-slate-300"><span>Sistema</span><strong className="text-white">{pendingSystem}</strong></div>
-                <div className="mt-2 flex justify-between text-sm text-slate-300"><span>Extracto</span><strong className="text-white">{pendingBank}</strong></div>
+              <div className="mx-auto mb-6 max-w-lg rounded-xl border border-cyan-400/20 bg-card/45 p-5 text-left">
+                <div className="mb-3 font-semibold text-primary">Pendientes de conciliar</div>
+                <div className="flex justify-between text-sm text-muted-foreground"><span>Sistema</span><strong className="text-white">{pendingSystem}</strong></div>
+                <div className="mt-2 flex justify-between text-sm text-muted-foreground"><span>Extracto</span><strong className="text-white">{pendingBank}</strong></div>
               </div>
             ) : null}
             <button type="button" onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacionId}`)} className={primaryButtonClass}>
@@ -200,7 +200,7 @@ export default function ConciliacionWizard({
                   <StatCard label="Saldo Banco" value={formatCurrency(estadisticas.saldos.saldo_banco)} />
                   <StatCard label="Diferencia" value={formatCurrency(netDifference)} />
                 </div>
-                <div className={`rounded-xl border p-5 text-center ${isBalanced ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100' : 'border-slate-400/30 bg-slate-400/10 text-slate-100'}`}>
+                <div className={`rounded-xl border p-5 text-center ${isBalanced ? 'border-cyan-300/30 bg-cyan-300/10 text-primary' : 'border-border/30 bg-slate-400/10 text-foreground'}`}>
                   <div className="text-lg font-bold">{isBalanced ? 'Conciliacion cuadrada' : 'Hay diferencias'}</div>
                   <div className="mt-1 text-sm opacity-80">{isBalanced ? 'Los saldos coinciden.' : 'Revisa los movimientos pendientes antes de cerrar.'}</div>
                 </div>
@@ -218,11 +218,11 @@ export default function ConciliacionWizard({
           <div className={stepPanelClass}>
             <StepIntro icon={FileCheck} title="Cerrar Conciliacion" description="Finaliza el proceso de conciliacion y marca los movimientos como conciliados." />
             {estadisticas ? (
-              <div className={`mx-auto mb-6 max-w-xl rounded-xl border p-5 text-left ${pendingSystem === 0 && pendingBank === 0 ? 'border-cyan-300/30 bg-cyan-300/10' : 'border-slate-400/30 bg-slate-400/10'}`}>
+              <div className={`mx-auto mb-6 max-w-xl rounded-xl border p-5 text-left ${pendingSystem === 0 && pendingBank === 0 ? 'border-cyan-300/30 bg-cyan-300/10' : 'border-border/30 bg-slate-400/10'}`}>
                 <div className="mb-3 font-semibold text-white">Estado final</div>
-                <div className="flex justify-between text-sm text-slate-300"><span>Sistema pendientes</span><strong className="text-white">{pendingSystem}</strong></div>
-                <div className="mt-2 flex justify-between text-sm text-slate-300"><span>Extracto pendientes</span><strong className="text-white">{pendingBank}</strong></div>
-                <div className="mt-3 flex justify-between border-t border-cyan-400/10 pt-3 text-sm text-slate-300"><span>Diferencia final</span><strong className="text-white">{formatCurrency(netDifference)}</strong></div>
+                <div className="flex justify-between text-sm text-muted-foreground"><span>Sistema pendientes</span><strong className="text-white">{pendingSystem}</strong></div>
+                <div className="mt-2 flex justify-between text-sm text-muted-foreground"><span>Extracto pendientes</span><strong className="text-white">{pendingBank}</strong></div>
+                <div className="mt-3 flex justify-between border-t border-cyan-400/10 pt-3 text-sm text-muted-foreground"><span>Diferencia final</span><strong className="text-white">{formatCurrency(netDifference)}</strong></div>
               </div>
             ) : null}
             <button
@@ -245,15 +245,15 @@ export default function ConciliacionWizard({
 
   return (
     <div className={panelClass}>
-      <div className="border-b border-cyan-400/10 bg-slate-950/45 p-5">
+      <div className="border-b border-cyan-400/10 bg-card/45 p-5">
         <div className="mx-auto grid max-w-5xl gap-3 md:grid-cols-5">
           {steps.map((step) => (
             <div key={step.id} className="flex flex-col items-center text-center">
-              <div className={`mb-2 flex size-10 items-center justify-center rounded-full border text-sm font-bold ${step.status === 'completed' ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100' : step.status === 'current' ? 'border-blue-300/30 bg-blue-500/20 text-blue-100' : 'border-slate-500/30 bg-slate-900 text-slate-500'}`}>
+              <div className={`mb-2 flex size-10 items-center justify-center rounded-full border text-sm font-bold ${step.status === 'completed' ? 'border-cyan-300/30 bg-cyan-300/10 text-primary' : step.status === 'current' ? 'border-blue-300/30 bg-blue-500/20 text-primary dark:text-blue-200' : 'border-slate-500/30 bg-card text-muted-foreground'}`}>
                 {step.status === 'completed' ? <CheckCircle className="h-5 w-5" /> : step.id}
               </div>
-              <div className={`text-xs font-semibold uppercase tracking-[0.12em] ${step.status === 'current' ? 'text-white' : 'text-slate-400'}`}>{step.title}</div>
-              <div className="mt-1 hidden text-xs text-slate-500 xl:block">{step.description}</div>
+              <div className={`text-xs font-semibold uppercase tracking-[0.12em] ${step.status === 'current' ? 'text-white' : 'text-muted-foreground'}`}>{step.title}</div>
+              <div className="mt-1 hidden text-xs text-muted-foreground xl:block">{step.description}</div>
             </div>
           ))}
         </div>
@@ -266,7 +266,7 @@ export default function ConciliacionWizard({
           <ChevronLeft className="h-4 w-4" />
           Anterior
         </button>
-        <div className="text-sm font-semibold text-slate-400">Paso {currentStep} de {steps.length}</div>
+        <div className="text-sm font-semibold text-muted-foreground">Paso {currentStep} de {steps.length}</div>
         <button type="button" onClick={handleNextStep} disabled={currentStep === 5} className={outlineButtonClass}>
           Siguiente
           <ChevronRight className="h-4 w-4" />

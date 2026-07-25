@@ -19,7 +19,7 @@ export default function FinanzasFilterField({
 }: FinanzasFilterFieldProps) {
   return (
     <div className="flex-[1]">
-      <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+      <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
         {label}
       </label>
       {children}

@@ -27,12 +27,15 @@ interface CpeItem {
   descripcion?: string
   cantidad?: number
   precio_unitario?: number
+  valor_venta?: number
+  subtotal?: number
 }
 
 interface CpeData {
   serie: string
   numero: string | number
   created_at: string
+  fecha_emision?: string
   razon_social_emisor: string
   ruc_emisor: string
   logo_url?: string
@@ -45,6 +48,10 @@ interface CpeData {
   moneda: string
   estado: string
   hash: string
+  hash_firma?: string
+  valor_resumen?: string
+  sunat_qr_content?: string
+  sunat_qr_data_url?: string
   items: CpeItem[]
   tipo_documento: string
   tasa_igv?: number
@@ -73,7 +80,7 @@ export default function CpeViewModal({
     try {
       // Usar el endpoint correcto: /api/cpe/comprobantes/:id
       const response = await api.get(`/api/cpe/comprobantes/${documentId}`)
-      
+
       if (response?.success && response?.data) {
         setCpeData(response.data)
       } else {
@@ -93,24 +100,26 @@ export default function CpeViewModal({
     if (!cpeData) return
 
     const formatMoney = (value: number) => `${cpeData.moneda} ${value.toFixed(2)}`
-    const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('es-PE')
+    const formatDate = (dateStr?: string) => new Date(dateStr || Date.now()).toLocaleDateString('es-PE')
     const taxLabel = getTaxLabel(cpeData)
+    const hashValue = cpeData.valor_resumen || cpeData.hash_firma || cpeData.hash || ''
 
     const itemsHtml = Array.isArray(cpeData.items) && cpeData.items.length > 0
       ? cpeData.items.map((item, idx) => {
           const qty = item.cantidad ?? 1
           const unit = item.precio_unitario ?? 0
+          const total = item.valor_venta ?? item.subtotal ?? qty * unit
           return `
             <div>
               <span>${escapeHtml(qty)}x ${escapeHtml(item.nombre_producto || item.descripcion || 'Producto')}</span>
-              <span>${escapeHtml(formatMoney(qty * unit))}</span>
+              <span>${escapeHtml(formatMoney(total))}</span>
             </div>
           `
         }).join('')
       : '<div>Sin detalle de productos</div>'
 
     const printWindow = window.open('', '_blank', 'width=350,height=600')
-    
+
     if (!printWindow) {
       alert('Por favor permite las ventanas emergentes para imprimir')
       return
@@ -122,6 +131,13 @@ export default function CpeViewModal({
     const logoUrl = safeImageUrl(cpeData.logo_url)
     const logoHtml = logoUrl
       ? `<img src="${escapeHtml(logoUrl)}" alt="Logo" />`
+      : ''
+    const qrUrl = safeImageUrl(cpeData.sunat_qr_data_url)
+    const qrHtml = qrUrl
+      ? `<div class="qr"><img src="${escapeHtml(qrUrl)}" alt="Código QR SUNAT" /></div>`
+      : ''
+    const qrContentHtml = cpeData.sunat_qr_content
+      ? `<div class="qr-content">${escapeHtml(cpeData.sunat_qr_content)}</div>`
       : ''
     const documentTypeName = getDocumentTypeName()
 
@@ -139,15 +155,15 @@ export default function CpeViewModal({
           <div class="ruc">RUC: ${escapeHtml(cpeData.ruc_emisor || '20000000001')}</div>
           <div class="tipo-doc">${escapeHtml(documentTypeName)}</div>
           <div class="numero">${escapeHtml(numeroFormateado)}</div>
-          <div class="fecha">${escapeHtml(formatDate(cpeData.created_at))}</div>
+          <div class="fecha">${escapeHtml(formatDate(cpeData.fecha_emision || cpeData.created_at))}</div>
         </div>
-        
+
         <div class="seccion">
           <div class="label">CLIENTE:</div>
           <div class="valor">${escapeHtml(cpeData.razon_social_receptor || 'Cliente General')}</div>
           <div class="valor">${cpeData.tipo_documento_receptor === '6' ? 'RUC' : 'DNI'}: ${escapeHtml(cpeData.documento_receptor || '-')}</div>
         </div>
-        
+
         <div class="items">
           <div>
             <span>DESCRIPCIÓN</span>
@@ -155,16 +171,18 @@ export default function CpeViewModal({
           </div>
           ${itemsHtml}
         </div>
-        
+
         <div class="totales">
           <div class="total-row"><span>Subtotal:</span><span>${escapeHtml(formatMoney(cpeData.total_gravadas || 0))}</span></div>
           <div class="total-row"><span>${escapeHtml(taxLabel)}:</span><span>${escapeHtml(formatMoney(cpeData.total_igv || 0))}</span></div>
           <div class="total-row total-final"><span>TOTAL:</span><span>${escapeHtml(formatMoney(cpeData.total_venta || 0))}</span></div>
         </div>
-        
+
         <div class="footer">
-          <div class="hash">Hash: ${escapeHtml(cpeData.hash || 'N/A')}</div>
-          <div>Representación impresa del CPE</div>
+          ${qrHtml}
+          <div class="hash">Valor resumen/Hash: ${escapeHtml(hashValue || 'N/A')}</div>
+          ${qrContentHtml}
+          <div>Representación impresa del ${escapeHtml(documentTypeName)}</div>
           <div>¡Gracias por su compra!</div>
         </div>
       </body>
@@ -229,14 +247,16 @@ export default function CpeViewModal({
     .table-head { font-weight: 700; }
     .total-final { border-top: 1px solid #111; padding-top: 4px; font-weight: 700; font-size: 13px; }
     .footer { margin-top: 8px; border-top: 1px dashed #333; padding-top: 5px; }
-    .hash { overflow-wrap: anywhere; }
+    .qr { text-align: center; margin: 7px 0 4px; }
+    .qr img { width: 28mm; height: 28mm; object-fit: contain; image-rendering: pixelated; }
+    .hash, .qr-content { overflow-wrap: anywhere; word-break: break-word; font-size: 8px; }
   `
 
   if (!isOpen) return null
 
   return (
     <div
-      className="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose()
@@ -244,17 +264,17 @@ export default function CpeViewModal({
       }}
     >
       <div
-        className="relative max-h-[95vh] w-[95%] max-w-7xl overflow-auto rounded-lg border border-cyan-400/20 bg-slate-950 text-slate-100 shadow-2xl shadow-cyan-950/40"
+        className="relative max-h-[95vh] w-[95%] max-w-7xl overflow-auto rounded-lg border border-cyan-400/20 bg-background text-foreground shadow-2xl shadow-cyan-950/40"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 border-b border-cyan-400/10 bg-slate-950/95 px-5 py-4 backdrop-blur">
+        <div className="sticky top-0 z-10 border-b border-cyan-400/10 bg-card/95 px-5 py-4 backdrop-blur">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-cyan-100">
+              <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-primary">
                 Vista CPE
               </Badge>
-              <h2 className="text-xl font-semibold tracking-normal text-slate-50">{getDocumentTypeName()}</h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <h2 className="text-xl font-semibold tracking-normal text-foreground">{getDocumentTypeName()}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {cpeData
                   ? `${cpeData.serie}-${(typeof cpeData.numero === 'number'
                       ? cpeData.numero
@@ -277,7 +297,7 @@ export default function CpeViewModal({
                 onClick={onClose}
                 variant="outline"
                 size="icon"
-                className="border-cyan-400/20 bg-slate-900/80 text-slate-200 hover:bg-cyan-400/10"
+                className="border-cyan-400/20 bg-card/80 text-foreground/90 hover:bg-cyan-400/10"
                 aria-label="Cerrar"
               >
                 <X className="h-4 w-4" />
@@ -289,26 +309,26 @@ export default function CpeViewModal({
         <div className="p-5">
           {loading ? (
             <div className="flex min-h-96 flex-col items-center justify-center gap-4">
-              <RefreshCw className="h-9 w-9 animate-spin text-cyan-300" />
-              <p className="text-sm text-slate-400">Cargando comprobante...</p>
+              <RefreshCw className="h-9 w-9 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Cargando comprobante...</p>
             </div>
           ) : cpeData ? (
             <div className="space-y-5">
               <section className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-                <div className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4 text-center">
-                  <h1 className="text-2xl font-semibold text-slate-50">NEON SYSTEM</h1>
-                  <p className="mt-1 text-sm text-slate-400">Sistema Empresarial Integrado</p>
-                  <div className="mt-4 grid gap-2 text-sm text-slate-300 md:grid-cols-2">
+                <div className="rounded-lg border border-cyan-400/15 bg-card/50 p-4 text-center">
+                  <h1 className="text-2xl font-semibold text-foreground">NEON SYSTEM</h1>
+                  <p className="mt-1 text-sm text-muted-foreground">Sistema Empresarial Integrado</p>
+                  <div className="mt-4 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
                     <p><strong>RUC:</strong> {cpeData.ruc_emisor}</p>
                     <p><strong>Razón social:</strong> {cpeData.razon_social_emisor}</p>
                     <p className="md:col-span-2">Dirección: Lima, Perú</p>
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
+                <div className="rounded-lg border border-cyan-400/15 bg-card/50 p-4">
                   <div className="rounded-md border border-cyan-400/25 bg-cyan-400/10 p-4 text-center">
-                    <h2 className="text-sm font-semibold uppercase text-cyan-100">{getDocumentTypeName()}</h2>
-                    <p className="mt-2 text-xl font-semibold text-slate-50">
+                    <h2 className="text-sm font-semibold uppercase text-primary">{getDocumentTypeName()}</h2>
+                    <p className="mt-2 text-xl font-semibold text-foreground">
                       {cpeData.serie} -{' '}
                       {(typeof cpeData.numero === 'number'
                         ? cpeData.numero
@@ -318,7 +338,7 @@ export default function CpeViewModal({
                         .padStart(8, '0')}
                     </p>
                   </div>
-                  <div className="mt-4 space-y-2 text-sm text-slate-300">
+                  <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                     <p><strong>Fecha:</strong> {new Date(cpeData.created_at).toLocaleDateString('es-PE')}</p>
                     <p><strong>Estado:</strong> {cpeData.estado}</p>
                     <p><strong>Moneda:</strong> {cpeData.moneda}</p>
@@ -326,9 +346,9 @@ export default function CpeViewModal({
                 </div>
               </section>
 
-              <section className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
+              <section className="rounded-lg border border-cyan-400/15 bg-card/50 p-4">
                 <h3 className="mb-3 text-sm font-semibold uppercase text-cyan-200/80">Datos del cliente</h3>
-                <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
+                <div className="grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
                   <p><strong>Cliente:</strong> {cpeData.razon_social_receptor}</p>
                   <p><strong>Documento:</strong> {cpeData.documento_receptor}</p>
                   <p>
@@ -342,7 +362,7 @@ export default function CpeViewModal({
                 </div>
               </section>
 
-              <section className="rounded-lg border border-cyan-400/15 bg-slate-900/50">
+              <section className="rounded-lg border border-cyan-400/15 bg-card/50">
                 <div className="border-b border-cyan-400/10 p-4">
                   <h3 className="text-sm font-semibold uppercase text-cyan-200/80">Detalle de productos</h3>
                 </div>
@@ -364,14 +384,14 @@ export default function CpeViewModal({
                         return (
                           <TableRow key={`${index}-${item.nombre_producto ?? item.descripcion ?? 'item'}`} className="border-cyan-400/10">
                             <TableCell className="text-center">{index + 1}</TableCell>
-                            <TableCell className="font-medium text-slate-100">
+                            <TableCell className="font-medium text-foreground">
                               {item.nombre_producto || item.descripcion || 'Producto'}
                             </TableCell>
                             <TableCell className="text-center">{qty}</TableCell>
                             <TableCell className="text-right">
                               {cpeData.moneda} {unit.toFixed(2)}
                             </TableCell>
-                            <TableCell className="text-right font-semibold text-cyan-100">
+                            <TableCell className="text-right font-semibold text-primary">
                               {cpeData.moneda} {(qty * unit).toFixed(2)}
                             </TableCell>
                           </TableRow>
@@ -381,7 +401,7 @@ export default function CpeViewModal({
                       <TableRow>
                         <TableCell
                           colSpan={5}
-                          className="py-8 text-center text-slate-400"
+                          className="py-8 text-center text-muted-foreground"
                         >
                           No hay productos disponibles
                         </TableCell>
@@ -392,19 +412,27 @@ export default function CpeViewModal({
               </section>
 
               <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
-                <div className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
+                <div className="rounded-lg border border-cyan-400/15 bg-card/50 p-4">
                   <h3 className="mb-3 text-sm font-semibold uppercase text-cyan-200/80">Información de seguridad</h3>
-                  <p className="text-sm font-semibold text-slate-200">Hash de seguridad:</p>
-                  <p className="mt-2 break-all font-mono text-xs text-slate-400">{cpeData.hash || 'N/A'}</p>
-                  <p className="mt-4 text-xs text-slate-500">Representación impresa del {getDocumentTypeName()}</p>
+                  <p className="text-sm font-semibold text-foreground/90">Hash de seguridad:</p>
+                  <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
+                    {cpeData.valor_resumen || cpeData.hash_firma || cpeData.hash || 'N/A'}
+                  </p>
+                  {cpeData.sunat_qr_content && (
+                    <>
+                      <p className="mt-4 text-sm font-semibold text-foreground/90">Contenido QR SUNAT:</p>
+                      <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{cpeData.sunat_qr_content}</p>
+                    </>
+                  )}
+                  <p className="mt-4 text-xs text-muted-foreground">Representación impresa del {getDocumentTypeName()}</p>
                 </div>
 
-                <div className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
+                <div className="rounded-lg border border-cyan-400/15 bg-card/50 p-4">
                   <h3 className="mb-3 text-sm font-semibold uppercase text-cyan-200/80">Resumen de totales</h3>
                   <div className="space-y-3 text-sm">
                     <TotalRow label="Subtotal" value={`${cpeData.moneda} ${(cpeData.total_gravadas || 0).toFixed(2)}`} />
                     <TotalRow label={getTaxLabel(cpeData)} value={`${cpeData.moneda} ${(cpeData.total_igv || 0).toFixed(2)}`} />
-                    <div className="flex justify-between border-t border-cyan-400/10 pt-3 text-base font-semibold text-cyan-100">
+                    <div className="flex justify-between border-t border-cyan-400/10 pt-3 text-base font-semibold text-primary">
                       <span>TOTAL:</span>
                       <span>{cpeData.moneda} {(cpeData.total_venta || 0).toFixed(2)}</span>
                     </div>
@@ -412,8 +440,8 @@ export default function CpeViewModal({
                 </div>
               </section>
 
-              <footer className="border-t border-cyan-400/10 pt-4 text-center text-xs text-slate-400">
-                <p className="font-semibold text-slate-300">NEON SYSTEM - Sistema Empresarial Integrado</p>
+              <footer className="border-t border-cyan-400/10 pt-4 text-center text-xs text-muted-foreground">
+                <p className="font-semibold text-muted-foreground">NEON SYSTEM - Sistema Empresarial Integrado</p>
                 <p className="mt-1">
                   Documento generado automáticamente el {new Date().toLocaleDateString('es-PE')}
                 </p>
@@ -423,7 +451,7 @@ export default function CpeViewModal({
               </footer>
             </div>
           ) : (
-            <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-100">
+            <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>No se pudo cargar el comprobante</AlertDescription>
             </Alert>
@@ -436,9 +464,9 @@ export default function CpeViewModal({
 
 function TotalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-4 text-slate-300">
+    <div className="flex justify-between gap-4 text-muted-foreground">
       <span>{label}:</span>
-      <span className="font-semibold text-slate-100">{value}</span>
+      <span className="font-semibold text-foreground">{value}</span>
     </div>
   )
 }

@@ -92,7 +92,7 @@ export function OnboardingTooltip({
   }, [step, isModal])
 
   return (
-    <div className="fixed z-[10000] w-[320px] bg-white rounded-3 shadow"
+    <div className="fixed z-[10000] w-[320px] bg-card rounded-xl shadow"
       role="dialog"
       aria-label={step.titulo}
     >
@@ -102,12 +102,12 @@ export function OnboardingTooltip({
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-blue-500 rounded-full"
           />
-          <span className="text-3 text-slate-500">
+          <span className="text-xs text-muted-foreground">
             Paso {currentIndex + 1} de {totalSteps}
           </span>
         </div>
         <button
-          onClick={onClose} className="text-gray-400 border-0 cursor-pointer p-[4px] flex items-center justify-center rounded-[4px]"
+          onClick={onClose} className="text-muted-foreground border-0 cursor-pointer p-[4px] flex items-center justify-center rounded-[4px]"
           aria-label="Cerrar tour"
         >
           <X className="w-4 h-4" />
@@ -116,11 +116,11 @@ export function OnboardingTooltip({
 
       {/* Content */}
       <div className="p-4">
-        <h3 className="text-[18px] font-semibold text-gray-900 mb-2 m-0"
+        <h3 className="text-[18px] font-semibold text-foreground mb-2 m-0"
         >
           {step.titulo}
         </h3>
-        <p className="text-3.5 text-[#4b5563] leading-6 mt-2 mr-0 mb-0 ml-0"
+        <p className="text-sm text-[#4b5563] leading-6 mt-2 mr-0 mb-0 ml-0"
         >
           {step.descripcion}
         </p>
@@ -128,7 +128,7 @@ export function OnboardingTooltip({
 
       {/* Progress bar */}
       <div>
-        <div className="h-[4px] bg-slate-100 rounded-full overflow-hidden"
+        <div className="h-[4px] bg-muted rounded-full overflow-hidden"
         >
           <div className="h-[100%] bg-blue-500 transition"
           />
@@ -136,10 +136,10 @@ export function OnboardingTooltip({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-between py-3 px-4 border-t bg-slate-50"
+      <div className="flex items-center justify-between py-3 px-4 border-t bg-muted/30"
       >
         <button
-          onClick={onSkip} className="text-3.5 text-slate-500 border-0 cursor-pointer flex items-center gap-[4px]"
+          onClick={onSkip} className="text-sm text-muted-foreground border-0 cursor-pointer flex items-center gap-[4px]"
         >
           <SkipForward className="w-3 h-3" />
           Saltar
@@ -148,14 +148,14 @@ export function OnboardingTooltip({
         <div className="flex items-center gap-2">
           {!isFirst && (
             <button
-              onClick={onPrev} className="flex items-center gap-[4px] py-[6px] px-3 rounded-2 text-3.5 text-[#4b5563] border-0 cursor-pointer"
+              onClick={onPrev} className="flex items-center gap-[4px] py-[6px] px-3 rounded-lg text-sm text-[#4b5563] border-0 cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
               Anterior
             </button>
           )}
           <button
-            onClick={onNext} className="flex items-center gap-[4px] py-[6px] px-4 rounded-2 text-3.5 bg-blue-600 text-white border-0 cursor-pointer"
+            onClick={onNext} className="flex items-center gap-[4px] py-[6px] px-4 rounded-lg text-sm bg-blue-600 text-white border-0 cursor-pointer"
           >
             {isLast ? 'Finalizar' : 'Siguiente'}
             {!isLast && <ChevronRight className="w-4 h-4" />}

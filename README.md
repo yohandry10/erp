@@ -22,6 +22,8 @@
 **Sistema ERP empresarial multi-tenant con facturación electrónica SUNAT/OSE, gestión comercial, inventarios, finanzas y contabilidad automatizada.**
 
 [Primera lectura para cualquier sesion](docs/START_HERE.md) •
+[Anti-duplicacion](docs/00_coordination/ANTI_DUPLICATION_PROTOCOL.md) •
+[Decisiones canonicas](docs/00_coordination/DECISIONS.md) •
 [📚 Documentación](#-documentación) •
 [🚀 Inicio Rápido](#-inicio-rápido) •
 [🏗️ Arquitectura](#️-arquitectura) •
@@ -31,6 +33,20 @@
 </div>
 
 ---
+
+## Regla para agentes
+
+Antes de auditar, codificar o crear migraciones, leer:
+
+1. `docs/START_HERE.md`
+2. `docs/00_coordination/CURRENT_STATE.md`
+3. `docs/00_coordination/FLOW_STATUS.md`
+4. `docs/00_coordination/AGENT_SYNC.md`
+5. `docs/00_coordination/ANTI_DUPLICATION_PROTOCOL.md`
+6. `docs/00_coordination/DECISIONS.md`
+7. `docs/DOC_NAVIGATION_MANIFEST.md` para ubicar la fuente del dominio
+
+No empezar desde cero: buscar primero en docs y decisiones para no repetir analisis ni reimplementar algo existente.
 
 ## 📋 Tabla de Contenidos
 

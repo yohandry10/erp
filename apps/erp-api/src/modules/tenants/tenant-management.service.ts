@@ -6,6 +6,13 @@ import { CreateTenantDto, UpdateTenantDto, TenantFiltersDto, ActivateDemoTenantD
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { sanitizePostgrestSearch } from '../../common/util/postgrest.util';
+import {
+  INITIAL_ACTIVE_COUNTRY_CODE,
+  INITIAL_ACTIVE_COUNTRY_ID,
+  INITIAL_ACTIVE_COUNTRY_MESSAGE,
+  isInitialActiveCountryCode,
+  isInitialActiveCountryId,
+} from '../paises/initial-country';
 
 @Injectable()
 export class TenantManagementService {
@@ -14,6 +21,15 @@ export class TenantManagementService {
     private readonly userManagementService: UserManagementService,
     private readonly tenantContext: TenantContextService,
   ) { }
+
+  private assertInitialActiveCountry(paisId?: number | null, paisCodigo?: string | null): void {
+    if (paisId !== undefined && paisId !== null && !isInitialActiveCountryId(paisId)) {
+      throw new BadRequestException(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+    }
+    if (paisCodigo && !isInitialActiveCountryCode(paisCodigo)) {
+      throw new BadRequestException(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+    }
+  }
 
   private async rollbackTenantCreation(client: any, tenantId: string): Promise<void> {
     const { error } = await client
@@ -49,11 +65,12 @@ export class TenantManagementService {
     if (!paisIdInput || Number.isNaN(paisIdInput)) {
       throw new BadRequestException('pais_id es requerido para crear el tenant');
     }
+    this.assertInitialActiveCountry(paisIdInput, tenantData.pais);
 
     const { data: paisData, error: paisError } = await client
       .from('paises')
       .select('id, codigo_iso, moneda_codigo')
-      .eq('id', paisIdInput)
+      .eq('id', INITIAL_ACTIVE_COUNTRY_ID)
       .single();
 
     if (paisError || !paisData?.id) {
@@ -64,6 +81,7 @@ export class TenantManagementService {
     if (!pais) {
       throw new BadRequestException('El país seleccionado no tiene código ISO válido');
     }
+    this.assertInitialActiveCountry(paisData.id, pais);
 
     if (tenantData.pais && tenantData.pais.toUpperCase() !== pais) {
       throw new BadRequestException('pais_id no coincide con el país enviado');
@@ -101,7 +119,7 @@ export class TenantManagementService {
     const moneda = tenantData.moneda || paisData.moneda_codigo || 'PEN';
     const adminEmail = tenantData.admin_email || tenantData.email;
     const adminNombre = tenantData.admin_nombre || 'Administrador';
-    const paisId = paisData.id;
+    const paisId = INITIAL_ACTIVE_COUNTRY_ID;
 
     const { error: canonicalTenantError } = await client
       .from('tenants')
@@ -235,18 +253,20 @@ export class TenantManagementService {
       if (!parsedPaisId || Number.isNaN(parsedPaisId)) {
         throw new BadRequestException('pais_id debe ser válido');
       }
+      this.assertInitialActiveCountry(parsedPaisId, null);
       resolvedPaisId = parsedPaisId;
     }
 
     if (typeof tenantData.pais === 'string' && tenantData.pais.trim()) {
       resolvedPaisCodigo = tenantData.pais.trim().toUpperCase();
+      this.assertInitialActiveCountry(null, resolvedPaisCodigo);
     }
 
     if (resolvedPaisId) {
       const { data: paisData, error: paisError } = await client
         .from('paises')
         .select('id, codigo_iso')
-        .eq('id', resolvedPaisId)
+        .eq('id', INITIAL_ACTIVE_COUNTRY_ID)
         .single();
 
       if (paisError || !paisData?.id) {
@@ -257,6 +277,7 @@ export class TenantManagementService {
       if (!paisCodigo) {
         throw new BadRequestException('El país seleccionado no tiene código ISO válido');
       }
+      this.assertInitialActiveCountry(paisData.id, paisCodigo);
 
       if (resolvedPaisCodigo && resolvedPaisCodigo !== paisCodigo) {
         throw new BadRequestException('pais_id no coincide con el país enviado');
@@ -267,7 +288,7 @@ export class TenantManagementService {
       const { data: paisData, error: paisError } = await client
         .from('paises')
         .select('id, codigo_iso')
-        .eq('codigo_iso', resolvedPaisCodigo)
+        .eq('codigo_iso', INITIAL_ACTIVE_COUNTRY_CODE)
         .maybeSingle();
 
       if (paisError || !paisData?.id) {
@@ -276,6 +297,7 @@ export class TenantManagementService {
 
       resolvedPaisId = paisData.id;
       resolvedPaisCodigo = paisData.codigo_iso?.toUpperCase() || resolvedPaisCodigo;
+      this.assertInitialActiveCountry(resolvedPaisId, resolvedPaisCodigo);
     }
 
     if (!resolvedPaisId && !existingTenant?.pais_id) {

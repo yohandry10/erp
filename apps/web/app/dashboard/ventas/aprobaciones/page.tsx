@@ -133,7 +133,7 @@ export default function AprobacionesPage() {
 
     const style = ESTADO_CREDITO_COLOR[estado] || ESTADO_CREDITO_COLOR.SIN_EVALUAR
     return (
-      <span className="inline-flex items-center py-1 px-3 rounded-full text-3 font-semibold"
+      <span className="inline-flex items-center py-1 px-3 rounded-full text-xs font-semibold"
       >
         {estado}
       </span>
@@ -153,19 +153,19 @@ export default function AprobacionesPage() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">Bandeja de Aprobaciones</h1>
-          <p className="dashboard-subtitle">
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Bandeja de Aprobaciones</h1>
+          <p className="mt-2 text-base text-muted-foreground">
             Gestiona pedidos que requieren autorización por crédito, descuentos o límites configurados
           </p>
         </div>
         <div className="flex gap-4 items-center">
           <button
             onClick={loadPendientes}
-            className="refresh-btn py-3 px-6"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 py-3 px-6"
             disabled={loading}
           >
             <RefreshCw size={16} />
@@ -175,55 +175,55 @@ export default function AprobacionesPage() {
       </div>
 
       {/* Stats */}
-      <div className="stats-grid ventas-stats-grid mb-8">
-        <div className="stat-card">
-          <div className="stat-header">
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5  mb-8">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>PENDIENTES</h3>
-            <span className="stat-icon stat-icon-amber">
+            <span className="inline-flex size-11 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500">
               <Clock />
             </span>
           </div>
-          <div className="stat-value">{data.length}</div>
-          <div className="stat-subtitle">Pedidos en espera</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none">{data.length}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Pedidos en espera</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>MONTO COMPROMETIDO</h3>
-            <span className="stat-icon stat-icon-emerald">
+            <span className="inline-flex size-11 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500">
               <DollarSign />
             </span>
           </div>
-          <div className="stat-value text-5">
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-xl">
             {formatCurrency(totalPendiente)}
           </div>
-          <div className="stat-subtitle">Total a aprobar</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Total a aprobar</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>ÚLTIMA ACTUALIZACIÓN</h3>
-            <span className="stat-icon stat-icon-blue">
+            <span className="inline-flex size-11 items-center justify-center rounded-xl bg-blue-500/15 text-blue-500">
               <FileText />
             </span>
           </div>
-          <div className="stat-value text-4">
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-base">
             {ultimaActualizacion?.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) ?? '--:--'}
           </div>
-          <div className="stat-subtitle">{ultimaActualizacion?.toLocaleDateString('es-PE') ?? '-'}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">{ultimaActualizacion?.toLocaleDateString('es-PE') ?? '-'}</div>
         </div>
       </div>
 
       {/* Pedidos Pendientes */}
-      <div className="activity-section">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
         {loading ? (
-          <div className="loading">
-            <div className="loading-spinner"></div>
+          <div className="flex min-h-48 items-center justify-center">
+            <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
             <p>Cargando pedidos pendientes...</p>
           </div>
         ) : data.length === 0 ? (
-          <div className="activity-card">
-            <div className="text-center p-12 text-gray-500">
+          <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+            <div className="text-center p-12 text-muted-foreground">
               <CheckCircle2 size={48} className="text-[#10b981]" />
               <h3 className="text-[1.125rem] font-semibold mb-2">
                 No hay pedidos pendientes de aprobación
@@ -232,12 +232,12 @@ export default function AprobacionesPage() {
             </div>
           </div>
         ) : (
-          <div className="activity-card">
+          <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
             <div className="mb-6">
-              <h2 className="text-5 font-semibold text-gray-900 mb-2">
+              <h2 className="text-xl font-semibold text-foreground mb-2">
                 Pedidos Pendientes
               </h2>
-              <p className="text-[0.875rem] text-gray-500">
+              <p className="text-[0.875rem] text-muted-foreground">
                 {data.length} {data.length === 1 ? 'pedido requiere' : 'pedidos requieren'} aprobación
               </p>
             </div>
@@ -245,7 +245,7 @@ export default function AprobacionesPage() {
             <div className="flex flex-col gap-6">
               {data.map((pedido) => (
                 <div
-                  key={pedido.id} className="p-6 bg-[rgba(255,_255,_255,_0.8)] border rounded-3 transition"
+                  key={pedido.id} className="p-6 bg-card/80 border rounded-xl transition"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = '#3b82f6'
                     e.currentTarget.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.1)'
@@ -262,22 +262,22 @@ export default function AprobacionesPage() {
                     <div className="flex justify-between items-start flex-wrap gap-4">
                       <div className="flex-[1] min-w-0">
                         <div className="flex items-center gap-4 mb-3 flex-wrap">
-                          <h3 className="text-5 font-bold text-gray-900">
+                          <h3 className="text-xl font-bold text-foreground">
                             {pedido.numero}
                           </h3>
                           {renderEstadoCredito(pedido.estado_credito)}
-                          <span className="inline-flex items-center py-1.5 px-3 rounded-2 text-[0.875rem] font-semibold bg-[#f3f4f6] text-gray-700 border">
+                          <span className="inline-flex items-center py-1.5 px-3 rounded-lg text-[0.875rem] font-semibold bg-muted text-foreground/85 border">
                             {formatCurrency(pedido.total)}
                           </span>
                         </div>
-                        <p className="text-[0.875rem] text-gray-500 mb-2">
+                        <p className="text-[0.875rem] text-muted-foreground mb-2">
                           <strong>{pedido.cliente?.razon_social || 'Cliente no asignado'}</strong>
                           {pedido.cliente?.documento_numero && (
                             <span> · {pedido.cliente.documento_numero}</span>
                           )}
                         </p>
                         {pedido.created_at && (
-                          <p className="text-3 text-gray-400">
+                          <p className="text-xs text-muted-foreground">
                             Creado: {formatDate(pedido.created_at)}
                           </p>
                         )}
@@ -287,7 +287,7 @@ export default function AprobacionesPage() {
                       <div className="flex gap-3 flex-wrap">
                         <button
                           onClick={() => handleDecision(pedido, 'APROBADO')}
-                          disabled={decidingId === pedido.id} className="py-3 px-6 rounded-2 border-0 text-white text-[0.875rem] font-semibold flex items-center gap-2 transition"
+                          disabled={decidingId === pedido.id} className="py-3 px-6 rounded-lg border-0 text-white text-[0.875rem] font-semibold flex items-center gap-2 transition"
                           onMouseEnter={(e) => {
                             if (decidingId !== pedido.id) {
                               e.currentTarget.style.background = '#059669'
@@ -308,7 +308,7 @@ export default function AprobacionesPage() {
                         </button>
                         <button
                           onClick={() => handleDecision(pedido, 'RECHAZADO')}
-                          disabled={decidingId === pedido.id} className="py-3 px-6 rounded-2 border text-[0.875rem] font-semibold flex items-center gap-2 transition"
+                          disabled={decidingId === pedido.id} className="py-3 px-6 rounded-lg border text-[0.875rem] font-semibold flex items-center gap-2 transition"
                           onMouseEnter={(e) => {
                             if (decidingId !== pedido.id) {
                               e.currentTarget.style.background = '#fef2f2'
@@ -334,8 +334,8 @@ export default function AprobacionesPage() {
 
                     {/* Motivos */}
                     {pedido.motivos.length > 0 && (
-                      <div className="p-4 bg-[#fef3c7] border rounded-2">
-                        <span className="block text-3 font-bold text-[#92400e] mb-3">
+                      <div className="p-4 bg-[#fef3c7] border rounded-lg">
+                        <span className="block text-xs font-bold text-[#92400e] mb-3">
                           Motivos que requieren aprobación:
                         </span>
                         <ul className="m-0 pl-5 text-[0.875rem] text-[#78350f]">
@@ -350,17 +350,17 @@ export default function AprobacionesPage() {
 
                     {/* Resumen de crédito */}
                     {pedido.resumen_credito && (
-                      <div className="flex flex-wrap gap-3 p-4 bg-[#f3f4f6] rounded-2">
-                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-3 font-semibold bg-white text-gray-700 border">
+                      <div className="flex flex-wrap gap-3 p-4 bg-muted rounded-lg">
+                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-xs font-semibold bg-card text-foreground/85 border">
                           Límite: {formatCurrency(pedido.resumen_credito.limite)}
                         </span>
-                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-3 font-semibold bg-white text-gray-700 border">
+                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-xs font-semibold bg-card text-foreground/85 border">
                           Pendiente: {formatCurrency(pedido.resumen_credito.pendiente)}
                         </span>
-                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-3 font-semibold">
+                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-xs font-semibold">
                           {pedido.resumen_credito.tieneVencidos ? '⚠️ Con morosidad' : '✓ Sin morosidad'}
                         </span>
-                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-3 font-semibold bg-white text-gray-700 border">
+                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-xs font-semibold bg-card text-foreground/85 border">
                           {pedido.resumen_credito.permiteMorosidad ? 'Permite mora' : 'No permite mora'}
                         </span>
                       </div>

@@ -26,7 +26,7 @@ export function RucConfigStep() {
 
   return (
     <div className="py-4 px-0">
-      <div className="flex items-center gap-3 mb-6 p-4 bg-[rgba(59,_130,_246,_0.1)] rounded-2">
+      <div className="flex items-center gap-3 mb-6 p-4 bg-[rgba(59,_130,_246,_0.1)] rounded-lg">
         <Building2 size={24} className="text-[var(--primary-600)]" />
         <p className="text-[0.875rem] text-[var(--primary-700)] m-0">
           Ingresa los datos de tu empresa tal como aparecen en {country.servicioFiscal}
@@ -41,13 +41,13 @@ export function RucConfigStep() {
           <Input
             id="ruc"
             type="text"
-            placeholder={country.paisCodigo === 'PE' ? 'Ej: 20123456789' : country.paisCodigo === 'CO' ? 'Ej: 900123456-7' : 'Ingrese documento fiscal'}
+            placeholder="Ej: 20123456789"
             value={state.configuration.ruc}
             onChange={(e) => handleInputChange('ruc', e.target.value)}
-            maxLength={country.paisCodigo === 'PE' ? 11 : country.paisCodigo === 'CO' ? 12 : 20} className="text-4"
+            maxLength={11} className="text-base"
           />
-          <p className="text-3 text-[var(--primary-500)] mt-1">
-            {country.paisCodigo === 'PE' ? 'Debe tener 11 dígitos' : country.paisCodigo === 'CO' ? 'Formato: 9-10 dígitos + dígito de verificación' : 'Ingrese documento fiscal válido'}
+          <p className="text-xs text-[var(--primary-500)] mt-1">
+            Debe tener 11 dígitos.
           </p>
         </div>
 
@@ -60,9 +60,9 @@ export function RucConfigStep() {
             type="text"
             placeholder="Ej: EMPRESA EJEMPLO S.A.C."
             value={state.configuration.razonSocial}
-            onChange={(e) => handleInputChange('razonSocial', e.target.value)} className="text-4"
+            onChange={(e) => handleInputChange('razonSocial', e.target.value)} className="text-base"
           />
-          <p className="text-3 text-[var(--primary-500)] mt-1">
+          <p className="text-xs text-[var(--primary-500)] mt-1">
             Nombre completo de la empresa
           </p>
         </div>
@@ -76,17 +76,72 @@ export function RucConfigStep() {
             type="text"
             placeholder="Ej: Av. Principal 123, Lima, Lima"
             value={state.configuration.direccion}
-            onChange={(e) => handleInputChange('direccion', e.target.value)} className="text-4"
+            onChange={(e) => handleInputChange('direccion', e.target.value)} className="text-base"
           />
-          <p className="text-3 text-[var(--primary-500)] mt-1">
+          <p className="text-xs text-[var(--primary-500)] mt-1">
             Dirección registrada en {country.servicioFiscal}
           </p>
         </div>
 
+        {country.paisCodigo === 'PE' && (
+          <>
+            <div>
+              <Label htmlFor="ubigeo" className="mb-2 block">
+                Ubigeo del domicilio fiscal <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="ubigeo"
+                type="text"
+                inputMode="numeric"
+                placeholder="Ej: 150101"
+                value={state.configuration.ubigeo}
+                onChange={(e) => handleInputChange('ubigeo', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                minLength={6}
+                maxLength={6}
+                pattern="[0-9]{6}"
+                className="text-base"
+              />
+              <p className="text-xs text-[var(--primary-500)] mt-1">
+                Código INEI de 6 dígitos requerido para emitir guías de remisión.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <Label htmlFor="departamento" className="mb-2 block">Departamento</Label>
+                <Input
+                  id="departamento"
+                  value={state.configuration.departamento || ''}
+                  onChange={(e) => handleInputChange('departamento', e.target.value)}
+                  placeholder="Lima"
+                />
+              </div>
+              <div>
+                <Label htmlFor="provincia" className="mb-2 block">Provincia</Label>
+                <Input
+                  id="provincia"
+                  value={state.configuration.provincia || ''}
+                  onChange={(e) => handleInputChange('provincia', e.target.value)}
+                  placeholder="Lima"
+                />
+              </div>
+              <div>
+                <Label htmlFor="distrito" className="mb-2 block">Distrito</Label>
+                <Input
+                  id="distrito"
+                  value={state.configuration.distrito || ''}
+                  onChange={(e) => handleInputChange('distrito', e.target.value)}
+                  placeholder="Lima"
+                />
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Logo de la empresa */}
         <div>
           <Label className="mb-2 block">
-            Logo de la Empresa <span className="text-slate-400 font-normal">(opcional)</span>
+            Logo de la Empresa <span className="text-muted-foreground font-normal">(opcional)</span>
           </Label>
           <LogoUploader
             currentLogoUrl={state.configuration.logoUrl}
@@ -97,7 +152,7 @@ export function RucConfigStep() {
 
       </div>
 
-      <div className="mt-8 p-4 bg-[rgba(251,_191,_36,_0.1)] rounded-2 border">
+      <div className="mt-8 p-4 bg-[rgba(251,_191,_36,_0.1)] rounded-lg border">
         <p className="text-[0.875rem] text-[var(--warning-700)] m-0 leading-6">
           <strong>⚠️ Importante:</strong> Asegúrate de que los datos coincidan exactamente con
           los registrados en {country.servicioFiscal} para evitar rechazos en la emisión de comprobantes.

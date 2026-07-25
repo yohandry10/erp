@@ -12,7 +12,7 @@ $API_URL = "$BASE_URL/api"
 Write-Host "1. Obteniendo token de autenticación..." -ForegroundColor Yellow
 $loginBody = @{
     email = "admin@vierdes.com"
-    password = "Admin123!"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json
 
 try {

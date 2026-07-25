@@ -1,0 +1,76 @@
+{
+  "createdAt": "2026-06-17T21:18:32.614Z",
+  "tenantId": "c0af84b5-5ea6-44a9-9e6e-a869f119b013",
+  "webBase": "http://localhost:3001",
+  "apiBase": "http://localhost:3002/api",
+  "total": 11,
+  "failed": 11,
+  "results": [
+    {
+      "role": "ADMIN_DEMO",
+      "route": "/dashboard/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "ADMIN",
+      "route": "/dashboard/usuarios/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "GERENCIA",
+      "route": "/dashboard/analytics/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "COMPRAS",
+      "route": "/dashboard/compras/proveedores/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "ALMACEN",
+      "route": "/dashboard/inventario/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "VENDEDOR",
+      "route": "/dashboard/ventas/clientes/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "CAJERO",
+      "route": "/dashboard/pos/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "FINANZAS",
+      "route": "/dashboard/finanzas/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "CONTADOR",
+      "route": "/dashboard/contabilidad/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "RRHH",
+      "route": "/dashboard/rrhh/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    },
+    {
+      "role": "AUDITOR",
+      "route": "/dashboard/audit-logs/",
+      "pass": false,
+      "error": "browserContext.addCookies: Cookie should have either url or path"
+    }
+  ]
+}

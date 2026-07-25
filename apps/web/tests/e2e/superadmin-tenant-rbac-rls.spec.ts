@@ -86,6 +86,38 @@ async function loginApi(email: string, password: string): Promise<LoginResponse>
   }
 }
 
+async function ensureEphemeralSuperadmin(supabase: SupabaseClient, email: string): Promise<boolean> {
+  const { data: original, error: originalError } = await supabase
+    .from('usuarios_sistema')
+    .select('is_super_admin')
+    .eq('email', email)
+    .single();
+  expect(originalError?.message || '', 'leer estado original del principal efímero').toBe('');
+
+  const { data, error } = await supabase
+    .from('usuarios_sistema')
+    .update({ is_super_admin: true })
+    .eq('email', email)
+    .select('id, is_super_admin')
+    .single();
+
+  expect(error?.message || '', 'elevar principal efímero de DEV para Gate 21').toBe('');
+  expect(data?.is_super_admin, 'principal efímero debe quedar marcado como superadmin').toBe(true);
+  return original?.is_super_admin === true;
+}
+
+async function restoreEphemeralSuperadmin(
+  supabase: SupabaseClient,
+  email: string,
+  originalValue: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from('usuarios_sistema')
+    .update({ is_super_admin: originalValue })
+    .eq('email', email);
+  expect(error?.message || '', 'restaurar estado original del principal efímero').toBe('');
+}
+
 async function contextFor(token: string): Promise<APIRequestContext> {
   return playwrightRequest.newContext({
     baseURL: apiBaseURL,
@@ -226,50 +258,59 @@ test.describe('Gate 21 superadmin tenant RBAC RLS', () => {
   test('tenant nuevo nace operable, con RBAC limpio y aislamiento RLS por API', async () => {
     const password = getOperationalPassword();
     const supabase = getSupabase();
+    const superadminEmail = process.env.TEST_USER_EMAIL || 'admin@erp.local';
 
-    const superadmin = await loginApi(process.env.TEST_USER_EMAIL || 'admin@erp.local', password);
-    expect(superadmin.user.is_super_admin, 'superadmin debe autenticar con flag real').toBe(true);
-    const superContext = await contextFor(superadmin.access_token);
+    // El runner crea un tenant DEV desechable y su admin no es superadmin por
+    // diseño. Este gate eleva únicamente ese principal efímero para probar la
+    // frontera global real sin debilitar la política del producto.
+    const originalSuperadminValue = await ensureEphemeralSuperadmin(supabase, superadminEmail);
+    try {
+      const superadmin = await loginApi(superadminEmail, password);
+      expect(superadmin.user.is_super_admin, 'superadmin debe autenticar con flag real').toBe(true);
+      const superContext = await contextFor(superadmin.access_token);
 
-    const tenantA = await createTenant(superContext, 'A', password);
-    const tenantB = await createTenant(superContext, 'B', password);
+      const tenantA = await createTenant(superContext, 'A', password);
+      const tenantB = await createTenant(superContext, 'B', password);
 
-    await validateTenantRbac(supabase, tenantA.tenantId);
-    await validateTenantRbac(supabase, tenantB.tenantId);
+      await validateTenantRbac(supabase, tenantA.tenantId);
+      await validateTenantRbac(supabase, tenantB.tenantId);
 
-    const adminA = await loginApi(tenantA.adminEmail, password);
-    const adminB = await loginApi(tenantB.adminEmail, password);
-    expect(adminA.user.is_super_admin).toBe(false);
-    expect(adminB.user.is_super_admin).toBe(false);
-    expect(adminA.user.tenant_id).toBe(tenantA.tenantId);
-    expect(adminB.user.tenant_id).toBe(tenantB.tenantId);
+      const adminA = await loginApi(tenantA.adminEmail, password);
+      const adminB = await loginApi(tenantB.adminEmail, password);
+      expect(adminA.user.is_super_admin).toBe(false);
+      expect(adminB.user.is_super_admin).toBe(false);
+      expect(adminA.user.tenant_id).toBe(tenantA.tenantId);
+      expect(adminB.user.tenant_id).toBe(tenantB.tenantId);
 
-    const contextA = await contextFor(adminA.access_token);
-    const contextB = await contextFor(adminB.access_token);
-    const vendedorEmail = await createOperationalUser(contextA, supabase, tenantA.tenantId, 'VENDEDOR', password);
-    const vendedor = await loginApi(vendedorEmail, password);
-    const vendedorRoles = (vendedor.user.roles || []).map((role) =>
-      typeof role === 'string' ? role : role.nombre,
-    );
-    expect(vendedorRoles).toContain('VENDEDOR');
-    const vendedorContext = await contextFor(vendedor.access_token);
-    expect(await status(vendedorContext.get(api('/ventas/clientes'))), 'VENDEDOR tenant nuevo accede a ventas/clientes').toBe(200);
-    expect(await status(vendedorContext.get(api('/compras/proveedores'))), 'VENDEDOR tenant nuevo no accede a compras/proveedores').toBe(403);
+      const contextA = await contextFor(adminA.access_token);
+      const contextB = await contextFor(adminB.access_token);
+      const vendedorEmail = await createOperationalUser(contextA, supabase, tenantA.tenantId, 'VENDEDOR', password);
+      const vendedor = await loginApi(vendedorEmail, password);
+      const vendedorRoles = (vendedor.user.roles || []).map((role) =>
+        typeof role === 'string' ? role : role.nombre,
+      );
+      expect(vendedorRoles).toContain('VENDEDOR');
+      const vendedorContext = await contextFor(vendedor.access_token);
+      expect(await status(vendedorContext.get(api('/ventas/clientes'))), 'VENDEDOR tenant nuevo accede a ventas/clientes').toBe(200);
+      expect(await status(vendedorContext.get(api('/compras/proveedores'))), 'VENDEDOR tenant nuevo no accede a compras/proveedores').toBe(403);
 
-    const clienteA = await createCliente(contextA, 'A');
-    const clienteB = await createCliente(contextB, 'B');
+      const clienteA = await createCliente(contextA, 'A');
+      const clienteB = await createCliente(contextB, 'B');
 
-    expect(await status(contextA.get(api(`/ventas/clientes/${clienteA}`))), 'admin A lee cliente A').toBe(200);
-    expect(await status(contextA.get(api(`/ventas/clientes/${clienteB}`))), 'admin A no lee cliente B por ID directo').toBe(404);
-    expect(await status(contextB.get(api(`/ventas/clientes/${clienteB}`))), 'admin B lee cliente B').toBe(200);
-    expect(await status(contextB.get(api(`/ventas/clientes/${clienteA}`))), 'admin B no lee cliente A por ID directo').toBe(404);
-    expect(await status(contextA.get(api('/tenants'))), 'admin A no lista tenants globales').toBe(403);
-    expect(await status(contextB.get(api('/tenants'))), 'admin B no lista tenants globales').toBe(403);
-    expect(await status(superContext.get(api('/tenants'))), 'superadmin lista tenants globales').toBe(200);
+      expect(await status(contextA.get(api(`/ventas/clientes/${clienteA}`))), 'admin A lee cliente A').toBe(200);
+      expect(await status(contextA.get(api(`/ventas/clientes/${clienteB}`))), 'admin A no lee cliente B por ID directo').toBe(404);
+      expect(await status(contextB.get(api(`/ventas/clientes/${clienteB}`))), 'admin B lee cliente B').toBe(200);
+      expect(await status(contextB.get(api(`/ventas/clientes/${clienteA}`))), 'admin B no lee cliente A por ID directo').toBe(404);
+      expect(await status(contextA.get(api('/tenants'))), 'admin A no lista tenants globales').toBe(403);
+      expect(await status(contextB.get(api('/tenants'))), 'admin B no lista tenants globales').toBe(403);
+      expect(await status(superContext.get(api('/tenants'))), 'superadmin lista tenants globales').toBe(200);
 
-    await vendedorContext.dispose();
-    await contextA.dispose();
-    await contextB.dispose();
-    await superContext.dispose();
+      await vendedorContext.dispose();
+      await contextA.dispose();
+      await contextB.dispose();
+      await superContext.dispose();
+    } finally {
+      await restoreEphemeralSuperadmin(supabase, superadminEmail, originalSuperadminValue);
+    }
   });
 });

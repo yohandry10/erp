@@ -6,21 +6,41 @@ import { useApiCall } from '@/hooks/use-api'
 import { usePaises } from '@/hooks/use-paises'
 import { Building2, Mail, Phone, MapPin, Settings, FileText, X, AlertCircle, Eye, EyeOff, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { INITIAL_ACTIVE_COUNTRY, INITIAL_ACTIVE_COUNTRY_CODE } from '@/lib/initial-country'
 
 const sectionClass = 'mb-8'
-const sectionHeaderClass = 'mb-5 flex items-center gap-3 border-b-2 border-slate-200 pb-3'
+const sectionHeaderClass = 'mb-5 flex items-center gap-3 border-b-2 border-border pb-3'
 const sectionIconClass = 'flex items-center justify-center rounded-lg bg-blue-600 p-2 text-white'
-const sectionTitleClass = 'm-0 text-lg font-bold text-slate-800'
+const sectionTitleClass = 'm-0 text-lg font-bold text-foreground'
 const formGridClass = 'grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]'
-const labelClass = 'mb-2 flex items-center gap-2 text-sm font-semibold text-slate-600'
-const labelIconClass = 'size-3.5 text-slate-500'
-const requiredClass = 'text-slate-500'
-const inputClass = 'w-full rounded-[10px] border-2 border-slate-200 bg-white px-4 py-3 text-[0.9rem] outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60'
-const helperClass = 'mt-1 text-xs text-slate-500'
+const labelClass = 'mb-2 flex items-center gap-2 text-sm font-semibold text-foreground/80'
+const labelIconClass = 'size-3.5 text-muted-foreground'
+const requiredClass = 'text-muted-foreground'
+const inputClass = 'w-full rounded-[10px] border-2 border-border bg-card px-4 py-3 text-[0.9rem] outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60'
+const helperClass = 'mt-1 text-xs text-muted-foreground'
 const fullSpanClass = 'md:col-span-full'
-const optionCardClass = 'flex cursor-pointer items-center rounded-[10px] border-2 border-slate-200 bg-white p-4 transition hover:border-blue-500 hover:bg-blue-50'
-const optionCardActiveClass = 'border-blue-500 bg-blue-50'
+const optionCardClass = 'flex cursor-pointer items-center rounded-[10px] border-2 border-border bg-card p-4 transition hover:border-blue-500 hover:bg-primary/10'
+const optionCardActiveClass = 'border-blue-500 bg-primary/10'
 const checkboxClass = 'mr-3 size-5 cursor-pointer accent-blue-600'
+
+const defaultTenantFormData = {
+  ruc: '',
+  razon_social: '',
+  nombre_comercial: '',
+  direccion: '',
+  email: '',
+  telefono: '',
+  pais: INITIAL_ACTIVE_COUNTRY.codigo_iso,
+  pais_id: INITIAL_ACTIVE_COUNTRY.id,
+  moneda: INITIAL_ACTIVE_COUNTRY.moneda_codigo,
+  tipo_empresa: 'MICRO',
+  usar_flujo_logistica: false,
+  gre_obligatorio: false,
+  gre_automatico_habilitado: false,
+  umbral_gre_automatico: 700,
+  admin_password: '',
+  admin_nombre: '',
+}
 
 interface Tenant {
   id?: string
@@ -67,24 +87,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
     umbral_gre_automatico: number
     admin_password: string
     admin_nombre: string
-  }>({
-    ruc: '',
-    razon_social: '',
-    nombre_comercial: '',
-    direccion: '',
-    email: '',
-    telefono: '',
-    pais: '',
-    pais_id: null,
-    moneda: '',
-    tipo_empresa: 'MICRO',
-    usar_flujo_logistica: false,
-    gre_obligatorio: false,
-    gre_automatico_habilitado: false,
-    umbral_gre_automatico: 700,
-    admin_password: '', // Contraseña del admin
-    admin_nombre: '', // Nombre del admin
-  })
+  }>({ ...defaultTenantFormData })
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -95,7 +98,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
   } | null>(null)
 
   const api = useApiCall()
-  const { paises, loading: paisesLoading } = usePaises()
+  const { paises } = usePaises()
 
   const documentoConfigMap: Record<string, {
     label: string
@@ -111,34 +114,6 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
       maxLength: 11,
       helper: 'Debe tener 11 dígitos',
     },
-    CO: {
-      label: 'NIT',
-      placeholder: '900123456-7',
-      pattern: '^[0-9]{9,10}(-[0-9])?$',
-      maxLength: 12,
-      helper: 'Formato: 9-10 dígitos + dígito de verificación',
-    },
-    CL: {
-      label: 'RUT',
-      placeholder: '12345678-9',
-      pattern: '^[0-9]{7,9}(-[0-9kK])?$',
-      maxLength: 11,
-      helper: 'Formato: 7-9 dígitos + dígito verificador',
-    },
-    MX: {
-      label: 'RFC',
-      placeholder: 'XAXX010101000',
-      pattern: '^[A-Z0-9]{12,13}$',
-      maxLength: 13,
-      helper: 'Debe tener 12 o 13 caracteres alfanuméricos',
-    },
-    EC: {
-      label: 'RUC',
-      placeholder: '1790012345001',
-      pattern: '^[0-9]{13}$',
-      maxLength: 13,
-      helper: 'Debe tener 13 dígitos',
-    },
   }
 
   const documentoConfig = documentoConfigMap[formData.pais] || documentoConfigMap.PE
@@ -151,11 +126,9 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
   // Cargar datos del tenant si estamos editando
   useEffect(() => {
     if (tenant) {
-      const paisMatch = tenant.pais
-        ? paises.find((pais) => pais.codigo_iso === tenant.pais)
-        : undefined
-      const resolvedPaisId = tenant.pais_id ?? paisMatch?.id ?? null
-      const resolvedMoneda = tenant.moneda_defecto || paisMatch?.moneda_codigo || ''
+      const paisMatch = paises.find((pais) => pais.codigo_iso === INITIAL_ACTIVE_COUNTRY_CODE) ?? INITIAL_ACTIVE_COUNTRY
+      const resolvedPaisId = paisMatch.id
+      const resolvedMoneda = paisMatch.moneda_codigo
 
       setFormData({
         ruc: tenant.ruc || '',
@@ -164,7 +137,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
         direccion: tenant.direccion || '',
         email: tenant.email || '',
         telefono: tenant.telefono || '',
-        pais: tenant.pais || '',
+        pais: INITIAL_ACTIVE_COUNTRY_CODE,
         pais_id: resolvedPaisId,
         moneda: resolvedMoneda,
         tipo_empresa: tenant.tipo_empresa || 'MICRO',
@@ -175,6 +148,14 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
         admin_password: '',
         admin_nombre: '',
       })
+    } else {
+      const paisMatch = paises.find((pais) => pais.codigo_iso === INITIAL_ACTIVE_COUNTRY_CODE) ?? INITIAL_ACTIVE_COUNTRY
+      setFormData((prev) => ({
+        ...prev,
+        pais: paisMatch.codigo_iso,
+        pais_id: paisMatch.id,
+        moneda: paisMatch.moneda_codigo,
+      }))
     }
   }, [tenant, paises])
 
@@ -206,7 +187,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
         pais_id: formData.pais_id,
       }
 
-      const result = isEditing 
+      const result = isEditing
         ? await api.put(`/tenants/${tenant.id}`, payload)
         : await api.post('/tenants', payload)
 
@@ -223,24 +204,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
         onSuccess()
         if (!adminUser?.email || !adminUser?.temporaryPassword) {
           onClose()
-          setFormData({
-            ruc: '',
-            razon_social: '',
-            nombre_comercial: '',
-            direccion: '',
-            email: '',
-            telefono: '',
-            pais: '',
-            pais_id: null,
-            moneda: '',
-            tipo_empresa: 'MICRO',
-            usar_flujo_logistica: false,
-            gre_obligatorio: false,
-            gre_automatico_habilitado: false,
-            umbral_gre_automatico: 700,
-            admin_password: '',
-            admin_nombre: '',
-          })
+          setFormData({ ...defaultTenantFormData })
         }
       } else {
         setError(result?.message || 'Error al crear la empresa')
@@ -278,24 +242,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
   const handleCloseCredentials = () => {
     setCredentials(null)
     onClose()
-    setFormData({
-      ruc: '',
-      razon_social: '',
-      nombre_comercial: '',
-      direccion: '',
-      email: '',
-      telefono: '',
-      pais: '',
-      pais_id: null,
-      moneda: '',
-      tipo_empresa: 'MICRO',
-      usar_flujo_logistica: false,
-      gre_obligatorio: false,
-      gre_automatico_habilitado: false,
-      umbral_gre_automatico: 700,
-      admin_password: '',
-      admin_nombre: '',
-    })
+    setFormData({ ...defaultTenantFormData })
   }
 
   if ((!isOpen && !credentials) || !mounted) return null
@@ -351,11 +298,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
           {/* Error */}
           {error && (
             <div
-              className="mx-8 mt-6 flex animate-in slide-in-from-top-2 items-start gap-3 rounded-[10px] border border-slate-300 bg-slate-50 p-4 duration-300"
+              className="mx-8 mt-6 flex animate-in slide-in-from-top-2 items-start gap-3 rounded-[10px] border border-border bg-muted/30 p-4 duration-300"
             >
-              <AlertCircle className="mt-0.5 size-5 shrink-0 text-slate-600" />
+              <AlertCircle className="mt-0.5 size-5 shrink-0 text-foreground/80" />
               <div className="flex-1">
-                <p className="m-0 text-sm font-semibold text-slate-700">{error}</p>
+                <p className="m-0 text-sm font-semibold text-foreground/85">{error}</p>
               </div>
             </div>
           )}
@@ -383,20 +330,12 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       value={formData.pais}
                       onChange={handleChange}
                       required
-                      disabled={paisesLoading}
-                      className={cn(inputClass, !paisesLoading && 'cursor-pointer')}
+                      disabled
+                      className={inputClass}
                     >
-                      {paisesLoading && <option value="">Cargando países...</option>}
-                      {!paisesLoading && (
-                        <>
-                          <option value="">Selecciona un país...</option>
-                          {paises.map((pais) => (
-                            <option key={pais.codigo_iso} value={pais.codigo_iso}>
-                              {pais.nombre} ({pais.codigo_iso})
-                            </option>
-                          ))}
-                        </>
-                      )}
+                      <option value={INITIAL_ACTIVE_COUNTRY.codigo_iso}>
+                        {INITIAL_ACTIVE_COUNTRY.nombre} ({INITIAL_ACTIVE_COUNTRY.codigo_iso})
+                      </option>
                     </select>
                   </div>
 
@@ -563,7 +502,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
                 <div className={formGridClass}>
                   <div className={fullSpanClass}>
-                    <label className="mb-2 block text-sm font-semibold text-slate-600">
+                    <label className="mb-2 block text-sm font-semibold text-foreground/80">
                       Tipo de Empresa <span className={requiredClass}>*</span>
                     </label>
                     <select
@@ -578,7 +517,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       <option value="MEDIANA">Mediana Empresa</option>
                       <option value="GRANDE">Gran Empresa</option>
                     </select>
-                    <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-800">
+                    <div className="mt-2 rounded-lg border border-blue-200 bg-primary/10 p-3 text-xs font-semibold text-primary">
                       {formData.tipo_empresa === 'MICRO' || formData.tipo_empresa === 'PEQUEÑA'
                         ? '💡 Flujo simplificado (sin logística)'
                         : '💡 Flujo completo (con logística)'}
@@ -597,8 +536,8 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                         className={checkboxClass}
                       />
                       <div className="flex-1">
-                        <span className="text-[0.95rem] font-bold text-slate-800">Usar Flujo Logístico</span>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <span className="text-[0.95rem] font-bold text-foreground">Usar Flujo Logístico</span>
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Incluye preparación y despacho en almacén
                         </p>
                       </div>
@@ -629,8 +568,8 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                         className={checkboxClass}
                       />
                       <div className="flex-1">
-                        <span className="text-[0.95rem] font-bold text-slate-800">GRE Obligatorio</span>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <span className="text-[0.95rem] font-bold text-foreground">GRE Obligatorio</span>
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Exigir GRE para todas las ventas
                         </p>
                       </div>
@@ -649,8 +588,8 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                         className={checkboxClass}
                       />
                       <div className="flex-1">
-                        <span className="text-[0.95rem] font-bold text-slate-800">Sugerencia Automática</span>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <span className="text-[0.95rem] font-bold text-foreground">Sugerencia Automática</span>
+                        <p className="mt-1 text-xs text-muted-foreground">
                           Sugerir GRE según monto
                         </p>
                       </div>
@@ -659,7 +598,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
                   {formData.gre_automatico_habilitado && (
                     <div className={cn(fullSpanClass, 'animate-in slide-in-from-top-2 duration-300')}>
-                      <label className="mb-2 block text-sm font-semibold text-slate-600">
+                      <label className="mb-2 block text-sm font-semibold text-foreground/80">
                         Umbral para Sugerencia (S/)
                       </label>
                       <input
@@ -671,7 +610,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                         step={0.01}
                         className={inputClass}
                       />
-                      <p className="mt-2 text-xs text-slate-500">
+                      <p className="mt-2 text-xs text-muted-foreground">
                         💡 Sugerir GRE si el monto de venta supera este valor
                       </p>
                     </div>
@@ -685,7 +624,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   type="button"
                   onClick={onClose}
                   disabled={isLoading}
-                  className="rounded-[10px] border-2 border-slate-200 bg-white px-7 py-3 text-[0.9rem] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-[10px] border-2 border-border bg-card px-7 py-3 text-[0.9rem] font-semibold text-foreground/80 transition hover:border-border hover:bg-muted/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -718,42 +657,42 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
           className="fixed inset-0 z-[11000] flex animate-in fade-in items-center justify-center bg-black/60 backdrop-blur-sm duration-200"
         >
           <div
-            className="w-[90%] max-w-[500px] rounded-2xl bg-white p-8 shadow-2xl"
+            className="w-[90%] max-w-[500px] rounded-2xl bg-card p-8 shadow-2xl"
           >
             <div className="mb-6 text-center">
               <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-2xl text-white">
                 <Building2 className="size-8" />
               </div>
-              <h2 className="mb-2 text-2xl font-bold text-slate-800">
+              <h2 className="mb-2 text-2xl font-bold text-foreground">
                 ¡Empresa Creada!
               </h2>
-              <p className="m-0 text-slate-500">
+              <p className="m-0 text-muted-foreground">
                 Guarda estas credenciales del administrador
               </p>
             </div>
 
-            <div className="mb-6 rounded-xl border-2 border-slate-200 bg-slate-50 p-5">
+            <div className="mb-6 rounded-xl border-2 border-border bg-muted/30 p-5">
               <div className="mb-4">
-                <label className="mb-1 block text-xs font-semibold text-slate-500">
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">
                   EMAIL
                 </label>
-                <div className="rounded-lg border border-slate-200 bg-white p-3 font-mono text-[0.9rem] text-slate-800">
+                <div className="rounded-lg border border-border bg-card p-3 font-mono text-[0.9rem] text-foreground">
                   {credentials.email}
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-500">
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">
                   CONTRASEÑA TEMPORAL
                 </label>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3">
-                  <span className="flex-1 font-mono text-[0.9rem] font-bold text-slate-800">
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-3">
+                  <span className="flex-1 font-mono text-[0.9rem] font-bold text-foreground">
                     {showPassword ? credentials.temporaryPassword : '••••••••••••'}
                   </span>
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="text-slate-400 hover:text-slate-600 transition"
+                    className="text-muted-foreground hover:text-foreground/80 transition"
                     title={showPassword ? 'Ocultar' : 'Mostrar'}
                   >
                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -761,7 +700,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   <button
                     type="button"
                     onClick={() => navigator.clipboard?.writeText(credentials.temporaryPassword)}
-                    className="text-slate-400 hover:text-slate-600 transition"
+                    className="text-muted-foreground hover:text-foreground/80 transition"
                     title="Copiar"
                   >
                     <Copy className="size-4" />
@@ -770,7 +709,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
               </div>
             </div>
 
-            <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-3 text-[0.85rem] text-blue-900">
+            <div className="mb-6 rounded-lg border border-blue-200 bg-primary/10 p-3 text-[0.85rem] text-primary">
               ⚠️ <strong>Importante:</strong> El usuario deberá cambiar esta contraseña en su primer inicio de sesión.
             </div>
 

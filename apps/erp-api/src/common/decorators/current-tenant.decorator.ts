@@ -13,13 +13,14 @@ export const CurrentTenant = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): string => {
     const request = ctx.switchToHttp().getRequest();
     const user = request.user;
+    const resolvedTenant = request.tenant_id || request.tenantId || user?.tenant_id;
 
-    if (!user || !user.tenant_id) {
+    if (!user || !resolvedTenant) {
       console.error('❌ [CurrentTenant] Usuario sin tenant_id:', user);
       throw new UnauthorizedException('Tenant no identificado');
     }
 
-    console.log('🏢 [CurrentTenant] Tenant extraído:', user.tenant_id);
-    return user.tenant_id;
+    console.log('🏢 [CurrentTenant] Tenant extraído:', resolvedTenant);
+    return resolvedTenant;
   },
 );

@@ -23,9 +23,9 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
   className,
   placeholder
 }) => {
-  const { 
-    getLabel, 
-    getValidationRule, 
+  const {
+    getLabel,
+    getValidationRule,
     isFieldRequired,
     getDocumentTypes,
     getTaxTypes,
@@ -93,7 +93,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
             </SelectContent>
           </Select>
         );
-      
+
       case 'number':
         return (
           <Input
@@ -107,7 +107,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
             step={validationRule?.step || 0.01}
           />
         );
-      
+
       case 'date':
         return (
           <Input
@@ -118,7 +118,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
             placeholder={placeholder}
           />
         );
-      
+
       default:
         return (
           <Input
@@ -142,7 +142,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       </Label>
       {renderField()}
       {validationRule?.helpText && (
-        <p className="text-sm text-gray-500">{validationRule.helpText}</p>
+        <p className="text-sm text-muted-foreground">{validationRule.helpText}</p>
       )}
     </div>
   );

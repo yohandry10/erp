@@ -93,6 +93,12 @@ async function createSaleWithCpe(apiContext: APIRequestContext) {
     'crear cliente SIRE',
   );
 
+  const almacenes = await parseOk<any[]>(
+    await apiContext.get(api('/inventario/almacenes')),
+    'listar almacenes venta SIRE',
+  );
+  expect(almacenes.length, 'SIRE requiere almacén operativo').toBeGreaterThan(0);
+
   const producto = await parseOk<any>(
     await apiContext.post(api('/inventario/productos'), {
       data: {
@@ -102,6 +108,7 @@ async function createSaleWithCpe(apiContext: APIRequestContext) {
         precio_compra: 50,
         precio_venta: 118,
         stock: 4,
+        almacen_id: almacenes[0].id,
         stock_minimo: 0,
         controla_stock: true,
       },

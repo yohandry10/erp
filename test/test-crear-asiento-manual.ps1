@@ -7,7 +7,7 @@ $baseUrl = "http://localhost:3000/api"
 Write-Host "🔐 Iniciando sesión..." -ForegroundColor Cyan
 $loginResponse = Invoke-RestMethod -Uri "$baseUrl/auth/login" -Method Post -Body (@{
     email = "admin@vierdes.com"
-    password = "Admin123!"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json) -ContentType "application/json"
 
 $token = $loginResponse.access_token

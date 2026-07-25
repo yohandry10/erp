@@ -86,15 +86,15 @@ export default function ReportesRrhhPage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
           <div>
-            <h1 className="dashboard-title">Reportes RRHH</h1>
-            <p className="dashboard-subtitle">Cargando indicadores de personal, ingresos recientes y distribución por área.</p>
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Reportes RRHH</h1>
+            <p className="mt-2 text-base text-muted-foreground">Cargando indicadores de personal, ingresos recientes y distribución por área.</p>
           </div>
         </div>
-        <div className="loading">
-          <div className="loading-spinner" />
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary" />
           <p>Cargando reportes de RRHH...</p>
         </div>
       </div>
@@ -103,11 +103,11 @@ export default function ReportesRrhhPage() {
 
   if (!rrhhEnabled) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
           <div>
-            <h1 className="dashboard-title">Reportes RRHH</h1>
-            <p className="dashboard-subtitle">El módulo de RRHH está deshabilitado en este entorno.</p>
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Reportes RRHH</h1>
+            <p className="mt-2 text-base text-muted-foreground">El módulo de RRHH está deshabilitado en este entorno.</p>
           </div>
         </div>
       </div>
@@ -115,66 +115,66 @@ export default function ReportesRrhhPage() {
   }
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">Reportes RRHH</h1>
-          <p className="dashboard-subtitle">Indicadores operativos de personal, ingresos y distribución por área</p>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Reportes RRHH</h1>
+          <p className="mt-2 text-base text-muted-foreground">Indicadores operativos de personal, ingresos y distribución por área</p>
         </div>
-        <button className="refresh-btn" onClick={loadData}>
+        <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50" onClick={loadData}>
           Actualizar
         </button>
       </div>
 
       {error && (
-        <div className="activity-card text-[var(--red-700)]">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl text-[var(--red-700)]">
           {error}
         </div>
       )}
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-header">
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Total empleados</h3>
-            <div className="stat-icon">👥</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">👥</div>
           </div>
-          <div className="stat-value text-blue-600">{metrics.total}</div>
-          <div className="stat-subtitle">Personal registrado</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-primary">{metrics.total}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Personal registrado</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Activos</h3>
-            <div className="stat-icon">✅</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">✅</div>
           </div>
-          <div className="stat-value text-green-600">{metrics.activos}</div>
-          <div className="stat-subtitle">Personal habilitado</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-emerald-400">{metrics.activos}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Personal habilitado</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Inactivos</h3>
-            <div className="stat-icon">⏸️</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">⏸️</div>
           </div>
-          <div className="stat-value text-red-600">{metrics.inactivos}</div>
-          <div className="stat-subtitle">Personal no activo</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-destructive">{metrics.inactivos}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Personal no activo</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Nuevos ingresos</h3>
-            <div className="stat-icon">📈</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">📈</div>
           </div>
-          <div className="stat-value text-purple-600">{metrics.ingresos30Dias}</div>
-          <div className="stat-subtitle">Últimos 30 días</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-violet-400">{metrics.ingresos30Dias}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Últimos 30 días</div>
         </div>
       </div>
 
-      <div className="activity-section">
-        <h2 className="activity-title">Distribución por departamento</h2>
-        <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
+        <h2 className="m-0 text-lg font-bold text-foreground">Distribución por departamento</h2>
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           {metrics.porDepartamento.length === 0 ? (
-            <div className="activity-empty">
+            <div className="px-4 py-10 text-center text-muted-foreground">
               <h3>No hay departamentos registrados</h3>
               <p>Cuando existan áreas organizacionales se mostrará la distribución del personal.</p>
             </div>

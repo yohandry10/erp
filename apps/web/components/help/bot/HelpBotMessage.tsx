@@ -17,7 +17,7 @@ export function HelpBotMessage({ message }: HelpBotMessageProps) {
       <div
         className={cn(
           'max-w-[85%] rounded-lg px-3 py-2',
-          isUser ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800',
+          isUser ? 'bg-blue-600 text-white' : 'bg-muted text-foreground',
         )}
       >
         <p className="m-0 whitespace-pre-wrap text-sm">{message.content}</p>
@@ -25,7 +25,7 @@ export function HelpBotMessage({ message }: HelpBotMessageProps) {
         {message.result && (
           <div className="mt-3 flex flex-col gap-2">
             {message.result.pasos && message.result.pasos.length > 0 && (
-              <div className="rounded-md bg-white p-2 text-slate-700">
+              <div className="rounded-md bg-card p-2 text-foreground/85">
                 <p className="m-0 mb-1 text-xs font-semibold">
                   Pasos:
                 </p>
@@ -42,7 +42,7 @@ export function HelpBotMessage({ message }: HelpBotMessageProps) {
             {message.result.url_modulo && (
               <Link
                 href={message.result.url_modulo}
-                className="flex items-center gap-1 text-xs text-blue-600 no-underline hover:text-blue-700"
+                className="flex items-center gap-1 text-xs text-primary no-underline hover:text-primary"
               >
                 <ExternalLink className="h-3 w-3" />
                 Ir al módulo
@@ -52,7 +52,7 @@ export function HelpBotMessage({ message }: HelpBotMessageProps) {
         )}
 
         <p
-          className={cn('m-0 mt-1 text-[10px]', isUser ? 'text-blue-100' : 'text-slate-400')}
+          className={cn('m-0 mt-1 text-[10px]', isUser ? 'text-primary dark:text-blue-200' : 'text-muted-foreground')}
         >
           {message.timestamp.toLocaleTimeString('es-PE', {
             hour: '2-digit',

@@ -101,6 +101,7 @@ describe('InventoryIntegrationService', () => {
   it('retorna el movimiento existente sin descontar stock cuando llega un duplicado con la misma referencia', async () => {
     const client = clientFromSequence({
       productos: [query({ data: producto, error: null })],
+      almacenes: [query({ data: { id: '00000000-0000-4000-8000-000000000001', activo: true }, error: null })],
       stock_movimientos: [query({ data: { id: 'mov-existente' }, error: null })],
     });
     const service = buildService(client);
@@ -118,11 +119,12 @@ describe('InventoryIntegrationService', () => {
           valorTotal: 10,
           usuarioId: 'qa',
           referencia: 'QA-PROD-READY-DUP-001',
+          almacenId: '00000000-0000-4000-8000-000000000001',
         },
         tenantId,
       ),
     ).resolves.toBe('mov-existente');
 
-    expect(client.from).toHaveBeenCalledTimes(2);
+    expect(client.from).toHaveBeenCalledTimes(3);
   });
 });

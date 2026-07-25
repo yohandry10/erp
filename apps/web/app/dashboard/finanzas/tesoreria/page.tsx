@@ -65,23 +65,23 @@ interface ResumenFlujo {
 const URGENCIA_CONFIG = {
   VENCIDA: {
     label: 'Vencida',
-    className: 'border-amber-300/35 bg-amber-300/10 text-amber-100',
+    className: 'border-amber-300/35 bg-amber-300/10 text-amber-400 dark:text-amber-200',
   },
   HOY: {
     label: 'Vence hoy',
-    className: 'border-amber-300/35 bg-amber-300/10 text-amber-100',
+    className: 'border-amber-300/35 bg-amber-300/10 text-amber-400 dark:text-amber-200',
   },
   URGENTE: {
     label: 'Urgente',
-    className: 'border-sky-300/35 bg-sky-300/10 text-sky-100',
+    className: 'border-sky-300/35 bg-sky-300/10 text-primary dark:text-sky-200',
   },
   PROXIMA: {
     label: 'Próxima',
-    className: 'border-cyan-300/35 bg-cyan-300/10 text-cyan-100',
+    className: 'border-cyan-300/35 bg-cyan-300/10 text-primary',
   },
   NORMAL: {
     label: 'Normal',
-    className: 'border-slate-400/30 bg-slate-400/10 text-slate-200',
+    className: 'border-border/30 bg-slate-400/10 text-foreground/90',
   },
 }
 
@@ -164,11 +164,11 @@ export default function TesoreriaPage() {
 
   if (loading) {
     return (
-      <div className="min-h-full bg-slate-950 p-6 text-slate-100">
-        <Card className="border-cyan-400/20 bg-slate-950/70">
+      <div className="min-h-full bg-background p-6 text-foreground">
+        <Card className="border-cyan-400/20 bg-card/70">
           <CardContent className="flex min-h-80 flex-col items-center justify-center gap-4">
-            <RefreshCw className="h-8 w-8 animate-spin text-cyan-300" />
-            <p className="text-sm text-slate-300">Cargando información de tesorería...</p>
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Cargando información de tesorería...</p>
           </CardContent>
         </Card>
       </div>
@@ -176,22 +176,22 @@ export default function TesoreriaPage() {
   }
 
   return (
-    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.22),transparent_34%),linear-gradient(135deg,#020617_0%,#061a2f_58%,#020617_100%)] p-4 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:p-6">
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.22),transparent_34%),linear-gradient(135deg,#020617_0%,#061a2f_58%,#020617_100%)] p-4 text-foreground group-data-[erp-theme=light]/dashboard:bg-muted/30 group-data-[erp-theme=light]/dashboard:text-foreground lg:p-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-        <Card className="border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-cyan-950/20 group-data-[erp-theme=light]/dashboard:bg-white">
+        <Card className="border-cyan-400/20 bg-card/75 shadow-2xl shadow-cyan-950/20 group-data-[erp-theme=light]/dashboard:bg-card">
           <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-cyan-100">
+              <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-primary">
                 ERP Treasury Center
               </Badge>
-              <h1 className="text-2xl font-semibold tracking-normal text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-normal text-foreground group-data-[erp-theme=light]/dashboard:text-foreground lg:text-3xl">
                 Tesorería
               </h1>
-              <p className="mt-1 text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+              <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                 Saldos bancarios, pagos próximos, flujo proyectado y acciones financieras críticas.
               </p>
             </div>
-            <Button variant="outline" className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10" onClick={loadDashboardData}>
+            <Button variant="outline" className="border-cyan-400/30 bg-card/50 text-primary hover:bg-cyan-400/10" onClick={loadDashboardData}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Actualizar
             </Button>
@@ -206,22 +206,22 @@ export default function TesoreriaPage() {
         </div>
 
         {resumenFlujo.length > 0 && (
-          <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+          <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
             <CardHeader className="flex flex-row items-center justify-between border-b border-cyan-400/10 p-4">
-              <CardTitle className="text-base text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">Proyección de flujo (30 días)</CardTitle>
-              <Button variant="outline" className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10" onClick={() => router.push('/dashboard/finanzas/tesoreria/flujo-caja')}>
+              <CardTitle className="text-base text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">Proyección de flujo (30 días)</CardTitle>
+              <Button variant="outline" className="border-cyan-400/30 bg-card/50 text-primary hover:bg-cyan-400/10" onClick={() => router.push('/dashboard/finanzas/tesoreria/flujo-caja')}>
                 Ver detalle
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </CardHeader>
             <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
               {resumenFlujo.map((resumen) => (
-                <Card key={resumen.moneda} className="border-cyan-400/20 bg-slate-950/55">
+                <Card key={resumen.moneda} className="border-cyan-400/20 bg-card/55">
                   <CardContent className="space-y-4 p-4">
                     <div>
                       <p className="text-xs font-semibold uppercase text-cyan-200/75">{resumen.moneda}</p>
-                      <p className="mt-2 text-2xl font-semibold text-slate-50">{formatCurrency(resumen.saldo_proyectado, resumen.moneda)}</p>
-                      <p className="text-xs text-slate-400">Saldo proyectado</p>
+                      <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(resumen.saldo_proyectado, resumen.moneda)}</p>
+                      <p className="text-xs text-muted-foreground">Saldo proyectado</p>
                     </div>
 
                     <div className="space-y-2 text-sm">
@@ -238,7 +238,7 @@ export default function TesoreriaPage() {
                     </div>
 
                     {resumen.alerta && (
-                      <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-100">
+                      <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
                           {resumen.alerta === 'SALDO_NEGATIVO' ? 'Saldo negativo proyectado' : 'Saldo bajo proyectado'}
@@ -252,11 +252,11 @@ export default function TesoreriaPage() {
           </Card>
         )}
 
-        <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+        <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
           <CardHeader className="flex flex-col gap-3 border-b border-cyan-400/10 p-4 lg:flex-row lg:items-center lg:justify-between">
-            <CardTitle className="text-base text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">Próximos pagos (15 días)</CardTitle>
+            <CardTitle className="text-base text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">Próximos pagos (15 días)</CardTitle>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button variant="outline" className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10" onClick={() => router.push('/dashboard/finanzas/tesoreria/programacion')}>
+              <Button variant="outline" className="border-cyan-400/30 bg-card/50 text-primary hover:bg-cyan-400/10" onClick={() => router.push('/dashboard/finanzas/tesoreria/programacion')}>
                 <Calendar className="mr-2 h-4 w-4" />
                 Ver programación
               </Button>
@@ -269,12 +269,12 @@ export default function TesoreriaPage() {
           <CardContent className="p-0">
             {proximosPagos.length === 0 ? (
               <div className="flex min-h-72 flex-col items-center justify-center gap-4 p-8 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-primary">
                   <CheckCircle className="h-7 w-7" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">No hay pagos próximos</h2>
-                  <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                  <h2 className="text-lg font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">No hay pagos próximos</h2>
+                  <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                     No hay cuentas por pagar con vencimiento en los próximos 15 días.
                   </p>
                 </div>
@@ -295,13 +295,13 @@ export default function TesoreriaPage() {
                   {proximosPagos.map((pago) => (
                     <TableRow key={pago.id} className="border-cyan-400/10 hover:bg-cyan-400/5">
                       <TableCell>{getUrgenciaBadge(pago.urgencia)}</TableCell>
-                      <TableCell className="font-medium text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
+                      <TableCell className="font-medium text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">
                         {pago.proveedor?.razon_social || 'N/A'}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">{pago.numero_documento}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">{pago.numero_documento}</TableCell>
                       <TableCell>
-                        <div className="text-sm text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">{formatDate(pago.fecha_vencimiento)}</div>
-                        <div className={cn('mt-1 text-xs', pago.dias_hasta_vencimiento < 0 ? 'text-amber-200' : 'text-slate-400')}>
+                        <div className="text-sm text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">{formatDate(pago.fecha_vencimiento)}</div>
+                        <div className={cn('mt-1 text-xs', pago.dias_hasta_vencimiento < 0 ? 'text-amber-400 dark:text-amber-200' : 'text-muted-foreground')}>
                           {pago.dias_hasta_vencimiento < 0
                             ? `Vencido hace ${Math.abs(pago.dias_hasta_vencimiento)} días`
                             : pago.dias_hasta_vencimiento === 0
@@ -309,7 +309,7 @@ export default function TesoreriaPage() {
                               : `Vence en ${pago.dias_hasta_vencimiento} días`}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-amber-100">
+                      <TableCell className="text-right font-semibold text-amber-400 dark:text-amber-200">
                         {formatCurrency(pago.saldo, pago.moneda)}
                       </TableCell>
                       <TableCell className="text-right">
@@ -348,15 +348,15 @@ function MetricCard({
   detail: string
 }) {
   return (
-    <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+    <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase text-cyan-200/75 group-data-[erp-theme=light]/dashboard:text-slate-500">{label}</p>
-            <p className="mt-2 text-xl font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">{value}</p>
-            <p className="mt-1 text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">{detail}</p>
+            <p className="text-xs font-semibold uppercase text-cyan-200/75 group-data-[erp-theme=light]/dashboard:text-muted-foreground">{label}</p>
+            <p className="mt-2 text-xl font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">{value}</p>
+            <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{detail}</p>
           </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-primary">
             <Icon className="h-5 w-5" />
           </div>
         </div>
@@ -378,8 +378,8 @@ function FlowLine({
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className={cn('text-slate-400', strong && 'font-semibold text-slate-200')}>{label}:</span>
-      <span className={cn('font-semibold', tone === 'positive' ? 'text-cyan-200' : 'text-amber-100', strong && 'font-bold')}>
+      <span className={cn('text-muted-foreground', strong && 'font-semibold text-foreground/90')}>{label}:</span>
+      <span className={cn('font-semibold', tone === 'positive' ? 'text-primary' : 'text-amber-400 dark:text-amber-200', strong && 'font-bold')}>
         {value}
       </span>
     </div>
@@ -401,13 +401,13 @@ function QuickAction({
     <button
       type="button"
       onClick={onClick}
-      className="group rounded-lg border border-cyan-400/20 bg-slate-950/70 p-4 text-left shadow-lg shadow-cyan-950/10 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-white"
+      className="group rounded-lg border border-cyan-400/20 bg-card/70 p-4 text-left shadow-lg shadow-cyan-950/10 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-card"
     >
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 transition group-hover:bg-cyan-400/20">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-primary transition group-hover:bg-cyan-400/20">
         <Icon className="h-5 w-5" />
       </div>
-      <h3 className="text-sm font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">{description}</p>
+      <h3 className="text-sm font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">{title}</h3>
+      <p className="mt-2 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{description}</p>
     </button>
   )
 }

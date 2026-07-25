@@ -43,7 +43,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Calcular totales
     const subtotal = formData.items.reduce((sum, item) => sum + (item.valorUnitario * item.cantidad), 0)
     const totalIgv = formData.items.reduce((sum, item) => sum + item.igv, 0)
@@ -57,7 +57,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
     }
 
     const result = await api.post('/api/cpe/comprobantes', cpeData)
-    
+
     if (result) {
       onSuccess()
       onClose()
@@ -166,12 +166,12 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   const total = subtotal + totalIgv
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]">
-      <div className="bg-white rounded-3 p-8 w-[95%] max-w-[900px] overflow-auto">
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1100]">
+      <div className="bg-card rounded-xl p-8 w-[95%] max-w-[900px] overflow-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-6 font-semibold text-gray-800">Nuevo Comprobante Electrónico</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Nuevo Comprobante Electrónico</h2>
           <button
-            onClick={onClose} className="border-0 text-6 cursor-pointer text-gray-500"
+            onClick={onClose} className="border-0 text-2xl cursor-pointer text-muted-foreground"
           >
             ×
           </button>
@@ -180,19 +180,19 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
         <form onSubmit={handleSubmit}>
           {/* Datos del Comprobante */}
           <div className="mb-8">
-            <h3 className="text-5 font-semibold mb-4 text-gray-700">
+            <h3 className="text-xl font-semibold mb-4 text-foreground/85">
               Datos del Comprobante
             </h3>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
               <div>
-                <label className="block mb-2 font-semibold text-gray-700">
+                <label className="block mb-2 font-semibold text-foreground/85">
                   Tipo de Comprobante *
                 </label>
                 <select
                   name="tipoComprobante"
                   value={formData.tipoComprobante}
                   onChange={handleChange}
-                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                  required className="w-[100%] p-3 border rounded-[6px] text-sm"
                 >
                   <option value="01">01 - Factura</option>
                   <option value="03">03 - Boleta de Venta</option>
@@ -202,7 +202,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-gray-700">
+                <label className="block mb-2 font-semibold text-foreground/85">
                   Serie *
                 </label>
                 <input
@@ -210,12 +210,12 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="serie"
                   value={formData.serie}
                   onChange={handleChange}
-                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                  required className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-gray-700">
+                <label className="block mb-2 font-semibold text-foreground/85">
                   Fecha de Emisión *
                 </label>
                 <input
@@ -223,18 +223,18 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="fechaEmision"
                   value={formData.fechaEmision}
                   onChange={handleChange}
-                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                  required className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-gray-700">
+                <label className="block mb-2 font-semibold text-foreground/85">
                   Moneda
                 </label>
                 <select
                   name="moneda"
                   value={formData.moneda}
-                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
                 >
                   <option value="PEN">PEN - Soles</option>
                   <option value="USD">USD - Dólares</option>
@@ -245,12 +245,12 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
           {/* Datos del Cliente */}
           <div className="mb-8">
-            <h3 className="text-5 font-semibold mb-4 text-gray-700">
+            <h3 className="text-xl font-semibold mb-4 text-foreground/85">
               Datos del Cliente
             </h3>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4">
               <div>
-                <label className="block mb-2 font-semibold text-gray-700">
+                <label className="block mb-2 font-semibold text-foreground/85">
                   RUC/DNI *
                 </label>
                 <input
@@ -258,12 +258,12 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="clienteRuc"
                   value={formData.clienteRuc}
                   onChange={handleChange}
-                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                  required className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-gray-700">
+                <label className="block mb-2 font-semibold text-foreground/85">
                   Razón Social/Nombre *
                 </label>
                 <input
@@ -271,19 +271,19 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="clienteRazonSocial"
                   value={formData.clienteRazonSocial}
                   onChange={handleChange}
-                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                  required className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-gray-700">
+                <label className="block mb-2 font-semibold text-foreground/85">
                   Dirección
                 </label>
                 <input
                   type="text"
                   name="clienteDireccion"
                   value={formData.clienteDireccion}
-                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
               </div>
             </div>
@@ -292,27 +292,27 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
           {/* Items */}
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-5 font-semibold text-gray-700">
+              <h3 className="text-xl font-semibold text-foreground/85">
                 Detalle de Items
               </h3>
               <button
                 type="button"
-                onClick={addItem} className="py-2 px-4 rounded-[6px] border bg-[rgba(59,_130,_246,_0.1)] text-blue-500 cursor-pointer text-3.5"
+                onClick={addItem} className="py-2 px-4 rounded-[6px] border bg-[rgba(59,_130,_246,_0.1)] text-blue-500 cursor-pointer text-sm"
               >
                 + Agregar Item
               </button>
             </div>
 
             {formData.items.map((item, index) => (
-              <div key={index} className="border rounded-2 p-4 mb-4 bg-[#f9fafb]">
+              <div key={index} className="border rounded-lg p-4 mb-4 bg-muted">
                 <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-4 font-semibold text-gray-700">
+                  <h4 className="text-base font-semibold text-foreground/85">
                     Item {index + 1}
                   </h4>
                   {formData.items.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => removeItem(index)} className="py-1 px-2 rounded-[4px] border bg-[rgba(239,_68,_68,_0.1)] text-red-500 cursor-pointer text-[0.8rem]"
+                      onClick={() => removeItem(index)} className="py-1 px-2 rounded-[4px] border bg-destructive/10 text-red-500 cursor-pointer text-[0.8rem]"
                     >
                       Eliminar
                     </button>
@@ -321,30 +321,30 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
                 <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4">
                   <div>
-                    <label className="block mb-2 font-semibold text-gray-700">
+                    <label className="block mb-2 font-semibold text-foreground/85">
                       Código
                     </label>
                     <input
                       type="text"
                       value={item.codigo}
-                      onChange={(e) => handleItemChange(index, 'codigo', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                      onChange={(e) => handleItemChange(index, 'codigo', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-gray-700">
+                    <label className="block mb-2 font-semibold text-foreground/85">
                       Descripción *
                     </label>
                     <input
                       type="text"
                       value={item.descripcion}
                       onChange={(e) => handleItemChange(index, 'descripcion', e.target.value)}
-                      required className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                      required className="w-[100%] p-2 border rounded-[4px] text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-gray-700">
+                    <label className="block mb-2 font-semibold text-foreground/85">
                       Cantidad *
                     </label>
                     <input
@@ -353,12 +353,12 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                       onChange={(e) => handleItemChange(index, 'cantidad', parseFloat(e.target.value) || 0)}
                       min="0"
                       step="0.01"
-                      required className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                      required className="w-[100%] p-2 border rounded-[4px] text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-gray-700">
+                    <label className="block mb-2 font-semibold text-foreground/85">
                       Valor Unitario *
                     </label>
                     <input
@@ -367,29 +367,29 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                       onChange={(e) => handleItemChange(index, 'valorUnitario', parseFloat(e.target.value) || 0)}
                       min="0"
                       step="0.01"
-                      required className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                      required className="w-[100%] p-2 border rounded-[4px] text-sm"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-gray-700">
+                    <label className="block mb-2 font-semibold text-foreground/85">
                       IGV
                     </label>
                     <input
                       type="number"
                       value={item.igv.toFixed(2)}
-                      readOnly className="w-[100%] p-2 border rounded-[4px] text-3.5 bg-[#f3f4f6]"
+                      readOnly className="w-[100%] p-2 border rounded-[4px] text-sm bg-muted"
                     />
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-gray-700">
+                    <label className="block mb-2 font-semibold text-foreground/85">
                       Total
                     </label>
                     <input
                       type="number"
                       value={item.total.toFixed(2)}
-                      readOnly className="w-[100%] p-2 border rounded-[4px] text-3.5 bg-[#f3f4f6] font-semibold"
+                      readOnly className="w-[100%] p-2 border rounded-[4px] text-sm bg-muted font-semibold"
                     />
                   </div>
                 </div>
@@ -398,43 +398,43 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
           </div>
 
           {/* Totales */}
-          <div className="bg-slate-50 p-6 rounded-2 mb-8 border">
-            <h3 className="text-5 font-semibold mb-4 text-gray-700">
+          <div className="bg-muted/30 p-6 rounded-lg mb-8 border">
+            <h3 className="text-xl font-semibold mb-4 text-foreground/85">
               Resumen
             </h3>
             <div className="grid grid-cols-[repeat(3,_1fr)] gap-4 text-right">
               <div>
-                <div className="font-semibold text-gray-500">Subtotal:</div>
-                <div className="text-4 font-semibold">S/ {subtotal.toFixed(2)}</div>
+                <div className="font-semibold text-muted-foreground">Subtotal:</div>
+                <div className="text-base font-semibold">S/ {subtotal.toFixed(2)}</div>
               </div>
               <div>
-                <div className="font-semibold text-gray-500">IGV ({taxPercent}%):</div>
-                <div className="text-4 font-semibold">S/ {totalIgv.toFixed(2)}</div>
+                <div className="font-semibold text-muted-foreground">IGV ({taxPercent}%):</div>
+                <div className="text-base font-semibold">S/ {totalIgv.toFixed(2)}</div>
               </div>
               <div>
-                <div className="font-semibold text-gray-500">Total:</div>
-                <div className="text-[1.3rem] font-bold text-emerald-600">S/ {total.toFixed(2)}</div>
+                <div className="font-semibold text-muted-foreground">Total:</div>
+                <div className="text-[1.3rem] font-bold text-emerald-400">S/ {total.toFixed(2)}</div>
               </div>
             </div>
           </div>
 
           {/* Observaciones */}
           <div className="mb-8">
-            <label className="block mb-2 font-semibold text-gray-700">
+            <label className="block mb-2 font-semibold text-foreground/85">
               Observaciones
             </label>
             <textarea
               name="observaciones"
               value={formData.observaciones}
               onChange={handleChange}
-              rows={3} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+              rows={3} className="w-[100%] p-3 border rounded-[6px] text-sm"
             />
           </div>
 
           <div className="flex gap-4 justify-end">
             <button
               type="button"
-              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-semibold"
+              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-card text-foreground/85 cursor-pointer font-semibold"
             >
               Cancelar
             </button>

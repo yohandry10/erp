@@ -8,6 +8,25 @@ export interface HeaderPair {
   value: string
 }
 
+const SENSITIVE_PERSISTED_HEADER_NAMES = new Set([
+  'authorization',
+  'cookie',
+  'proxy-authorization',
+  'set-cookie',
+  'x-api-key',
+  'x-access-token',
+  'x-auth-token',
+  'x-refresh-token',
+])
+
+function isSensitivePersistedHeader(name: string) {
+  return SENSITIVE_PERSISTED_HEADER_NAMES.has(name.trim().toLowerCase())
+}
+
+function sanitizePersistedHeaders(headers: HeaderPair[]) {
+  return headers.filter((header) => header.name && !isSensitivePersistedHeader(header.name))
+}
+
 export interface OfflineRequestInput {
   endpoint: string
   method: string
@@ -98,10 +117,29 @@ export const DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS = [
   '/api/pos/ventas-recientes',
   '/api/pos/detalles-venta',
   '/api/configuration/gre-thresholds',
+  '/api/configuration/context/country',
+  '/api/configuracion-fiscal',
+  '/api/validations/certificate',
   '/api/inventario/productos',
+  '/api/inventario/almacenes',
+  '/api/inventario/recepciones',
+  '/api/inventario/kardex',
+  '/api/inventario/logistica/ordenes-pendientes',
+  '/api/inventario/logistica/listo-despacho',
   '/api/ventas/clientes',
   '/api/ventas/cotizaciones',
   '/api/ventas/pedidos',
+  '/api/ventas/pedidos/aprobaciones/pendientes',
+  '/api/ventas/reportes/fill-rate',
+  '/api/ventas/reportes/cotizaciones-pendientes',
+  '/api/ventas/reportes/cxc-aging',
+  '/api/ventas/reportes/pedidos-por-estado',
+  '/api/ventas/reportes/lead-time',
+  '/api/ventas/reportes/pipeline',
+  '/api/ventas/reportes/productos-mas-vendidos',
+  '/api/ventas/reportes/sunat-kpis',
+  '/api/ventas/reportes/top-clientes',
+  '/api/ventas/reportes/ventas-por-cliente',
   '/api/compras/proveedores',
   '/api/compras/productos',
   '/api/compras/next-number',
@@ -127,7 +165,11 @@ export const DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS = [
   '/api/finanzas/bancos/cuentas',
   '/api/finanzas/conciliacion/pendientes',
   '/api/finanzas/tesoreria/programacion',
+  '/api/finanzas/tesoreria/flujo-caja',
   '/api/finanzas/cxp/vencimientos',
+  '/api/finanzas/cxp/proveedores-mayor-deuda',
+  '/api/finanzas/bancos/saldos',
+  '/api/finanzas/bancos/movimientos/periodo',
   '/api/finanzas/conciliacion',
   '/api/contabilidad/asientos',
   '/api/contabilidad/asientos-contables',
@@ -142,6 +184,7 @@ export const DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS = [
   '/api/gre/reporte',
   '/api/sire/files',
   '/api/documentos',
+  '/api/documentos/descargas',
   '/api/paises',
   '/api/paises/usuario/configuracion',
   '/api/notifications',
@@ -227,7 +270,7 @@ export function headersToPairs(headers: HeadersInit | undefined): HeaderPair[] {
   const normalized = new Headers(headers)
   const pairs: HeaderPair[] = []
   normalized.forEach((value, name) => {
-    if (name.toLowerCase() === 'cookie') return
+    if (isSensitivePersistedHeader(name)) return
     pairs.push({ name, value })
   })
   return pairs
@@ -236,7 +279,7 @@ export function headersToPairs(headers: HeadersInit | undefined): HeaderPair[] {
 function pairsToHeaders(pairs: HeaderPair[]) {
   const headers = new Headers()
   for (const pair of pairs) {
-    if (!pair.name || pair.name.toLowerCase() === 'cookie') continue
+    if (!pair.name || isSensitivePersistedHeader(pair.name)) continue
     headers.set(pair.name, pair.value)
   }
   return headers
@@ -433,11 +476,15 @@ function responseFromBinaryLocal(local: BinaryLocalResponse) {
   })
 }
 
-async function readLocalFirstResponse(endpoint: string, url: string) {
+async function readLocalFirstResponse(endpoint: string, url: string, tenantId?: string | null) {
   if (!isDesktopRuntime() || !isLocalFirstGetEndpoint(endpoint)) return null
   const normalizedEndpoint = localFirstEndpoint(endpoint)
   try {
-    const local = await invoke<LocalFirstResponse | null>('get_local_first_response', { endpoint: normalizedEndpoint, url })
+    const local = await invoke<LocalFirstResponse | null>('get_local_first_response', {
+      endpoint: normalizedEndpoint,
+      url,
+      tenantId: tenantId ?? null,
+    })
     return local ? responseFromLocalFirst(local) : null
   } catch (error) {
     console.warn('[offline-store] No se pudo leer respuesta local-first:', error)
@@ -445,12 +492,13 @@ async function readLocalFirstResponse(endpoint: string, url: string) {
   }
 }
 
-async function readBinaryResponse(endpoint: string, url: string) {
+async function readBinaryResponse(endpoint: string, url: string, tenantId?: string | null) {
   if (!isDesktopRuntime()) return null
   try {
     const local = await invoke<BinaryLocalResponse | null>('get_binary_response', {
       endpoint: localFirstEndpoint(endpoint),
       url,
+      tenantId: tenantId ?? null,
     })
     return local ? responseFromBinaryLocal(local) : null
   } catch (error) {
@@ -459,7 +507,7 @@ async function readBinaryResponse(endpoint: string, url: string) {
   }
 }
 
-async function hydrateLocalFirstResponse(url: string, endpoint: string, response: Response) {
+async function hydrateLocalFirstResponse(url: string, endpoint: string, response: Response, tenantId?: string | null) {
   if (!isDesktopRuntime() || !isLocalFirstGetEndpoint(endpoint)) return
   if (!response.ok || response.status === 204) return
 
@@ -476,13 +524,14 @@ async function hydrateLocalFirstResponse(url: string, endpoint: string, response
       status: response.status,
       headers: headersToPairs(response.headers),
       body,
+      tenantId: tenantId ?? null,
     })
   } catch (error) {
     console.warn('[offline-store] No se pudo hidratar SQLite local-first:', error)
   }
 }
 
-async function hydrateBinaryResponse(url: string, endpoint: string, response: Response) {
+async function hydrateBinaryResponse(url: string, endpoint: string, response: Response, tenantId?: string | null) {
   if (!isDesktopRuntime()) return
   if (!response.ok || response.status === 204) return
 
@@ -499,6 +548,7 @@ async function hydrateBinaryResponse(url: string, endpoint: string, response: Re
       status: response.status,
       headers: headersToPairs(response.headers),
       bodyBase64: arrayBufferToBase64(buffer),
+      tenantId: tenantId ?? null,
     })
   } catch (error) {
     console.warn('[offline-store] No se pudo hidratar binario local:', error)
@@ -530,16 +580,17 @@ async function processLocalFirstWrite(
 }
 
 export async function enqueueOfflineRequest(input: OfflineRequestInput): Promise<OfflineQueueItem> {
+  const safeInput = { ...input, headers: sanitizePersistedHeaders(input.headers || []) }
   if (isDesktopRuntime()) {
-    return invoke<OfflineQueueItem>('enqueue_offline_request', { request: input })
+    return invoke<OfflineQueueItem>('enqueue_offline_request', { request: safeInput })
   }
 
   const queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
   const timestamp = now()
   const item: OfflineQueueItem = {
-    ...input,
+    ...safeInput,
     id: localId(),
-    method: input.method.toUpperCase(),
+    method: safeInput.method.toUpperCase(),
     status: 'pending',
     attempts: 0,
     created_at: timestamp,
@@ -559,7 +610,15 @@ export async function listOfflineRequests(): Promise<OfflineQueueItem[]> {
   if (isDesktopRuntime()) {
     return invoke<OfflineQueueItem[]>('list_offline_requests')
   }
-  return readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
+  const queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
+  let changed = false
+  const sanitized = queue.map((item) => {
+    const headers = sanitizePersistedHeaders(item.headers || [])
+    changed ||= headers.length !== (item.headers || []).length
+    return { ...item, headers }
+  })
+  if (changed) writeJson(OUTBOX_KEY, sanitized)
+  return sanitized
 }
 
 export async function listLocalIdMappings(): Promise<LocalIdMapping[]> {
@@ -780,6 +839,53 @@ function responseBodyFailureMessage(body: string) {
   return null
 }
 
+function buildLocalIdReplacementMap(mappings: LocalIdMapping[]) {
+  const map = new Map<string, string>()
+  for (const mapping of mappings) {
+    if (mapping.local_id && mapping.remote_id && mapping.local_id !== mapping.remote_id) {
+      map.set(mapping.local_id, mapping.remote_id)
+    }
+  }
+  return map
+}
+
+function replaceLocalIdsInValue(value: any, replacements: Map<string, string>): any {
+  if (typeof value === 'string') {
+    return replacements.get(value) ?? value
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => replaceLocalIdsInValue(item, replacements))
+  }
+  if (value && typeof value === 'object') {
+    const next: Record<string, any> = {}
+    for (const [key, item] of Object.entries(value)) {
+      next[key] = replaceLocalIdsInValue(item, replacements)
+    }
+    return next
+  }
+  return value
+}
+
+function rewriteLocalIdsInBody(body: string | null | undefined, replacements: Map<string, string>) {
+  if (!body || replacements.size === 0) return body
+  try {
+    const payload = JSON.parse(body)
+    return JSON.stringify(replaceLocalIdsInValue(payload, replacements))
+  } catch {
+    return body
+  }
+}
+
+function rewriteLocalIdsInEndpoint(endpoint: string, replacements: Map<string, string>) {
+  if (!endpoint || replacements.size === 0) return endpoint
+  let next = endpoint
+  for (const [localId, remoteId] of replacements) {
+    next = next.split(encodeURIComponent(localId)).join(encodeURIComponent(remoteId))
+    next = next.split(localId).join(remoteId)
+  }
+  return next
+}
+
 export async function fetchWithOfflineSupport(
   url: string,
   init: RequestInit,
@@ -794,10 +900,10 @@ export async function fetchWithOfflineSupport(
     }
 
     if (method === 'GET') {
-      const localFirst = await readLocalFirstResponse(meta.endpoint, url)
+      const localFirst = await readLocalFirstResponse(meta.endpoint, url, meta.tenantId)
       if (localFirst) return localFirst
 
-      const binary = await readBinaryResponse(meta.endpoint, url)
+      const binary = await readBinaryResponse(meta.endpoint, url, meta.tenantId)
       if (binary) return binary
 
       const cached = await readCachedApiResponse(url)
@@ -827,8 +933,8 @@ export async function fetchWithOfflineSupport(
   try {
     const response = await fetch(url, init)
     if (method === 'GET' && response.ok) {
-      await hydrateLocalFirstResponse(url, meta.endpoint, response.clone())
-      await hydrateBinaryResponse(url, meta.endpoint, response.clone())
+      await hydrateLocalFirstResponse(url, meta.endpoint, response.clone(), meta.tenantId)
+      await hydrateBinaryResponse(url, meta.endpoint, response.clone(), meta.tenantId)
       await cacheApiResponse(url, meta.endpoint, response.clone())
     }
     return response
@@ -838,10 +944,10 @@ export async function fetchWithOfflineSupport(
     }
 
     if (method === 'GET') {
-      const localFirst = await readLocalFirstResponse(meta.endpoint, url)
+      const localFirst = await readLocalFirstResponse(meta.endpoint, url, meta.tenantId)
       if (localFirst) return localFirst
 
-      const binary = await readBinaryResponse(meta.endpoint, url)
+      const binary = await readBinaryResponse(meta.endpoint, url, meta.tenantId)
       if (binary) return binary
 
       const cached = await readCachedApiResponse(url)
@@ -869,16 +975,25 @@ export async function fetchWithOfflineSupport(
   }
 }
 
-export async function syncOfflineQueue() {
+export async function syncOfflineQueue(accessToken: string | null = null) {
   const queue = await listOfflineRequests()
   const candidates = queue.filter((item) => item.status === 'pending' || item.status === 'failed')
   const results: Array<{ id: string; ok: boolean; status?: number; error?: string }> = []
+  let idReplacements = buildLocalIdReplacementMap(await listLocalIdMappings())
 
   for (const item of candidates) {
     try {
-      const targetUrl = item.endpoint ? buildApiUrl(item.endpoint) : item.url
-      const formDataBody = item.body ? serializedFormDataToBody(item.body) : null
+      const rewrittenEndpoint = item.endpoint
+        ? rewriteLocalIdsInEndpoint(item.endpoint, idReplacements)
+        : item.endpoint
+      const rewrittenUrl = rewriteLocalIdsInEndpoint(item.url, idReplacements)
+      const rewrittenBody = rewriteLocalIdsInBody(item.body, idReplacements)
+      const targetUrl = rewrittenEndpoint ? buildApiUrl(rewrittenEndpoint) : rewrittenUrl
+      const formDataBody = rewrittenBody ? serializedFormDataToBody(rewrittenBody) : null
       const headers = pairsToHeaders(item.headers)
+      if (accessToken?.trim()) {
+        headers.set('Authorization', `Bearer ${accessToken.trim()}`)
+      }
       if (formDataBody) {
         headers.delete('Content-Type')
         headers.delete('content-type')
@@ -886,7 +1001,7 @@ export async function syncOfflineQueue() {
       const response = await fetch(targetUrl, {
         method: item.method,
         headers,
-        body: formDataBody ?? item.body ?? undefined,
+        body: formDataBody ?? rewrittenBody ?? undefined,
         credentials: 'include',
         mode: 'cors',
         cache: 'no-store',
@@ -896,6 +1011,7 @@ export async function syncOfflineQueue() {
 
       if (response.ok && !logicalError) {
         await markOfflineRequestSynced(item.id, response.status, responseBody)
+        idReplacements = buildLocalIdReplacementMap(await listLocalIdMappings())
         results.push({ id: item.id, ok: true, status: response.status })
       } else {
         const error = logicalError || responseBody || `HTTP ${response.status}`
@@ -917,6 +1033,8 @@ export async function refreshLocalFirstSnapshots(
   headers?: HeadersInit,
 ) {
   const results: Array<{ endpoint: string; ok: boolean; status?: number; error?: string }> = []
+  const snapshotHeaders = new Headers(headers)
+  const tenantId = snapshotHeaders.get('x-tenant-id') || snapshotHeaders.get('X-Tenant-Id')
   if (await isOfflineModeEnabled()) {
     return endpoints.map((endpoint) => ({
       endpoint,
@@ -936,8 +1054,8 @@ export async function refreshLocalFirstSnapshots(
         cache: 'no-store',
       })
       if (response.ok) {
-        await hydrateLocalFirstResponse(url, endpoint, response.clone())
-        await hydrateBinaryResponse(url, endpoint, response.clone())
+        await hydrateLocalFirstResponse(url, endpoint, response.clone(), tenantId)
+        await hydrateBinaryResponse(url, endpoint, response.clone(), tenantId)
         await cacheApiResponse(url, endpoint, response.clone())
       }
       results.push({ endpoint, ok: response.ok, status: response.status })

@@ -42,10 +42,11 @@ test.describe('API/UI contracts', () => {
       '/dashboard/audit-logs/',
     ]) {
       await gotoAuthenticated(page, route);
-      await expect(page.locator('main')).toBeVisible({ timeout: 30000 });
+      const main = page.locator('main').first();
+      await expect(main).toBeVisible({ timeout: 30000 });
       await expect(page.locator('body')).not.toContainText(/Application error|Internal Server Error|404: This page could not be found/i);
-      await expect(page.locator('main')).not.toContainText(/Cargando/i, { timeout: 30000 });
-      const text = await page.locator('main').innerText({ timeout: 15000 });
+      await expect(main).not.toContainText(/Cargando|Validando acceso/i, { timeout: 30000 });
+      const text = await main.innerText({ timeout: 15000 });
       expect(text.trim().length, `${route} debe mostrar contenido util`).toBeGreaterThan(40);
     }
 

@@ -114,8 +114,6 @@ test.describe('CASE-18 Analytics y Dashboard', () => {
       categoria: 'QA-PROD-READY-ANALYTICS-CASE18',
       precio,
       precio_venta: precio,
-      stock_actual: stockActual,
-      stock: stockActual,
       stock_minimo: 2,
       activo: true,
       estado: 'activo',
@@ -123,6 +121,29 @@ test.describe('CASE-18 Analytics y Dashboard', () => {
       updated_at: new Date().toISOString(),
     });
     expect(product.id, 'producto CASE-18 debe persistir').toBeTruthy();
+
+    const { data: almacen, error: almacenError } = await supabase
+      .from('almacenes')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('activo', true)
+      .order('es_principal', { ascending: false })
+      .limit(1)
+      .single();
+    expect(almacenError?.message || '', 'consultar almacén CASE-18').toBe('');
+    const { error: stockError } = await supabase.rpc('aplicar_movimiento_inventario_tx', {
+      p_tenant_id: tenantId,
+      p_producto_id: product.id,
+      p_almacen_id: almacen!.id,
+      p_tipo: 'ENTRADA',
+      p_cantidad: stockActual,
+      p_referencia_tipo: 'QA_ANALYTICS_E2E',
+      p_referencia_id: crypto.randomUUID(),
+      p_notas: 'Stock controlado para Analytics E2E',
+      p_created_by: 'playwright',
+      p_metadata: { source: 'analytics-dashboard.spec.ts', run_id: runId },
+    });
+    expect(stockError?.message || '', 'cargar stock por ledger CASE-18').toBe('');
 
     await insertRow(supabase, 'cpe', {
       tenant_id: tenantId,
@@ -304,7 +325,9 @@ test.describe('CASE-18 Analytics y Dashboard', () => {
 
     await gotoAuthenticated(page, '/dashboard/');
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText('INGRESOS MENSUALES')).toBeVisible();
+    // El dashboard ejecutivo vigente presenta el KPI como "Revenue operativo";
+    // el rótulo legacy "INGRESOS MENSUALES" pertenecía al diseño anterior.
+    await expect(page.getByText('Revenue operativo')).toBeVisible();
     await expect(page.locator('body')).not.toContainText(/Cargando datos del dashboard|Application error|Unhandled Runtime Error/i);
 
     await gotoAuthenticated(page, '/dashboard/analytics/');

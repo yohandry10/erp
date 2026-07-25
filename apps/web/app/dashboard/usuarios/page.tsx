@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import UsuarioModal from '@/components/modals/UsuarioModal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { useToast } from "@/components/ui/use-toast"
@@ -14,15 +15,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ShieldAlert, Users } from 'lucide-react'
 
 export default function UsuariosPage() {
-  const [usuarios, setUsuarios] = useState<any[]>([])
-  const [roles, setRoles] = useState<any[]>([])
-  const [stats, setStats] = useState({
-    totalUsuarios: 0,
-    usuariosActivos: 0,
-    usuariosInactivos: 0,
-    totalRoles: 0
-  })
-  const [loading, setLoading] = useState(true)
   const [filtroRol, setFiltroRol] = useState('todos')
   const [filtroEstado, setFiltroEstado] = useState('todos')
   const [modalOpen, setModalOpen] = useState(false)
@@ -32,6 +24,7 @@ export default function UsuariosPage() {
   const { user: currentUser } = useTenant()
   const { hasPermission: canViewUsers, loading: permissionLoading } = usePermission('configuracion', 'ver', 'usuarios')
   const { hasPermission: canCreateUsers } = usePermission('configuracion', 'crear', 'usuarios')
+  const queryClient = useQueryClient()
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean
@@ -47,48 +40,47 @@ export default function UsuariosPage() {
     variant: 'default'
   })
 
-  const fetchData = useCallback(async () => {
-    if (permissionLoading || !canViewUsers) {
-      if (!permissionLoading) setLoading(false)
-      return
-    }
+  const DEFAULT_STATS = { totalUsuarios: 0, usuariosActivos: 0, usuariosInactivos: 0, totalRoles: 0 }
 
-    try {
-      setLoading(true)
-
+  // React Query cachea por 60s (config global): la primera visita bloquea con
+  // spinner, pero al volver al módulo se muestran los datos cacheados al instante
+  // y se revalidan en segundo plano en lugar de recargar de cero cada vez.
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['usuarios-sistema', filtroRol, filtroEstado],
+    enabled: !permissionLoading && canViewUsers,
+    queryFn: async () => {
       const [usuariosData, rolesData, statsData] = await Promise.all([
         get(`/usuarios-sistema?rol=${filtroRol}&estado=${filtroEstado}`),
         get('/usuarios-sistema/roles'),
-        get('/usuarios-sistema/stats')
+        get('/usuarios-sistema/stats'),
       ])
-
-      if (usuariosData?.success) {
-        setUsuarios(usuariosData.data || [])
+      return {
+        usuarios: usuariosData?.success ? (usuariosData.data || []) : [],
+        roles: rolesData?.success ? (rolesData.data || []) : [],
+        stats: statsData?.success ? statsData.data : DEFAULT_STATS,
       }
+    },
+  })
 
-      if (rolesData?.success) {
-        setRoles(rolesData.data || [])
-      }
+  const usuarios = data?.usuarios ?? []
+  const roles = data?.roles ?? []
+  const stats = data?.stats ?? DEFAULT_STATS
+  const loading = permissionLoading || (canViewUsers && isLoading)
 
-      if (statsData?.success) {
-        setStats(statsData.data)
-      }
+  const fetchData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['usuarios-sistema'] })
+  }, [queryClient])
 
-    } catch (error) {
+  useEffect(() => {
+    if (isError) {
       console.error('❌ Error cargando datos:', error)
       toast({
         variant: "destructive",
         title: "❌ Error",
         description: "Error cargando datos de usuarios",
       })
-    } finally {
-      setLoading(false)
     }
-  }, [canViewUsers, filtroEstado, filtroRol, get, permissionLoading, toast])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  }, [isError, error, toast])
 
   const handleNuevoUsuario = () => {
     setUsuarioEditando(null)
@@ -127,7 +119,7 @@ export default function UsuariosPage() {
   if (loading || permissionLoading) {
     return (
       <PageShell title="Gestión de Usuarios" description="Cargando usuarios, roles, permisos y métricas de acceso.">
-        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-card/60 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
           <div className="text-center">
             <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
             <span className="text-sm font-semibold">Cargando usuarios...</span>
@@ -140,10 +132,10 @@ export default function UsuariosPage() {
   if (!canViewUsers) {
     return (
       <PageShell title="Acceso denegado" description="No tienes permisos para gestionar usuarios.">
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-center text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+        <Card className="border-cyan-400/20 bg-card/65 text-center text-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
           <CardContent className="p-12">
-            <ShieldAlert className="mx-auto mb-4 h-10 w-10 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
-            <p className="text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">El rol actual no puede administrar usuarios.</p>
+            <ShieldAlert className="mx-auto mb-4 h-10 w-10 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" />
+            <p className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">El rol actual no puede administrar usuarios.</p>
           </CardContent>
         </Card>
       </PageShell>
@@ -161,9 +153,9 @@ export default function UsuariosPage() {
       <UsersStats stats={stats} />
 
       {/* Users Section */}
-      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+      <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Usuarios del Sistema</CardTitle>
+          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">Usuarios del Sistema</CardTitle>
           <UsersFilters
             filtroRol={filtroRol}
             filtroEstado={filtroEstado}

@@ -42,7 +42,7 @@ export default function ConfirmarPedidoButton({
 }: ConfirmarPedidoButtonProps) {
   const { post } = useApi({ throwOnError: true }) // dejamos toasts de useApi y re-lanzamos error
   const { hasPermission, loading: permissionLoading } = usePermission('ventas', 'confirmar', 'pedidos')
-  
+
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showWarningDialog, setShowWarningDialog] = useState(false)
   const [warnings, setWarnings] = useState<StockWarning[]>([])
@@ -67,7 +67,7 @@ export default function ConfirmarPedidoButton({
     try {
       setConfirming(true)
       setShowConfirmDialog(false)
-      
+
       const response: ConfirmarPedidoResponse = await post(
         `/ventas/pedidos/${pedidoId}/confirmar`,
         {}
@@ -93,7 +93,7 @@ export default function ConfirmarPedidoButton({
         onSuccess()
         return
       }
-      
+
       if (response?.success) {
         // Check if there are stock warnings
         if (response.warnings && response.warnings.length > 0) {
@@ -160,7 +160,7 @@ export default function ConfirmarPedidoButton({
   return (
     <>
       {lastError && (
-        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <div className="mb-3 rounded-md border border-red-200 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {lastError}
         </div>
       )}
@@ -211,7 +211,7 @@ export default function ConfirmarPedidoButton({
       <Dialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-yellow-600">
+            <DialogTitle className="flex items-center gap-2 text-amber-400">
               <AlertTriangle className="w-5 h-5" />
               Advertencia de Stock Insuficiente
             </DialogTitle>
@@ -219,28 +219,28 @@ export default function ConfirmarPedidoButton({
               Algunos productos no tienen stock suficiente. ¿Desea continuar de todas formas?
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="my-4">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h4 className="font-semibold text-sm text-yellow-800 mb-3">
+            <div className="bg-amber-500/10 border border-yellow-200 rounded-lg p-4">
+              <h4 className="font-semibold text-sm text-amber-400 mb-3">
                 Productos con stock insuficiente:
               </h4>
               <div className="space-y-2">
                 {warnings.map((warning, index) => (
                   <div
                     key={index}
-                    className="flex justify-between items-center text-sm bg-white p-3 rounded border border-yellow-100"
+                    className="flex justify-between items-center text-sm bg-card p-3 rounded border border-yellow-100"
                   >
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-foreground">
                         {warning.producto_nombre || `Producto ${warning.producto_id}`}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-gray-600">
-                        Disponible: <span className="font-semibold text-red-600">{warning.disponible}</span>
+                      <p className="text-foreground/80">
+                        Disponible: <span className="font-semibold text-destructive">{warning.disponible}</span>
                       </p>
-                      <p className="text-gray-600">
+                      <p className="text-foreground/80">
                         Solicitado: <span className="font-semibold">{warning.solicitado}</span>
                       </p>
                     </div>

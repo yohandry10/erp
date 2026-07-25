@@ -5,7 +5,7 @@ $baseUrl = "http://localhost:3002"
 # Login
 $loginData = @{
     email = "superadmin@neon.com"
-    password = "[REMOVED]"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json
 
 Write-Host "Login..." -ForegroundColor Yellow

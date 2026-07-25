@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { 
   PaisDto, 
@@ -15,6 +15,14 @@ import {
   LibrosRequeridosDto,
   LibroContableDto
 } from './paises.dto';
+import {
+  INITIAL_ACTIVE_COUNTRY_CODE,
+  INITIAL_ACTIVE_COUNTRY_ID,
+  INITIAL_ACTIVE_COUNTRY_MESSAGE,
+  isInitialActiveCountryCode,
+  isInitialActiveCountryId,
+  normalizeCountryCode,
+} from './initial-country';
 
 @Injectable()
 export class PaisesService {
@@ -23,6 +31,21 @@ export class PaisesService {
   private paisesCache: { data: PaisDto[]; fetchedAt: number } | null = null;
 
   constructor(private readonly supabaseService: SupabaseService) {}
+
+  private assertInitialActiveCountryCode(codigoIso: string): string {
+    const normalizedCode = normalizeCountryCode(codigoIso);
+    if (!isInitialActiveCountryCode(normalizedCode)) {
+      throw new NotFoundException(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+    }
+    return normalizedCode;
+  }
+
+  private assertInitialActiveCountryId(paisId: number): number {
+    if (!isInitialActiveCountryId(paisId)) {
+      throw new NotFoundException(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+    }
+    return INITIAL_ACTIVE_COUNTRY_ID;
+  }
 
   // ========== GESTIÓN DE PAÍSES ==========
   async obtenerPaises(): Promise<PaisDto[]> {
@@ -34,6 +57,7 @@ export class PaisesService {
         .from('paises')
         .select('*')
         .eq('activo', true)
+        .eq('codigo_iso', INITIAL_ACTIVE_COUNTRY_CODE)
         .order('nombre');
 
       if (error) {
@@ -57,19 +81,20 @@ export class PaisesService {
 
   async obtenerPaisPorCodigo(codigoIso: string): Promise<PaisDto> {
     try {
-      this.logger.log(`🌍 Obteniendo país por código: ${codigoIso}`);
-      
+      const codigo = this.assertInitialActiveCountryCode(codigoIso);
+      this.logger.log(`🌍 Obteniendo país por código: ${codigo}`);
+
       const { data, error } = await this.supabaseService
         .getPublicClient()
         .from('paises')
         .select('*')
-        .eq('codigo_iso', codigoIso.toUpperCase())
+        .eq('codigo_iso', codigo)
         .eq('activo', true)
         .single();
 
       if (error) {
         this.logger.error('❌ Error obteniendo país:', error);
-        throw new NotFoundException(`País con código ${codigoIso} no encontrado`);
+        throw new NotFoundException(`País con código ${codigo} no encontrado`);
       }
 
       this.logger.log(`✅ País ${data.nombre} obtenido exitosamente`);
@@ -93,8 +118,9 @@ export class PaisesService {
   // ========== CONFIGURACIÓN FISCAL ==========
   async obtenerConfiguracionFiscal(paisId: number): Promise<ConfiguracionFiscalDto> {
     try {
-      this.logger.log(`⚖️ Obteniendo configuración fiscal para país: ${paisId}`);
-      
+      const activePaisId = this.assertInitialActiveCountryId(paisId);
+      this.logger.log(`⚖️ Obteniendo configuración fiscal para país: ${activePaisId}`);
+
       const { data, error } = await this.supabaseService
         .getPublicClient()
         .from('configuracion_fiscal')
@@ -106,13 +132,13 @@ export class PaisesService {
             nombre_fiscal
           )
         `)
-        .eq('pais_id', paisId)
+        .eq('pais_id', activePaisId)
         .eq('activo', true)
         .single();
 
       if (error) {
         this.logger.error('❌ Error obteniendo configuración fiscal:', error);
-        throw new NotFoundException(`Configuración fiscal para país ${paisId} no encontrada`);
+        throw new NotFoundException(`Configuración fiscal para país ${activePaisId} no encontrada`);
       }
 
       this.logger.log(`✅ Configuración fiscal obtenida para ${data.paises.nombre}`);
@@ -125,8 +151,9 @@ export class PaisesService {
 
   async obtenerConfiguracionPorCodigo(codigoIso: string): Promise<ConfiguracionFiscalDto> {
     try {
-      this.logger.log(`⚖️ Obteniendo configuración fiscal por código: ${codigoIso}`);
-      
+      const codigo = this.assertInitialActiveCountryCode(codigoIso);
+      this.logger.log(`⚖️ Obteniendo configuración fiscal por código: ${codigo}`);
+
       const { data, error } = await this.supabaseService
         .getPublicClient()
         .from('configuracion_fiscal')
@@ -139,13 +166,13 @@ export class PaisesService {
             nombre_fiscal
           )
         `)
-        .eq('paises.codigo_iso', codigoIso.toUpperCase())
+        .eq('paises.codigo_iso', codigo)
         .eq('activo', true)
         .single();
 
       if (error) {
         this.logger.error('❌ Error obteniendo configuración fiscal:', error);
-        throw new NotFoundException(`Configuración fiscal para ${codigoIso} no encontrada`);
+        throw new NotFoundException(`Configuración fiscal para ${codigo} no encontrada`);
       }
 
       this.logger.log(`✅ Configuración fiscal obtenida para ${data.paises.nombre}`);
@@ -202,6 +229,12 @@ export class PaisesService {
   ): Promise<UsuarioConfiguracionDto> {
     try {
       this.logger.log(`👤 Actualizando configuración de usuario: ${usuarioId}`);
+      if (
+        configuracion.pais_preferido_id !== undefined &&
+        !isInitialActiveCountryId(configuracion.pais_preferido_id)
+      ) {
+        throw new BadRequestException(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+      }
       
       // Verificar si ya existe configuración
       const existeConfiguracion = await this.obtenerConfiguracionUsuario(usuarioId);
@@ -277,7 +310,7 @@ export class PaisesService {
   // ========== UTILIDADES ==========
   async validarDocumentoEmpresa(documento: string, paisId: number): Promise<boolean> {
     try {
-      const configuracion = await this.obtenerConfiguracionFiscal(paisId);
+      const configuracion = await this.obtenerConfiguracionFiscal(this.assertInitialActiveCountryId(paisId));
       
       // Validar longitud
       if (documento.length !== configuracion.longitud_documento_empresa) {
@@ -298,7 +331,7 @@ export class PaisesService {
 
   async obtenerLibrosRequeridos(paisId: number): Promise<string[]> {
     try {
-      const configuracion = await this.obtenerConfiguracionFiscal(paisId);
+      const configuracion = await this.obtenerConfiguracionFiscal(this.assertInitialActiveCountryId(paisId));
       const libros: string[] = [];
       
       if (configuracion.requiere_libro_diario) libros.push('Libro Diario');
@@ -319,31 +352,32 @@ export class PaisesService {
 
   async getConfiguracionPais(paisId: number): Promise<ConfiguracionPaisDto> {
     try {
-      this.logger.log(`🌍 Obteniendo configuración completa del país ID: ${paisId}`);
+      const activePaisId = this.assertInitialActiveCountryId(paisId);
+      this.logger.log(`🌍 Obteniendo configuración completa del país ID: ${activePaisId}`);
       
       // Obtener información básica del país
       const { data: paisData, error: paisError } = await this.supabaseService
         .getPublicClient()
         .from('paises')
         .select('*')
-        .eq('id', paisId)
+        .eq('id', activePaisId)
         .eq('activo', true)
         .single();
 
       if (paisError) {
         this.logger.error('❌ Error obteniendo país:', paisError);
-        throw new NotFoundException(`País con ID ${paisId} no encontrado`);
+        throw new NotFoundException(`País con ID ${activePaisId} no encontrado`);
       }
 
       // Obtener configuración fiscal
-      const configuracionFiscal = await this.obtenerConfiguracionFiscal(paisId);
+      const configuracionFiscal = await this.obtenerConfiguracionFiscal(activePaisId);
 
       // Obtener tipos de documentos
       const { data: tiposDocumentos, error: docError } = await this.supabaseService
         .getPublicClient()
         .from('tipos_documentos_fiscales')
         .select('*')
-        .eq('pais_id', paisId)
+        .eq('pais_id', activePaisId)
         .eq('activo', true)
         .order('codigo');
 
@@ -357,7 +391,7 @@ export class PaisesService {
         .getPublicClient()
         .from('tipos_impuestos')
         .select('*')
-        .eq('pais_id', paisId)
+        .eq('pais_id', activePaisId)
         .eq('activo', true)
         .order('codigo');
 

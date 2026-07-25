@@ -1,0 +1,2153 @@
+{
+  "kind": "visible-admin-integrated-browser-cdp-audit",
+  "createdAt": "2026-06-18T01:12:16.785Z",
+  "browserVisible": true,
+  "baseUrl": "http://localhost:3001",
+  "apiBaseUrl": "http://localhost:3002/api",
+  "tenantId": "c0af84b5-5ea6-44a9-9e6e-a869f119b013",
+  "role": "ADMIN",
+  "userLabel": "aprobador",
+  "scope": "read-only route/module navigation; no business writes, no CPE/GRE/SUNAT sends, no payments/cash mutations",
+  "cdp": {
+    "networkEnabled": true,
+    "runtimeEnabled": true,
+    "logEnabled": true
+  },
+  "summary": {
+    "totalRoutes": 56,
+    "okRoutes": 56,
+    "needsReviewRoutes": 0,
+    "consoleWarnErrorCount": 0,
+    "badHttpResponseCount": 0,
+    "networkFailureCount": 0,
+    "loadingRecheck": {
+      "initiallyFlagged": 44,
+      "quickSettled": 32,
+      "slowRoutesDeepChecked": 12,
+      "persistentAfterDeepCheck": []
+    }
+  },
+  "byModule": {
+    "Core": {
+      "total": 1,
+      "ok": 1,
+      "review": 0
+    },
+    "POS/Caja": {
+      "total": 2,
+      "ok": 2,
+      "review": 0
+    },
+    "Ventas": {
+      "total": 6,
+      "ok": 6,
+      "review": 0
+    },
+    "Compras": {
+      "total": 6,
+      "ok": 6,
+      "review": 0
+    },
+    "Inventario": {
+      "total": 6,
+      "ok": 6,
+      "review": 0
+    },
+    "Documentos": {
+      "total": 2,
+      "ok": 2,
+      "review": 0
+    },
+    "Fiscal": {
+      "total": 3,
+      "ok": 3,
+      "review": 0
+    },
+    "Analytics": {
+      "total": 1,
+      "ok": 1,
+      "review": 0
+    },
+    "Finanzas": {
+      "total": 7,
+      "ok": 7,
+      "review": 0
+    },
+    "Contabilidad": {
+      "total": 7,
+      "ok": 7,
+      "review": 0
+    },
+    "RRHH": {
+      "total": 7,
+      "ok": 7,
+      "review": 0
+    },
+    "Admin": {
+      "total": 2,
+      "ok": 2,
+      "review": 0
+    },
+    "Configuracion": {
+      "total": 4,
+      "ok": 4,
+      "review": 0
+    },
+    "Operaciones": {
+      "total": 1,
+      "ok": 1,
+      "review": 0
+    },
+    "Soporte": {
+      "total": 1,
+      "ok": 1,
+      "review": 0
+    }
+  },
+  "routes": [
+    {
+      "module": "Core",
+      "name": "Dashboard",
+      "path": "/dashboard/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Dashboard ejecutivo",
+        "Flujo financiero y operacional",
+        "Mix fiscal",
+        "Actividad reciente",
+        "Radar ejecutivo"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "POS/Caja",
+      "name": "POS",
+      "path": "/dashboard/pos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/pos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Cargando POS..."
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "POS/Caja",
+      "name": "Cajas",
+      "path": "/dashboard/cajas/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/cajas/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "💰 Gestión de Cajas"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Ventas home",
+      "path": "/dashboard/ventas/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/ventas/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Ventas",
+        "Clientes",
+        "Cotizaciones",
+        "Pedidos",
+        "Aprobaciones",
+        "Reportes"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Clientes",
+      "path": "/dashboard/ventas/clientes/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/ventas/clientes/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Clientes",
+        "TOTAL CLIENTES"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Cotizaciones",
+      "path": "/dashboard/ventas/cotizaciones/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/ventas/cotizaciones/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Cotizaciones",
+        "TOTAL COTIZACIONES"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Pedidos",
+      "path": "/dashboard/ventas/pedidos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/ventas/pedidos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Pedidos de Venta",
+        "TOTAL PEDIDOS",
+        "FILTRADOS"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Aprobaciones",
+      "path": "/dashboard/ventas/aprobaciones/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/ventas/aprobaciones/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Bandeja de Aprobaciones",
+        "PENDIENTES",
+        "MONTO COMPROMETIDO",
+        "ÚLTIMA ACTUALIZACIÓN"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Reportes ventas",
+      "path": "/dashboard/ventas/reportes/",
+      "status": "ok",
+      "retryApplied": true,
+      "url": "http://localhost:3001/dashboard/ventas/reportes/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Reportes y Estadísticas",
+        "Filtros Globales",
+        "Total Ventas",
+        "Subtotal",
+        "IGV"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Compras home",
+      "path": "/dashboard/compras/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/compras/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Proveedores",
+      "path": "/dashboard/compras/proveedores/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/compras/proveedores/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Proveedores",
+        "TOTAL PROVEEDORES",
+        "ACTIVOS",
+        "INACTIVOS"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Cotizaciones compra",
+      "path": "/dashboard/compras/cotizaciones/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/compras/cotizaciones/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Cotizaciones de Compra",
+        "TOTAL",
+        "BORRADORES",
+        "ENVIADAS",
+        "APROBADAS",
+        "VENCIDAS"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Ordenes compra",
+      "path": "/dashboard/compras/ordenes/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/compras/ordenes/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Ordenes de Compra"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Recepciones",
+      "path": "/dashboard/compras/recepciones/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/compras/recepciones/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Recepciones de Mercancía",
+        "ÓRDENES PENDIENTES",
+        "APROBADAS",
+        "PARCIALES"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Devoluciones",
+      "path": "/dashboard/compras/devoluciones/",
+      "status": "ok",
+      "retryApplied": true,
+      "url": "http://localhost:3001/dashboard/compras/devoluciones/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Devoluciones a Proveedor"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Inventario home",
+      "path": "/dashboard/inventario/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/inventario/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Inventario"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Productos",
+      "path": "/dashboard/inventario/productos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/inventario/productos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Gestión de Productos",
+        "Filtros",
+        "Productos (0)"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Almacenes",
+      "path": "/dashboard/inventario/almacenes/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/inventario/almacenes/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Almacenes & Ubicaciones"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Kardex",
+      "path": "/dashboard/inventario/kardex/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/inventario/kardex/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Kardex valorizado"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Ordenes pendientes despacho",
+      "path": "/dashboard/inventario/logistica/ordenes-pendientes/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/inventario/logistica/ordenes-pendientes/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": "Timed out waiting for tab 1 to navigate to http://localhost:3001/dashboard/inventario/logistica/ordenes-pendientes/.",
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Listo despacho",
+      "path": "/dashboard/inventario/logistica/listo-despacho/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/inventario/logistica/listo-despacho/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Documentos",
+      "name": "Documentos",
+      "path": "/dashboard/documentos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/documentos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Documentos",
+      "name": "Descargas",
+      "path": "/dashboard/documentos/descargas/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/documentos/descargas/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Mis Descargas CPE",
+        "Filtros",
+        "Resultados"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Fiscal",
+      "name": "CPE",
+      "path": "/dashboard/cpe/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/cpe/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Comprobantes de Pago Electronicos"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Fiscal",
+      "name": "GRE",
+      "path": "/dashboard/gre/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/gre/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Fiscal",
+      "name": "SIRE",
+      "path": "/dashboard/sire/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/sire/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "SIRE - Sistema de Registros Electronicos",
+        "Filtros SIRE",
+        "Reportes SIRE",
+        "No hay reportes SIRE"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Analytics",
+      "name": "Analytics",
+      "path": "/dashboard/analytics/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/analytics/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Analytics Financiero"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": "Timed out waiting for tab 1 to navigate to http://localhost:3001/dashboard/analytics/.",
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Finanzas home",
+      "path": "/dashboard/finanzas/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/finanzas/cxc/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Cuentas por Cobrar",
+        "Filtros operativos"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": "Timed out waiting for tab 1 to navigate to http://localhost:3001/dashboard/finanzas/.",
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "CxC",
+      "path": "/dashboard/finanzas/cxc/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/finanzas/cxc/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Cuentas por Cobrar",
+        "Filtros operativos"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "CxP",
+      "path": "/dashboard/finanzas/cxp/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/finanzas/cxp/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Cuentas por Pagar"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": "Timed out waiting for tab 1 to navigate to http://localhost:3001/dashboard/finanzas/cxp/.",
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Bancos",
+      "path": "/dashboard/finanzas/bancos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/finanzas/bancos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Cuentas Bancarias",
+        "Cuentas activas"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Tesoreria",
+      "path": "/dashboard/finanzas/tesoreria/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/finanzas/tesoreria/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Conciliacion",
+      "path": "/dashboard/finanzas/conciliacion/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/finanzas/conciliacion/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Conciliación Bancaria",
+        "TOTAL",
+        "ABIERTAS",
+        "EN PROCESO",
+        "CERRADAS"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Reportes finanzas",
+      "path": "/dashboard/finanzas/reportes/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/finanzas/reportes/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Reportes Financieros",
+        "Aging de Cuentas por Pagar",
+        "Proveedores con Mayor Deuda",
+        "Movimientos Bancarios",
+        "Conciliaciones Pendientes",
+        "Flujo de Caja Proyectado"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Contabilidad home",
+      "path": "/dashboard/contabilidad/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/contabilidad/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Contabilidad",
+        "Vistas contables",
+        "Radar operativo contable",
+        "Control de consistencia",
+        "Flujos contables principales"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Asientos",
+      "path": "/dashboard/contabilidad/asientos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/contabilidad/asientos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Periodos",
+      "path": "/dashboard/contabilidad/periodos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/contabilidad/periodos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Centros costo",
+      "path": "/dashboard/contabilidad/centros-costo/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/contabilidad/centros-costo/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Presupuestos",
+      "path": "/dashboard/contabilidad/presupuestos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/contabilidad/presupuestos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Presupuestos",
+        "Comparación Presupuesto vs Real",
+        "Gestión de Presupuestos",
+        "Alertas de Sobregiro",
+        "Crear Presupuesto"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Estados financieros",
+      "path": "/dashboard/contabilidad/estados/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/contabilidad/estados/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Estados Financieros",
+        "Seleccionar periodo"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": "Timed out waiting for tab 1 to navigate to http://localhost:3001/dashboard/contabilidad/estados/.",
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Monitoreo",
+      "path": "/dashboard/contabilidad/monitoreo/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/contabilidad/monitoreo/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Monitoreo de Eventos Contables"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "RRHH home",
+      "path": "/dashboard/rrhh/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/rrhh/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Recursos Humanos"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Candidatos",
+      "path": "/dashboard/rrhh/candidatos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/rrhh/candidatos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Candidatos"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Contratos",
+      "path": "/dashboard/rrhh/contratos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/rrhh/contratos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Gestión de Contratos"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Asistencia",
+      "path": "/dashboard/rrhh/asistencia/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/rrhh/asistencia/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Control de Asistencia"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Planillas",
+      "path": "/dashboard/rrhh/planillas/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/rrhh/planillas/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Planillas"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Pagos",
+      "path": "/dashboard/rrhh/pagos/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/rrhh/pagos/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Pagos & Comprobantes"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Reportes RRHH",
+      "path": "/dashboard/rrhh/reportes/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/rrhh/reportes/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Reportes RRHH"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Admin",
+      "name": "Usuarios",
+      "path": "/dashboard/usuarios/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/usuarios/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Gestión de Usuarios"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Configuracion",
+      "name": "Configuracion home",
+      "path": "/dashboard/configuracion/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/configuracion/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Configuracion",
+      "name": "Empresa",
+      "path": "/dashboard/configuracion/empresa/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/configuracion/empresa/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Configuracion",
+      "name": "Ventas",
+      "path": "/dashboard/configuracion/ventas/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/configuracion/ventas/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Configuracion",
+      "name": "Wizard",
+      "path": "/dashboard/wizard/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/wizard/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": true,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Bienvenido"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Operaciones",
+      "name": "Offline",
+      "path": "/dashboard/offline/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/offline/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Offline",
+        "Operaciones locales",
+        "IDs locales sincronizados"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Admin",
+      "name": "Audit logs",
+      "path": "/dashboard/audit-logs/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/audit-logs/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Soporte",
+      "name": "Ayuda",
+      "path": "/dashboard/ayuda/",
+      "status": "ok",
+      "retryApplied": false,
+      "url": "http://localhost:3001/dashboard/ayuda/",
+      "title": "ERP Suite - Sistema Tributario Peruano",
+      "flags": {
+        "authRedirect": false,
+        "genericError": false,
+        "loadingStillVisible": false,
+        "notFound": false,
+        "permissionDenied": false,
+        "serviceUnavailable": false
+      },
+      "headings": [
+        "Centro de Ayuda",
+        "Tours Interactivos",
+        "Tours de Aprendizaje",
+        "Asistente de Ayuda",
+        "Atajos Útiles"
+      ],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "navigationWarning": null,
+      "error": null
+    }
+  ],
+  "loadingRechecks": [
+    {
+      "module": "POS/Caja",
+      "name": "POS",
+      "path": "/dashboard/pos/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/pos/",
+      "loadingMatches": [
+        "Cargando POS..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "POS/Caja",
+      "name": "Cajas",
+      "path": "/dashboard/cajas/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/cajas/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Clientes",
+      "path": "/dashboard/ventas/clientes/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/ventas/clientes/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Cotizaciones",
+      "path": "/dashboard/ventas/cotizaciones/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/ventas/cotizaciones/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Pedidos",
+      "path": "/dashboard/ventas/pedidos/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/ventas/pedidos/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Aprobaciones",
+      "path": "/dashboard/ventas/aprobaciones/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/ventas/aprobaciones/",
+      "loadingMatches": [
+        "Cargando pedidos pendientes..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Ventas",
+      "name": "Reportes ventas",
+      "path": "/dashboard/ventas/reportes/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/ventas/reportes/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Compras home",
+      "path": "/dashboard/compras/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/compras/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Proveedores",
+      "path": "/dashboard/compras/proveedores/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/compras/proveedores/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Cotizaciones compra",
+      "path": "/dashboard/compras/cotizaciones/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/compras/cotizaciones/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Ordenes compra",
+      "path": "/dashboard/compras/ordenes/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/compras/ordenes/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Recepciones",
+      "path": "/dashboard/compras/recepciones/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/compras/recepciones/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Compras",
+      "name": "Devoluciones",
+      "path": "/dashboard/compras/devoluciones/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/compras/devoluciones/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Inventario home",
+      "path": "/dashboard/inventario/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/inventario/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Productos",
+      "path": "/dashboard/inventario/productos/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/inventario/productos/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Ordenes pendientes despacho",
+      "path": "/dashboard/inventario/logistica/ordenes-pendientes/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/inventario/logistica/ordenes-pendientes/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Inventario",
+      "name": "Listo despacho",
+      "path": "/dashboard/inventario/logistica/listo-despacho/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/inventario/logistica/listo-despacho/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Documentos",
+      "name": "Documentos",
+      "path": "/dashboard/documentos/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/documentos/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Fiscal",
+      "name": "GRE",
+      "path": "/dashboard/gre/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/gre/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Finanzas home",
+      "path": "/dashboard/finanzas/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/finanzas/cxc/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "CxC",
+      "path": "/dashboard/finanzas/cxc/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/finanzas/cxc/",
+      "loadingMatches": [
+        "Cargando cuentas por cobrar..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "CxP",
+      "path": "/dashboard/finanzas/cxp/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/finanzas/cxp/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Bancos",
+      "path": "/dashboard/finanzas/bancos/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/finanzas/bancos/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Tesoreria",
+      "path": "/dashboard/finanzas/tesoreria/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/finanzas/tesoreria/",
+      "loadingMatches": [
+        "Cargando información de tesorería..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Conciliacion",
+      "path": "/dashboard/finanzas/conciliacion/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/finanzas/conciliacion/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Finanzas",
+      "name": "Reportes finanzas",
+      "path": "/dashboard/finanzas/reportes/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/finanzas/reportes/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Contabilidad home",
+      "path": "/dashboard/contabilidad/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/contabilidad/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Asientos",
+      "path": "/dashboard/contabilidad/asientos/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/contabilidad/asientos/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Periodos",
+      "path": "/dashboard/contabilidad/periodos/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/contabilidad/periodos/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Centros costo",
+      "path": "/dashboard/contabilidad/centros-costo/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/contabilidad/centros-costo/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Estados financieros",
+      "path": "/dashboard/contabilidad/estados/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/contabilidad/estados/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Monitoreo",
+      "path": "/dashboard/contabilidad/monitoreo/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/contabilidad/monitoreo/",
+      "loadingMatches": [
+        "Cargando datos de monitoreo..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "RRHH home",
+      "path": "/dashboard/rrhh/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/rrhh/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Candidatos",
+      "path": "/dashboard/rrhh/candidatos/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/rrhh/candidatos/",
+      "loadingMatches": [
+        "Cargando postulantes, vacantes activas y departamentos disponibles.",
+        "Cargando candidatos..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Contratos",
+      "path": "/dashboard/rrhh/contratos/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/rrhh/contratos/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Asistencia",
+      "path": "/dashboard/rrhh/asistencia/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/rrhh/asistencia/",
+      "loadingMatches": [
+        "Cargando asistencias del día, empleados y marcaciones de entrada o salida.",
+        "Cargando asistencias..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Planillas",
+      "path": "/dashboard/rrhh/planillas/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/rrhh/planillas/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Pagos",
+      "path": "/dashboard/rrhh/pagos/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/rrhh/pagos/",
+      "loadingMatches": [
+        "Cargando pagos de empleados, planillas y comprobantes asociados.",
+        "Cargando pagos..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "RRHH",
+      "name": "Reportes RRHH",
+      "path": "/dashboard/rrhh/reportes/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/rrhh/reportes/",
+      "loadingMatches": [
+        "Cargando indicadores de personal, ingresos recientes y distribución por área.",
+        "Cargando reportes de RRHH..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Admin",
+      "name": "Usuarios",
+      "path": "/dashboard/usuarios/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/usuarios/",
+      "loadingMatches": [
+        "Cargando usuarios, roles, permisos y métricas de acceso.",
+        "Cargando usuarios..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Configuracion",
+      "name": "Configuracion home",
+      "path": "/dashboard/configuracion/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/configuracion/",
+      "loadingMatches": [
+        "Cargando configuración operativa..."
+      ],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Configuracion",
+      "name": "Empresa",
+      "path": "/dashboard/configuracion/empresa/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/configuracion/empresa/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Configuracion",
+      "name": "Ventas",
+      "path": "/dashboard/configuracion/ventas/",
+      "status": "settled",
+      "url": "http://localhost:3001/dashboard/configuracion/ventas/",
+      "loadingMatches": [],
+      "navigationWarning": null,
+      "error": null
+    },
+    {
+      "module": "Configuracion",
+      "name": "Wizard",
+      "path": "/dashboard/wizard/",
+      "status": "persistent_loading_text",
+      "url": "http://localhost:3001/dashboard/wizard/",
+      "loadingMatches": [
+        "Cargando configuración inicial del sistema"
+      ],
+      "navigationWarning": null,
+      "error": null
+    }
+  ],
+  "deepChecks": [
+    {
+      "module": "POS/Caja",
+      "name": "POS deep",
+      "path": "/dashboard/pos/",
+      "url": "http://localhost:3001/dashboard/pos/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nCAJA CERRADA\n\nPara usar el sistema POS, primero debe abrir la caja registradora con el monto inicial\n\nAbrir Caja Registradora"
+    },
+    {
+      "module": "Ventas",
+      "name": "Aprobaciones deep",
+      "path": "/dashboard/ventas/aprobaciones/",
+      "url": "http://localhost:3001/dashboard/ventas/aprobaciones/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nDashboard\nVentas\nAprobaciones\nBandeja de Aprobaciones\n\nGestiona pedidos que requieren autorización por crédito, descuentos o límites configurados\n\nActualizar\nPENDIENTES\n0\nPedidos en espera\nMONTO COMPROMETIDO\nS/ 0.00\nTotal a aprobar\nÚLTIMA ACTUALIZACIÓN\n08:05 p. m.\n17/6/2026\nNo hay pedidos pendientes de aprobación\n\nTodos los pedidos han sido procesados o no hay pedidos que requieran aprobación."
+    },
+    {
+      "module": "Finanzas",
+      "name": "CxC deep",
+      "path": "/dashboard/finanzas/cxc/",
+      "url": "http://localhost:3001/dashboard/finanzas/cxc/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nERP RECEIVABLES\nCuentas por Cobrar\n\nCxC generadas desde ventas con cobros, notas de credito, reprogramaciones e historial.\n\nActualizar\nExportar\nTOTAL\n0\nCuentas registradas\nPENDIENTES\n0\nPor cobrar\nVENCIDAS\n0\nAtrasadas\nSALDO TOTAL\nS/ 0.00\nPendiente por cobrar\nFiltros operativos\nBUSCAR\nESTADO\nTodos\nPendiente\nParcial\nVencido\nCancelado\nCLIENTE\nTodos\nDESDE\nHASTA\nNo hay cuentas por cobrar\n\nLas CxC se generan automaticamente cuando emites comprobantes de ventas."
+    },
+    {
+      "module": "Finanzas",
+      "name": "Tesoreria deep",
+      "path": "/dashboard/finanzas/tesoreria/",
+      "url": "http://localhost:3001/dashboard/finanzas/tesoreria/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nERP Treasury Center\nTesorería\n\nSaldos bancarios, pagos próximos, flujo proyectado y acciones financieras críticas.\n\nActualizar\n\nSALDO PEN\n\nS/ 0.00\n\n0 cuenta(s)\n\nSALDO USD\n\nUSD 0.00\n\n0 cuenta(s)\n\nPOR PAGAR 15 DÍAS\n\nS/ 0.00\n\nUSD 0.00 en USD\n\nALERTAS\n\n0\n\n0 vencidos, 0 urgentes\n\nPróximos pagos (15 días)\nVer programación\nPago masivo\nNo hay pagos próximos\n\nNo hay cuentas por pagar con vencimiento en los próximos 15 días.\n\nCuentas por pagar\n\nGestiona cuentas pendientes con proveedores.\n\nProgramación de pagos\n\nPlanifica pagos por fecha de vencimiento.\n\nPago masivo\n\nProcesa múltiples pagos en una operación.\n\nCuentas bancarias\n\nAdministra saldos y bancos de la empresa."
+    },
+    {
+      "module": "Contabilidad",
+      "name": "Monitoreo deep",
+      "path": "/dashboard/contabilidad/monitoreo/",
+      "url": "http://localhost:3001/dashboard/contabilidad/monitoreo/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nERP EVENT CONTROL\nMonitoreo de Eventos Contables\n\nCola, asientos generados, reintentos y eventos que requieren intervención contable.\n\nActualizar\nEVENTOS PENDIENTES\n0\nEn cola contable\nPROCESADOS HOY\n0\nCiclo actual\nEVENTOS CON ERROR\n0\nRequieren revisión\nDEAD LETTER\n0\nIntervención manual\nTOTAL PROCESADOS\n0\nHistórico operativo\nTIEMPO PROMEDIO\nN/A\nLatencia de procesamiento\nAsientos generados por tipo\n\nDistribución según el evento operativo que originó contabilidad.\n\nNo hay asientos clasificados por tipo en el periodo consultado.\nEstado de cola\n\nSeñales para detectar fallos de procesamiento sin abrir logs técnicos.\n\nPendientes\n0\nProcesados hoy\n0\nFallidos\n0\nDead letter\n0\nTodo en orden\n\nNo hay eventos fallidos en este momento."
+    },
+    {
+      "module": "RRHH",
+      "name": "Candidatos deep",
+      "path": "/dashboard/rrhh/candidatos/",
+      "url": "http://localhost:3001/dashboard/rrhh/candidatos/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nCVs & Candidatos\n\nGestión de reclutamiento y selección\n\n📋 Nueva Vacante\n👤 Nuevo Candidato\nTOTAL CVS\n📄\n0\nCandidatos registrados\nEN PROCESO\n⏳\n0\nEn entrevistas\nNUEVOS\n🆕\n0\nPostulaciones nuevas\nCONTRATADOS\n🎉\n0\nProceso exitoso\nESTADO:\nTodos\nPostulante\nEn Entrevista\nSeleccionado\nContratado\nRechazado\nVACANTE:\nTodas las vacantes\nLista de Candidatos (0)\nCANDIDATO\tVACANTE\tTELÉFONO\tEXPERIENCIA\tPUNTUACIÓN CV\tESTADO\tFECHA POSTULACIÓN\tACCIONES\nNo hay candidatos que coincidan con los filtros seleccionados."
+    },
+    {
+      "module": "RRHH",
+      "name": "Asistencia deep",
+      "path": "/dashboard/rrhh/asistencia/",
+      "url": "http://localhost:3001/dashboard/rrhh/asistencia/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nControl de Asistencia\n\nMarcado de entrada y salida del personal\n\n🔄 Actualizar\nPRESENTES\n✅\n0\nCon entrada registrada\nAUSENTES\n❌\n0\nSin entrada registrada\nCOMPLETARON\n🎯\n0\nEntrada y salida\nTRABAJANDO\n⏰\n0\nActualmente en oficina\nAsistencia del jueves, 18 de junio de 2026\nEMPLEADO\tDEPARTAMENTO\tHORA ENTRADA\tHORA SALIDA\tHORAS TRABAJADAS\tESTADO\tACCIONES"
+    },
+    {
+      "module": "RRHH",
+      "name": "Pagos deep",
+      "path": "/dashboard/rrhh/pagos/",
+      "url": "http://localhost:3001/dashboard/rrhh/pagos/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nPagos & Comprobantes\n\nControl de pagos mensuales a empleados\n\n🔄 Actualizar\nTOTAL PAGOS\n💰\n0\nRegistros de pago\nPENDIENTES\n⏳\n0\nPor procesar\nPROCESADOS\n✅\n0\nPagos completados\nMONTO TOTAL\n💸\nS/ 0\nPagos procesados\nESTADO:\nTodos\nPendiente\nProcesado\nRechazado\nPERÍODO:\nTodos\nControl de Pagos (0)\nEMPLEADO\tPERÍODO\tSUELDO BRUTO\tDESCUENTOS\tMONTO NETO\tFECHA PAGO\tESTADO\tACCIONES\nNo hay pagos que coincidan con los filtros seleccionados.\nResumen de Pagos por Empleado\nEMPLEADO\tÚLTIMO PAGO\tESTADO ÚLTIMO\tTOTAL PAGADO (AÑO)\tPROMEDIO MENSUAL"
+    },
+    {
+      "module": "RRHH",
+      "name": "Reportes RRHH deep",
+      "path": "/dashboard/rrhh/reportes/",
+      "url": "http://localhost:3001/dashboard/rrhh/reportes/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nReportes RRHH\n\nIndicadores operativos de personal, ingresos y distribución por área\n\nActualizar\nTOTAL EMPLEADOS\n👥\n0\nPersonal registrado\nACTIVOS\n✅\n0\nPersonal habilitado\nINACTIVOS\n⏸️\n0\nPersonal no activo\nNUEVOS INGRESOS\n📈\n0\nÚltimos 30 días\nDistribución por departamento\nNo hay departamentos registrados\n\nCuando existan áreas organizacionales se mostrará la distribución del personal."
+    },
+    {
+      "module": "Admin",
+      "name": "Usuarios deep",
+      "path": "/dashboard/usuarios/",
+      "url": "http://localhost:3001/dashboard/usuarios/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nGestión de Usuarios\n\nAdministra usuarios, roles operativos y permisos del sistema con trazabilidad por tenant.\n\nNuevo usuario\nUSUARIOS TOTALES\n11\nUsuarios registrados\nUSUARIOS ACTIVOS\n11\nActivos en el sistema\nROLES DEFINIDOS\n11\nRoles configurados\nINACTIVOS\n0\nUsuarios inactivos\nUsuarios del Sistema\nTodos los roles\nADMIN\nADMIN_DEMO\nALMACEN\nAUDITOR\nCAJERO\nCOMPRAS\nCONTADOR\nFINANZAS\nGERENCIA\nRRHH\nVENDEDOR\nTodos los estados\nActivo\nInactivo\nSuspendido\nUSUARIO\tEMAIL\tROL\tÚLTIMO ACCESO\tCREADO\tESTADO\tACCIONES\n\nQV\nQA VENDEDOR\nVENDEDOR\n\t[email-redacted]\tVENDEDOR\t\nhace 3h\n17/6/2026\n\t17/6/2026\tACTIVO\t\nEditar\nDesactivar\n\n\nQR\nQA RRHH\nRRHH\n\t[email-redacted]\tRRHH\t\nhace 3h\n17/6/2026\n\t17/6/2026\tACTIVO\t\nEditar\nDesactivar\n\n\nQG\nQA GERENCIA\nGERENCIA\n\tqa-ge"
+    },
+    {
+      "module": "Configuracion",
+      "name": "Configuracion deep",
+      "path": "/dashboard/configuracion/",
+      "url": "http://localhost:3001/dashboard/configuracion/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nConfiguración operativa\n\nEstado real de empresa, certificado, emisión fiscal, ventas y logística.\n\nActualizar\nResumen\nEmpresa\nVentas\nEditar en asistente\n67%\n\nConfiguración total\n\nVálido\n\nCertificado digital\n\nOperativo\n\nSUNAT/OSE\n\nEmpresa\nCorrecto\nRUC\n20123456786\nRazón social\nQA ROLES ERP PERU\nNombre comercial\nQA ROLES ERP PERU\nDirección fiscal\nAv. Demo 123, Lima\nUbigeo\nNo configurado\nCorreo\nNo configurado\nFiscal y certificado\nCorrecto\nCertificado existe\nSí\nCertificado válido\nSí\nVencimiento\n18/10/2027\nOSE/SUNAT válido\nSí\nCertificado OSE resuelto\nSí\nAmbiente\nhomologacion\nVentas y documentos\nRequiere atención\nModo emisión CPE\nSUNAT_DIRECTO\nSerie factura\nNo configurado\nSerie boleta\nNo configurado\nSerie nota crédito\nNo configurado\nSerie nota débito\nNo configurad"
+    },
+    {
+      "module": "Configuracion",
+      "name": "Wizard deep",
+      "path": "/dashboard/wizard/",
+      "url": "http://localhost:3001/dashboard/wizard/",
+      "loadingMatches": [],
+      "console": [],
+      "badResponses": [],
+      "networkFailures": [],
+      "sample": "N\nNEON\nERP SUITE\nDashboard\nPOS\nDocumentos\nContabilidad\nAnalytics\nInventario\nCPE\nGRE\nReportes SIRE\nCompras\nVentas\nFinanzas\nUsuarios\nRRHH\nConfiguración\nOffline\nAyuda\naprobador\n[email-redacted]\nCerrar Sesión\nOnline\n5\nLight\nPaso 1 de 8\n13%\n1\nBienvenido\n2\nTipo de Empresa\n3\nConfiguración RUC\n4\nCertificado Digital\n5\nConfiguración Fiscal\n6\nAutoridad fiscal\n7\nValidación\n8\nCompletado\nBienvenido\n\nConfiguración inicial del sistema\n\n¡Bienvenido al Asistente de Configuración!\n\nEste asistente te guiará paso a paso para configurar tu sistema y comenzar a emitir comprobantes electrónicos de forma rápida y segura.\n\nConfiguración de Datos Empresariales\n\nIngresarás los datos de tu empresa (RUC, razón social, dirección) necesarios para la emisión de comprobantes.\n\nCarga de Certificado Digital\n\nCargarás tu certificado digital emitido por SUNAT o tu proveedor autorizado (archivo .pfx o .p12) para firmar electrónicamente tus comprobantes.\n\nValidación y Verificación\n\nEl sistema verificará que toda"
+    }
+  ]
+}

@@ -50,6 +50,19 @@ for (const token of ['border', 'input', 'ring', 'background', 'foreground', 'pri
   }
 }
 
+for (const removedCompatibilityFile of [
+  path.join(webRoot, 'styles', 'dashboard-primitives.css'),
+  path.join(webRoot, 'styles', 'theme-compat.css'),
+]) {
+  if (fs.existsSync(removedCompatibilityFile)) {
+    critical.push(`${rel(removedCompatibilityFile)} no debe reaparecer despues de la migracion Tailwind/shadcn`);
+  }
+}
+
+const legacyDashboardClassPattern = /dashboard-container|dashboard-header|dashboard-title|dashboard-subtitle|refresh-btn|btn-primary|btn-secondary|btn-outline|btn-icon(?:-danger)?|stats-grid|ventas-stats-grid|stat-card|stat-header|stat-icon|stat-value|stat-subtitle|activity-section|activity-header|activity-title|activity-meta|activity-card|activity-empty|status-success|status-warning|status-error|status-info|loading-spinner|ventas-layout|ventas-breadcrumbs|breadcrumbs-nav|breadcrumb-item|breadcrumb-link|breadcrumb-current|breadcrumb-separator|ventas-content|erp-light-scope/g;
+const compatibilityNeutralPattern = /(?<![A-Za-z0-9_/-])(?:bg-white|bg-slate-(?:50|100)|bg-gray-50|text-slate-(?:950|900|800|700|600|500|400|300|200|100)|text-gray-(?:950|900|800|700|600|500|400)|border-(?:gray-200|slate-200|slate-300|green-200)|from-slate-(?:950|900)|via-(?:sky-950|slate-900)|to-(?:slate-950|blue-950))(?![A-Za-z0-9_/-])/g;
+const nonstandardScalePattern = /(?<![A-Za-z0-9_.-])(?:text|rounded)-(?:1(?:\.5)?|2(?:\.5)?|3(?:\.5)?|4|5|6|7|8|10|12|16)(?![A-Za-z0-9_.-])/g;
+
 const files = walk(webRoot);
 const rows = files.map((file) => {
   const text = read(file);
@@ -63,6 +76,9 @@ const rows = files.map((file) => {
     cssImports: count(text, /from ['"].*\.css['"]|import ['"].*\.css['"]/g),
     hardcodedColor: count(text, /#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\(/g),
     globalUiClasses: count(text, /dashboard-container|dashboard-header|dashboard-title|stat-card|refresh-btn|modal-|btn\b|status-/g),
+    legacyDashboardClasses: count(text, legacyDashboardClassPattern),
+    compatibilityNeutralClasses: count(text, compatibilityNeutralPattern),
+    nonstandardScaleClasses: count(text, nonstandardScalePattern),
   };
 });
 
@@ -73,6 +89,16 @@ const totals = rows.reduce((acc, row) => {
   }
   return acc;
 }, { files: rows.length });
+
+if (totals.legacyDashboardClasses > 0) {
+  critical.push(`Quedan ${totals.legacyDashboardClasses} usos de clases dashboard legacy`);
+}
+if (totals.compatibilityNeutralClasses > 0) {
+  critical.push(`Quedan ${totals.compatibilityNeutralClasses} neutros literales cubiertos por el antiguo puente de tema`);
+}
+if (totals.nonstandardScaleClasses > 0) {
+  critical.push(`Quedan ${totals.nonstandardScaleClasses} utilidades numericas de texto/radio que Tailwind no compila`);
+}
 
 function top(key) {
   return rows
@@ -91,8 +117,8 @@ const result = {
   topArbitrary: top('arbitrary'),
   topImportant: top('important'),
   notes: [
-    'Inline styles and legacy global classes are tracked as migration debt, not automatic blockers.',
-    'This gate blocks only missing Tailwind compilation, missing semantic tokens, or visual/runtime regressions.',
+    'Inline styles, arbitrary utilities and functional hardcoded colors are tracked as follow-up design-system debt.',
+    'Compatibility CSS, legacy dashboard classes, neutral bridge classes, missing Tailwind compilation and missing semantic tokens are blockers.',
   ],
 };
 

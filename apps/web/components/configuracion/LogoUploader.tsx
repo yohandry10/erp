@@ -114,9 +114,9 @@ export function LogoUploader({
 
       {previewUrl ? (
         // Vista con logo cargado
-        <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2 border"
+        <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg border"
         >
-          <div className="w-[80px] h-[80px] rounded-2 overflow-hidden bg-white border flex items-center justify-center"
+          <div className="w-[80px] h-[80px] rounded-lg overflow-hidden bg-card border flex items-center justify-center"
           >
             <Image
               src={previewUrl}
@@ -127,10 +127,10 @@ export function LogoUploader({
             />
           </div>
           <div className="flex-[1]">
-            <p className="m-0 text-[0.875rem] font-medium text-slate-800">
+            <p className="m-0 text-[0.875rem] font-medium text-foreground">
               Logo cargado
             </p>
-            <p className="text-3 text-slate-500">
+            <p className="text-xs text-muted-foreground">
               Este logo aparecerá en facturas, boletas y tickets
             </p>
           </div>
@@ -138,14 +138,14 @@ export function LogoUploader({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={handleClick} className="py-2 px-3 text-3 bg-blue-500 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-1"
+                onClick={handleClick} className="py-2 px-3 text-xs bg-blue-500 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-1"
               >
                 <Upload size={14} />
                 Cambiar
               </button>
               <button
                 type="button"
-                onClick={handleRemoveLogo} className="py-2 px-3 text-3 bg-[#fee2e2] text-red-600 border-0 rounded-[6px] cursor-pointer flex items-center gap-1"
+                onClick={handleRemoveLogo} className="py-2 px-3 text-xs bg-[#fee2e2] text-destructive border-0 rounded-[6px] cursor-pointer flex items-center gap-1"
               >
                 <X size={14} />
                 Quitar
@@ -159,7 +159,7 @@ export function LogoUploader({
           onClick={handleClick}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onDrop={handleDrop} className="p-8 rounded-2 transition"
+          onDrop={handleDrop} className="p-8 rounded-lg transition"
         >
           <div className="text-center">
             <div className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -167,13 +167,13 @@ export function LogoUploader({
               {isDragging ? (
                 <ImageIcon size={24} className="text-blue-500" />
               ) : (
-                <Building2 size={24} className="text-slate-500" />
+                <Building2 size={24} className="text-muted-foreground" />
               )}
             </div>
-            <p className="m-0 text-[0.875rem] font-medium text-slate-800">
+            <p className="m-0 text-[0.875rem] font-medium text-foreground">
               {isDragging ? 'Suelta la imagen aquí' : 'Arrastra tu logo o haz clic para seleccionar'}
             </p>
-            <p className="text-3 text-slate-500">
+            <p className="text-xs text-muted-foreground">
               PNG, JPG, WebP o SVG • Máximo {maxSizeMB}MB
             </p>
           </div>
@@ -181,13 +181,13 @@ export function LogoUploader({
       )}
 
       {error && (
-        <div className="mt-2 py-2 px-3 bg-[#fef2f2] border rounded-[6px] text-3 text-red-600"
+        <div className="mt-2 py-2 px-3 bg-[#fef2f2] border rounded-[6px] text-xs text-destructive"
         >
           ⚠️ {error}
         </div>
       )}
 
-      <p className="mt-2 text-3 text-slate-400"
+      <p className="mt-2 text-xs text-muted-foreground"
       >
         💡 Recomendación: Usa un logo cuadrado o con fondo transparente para mejor visualización
       </p>

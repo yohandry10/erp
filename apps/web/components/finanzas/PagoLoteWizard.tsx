@@ -167,7 +167,7 @@ export function PagoLoteWizard({
         </div>
 
         {cuentaSeleccionada && (
-          <Card className="p-4 bg-blue-50 border-blue-200">
+          <Card className="p-4 bg-primary/10 border-blue-200">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <div className="text-muted-foreground">Banco</div>
@@ -183,7 +183,7 @@ export function PagoLoteWizard({
               </div>
               <div>
                 <div className="text-muted-foreground">Saldo Disponible</div>
-                <div className="font-semibold text-green-600">
+                <div className="font-semibold text-emerald-400">
                   {cuentaSeleccionada.moneda} {cuentaSeleccionada.saldo.toFixed(2)}
                 </div>
               </div>
@@ -255,7 +255,7 @@ export function PagoLoteWizard({
       </div>
 
       {cuentaSeleccionada && (
-        <Card className="p-3 bg-blue-50 border-blue-200">
+        <Card className="p-3 bg-primary/10 border-blue-200">
           <div className="flex items-center justify-between text-sm">
             <div>
               <span className="text-muted-foreground">Cuenta: </span>
@@ -263,7 +263,7 @@ export function PagoLoteWizard({
             </div>
             <div>
               <span className="text-muted-foreground">Saldo: </span>
-              <span className="font-semibold text-green-600">
+              <span className="font-semibold text-emerald-400">
                 {cuentaSeleccionada.moneda} {cuentaSeleccionada.saldo.toFixed(2)}
               </span>
             </div>
@@ -330,7 +330,7 @@ export function PagoLoteWizard({
                 <div className="text-muted-foreground">Saldo Después</div>
                 <div
                   className={`font-semibold ${
-                    saldoSuficiente ? 'text-green-600' : 'text-red-600'
+                    saldoSuficiente ? 'text-emerald-400' : 'text-destructive'
                   }`}
                 >
                   {cuentaSeleccionada.moneda}{' '}
@@ -343,12 +343,12 @@ export function PagoLoteWizard({
 
         {/* Validación de saldo */}
         {!saldoSuficiente && (
-          <Card className="p-4 bg-red-50 border-red-200">
+          <Card className="p-4 bg-destructive/10 border-red-200">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
               <div>
-                <div className="font-semibold text-red-900">Saldo Insuficiente</div>
-                <div className="text-sm text-red-700">
+                <div className="font-semibold text-destructive">Saldo Insuficiente</div>
+                <div className="text-sm text-destructive">
                   El saldo de la cuenta bancaria no es suficiente para procesar este lote de
                   pagos. Falta: {cuentaSeleccionada?.moneda}{' '}
                   {(montoTotalLote - (cuentaSeleccionada?.saldo || 0)).toFixed(2)}
@@ -394,7 +394,7 @@ export function PagoLoteWizard({
               return (
                 <div
                   key={cxp.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg text-sm"
+                  className="flex items-center justify-between p-3 bg-muted/30 rounded-lg text-sm"
                 >
                   <div className="flex-1">
                     <div className="font-semibold">{cxp.proveedor.razon_social}</div>
@@ -403,7 +403,7 @@ export function PagoLoteWizard({
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-orange-600">
+                    <div className="font-semibold text-amber-400">
                       {cxp.moneda} {montoPago.toFixed(2)}
                     </div>
                     {montoPago < cxp.saldo && (
@@ -500,7 +500,7 @@ export function PagoLoteWizard({
             className={`w-8 h-8 rounded-full flex items-center justify-center ${
               currentStep === 'seleccion-cuenta'
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-gray-200'
+                : 'bg-muted'
             }`}
           >
             1
@@ -519,7 +519,7 @@ export function PagoLoteWizard({
             className={`w-8 h-8 rounded-full flex items-center justify-center ${
               currentStep === 'seleccion-cxp'
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-gray-200'
+                : 'bg-muted'
             }`}
           >
             2
@@ -538,7 +538,7 @@ export function PagoLoteWizard({
             className={`w-8 h-8 rounded-full flex items-center justify-center ${
               currentStep === 'confirmacion'
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-gray-200'
+                : 'bg-muted'
             }`}
           >
             3

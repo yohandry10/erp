@@ -27,14 +27,14 @@ export default function VentasLayout({
     let currentPath = ''
     paths.forEach((path) => {
       currentPath += `/${path}`
-      
+
       // Skip the first 'dashboard' segment as it's already in breadcrumbs
       if (path === 'dashboard') return
 
       // Format the label and assign icons
       let label = path.charAt(0).toUpperCase() + path.slice(1)
       let icon: Breadcrumb['icon'] = undefined
-      
+
       // Special formatting for known paths
       if (path === 'ventas') {
         label = 'Ventas'
@@ -57,12 +57,12 @@ export default function VentasLayout({
         icon = CheckSquare
       }
       if (path === 'nuevo') label = 'Nuevo'
-      
+
       // Handle dynamic routes (IDs)
       if (path.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
         label = 'Detalle'
       }
-      
+
       breadcrumbs.push({
         label,
         href: currentPath,
@@ -76,26 +76,26 @@ export default function VentasLayout({
   const breadcrumbs = generateBreadcrumbs()
 
   return (
-    <div className="ventas-layout">
+    <div className="min-h-full">
       {/* Breadcrumbs */}
-      <div className="ventas-breadcrumbs">
-        <nav className="breadcrumbs-nav">
+      <div className="mb-4">
+        <nav className="flex items-center gap-2 text-sm text-muted-foreground">
           {breadcrumbs.map((crumb, index) => {
             const isLast = index === breadcrumbs.length - 1
             const Icon = crumb.icon
 
             return (
-              <div key={crumb.href} className="breadcrumb-item">
+              <div key={crumb.href} className="inline-flex items-center gap-2">
                 {index > 0 && (
-                  <ChevronRight size={16} className="breadcrumb-separator" />
+                  <ChevronRight size={16} className="text-muted-foreground" />
                 )}
                 {isLast ? (
-                  <span className="breadcrumb-current">
+                  <span className="font-semibold text-foreground">
                     {Icon && <Icon size={16} />}
                     {crumb.label}
                   </span>
                 ) : (
-                  <Link href={crumb.href} className="breadcrumb-link">
+                  <Link href={crumb.href} className="text-primary underline-offset-4 hover:underline">
                     {Icon && <Icon size={16} />}
                     {crumb.label}
                   </Link>
@@ -107,7 +107,7 @@ export default function VentasLayout({
       </div>
 
       {/* Main content */}
-      <div className="ventas-content">
+      <div className="w-full">
         {children}
       </div>
     </div>

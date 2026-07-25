@@ -100,7 +100,7 @@ export default function SuperAdminDashboard() {
   if (tenantLoading || !user) {
     return (
       <PageShell title="Super Admin" description="Validando sesión y privilegios globales.">
-        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-card/60 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
           <div className="text-center">
             <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
             <p className="text-sm font-semibold">Cargando Super Admin...</p>
@@ -127,7 +127,7 @@ export default function SuperAdminDashboard() {
       }
     >
       {statsError ? (
-        <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
+        <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-700 dark:text-amber-200 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
           {statsError}
         </div>
       ) : null}
@@ -141,19 +141,19 @@ export default function SuperAdminDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+      <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
         <CardHeader>
-          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Acciones rápidas</CardTitle>
+          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">Acciones rápidas</CardTitle>
         </CardHeader>
         <CardContent>
           <button
             onClick={() => router.push('/superadmin/dashboard/security')}
-            className="flex w-full items-center gap-4 rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-4 text-left transition hover:border-cyan-300/40 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50"
+            className="flex w-full items-center gap-4 rounded-2xl border border-cyan-400/15 bg-card/50 p-4 text-left transition hover:border-cyan-300/40 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50"
           >
-            <Shield className="h-6 w-6 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+            <Shield className="h-6 w-6 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" />
             <span>
-              <span className="block font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Dashboard de Seguridad</span>
-              <span className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Monitoreo RLS y alertas</span>
+              <span className="block font-bold text-white group-data-[erp-theme=light]/dashboard:text-foreground">Dashboard de Seguridad</span>
+              <span className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">Monitoreo RLS y alertas</span>
             </span>
           </button>
         </CardContent>

@@ -46,7 +46,7 @@ export class CajasService {
       nombre: dto.nombre,
       descripcion: dto.descripcion ?? null,
       sucursal_id: dto.sucursal_id ?? null,
-      almacen_id: dto.almacen_id ?? null,
+      almacen_id: dto.almacen_id,
       dispositivo: dto.dispositivo ?? null,
       tipo: dto.tipo ?? 'TIENDA',
       estado: 'ACTIVO',
@@ -120,7 +120,7 @@ export class CajasService {
     const { data: caja, error: findError } = await this.supabase
       .getClient()
       .from('cajas')
-      .select('id, estado, nombre')
+      .select('id, estado, nombre, almacen_id')
       .eq('tenant_id', tenantId)
       .eq('id', cajaId)
       .single();
@@ -132,6 +132,12 @@ export class CajasService {
     if (caja.estado !== 'ACTIVO') {
       throw new BadRequestException(
         `La caja "${caja.nombre}" está ${caja.estado.toLowerCase()}. Debe estar activa para abrir sesión.`,
+      );
+    }
+
+    if (!caja.almacen_id) {
+      throw new BadRequestException(
+        `La caja "${caja.nombre}" no tiene un almacén asignado. Configure el almacén antes de abrir una sesión.`,
       );
     }
 
@@ -634,7 +640,9 @@ export class CajasService {
   async listarSesiones(tenantId: string, filters: { fecha_desde?: string; fecha_hasta?: string; estado?: string; cajero_id?: string }) {
     let query = this.supabase.getClient()
       .from('sesiones_caja')
-      .select('*')
+      // Embebe el cajero y la caja para que la UI muestre "Por:" y el nombre de
+      // caja sin lookups extra. Antes select('*') dejaba "Por:" siempre vacío.
+      .select('*, usuario:usuarios_sistema!cajero_id(nombres, apellidos, nombre, apellido, email), caja:cajas!caja_id(nombre, codigo)')
       .eq('tenant_id', tenantId);
 
     if (filters.estado) {

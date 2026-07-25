@@ -38,7 +38,6 @@ describe('CpeService idempotency/in-flight guards', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
       fiscalAdapter,
     );
 
@@ -48,4 +47,3 @@ describe('CpeService idempotency/in-flight guards', () => {
     expect(supabaseService.update).not.toHaveBeenCalled();
   });
 });
-

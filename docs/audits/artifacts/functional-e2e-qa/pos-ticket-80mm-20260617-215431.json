@@ -1,0 +1,11 @@
+{
+  "tenantId": "c0af84b5-5ea6-44a9-9e6e-a869f119b013",
+  "ventaId": "551d5b62-fdb3-474a-b580-615028adafdd",
+  "numeroTicket": "B001-00000001",
+  "pdf": "C:\\Users\\PC\\Desktop\\erp\\docs\\audits\\artifacts\\functional-e2e-qa\\pos-ticket-80mm-20260617-215431.pdf",
+  "bytes": 51016,
+  "pageWidth": "80mm",
+  "pageHeight": "160mm",
+  "sunatProductionUsed": false,
+  "passed": true
+}

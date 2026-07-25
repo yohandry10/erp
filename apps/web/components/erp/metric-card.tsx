@@ -14,11 +14,11 @@ type MetricCardProps = {
 }
 
 const toneClasses = {
-  default: "border-slate-400/20 bg-slate-400/10 text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700",
-  success: "border-cyan-300/25 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50 group-data-[erp-theme=light]/dashboard:text-cyan-700",
-  warning: "border-amber-300/25 bg-amber-300/10 text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-700",
-  danger: "border-slate-300/25 bg-slate-300/10 text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-300 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700",
-  info: "border-blue-300/25 bg-blue-300/10 text-blue-100 group-data-[erp-theme=light]/dashboard:border-blue-200 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700",
+  default: "border-border/20 bg-slate-400/10 text-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted group-data-[erp-theme=light]/dashboard:text-foreground/85",
+  success: "border-cyan-300/25 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50 group-data-[erp-theme=light]/dashboard:text-cyan-700",
+  warning: "border-amber-300/25 bg-amber-300/10 text-amber-700 dark:text-amber-200 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-700",
+  danger: "border-border/25 bg-slate-300/10 text-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted group-data-[erp-theme=light]/dashboard:text-foreground/85",
+  info: "border-blue-300/25 bg-blue-300/10 text-blue-700 dark:text-blue-200 group-data-[erp-theme=light]/dashboard:border-blue-200 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700",
 }
 
 export function MetricCard({
@@ -30,9 +30,9 @@ export function MetricCard({
   className,
 }: MetricCardProps) {
   return (
-    <Card className={cn("overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950 group-data-[erp-theme=light]/dashboard:shadow-slate-200/70", className)}>
+    <Card className={cn("overflow-hidden border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground group-data-[erp-theme=light]/dashboard:shadow-slate-200/70", className)}>
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-2">
-        <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70 group-data-[erp-theme=light]/dashboard:text-blue-700">
+        <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80 group-data-[erp-theme=light]/dashboard:text-blue-700">
           {title}
         </CardTitle>
         {Icon ? (
@@ -42,11 +42,11 @@ export function MetricCard({
         ) : null}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold tracking-normal text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+        <div className="text-2xl font-bold tracking-normal text-white group-data-[erp-theme=light]/dashboard:text-foreground">
           {value}
         </div>
         {description ? (
-          <div className="mt-2 flex items-center gap-2 text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+          <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
             {description}
           </div>
         ) : null}

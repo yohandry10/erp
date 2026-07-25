@@ -60,31 +60,37 @@ export default function GreModal({
   const [formData, setFormData] = useState({
     destinatario: '',
     direccionDestino: '',
+    ubigeoDestino: '',
     fechaTraslado: '',
     modalidad: 'TRANSPORTE_PUBLICO',
     motivo: 'VENTA',
     pesoTotal: '',
     observaciones: '',
     transportista: '',
+    transportistaDocumento: '',
     placaVehiculo: '',
-    licenciaConducir: ''
+    licenciaConducir: '',
+    conductorDocumentoTipo: '1',
+    conductorDocumentoNumero: '',
+    conductorNombres: '',
+    conductorApellidos: ''
   })
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-    const api = useApiCall()
+  const api = useApiCall()
 
   // Pre-llenar datos cuando se proporciona CPE (OPCIONAL, para facilitar)
   useEffect(() => {
     if (cpeData && isOpen) {
       console.log('🔗 Pre-llenando GRE con datos de CPE para facilitar:', cpeData)
-      
+
       // Calcular fecha de traslado (mañana por defecto)
       const mañana = new Date()
       mañana.setDate(mañana.getDate() + 1)
       const fechaTraslado = mañana.toISOString().split('T')[0]
-      
+
       setFormData(prev => ({
         ...prev,
         destinatario: cpeData.cliente,
@@ -109,7 +115,7 @@ export default function GreModal({
     e.preventDefault()
     setIsLoading(true)
     setError('')
-    
+
     try {
       const greData = {
         ...formData,
@@ -122,29 +128,35 @@ export default function GreModal({
 
       console.log('🚚 Enviando datos GRE:', greData)
       const result = await api.post('/api/gre/guias', greData)
-      
+
       console.log('✅ Respuesta del servidor:', result)
-      
+
       if (result && result.success) {
         console.log('✅ GRE creada exitosamente:', result.data)
-        
+
         // Mostrar toast de éxito
         showToast(`✅ ${result.message || 'Guía de remisión creada exitosamente'}`)
-        
+
         onSuccess(result.data)
         onClose()
         // Reset form
         setFormData({
           destinatario: '',
           direccionDestino: '',
+          ubigeoDestino: '',
           fechaTraslado: '',
           modalidad: 'TRANSPORTE_PUBLICO',
           motivo: 'VENTA',
           pesoTotal: '',
           observaciones: '',
           transportista: '',
+          transportistaDocumento: '',
           placaVehiculo: '',
-          licenciaConducir: ''
+          licenciaConducir: '',
+          conductorDocumentoTipo: '1',
+          conductorDocumentoNumero: '',
+          conductorNombres: '',
+          conductorApellidos: ''
         })
       } else {
         console.log('❌ Error en la respuesta:', result)
@@ -168,27 +180,27 @@ export default function GreModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]">
-      <div className="bg-white rounded-3 p-8 w-[90%] max-w-[700px] overflow-auto">
+    <div className="fixed inset-0 z-[1100] flex items-start justify-center overflow-y-auto bg-[rgba(0,_0,_0,_0.5)] p-4">
+      <div className="my-auto max-h-[calc(100dvh-2rem)] w-[90%] max-w-[700px] overflow-y-auto rounded-xl bg-card p-8">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-6 font-semibold text-gray-800">Nueva Guía de Remisión Electrónica</h2>
+            <h2 className="text-2xl font-semibold text-foreground">Nueva Guía de Remisión Electrónica</h2>
             {cpeData && (
-              <p className="text-3.5 text-[#22c55e] mt-1 font-medium">
+              <p className="text-sm text-[#22c55e] mt-1 font-medium">
                 🔗 Datos pre-llenados desde {(cpeData.tipoDocumento || cpeData.tipoComprobante) === '01' ? 'Factura' : 'Boleta'} {cpeData.serie}-{cpeData.numero.toString().padStart(8, '0')}
               </p>
             )}
           </div>
           <button
             onClick={onClose}
-            disabled={isLoading} className="border-0 text-6 text-gray-500"
+            disabled={isLoading} className="border-0 text-2xl text-muted-foreground"
           >
             ×
           </button>
         </div>
 
         {error && (
-          <div className="bg-[#fee2e2] border text-red-600 p-3 rounded-[6px] mb-4 text-3.5">
+          <div className="bg-[#fee2e2] border text-destructive p-3 rounded-[6px] mb-4 text-sm">
             {error}
           </div>
         )}
@@ -196,7 +208,7 @@ export default function GreModal({
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Destinatario *
               </label>
               <input
@@ -205,12 +217,12 @@ export default function GreModal({
                 name="destinatario"
                 value={formData.destinatario}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Dirección de Destino *
               </label>
               <input
@@ -219,12 +231,32 @@ export default function GreModal({
                 name="direccionDestino"
                 value={formData.direccionDestino}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
+                Ubigeo de Destino *
+              </label>
+              <input
+                aria-label="Ubigeo de Destino *"
+                type="text"
+                inputMode="numeric"
+                name="ubigeoDestino"
+                value={formData.ubigeoDestino}
+                onChange={handleChange}
+                minLength={6}
+                maxLength={6}
+                pattern="[0-9]{6}"
+                placeholder="Ej: 150101"
+                required
+                className="w-[100%] p-3 border rounded-[6px] text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Fecha de Traslado *
               </label>
               <input
@@ -233,12 +265,12 @@ export default function GreModal({
                 name="fechaTraslado"
                 value={formData.fechaTraslado}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Modalidad de Transporte *
               </label>
               <select
@@ -246,7 +278,7 @@ export default function GreModal({
                 name="modalidad"
                 value={formData.modalidad}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               >
                 <option value="TRANSPORTE_PUBLICO">Transporte Público</option>
                 <option value="TRANSPORTE_PRIVADO">Transporte Privado</option>
@@ -254,7 +286,7 @@ export default function GreModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Motivo del Traslado *
               </label>
               <select
@@ -262,7 +294,7 @@ export default function GreModal({
                 name="motivo"
                 value={formData.motivo}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               >
                 <option value="VENTA">Venta</option>
                 <option value="COMPRA">Compra</option>
@@ -274,7 +306,7 @@ export default function GreModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Peso Total (Kg) *
               </label>
               <input
@@ -285,57 +317,142 @@ export default function GreModal({
                 onChange={handleChange}
                 step="0.01"
                 min="0"
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             {formData.modalidad === 'TRANSPORTE_PUBLICO' && (
-              <div>
-                <label className="block mb-2 font-semibold text-gray-700">
-                  Transportista
-                </label>
-                <input
-                  aria-label="Transportista"
-                  type="text"
-                  name="transportista"
-                  value={formData.transportista}
-                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block mb-2 font-semibold text-foreground/85">
+                    Transportista *
+                  </label>
+                  <input
+                    aria-label="Transportista *"
+                    type="text"
+                    name="transportista"
+                    value={formData.transportista}
+                    onChange={handleChange}
+                    required={formData.modalidad === 'TRANSPORTE_PUBLICO'} className="w-[100%] p-3 border rounded-[6px] text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2 font-semibold text-foreground/85">
+                    RUC del Transportista *
+                  </label>
+                  <input
+                    aria-label="RUC del Transportista *"
+                    type="text"
+                    name="transportistaDocumento"
+                    value={formData.transportistaDocumento}
+                    onChange={handleChange}
+                    inputMode="numeric"
+                    maxLength={11}
+                    pattern="[0-9]{11}"
+                    required={formData.modalidad === 'TRANSPORTE_PUBLICO'} className="w-[100%] p-3 border rounded-[6px] text-sm"
+                  />
+                </div>
+              </>
             )}
 
             {formData.modalidad === 'TRANSPORTE_PRIVADO' && (
               <>
                 <div>
-                  <label className="block mb-2 font-semibold text-gray-700">
-                    Placa del Vehículo
+                  <label className="block mb-2 font-semibold text-foreground/85">
+                    Placa del Vehículo *
                   </label>
                   <input
-                    aria-label="Placa del Vehículo"
+                    aria-label="Placa del Vehículo *"
                     type="text"
                     name="placaVehiculo"
                     value={formData.placaVehiculo}
-                    onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                    onChange={handleChange}
+                    maxLength={8}
+                    required={formData.modalidad === 'TRANSPORTE_PRIVADO'} className="w-[100%] p-3 border rounded-[6px] text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block mb-2 font-semibold text-gray-700">
-                    Licencia de Conducir
+                  <label className="block mb-2 font-semibold text-foreground/85">
+                    Licencia de Conducir *
                   </label>
                   <input
-                    aria-label="Licencia de Conducir"
+                    aria-label="Licencia de Conducir *"
                     type="text"
                     name="licenciaConducir"
                     value={formData.licenciaConducir}
-                    onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                    onChange={handleChange}
+                    maxLength={10}
+                    required={formData.modalidad === 'TRANSPORTE_PRIVADO'} className="w-[100%] p-3 border rounded-[6px] text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2 font-semibold text-foreground/85">
+                    Tipo Doc. Conductor *
+                  </label>
+                  <select
+                    aria-label="Tipo Doc. Conductor *"
+                    name="conductorDocumentoTipo"
+                    value={formData.conductorDocumentoTipo}
+                    onChange={handleChange}
+                    required={formData.modalidad === 'TRANSPORTE_PRIVADO'} className="w-[100%] p-3 border rounded-[6px] text-sm"
+                  >
+                    <option value="1">DNI</option>
+                    <option value="4">Carné de extranjería</option>
+                    <option value="7">Pasaporte</option>
+                    <option value="0">Doc. trib. no domiciliado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block mb-2 font-semibold text-foreground/85">
+                    Documento Conductor *
+                  </label>
+                  <input
+                    aria-label="Documento Conductor *"
+                    type="text"
+                    name="conductorDocumentoNumero"
+                    value={formData.conductorDocumentoNumero}
+                    onChange={handleChange}
+                    maxLength={15}
+                    required={formData.modalidad === 'TRANSPORTE_PRIVADO'} className="w-[100%] p-3 border rounded-[6px] text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2 font-semibold text-foreground/85">
+                    Nombres Conductor *
+                  </label>
+                  <input
+                    aria-label="Nombres Conductor *"
+                    type="text"
+                    name="conductorNombres"
+                    value={formData.conductorNombres}
+                    onChange={handleChange}
+                    required={formData.modalidad === 'TRANSPORTE_PRIVADO'} className="w-[100%] p-3 border rounded-[6px] text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2 font-semibold text-foreground/85">
+                    Apellidos Conductor *
+                  </label>
+                  <input
+                    aria-label="Apellidos Conductor *"
+                    type="text"
+                    name="conductorApellidos"
+                    value={formData.conductorApellidos}
+                    onChange={handleChange}
+                    required={formData.modalidad === 'TRANSPORTE_PRIVADO'} className="w-[100%] p-3 border rounded-[6px] text-sm"
                   />
                 </div>
               </>
             )}
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Observaciones
               </label>
               <textarea
@@ -343,7 +460,7 @@ export default function GreModal({
                 name="observaciones"
                 value={formData.observaciones}
                 onChange={handleChange}
-                rows={3} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                rows={3} className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
           </div>
@@ -351,7 +468,7 @@ export default function GreModal({
           <div className="flex gap-4 justify-end">
             <button
               type="button"
-              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-semibold"
+              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-card text-foreground/85 cursor-pointer font-semibold"
             >
               Cancelar
             </button>

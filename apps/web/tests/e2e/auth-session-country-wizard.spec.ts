@@ -1,6 +1,8 @@
 import { expect, request, test, type APIRequestContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
 
 for (const envPath of [
   path.resolve(process.cwd(), '../../.env.local'),
@@ -27,10 +29,8 @@ function getOperationalPassword(): string {
 }
 
 const adminAuthFile = path.join(__dirname, '.auth', 'admin.json');
-const AUTH_SESSION_STORAGE_KEY = 'erp.auth.session.snapshot';
 const adminEmail = process.env.TEST_USER_EMAIL || 'admin@erp.local';
 const adminPassword = getOperationalPassword();
-const standardPassword = 'StdUserProd2026!';
 
 type BrowserEvidence = {
   consoleErrors: string[];
@@ -44,22 +44,6 @@ function getBaseURL(testInfo: { project: { use: Record<string, unknown> } }) {
 
 function getApiOrigin() {
   return process.env.E2E_API_ORIGIN || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-}
-
-function readStoredAdminToken(): string | null {
-  try {
-    const storageState = JSON.parse(fs.readFileSync(adminAuthFile, 'utf8')) as {
-      origins?: Array<{ localStorage?: Array<{ name: string; value: string }> }>;
-    };
-    for (const origin of storageState.origins || []) {
-      const raw = origin.localStorage?.find((item) => item.name === AUTH_SESSION_STORAGE_KEY)?.value;
-      if (!raw) continue;
-      return JSON.parse(raw)?.access_token || null;
-    }
-  } catch {
-    return null;
-  }
-  return null;
 }
 
 function attachBrowserEvidence(page: Page): BrowserEvidence {
@@ -113,8 +97,9 @@ async function expectCleanBrowserEvidence(
 
 async function expectDashboardReady(page: Page) {
   await expect(page).toHaveURL(/\/dashboard\/?(?:$|\?)/, { timeout: 30000 });
-  await expect(page.locator('body')).toContainText(/Dashboard/i, { timeout: 30000 });
-  await expect(page.locator('body')).toContainText(/Panel de control ejecutivo/i, { timeout: 30000 });
+  await expect(page.locator('html[data-erp-hydrated="true"]')).toHaveCount(1, { timeout: 60000 });
+  await expect(page.getByRole('button', { name: /^Iniciar Sesión$/i })).toBeHidden({ timeout: 60000 });
+  await expect(page.locator('body')).toContainText(/Dashboard ejecutivo/i, { timeout: 60000 });
 
   const bodyText = await page.locator('body').innerText({ timeout: 15000 });
   expect(bodyText).not.toMatch(/Cargando país configurado/i);
@@ -145,43 +130,107 @@ async function loginThroughUi(page: Page, email: string, password: string) {
 
 async function adminContext(baseURL: string): Promise<APIRequestContext> {
   void baseURL;
-  const token = readStoredAdminToken();
   return request.newContext({
     baseURL: getApiOrigin(),
     storageState: adminAuthFile,
-    extraHTTPHeaders: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }
 
 async function createStandardUser(baseURL: string) {
-  const api = await adminContext(baseURL);
-  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const email = `standard-auth-${unique}@erp-e2e.local`;
+  void baseURL;
+  const aprobadorEmail = process.env.TEST_APROBADOR_EMAIL;
+  const password = process.env.TEST_APROBADOR_PASSWORD;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  expect(aprobadorEmail, 'TEST_APROBADOR_EMAIL requerido para usuario estándar E2E').toBeTruthy();
+  expect(password, 'TEST_APROBADOR_PASSWORD requerido para usuario estándar E2E').toBeTruthy();
+  expect(supabaseUrl, 'SUPABASE_URL requerido para usuario estándar E2E').toBeTruthy();
+  expect(serviceRoleKey, 'SUPABASE_SERVICE_ROLE_KEY requerido para usuario estándar E2E').toBeTruthy();
 
-  try {
-    const response = await api.post('/api/users', {
-      data: {
-        nombre: 'Usuario',
-        apellido: 'Estandar Auth',
-        email,
-        password: standardPassword,
-        cargo: 'Auditor funcional',
-        departamento: 'QA',
-        roles: [],
-      },
+  const supabase = createClient(supabaseUrl!, serviceRoleKey!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: aprobador, error: userError } = await supabase
+    .from('usuarios_sistema')
+    .select('id, tenant_id, password_hash')
+    .eq('email', aprobadorEmail!)
+    .single();
+  expect(userError?.message || '', 'resolver usuario aprobador E2E').toBe('');
+  const email = `standard-auth-${aprobador!.tenant_id.slice(0, 8)}@temp.local`;
+
+  let { data: user, error: standardUserError } = await supabase
+    .from('usuarios_sistema')
+    .select('id, tenant_id')
+    .eq('email', email)
+    .maybeSingle();
+  expect(standardUserError?.message || '', 'consultar usuario estándar E2E').toBe('');
+
+  if (!user) {
+    const userId = crypto.randomUUID();
+    const insertedUser = await supabase.from('usuarios_sistema').insert({
+      id: userId,
+      tenant_id: aprobador!.tenant_id,
+      nombre: 'Usuario',
+      apellido: 'Estándar E2E',
+      email,
+      nombre_usuario: `standard-${aprobador!.tenant_id.slice(0, 8)}`,
+      password_hash: aprobador!.password_hash,
+      activo: true,
+      estado: 'ACTIVO',
+      is_super_admin: false,
+      is_demo_user: true,
+      demo_email_temp: email,
+    }).select('id, tenant_id').single();
+    expect(insertedUser.error?.message || '', 'crear usuario estándar E2E').toBe('');
+    user = insertedUser.data;
+
+    const insertedDomainUser = await supabase.from('users').insert({
+      id: userId,
+      tenant_id: aprobador!.tenant_id,
+      email,
+      nombre: 'Usuario',
+      apellido: 'Estándar E2E',
+      activo: true,
+      estado: 'ACTIVO',
     });
-
-    expect(response.ok(), `creación de usuario estándar HTTP ${response.status()}: ${await response.text()}`).toBe(
-      true,
-    );
-
-    const body = await response.json();
-    expect(body.id, 'la API debe persistir el usuario y devolver id real').toBeTruthy();
-
-    return { email, password: standardPassword, id: body.id as string };
-  } finally {
-    await api.dispose();
+    expect(insertedDomainUser.error?.message || '', 'crear espejo de usuario estándar E2E').toBe('');
   }
+
+  let { data: role, error: roleError } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('tenant_id', aprobador!.tenant_id)
+    .eq('nombre', 'E2E_STANDARD_AUTH')
+    .maybeSingle();
+  expect(roleError?.message || '', 'consultar rol estándar E2E').toBe('');
+  if (!role) {
+    const inserted = await supabase.from('roles').insert({
+      id: crypto.randomUUID(),
+      tenant_id: aprobador!.tenant_id,
+      nombre: 'E2E_STANDARD_AUTH',
+      descripcion: 'Rol efímero sin permisos para QA de autenticación',
+      is_system_role: false,
+      activo: true,
+    }).select('id').single();
+    expect(inserted.error?.message || '', 'crear rol estándar E2E').toBe('');
+    role = inserted.data;
+  }
+
+  const { error: deleteRolesError } = await supabase
+    .from('user_roles')
+    .delete()
+    .eq('tenant_id', aprobador!.tenant_id)
+    .eq('usuario_sistema_id', user!.id);
+  expect(deleteRolesError?.message || '', 'limpiar roles del usuario estándar E2E').toBe('');
+  const { error: assignRoleError } = await supabase.from('user_roles').insert({
+    id: crypto.randomUUID(),
+    tenant_id: aprobador!.tenant_id,
+    usuario_sistema_id: user!.id,
+    role_id: role!.id,
+  });
+  expect(assignRoleError?.message || '', 'asignar rol estándar E2E').toBe('');
+
+  return { email, password: password!, id: user!.id as string };
 }
 
 async function loginApi(baseURL: string, email: string, password: string) {
@@ -231,7 +280,10 @@ test.describe('Auth, sesión, país/empresa, wizard y permisos', () => {
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
     await expectDashboardReady(page);
 
-    const api = await request.newContext({ baseURL, storageState: await context.storageState() });
+    const api = await request.newContext({
+      baseURL: getApiOrigin(),
+      storageState: await context.storageState(),
+    });
     const refresh = await api.post('/api/auth/refresh');
     expect(refresh.ok(), `refresh de sesión HTTP ${refresh.status()}: ${await refresh.text()}`).toBe(true);
     const profile = await api.get('/api/auth/profile');

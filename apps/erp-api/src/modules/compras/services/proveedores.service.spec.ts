@@ -164,14 +164,12 @@ describe('ProveedoresService', () => {
       expect(repository.create).toHaveBeenCalled();
     });
 
-    it('should accept valid Colombia RUC (9 digits)', async () => {
+    it('should reject Colombia NIT length while country is roadmap', async () => {
       const colombiaDto = { ...validDto, ruc: '123456789' };
       repository.findByRuc.mockResolvedValue(null);
-      repository.create.mockResolvedValue({ ...mockProveedor, ruc: '123456789' });
 
-      await service.create(colombiaDto, 'tenant-123');
-
-      expect(repository.create).toHaveBeenCalled();
+      await expect(service.create(colombiaDto, 'tenant-123'))
+        .rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException for invalid email', async () => {
@@ -344,7 +342,6 @@ describe('ProveedoresService', () => {
     it('should accept valid RUC formats', async () => {
       const validRucs = [
         '20100070970', // Peru (11 digits)
-        '123456789'    // Colombia (9 digits)
       ];
 
       repository.findByRuc.mockResolvedValue(null);
@@ -367,6 +364,7 @@ describe('ProveedoresService', () => {
     it('should reject invalid RUC formats', async () => {
       const invalidRucs = [
         '123',           // Too short
+        '123456789',     // Colombia NIT length is roadmap, not active
         '12345678901234', // Too long
         '2012345678A',   // Contains letters
         '201234567 89',  // Contains spaces

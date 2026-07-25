@@ -25,32 +25,32 @@ export default function CotizacionEstadoBadge({
     const configs = {
       [EstadoCotizacion.BORRADOR]: {
         label: 'Borrador',
-        color: 'bg-gray-100 text-gray-800 border-gray-200',
+        color: 'bg-muted text-foreground border-border',
         icon: FileEdit
       },
       [EstadoCotizacion.ENVIADA]: {
         label: 'Enviada',
-        color: 'bg-blue-100 text-blue-800 border-blue-200',
+        color: 'bg-primary/10 text-primary border-blue-200',
         icon: Send
       },
       [EstadoCotizacion.APROBADA]: {
         label: 'Aprobada',
-        color: 'bg-green-100 text-green-800 border-green-200',
+        color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
         icon: CheckCircle
       },
       [EstadoCotizacion.RECHAZADA]: {
         label: 'Rechazada',
-        color: 'bg-red-100 text-red-800 border-red-200',
+        color: 'bg-destructive/10 text-destructive border-red-200',
         icon: XCircle
       },
       [EstadoCotizacion.CONVERTIDA]: {
         label: 'Convertida',
-        color: 'bg-purple-100 text-purple-800 border-purple-200',
+        color: 'bg-violet-500/10 text-violet-400 border-purple-200',
         icon: ArrowRightCircle
       },
       [EstadoCotizacion.VENCIDA]: {
         label: 'Vencida',
-        color: 'bg-orange-100 text-orange-800 border-orange-200',
+        color: 'bg-amber-500/10 text-amber-400 border-orange-200',
         icon: Clock
       }
     }

@@ -9,7 +9,7 @@ import {
   ArrayMaxSize,
   MaxLength,
   Min,
-  IsUUID,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -107,6 +107,45 @@ export class VentaPosComprobanteDto {
   @IsString()
   @MaxLength(30)
   numero?: string;
+
+  // Compatibilidad de despliegue progresivo con la imagen Web anterior.
+  // Son snapshots informativos: PosService recalcula precios, impuestos y
+  // stock desde la BD y sólo usa serie/correlativo/tipo/numero del comprobante.
+  @IsOptional()
+  @IsString()
+  fecha?: string;
+
+  @IsOptional()
+  @IsObject()
+  cliente?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsArray()
+  items?: unknown[];
+
+  @IsOptional()
+  @IsNumber()
+  subtotal?: number;
+
+  @IsOptional()
+  @IsNumber()
+  descuentos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  impuestos?: number;
+
+  @IsOptional()
+  @IsNumber()
+  total?: number;
+
+  @IsOptional()
+  @IsObject()
+  metodoPago?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  estado?: string;
 }
 
 export class VentaPosDescuentoGlobalDto {
@@ -118,6 +157,11 @@ export class VentaPosDescuentoGlobalDto {
   @IsNumber()
   @Min(0)
   valor?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  descripcion?: string;
 }
 
 export class CreateVentaPosDto {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
+import { parseDateLocal } from '@/lib/date-utils'
 import {
   ArrowLeft,
   FileText,
@@ -24,6 +25,7 @@ import AprobacionesPanel from '@/components/compras/AprobacionesPanel'
 import AprobarOrdenModal from '@/components/compras/AprobarOrdenModal'
 import RechazarOrdenModal from '@/components/compras/RechazarOrdenModal'
 import RecepcionesPanel from '@/components/compras/RecepcionesPanel'
+import toast from 'react-hot-toast'
 
 interface OrdenCompraDetalle {
   id: string
@@ -51,7 +53,7 @@ interface OrdenCompra {
   total: number
   moneda: string
   observaciones?: string
-  proveedores?: {
+  proveedor?: {
     razon_social: string
     ruc: string
     email?: string
@@ -65,26 +67,26 @@ interface OrdenCompra {
 type EstadoOrden = 'BORRADOR' | 'APROBACION' | 'APROBADA' | 'PARCIAL' | 'RECIBIDA' | 'CERRADA' | 'ANULADA'
 
 const ESTADOS_CONFIG: Record<EstadoOrden, { label: string; icon: any; className: string }> = {
-  BORRADOR: { label: 'Borrador', icon: Edit, className: 'bg-slate-700/80 text-slate-100 ring-slate-500/40' },
-  APROBACION: { label: 'En Aprobación', icon: Clock, className: 'bg-blue-500/20 text-blue-100 ring-blue-400/40' },
-  APROBADA: { label: 'Aprobada', icon: CheckCircle, className: 'bg-blue-500/25 text-blue-50 ring-blue-300/40' },
-  PARCIAL: { label: 'Parcial', icon: Package, className: 'bg-cyan-500/20 text-cyan-100 ring-cyan-300/40' },
-  RECIBIDA: { label: 'Recibida', icon: CheckCircle, className: 'bg-cyan-500/25 text-cyan-50 ring-cyan-300/40' },
-  CERRADA: { label: 'Cerrada', icon: FileText, className: 'bg-slate-700/80 text-slate-100 ring-slate-500/40' },
-  ANULADA: { label: 'Anulada', icon: XCircle, className: 'bg-slate-800 text-slate-100 ring-slate-500/40' }
+  BORRADOR: { label: 'Borrador', icon: Edit, className: 'bg-muted/80 text-foreground ring-slate-500/40' },
+  APROBACION: { label: 'En Aprobación', icon: Clock, className: 'bg-blue-500/20 text-primary dark:text-blue-200 ring-blue-400/40' },
+  APROBADA: { label: 'Aprobada', icon: CheckCircle, className: 'bg-blue-500/25 text-primary dark:text-blue-200 ring-blue-300/40' },
+  PARCIAL: { label: 'Parcial', icon: Package, className: 'bg-cyan-500/20 text-primary ring-cyan-300/40' },
+  RECIBIDA: { label: 'Recibida', icon: CheckCircle, className: 'bg-cyan-500/25 text-primary ring-cyan-300/40' },
+  CERRADA: { label: 'Cerrada', icon: FileText, className: 'bg-muted/80 text-foreground ring-slate-500/40' },
+  ANULADA: { label: 'Anulada', icon: XCircle, className: 'bg-muted text-foreground ring-slate-500/40' }
 }
 
-const pageClass = 'min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 text-slate-100'
-const panelClass = 'rounded-2xl border border-blue-400/20 bg-slate-950/70 p-5 shadow-xl shadow-blue-950/20 backdrop-blur'
+const pageClass = 'min-h-full bg-gradient-to-br from-background via-muted/50 to-background p-6 text-foreground'
+const panelClass = 'rounded-2xl border border-blue-400/20 bg-card/70 p-5 shadow-xl shadow-blue-950/20 backdrop-blur'
 const panelHeaderClass = 'mb-5 flex items-center gap-3 border-b border-blue-400/20 pb-4'
-const iconBoxClass = 'flex size-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-200'
-const labelClass = 'mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-const valueClass = 'm-0 text-sm font-semibold text-slate-100'
-const actionClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/15 px-4 py-2.5 text-sm font-semibold text-blue-50 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60'
+const iconBoxClass = 'flex size-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-primary dark:text-blue-200'
+const labelClass = 'mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground'
+const valueClass = 'm-0 text-sm font-semibold text-foreground'
+const actionClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/15 px-4 py-2.5 text-sm font-semibold text-primary dark:text-blue-200 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60'
 const primaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60'
-const secondaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-500/40 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-slate-800'
-const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-const tableCellClass = 'px-4 py-3 text-sm text-slate-200'
+const secondaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-500/40 bg-card/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted'
+const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground'
+const tableCellClass = 'px-4 py-3 text-sm text-foreground/90'
 
 export default function OrdenCompraDetallePage() {
   const router = useRouter()
@@ -133,11 +135,20 @@ export default function OrdenCompraDetallePage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     })
+  }
+
+  const CONDICIONES_LABELS: Record<string, string> = {
+    CONTADO: 'Contado',
+    CREDITO_15: 'Crédito 15 días',
+    CREDITO_30: 'Crédito 30 días',
+    CREDITO_45: 'Crédito 45 días',
+    CREDITO_60: 'Crédito 60 días',
+    CREDITO_90: 'Crédito 90 días',
   }
 
   const getEstadoBadge = (estado: string) => {
@@ -173,13 +184,13 @@ export default function OrdenCompraDetallePage() {
 
       if (response?.success) {
         await loadOrden()
-        alert('✅ Orden de compra aprobada exitosamente')
+        toast.success('✅ Orden de compra aprobada exitosamente')
       } else {
         throw new Error(response?.message || 'Error al aprobar la orden')
       }
     } catch (err: any) {
       console.error('Error al aprobar orden:', err)
-      alert(`❌ Error: ${err.message || 'No se pudo aprobar la orden'}`)
+      toast.error(`❌ Error: ${err.message || 'No se pudo aprobar la orden'}`)
       throw err
     }
   }
@@ -192,13 +203,13 @@ export default function OrdenCompraDetallePage() {
 
       if (response?.success) {
         await loadOrden()
-        alert('✅ Orden de compra rechazada exitosamente')
+        toast.success('✅ Orden de compra rechazada exitosamente')
       } else {
         throw new Error(response?.message || 'Error al rechazar la orden')
       }
     } catch (err: any) {
       console.error('Error al rechazar orden:', err)
-      alert(`❌ Error: ${err.message || 'No se pudo rechazar la orden'}`)
+      toast.error(`❌ Error: ${err.message || 'No se pudo rechazar la orden'}`)
       throw err
     }
   }
@@ -218,9 +229,9 @@ export default function OrdenCompraDetallePage() {
       <div className={pageClass}>
         <div className="flex min-h-[40vh] items-center justify-center">
           <div className={`${panelClass} max-w-xl text-center`}>
-            <AlertCircle className="mx-auto mb-4 size-12 text-slate-300" />
-            <h3 className="mb-2 text-lg font-semibold text-white">Error al cargar la orden</h3>
-            <p className="mb-6 text-sm text-slate-300">{error || 'Orden no encontrada'}</p>
+            <AlertCircle className="mx-auto mb-4 size-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-semibold text-foreground">Error al cargar la orden</h3>
+            <p className="mb-6 text-sm text-muted-foreground">{error || 'Orden no encontrada'}</p>
             <button onClick={() => router.push('/dashboard/compras/ordenes')} className={secondaryActionClass}>
               <ArrowLeft size={16} />
               Volver a Órdenes
@@ -233,18 +244,18 @@ export default function OrdenCompraDetallePage() {
 
   return (
     <div className={pageClass}>
-      <div className="mb-6 rounded-3xl border border-blue-400/20 bg-slate-950/80 p-6 shadow-2xl shadow-blue-950/30">
+      <div className="mb-6 rounded-3xl border border-blue-400/20 bg-card/80 p-6 shadow-2xl shadow-blue-950/30">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <button onClick={() => router.push('/dashboard/compras/ordenes')} className="mb-4 inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20">
+            <button onClick={() => router.push('/dashboard/compras/ordenes')} className="mb-4 inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-primary dark:text-blue-200 transition hover:bg-blue-500/20">
               <ArrowLeft size={16} />
               Volver a Órdenes de Compra
             </button>
             <div className="mb-2 flex flex-wrap items-center gap-4">
-              <h1 className="m-0 text-3xl font-bold text-white">Orden de Compra {orden.numero}</h1>
+              <h1 className="m-0 text-3xl font-bold text-foreground">Orden de Compra {orden.numero}</h1>
               {getEstadoBadge(orden.estado)}
             </div>
-            <p className="m-0 text-sm text-slate-300">Creada el {formatDate(orden.created_at)}</p>
+            <p className="m-0 text-sm text-muted-foreground">Creada el {formatDate(orden.created_at)}</p>
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -260,7 +271,7 @@ export default function OrdenCompraDetallePage() {
                 </button>
               </ProtectedComponent>
             )}
-            <button onClick={() => alert('📥 Funcionalidad de descarga próximamente')} className={secondaryActionClass}>
+            <button onClick={() => toast('📥 Funcionalidad de descarga próximamente')} className={secondaryActionClass}>
               <Download size={16} />
               Descargar PDF
             </button>
@@ -273,31 +284,31 @@ export default function OrdenCompraDetallePage() {
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><User size={20} /></div>
-              <h2 className="m-0 text-lg font-bold text-white">Información del Proveedor</h2>
+              <h2 className="m-0 text-lg font-bold text-foreground">Información del Proveedor</h2>
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
               <div>
                 <label className={labelClass}>Razón Social</label>
-                <p className={valueClass}>{orden.proveedores?.razon_social || 'N/A'}</p>
+                <p className={valueClass}>{orden.proveedor?.razon_social || 'N/A'}</p>
               </div>
 
               <div>
                 <label className={labelClass}>RUC</label>
-                <p className={valueClass}>{orden.proveedores?.ruc || 'N/A'}</p>
+                <p className={valueClass}>{orden.proveedor?.ruc || 'N/A'}</p>
               </div>
 
-              {orden.proveedores?.email && (
+              {orden.proveedor?.email && (
                 <div>
                   <label className={labelClass}>Email</label>
-                  <p className="m-0 text-sm text-slate-200">{orden.proveedores.email}</p>
+                  <p className="m-0 text-sm text-foreground/90">{orden.proveedor.email}</p>
                 </div>
               )}
 
-              {orden.proveedores?.telefono && (
+              {orden.proveedor?.telefono && (
                 <div>
                   <label className={labelClass}>Teléfono</label>
-                  <p className="m-0 text-sm text-slate-200">{orden.proveedores.telefono}</p>
+                  <p className="m-0 text-sm text-foreground/90">{orden.proveedor.telefono}</p>
                 </div>
               )}
             </div>
@@ -306,7 +317,7 @@ export default function OrdenCompraDetallePage() {
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><Package size={20} /></div>
-              <h2 className="m-0 text-lg font-bold text-white">Productos Solicitados</h2>
+              <h2 className="m-0 text-lg font-bold text-foreground">Productos Solicitados</h2>
             </div>
 
             <div className="overflow-auto rounded-xl border border-blue-400/10">
@@ -325,17 +336,17 @@ export default function OrdenCompraDetallePage() {
                   {orden.detalles && orden.detalles.length > 0 ? (
                     orden.detalles.map((detalle, index) => (
                       <tr key={detalle.id || index} className="border-b border-blue-400/10 last:border-b-0 hover:bg-blue-500/5">
-                        <td className={`${tableCellClass} font-semibold text-white`}>{detalle.descripcion}</td>
+                        <td className={`${tableCellClass} font-semibold text-foreground`}>{detalle.descripcion}</td>
                         <td className={`${tableCellClass} text-right`}>{detalle.cantidad}</td>
-                        <td className={`${tableCellClass} text-right font-semibold text-blue-100`}>{detalle.cantidad_recibida || 0}</td>
-                        <td className={`${tableCellClass} text-right font-semibold text-slate-300`}>{cantidadPendiente(detalle)}</td>
+                        <td className={`${tableCellClass} text-right font-semibold text-primary dark:text-blue-200`}>{detalle.cantidad_recibida || 0}</td>
+                        <td className={`${tableCellClass} text-right font-semibold text-muted-foreground`}>{cantidadPendiente(detalle)}</td>
                         <td className={`${tableCellClass} text-right`}>{formatCurrency(detalle.precio_unitario)}</td>
-                        <td className={`${tableCellClass} text-right font-semibold text-white`}>{formatCurrency(detalle.cantidad * detalle.precio_unitario)}</td>
+                        <td className={`${tableCellClass} text-right font-semibold text-foreground`}>{formatCurrency(detalle.cantidad * detalle.precio_unitario)}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
+                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
                         No hay productos en esta orden
                       </td>
                     </tr>
@@ -350,25 +361,25 @@ export default function OrdenCompraDetallePage() {
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><DollarSign size={20} /></div>
-              <h2 className="m-0 text-lg font-bold text-white">Resumen</h2>
+              <h2 className="m-0 text-lg font-bold text-foreground">Resumen</h2>
             </div>
 
             <div className="grid gap-4">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">Subtotal</span>
-                <span className="font-semibold text-slate-100">{formatCurrency(orden.subtotal)}</span>
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-semibold text-foreground">{formatCurrency(orden.subtotal)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">IGV (18%)</span>
-                <span className="font-semibold text-slate-100">{formatCurrency(orden.igv)}</span>
+                <span className="text-muted-foreground">IGV (18%)</span>
+                <span className="font-semibold text-foreground">{formatCurrency(orden.igv)}</span>
               </div>
               <div className="flex items-center justify-between border-t border-blue-400/20 pt-4">
-                <span className="font-bold text-white">Total</span>
-                <span className="text-xl font-bold text-blue-100">{formatCurrency(orden.total)}</span>
+                <span className="font-bold text-foreground">Total</span>
+                <span className="text-xl font-bold text-primary dark:text-blue-200">{formatCurrency(orden.total)}</span>
               </div>
               <div className="rounded-lg border border-blue-400/20 bg-blue-500/10 p-3">
-                <div className="mb-1 text-xs text-slate-400">Moneda</div>
-                <div className="text-sm font-semibold text-white">{orden.moneda || 'PEN'}</div>
+                <div className="mb-1 text-xs text-muted-foreground">Moneda</div>
+                <div className="text-sm font-semibold text-foreground">{orden.moneda || 'PEN'}</div>
               </div>
             </div>
           </div>
@@ -376,7 +387,7 @@ export default function OrdenCompraDetallePage() {
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><Calendar size={20} /></div>
-              <h2 className="m-0 text-lg font-bold text-white">Fechas</h2>
+              <h2 className="m-0 text-lg font-bold text-foreground">Fechas</h2>
             </div>
 
             <div className="grid gap-4">
@@ -396,8 +407,8 @@ export default function OrdenCompraDetallePage() {
                 <div>
                   <label className={labelClass}>Condiciones de Pago</label>
                   <p className={valueClass}>
-                    {orden.condiciones_pago}
-                    {orden.dias_credito && ` (${orden.dias_credito} días)`}
+                    {CONDICIONES_LABELS[orden.condiciones_pago] ?? orden.condiciones_pago}
+                    {orden.dias_credito ? ` (${orden.dias_credito} días)` : ''}
                   </p>
                 </div>
               )}
@@ -408,13 +419,13 @@ export default function OrdenCompraDetallePage() {
             <div className={panelClass}>
               <div className={panelHeaderClass}>
                 <div className={iconBoxClass}><Truck size={20} /></div>
-                <h2 className="m-0 text-lg font-bold text-white">Progreso de Recepción</h2>
+                <h2 className="m-0 text-lg font-bold text-foreground">Progreso de Recepción</h2>
               </div>
 
               <div className="mb-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-300">Recibido</span>
-                  <span className="text-sm font-bold text-blue-100">{porcentajeRecibido().toFixed(1)}%</span>
+                  <span className="text-sm font-semibold text-muted-foreground">Recibido</span>
+                  <span className="text-sm font-bold text-primary dark:text-blue-200">{porcentajeRecibido().toFixed(1)}%</span>
                 </div>
                 <progress className="h-3 w-full accent-blue-500" value={porcentajeRecibido()} max={100} />
               </div>
@@ -429,7 +440,7 @@ export default function OrdenCompraDetallePage() {
           {(orden.estado === 'APROBACION' || orden.estado === 'BORRADOR' || orden.estado === 'PENDIENTE') && (
             <div className={panelClass}>
               <div className={panelHeaderClass}>
-                <h2 className="m-0 text-lg font-bold text-white">Aprobación</h2>
+                <h2 className="m-0 text-lg font-bold text-foreground">Aprobación</h2>
               </div>
 
               <div className="grid gap-3">
@@ -457,7 +468,7 @@ export default function OrdenCompraDetallePage() {
           {orden.estado === 'APROBADA' && (
             <div className={panelClass}>
               <div className={panelHeaderClass}>
-                <h2 className="m-0 text-lg font-bold text-white">Acciones</h2>
+                <h2 className="m-0 text-lg font-bold text-foreground">Acciones</h2>
               </div>
 
               <button onClick={() => router.push(`/dashboard/compras/recepciones/nueva?orden_id=${orden.id}`)} className={`${primaryActionClass} w-full`}>
@@ -473,9 +484,9 @@ export default function OrdenCompraDetallePage() {
         <div className={`${panelClass} mb-6`}>
           <div className={panelHeaderClass}>
             <div className={iconBoxClass}><FileText size={20} /></div>
-            <h2 className="m-0 text-lg font-bold text-white">Observaciones</h2>
+            <h2 className="m-0 text-lg font-bold text-foreground">Observaciones</h2>
           </div>
-          <p className="m-0 whitespace-pre-wrap text-sm leading-6 text-slate-300">{orden.observaciones}</p>
+          <p className="m-0 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{orden.observaciones}</p>
         </div>
       )}
 
@@ -499,4 +510,3 @@ export default function OrdenCompraDetallePage() {
     </div>
   )
 }
-

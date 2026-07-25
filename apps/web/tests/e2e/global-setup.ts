@@ -4,7 +4,6 @@ import path from 'node:path';
 
 const authFile = path.join(__dirname, '.auth', 'admin.json');
 const authLockFile = path.join(__dirname, '.auth', 'admin.lock');
-const AUTH_SESSION_STORAGE_KEY = 'erp.auth.session.snapshot';
 
 type StorageState = {
   cookies: unknown[];
@@ -13,6 +12,20 @@ type StorageState = {
     localStorage?: Array<{ name: string; value: string }>;
   }>;
 };
+
+for (const envPath of [
+  path.resolve(process.cwd(), '../../.env.local'),
+  path.resolve(process.cwd(), '../../.env'),
+  path.resolve(process.cwd(), '.env.local'),
+  path.resolve(process.cwd(), '../erp-api/.env'),
+]) {
+  if (!fs.existsSync(envPath)) continue;
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)\s*$/);
+    if (!match || process.env[match[1]]) continue;
+    process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
+  }
+}
 
 function sleep(ms: number) {
   return new Promise((resolve) => {
@@ -24,49 +37,18 @@ function getApiOrigin() {
   return process.env.E2E_API_ORIGIN || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 }
 
-function getStoredToken(storageState: StorageState | null): string | null {
-  for (const origin of storageState?.origins || []) {
-    const raw = origin.localStorage?.find((item) => item.name === AUTH_SESSION_STORAGE_KEY)?.value;
-    if (!raw) continue;
-    try {
-      return JSON.parse(raw)?.access_token || null;
-    } catch {
-      return null;
-    }
+function getOperationalPassword() {
+  if (process.env.DATABASE_URL) {
+    return decodeURIComponent(new URL(process.env.DATABASE_URL).password);
   }
-  return null;
+  if (process.env.TEST_USER_PASSWORD) {
+    return process.env.TEST_USER_PASSWORD;
+  }
+  throw new Error('TEST_USER_PASSWORD o DATABASE_URL es requerido para E2E');
 }
 
 function hasAuthState(storageState: StorageState | null) {
-  return Boolean(storageState?.cookies.length || getStoredToken(storageState));
-}
-
-function normalizeLoginSession(loginData: any) {
-  const rawUser = loginData?.user || loginData?.data?.user;
-  const accessToken = loginData?.access_token || loginData?.token || loginData?.data?.access_token || loginData?.data?.token;
-  const roles = Array.isArray(rawUser?.roles)
-    ? rawUser.roles
-        .map((role: any) => (typeof role === 'string' ? role : role?.nombre))
-        .filter((role: any): role is string => typeof role === 'string' && role.length > 0)
-    : [];
-
-  if (!rawUser?.id || !rawUser?.email || !accessToken) {
-    throw new Error(`E2E auth setup recibió login incompleto: ${JSON.stringify(loginData).slice(0, 300)}`);
-  }
-
-  return {
-    user: {
-      id: rawUser.id,
-      email: rawUser.email,
-      nombre: rawUser.nombre || rawUser.username || rawUser.email.split('@')[0],
-      apellido: rawUser.apellido || '',
-      nombre_usuario: rawUser.nombre_usuario || rawUser.username,
-      roles,
-      tenant_id: rawUser.tenant_id,
-      is_super_admin: rawUser.is_super_admin === true || rawUser.isSuperAdmin === true || rawUser.super_admin === true,
-    },
-    access_token: accessToken,
-  };
+  return Boolean(storageState?.cookies.length);
 }
 
 function readStorageState(): StorageState | null {
@@ -99,26 +81,6 @@ function addOnboardingState(storageState: StorageState, baseURL: string) {
   return storageState;
 }
 
-function addSessionSnapshot(storageState: StorageState, baseURL: string, session: unknown) {
-  const origin = new URL(baseURL).origin;
-  const existingOrigin = storageState.origins.find((item) => item.origin === origin);
-  const sessionState = {
-    name: AUTH_SESSION_STORAGE_KEY,
-    value: JSON.stringify(session),
-  };
-
-  if (existingOrigin) {
-    existingOrigin.localStorage = [
-      ...(existingOrigin.localStorage || []).filter((item) => item.name !== AUTH_SESSION_STORAGE_KEY),
-      sessionState,
-    ];
-  } else {
-    storageState.origins.push({ origin, localStorage: [sessionState] });
-  }
-
-  return storageState;
-}
-
 function writeStorageState(storageState: StorageState) {
   const tempFile = `${authFile}.${process.pid}.tmp`;
   fs.writeFileSync(tempFile, `${JSON.stringify(storageState, null, 2)}\n`);
@@ -130,11 +92,9 @@ async function existingSessionIsValid(baseURL: string) {
     return false;
   }
 
-  const token = getStoredToken(readStorageState());
   const context = await request.newContext({
     baseURL: getApiOrigin(),
     storageState: authFile,
-    extraHTTPHeaders: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   try {
     const response = await context.get('/api/auth/profile');
@@ -169,9 +129,14 @@ async function globalSetup(config: FullConfig) {
   const project = config.projects[0];
   const baseURL = String(project.use.baseURL || process.env.BASE_URL || 'http://localhost:3001');
   const email = process.env.TEST_USER_EMAIL || 'admin@erp.local';
-  const password = process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+  const password = getOperationalPassword();
+  const forceAuthRefresh = process.env.E2E_FORCE_AUTH_REFRESH === '1';
 
   fs.mkdirSync(path.dirname(authFile), { recursive: true });
+
+  if (forceAuthRefresh && fs.existsSync(authFile)) {
+    fs.rmSync(authFile, { force: true });
+  }
 
   const existingState = readStorageState();
   if (existingState && hasAuthState(existingState)) {
@@ -206,16 +171,22 @@ async function globalSetup(config: FullConfig) {
       fs.rmSync(authFile, { force: true });
     }
 
-    const response = await requestContext.post('/api/auth/login', {
+    let response = await requestContext.post('/api/auth/login', {
       data: { email, password },
     });
+    if (response.status() === 429) {
+      await sleep(61000);
+      response = await requestContext.post('/api/auth/login', {
+        data: { email, password },
+      });
+    }
 
     if (!response.ok()) {
       throw new Error(`E2E auth setup failed with HTTP ${response.status()}: ${await response.text()}`);
     }
 
-    const session = normalizeLoginSession(await response.json());
-    const storageState = addSessionSnapshot(await requestContext.storageState(), baseURL, session);
+    await response.body();
+    const storageState = await requestContext.storageState();
     writeStorageState(addOnboardingState(storageState, baseURL));
   } finally {
     if (ownsLock) {

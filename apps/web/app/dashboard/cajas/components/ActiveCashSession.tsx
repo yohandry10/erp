@@ -28,35 +28,35 @@ export function ActiveCashSession({ sesion, onCloseSession, className = '' }: Ac
     return (
         <div className={cn(className, "flex flex-col gap-6")}>
             {/* Header */}
-            <div className="rounded-4 p-6 shadow border flex justify-between items-start relative overflow-hidden"
+            <div className="rounded-2xl p-6 shadow border flex justify-between items-start relative overflow-hidden"
             >
                 <div className="absolute top-0 left-0 right-0 h-[4px]"
                 />
                 <div>
                     <div className="flex items-center gap-3 mb-3">
-                        <h2 className="text-6 font-bold text-slate-800 m-0"
+                        <h2 className="text-2xl font-bold text-foreground m-0"
                         >
                             💰 {sesion.caja?.nombre || 'Caja Principal'}
                         </h2>
-                        <span className="py-1.5 px-3 text-[0.875rem] font-semibold bg-[#dcfce7] text-emerald-700 rounded-full border"
+                        <span className="py-1.5 px-3 text-[0.875rem] font-semibold bg-[#dcfce7] text-emerald-400 rounded-full border"
                         >
                             {sesion.estado}
                         </span>
                     </div>
-                    <div className="text-3.5 text-slate-500 flex flex-col gap-1">
+                    <div className="text-sm text-muted-foreground flex flex-col gap-1">
                         <p className="m-0">
-                            Abierto por: <span className="font-semibold text-slate-800">{sesion.usuario?.nombres} {sesion.usuario?.apellidos}</span>
+                            Abierto por: <span className="font-semibold text-foreground">{sesion.usuario?.nombres} {sesion.usuario?.apellidos}</span>
                         </p>
                         <p className="m-0">
-                            Hora apertura: <span className="font-semibold text-slate-800">{new Date(sesion.hora_apertura).toLocaleString('es-PE')}</span>
+                            Hora apertura: <span className="font-semibold text-foreground">{new Date(sesion.hora_apertura).toLocaleString('es-PE')}</span>
                         </p>
                         <p className="m-0">
-                            Monto inicial: <span className="font-bold text-emerald-600">S/ {sesion.monto_inicio.toFixed(2)}</span>
+                            Monto inicial: <span className="font-bold text-emerald-400">S/ {sesion.monto_inicio.toFixed(2)}</span>
                         </p>
                     </div>
                 </div>
                 <button
-                    onClick={onCloseSession} className="bg-slate-100 text-slate-600 border py-2 px-4 rounded-2 text-[0.875rem] font-medium cursor-pointer transition"
+                    onClick={onCloseSession} className="bg-muted text-foreground/80 border py-2 px-4 rounded-lg text-[0.875rem] font-medium cursor-pointer transition"
                     onMouseEnter={(e) => {
                         e.currentTarget.style.background = '#e2e8f0';
                         e.currentTarget.style.borderColor = '#94a3b8';
@@ -77,13 +77,13 @@ export function ActiveCashSession({ sesion, onCloseSession, className = '' }: Ac
             />
 
             {/* Movements Table */}
-            <div className="rounded-4 shadow border overflow-hidden relative"
+            <div className="rounded-2xl shadow border overflow-hidden relative"
             >
                 <div className="absolute top-0 left-0 right-0 h-[4px]"
                 />
                 <div className="py-5 px-6 border-b"
                 >
-                    <h3 className="text-[1.125rem] font-bold text-slate-800 m-0"
+                    <h3 className="text-[1.125rem] font-bold text-foreground m-0"
                     >
                         📋 Movimientos del Turno
                     </h3>

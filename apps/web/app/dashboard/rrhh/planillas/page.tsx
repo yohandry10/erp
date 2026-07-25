@@ -8,6 +8,23 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useApi } from '@/hooks/use-api';
 import { apiSucceeded, unwrapApiArray } from '@/lib/api-contract';
 import { fetchApi } from '@/lib/api-fetch';
+import {
+  BadgeCheck,
+  Banknote,
+  BookOpenCheck,
+  Calculator,
+  BarChart3,
+  CheckCircle,
+  HelpCircle,
+  Eye,
+  FileDown,
+  FileEdit,
+  Hourglass,
+  Rocket,
+  Users,
+  WalletCards,
+  X,
+} from 'lucide-react';
 
 const PlanillasPage = () => {
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
@@ -35,7 +52,7 @@ const PlanillasPage = () => {
     onConfirm: () => {},
     variant: 'default'
   });
-  
+
   const loadPlanillas = useCallback(async () => {
     if (!rrhhEnabled) {
       setPlanillas([]);
@@ -154,7 +171,7 @@ const PlanillasPage = () => {
 
       if (response.ok) {
         const data = await response.json();
-        
+
         if (!data || !Array.isArray(data) || data.length === 0) {
           alert('⚠️ Esta planilla no tiene empleados calculados. Primero calcule la planilla.');
           return;
@@ -162,7 +179,7 @@ const PlanillasPage = () => {
 
         // Generar reporte HTML profesional
         const html = generarReporteHTML(data, periodo);
-        
+
         // Crear y descargar
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
         const link = document.createElement("a");
@@ -184,7 +201,7 @@ const PlanillasPage = () => {
     if (!Array.isArray(empleados)) {
       empleados = [];
     }
-    
+
     const totalIngresos = empleados.reduce((sum, emp) => sum + (parseFloat(emp?.total_ingresos) || 0), 0);
     const totalDescuentos = empleados.reduce((sum, emp) => sum + (parseFloat(emp?.total_descuentos) || 0), 0);
     const totalNeto = empleados.reduce((sum, emp) => sum + (parseFloat(emp?.neto_pagar) || 0), 0);
@@ -276,10 +293,10 @@ const PlanillasPage = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('Datos empleado para boleta:', data);
-        
+
         // Generar boleta HTML
         const html = generarBoletaHTML(data);
-        
+
         // Crear y descargar
         const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
         const link = document.createElement("a");
@@ -301,7 +318,7 @@ const PlanillasPage = () => {
     if (!data) {
       data = {};
     }
-    
+
     return `
     <!DOCTYPE html>
     <html>
@@ -316,7 +333,7 @@ const PlanillasPage = () => {
                 <div class="title">Boleta de Pago</div>
                 <div>Período: ${data?.planillas?.periodo || 'N/A'}</div>
             </div>
-            
+
             <div class="empleado">
                 <strong>Empleado:</strong> ${data?.empleados?.nombres || 'N/A'} ${data?.empleados?.apellidos || ''}<br>
                 <strong>Documento:</strong> ${data?.empleados?.numero_documento || 'N/A'}<br>
@@ -405,10 +422,10 @@ const PlanillasPage = () => {
 
   if (!rrhhEnabled) {
     return (
-      <div className="dashboard-container">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
         <div className="alert alert-warning">
           <h1 className="text-xl font-semibold">RRHH deshabilitado</h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-foreground/80">
             {/* // HARDENING: bloquear planillas cuando RRHH no está habilitado. */}
             Las funciones de planilla estarán disponibles cuando el módulo de RRHH se active en este entorno.
           </p>
@@ -419,15 +436,15 @@ const PlanillasPage = () => {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
           <div>
-            <h1 className="dashboard-title">Planillas</h1>
-            <p className="dashboard-subtitle">Cargando nómina, periodos, cálculos y estado de pagos de RRHH.</p>
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Planillas</h1>
+            <p className="mt-2 text-base text-muted-foreground">Cargando nómina, periodos, cálculos y estado de pagos de RRHH.</p>
           </div>
         </div>
-        <div className="loading">
-          <div className="loading-spinner"></div>
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando planillas...</p>
         </div>
       </div>
@@ -436,8 +453,8 @@ const PlanillasPage = () => {
 
   if (!rrhhEnabled) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="flex min-h-48 items-center justify-center">
           <p>El módulo de RRHH está deshabilitado en este entorno.</p>
         </div>
       </div>
@@ -451,81 +468,85 @@ const PlanillasPage = () => {
   const planillasEnProceso = planillasArray.filter((p: any) => p?.estado === 'borrador').length;
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">💰 Planillas</h1>
-          <p className="dashboard-subtitle">Gestión de nómina</p>
+          <h1 className="m-0 flex items-center gap-3 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">
+            <WalletCards className="h-8 w-8 text-primary" aria-hidden="true" />
+            Planillas
+          </h1>
+          <p className="mt-2 text-base text-muted-foreground">Gestión de nómina</p>
         </div>
-        <button 
-          className="refresh-btn"
+        <button
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
           onClick={abrirModalPlanilla}
         >
-          <span>🚀</span>
+          <Rocket className="h-4 w-4" aria-hidden="true" />
           Crear Nueva Planilla
         </button>
       </div>
 
       {/* Estadísticas */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-header">
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Total Planillas</h3>
-            <div className="stat-icon">📊</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BarChart3 className="h-5 w-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-blue-600">{planillasArray.length}</div>
-          <div className="stat-subtitle">Períodos registrados</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-primary">{planillasArray.length}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Períodos registrados</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Planillas Listas</h3>
-            <div className="stat-icon">✅</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><CheckCircle className="h-5 w-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-green-600">{planillasCalculadas.length}</div>
-          <div className="stat-subtitle">Calculadas y aprobadas</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-emerald-400">{planillasCalculadas.length}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Calculadas y aprobadas</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>En Proceso</h3>
-            <div className="stat-icon">⏳</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Hourglass className="h-5 w-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-amber-600">{planillasEnProceso}</div>
-          <div className="stat-subtitle">Pendientes de cálculo</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-amber-400">{planillasEnProceso}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Pendientes de cálculo</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Total Nómina</h3>
-            <div className="stat-icon">💵</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Banknote className="h-5 w-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-purple-600">{formatCurrency(totalNomina)}</div>
-          <div className="stat-subtitle">Monto total calculado</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-violet-400">{formatCurrency(totalNomina)}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Monto total calculado</div>
         </div>
       </div>
 
       {/* Lista de Planillas */}
-      <div className="activity-section">
-        <div className="activity-header">
-          <h2 className="activity-title">Períodos de Planilla</h2>
-          <div className="activity-meta">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="m-0 text-lg font-bold text-foreground">Períodos de Planilla</h2>
+          <div className="text-[0.8125rem] text-muted-foreground">
             <span>Total: {planillasArray.length} planillas | {planillasCalculadas.length} procesadas</span>
           </div>
         </div>
 
-        <div className="activity-card">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           {planillasArray.length === 0 ? (
-            <div className="activity-empty">
-              <div className="text-16 mb-4">🚀</div>
+            <div className="px-4 py-10 text-center text-muted-foreground">
+              <Rocket className="mx-auto mb-4 h-14 w-14 text-primary/70" aria-hidden="true" />
               <h3>¡Comienza con tu Primera Planilla!</h3>
               <p>Usa el botón &quot;Crear Nueva Planilla&quot; para configurar y generar tu primera planilla</p>
-              <button 
-                className="btn btn-primary" 
+              <button
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
                 onClick={abrirModalPlanilla}
               >
-                🚀 Crear Primera Planilla
+                <Rocket className="h-4 w-4" aria-hidden="true" />
+                Crear primera planilla
               </button>
             </div>
           ) : (
@@ -548,36 +569,36 @@ const PlanillasPage = () => {
                       <td>
                         <div>
                           <strong>{planilla?.periodo || 'N/A'}</strong>
-                          <div className="text-3 text-[var(--primary-500)]">
+                          <div className="text-xs text-[var(--primary-500)]">
                             {formatDate(planilla?.fecha_inicio)} - {formatDate(planilla?.fecha_fin)}
                           </div>
                         </div>
                       </td>
                       <td>
                         <span className={
-                          planilla?.estado === 'borrador' ? 'status-warning' :
-                          planilla?.estado === 'calculada' ? 'status-info' :
-                          planilla?.estado === 'aprobada' || planilla?.estado === 'pagada' ? 'status-success' : 'status-error'
+                          planilla?.estado === 'borrador' ? 'inline-flex items-center rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-400 dark:text-amber-300' :
+                          planilla?.estado === 'calculada' ? 'inline-flex items-center rounded-full bg-blue-500/15 px-2.5 py-1 text-xs font-bold text-primary dark:text-blue-300' :
+                          planilla?.estado === 'aprobada' || planilla?.estado === 'pagada' ? 'inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-400 dark:text-emerald-300' : 'inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-1 text-xs font-bold text-destructive'
                         }>
-                          {planilla?.estado === 'borrador' && '📝 Borrador'}
-                          {planilla?.estado === 'calculada' && '🧮 Calculada'}
-                          {planilla?.estado === 'aprobada' && '✅ Aprobada'}
-                          {planilla?.estado === 'pagada' && '💰 Pagada'}
-                          {!planilla?.estado && '❓ Sin estado'}
+                          {planilla?.estado === 'borrador' && <><FileEdit className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Borrador</>}
+                          {planilla?.estado === 'calculada' && <><Calculator className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Calculada</>}
+                          {planilla?.estado === 'aprobada' && <><CheckCircle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Aprobada</>}
+                          {planilla?.estado === 'pagada' && <><Banknote className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Pagada</>}
+                          {!planilla?.estado && <><HelpCircle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Sin estado</>}
                         </span>
                       </td>
                       <td>
-                        <span className="bg-[var(--blue-100)] text-[var(--blue-800)] py-1 px-2 rounded-3 text-3 font-bold">
-                          👥 Ver detalle
+                        <span className="bg-[var(--blue-100)] text-[var(--blue-800)] py-1 px-2 rounded-xl text-xs font-bold">
+                          <Users className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" /> Ver detalle
                         </span>
                       </td>
-                      <td className="text-green-600">
+                      <td className="text-emerald-400">
                         <strong>{formatCurrency(parseFloat(planilla?.total_ingresos) || 0)}</strong>
                       </td>
-                      <td className="text-red-600">
+                      <td className="text-destructive">
                         <strong>{formatCurrency(parseFloat(planilla?.total_descuentos) || 0)}</strong>
                       </td>
-                      <td className="text-blue-600">
+                      <td className="text-primary">
                         <strong>{formatCurrency(parseFloat(planilla?.total_neto) || 0)}</strong>
                       </td>
                       <td>
@@ -588,7 +609,7 @@ const PlanillasPage = () => {
                               onClick={() => abrirCalcularPlanilla(planilla)}
                               title="Calcular planilla detallada"
                             >
-                              🧮 Calcular
+                              <Calculator className="h-3.5 w-3.5" aria-hidden="true" /> Calcular
                             </button>
                           )}
 
@@ -598,33 +619,33 @@ const PlanillasPage = () => {
                               onClick={() => abrirPagarPlanilla(planilla)}
                               title="Pagar planilla"
                             >
-                              💰 Pagar
+                              <Banknote className="h-3.5 w-3.5" aria-hidden="true" /> Pagar
                             </button>
                           )}
-                          
+
                           {/* Botón Ver Detalle */}
                           <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-gray-500 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-gray-600"
                             onClick={() => verDetallePlanilla(planilla?.id)}
                             title="Ver detalle completo"
                           >
-                            👁️ Ver
+                            <Eye className="h-3.5 w-3.5" aria-hidden="true" /> Ver
                           </button>
-                          
+
                           {/* Botón Reporte */}
                           <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-blue-700 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-blue-800"
                             onClick={() => generarReporteProfesional(planilla?.id, planilla?.periodo)}
                             title="Generar reporte profesional"
                           >
-                            📊 Reporte
+                            <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" /> Reporte
                           </button>
-                          
+
                           {/* Botón Generar Asientos - Solo para calculadas */}
                           {planilla?.estado === 'calculada' && (
                             <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-blue-700 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-blue-800"
                               onClick={() => generarAsientosContables(planilla?.id)}
                               title="Generar asientos contables"
                             >
-                              📊 Asientos
+                              <BookOpenCheck className="h-3.5 w-3.5" aria-hidden="true" /> Asientos
                             </button>
                           )}
 
@@ -634,14 +655,14 @@ const PlanillasPage = () => {
                               onClick={() => aprobarPlanilla(planilla?.id)}
                               title="Aprobar planilla"
                             >
-                              ✅ Aprobar
+                              <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" /> Aprobar
                             </button>
                           )}
-                          
+
                           {/* Estado Aprobada - Informativo */}
                           {planilla?.estado === 'aprobada' && (
                             <span className="bg-[var(--green-100)] text-[var(--green-800)] py-[4px] px-2 rounded-[6px] text-[0.7rem] font-semibold">
-                              ✅ Oficial
+                              <BadgeCheck className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" /> Oficial
                             </span>
                           )}
                         </div>
@@ -657,22 +678,24 @@ const PlanillasPage = () => {
 
       {/* Modal para ver detalle de planilla */}
       {showDetalle && Array.isArray(detallePlanilla) && (
-        <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(15,_23,_42,_0.8)] flex items-center justify-center p-4 z-[1000]">
-          <div className="p-10 w-[95%] max-w-[1200px] overflow-auto shadow border">
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-[95%] max-w-[1200px] overflow-auto rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-2xl md:p-10">
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-7 font-extrabold bg-[var(--gradient-primary)] m-0">
-                👁️ Detalle de Planilla
+              <h2 className="m-0 flex items-center gap-2 text-[1.75rem] font-extrabold text-foreground">
+                <Eye className="h-6 w-6 text-primary" aria-hidden="true" />
+                Detalle de planilla
               </h2>
               <button
-                onClick={() => setShowDetalle(false)} className="border-0 text-6 cursor-pointer text-[var(--primary-500)]"
+                onClick={() => setShowDetalle(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                aria-label="Cerrar detalle de planilla"
               >
-                ✕
+                <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
-            
+
             {detallePlanilla.length === 0 ? (
               <div className="text-center p-8">
-                <div className="text-12 mb-4">📝</div>
+                <FileEdit className="mx-auto mb-4 h-12 w-12 text-muted-foreground" aria-hidden="true" />
                 <h3>Planilla sin calcular</h3>
                 <p>Esta planilla aún no tiene empleados calculados. Use el proceso automático para calcularla.</p>
               </div>
@@ -712,12 +735,12 @@ const PlanillasPage = () => {
                           <strong>{formatCurrency(parseFloat(empleado?.neto_pagar) || 0)}</strong>
                         </td>
                         <td className="p-3 border-b text-center">
-                          <button 
-                            className="btn-icon"
+                          <button
+                            className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-accent"
                             onClick={() => descargarBoleta(empleado?.id)}
                             title="Descargar boleta profesional"
                           >
-                            📄
+                            <FileDown className="h-4 w-4" aria-hidden="true" />
                           </button>
                         </td>
                       </tr>
@@ -730,7 +753,7 @@ const PlanillasPage = () => {
             <div className="flex justify-end gap-4">
               <button
                 onClick={() => setShowDetalle(false)}
-                className="btn btn-secondary"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold leading-5 text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
               >
                 Cerrar
               </button>

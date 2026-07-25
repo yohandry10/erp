@@ -43,9 +43,9 @@ interface AsientoFormProps {
 }
 
 const inputClass =
-  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/70 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60'
+  'w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60'
 
-const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function AsientoForm({
   onSubmit,
@@ -142,12 +142,12 @@ export default function AsientoForm({
     }).format(amount)
 
   const fieldError = (key: string) =>
-    errors[key] ? <p className="mt-1 text-xs font-medium text-cyan-100">{errors[key]}</p> : null
+    errors[key] ? <p className="mt-1 text-xs font-medium text-primary">{errors[key]}</p> : null
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-4">
-        <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/70 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
             <CardTitle className="text-base text-white">Informacion general</CardTitle>
           </CardHeader>
@@ -191,7 +191,7 @@ export default function AsientoForm({
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/70 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="flex-row items-center justify-between border-b border-cyan-400/10 px-5 py-4">
             <CardTitle className="text-base text-white">Movimientos debe / haber</CardTitle>
             <Button
@@ -206,13 +206,13 @@ export default function AsientoForm({
           </CardHeader>
           <CardContent className="space-y-3 p-5">
             {errors.detalles && (
-              <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
+              <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-primary">
                 {errors.detalles}
               </div>
             )}
 
             {formData.detalles.map((detalle, index) => (
-              <div key={index} className="rounded-2xl border border-cyan-400/15 bg-slate-900/70 p-4">
+              <div key={index} className="rounded-2xl border border-cyan-400/15 bg-card/70 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold text-white">Movimiento {index + 1}</span>
                   {formData.detalles.length > 2 && (
@@ -222,7 +222,7 @@ export default function AsientoForm({
                       disabled={loading}
                       variant="outline"
                       size="sm"
-                      className="gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+                      className="gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-white"
                     >
                       <Trash2 className="h-4 w-4" />
                       Quitar
@@ -315,14 +315,14 @@ export default function AsientoForm({
       </div>
 
       <aside className="space-y-4">
-        <Card className="sticky top-4 border-cyan-400/20 bg-slate-950/75 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="sticky top-4 border-cyan-400/20 bg-card/75 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
             <CardTitle className="text-base text-white">Resumen del asiento</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-5">
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/10 p-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Debe</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Debe</div>
                 <div className="mt-2 text-lg font-bold text-white">{formatCurrency(totalDebe)}</div>
               </div>
               <div className="rounded-xl border border-blue-400/15 bg-blue-400/10 p-3">
@@ -331,29 +331,29 @@ export default function AsientoForm({
               </div>
             </div>
 
-            <div className="rounded-xl border border-cyan-400/15 bg-slate-900/75 p-4">
+            <div className="rounded-xl border border-cyan-400/15 bg-card/75 p-4">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-300">Diferencia</span>
+                <span className="text-sm font-semibold text-muted-foreground">Diferencia</span>
                 <span className="text-xl font-bold text-white">{formatCurrency(diferencia)}</span>
               </div>
               <div className="mt-4 flex items-start gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/10 p-3">
                 {isBalanced ? (
-                  <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-cyan-100" />
+                  <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                 ) : (
-                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-cyan-100" />
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                 )}
-                <p className="text-sm font-medium text-cyan-50">
+                <p className="text-sm font-medium text-primary">
                   {isBalanced ? 'El asiento esta balanceado correctamente.' : 'Debe y haber deben cuadrar antes de guardar.'}
                 </p>
               </div>
-              {errors.balance && <p className="mt-3 text-sm font-semibold text-cyan-100">{errors.balance}</p>}
+              {errors.balance && <p className="mt-3 text-sm font-semibold text-primary">{errors.balance}</p>}
             </div>
 
             <div className="grid gap-2">
               <Button
                 type="submit"
                 disabled={loading || !isBalanced}
-                className="w-full bg-blue-600 text-white hover:bg-blue-500 disabled:bg-slate-700"
+                className="w-full bg-blue-600 text-white hover:bg-blue-500 disabled:bg-muted"
               >
                 {loading ? 'Guardando...' : 'Guardar asiento'}
               </Button>
@@ -362,7 +362,7 @@ export default function AsientoForm({
                 onClick={onCancel}
                 disabled={loading}
                 variant="outline"
-                className="w-full border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+                className="w-full border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-white"
               >
                 Cancelar
               </Button>

@@ -119,9 +119,21 @@ async function prepararDatos(supabase: SupabaseClient, tenantId: string) {
     updated_at: new Date().toISOString(),
   }, { onConflict: 'tenant_id' });
 
+  const { data: almacen, error: almacenError } = await supabase
+    .from('almacenes')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('activo', true)
+    .order('es_principal', { ascending: false })
+    .limit(1)
+    .single();
+  expect(almacenError?.message || '', 'consultar almacén POS').toBe('');
+  expect(almacen?.id, 'debe existir un almacén operativo para POS').toBeTruthy();
+
   const { data: caja, error: cajaError } = await supabase.from('cajas').insert({
     id: crypto.randomUUID(),
     tenant_id: tenantId,
+    almacen_id: almacen!.id,
     codigo: `CAJA-POS-${runId}`,
     nombre: `Caja POS ${runId}`,
     estado: 'ACTIVO',
@@ -157,9 +169,6 @@ async function prepararDatos(supabase: SupabaseClient, tenantId: string) {
     precio: 40,
     precio_venta: 40,
     precio_unitario: 40,
-    stock: '6',
-    stock_actual: '6',
-    stock_reservado: '0',
     stock_minimo: '0',
     unidad_medida: 'NIU',
     activo: true,
@@ -168,6 +177,20 @@ async function prepararDatos(supabase: SupabaseClient, tenantId: string) {
     es_servicio: false,
   }).select('*').single();
   expect(productoError?.message || '', 'crear producto POS').toBe('');
+
+  const { error: stockError } = await supabase.rpc('aplicar_movimiento_inventario_tx', {
+    p_tenant_id: tenantId,
+    p_producto_id: producto!.id,
+    p_almacen_id: almacen!.id,
+    p_tipo: 'ENTRADA',
+    p_cantidad: 6,
+    p_referencia_tipo: 'QA_POS_E2E',
+    p_referencia_id: crypto.randomUUID(),
+    p_notas: 'Stock inicial controlado para POS vertical',
+    p_created_by: 'playwright',
+    p_metadata: { source: 'pos-vertical.spec.ts', run_id: runId },
+  });
+  expect(stockError?.message || '', 'cargar stock por ledger para POS').toBe('');
 
   const { data: sinStock, error: sinStockError } = await supabase.from('productos').insert({
     id: crypto.randomUUID(),
@@ -178,9 +201,6 @@ async function prepararDatos(supabase: SupabaseClient, tenantId: string) {
     precio: 20,
     precio_venta: 20,
     precio_unitario: 20,
-    stock: '0',
-    stock_actual: '0',
-    stock_reservado: '0',
     stock_minimo: '0',
     unidad_medida: 'NIU',
     activo: true,
@@ -199,9 +219,6 @@ async function prepararDatos(supabase: SupabaseClient, tenantId: string) {
     precio: 20,
     precio_venta: 20,
     precio_unitario: 20,
-    stock: '10',
-    stock_actual: '10',
-    stock_reservado: '0',
     stock_minimo: '0',
     unidad_medida: 'NIU',
     activo: false,
@@ -268,7 +285,20 @@ test.describe('T08 POS vertical completo', () => {
       sesionId = sesionAbierta.id;
     }
 
-    await expect(page.getByText('Sistema POS Empresarial', { exact: false })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('heading', { name: 'Punto de venta' })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('heading', { name: 'Venta actual' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Ventas del día' })).toBeVisible();
+    const modoCajaButton = page.getByRole('button', { name: 'Modo caja' });
+    await expect(modoCajaButton).toBeVisible();
+    await modoCajaButton.click();
+    await expect(page.getByRole('button', { name: 'Salir de modo caja' })).toBeVisible();
+    await page.keyboard.press('F2');
+    await expect(page.getByRole('combobox', { name: 'Buscar productos' })).toBeFocused();
+    await page.keyboard.press('F4');
+    await expect(page.getByRole('textbox', { name: 'Código de barras' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(modoCajaButton).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Guardar' })).toHaveCount(0);
     await expect(page.getByText(data.producto.codigo, { exact: false })).toBeVisible({ timeout: 20000 });
     await expect(page.locator('body')).not.toContainText(/Cargando|Application error|Unhandled|Error fatal/i);
 
@@ -443,8 +473,8 @@ test.describe('T08 POS vertical completo', () => {
     }).toBeGreaterThan(0);
 
     await gotoAuthenticated(page, '/dashboard/pos');
-    // .first() evita strict mode violation: el número de ticket aparece
-    // varias veces en la página (lista + detalle expandido).
+    await page.getByRole('button', { name: 'Ventas del día' }).click();
+    await expect(page.getByRole('dialog', { name: 'Ventas del día' })).toBeVisible();
     await expect(page.getByText(venta.numero_ticket, { exact: false }).first()).toBeVisible({ timeout: 20000 });
     await gotoAuthenticated(page, '/dashboard/inventario/kardex');
     await expect(page.locator('body')).toContainText(/Kardex|Movimientos/i, { timeout: 20000 });

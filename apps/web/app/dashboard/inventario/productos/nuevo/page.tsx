@@ -1,123 +1,137 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useApi } from '@/hooks/use-api'
-import { ArrowLeft, Package, Save } from 'lucide-react'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useApi } from "@/hooks/use-api";
+import { ArrowLeft, Package, Save } from "lucide-react";
 
 export default function NuevoProductoPage() {
-  const router = useRouter()
-  const { post } = useApi()
-  const [isLoading, setIsLoading] = useState(false)
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const router = useRouter();
+  const { post } = useApi();
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    codigo: '',
-    nombre: '',
-    descripcion: '',
-    categoria: '',
-    precioVenta: '',
-    precioCompra: '',
-    stock: '',
-    stockMinimo: '',
-    codigoBarras: '',
-    impuesto: '18'
-  })
+    codigo: "",
+    nombre: "",
+    descripcion: "",
+    categoria: "",
+    precioVenta: "",
+    precioCompra: "",
+    stock: "",
+    stockMinimo: "",
+    codigoBarras: "",
+    impuesto: "18",
+  });
 
   const validateForm = () => {
-    const nextErrors: Record<string, string> = {}
-    const precioVenta = Number(formData.precioVenta)
-    const precioCompra = formData.precioCompra === '' ? 0 : Number(formData.precioCompra)
-    const stock = formData.stock === '' ? 0 : Number(formData.stock)
-    const stockMinimo = formData.stockMinimo === '' ? 0 : Number(formData.stockMinimo)
-    const impuesto = formData.impuesto === '' ? 0 : Number(formData.impuesto)
+    const nextErrors: Record<string, string> = {};
+    const precioVenta = Number(formData.precioVenta);
+    const precioCompra =
+      formData.precioCompra === "" ? 0 : Number(formData.precioCompra);
+    const stock = formData.stock === "" ? 0 : Number(formData.stock);
+    const stockMinimo =
+      formData.stockMinimo === "" ? 0 : Number(formData.stockMinimo);
+    const impuesto = formData.impuesto === "" ? 0 : Number(formData.impuesto);
 
-    if (!formData.codigo.trim()) nextErrors.codigo = 'El código es requerido'
-    if (!formData.nombre.trim()) nextErrors.nombre = 'El nombre es requerido'
-    if (!formData.categoria) nextErrors.categoria = 'La categoría es requerida'
-    if (!formData.precioVenta || Number.isNaN(precioVenta) || precioVenta <= 0) {
-      nextErrors.precioVenta = 'El precio de venta debe ser mayor a 0'
+    if (!formData.codigo.trim()) nextErrors.codigo = "El código es requerido";
+    if (!formData.nombre.trim()) nextErrors.nombre = "El nombre es requerido";
+    if (!formData.categoria) nextErrors.categoria = "La categoría es requerida";
+    if (
+      !formData.precioVenta ||
+      Number.isNaN(precioVenta) ||
+      precioVenta <= 0
+    ) {
+      nextErrors.precioVenta = "El precio de venta debe ser mayor a 0";
     }
     if (Number.isNaN(precioCompra) || precioCompra < 0) {
-      nextErrors.precioCompra = 'El precio de compra no puede ser negativo'
+      nextErrors.precioCompra = "El precio de compra no puede ser negativo";
     }
     if (Number.isNaN(stock) || stock < 0) {
-      nextErrors.stock = 'El stock inicial no puede ser negativo'
+      nextErrors.stock = "El stock inicial no puede ser negativo";
     }
     if (Number.isNaN(stockMinimo) || stockMinimo < 0) {
-      nextErrors.stockMinimo = 'El stock mínimo no puede ser negativo'
+      nextErrors.stockMinimo = "El stock mínimo no puede ser negativo";
     }
     if (Number.isNaN(impuesto) || impuesto < 0 || impuesto > 100) {
-      nextErrors.impuesto = 'El impuesto debe estar entre 0 y 100'
+      nextErrors.impuesto = "El impuesto debe estar entre 0 y 100";
     }
 
-    setErrors(nextErrors)
-    return Object.keys(nextErrors).length === 0
-  }
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    setSubmitError(null)
+    setSubmitError(null);
     if (!validateForm()) {
-      return
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const response = await post('/inventario/productos', formData)
-      
+      const response = await post("/inventario/productos", formData);
+
       if (response?.success) {
-        alert('✅ Producto creado exitosamente')
-        router.push('/dashboard/inventario/productos')
+        alert("✅ Producto creado exitosamente");
+        router.push("/dashboard/inventario/productos");
       } else {
-        throw new Error(response?.message || 'Error al crear producto')
+        throw new Error(response?.message || "Error al crear producto");
       }
     } catch (error: any) {
-      console.error('Error:', error)
-      setSubmitError(error.message || 'Error al crear producto')
+      console.error("Error:", error);
+      setSubmitError(error.message || "Error al crear producto");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors(prev => {
-        const next = { ...prev }
-        delete next[name]
-        return next
-      })
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
     }
-    if (submitError) setSubmitError(null)
-  }
+    if (submitError) setSubmitError(null);
+  };
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
           <button
-            onClick={() => router.push('/dashboard/inventario/productos')} className="inline-flex items-center gap-2 text-gray-500 text-[0.875rem] mb-2 border-0 cursor-pointer py-1 px-0"
+            onClick={() => router.push("/dashboard/inventario/productos")}
+            className="inline-flex items-center gap-2 text-muted-foreground text-[0.875rem] mb-2 border-0 cursor-pointer py-1 px-0"
           >
             <ArrowLeft size={16} />
             Volver a Productos
           </button>
-          <h1 className="dashboard-title flex items-center gap-3">
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground flex items-center gap-3">
             <Package size={32} />
             Nuevo Producto
           </h1>
-          <p className="dashboard-subtitle">Complete la información del nuevo producto</p>
+          <p className="mt-2 text-base text-muted-foreground">
+            Complete la información del nuevo producto
+          </p>
         </div>
       </div>
 
-      <div className="text-white py-4 px-6 rounded-3 mb-8 flex items-center gap-4">
-        <div className="text-8">ℹ️</div>
+      <div className="text-white py-4 px-6 rounded-xl mb-8 flex items-center gap-4">
+        <div className="text-[2rem]">ℹ️</div>
         <div>
           <h3 className="font-semibold mb-1">Información Importante</h3>
           <p className="text-[0.875rem] opacity-[0.95]">
-            Los campos marcados con <span className="text-[#fbbf24]">*</span> son obligatorios.
+            Los campos marcados con <span className="text-[#fbbf24]">*</span>{" "}
+            son obligatorios.
           </p>
         </div>
       </div>
@@ -125,27 +139,36 @@ export default function NuevoProductoPage() {
       <form onSubmit={handleSubmit} noValidate>
         {(submitError || Object.keys(errors).length > 0) && (
           <div
-            role="alert" className="bg-[#fef2f2] border text-red-800 py-[0.875rem] px-4 rounded-2 mb-4 text-[0.875rem]"
+            role="alert"
+            className="bg-[#fef2f2] border text-destructive py-[0.875rem] px-4 rounded-lg mb-4 text-[0.875rem]"
           >
-            {submitError || 'Revise los campos marcados antes de crear el producto.'}
+            {submitError ||
+              "Revise los campos marcados antes de crear el producto."}
           </div>
         )}
-        <div className="activity-card mb-8">
-          <h2 className="activity-title">Información Básica</h2>
-          <div className="modal-grid">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
+          <h2 className="m-0 text-lg font-bold text-foreground">Información Básica</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label>Código <span className="text-[var(--red-500)]">*</span></label>
+              <label>
+                Código <span className="text-[var(--red-500)]">*</span>
+              </label>
               <input
                 type="text"
                 name="codigo"
                 value={formData.codigo}
                 onChange={handleChange}
                 aria-invalid={Boolean(errors.codigo)}
-                aria-describedby={errors.codigo ? 'producto-codigo-error' : undefined}
+                aria-describedby={
+                  errors.codigo ? "producto-codigo-error" : undefined
+                }
                 placeholder="Ej: PROD001"
               />
               {errors.codigo && (
-                <p id="producto-codigo-error" className="text-red-500 text-3 mt-1">
+                <p
+                  id="producto-codigo-error"
+                  className="text-red-500 text-xs mt-1"
+                >
                   {errors.codigo}
                 </p>
               )}
@@ -163,18 +186,25 @@ export default function NuevoProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>Nombre <span className="text-[var(--red-500)]">*</span></label>
+            <label>
+              Nombre <span className="text-[var(--red-500)]">*</span>
+            </label>
             <input
               type="text"
               name="nombre"
               value={formData.nombre}
               onChange={handleChange}
               aria-invalid={Boolean(errors.nombre)}
-              aria-describedby={errors.nombre ? 'producto-nombre-error' : undefined}
+              aria-describedby={
+                errors.nombre ? "producto-nombre-error" : undefined
+              }
               placeholder="Nombre del producto"
             />
             {errors.nombre && (
-              <p id="producto-nombre-error" className="text-red-500 text-3 mt-1">
+              <p
+                id="producto-nombre-error"
+                className="text-red-500 text-xs mt-1"
+              >
                 {errors.nombre}
               </p>
             )}
@@ -192,13 +222,17 @@ export default function NuevoProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>Categoría <span className="text-[var(--red-500)]">*</span></label>
+            <label>
+              Categoría <span className="text-[var(--red-500)]">*</span>
+            </label>
             <select
               name="categoria"
               value={formData.categoria}
               onChange={handleChange}
               aria-invalid={Boolean(errors.categoria)}
-              aria-describedby={errors.categoria ? 'producto-categoria-error' : undefined}
+              aria-describedby={
+                errors.categoria ? "producto-categoria-error" : undefined
+              }
             >
               <option value="">Seleccione una categoría</option>
               <option value="ELECTRONICA">Electrónica</option>
@@ -209,16 +243,19 @@ export default function NuevoProductoPage() {
               <option value="OTROS">Otros</option>
             </select>
             {errors.categoria && (
-              <p id="producto-categoria-error" className="text-red-500 text-3 mt-1">
+              <p
+                id="producto-categoria-error"
+                className="text-red-500 text-xs mt-1"
+              >
                 {errors.categoria}
               </p>
             )}
           </div>
         </div>
 
-        <div className="activity-card mb-8">
-          <h2 className="activity-title">Precios e Impuestos</h2>
-          <div className="modal-grid">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
+          <h2 className="m-0 text-lg font-bold text-foreground">Precios e Impuestos</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label>Precio de Compra</label>
               <input
@@ -229,17 +266,26 @@ export default function NuevoProductoPage() {
                 step="0.01"
                 min="0"
                 aria-invalid={Boolean(errors.precioCompra)}
-                aria-describedby={errors.precioCompra ? 'producto-precio-compra-error' : undefined}
+                aria-describedby={
+                  errors.precioCompra
+                    ? "producto-precio-compra-error"
+                    : undefined
+                }
                 placeholder="0.00"
               />
               {errors.precioCompra && (
-                <p id="producto-precio-compra-error" className="text-red-500 text-3 mt-1">
+                <p
+                  id="producto-precio-compra-error"
+                  className="text-red-500 text-xs mt-1"
+                >
                   {errors.precioCompra}
                 </p>
               )}
             </div>
             <div>
-              <label>Precio de Venta <span className="text-[var(--red-500)]">*</span></label>
+              <label>
+                Precio de Venta <span className="text-[var(--red-500)]">*</span>
+              </label>
               <input
                 type="number"
                 name="precioVenta"
@@ -248,11 +294,16 @@ export default function NuevoProductoPage() {
                 step="0.01"
                 min="0"
                 aria-invalid={Boolean(errors.precioVenta)}
-                aria-describedby={errors.precioVenta ? 'producto-precio-venta-error' : undefined}
+                aria-describedby={
+                  errors.precioVenta ? "producto-precio-venta-error" : undefined
+                }
                 placeholder="0.00"
               />
               {errors.precioVenta && (
-                <p id="producto-precio-venta-error" className="text-red-500 text-3 mt-1">
+                <p
+                  id="producto-precio-venta-error"
+                  className="text-red-500 text-xs mt-1"
+                >
                   {errors.precioVenta}
                 </p>
               )}
@@ -268,11 +319,16 @@ export default function NuevoProductoPage() {
                 min="0"
                 max="100"
                 aria-invalid={Boolean(errors.impuesto)}
-                aria-describedby={errors.impuesto ? 'producto-impuesto-error' : undefined}
+                aria-describedby={
+                  errors.impuesto ? "producto-impuesto-error" : undefined
+                }
                 placeholder="18"
               />
               {errors.impuesto && (
-                <p id="producto-impuesto-error" className="text-red-500 text-3 mt-1">
+                <p
+                  id="producto-impuesto-error"
+                  className="text-red-500 text-xs mt-1"
+                >
                   {errors.impuesto}
                 </p>
               )}
@@ -280,9 +336,9 @@ export default function NuevoProductoPage() {
           </div>
         </div>
 
-        <div className="activity-card mb-8">
-          <h2 className="activity-title">Inventario</h2>
-          <div className="modal-grid">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
+          <h2 className="m-0 text-lg font-bold text-foreground">Inventario</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label>Stock Inicial</label>
               <input
@@ -292,11 +348,16 @@ export default function NuevoProductoPage() {
                 onChange={handleChange}
                 min="0"
                 aria-invalid={Boolean(errors.stock)}
-                aria-describedby={errors.stock ? 'producto-stock-error' : undefined}
+                aria-describedby={
+                  errors.stock ? "producto-stock-error" : undefined
+                }
                 placeholder="0"
               />
               {errors.stock && (
-                <p id="producto-stock-error" className="text-red-500 text-3 mt-1">
+                <p
+                  id="producto-stock-error"
+                  className="text-red-500 text-xs mt-1"
+                >
                   {errors.stock}
                 </p>
               )}
@@ -310,11 +371,16 @@ export default function NuevoProductoPage() {
                 onChange={handleChange}
                 min="0"
                 aria-invalid={Boolean(errors.stockMinimo)}
-                aria-describedby={errors.stockMinimo ? 'producto-stock-minimo-error' : undefined}
+                aria-describedby={
+                  errors.stockMinimo ? "producto-stock-minimo-error" : undefined
+                }
                 placeholder="0"
               />
               {errors.stockMinimo && (
-                <p id="producto-stock-minimo-error" className="text-red-500 text-3 mt-1">
+                <p
+                  id="producto-stock-minimo-error"
+                  className="text-red-500 text-xs mt-1"
+                >
                   {errors.stockMinimo}
                 </p>
               )}
@@ -325,20 +391,20 @@ export default function NuevoProductoPage() {
         <div className="flex gap-4 justify-end">
           <button
             type="button"
-            onClick={() => router.push('/dashboard/inventario/productos')}
-            className="btn btn-secondary"
+            onClick={() => router.push("/dashboard/inventario/productos")}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold leading-5 text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
             disabled={isLoading}
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="btn btn-primary"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             disabled={isLoading}
           >
             {isLoading ? (
               <>
-                <div className="loading-spinner w-4 h-4"></div>
+                <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary w-4 h-4"></div>
                 Guardando...
               </>
             ) : (
@@ -351,5 +417,5 @@ export default function NuevoProductoPage() {
         </div>
       </form>
     </div>
-  )
+  );
 }

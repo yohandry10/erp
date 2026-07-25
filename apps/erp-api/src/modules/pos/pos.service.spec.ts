@@ -60,16 +60,6 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any } = {}) => {
   const rpcMock = jest.fn(async (fn: string, _args?: any) => {
     if (fn === 'pos_registrar_venta_full_tx') {
       return {
-        data: null,
-        error: {
-          code: 'PGRST202',
-          message: 'Could not find the public.pos_registrar_venta_full_tx function',
-          details: 'pos_registrar_venta_full_tx',
-        },
-      };
-    }
-    if (fn === 'pos_registrar_venta_tx') {
-      return {
         data: [
           {
             venta_id: 'venta-1',
@@ -77,6 +67,8 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any } = {}) => {
             subtotal: 100,
             impuestos: 18,
             total: 118,
+            impactos_aplicados: true,
+            caja_movimiento_id: 'mov-caja-1',
           },
         ],
         error: null,
@@ -186,12 +178,12 @@ const ventaBase = {
   ],
 };
 
-describe('PosService locks', () => {
+describe('PosService full transaction contract', () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('no bloquea la venta por validacion fiscal pesada del CPE y libera locks', async () => {
+  it('no bloquea la venta por validacion fiscal pesada del CPE', async () => {
     const ctx = createService();
     ctx.validationService.validateCertificate.mockResolvedValue({
       isValid: false,
@@ -206,17 +198,12 @@ describe('PosService locks', () => {
     expect(result.success).toBe(true);
     expect(result.cpe_pendiente).toBe(true);
     expect(ctx.validationService.validateCertificate).not.toHaveBeenCalled();
-    expect(ctx.rpcMock).toHaveBeenCalledWith(
-      'acquire_pos_lock',
-      expect.objectContaining({ p_lock_key: expect.stringContaining('lock-123') }),
-    );
-    expect(ctx.rpcMock).toHaveBeenCalledWith(
-      'release_pos_lock',
-      expect.objectContaining({ p_lock_key: 'product:prod-1' }),
-    );
+    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_registrar_venta_full_tx', expect.any(Object));
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('acquire_pos_lock', expect.any(Object));
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('release_pos_lock', expect.any(Object));
   });
 
-  it('procesa venta feliz y libera locks al finalizar', async () => {
+  it('procesa venta feliz exclusivamente mediante full_tx', async () => {
     const ctx = createService();
     ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
@@ -227,21 +214,10 @@ describe('PosService locks', () => {
     expect(result.success).toBe(true);
     expect(result.venta_id).toBe('venta-1');
     expect(ctx.supabaseClient.from).toHaveBeenCalledWith('productos');
-    expect(ctx.supabaseClient.from).toHaveBeenCalledWith('detalle_ventas_pos');
-    expect(ctx.supabaseClient.from).toHaveBeenCalledWith('ventas_pos_pagos');
-    expect(ctx.supabaseClient.from).toHaveBeenCalledWith('movimientos_inventario');
-    expect(ctx.rpcMock).toHaveBeenCalledWith(
-      'acquire_pos_lock',
-      expect.objectContaining({ p_lock_key: expect.stringContaining('lock-123') }),
-    );
-    expect(ctx.rpcMock).toHaveBeenCalledWith(
-      'release_pos_lock',
-      expect.objectContaining({ p_lock_key: 'tenant-1:lock-123' }),
-    );
-    expect(ctx.rpcMock).toHaveBeenCalledWith(
-      'release_pos_lock',
-      expect.objectContaining({ p_lock_key: 'product:prod-1' }),
-    );
+    expect(ctx.inserts.find((entry) => entry.table === 'detalle_ventas_pos')).toBeUndefined();
+    expect(ctx.inserts.find((entry) => entry.table === 'ventas_pos_pagos')).toBeUndefined();
+    expect(ctx.inserts.find((entry) => entry.table === 'movimientos_inventario')).toBeUndefined();
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_tx', expect.any(Object));
   });
 
   it('usa RPC full_tx y no duplica detalles, pagos, stock ni caja desde la API', async () => {
@@ -286,14 +262,8 @@ describe('PosService locks', () => {
     const result = await ctx.service.procesarVenta({ ...ventaBase, metodo_pago_id: 'efectivo', total: 118 }, user);
 
     expect(result.success).toBe(true);
-    const pagosInsert = ctx.inserts.find((entry) => entry.table === 'ventas_pos_pagos');
-    expect(pagosInsert?.rows?.[0]).toEqual(
-      expect.objectContaining({
-        metodo_pago_codigo: 'efectivo',
-        metodo_pago_tipo: 'EFECTIVO',
-        metodo_pago_id: null,
-      }),
-    );
+    const fullTxCall = ctx.rpcMock.mock.calls.find((call: any[]) => call[0] === 'pos_registrar_venta_full_tx');
+    expect(fullTxCall?.[1]).toEqual(expect.objectContaining({ p_metodo_pago: 'efectivo' }));
   });
 
   it('usa metadata canonica de productos para dejar CPE POS en cola durable', async () => {
@@ -535,16 +505,27 @@ describe('PosService locks', () => {
     expect(r2.venta_id).toBe('venta-existente');
   });
 
-  it('maneja fallback chain: full_tx falla → legacy RPC', async () => {
+  it('bloquea la venta si falta full_tx y nunca cae al RPC legacy', async () => {
     const ctx = createService();
-    // full_tx falla con PGRST202 (function not found), legacy funciona
+    ctx.rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === 'pos_registrar_venta_full_tx') {
+        return {
+          data: null,
+          error: {
+            code: 'PGRST202',
+            message: 'Could not find the public.pos_registrar_venta_full_tx function',
+            details: 'pos_registrar_venta_full_tx',
+          },
+        };
+      }
+      return { data: null, error: null };
+    });
     const result = await ctx.service.procesarVenta(ventaBase, user);
-    expect(result.success).toBe(true);
-    expect(result.venta_id).toBe('venta-1');
-    // Verify full_tx was attempted first
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('POS_INVENTORY_CONTRACT_UNAVAILABLE');
     const rpcCalls = ctx.rpcMock.mock.calls.map((c: any) => c[0]);
     expect(rpcCalls).toContain('pos_registrar_venta_full_tx');
-    expect(rpcCalls).toContain('pos_registrar_venta_tx');
+    expect(rpcCalls).not.toContain('pos_registrar_venta_tx');
   });
 
   it('aplica el descuento del item una sola vez al recalcular totales', async () => {
@@ -568,14 +549,11 @@ describe('PosService locks', () => {
     }, user);
 
     expect(result.success).toBe(true);
-    const detalleInsert = ctx.inserts.find((entry) => entry.table === 'detalle_ventas_pos');
-    expect(detalleInsert?.rows?.[0]).toEqual(
-      expect.objectContaining({
-        precio_unitario: 100,
-        descuento: 10,
-        subtotal: 190,
-        total: 224.2,
-      }),
-    );
+    const fullTxCall = ctx.rpcMock.mock.calls.find((call: any[]) => call[0] === 'pos_registrar_venta_full_tx');
+    expect(fullTxCall?.[1]?.p_items?.[0]).toEqual(expect.objectContaining({
+      precio_unitario: 100,
+      descuento_monto: 10,
+      subtotal: 190,
+    }));
   });
 });

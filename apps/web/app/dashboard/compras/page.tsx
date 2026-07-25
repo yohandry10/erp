@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, FileText, PackageCheck, Plus, RefreshCw, ShoppingCart, Truck, type LucideIcon } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Building2, CheckCircle2, FileText, PackageCheck, Plus, RefreshCw, ShoppingCart, Truck, type LucideIcon } from 'lucide-react'
 import OrdenCompraModal from '../../../components/modals/OrdenCompraModal'
 import ProveedorModal from '../../../components/modals/ProveedorModal'
 import ConfirmDialog from '../../../components/ui/ConfirmDialog'
@@ -20,13 +21,14 @@ type StatCard = {
 }
 
 const inputClass =
-  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/70 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+  'w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
-const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function ComprasPage() {
   const { toast } = useToast()
-  const { get, delete: del, put } = useApi()
+  const { get, delete: del, post } = useApi()
+  const router = useRouter()
 
   const [ordenes, setOrdenes] = useState<any[]>([])
   const [stats, setStats] = useState({
@@ -150,39 +152,35 @@ export default function ComprasPage() {
     })
   }
 
-  const handleMarcarEntregado = async (id: string) => {
+  // Aprueba la orden (PENDIENTE → APROBADA) contra el endpoint real del backend.
+  // El backend aplica segregación de funciones: el creador NO puede aprobar su
+  // propia orden, por eso el error se muestra explícito en vez de fallar en silencio.
+  const handleAprobar = (id: string) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Marcar Orden como Entregada',
-      message: '¿Marcar esta orden como entregada?\n\nEsto actualizará automáticamente stock, contabilidad y cuentas por pagar.',
+      title: 'Aprobar Orden de Compra',
+      message: '¿Aprobar esta orden?\n\nPor control interno, quien la creó no puede aprobarla: debe hacerlo otro usuario autorizado. Una vez aprobada podrás recepcionar la mercancía.',
       variant: 'warning',
       onConfirm: async () => {
         try {
-          const result = await put(`/compras/ordenes/${id}/estado`, { estado: 'ENTREGADO' })
-          if (result?.success) {
-            toast({
-              title: 'Orden entregada',
-              description: 'Stock, asientos contables y cuentas por pagar actualizados.',
-            })
+          const result = await post(`/compras/ordenes/${id}/aprobar`, {})
+          if (apiSucceeded(result)) {
+            toast({ title: 'Orden aprobada', description: 'La orden quedó lista para recepcionar mercancía.' })
             await Promise.all([loadOrdenes(), loadStats()])
-            setOrdenes((prev) => prev.map((orden: AnyRecord) => (orden.id === id ? { ...orden, estado: 'ENTREGADO' } : orden)))
           } else {
-            toast({
-              title: 'Error',
-              description: 'Error al actualizar el estado: ' + (result?.message || 'Error desconocido'),
-              variant: 'destructive',
-            })
+            toast({ title: 'No se pudo aprobar', description: result?.message || 'Error al aprobar la orden', variant: 'destructive' })
           }
         } catch (error) {
-          console.error('Error updating order status:', error)
-          toast({
-            title: 'Error',
-            description: error instanceof Error ? error.message : 'Error al actualizar el estado de la orden',
-            variant: 'destructive',
-          })
+          toast({ title: 'No se pudo aprobar', description: error instanceof Error ? error.message : 'Error al aprobar la orden', variant: 'destructive' })
         }
       },
     })
+  }
+
+  // La recepción es un flujo propio (wizard) que llama a los endpoints reales
+  // POST /compras/recepciones/ordenes/:id y .../cerrar (postea stock, CxP y asiento).
+  const handleRecepcionar = (orden: AnyRecord) => {
+    router.push(`/dashboard/compras/recepciones/nueva?orden_id=${orden.id}`)
   }
 
   const handleModalSuccess = async (ordenData?: AnyRecord) => {
@@ -210,18 +208,18 @@ export default function ComprasPage() {
   }
 
   const statusBadge = (estado: string) => (
-    <span className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase text-cyan-100">
+    <span className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase text-primary">
       {estado || 'Sin estado'}
     </span>
   )
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
-        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-card/70 text-foreground">
           <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
-            <RefreshCw className="h-7 w-7 animate-spin text-cyan-200" />
-            <span className="text-sm font-medium text-slate-300">Cargando compras...</span>
+            <RefreshCw className="h-7 w-7 animate-spin text-primary" />
+            <span className="text-sm font-medium text-muted-foreground">Cargando compras...</span>
           </CardContent>
         </Card>
       </div>
@@ -236,20 +234,20 @@ export default function ComprasPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+        <section className="rounded-2xl border border-cyan-400/20 bg-card/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-primary">
                 <ShoppingCart className="h-6 w-6" />
               </span>
               <div>
-                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
                   ERP Purchasing Center
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight text-white">Gestión de Compras</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Gestión de Compras</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                   Órdenes, proveedores y seguimiento operativo conectados a inventario, CxP y contabilidad.
                 </p>
               </div>
@@ -262,7 +260,7 @@ export default function ComprasPage() {
                   toast({ title: 'Datos actualizados', description: 'Compras sincronizadas correctamente' })
                 }}
                 variant="outline"
-                className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
+                className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
               >
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
@@ -277,13 +275,13 @@ export default function ComprasPage() {
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {statCards.map(({ label, value, icon: Icon }) => (
-            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
                 <div>
                   <div className={labelClass}>{label}</div>
-                  <div className="mt-3 text-2xl font-bold text-white">{value}</div>
+                  <div className="mt-3 text-2xl font-bold text-foreground">{value}</div>
                 </div>
-                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
                   <Icon className="h-5 w-5" />
                 </span>
               </CardContent>
@@ -291,9 +289,9 @@ export default function ComprasPage() {
           ))}
         </section>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-            <CardTitle className="text-base text-white">Filtros operativos</CardTitle>
+            <CardTitle className="text-base text-foreground">Filtros operativos</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 p-4 md:grid-cols-[220px_minmax(0,1fr)_auto] md:items-end">
             <label className="space-y-2">
@@ -321,7 +319,7 @@ export default function ComprasPage() {
               type="button"
               variant="outline"
               onClick={() => setFilters({ estado: '', proveedor_id: '' })}
-              className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+              className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
             >
               Limpiar
             </Button>
@@ -329,20 +327,20 @@ export default function ComprasPage() {
         </Card>
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <Card className="overflow-hidden border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
             <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-              <CardTitle className="text-base text-white">Órdenes de compra</CardTitle>
-              <p className="text-xs text-slate-400">Mostrando {ordenes.length} órdenes con los filtros actuales.</p>
+              <CardTitle className="text-base text-foreground">Órdenes de compra</CardTitle>
+              <p className="text-xs text-muted-foreground">Mostrando {ordenes.length} órdenes con los filtros actuales.</p>
             </CardHeader>
             <CardContent className="p-0">
               {ordenes.length === 0 ? (
                 <div className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8 text-center">
                   <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4">
-                    <FileText className="h-10 w-10 text-cyan-100" />
+                    <FileText className="h-10 w-10 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-white">Listo para gestionar compras</h3>
-                    <p className="mt-2 text-sm text-slate-400">Crea una orden de compra para iniciar el flujo operativo.</p>
+                    <h3 className="text-lg font-semibold text-foreground">Listo para gestionar compras</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">Crea una orden de compra para iniciar el flujo operativo.</p>
                   </div>
                   <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                     <Plus className="h-4 w-4" />
@@ -353,7 +351,7 @@ export default function ComprasPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[980px] border-collapse">
                     <thead className="bg-cyan-400/10">
-                      <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+                      <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
                         <th className="px-4 py-3">Orden</th>
                         <th className="px-4 py-3">Proveedor</th>
                         <th className="px-4 py-3">Fecha</th>
@@ -367,30 +365,39 @@ export default function ComprasPage() {
                     <tbody>
                       {ordenes.map((orden: AnyRecord) => {
                         const itemsCount = Array.isArray(orden.items) ? orden.items.length : 0
+                        // La lista de órdenes no trae el join del proveedor; se resuelve
+                        // contra la lista de proveedores ya cargada para no mostrar "N/A".
+                        const prov = orden.proveedores || proveedores.find((p: AnyRecord) => p.id === orden.proveedor_id) || {}
                         return (
-                          <tr key={orden.id} className="border-b border-cyan-400/10 text-sm text-slate-200 transition hover:bg-cyan-400/10">
-                            <td className="px-4 py-3 font-mono font-semibold text-white">{orden.numero}</td>
+                          <tr key={orden.id} className="border-b border-cyan-400/10 text-sm text-foreground/90 transition hover:bg-cyan-400/10">
+                            <td className="px-4 py-3 font-mono font-semibold text-foreground">{orden.numero}</td>
                             <td className="px-4 py-3">
-                              <div className="font-semibold text-white">{orden.proveedores?.nombre || orden.proveedores?.razon_social || 'N/A'}</div>
-                              <div className="mt-1 text-xs text-slate-500">RUC: {orden.proveedores?.ruc || 'N/A'}</div>
+                              <div className="font-semibold text-foreground">{prov.razon_social || prov.nombre || 'N/A'}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">RUC: {prov.ruc || 'N/A'}</div>
                             </td>
                             <td className="px-4 py-3">{formatDate(orden.fecha_orden)}</td>
                             <td className="px-4 py-3">{formatDate(orden.fecha_entrega)}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-white">{itemsCount}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(parseFloat(orden.total) || 0)}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{itemsCount}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(parseFloat(orden.total) || 0)}</td>
                             <td className="px-4 py-3 text-center">{statusBadge(orden.estado)}</td>
                             <td className="px-4 py-3">
                               <div className="flex flex-wrap justify-end gap-2">
-                                <Button type="button" size="sm" variant="outline" onClick={() => handleEditOrden(orden)} className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white">
+                                <Button type="button" size="sm" variant="outline" onClick={() => handleEditOrden(orden)} className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground">
                                   Ver
                                 </Button>
-                                {orden.estado === 'PENDIENTE' && (
-                                  <Button type="button" size="sm" onClick={() => handleMarcarEntregado(orden.id)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
-                                    <PackageCheck className="h-4 w-4" />
-                                    Entregar
+                                {['PENDIENTE', 'BORRADOR', 'APROBACION'].includes(orden.estado) && (
+                                  <Button type="button" size="sm" onClick={() => handleAprobar(orden.id)} className="gap-2 bg-emerald-600 text-white hover:bg-emerald-500">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Aprobar
                                   </Button>
                                 )}
-                                <Button type="button" size="sm" variant="outline" onClick={() => handleDeleteOrden(orden.id)} className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white">
+                                {['APROBADA', 'PARCIAL'].includes(orden.estado) && (
+                                  <Button type="button" size="sm" onClick={() => handleRecepcionar(orden)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                                    <PackageCheck className="h-4 w-4" />
+                                    Recepcionar
+                                  </Button>
+                                )}
+                                <Button type="button" size="sm" variant="outline" onClick={() => handleDeleteOrden(orden.id)} className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground">
                                   Eliminar
                                 </Button>
                               </div>
@@ -405,11 +412,11 @@ export default function ComprasPage() {
             </CardContent>
           </Card>
 
-          <Card className="h-fit overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <Card className="h-fit overflow-hidden border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
             <CardHeader className="flex-row items-center justify-between border-b border-cyan-400/10 px-5 py-4">
               <div>
-                <CardTitle className="text-base text-white">Proveedores principales</CardTitle>
-                <p className="mt-1 text-xs text-slate-400">Red activa para compras.</p>
+                <CardTitle className="text-base text-foreground">Proveedores principales</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">Red activa para compras.</p>
               </div>
               <Button type="button" size="sm" onClick={() => setIsProveedorModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
@@ -418,7 +425,7 @@ export default function ComprasPage() {
             </CardHeader>
             <CardContent className="space-y-3 p-4">
               {proveedores.length === 0 ? (
-                <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-sm text-slate-400">
+                <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-sm text-muted-foreground">
                   Agrega proveedores para operar compras.
                 </div>
               ) : (
@@ -434,12 +441,12 @@ export default function ComprasPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="font-semibold text-white">{proveedor.razon_social || proveedor.nombre_comercial || proveedor.nombre || 'Sin nombre'}</div>
-                        <div className="mt-1 text-xs text-slate-500">RUC: {proveedor.ruc || 'N/A'}</div>
+                        <div className="font-semibold text-foreground">{proveedor.razon_social || proveedor.nombre_comercial || proveedor.nombre || 'Sin nombre'}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">RUC: {proveedor.ruc || 'N/A'}</div>
                       </div>
                       {statusBadge('Activo')}
                     </div>
-                    <div className="mt-3 text-xs text-slate-400">{proveedor.contacto || proveedor.email || proveedor.telefono || 'Sin contacto'}</div>
+                    <div className="mt-3 text-xs text-muted-foreground">{proveedor.contacto || proveedor.email || proveedor.telefono || 'Sin contacto'}</div>
                   </button>
                 ))
               )}

@@ -35,6 +35,7 @@ interface MenuItem {
   href?: string
   icon: any
   superAdminOnly?: boolean
+  forcePermissionCheck?: boolean
   permission?: {
     modulo: string
     accion: string
@@ -320,7 +321,12 @@ const menuItems: MenuItem[] = [
     title: 'Auditoría',
     href: '/dashboard/audit-logs',
     icon: Shield,
-    superAdminOnly: true
+    forcePermissionCheck: true,
+    permission: {
+      modulo: 'security',
+      accion: 'read',
+      recurso: 'audit'
+    }
   },
   {
     title: 'Ayuda',
@@ -380,7 +386,7 @@ function PermissionMenuItem({
   if (permissionResult.loading) {
     const Icon = item.icon
     return (
-      <div className={cn('my-1 flex min-h-11 items-center rounded-xl text-slate-400 opacity-50 group-data-[erp-theme=light]/dashboard:text-slate-500', isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm')}>
+      <div className={cn('my-1 flex min-h-11 items-center rounded-xl text-muted-foreground opacity-50 group-data-[erp-theme=light]/dashboard:text-muted-foreground', isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm')}>
         <Icon className={cn('shrink-0', isTablet ? 'mr-2 h-[18px] w-[18px]' : 'mr-3 h-5 w-5')} />
         <span className="min-w-0 truncate whitespace-nowrap">{item.title}</span>
       </div>
@@ -456,7 +462,7 @@ const MenuItemContent = memo(function MenuItemContent({
             isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm',
             isSubmenuActive
               ? 'bg-gradient-to-br from-cyan-500 to-blue-600 font-bold text-white shadow-[0_18px_40px_rgba(8,145,178,0.25)]'
-              : 'font-semibold text-slate-300 hover:border-cyan-300/20 hover:bg-cyan-400/10 hover:text-cyan-50 group-data-[erp-theme=light]/dashboard:text-slate-600 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700',
+              : 'font-semibold text-muted-foreground hover:border-cyan-300/20 hover:bg-cyan-400/10 hover:text-primary group-data-[erp-theme=light]/dashboard:text-foreground/80 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700',
           )}
         >
           <div className="flex min-w-0 flex-1 items-center">
@@ -504,7 +510,7 @@ const MenuItemContent = memo(function MenuItemContent({
         isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm',
         isActive
           ? 'active -translate-y-px border-transparent bg-gradient-to-br from-cyan-500 to-blue-600 font-bold text-white shadow-[0_18px_40px_rgba(8,145,178,0.25)]'
-          : 'border-transparent font-semibold text-slate-300 hover:border-cyan-300/20 hover:bg-cyan-400/10 hover:text-cyan-50 group-data-[erp-theme=light]/dashboard:text-slate-600 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700',
+          : 'border-transparent font-semibold text-muted-foreground hover:border-cyan-300/20 hover:bg-cyan-400/10 hover:text-primary group-data-[erp-theme=light]/dashboard:text-foreground/80 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700',
       )}
       data-tour={getDataTour(item.title)}
       onPointerEnter={() => onPrefetch(item.href)}
@@ -520,7 +526,9 @@ const MenuItemContent = memo(function MenuItemContent({
 })
 
 function MenuItem(props: MenuItemProps) {
-  const shouldCheckPermission = !!props.item.permission && !props.item.submenu && !props.bypassPermissions
+  const shouldCheckPermission =
+    !!props.item.permission
+    && (!props.bypassPermissions || props.item.forcePermissionCheck)
 
   if (shouldCheckPermission) {
     return <PermissionMenuItem {...props} />
@@ -538,13 +546,13 @@ function SidebarMenuLoading({ isTablet }: { isTablet: boolean }) {
         <div
           key={row}
           className={cn(
-            'flex min-h-11 animate-pulse items-center rounded-xl border border-cyan-300/10 bg-cyan-400/5 text-slate-500',
+            'flex min-h-11 animate-pulse items-center rounded-xl border border-border/70 bg-card/70 text-muted-foreground',
             isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm',
           )}
         >
-          <span className={cn('mr-3 shrink-0 rounded bg-cyan-300/20', isTablet ? 'h-[18px] w-[18px]' : 'h-5 w-5')} />
+          <span className={cn('mr-3 shrink-0 rounded bg-muted', isTablet ? 'h-[18px] w-[18px]' : 'h-5 w-5')} />
           <span
-            className="h-3 rounded bg-cyan-300/15"
+            className="h-3 rounded bg-muted"
             style={{ width: `${index === 0 ? 72 : 96 + (index % 2) * 32}px` }}
           />
         </div>
@@ -718,8 +726,9 @@ export default function Sidebar() {
     <>
       {/* Mobile menu button */}
       <button
+        data-testid="mobile-menu-button"
         className={cn(
-          'mobile-menu-btn fixed left-4 top-4 z-[1002] hidden cursor-pointer items-center justify-center rounded-xl border border-cyan-300/20 bg-slate-950/95 p-3 text-sky-100 shadow-lg backdrop-blur-xl transition duration-300 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white/95 group-data-[erp-theme=light]/dashboard:text-blue-800',
+          'mobile-menu-btn fixed left-4 top-4 z-[1002] hidden cursor-pointer items-center justify-center rounded-xl border border-cyan-300/20 bg-card/95 p-3 text-sky-700 dark:text-sky-200 shadow-lg backdrop-blur-xl transition duration-300 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-white/95 group-data-[erp-theme=light]/dashboard:text-blue-800',
           isMobile && 'flex',
         )}
         aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
@@ -732,14 +741,13 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'sidebar fixed left-0 top-0 z-[1001] h-screen w-[280px] overflow-x-hidden overflow-y-auto border-r border-cyan-300/15 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 shadow-[24px_0_70px_rgba(2,8,23,0.5)] backdrop-blur-xl transition-transform duration-300 ease-out [-webkit-overflow-scrolling:touch] group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:from-white group-data-[erp-theme=light]/dashboard:via-slate-50 group-data-[erp-theme=light]/dashboard:to-slate-100 group-data-[erp-theme=light]/dashboard:shadow-[24px_0_70px_rgba(15,23,42,0.12)]',
+          'sidebar fixed left-0 top-0 z-[1001] h-screen w-[280px] -translate-x-full overflow-x-hidden overflow-y-auto border-r border-cyan-300/15 bg-gradient-to-b from-background via-muted/50 to-background shadow-[24px_0_70px_rgba(2,8,23,0.5)] backdrop-blur-xl transition-transform duration-300 ease-out pointer-events-none [-webkit-overflow-scrolling:touch] md:translate-x-0 md:pointer-events-auto group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:from-white group-data-[erp-theme=light]/dashboard:via-slate-50 group-data-[erp-theme=light]/dashboard:to-slate-100 group-data-[erp-theme=light]/dashboard:shadow-[24px_0_70px_rgba(15,23,42,0.12)]',
           isTablet ? 'py-6 md:w-[240px] lg:w-[280px]' : 'py-8',
-          isMobile && !isOpen ? '-translate-x-full' : 'translate-x-0',
-          isOpen && 'sidebar-open',
+          isMobile && isOpen && 'sidebar-open translate-x-0 pointer-events-auto',
         )}
       >
         {/* Logo */}
-        <div className={cn('shrink-0 border-b border-slate-400/15 group-data-[erp-theme=light]/dashboard:border-slate-200', isTablet ? 'px-5 py-4' : 'p-6')}>
+        <div className={cn('shrink-0 border-b border-border/15 group-data-[erp-theme=light]/dashboard:border-border', isTablet ? 'px-5 py-4' : 'p-6')}>
           <Link
             href="/dashboard"
             className={cn(
@@ -747,14 +755,14 @@ export default function Sidebar() {
               isTablet ? 'p-3' : 'p-3.5',
             )}
           >
-            <span className={cn('grid place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 font-black tracking-normal text-cyan-50 shadow-[0_16px_35px_rgba(37,99,235,0.35)]', isTablet ? 'h-11 w-11 text-lg' : 'h-[50px] w-[50px] text-[1.35rem]')}>
+            <span className={cn('grid place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 font-black tracking-normal text-primary shadow-[0_16px_35px_rgba(37,99,235,0.35)]', isTablet ? 'h-11 w-11 text-lg' : 'h-[50px] w-[50px] text-[1.35rem]')}>
               N
             </span>
             <span className="min-w-0">
-              <span className={cn('block font-black leading-none tracking-[0.08em] text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950', isTablet ? 'text-[0.95rem]' : 'text-[1.05rem]')}>
+              <span className={cn('block font-black leading-none tracking-[0.08em] text-foreground group-data-[erp-theme=light]/dashboard:text-foreground', isTablet ? 'text-[0.95rem]' : 'text-[1.05rem]')}>
                 NEON
               </span>
-              <span className={cn('mt-1 block font-bold leading-none tracking-[0.2em] text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600', isTablet ? 'text-[0.62rem]' : 'text-[0.68rem]')}>
+              <span className={cn('mt-1 block font-bold leading-none tracking-[0.2em] text-primary group-data-[erp-theme=light]/dashboard:text-blue-600', isTablet ? 'text-[0.62rem]' : 'text-[0.68rem]')}>
                 ERP SUITE
               </span>
             </span>
@@ -783,17 +791,17 @@ export default function Sidebar() {
         </nav>
 
         {/* User Section */}
-        <div className={cn('flex shrink-0 flex-col border-t border-slate-400/15', isTablet ? 'gap-3 p-3' : 'gap-4 p-4')}>
+        <div className={cn('flex shrink-0 flex-col border-t border-border/15', isTablet ? 'gap-3 p-3' : 'gap-4 p-4')}>
           {/* User Info Card */}
           <div className={cn('rounded-xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/10 to-blue-500/10 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:from-blue-50 group-data-[erp-theme=light]/dashboard:to-white', isTablet ? 'p-3' : 'p-4')}>
-            <div className={cn('truncate whitespace-nowrap font-bold text-sky-100 group-data-[erp-theme=light]/dashboard:text-slate-950', isTablet ? 'text-[0.85rem]' : 'text-sm')}>{user?.nombre || 'Usuario'}</div>
-            <div className={cn('truncate whitespace-nowrap font-medium text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500', isTablet ? 'text-xs' : 'text-[0.8rem]')}>{user?.email || ''}</div>
+            <div className={cn('truncate whitespace-nowrap font-bold text-sky-700 dark:text-sky-200 group-data-[erp-theme=light]/dashboard:text-foreground', isTablet ? 'text-[0.85rem]' : 'text-sm')}>{user?.nombre || 'Usuario'}</div>
+            <div className={cn('truncate whitespace-nowrap font-medium text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground', isTablet ? 'text-xs' : 'text-[0.8rem]')}>{user?.email || ''}</div>
           </div>
 
           {/* Logout Button */}
           <button
             onClick={handleLogout}
-            className={cn('flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-slate-500/40 bg-transparent font-semibold text-slate-300 transition duration-300 hover:border-cyan-300/30 hover:bg-cyan-400/10 hover:text-cyan-50 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-600 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700', isTablet ? 'p-2 text-[0.85rem]' : 'px-4 py-3 text-sm')}
+            className={cn('flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-slate-500/40 bg-transparent font-semibold text-muted-foreground transition duration-300 hover:border-cyan-300/30 hover:bg-cyan-400/10 hover:text-primary group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:text-foreground/80 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700', isTablet ? 'p-2 text-[0.85rem]' : 'px-4 py-3 text-sm')}
           >
             <LogOut className={cn('shrink-0', isTablet ? 'mr-1 h-4 w-4' : 'mr-2 h-[18px] w-[18px]')} />
             <span className="truncate whitespace-nowrap">Cerrar Sesión</span>
@@ -804,7 +812,7 @@ export default function Sidebar() {
       {/* Mobile overlay */}
       {isMobile && isOpen && (
         <div
-          className="fixed inset-0 z-[1000] bg-slate-900/80 backdrop-blur"
+          className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur"
           onClick={() => setIsOpen(false)}
         />
       )}

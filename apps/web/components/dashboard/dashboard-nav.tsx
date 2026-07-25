@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { customAuth } from '@/lib/auth-service'
-import { 
-  Building2, 
-  FileText, 
-  Truck, 
-  Download, 
+import {
+  Building2,
+  FileText,
+  Truck,
+  Download,
   Package,
   ShoppingCart,
   FileSpreadsheet,
@@ -109,17 +109,17 @@ export function DashboardNav() {
               {/* Desktop Navigation */}
               <div className="ml-8 hidden gap-2 sm:flex">
                 {visibleNavigation.map((item) => {
-                  const isActive = pathname === item.href || 
+                  const isActive = pathname === item.href ||
                     (item.href !== '/dashboard' && pathname.startsWith(item.href))
-                  
+
                   return (
                     <Link
                       key={item.name}
                       href={item.href}
                       className={`inline-flex items-center rounded-t-md border-b-2 px-6 py-3 text-sm font-semibold transition ${
                         isActive
-                          ? 'border-blue-600 bg-blue-50 text-blue-700'
-                          : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-blue-700'
+                          ? 'border-blue-600 bg-primary/10 text-primary'
+                          : 'border-transparent text-foreground/80 hover:bg-muted/30 hover:text-primary'
                       }`}
                     >
                       <item.icon className="w-4 h-4 mr-2" />
@@ -164,9 +164,9 @@ export function DashboardNav() {
           <div className="border-t border-white/30 bg-white/95 backdrop-blur-xl sm:hidden">
             <div className="flex flex-col gap-2 py-4">
               {visibleNavigation.map((item) => {
-                const isActive = pathname === item.href || 
+                const isActive = pathname === item.href ||
                   (item.href !== '/dashboard' && pathname.startsWith(item.href))
-                
+
                 return (
                   <Link
                     key={item.name}
@@ -174,8 +174,8 @@ export function DashboardNav() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`block border-l-4 px-6 py-4 text-base font-semibold transition ${
                       isActive
-                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                        : 'border-transparent text-slate-600 hover:bg-slate-50'
+                        ? 'border-blue-600 bg-primary/10 text-primary'
+                        : 'border-transparent text-foreground/80 hover:bg-muted/30'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -185,10 +185,10 @@ export function DashboardNav() {
                   </Link>
                 )
               })}
-              
+
               {/* Mobile Logout */}
               <button
-                onClick={handleLogout} className="w-full cursor-pointer border-0 bg-transparent px-6 py-4 text-left text-base font-semibold text-slate-600"
+                onClick={handleLogout} className="w-full cursor-pointer border-0 bg-transparent px-6 py-4 text-left text-base font-semibold text-foreground/80"
               >
                 <div className="flex items-center gap-3">
                   <LogOut className="w-5 h-5" />
@@ -201,4 +201,4 @@ export function DashboardNav() {
       </nav>
     </>
   )
-} 
+}

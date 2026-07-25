@@ -14,6 +14,7 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { FiscalServiceFactory } from '../fiscal/fiscal-service.factory';
 import { DocumentoElectronico, FiscalResponse } from '../../shared/integration/fiscal.interfaces';
 import { OseApiFiscalService, OseApiConfig, OseAuthTipo } from '../fiscal/ose-api-fiscal.service';
+import { OseService } from '../ose/ose.service';
 
 export interface EnvioDocumentoResult {
   success: boolean;
@@ -33,7 +34,8 @@ export class FiscalAdapterService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly fiscalServiceFactory: FiscalServiceFactory,
-    private readonly oseApiService: OseApiFiscalService
+    private readonly oseApiService: OseApiFiscalService,
+    private readonly oseService: OseService,
   ) {}
 
   /**
@@ -77,6 +79,30 @@ export class FiscalAdapterService {
       // 3. Log del país detectado
       const paisNombre = paisId === 1 ? 'Perú (SUNAT)' : paisId === 2 ? 'Colombia (DIAN)' : `País ${paisId}`;
       this.logger.log(`🌍 Enviando documento a ${paisNombre} para tenant ${tenantId}`);
+
+      if (paisId === 1) {
+        if (!documento.xmlContent) {
+          return {
+            success: false,
+            codigoRespuesta: 'SUNAT_MISSING_XML',
+            descripcionRespuesta: 'SUNAT directo requiere XML UBL generado para el documento',
+          };
+        }
+
+        const fileName = this.buildSunatFileName(documento);
+        const sunatResponse = await this.oseService.enviarCpe(documento.xmlContent, fileName, { tenantId });
+        return {
+          success: sunatResponse.success,
+          codigoRespuesta: sunatResponse.codigoRespuesta,
+          descripcionRespuesta: sunatResponse.descripcionRespuesta,
+          cdr: sunatResponse.cdr,
+          hash: sunatResponse.hashCPE,
+          numeroComprobante: sunatResponse.numeroComprobante || fileName,
+          metadata: {
+            observaciones: sunatResponse.observaciones,
+          },
+        };
+      }
       
       // 4. Enviar documento
       const response: FiscalResponse = await fiscalService.enviarDocumento(documento);
@@ -134,6 +160,28 @@ export class FiscalAdapterService {
       }
 
       const paisId = await this.obtenerPaisTenant(tenantId);
+      if (paisId === 1) {
+        const ruc = await this.obtenerRucTenant(tenantId);
+        const sunatResponse = await this.oseService.consultarEstadoCpe(
+          ruc,
+          tipoDocumento,
+          serie,
+          numero,
+          { tenantId },
+        );
+        return {
+          success: sunatResponse.success,
+          codigoRespuesta: sunatResponse.codigoRespuesta,
+          descripcionRespuesta: sunatResponse.descripcionRespuesta,
+          cdr: sunatResponse.cdr,
+          hash: sunatResponse.hashCPE,
+          numeroComprobante: `${ruc}-${tipoDocumento}-${serie}-${numero}`,
+          metadata: {
+            observaciones: sunatResponse.observaciones,
+          },
+        };
+      }
+
       const fiscalService = this.fiscalServiceFactory.getServiceByPaisId(paisId);
       
       const response = await fiscalService.consultarEstado({
@@ -262,6 +310,17 @@ export class FiscalAdapterService {
     };
   }
 
+  private buildSunatFileName(documento: DocumentoElectronico): string {
+    return [
+      documento.emisor.numeroDocumento,
+      documento.tipoDocumento,
+      documento.serie,
+      documento.numero,
+    ]
+      .map((part) => String(part || '').trim())
+      .join('-');
+  }
+
   private async obtenerEmisionConfig(tenantId: string): Promise<{
     modo: string;
     activo: boolean;
@@ -351,6 +410,25 @@ export class FiscalAdapterService {
       this.logger.error(`❌ Error obteniendo país del tenant:`, error);
       return 1; // Default: Perú
     }
+  }
+
+  private async obtenerRucTenant(tenantId: string): Promise<string> {
+    const { data, error } = await this.supabaseService.getClient()
+      .from('empresa_config')
+      .select('ruc')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`No se pudo obtener RUC del tenant ${tenantId}: ${error.message}`);
+    }
+
+    const ruc = (data as any)?.ruc;
+    if (!ruc) {
+      throw new Error(`RUC no configurado para tenant ${tenantId}`);
+    }
+
+    return String(ruc);
   }
 
   /**

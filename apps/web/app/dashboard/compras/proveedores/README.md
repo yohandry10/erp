@@ -97,16 +97,11 @@ export interface Proveedor {
 - `@/types/compras`: Type definitions
 
 ## Styling
-Uses existing dashboard CSS classes:
-- `dashboard-container`
-- `dashboard-header`
-- `dashboard-title`
-- `dashboard-subtitle`
-- `stats-grid`
-- `stat-card`
-- `activity-section`
-- `activity-card`
-- `refresh-btn`
+Uses Tailwind 3.4 utilities and semantic shadcn tokens. Page surfaces use
+`bg-background`/`bg-card`, text uses `text-foreground`/`text-muted-foreground`,
+and borders use `border-border`. Shared interactions should use the primitives
+from `@/components/ui`; legacy dashboard CSS classes are not part of the
+current contract.
 
 ## Future Enhancements
 The following features are placeholders and need implementation:

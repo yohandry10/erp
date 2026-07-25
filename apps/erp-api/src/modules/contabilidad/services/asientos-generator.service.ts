@@ -113,17 +113,12 @@ export class AsientosGeneratorService {
         }
       }
 
-      // La numeración se reserva con RPC transaccional en BD.
-      const asientoNumbering = await this.generarNumeroAsiento(tenantId, fecha);
-
       // Crear asiento contable
       const { data: asiento, error: asientoError } = await this.supabaseService
         .getClient()
         .from('asientos_contables')
         .insert({
           tenant_id: tenantId,
-          numero_asiento: asientoNumbering.numero,
-          codigo: asientoNumbering.codigo,
           fecha: fecha.toISOString(),
           concepto,
           descripcion: concepto,
@@ -184,7 +179,7 @@ export class AsientosGeneratorService {
       }
 
       console.log(
-        `✅ [Asientos] Asiento ${asientoNumbering.codigo} creado exitosamente para tenant ${tenantId}`
+        `✅ [Asientos] Asiento ${asiento.codigo ?? asiento.numero_asiento ?? asiento.id} creado exitosamente para tenant ${tenantId}`
       );
 
       const asientoFinal = sourceEventId
@@ -643,34 +638,6 @@ export class AsientosGeneratorService {
   }
 
   /**
-   * Genera un número de asiento único para el período
-   */
-  private async generarNumeroAsiento(
-    tenantId: string,
-    fecha: Date
-  ): Promise<{ numero: number; codigo: string }> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .rpc('obtener_siguiente_numero_asiento', {
-        p_tenant_id: tenantId,
-        p_fecha: fecha.toISOString(),
-      });
-
-    if (error) {
-      throw new Error(`Error reservando número de asiento: ${error.message}`);
-    }
-
-    const row = Array.isArray(data) ? data[0] : data;
-    const numero = Number(row?.numero);
-    const codigo = row?.codigo;
-    if (!Number.isInteger(numero) || numero <= 0 || !codigo) {
-      throw new Error('La numeración contable no devolvió un número válido');
-    }
-
-    return { numero, codigo };
-  }
-
-  /**
    * Genera asiento de venta (factura CPE)
    * Dr 12 Clientes [total]
    *   Cr 70 Ventas [base]
@@ -699,7 +666,7 @@ export class AsientosGeneratorService {
 
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
         tenant_id,
-        ['12', '70', '40', '69', '20']
+        ['12', '70', '40', '69', '20', '10']
       );
 
       const montoPendiente = Math.max(this.round2(
@@ -738,11 +705,22 @@ export class AsientosGeneratorService {
 
       const detalles: DetalleAsiento[] = [];
 
+      // Venta al CONTADO (POS o factura contado): el cobro entra a Caja/Bancos
+      // según el método de pago, NO a CxC (12). Evita la "CxC fantasma" de una
+      // venta ya cobrada y hace que el ingreso quede contabilizado UNA sola vez.
+      const esContado = evento.es_contado === true;
+      const cuentaCobro = esContado
+        ? (cuentas.get(evento.cuenta_cobro_codigo) ??
+           cuentas.get('10111') ??
+           cuentas.get('10') ??
+           cuentas.get('12')!)
+        : cuentas.get('12')!;
+
       detalles.push({
-        cuenta_id: cuentas.get('12')!.id,
+        cuenta_id: cuentaCobro.id,
         debe: montoPendiente,
         haber: 0,
-        concepto: 'Clientes - Venta',
+        concepto: esContado ? 'Caja/Bancos - Cobro contado' : 'Clientes - Venta',
         centro_costo_id,
       });
 
@@ -1164,34 +1142,42 @@ export class AsientosGeneratorService {
   }
 
   /**
-   * Genera asiento de planilla
-   * Dr 621 Remuneraciones [total bruto]
+   * Genera asiento de planilla con aportes patronales reales.
+   * Dr 621 Remuneraciones [ingresos]
+   * Dr 627 Seguridad/prevision social [aportes empleador]
    *   Cr 403 Instituciones publicas [descuentos/retenciones]
-   *   Cr 411 Remuneraciones por pagar [neto a pagar]
+   *   Cr 407 Aportes empleador por pagar [aportes empleador]
+   *   Cr 411 Remuneraciones por pagar [neto]
    */
   async generarAsientoPlanilla(evento: any): Promise<AsientoContable> {
     try {
       const { tenant_id, fecha, sueldos, retenciones, neto, centro_costo_id } = evento;
       const totalIngresos = Number(sueldos ?? 0);
       const totalDescuentos = Number(retenciones ?? 0);
+      const totalAportes = Number(evento.aportes ?? evento.totalAportes ?? evento.total_aportes ?? 0);
       const totalNeto = Number(neto ?? 0);
       const sourceEventId = evento.source_event_id || evento.planilla_id || evento.event_id;
 
-      // Validar ecuación: sueldos = retenciones + neto (tolerancia 0.01)
-      const diferencia = Math.abs(totalIngresos - (totalDescuentos + totalNeto));
+      // Validar ecuación: ingresos + aportes patronales = descuentos + neto + aportes patronales.
+      const totalDebeEsperado = this.round2(totalIngresos + totalAportes);
+      const totalHaberEsperado = this.round2(totalDescuentos + totalNeto + totalAportes);
+      const diferencia = Math.abs(totalDebeEsperado - totalHaberEsperado);
       if (diferencia > 0.01) {
         this.logger.error(
-          `PLANILLA_IMBALANCE sueldos=${totalIngresos} != retenciones(${totalDescuentos}) + neto(${totalNeto}), diff=${diferencia.toFixed(2)}`,
+          `PLANILLA_IMBALANCE debe=${totalDebeEsperado} != haber=${totalHaberEsperado}, ingresos=${totalIngresos}, aportes=${totalAportes}, retenciones=${totalDescuentos}, neto=${totalNeto}, diff=${diferencia.toFixed(2)}`,
         );
         throw new Error(
-          `Asiento de planilla desbalanceado: sueldos (${totalIngresos}) != retenciones (${totalDescuentos}) + neto (${totalNeto}). Diferencia: ${diferencia.toFixed(2)}`,
+          `Asiento de planilla desbalanceado: debe (${totalDebeEsperado}) != haber (${totalHaberEsperado}). Diferencia: ${diferencia.toFixed(2)}`,
         );
       }
 
       // Obtener cuentas del plan
+      const codigosCuentas = totalAportes > 0
+        ? ['621', '627', '403', '407', '411']
+        : ['621', '403', '411'];
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
         tenant_id,
-        ['621', '403', '411']
+        codigosCuentas
       );
 
       const detalles: DetalleAsiento[] = [
@@ -1201,20 +1187,45 @@ export class AsientosGeneratorService {
           haber: 0,
           concepto: 'Gastos de Personal - Remuneraciones',
           centro_costo_id
-        },
-        {
+        }
+      ];
+
+      if (totalAportes > 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('627')!.id,
+          debe: totalAportes,
+          haber: 0,
+          concepto: 'Aportes empleador - EsSalud',
+          centro_costo_id,
+        });
+      }
+
+      if (totalDescuentos > 0) {
+        detalles.push({
           cuenta_id: cuentas.get('403')!.id,
           debe: 0,
           haber: totalDescuentos,
-          concepto: 'Instituciones publicas por pagar'
-        },
-        {
+          concepto: 'Retenciones laborales por pagar'
+        });
+      }
+
+      if (totalAportes > 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('407')!.id,
+          debe: 0,
+          haber: totalAportes,
+          concepto: 'EsSalud por pagar',
+        });
+      }
+
+      if (totalNeto > 0) {
+        detalles.push({
           cuenta_id: cuentas.get('411')!.id,
           debe: 0,
           haber: totalNeto,
           concepto: 'Remuneraciones por Pagar'
-        }
-      ];
+        });
+      }
 
       return await this.generarAsiento(
         tenant_id,

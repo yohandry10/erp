@@ -70,15 +70,15 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
   if (!isOpen) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(15,_23,_42,_0.8)] flex items-center justify-center p-4 z-[1000]">
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(15,_23,_42,_0.8)] flex items-center justify-center p-4 z-[1100]">
       <div className="p-10 w-[100%] max-w-[700px] overflow-y-auto shadow border relative">
         {/* Header del Modal */}
         <div className="flex justify-between items-center mb-8 pb-4">
-          <h2 className="text-8 font-extrabold bg-[var(--gradient-primary)] m-0">
+          <h2 className="text-[2rem] font-extrabold bg-[var(--gradient-primary)] m-0">
             👤 {initialData ? 'Editar Empleado' : 'Agregar Nuevo Empleado'}
           </h2>
           <button
-            onClick={onClose} className="bg-[var(--gradient-danger)] text-white border-0 p-3 cursor-pointer text-5 font-bold flex items-center justify-center w-10 h-10 transition"
+            onClick={onClose} className="bg-[var(--gradient-danger)] text-white border-0 p-3 cursor-pointer text-xl font-bold flex items-center justify-center w-10 h-10 transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.1) rotate(90deg)'
             }}
@@ -89,7 +89,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
             ✕
           </button>
         </div>
-        
+
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6 mb-8">
             {/* Nombres */}
@@ -101,7 +101,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
                 type="text"
                 value={formData.nombres}
                 onChange={(e) => handleChange('nombres', e.target.value)}
-                required className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                required className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -122,7 +122,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
                 type="text"
                 value={formData.apellidos}
                 onChange={(e) => handleChange('apellidos', e.target.value)}
-                required className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                required className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -141,7 +141,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               </label>
               <select
                 value={formData.tipo_documento}
-                onChange={(e) => handleChange('tipo_documento', e.target.value)} className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                onChange={(e) => handleChange('tipo_documento', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -166,7 +166,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
                 type="text"
                 value={formData.numero_documento}
                 onChange={(e) => handleChange('numero_documento', e.target.value)}
-                required className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                required className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -186,7 +186,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)} className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                onChange={(e) => handleChange('email', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -206,7 +206,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               <input
                 type="tel"
                 value={formData.telefono}
-                onChange={(e) => handleChange('telefono', e.target.value)} className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                onChange={(e) => handleChange('telefono', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -226,7 +226,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               <input
                 type="text"
                 value={formData.puesto}
-                onChange={(e) => handleChange('puesto', e.target.value)} className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                onChange={(e) => handleChange('puesto', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -245,7 +245,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               </label>
               <select
                 value={formData.id_departamento}
-                onChange={(e) => handleChange('id_departamento', e.target.value)} className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                onChange={(e) => handleChange('id_departamento', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -272,7 +272,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               <input
                 type="date"
                 value={formData.fecha_nacimiento}
-                onChange={(e) => handleChange('fecha_nacimiento', e.target.value)} className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                onChange={(e) => handleChange('fecha_nacimiento', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -292,7 +292,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               <input
                 type="date"
                 value={formData.fecha_ingreso}
-                onChange={(e) => handleChange('fecha_ingreso', e.target.value)} className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                onChange={(e) => handleChange('fecha_ingreso', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -311,7 +311,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
                 </label>
                 <select
                   value={formData.estado}
-                  onChange={(e) => handleChange('estado', e.target.value)} className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+                  onChange={(e) => handleChange('estado', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 >
                   <option value="activo">Activo</option>
                   <option value="inactivo">Inactivo</option>
@@ -329,7 +329,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               type="text"
               value={formData.direccion}
               onChange={(e) => handleChange('direccion', e.target.value)}
-              placeholder="Dirección completa del empleado" className="w-[100%] p-[0.875rem] text-4 transition bg-[rgba(255,_255,_255,_0.8)]"
+              placeholder="Dirección completa del empleado" className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = 'var(--blue-500)'
                 e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -346,13 +346,13 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="btn btn-secondary"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold leading-5 text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="btn btn-primary"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             >
               💾 {initialData ? 'Actualizar Empleado' : 'Guardar Empleado'}
             </button>
@@ -363,4 +363,4 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
   )
 }
 
-export default EmpleadoModal 
+export default EmpleadoModal

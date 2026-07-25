@@ -3,21 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Check, Package, Scan, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { useToast } from '@/components/ui/use-toast'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { cn } from '@/lib/utils'
 
-const fieldLabelClass = 'mb-2 block text-sm font-medium text-slate-700'
-const fieldClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400'
-const panelClass = 'activity-card border border-slate-200 bg-white'
+const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
+const fieldClass = 'w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
+const panelClass = 'relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl border border-border bg-card'
 const qualityClass = {
   OK: 'border-blue-600 bg-blue-600 text-white',
   OBSERVADO: 'border-cyan-600 bg-cyan-600 text-white',
-  RECHAZADO: 'border-slate-700 bg-slate-700 text-white',
+  RECHAZADO: 'border-border bg-muted text-white',
 } as const
 const qualityBadgeClass = {
-  OK: 'bg-blue-50 text-blue-700',
-  OBSERVADO: 'bg-cyan-50 text-cyan-700',
-  RECHAZADO: 'bg-slate-100 text-slate-700',
+  OK: 'bg-primary/10 text-primary',
+  OBSERVADO: 'bg-primary/10 text-primary',
+  RECHAZADO: 'bg-muted text-foreground/85',
 } as const
 
 interface OrdenDetalle {
@@ -26,6 +27,8 @@ interface OrdenDetalle {
   cantidad: number
   cantidad_recibida: number
   precio_unitario: number
+  descripcion?: string | null
+  codigo?: string | null
   productos?: {
     id: string
     nombre: string
@@ -39,7 +42,7 @@ interface OrdenCompra {
   numero: string
   proveedor_id: string
   estado: string
-  proveedores?: {
+  proveedor?: {
     razon_social: string
     ruc: string
   }
@@ -84,6 +87,7 @@ interface RecepcionWizardProps {
 }
 
 export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWizardProps) {
+  const { toast } = useToast()
   const [currentStep, setCurrentStep] = useState(1)
   const [orden, setOrden] = useState<OrdenCompra | null>(null)
   const [items, setItems] = useState<RecepcionItem[]>([])
@@ -113,8 +117,8 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             .map((detalle: OrdenDetalle) => ({
               detalle_id: detalle.id,
               producto_id: detalle.producto_id,
-              producto_nombre: detalle.productos?.nombre || 'Producto',
-              producto_codigo: detalle.productos?.codigo || '',
+              producto_nombre: detalle.productos?.nombre || detalle.descripcion || 'Producto',
+              producto_codigo: detalle.productos?.codigo || detalle.codigo || '',
               cantidad_pedida: detalle.cantidad,
               cantidad_recibida_anterior: detalle.cantidad_recibida || 0,
               cantidad_recibir: 0,
@@ -126,11 +130,11 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       }
     } catch (error) {
       console.error('Error loading orden:', error)
-      alert('Error: No se pudo cargar la orden de compra')
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar la orden de compra' })
     } finally {
       setLoading(false)
     }
-  }, [get, ordenId])
+  }, [get, ordenId, toast])
 
   const loadAlmacenes = useCallback(async () => {
     try {
@@ -189,9 +193,9 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       }
     } else {
       // Product not found
-      alert(`Producto no encontrado: ${scannedCode}`)
+      toast({ variant: 'destructive', title: 'Producto no encontrado', description: scannedCode })
     }
-  }, [items])
+  }, [items, toast])
 
   // Scanner detection: rapid keystrokes indicate scanner input
   useEffect(() => {
@@ -324,7 +328,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       // Validate at least one item has quantity
       const hasItems = items.some(item => item.cantidad_recibir > 0)
       if (!hasItems) {
-        alert('Debe ingresar al menos una cantidad para recepcionar')
+        toast({ variant: 'destructive', title: 'Cantidad requerida', description: 'Debe ingresar al menos una cantidad para recepcionar' })
         return
       }
       setCurrentStep(2)
@@ -336,7 +340,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       const itemsWithoutAlmacen = itemsToReceive.filter(item => !item.almacen_id)
 
       if (itemsWithoutAlmacen.length > 0) {
-        alert('Debe seleccionar un almacén para todos los productos a recepcionar')
+        toast({ variant: 'destructive', title: 'Almacén requerido', description: 'Debe seleccionar un almacén para todos los productos a recepcionar' })
         return
       }
       setCurrentStep(4)
@@ -355,7 +359,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       const itemsToReceive = items.filter(item => item.cantidad_recibir > 0)
 
       if (itemsToReceive.length === 0) {
-        alert('Debe ingresar al menos una cantidad para recepcionar')
+        toast({ variant: 'destructive', title: 'Cantidad requerida', description: 'Debe ingresar al menos una cantidad para recepcionar' })
         return
       }
 
@@ -397,11 +401,11 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
         throw new Error(closeResponse?.message || 'Error al cerrar la recepción')
       }
 
-      alert('Recepción completada exitosamente')
+      toast({ title: 'Recepción completada', description: 'Stock, cuentas por pagar y contabilidad actualizados.' })
       onComplete()
     } catch (error: any) {
       console.error('Error submitting recepcion:', error)
-      alert(`Error: ${error.message || 'No se pudo completar la recepción'}`)
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo completar la recepción' })
     } finally {
       setSubmitting(false)
     }
@@ -420,8 +424,8 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
   if (loading) {
     return (
-      <div className="loading">
-        <div className="loading-spinner"></div>
+      <div className="flex min-h-48 items-center justify-center">
+        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
         <p>Cargando orden de compra...</p>
       </div>
     )
@@ -429,15 +433,15 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
   if (!orden) {
     return (
-      <div className="activity-card px-8 py-12 text-center">
-        <AlertCircle size={48} className="mx-auto mb-4 text-slate-500" />
-        <h3 className="mb-2 text-lg font-semibold text-slate-950">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl px-8 py-12 text-center">
+        <AlertCircle size={48} className="mx-auto mb-4 text-muted-foreground" />
+        <h3 className="mb-2 text-lg font-semibold text-foreground">
           Orden no encontrada
         </h3>
-        <p className="mb-6 text-slate-500">
+        <p className="mb-6 text-muted-foreground">
           No se pudo cargar la orden de compra
         </p>
-        <button onClick={onCancel} className="refresh-btn">
+        <button onClick={onCancel} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50">
           Volver
         </button>
       </div>
@@ -447,7 +451,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   return (
     <div>
       {/* Progress Steps */}
-      <div className="mb-8 flex items-center justify-center gap-4 rounded-xl bg-white p-6 shadow-sm">
+      <div className="mb-8 flex items-center justify-center gap-4 rounded-xl bg-card p-6 shadow-sm">
         {[
           { num: 1, label: 'Cantidades' },
           { num: 2, label: 'Calidad' },
@@ -458,55 +462,55 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             <div className="flex flex-col items-center gap-2">
               <div className={cn(
                 'flex size-10 items-center justify-center rounded-full text-base font-semibold transition',
-                currentStep >= step.num ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'
+                currentStep >= step.num ? 'bg-blue-600 text-white' : 'bg-muted text-muted-foreground'
               )}>
                 {currentStep > step.num ? <Check size={20} /> : step.num}
               </div>
               <span className={cn(
                 'text-sm',
                 currentStep === step.num ? 'font-semibold' : 'font-normal',
-                currentStep >= step.num ? 'text-blue-600' : 'text-slate-500'
+                currentStep >= step.num ? 'text-primary' : 'text-muted-foreground'
               )}>
                 {step.label}
               </span>
             </div>
             {idx < 3 && (
-              <div className={cn('h-0.5 w-16 transition', currentStep > step.num ? 'bg-blue-600' : 'bg-slate-200')} />
+              <div className={cn('h-0.5 w-16 transition', currentStep > step.num ? 'bg-blue-600' : 'bg-muted')} />
             )}
           </div>
         ))}
       </div>
 
       {/* Order Info */}
-      <div className="activity-card mb-6">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="mb-2 text-lg font-semibold text-slate-950">
+            <h3 className="mb-2 text-lg font-semibold text-foreground">
               {orden.numero}
             </h3>
-            <p className="text-sm text-slate-500">
-              {orden.proveedores?.razon_social} - RUC: {orden.proveedores?.ruc}
+            <p className="text-sm text-muted-foreground">
+              {orden.proveedor?.razon_social || 'Proveedor N/A'} - RUC: {orden.proveedor?.ruc || '-'}
             </p>
           </div>
-          <div className="rounded-md bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800">
+          <div className="rounded-md bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
             {items.length} productos pendientes
           </div>
         </div>
       </div>
 
       {/* Step Content */}
-      <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         {currentStep === 1 && (
           <div>
             <div className="mb-6 flex items-center justify-between gap-4">
-              <h3 className="text-base font-semibold text-slate-950">
+              <h3 className="text-base font-semibold text-foreground">
                 Ingrese las cantidades recibidas
               </h3>
               <button
                 onClick={() => setScannerMode(!scannerMode)}
                 className={cn(
                   'flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition',
-                  scannerMode ? 'border-2 border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-300 bg-white text-slate-700'
+                  scannerMode ? 'border-2 border-blue-600 bg-primary/10 text-primary' : 'border-border bg-card text-foreground/85'
                 )}
               >
                 <Scan size={16} />
@@ -515,13 +519,13 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             </div>
 
             {scannerMode && (
-              <div className="mb-4 flex items-center gap-3 rounded-lg border-2 border-blue-600 bg-blue-50 p-4">
-                <Scan size={20} className="text-blue-600" />
+              <div className="mb-4 flex items-center gap-3 rounded-lg border-2 border-blue-600 bg-primary/10 p-4">
+                <Scan size={20} className="text-primary" />
                 <div>
-                  <div className="text-sm font-semibold text-blue-800">
+                  <div className="text-sm font-semibold text-primary">
                     Modo Scanner Activo
                   </div>
-                  <div className="text-xs text-blue-600">
+                  <div className="text-xs text-primary">
                     Escanee los códigos de barras de los productos. Cada escaneo incrementará la cantidad en 1.
                   </div>
                 </div>
@@ -549,11 +553,11 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         <div className="mb-1 text-sm font-semibold">
                           {item.producto_nombre}
                         </div>
-                        <div className={cn('font-mono text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-slate-500')}>
+                        <div className={cn('font-mono text-xs', flashItemIndex === index ? 'text-primary dark:text-blue-200' : 'text-muted-foreground')}>
                           Código: {item.producto_codigo}
                         </div>
                         {item.cantidad_recibida_anterior > 0 && (
-                          <div className={cn('mt-1 text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-blue-600')}>
+                          <div className={cn('mt-1 text-xs', flashItemIndex === index ? 'text-primary dark:text-blue-200' : 'text-primary')}>
                             Ya recibido: {item.cantidad_recibida_anterior} de {item.cantidad_pedida}
                           </div>
                         )}
@@ -561,24 +565,24 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
                       {/* Pedido */}
                       <div className="text-center">
-                        <div className={cn('mb-1 text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-slate-500')}>
+                        <div className={cn('mb-1 text-xs', flashItemIndex === index ? 'text-primary dark:text-blue-200' : 'text-muted-foreground')}>
                           Pedido
                         </div>
-                        <div className={cn('text-xl font-bold', flashItemIndex === index ? 'text-white' : 'text-slate-700')}>
+                        <div className={cn('text-xl font-bold', flashItemIndex === index ? 'text-white' : 'text-foreground/85')}>
                           {item.cantidad_pedida}
                         </div>
                       </div>
 
                       {/* Quantity Input */}
                       <div>
-                        <div className={cn('mb-2 text-center text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-slate-500')}>
+                        <div className={cn('mb-2 text-center text-xs', flashItemIndex === index ? 'text-primary dark:text-blue-200' : 'text-muted-foreground')}>
                           Recibir ahora
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => updateItemQuantity(index, item.cantidad_recibir - 1)}
                             disabled={item.cantidad_recibir === 0}
-                            className="flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-xl font-semibold text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                            className="flex size-8 items-center justify-center rounded-md border border-border bg-card text-xl font-semibold text-foreground/85 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                           >
                             -
                           </button>
@@ -588,12 +592,12 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                             max={maxCantidad}
                             value={item.cantidad_recibir}
                             onChange={(e) => updateItemQuantity(index, parseInt(e.target.value) || 0)}
-                            className="w-20 rounded-md border-2 border-blue-600 px-2 py-2 text-center text-lg font-bold text-blue-700 outline-none focus:ring-4 focus:ring-blue-100"
+                            className="w-20 rounded-md border-2 border-blue-600 px-2 py-2 text-center text-lg font-bold text-primary outline-none focus:ring-4 focus:ring-blue-100"
                           />
                           <button
                             onClick={() => updateItemQuantity(index, item.cantidad_recibir + 1)}
                             disabled={item.cantidad_recibir >= maxCantidad}
-                            className="flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-xl font-semibold text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                            className="flex size-8 items-center justify-center rounded-md border border-border bg-card text-xl font-semibold text-foreground/85 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                           >
                             +
                           </button>
@@ -602,26 +606,26 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
                       {/* Pendiente */}
                       <div className="text-center">
-                        <div className={cn('mb-1 text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-slate-500')}>
+                        <div className={cn('mb-1 text-xs', flashItemIndex === index ? 'text-primary dark:text-blue-200' : 'text-muted-foreground')}>
                           Pendiente
                         </div>
-                        <div className="text-xl font-bold text-blue-700">
+                        <div className="text-xl font-bold text-primary">
                           {pendiente}
                         </div>
                       </div>
                     </div>
 
                     {/* Quick Actions */}
-                    <div className="mt-3 flex gap-2 border-t border-slate-200 pt-3">
+                    <div className="mt-3 flex gap-2 border-t border-border pt-3">
                       <button
                         onClick={() => updateItemQuantity(index, maxCantidad)}
-                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+                        className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground/85"
                       >
                         Recibir todo ({maxCantidad})
                       </button>
                       <button
                         onClick={() => updateItemQuantity(index, 0)}
-                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
+                        className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground/85"
                       >
                         Limpiar
                       </button>
@@ -632,11 +636,11 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             </div>
 
             {/* Summary */}
-            <div className="mt-6 flex items-center justify-between rounded-lg bg-blue-50 p-4">
-              <span className="text-sm font-semibold text-blue-700">
+            <div className="mt-6 flex items-center justify-between rounded-lg bg-primary/10 border border-primary/20 p-4">
+              <span className="text-sm font-semibold text-primary">
                 Total de items a recibir:
               </span>
-              <span className="text-2xl font-bold text-blue-600">
+              <span className="text-2xl font-bold text-primary">
                 {getTotalItems()}
               </span>
             </div>
@@ -645,7 +649,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
         {currentStep === 2 && (
           <div>
-            <h3 className="mb-6 text-base font-semibold text-slate-950">
+            <h3 className="mb-6 text-base font-semibold text-foreground">
               Evaluación de Calidad
             </h3>
 
@@ -656,14 +660,14 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                 return (
                   <div
                     key={item.detalle_id}
-                    className="rounded-lg border border-slate-200 bg-white p-4"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     <div className="mb-4 flex items-start justify-between gap-4">
                       <div>
-                        <div className="mb-1 text-sm font-semibold text-slate-950">
+                        <div className="mb-1 text-sm font-semibold text-foreground">
                           {item.producto_nombre}
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-muted-foreground">
                           Cantidad a recibir: {item.cantidad_recibir}
                         </div>
                       </div>
@@ -682,7 +686,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         onClick={() => updateItemCalidad(originalIndex, 'OK')}
                         className={cn(
                           'flex items-center justify-center gap-2 rounded-md border px-3 py-3 text-sm font-semibold transition',
-                          item.calidad === 'OK' ? qualityClass.OK : 'border-slate-300 bg-white text-slate-700'
+                          item.calidad === 'OK' ? qualityClass.OK : 'border-border bg-card text-foreground/85'
                         )}
                       >
                         <CheckCircle size={16} />
@@ -692,7 +696,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         onClick={() => updateItemCalidad(originalIndex, 'OBSERVADO')}
                         className={cn(
                           'flex items-center justify-center gap-2 rounded-md border px-3 py-3 text-sm font-semibold transition',
-                          item.calidad === 'OBSERVADO' ? qualityClass.OBSERVADO : 'border-slate-300 bg-white text-slate-700'
+                          item.calidad === 'OBSERVADO' ? qualityClass.OBSERVADO : 'border-border bg-card text-foreground/85'
                         )}
                       >
                         <AlertCircle size={16} />
@@ -702,7 +706,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         onClick={() => updateItemCalidad(originalIndex, 'RECHAZADO')}
                         className={cn(
                           'flex items-center justify-center gap-2 rounded-md border px-3 py-3 text-sm font-semibold transition',
-                          item.calidad === 'RECHAZADO' ? qualityClass.RECHAZADO : 'border-slate-300 bg-white text-slate-700'
+                          item.calidad === 'RECHAZADO' ? qualityClass.RECHAZADO : 'border-border bg-card text-foreground/85'
                         )}
                       >
                         <XCircle size={16} />
@@ -713,7 +717,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                     {/* Observations */}
                     {(item.calidad === 'OBSERVADO' || item.calidad === 'RECHAZADO') && (
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-slate-700">
+                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
                           Observaciones {item.calidad === 'RECHAZADO' && '(requerido)'}
                         </label>
                         <textarea
@@ -734,7 +738,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
         {currentStep === 3 && (
           <div>
-            <h3 className="mb-6 text-base font-semibold text-slate-950">
+            <h3 className="mb-6 text-base font-semibold text-foreground">
               Asignar Almacén, Ubicación, Lotes y Series
             </h3>
 
@@ -745,14 +749,14 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                 return (
                   <div
                     key={item.detalle_id}
-                    className="rounded-lg border border-slate-200 bg-white p-4"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     <div className="mb-4 flex items-start justify-between gap-4">
                       <div>
-                        <div className="mb-1 text-sm font-semibold text-slate-950">
+                        <div className="mb-1 text-sm font-semibold text-foreground">
                           {item.producto_nombre}
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-muted-foreground">
                           Cantidad a recibir: {item.cantidad_recibir}
                         </div>
                       </div>
@@ -762,8 +766,8 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                     <div className="mb-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                       {/* Almacén */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-slate-700">
-                          Almacén <span className="text-slate-500">*</span>
+                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
+                          Almacén <span className="text-muted-foreground">*</span>
                         </label>
                         <select
                           value={item.almacen_id || ''}
@@ -781,7 +785,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
                       {/* Ubicación */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-slate-700">
+                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
                           Ubicación
                         </label>
                         <select
@@ -804,7 +808,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                     <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                       {/* Lote */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-slate-700">
+                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
                           Número de Lote
                         </label>
                         <input
@@ -818,7 +822,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
                       {/* Serie */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-slate-700">
+                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
                           Número de Serie
                         </label>
                         <input
@@ -832,7 +836,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
                       {/* Fecha Expiración */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-slate-700">
+                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
                           Fecha de Expiración
                         </label>
                         <input
@@ -845,7 +849,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                     </div>
 
                     {/* Info Note */}
-                    <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-3 text-xs text-blue-800">
+                    <div className="mt-3 rounded-md border border-blue-300 bg-primary/10 p-3 text-xs text-primary">
                       <strong>Nota:</strong> El almacén es obligatorio. Los campos de ubicación, lote y serie son opcionales. Complete solo si aplica para este producto.
                     </div>
                   </div>
@@ -857,84 +861,84 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
         {currentStep === 4 && (
           <div>
-            <h3 className="mb-6 text-base font-semibold text-slate-950">
+            <h3 className="mb-6 text-base font-semibold text-foreground">
               Confirmar Recepción
             </h3>
 
             {/* Summary Cards */}
             <div className="mb-6 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
-              <div className="rounded-lg border border-blue-300 bg-blue-50 p-4">
-                <div className="mb-2 text-xs text-blue-700">
+              <div className="rounded-lg border border-blue-400/30 bg-blue-500/15 p-4 group-data-[erp-theme=light]/dashboard:border-blue-300 group-data-[erp-theme=light]/dashboard:bg-blue-50">
+                <div className="mb-2 text-xs text-primary">
                   Total Items
                 </div>
-                <div className="text-3xl font-bold text-blue-700">
+                <div className="text-3xl font-bold text-primary">
                   {getTotalItems()}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-cyan-300 bg-cyan-50 p-4">
-                <div className="mb-2 text-xs text-cyan-700">
+              <div className="rounded-lg border border-cyan-400/30 bg-cyan-500/15 p-4 group-data-[erp-theme=light]/dashboard:border-cyan-300 group-data-[erp-theme=light]/dashboard:bg-cyan-50">
+                <div className="mb-2 text-xs text-primary">
                   OK
                 </div>
-                <div className="text-3xl font-bold text-cyan-700">
+                <div className="text-3xl font-bold text-primary">
                   {items.filter(i => i.cantidad_recibir > 0 && i.calidad === 'OK').reduce((sum, i) => sum + i.cantidad_recibir, 0)}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-300 bg-slate-50 p-4">
-                <div className="mb-2 text-xs text-slate-600">
+              <div className="rounded-lg border border-border/30 bg-muted/35 p-4 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30">
+                <div className="mb-2 text-xs text-foreground/80">
                   Observados
                 </div>
-                <div className="text-3xl font-bold text-slate-700">
+                <div className="text-3xl font-bold text-foreground/85">
                   {items.filter(i => i.cantidad_recibir > 0 && i.calidad === 'OBSERVADO').reduce((sum, i) => sum + i.cantidad_recibir, 0)}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-400 bg-slate-100 p-4">
-                <div className="mb-2 text-xs text-slate-700">
+              <div className="rounded-lg border border-border/40 bg-muted/60 p-4 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted">
+                <div className="mb-2 text-xs text-foreground/85">
                   Rechazados
                 </div>
-                <div className="text-3xl font-bold text-slate-800">
+                <div className="text-3xl font-bold text-foreground">
                   {items.filter(i => i.cantidad_recibir > 0 && i.calidad === 'RECHAZADO').reduce((sum, i) => sum + i.cantidad_recibir, 0)}
                 </div>
               </div>
             </div>
 
             {/* Items Detail */}
-            <div className="overflow-hidden rounded-lg border border-slate-200">
+            <div className="overflow-hidden rounded-lg border border-border">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="bg-slate-50">
-                    <th className="border-b border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  <tr className="bg-card/85 group-data-[erp-theme=light]/dashboard:bg-muted/30">
+                    <th className="border-b border-border px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Producto
                     </th>
-                    <th className="border-b border-slate-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="border-b border-border px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Cantidad
                     </th>
-                    <th className="border-b border-slate-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="border-b border-border px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Calidad
                     </th>
-                    <th className="border-b border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="border-b border-border px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Almacén/Ubicación/Lote
                     </th>
-                    <th className="border-b border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="border-b border-border px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Observaciones
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.filter(item => item.cantidad_recibir > 0).map((item) => (
-                    <tr key={item.detalle_id} className="border-b border-slate-200 last:border-b-0">
+                    <tr key={item.detalle_id} className="border-b border-border last:border-b-0">
                       <td className="px-3 py-3">
-                        <div className="text-sm font-semibold text-slate-950">
+                        <div className="text-sm font-semibold text-foreground">
                           {item.producto_nombre}
                         </div>
-                        <div className="font-mono text-xs text-slate-500">
+                        <div className="font-mono text-xs text-muted-foreground">
                           {item.producto_codigo}
                         </div>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <span className="text-lg font-bold text-blue-700">
+                        <span className="text-lg font-bold text-primary">
                           {item.cantidad_recibir}
                         </span>
                       </td>
@@ -948,7 +952,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="text-xs text-slate-700">
+                        <div className="text-xs text-foreground/85">
                           {item.almacen_id && (
                             <div>
                               <strong>Almacén:</strong> {almacenes.find(a => a.id === item.almacen_id)?.nombre || item.almacen_id}
@@ -978,7 +982,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         </div>
                       </td>
                       <td className="px-3 py-3">
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-muted-foreground">
                           {item.observaciones || '-'}
                         </span>
                       </td>
@@ -992,11 +996,11 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       </div>
 
       {/* Navigation Buttons */}
-      <div className="mt-8 flex justify-between border-t border-slate-200 pt-6">
+      <div className="mt-8 flex justify-between border-t border-border pt-6">
         <button
           onClick={currentStep === 1 ? onCancel : handleBack}
           disabled={submitting}
-          className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground/85 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronLeft size={16} />
           {currentStep === 1 ? 'Cancelar' : 'Anterior'}
@@ -1025,7 +1029,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             >
               {submitting ? (
                 <>
-                  <div className="loading-spinner size-4"></div>
+                  <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary size-4"></div>
                   Procesando...
                 </>
               ) : (

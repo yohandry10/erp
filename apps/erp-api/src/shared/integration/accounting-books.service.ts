@@ -99,7 +99,7 @@ export class AccountingBooksService {
             concepto,
             referencia
           ),
-          plan_cuentas!fk_detalle_asientos_cuenta_id(
+          plan_cuentas!fk_detalle_asientos_cuenta_id!inner(
             codigo,
             nombre
           )
@@ -387,13 +387,13 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables!fk_detalle_asientos_asiento_id(
+          asientos_contables!fk_detalle_asientos_asiento_id!inner(
             fecha,
             numero_asiento,
             concepto,
             referencia
           ),
-          plan_cuentas!fk_detalle_asientos_cuenta_id(
+          plan_cuentas!fk_detalle_asientos_cuenta_id!inner(
             codigo,
             nombre
           )
@@ -446,12 +446,12 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables!fk_detalle_asientos_asiento_id(
+          asientos_contables!fk_detalle_asientos_asiento_id!inner(
             fecha,
             numero_asiento,
             concepto
           ),
-          plan_cuentas!fk_detalle_asientos_cuenta_id(
+          plan_cuentas!fk_detalle_asientos_cuenta_id!inner(
             codigo,
             nombre
           )
@@ -508,8 +508,8 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento),
-          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
+          asientos_contables!fk_detalle_asientos_asiento_id!inner(fecha, concepto, numero_asiento),
+          plan_cuentas!fk_detalle_asientos_cuenta_id!inner(codigo, nombre)
         `,
         )
         .like('plan_cuentas.codigo', '33%')
@@ -540,8 +540,8 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento),
-          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
+          asientos_contables!fk_detalle_asientos_asiento_id!inner(fecha, concepto, numero_asiento),
+          plan_cuentas!fk_detalle_asientos_cuenta_id!inner(codigo, nombre)
         `,
         )
         .like('plan_cuentas.codigo', '62%')
@@ -572,8 +572,8 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento, referencia),
-          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
+          asientos_contables!fk_detalle_asientos_asiento_id!inner(fecha, concepto, numero_asiento, referencia),
+          plan_cuentas!fk_detalle_asientos_cuenta_id!inner(codigo, nombre)
         `,
         )
         .like('plan_cuentas.codigo', '9%')
@@ -637,8 +637,8 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento),
-          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
+          asientos_contables!fk_detalle_asientos_asiento_id!inner(fecha, concepto, numero_asiento),
+          plan_cuentas!fk_detalle_asientos_cuenta_id!inner(codigo, nombre)
         `,
         )
         .like('plan_cuentas.codigo', '70%')
@@ -663,27 +663,54 @@ export class AccountingBooksService {
       const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
+      // El Registro de Compras SUNAT es a nivel de comprobante → se lee de la tabla
+      // `compras` (facturas/OC recibidas), NO de líneas de asiento. Antes filtraba
+      // clase 60 sobre detalle_asientos, pero las compras postean a clase 20
+      // (Mercaderías) → siempre daba 0.
       let query = this.supabase
         .getClient()
-        .from('detalle_asientos')
+        .from('compras')
         .select(
           `
-          *,
-          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento),
-          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
+          fecha, tipo_documento, numero_documento, subtotal, igv, total, moneda, estado,
+          proveedores!fk_compras_proveedor_id(razon_social, nombre, ruc, numero_documento)
         `,
         )
-        .like('plan_cuentas.codigo', '60%')
         .eq('tenant_id', tenantId)
-        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
+        .not('estado', 'in', '("ANULADA","ANULADO","CANCELADA","CANCELADO")')
+        .order('fecha', { ascending: true });
 
-      if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
-      if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
+      if (fechaDesde) query = query.gte('fecha', fechaDesde);
+      if (fechaHasta) query = query.lte('fecha', fechaHasta);
 
-      const { data: movimientos, error } = await query;
+      const { data, error } = await query;
       if (error) throw error;
 
-      return movimientos || [];
+      const compras = (data || []).map((c: any) => ({
+        fecha: c.fecha,
+        tipoDocumento: c.tipo_documento,
+        numeroDocumento: c.numero_documento,
+        razonSocialProveedor:
+          c.proveedores?.razon_social || c.proveedores?.nombre || 'Proveedor no especificado',
+        rucProveedor: c.proveedores?.ruc || c.proveedores?.numero_documento || '',
+        baseImponible: Number(c.subtotal || 0),
+        igv: Number(c.igv || 0),
+        importeTotal: Number(c.total || 0),
+        moneda: c.moneda || 'PEN',
+      }));
+
+      const r2 = (n: number) => Math.round(n * 100) / 100;
+      const resumen = compras.reduce(
+        (acc, c) => {
+          acc.baseImponible = r2(acc.baseImponible + c.baseImponible);
+          acc.igv = r2(acc.igv + c.igv);
+          acc.total = r2(acc.total + c.importeTotal);
+          return acc;
+        },
+        { cantidadComprobantes: compras.length, baseImponible: 0, igv: 0, total: 0 },
+      );
+
+      return { resumen, compras, total: compras.length };
     } catch (error) {
       console.error('Error obteniendo registro de compras:', error);
       throw error;

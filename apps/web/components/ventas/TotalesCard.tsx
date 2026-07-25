@@ -58,33 +58,33 @@ export default function TotalesCard({
   }
 
   return (
-    <div className={`bg-gray-50 border border-gray-200 rounded-lg p-4 ${className}`}>
+    <div className={`bg-muted/30 border border-border rounded-lg p-4 ${className}`}>
       <div className="flex items-center gap-2 mb-3">
-        <Calculator className="w-5 h-5 text-gray-600" />
-        <h3 className="font-semibold text-gray-900">Totales</h3>
+        <Calculator className="w-5 h-5 text-foreground/80" />
+        <h3 className="font-semibold text-foreground">Totales</h3>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">Subtotal:</span>
-          <span className="font-medium text-gray-900">
+          <span className="text-foreground/80">Subtotal:</span>
+          <span className="font-medium text-foreground">
             {formatCurrency(subtotal)}
           </span>
         </div>
 
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">
+          <span className="text-foreground/80">
             IGV ({Math.round(effectiveIgvRate * 100)}%):
           </span>
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-foreground">
             {formatCurrency(igv)}
           </span>
         </div>
 
-        <div className="pt-2 border-t border-gray-300">
+        <div className="pt-2 border-t border-border">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-gray-900">Total:</span>
-            <span className="font-bold text-xl text-blue-600">
+            <span className="font-semibold text-foreground">Total:</span>
+            <span className="font-bold text-xl text-primary">
               {formatCurrency(total)}
             </span>
           </div>

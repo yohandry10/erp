@@ -39,7 +39,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
   const { get, post } = useApi()
   const [loading, setLoading] = useState(false)
   const [clientes, setClientes] = useState<Cliente[]>([])
-  
+
   const [formData, setFormData] = useState({
     cliente_id: '',
     fecha_cotizacion: new Date().toISOString().split('T')[0],
@@ -78,22 +78,22 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
       console.error('⚠️ Error cargando clientes desde API, usando datos de ejemplo:', error)
       // Usar UUIDs válidos para datos de ejemplo
       setClientes([
-        { 
-          id: '550e8400-e29b-41d4-a716-446655440010', 
+        {
+          id: '550e8400-e29b-41d4-a716-446655440010',
           razon_social: 'Juan Carlos García López',
           nombre_comercial: 'Juan García',
           numero_documento: '12345678',
           tipo_documento: 'DNI'
         },
-        { 
-          id: '550e8400-e29b-41d4-a716-446655440011', 
+        {
+          id: '550e8400-e29b-41d4-a716-446655440011',
           razon_social: 'María Elena Rodríguez Silva',
           nombre_comercial: 'María Rodríguez',
           numero_documento: '87654321',
           tipo_documento: 'DNI'
         },
-        { 
-          id: '550e8400-e29b-41d4-a716-446655440012', 
+        {
+          id: '550e8400-e29b-41d4-a716-446655440012',
           razon_social: 'Empresa Demo S.A.C.',
           nombre_comercial: 'Empresa Demo',
           numero_documento: '20123456789',
@@ -117,12 +117,12 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
   const handleDetalleChange = (index: number, field: string, value: any) => {
     const nuevosDetalles = [...detalles]
     nuevosDetalles[index] = { ...nuevosDetalles[index], [field]: value }
-    
+
     if (field === 'cantidad' || field === 'precio_unitario' || field === 'descuento') {
       const detalle = nuevosDetalles[index]
       detalle.total = (detalle.cantidad * detalle.precio_unitario) - detalle.descuento
     }
-    
+
     setDetalles(nuevosDetalles)
     calcularTotales(nuevosDetalles)
   }
@@ -175,7 +175,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
 
       if (!formData.vendedor.trim()) {
         toast({
-          title: "Error", 
+          title: "Error",
           description: "Ingresa el nombre del vendedor",
           variant: "destructive",
         })
@@ -256,37 +256,37 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
         }
       }}
     >
-      <div className="bg-white rounded-2 w-[90%] max-w-[1200px] overflow-auto shadow relative"
+      <div className="bg-card rounded-lg w-[90%] max-w-[1200px] overflow-auto shadow relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="bg-blue-600 text-white p-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-5 font-semibold m-0">Nueva Cotización</h2>
-            <button 
-              onClick={handleClose} className="border-0 text-white text-6 font-bold cursor-pointer p-0 w-[30px] h-[30px] flex items-center justify-center"
+            <h2 className="text-xl font-semibold m-0">Nueva Cotización</h2>
+            <button
+              onClick={handleClose} className="border-0 text-white text-2xl font-bold cursor-pointer p-0 w-[30px] h-[30px] flex items-center justify-center"
             >
               ×
             </button>
           </div>
         </div>
-        
+
         {/* Body */}
         <div className="p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             {/* Datos de la Cotización */}
-            <div className="bg-[#f9fafb] p-4 rounded-2">
-              <h3 className="text-[18px] font-semibold text-gray-700 mb-4 mt-0">
+            <div className="bg-muted p-4 rounded-lg">
+              <h3 className="text-[18px] font-semibold text-foreground/85 mb-4 mt-0">
                 Datos de la Cotización
               </h3>
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4">
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Cliente *
                   </label>
                   <select
                     value={formData.cliente_id}
-                    onChange={(e) => handleInputChange('cliente_id', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                    onChange={(e) => handleInputChange('cliente_id', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
                     required
                   >
                     <option value="">Seleccionar cliente</option>
@@ -299,25 +299,25 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                 </div>
 
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Vendedor *
                   </label>
                   <input
                     type="text"
                     value={formData.vendedor}
-                    onChange={(e) => handleInputChange('vendedor', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                    onChange={(e) => handleInputChange('vendedor', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
                     placeholder="Nombre del vendedor"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Moneda
                   </label>
                   <select
                     value={formData.moneda}
-                    onChange={(e) => handleInputChange('moneda', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                    onChange={(e) => handleInputChange('moneda', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
                   >
                     <option value="PEN">PEN - Soles</option>
                     <option value="USD">USD - Dólares</option>
@@ -325,29 +325,29 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                 </div>
 
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Fecha Cotización
                   </label>
                   <input
                     type="date"
                     value={formData.fecha_cotizacion}
-                    onChange={(e) => handleInputChange('fecha_cotizacion', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                    onChange={(e) => handleInputChange('fecha_cotizacion', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Fecha Vencimiento
                   </label>
                   <input
                     type="date"
                     value={formData.fecha_vencimiento}
-                    onChange={(e) => handleInputChange('fecha_vencimiento', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                    onChange={(e) => handleInputChange('fecha_vencimiento', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">
+                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Probabilidad (%)
                   </label>
                   <input
@@ -355,28 +355,28 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                     min="0"
                     max="100"
                     value={formData.probabilidad}
-                    onChange={(e) => handleInputChange('probabilidad', parseInt(e.target.value))} className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                    onChange={(e) => handleInputChange('probabilidad', parseInt(e.target.value))} className="w-[100%] p-2 border rounded-[4px] text-sm"
                   />
                 </div>
               </div>
             </div>
 
             {/* Detalle de Items */}
-            <div className="bg-[#f9fafb] p-4 rounded-2">
+            <div className="bg-muted p-4 rounded-lg">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[18px] font-semibold text-gray-700 m-0">
+                <h3 className="text-[18px] font-semibold text-foreground/85 m-0">
                   Detalle de Items
                 </h3>
                 <button
                   type="button"
-                  onClick={agregarDetalle} className="bg-[#10b981] text-white py-[4px] px-3 rounded-[4px] text-3.5 border-0 cursor-pointer"
+                  onClick={agregarDetalle} className="bg-[#10b981] text-white py-[4px] px-3 rounded-[4px] text-sm border-0 cursor-pointer"
                 >
                   + Agregar Item
                 </button>
               </div>
 
-              <div className="bg-white rounded-[4px] border">
-                <div className="grid grid-cols-[1fr_2fr_80px_100px_80px_80px_40px] gap-2 p-2 bg-[#f3f4f6] text-3.5 font-medium text-gray-700 border-b">
+              <div className="bg-card rounded-[4px] border">
+                <div className="grid grid-cols-[1fr_2fr_80px_100px_80px_80px_40px] gap-2 p-2 bg-muted text-sm font-medium text-foreground/85 border-b">
                   <div>Código</div>
                   <div>Descripción *</div>
                   <div>Cantidad *</div>
@@ -385,19 +385,19 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                   <div>Total</div>
                   <div></div>
                 </div>
-                
+
                 {detalles.map((detalle, index) => (
                   <div key={index} className="grid grid-cols-[1fr_2fr_80px_100px_80px_80px_40px] gap-2 p-2 items-center">
                     <input
                       type="text"
                       value={detalle.codigo}
-                      onChange={(e) => handleDetalleChange(index, 'codigo', e.target.value)} className="w-[100%] p-[4px] border rounded-[2px] text-3"
+                      onChange={(e) => handleDetalleChange(index, 'codigo', e.target.value)} className="w-[100%] p-[4px] border rounded-[2px] text-xs"
                       placeholder="Código"
                     />
                     <input
                       type="text"
                       value={detalle.descripcion}
-                      onChange={(e) => handleDetalleChange(index, 'descripcion', e.target.value)} className="w-[100%] p-[4px] border rounded-[2px] text-3"
+                      onChange={(e) => handleDetalleChange(index, 'descripcion', e.target.value)} className="w-[100%] p-[4px] border rounded-[2px] text-xs"
                       placeholder="Descripción del producto/servicio"
                       required
                     />
@@ -405,7 +405,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                       type="number"
                       min="1"
                       value={detalle.cantidad}
-                      onChange={(e) => handleDetalleChange(index, 'cantidad', parseFloat(e.target.value))} className="w-[100%] p-[4px] border rounded-[2px] text-3 text-center"
+                      onChange={(e) => handleDetalleChange(index, 'cantidad', parseFloat(e.target.value))} className="w-[100%] p-[4px] border rounded-[2px] text-xs text-center"
                       required
                     />
                     <input
@@ -413,18 +413,18 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                       min="0"
                       step="0.01"
                       value={detalle.precio_unitario}
-                      onChange={(e) => handleDetalleChange(index, 'precio_unitario', parseFloat(e.target.value))} className="w-[100%] p-[4px] border rounded-[2px] text-3 text-right"
+                      onChange={(e) => handleDetalleChange(index, 'precio_unitario', parseFloat(e.target.value))} className="w-[100%] p-[4px] border rounded-[2px] text-xs text-right"
                       required
                     />
-                    <div className="text-center text-3">18%</div>
-                    <div className="text-right text-3 font-medium">
+                    <div className="text-center text-xs">18%</div>
+                    <div className="text-right text-xs font-medium">
                       {detalle.total.toFixed(2)}
                     </div>
                     <div className="text-center">
                       {detalles.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => eliminarDetalle(index)} className="border-0 text-red-500 text-4 font-bold cursor-pointer p-0 w-5 h-5 flex items-center justify-center"
+                          onClick={() => eliminarDetalle(index)} className="border-0 text-red-500 text-base font-bold cursor-pointer p-0 w-5 h-5 flex items-center justify-center"
                         >
                           ×
                         </button>
@@ -436,36 +436,36 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
             </div>
 
             {/* Resumen */}
-            <div className="bg-white p-4 rounded-2 border">
+            <div className="bg-card p-4 rounded-lg border">
               <div className="grid grid-cols-[1fr_300px] gap-6">
                 <div>
-                  <label className="block text-3.5 font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     Observaciones
                   </label>
                   <textarea
                     value={formData.observaciones}
                     onChange={(e) => handleInputChange('observaciones', e.target.value)}
-                    rows={4} className="w-[100%] p-2 border rounded-[4px] text-3.5"
+                    rows={4} className="w-[100%] p-2 border rounded-[4px] text-sm"
                     placeholder="Observaciones adicionales..."
                   />
                 </div>
 
-                <div className="bg-[#f9fafb] p-4 rounded-[4px]">
-                  <h4 className="text-3.5 font-medium text-gray-700 mb-3 mt-0">
+                <div className="bg-muted p-4 rounded-[4px]">
+                  <h4 className="text-sm font-medium text-foreground/85 mb-3 mt-0">
                     Resumen
                   </h4>
-                  <div className="flex flex-col gap-2 text-3.5">
+                  <div className="flex flex-col gap-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Subtotal:</span>
+                      <span className="text-muted-foreground">Subtotal:</span>
                       <span className="font-medium">S/ {formData.subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">IGV (18%):</span>
+                      <span className="text-muted-foreground">IGV (18%):</span>
                       <span className="font-medium">S/ {formData.igv.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between pt-2 border-t">
-                      <span className="font-semibold text-gray-700">Total:</span>
-                      <span className="font-bold text-[18px] text-emerald-600">
+                      <span className="font-semibold text-foreground/85">Total:</span>
+                      <span className="font-bold text-[18px] text-emerald-400">
                         S/ {formData.total.toFixed(2)}
                       </span>
                     </div>
@@ -475,17 +475,17 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
             </div>
 
             {/* Botones */}
-            <div className="bg-[#f9fafb] py-4 px-6 flex justify-end gap-3">
+            <div className="bg-muted py-4 px-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={handleClose} className="py-2 px-4 border bg-white text-gray-700 rounded-[4px] text-3.5 cursor-pointer"
+                onClick={handleClose} className="py-2 px-4 border bg-card text-foreground/85 rounded-[4px] text-sm cursor-pointer"
                 disabled={loading}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                disabled={loading} className="py-2 px-6 bg-blue-600 text-white border-0 rounded-[4px] text-3.5 font-medium"
+                disabled={loading} className="py-2 px-6 bg-blue-600 text-white border-0 rounded-[4px] text-sm font-medium"
               >
                 {loading ? 'Creando...' : 'Crear Cotización'}
               </button>
@@ -495,4 +495,4 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
       </div>
     </div>
   )
-} 
+}

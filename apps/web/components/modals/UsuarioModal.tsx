@@ -3,6 +3,19 @@
 import { useState, useEffect } from 'react'
 import { useToast } from "@/components/ui/use-toast"
 import { useApi } from '@/hooks/use-api'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Pencil, UserRound } from 'lucide-react'
 
 interface UsuarioModalProps {
   isOpen: boolean
@@ -92,7 +105,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       return
     }
@@ -110,7 +123,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
         ...(formData.password && !isEdit ? { password: formData.password } : {})
       }
 
-      const data = isEdit 
+      const data = isEdit
         ? await put(`/usuarios-sistema/${usuario.id}`, dataToSend)
         : await post('/usuarios-sistema/crear', dataToSend)
 
@@ -119,7 +132,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
           title: "✅ Éxito",
           description: data.message || `Usuario ${isEdit ? 'actualizado' : 'creado'} exitosamente`,
         })
-        
+
         onSuccess()
         onClose()
       } else {
@@ -143,7 +156,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
       ...prev,
       [field]: value
     }))
-    
+
     // Limpiar error del campo cuando el usuario empiece a escribir
     if (errors[field]) {
       setErrors((prev: any) => ({
@@ -153,205 +166,131 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
     }
   }
 
-  const getRoleColor = (rol: string) => {
-    switch (rol) {
-      case 'ADMIN': return '#8b5cf6'
-      case 'CONTADOR': return '#3b82f6'
-      case 'VENDEDOR': return '#10b981'
-      case 'ALMACENERO': return '#f59e0b'
-      default: return '#6b7280'
-    }
-  }
-
-  if (!isOpen) return null
-
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.6)] z-[10000] flex items-center justify-center p-5" onClick={onClose}>
-      <div className="bg-white rounded-3 p-6 w-[100%] max-w-[500px] overflow-auto shadow" onClick={(e) => e.stopPropagation()}>
-        
-        {/* Header */}
-        <div className="mb-6 relative">
-          <h2 className="text-6 font-semibold mb-2 text-gray-800 pr-10">
-            {isEdit ? '✏️ Editar Usuario' : '👤 Nuevo Usuario'}
-          </h2>
-          <p className="text-gray-500 text-3.5">
-            {isEdit 
-              ? 'Modifica la información del usuario del sistema.'
-              : 'Crea un nuevo usuario del sistema con sus permisos y rol correspondiente.'
-            }
-          </p>
-          
-          {/* Botón X de cerrar */}
-          <button
-            type="button"
-            aria-label="Cerrar modal de usuario"
-            title="Cerrar modal de usuario"
-            onClick={onClose} className="absolute top-0 right-0 w-8 h-8 rounded-full bg-red-500 border-0 text-white text-[18px] font-bold cursor-pointer flex items-center justify-center transition z-[1]"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#dc2626';
-              e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ef4444';
-              e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            ×
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !loading && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[540px]">
+        <DialogHeader className="pr-8">
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            {isEdit ? <Pencil className="h-5 w-5 text-primary" /> : <UserRound className="h-5 w-5 text-primary" />}
+            {isEdit ? 'Editar usuario' : 'Nuevo usuario'}
+          </DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? 'Modifica la información y el acceso operativo del usuario.'
+              : 'Crea un usuario y asigna el rol que define sus permisos en el ERP.'}
+          </DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          {/* Nombre */}
-          <div className="mb-5">
-            <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
-              Nombre Completo <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <div className="space-y-2">
+            <Label htmlFor="usuario-nombre">Nombre completo <span className="text-destructive">*</span></Label>
+            <Input
+              id="usuario-nombre"
               value={formData.nombre}
               onChange={(e) => handleInputChange('nombre', e.target.value)}
-              placeholder="Ej: Juan Carlos García" className="w-[100%] p-3 rounded-2 text-3.5 transition"
+              placeholder="Ej. Juan Carlos García"
+              aria-invalid={!!errors.nombre}
+              aria-describedby={errors.nombre ? 'usuario-nombre-error' : undefined}
             />
-            {errors.nombre && (
-              <p className="text-3 text-red-500 mt-[4px]">
-                {errors.nombre}
-              </p>
-            )}
+            {errors.nombre && <p id="usuario-nombre-error" className="text-xs text-destructive">{errors.nombre}</p>}
           </div>
 
-          {/* Email */}
-          <div className="mb-5">
-            <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
-              Email <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              placeholder="Ej: juan.garcia@empresa.com" className="w-[100%] p-3 rounded-2 text-3.5 transition"
-            />
-            {errors.email && (
-              <p className="text-3 text-red-500 mt-[4px]">
-                {errors.email}
-              </p>
-            )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="usuario-email">Email <span className="text-destructive">*</span></Label>
+              <Input
+                id="usuario-email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="usuario@empresa.com"
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? 'usuario-email-error' : undefined}
+              />
+              {errors.email && <p id="usuario-email-error" className="text-xs text-destructive">{errors.email}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="usuario-telefono">Teléfono</Label>
+              <Input
+                id="usuario-telefono"
+                inputMode="tel"
+                value={formData.telefono}
+                onChange={(e) => handleInputChange('telefono', e.target.value)}
+                placeholder="987654321"
+              />
+            </div>
           </div>
 
-          {/* Teléfono */}
-          <div className="mb-5">
-            <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
-              Teléfono
-            </label>
-            <input
-              type="text"
-              value={formData.telefono}
-              onChange={(e) => handleInputChange('telefono', e.target.value)}
-              placeholder="Ej: 987654321" className="w-[100%] p-3 border rounded-2 text-3.5 transition"
-            />
-          </div>
-
-          {/* Contraseña - Solo en creación */}
           {!isEdit && (
-            <>
-              <div className="mb-5">
-                <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
-                  Contraseña <span className="text-red-500">*</span>
-                </label>
-                <input
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="usuario-password">Contraseña <span className="text-destructive">*</span></Label>
+                <Input
+                  id="usuario-password"
                   type="password"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  placeholder="Mínimo 8 caracteres" className="w-[100%] p-3 rounded-2 text-3.5 transition"
+                  placeholder="Mínimo 8 caracteres"
+                  aria-invalid={!!errors.password}
+                  aria-describedby={errors.password ? 'usuario-password-error' : 'usuario-password-help'}
                 />
-                {errors.password && (
-                  <p className="text-3 text-red-500 mt-[4px]">
-                    {errors.password}
-                  </p>
-                )}
-                <p className="text-[11px] text-gray-500 mt-[4px]">
-                  Debe incluir mayúscula, minúscula y número
-                </p>
+                {errors.password
+                  ? <p id="usuario-password-error" className="text-xs text-destructive">{errors.password}</p>
+                  : <p id="usuario-password-help" className="text-xs text-muted-foreground">Mayúscula, minúscula y número.</p>}
               </div>
-
-              <div className="mb-5">
-                <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
-                  Confirmar Contraseña <span className="text-red-500">*</span>
-                </label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="usuario-confirmacion">Confirmar contraseña <span className="text-destructive">*</span></Label>
+                <Input
+                  id="usuario-confirmacion"
                   type="password"
                   value={formData.confirmarPassword}
                   onChange={(e) => handleInputChange('confirmarPassword', e.target.value)}
-                  placeholder="Repite la contraseña" className="w-[100%] p-3 rounded-2 text-3.5 transition"
+                  placeholder="Repite la contraseña"
+                  aria-invalid={!!errors.confirmarPassword}
+                  aria-describedby={errors.confirmarPassword ? 'usuario-confirmacion-error' : undefined}
                 />
-                {errors.confirmarPassword && (
-                  <p className="text-3 text-red-500 mt-[4px]">
-                    {errors.confirmarPassword}
-                  </p>
-                )}
+                {errors.confirmarPassword && <p id="usuario-confirmacion-error" className="text-xs text-destructive">{errors.confirmarPassword}</p>}
               </div>
-            </>
-          )}
-
-          {/* Rol */}
-          <div className="mb-5">
-            <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
-              Rol <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.rol_id}
-              onChange={(e) => handleInputChange('rol_id', e.target.value)} className="w-[100%] p-3 rounded-2 text-3.5 bg-white cursor-pointer"
-            >
-              <option value="">Seleccionar rol</option>
-              {roles.map((rol) => (
-                <option key={rol.id} value={rol.id}>
-                  {rol.nombre} - {rol.descripcion}
-                </option>
-              ))}
-            </select>
-            {errors.rol_id && (
-              <p className="text-3 text-red-500 mt-[4px]">
-                {errors.rol_id}
-              </p>
-            )}
-          </div>
-
-          {/* Estado - Solo en edición */}
-          {isEdit && (
-            <div className="mb-5">
-              <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
-                Estado
-              </label>
-              <select
-                value={formData.estado}
-                onChange={(e) => handleInputChange('estado', e.target.value)} className="w-[100%] p-3 border rounded-2 text-3.5 bg-white cursor-pointer"
-              >
-                <option value="ACTIVO">Activo</option>
-                <option value="INACTIVO">Inactivo</option>
-                <option value="SUSPENDIDO">Suspendido</option>
-              </select>
             </div>
           )}
 
-          {/* Botones */}
-          <div className="flex gap-3 justify-end pt-4 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading} className="py-3 px-6 border rounded-2 bg-white text-gray-700 text-3.5 font-medium cursor-pointer transition"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading} className="py-3 px-6 border-0 rounded-2 text-white text-3.5 font-medium transition min-w-[120px]"
-            >
-              {loading ? 'Guardando...' : (isEdit ? 'Actualizar' : 'Crear Usuario')}
-            </button>
+          <div className="space-y-2">
+            <Label htmlFor="usuario-rol">Rol <span className="text-destructive">*</span></Label>
+            <Select value={formData.rol_id} onValueChange={(value) => handleInputChange('rol_id', value)}>
+              <SelectTrigger id="usuario-rol" aria-invalid={!!errors.rol_id} aria-describedby={errors.rol_id ? 'usuario-rol-error' : undefined}>
+                <SelectValue placeholder="Seleccionar rol" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((rol) => (
+                  <SelectItem key={rol.id} value={rol.id}>{rol.nombre} — {rol.descripcion}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.rol_id && <p id="usuario-rol-error" className="text-xs text-destructive">{errors.rol_id}</p>}
           </div>
+
+          {isEdit && (
+            <div className="space-y-2">
+              <Label htmlFor="usuario-estado">Estado</Label>
+              <Select value={formData.estado} onValueChange={(value) => handleInputChange('estado', value)}>
+                <SelectTrigger id="usuario-estado"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVO">Activo</SelectItem>
+                  <SelectItem value="INACTIVO">Inactivo</SelectItem>
+                  <SelectItem value="SUSPENDIDO">Suspendido</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <DialogFooter className="border-t border-border pt-4">
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancelar</Button>
+            <Button type="submit" disabled={loading} className="min-w-32">
+              {loading ? 'Guardando…' : (isEdit ? 'Actualizar usuario' : 'Crear usuario')}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

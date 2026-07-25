@@ -27,8 +27,8 @@ export function ConfigurationModal({ isOpen, onClose, missingItems }: Configurat
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[500px]">
         <DialogHeader>
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
-            <AlertTriangle className="h-8 w-8 text-blue-600" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <AlertTriangle className="h-8 w-8 text-primary" />
           </div>
           <DialogTitle className="text-center text-2xl">
             Configuración Incompleta
@@ -38,11 +38,11 @@ export function ConfigurationModal({ isOpen, onClose, missingItems }: Configurat
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="rounded-lg border border-blue-200 bg-primary/10 p-4">
           <p className="mb-2 text-sm font-semibold text-blue-950">
             Elementos faltantes:
           </p>
-          <ul className="m-0 list-disc pl-6 text-sm text-blue-800">
+          <ul className="m-0 list-disc pl-6 text-sm text-primary">
             {missingItems.map((item, index) => (
               <li key={index} className="mb-1">
                 {item}

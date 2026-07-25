@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
+import PDFDocument from 'pdfkit';
 
 @Injectable()
 export class RrhhService {
@@ -253,6 +254,12 @@ export class RrhhService {
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
+    // Validación mínima (el endpoint recibe `any`): evita vacantes vacías/basura.
+    const titulo = (vacanteData?.titulo ?? '').toString().trim();
+    const puesto = (vacanteData?.puesto_solicitado ?? '').toString().trim();
+    if (!titulo || !puesto) {
+      throw new BadRequestException('La vacante requiere al menos un título y el puesto solicitado');
+    }
     const currentTenantId = tenantId;
 
     const { data, error } = await this.supabaseService
@@ -295,12 +302,26 @@ export class RrhhService {
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
+    // El endpoint recibe `any` (sin DTO), así que la validación mínima de identidad
+    // vive aquí para no insertar candidatos vacíos/basura en la tabla.
+    const nombres = (candidatoData?.nombres ?? '').toString().trim();
+    const apellidos = (candidatoData?.apellidos ?? '').toString().trim();
+    if (!nombres || !apellidos) {
+      throw new BadRequestException('El candidato requiere al menos nombres y apellidos');
+    }
     const currentTenantId = tenantId;
+
+    // Postgres rechaza '' en columnas date/numeric. El modal envía '' en campos
+    // opcionales (fecha_nacimiento, etc.) → se normalizan a null antes de insertar,
+    // evitando el 500 "invalid input syntax for type date".
+    const sanitized = Object.fromEntries(
+      Object.entries(candidatoData ?? {}).map(([k, v]) => [k, v === '' ? null : v]),
+    );
 
     const { data, error } = await this.supabaseService
       .getClient()
       .from('candidatos')
-      .insert({ ...candidatoData, tenant_id: currentTenantId })
+      .insert({ ...sanitized, tenant_id: currentTenantId })
       .select();
 
     if (error) throw error;
@@ -1249,19 +1270,59 @@ export class RrhhService {
     return { success: true, data: data?.[0] };
   }
 
-  async generarComprobantePago(pagoId: string, tenantId?: string) {
-    // ✅ MULTI-TENANT: Validar tenant (aunque aquí no se usa aún)
+  async generarComprobantePago(pagoId: string, tenantId?: string): Promise<Buffer> {
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
 
-    // Aquí iría la lógica para generar PDF del comprobante
-    // Por ahora retornamos un placeholder
-    return {
-      success: true,
-      message: 'Generando comprobante...',
-      download_url: `/downloads/comprobante-${pagoId}.pdf`,
-    };
+    const client = this.supabaseService.getClient();
+    const { data: pago, error: pagoError } = await client
+      .from('rrhh_pagos')
+      .select('*')
+      .eq('id', pagoId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (pagoError) {
+      throw new BadRequestException(`No se pudo leer el pago: ${pagoError.message}`);
+    }
+    if (!pago) {
+      throw new NotFoundException('Pago de RRHH no encontrado');
+    }
+
+    let empleado: any = null;
+    if (pago.empleado_id) {
+      const { data } = await client
+        .from('empleados')
+        .select('*')
+        .eq('id', pago.empleado_id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      empleado = data;
+    }
+
+    return this.createRrhhPdf((doc) => {
+      const empleadoNombre = [empleado?.nombres, empleado?.apellidos].filter(Boolean).join(' ') || 'No consignado';
+      const documento = empleado?.numero_documento || empleado?.documento_numero || 'No consignado';
+      const montoNeto = Number(pago.monto_neto ?? pago.monto ?? pago.total_neto ?? 0);
+
+      doc.fontSize(20).text('COMPROBANTE DE PAGO RRHH', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(11);
+      doc.text(`Comprobante: ${pago.id}`);
+      doc.text(`Empleado: ${empleadoNombre}`);
+      doc.text(`Documento: ${documento}`);
+      doc.text(`Periodo: ${pago.periodo || 'No consignado'}`);
+      doc.text(`Fecha de pago: ${pago.fecha_pago || pago.created_at || 'No consignada'}`);
+      doc.text(`Método: ${pago.metodo_pago || pago.metodo || 'No consignado'}`);
+      doc.text(`Estado: ${pago.estado || 'No consignado'}`);
+      doc.moveDown();
+      doc.fontSize(14).text(`Monto neto: S/ ${montoNeto.toFixed(2)}`, { align: 'right' });
+      doc.moveDown(2);
+      doc.fontSize(9).fillColor('#555555').text(
+        'Documento generado por el ERP a partir del registro persistido del pago.',
+      );
+    });
   }
 
   async generarBoletaPago(empleadoId: string, mes: string, tenantId?: string) {
@@ -1637,19 +1698,78 @@ export class RrhhService {
     return { success: true, data: data?.[0] };
   }
 
-  async generarContratoPDF(contratoId: string, tenantId?: string) {
-    // ✅ MULTI-TENANT: Validar tenant (aunque aquí no se usa aún)
+  async generarContratoPDF(contratoId: string, tenantId?: string): Promise<Buffer> {
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
 
-    // Aquí iría la lógica para generar PDF del contrato
-    // Por ahora retornamos un placeholder
-    return {
-      success: true,
-      message: 'Generando contrato...',
-      download_url: `/downloads/contrato-${contratoId}.pdf`,
-    };
+    const client = this.supabaseService.getClient();
+    const { data: contrato, error: contratoError } = await client
+      .from('contratos')
+      .select('*')
+      .eq('id', contratoId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (contratoError) {
+      throw new BadRequestException(`No se pudo leer el contrato: ${contratoError.message}`);
+    }
+    if (!contrato) {
+      throw new NotFoundException('Contrato laboral no encontrado');
+    }
+
+    const empleadoId = contrato.empleado_id || contrato.id_empleado;
+    let empleado: any = null;
+    if (empleadoId) {
+      const { data } = await client
+        .from('empleados')
+        .select('*')
+        .eq('id', empleadoId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      empleado = data;
+    }
+
+    return this.createRrhhPdf((doc) => {
+      const empleadoNombre = [empleado?.nombres, empleado?.apellidos].filter(Boolean).join(' ') || 'No consignado';
+      const documento = empleado?.numero_documento || empleado?.documento_numero || 'No consignado';
+      const salario = Number(
+        contrato.sueldo_bruto ?? contrato.salario ?? contrato.sueldo ?? contrato.remuneracion ?? 0,
+      );
+
+      doc.fontSize(20).text('CONTRATO LABORAL', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(11);
+      doc.text(`Contrato: ${contrato.id}`);
+      doc.text(`Empleado: ${empleadoNombre}`);
+      doc.text(`Documento: ${documento}`);
+      doc.text(`Puesto: ${empleado?.puesto || contrato.puesto || 'No consignado'}`);
+      doc.text(`Tipo: ${contrato.tipo_contrato || contrato.tipo || 'No consignado'}`);
+      doc.text(`Inicio: ${contrato.fecha_inicio || 'No consignado'}`);
+      doc.text(`Fin: ${contrato.fecha_fin || 'Indefinido'}`);
+      doc.text(`Estado: ${contrato.estado || 'No consignado'}`);
+      doc.text(`Remuneración: S/ ${salario.toFixed(2)}`);
+      if (contrato.observaciones) {
+        doc.moveDown();
+        doc.text(`Observaciones: ${contrato.observaciones}`);
+      }
+      doc.moveDown(2);
+      doc.fontSize(9).fillColor('#555555').text(
+        'Representación generada desde el contrato persistido. La validez legal y firma corresponden al proceso laboral aplicable.',
+      );
+    });
+  }
+
+  private createRrhhPdf(render: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 56, info: { Creator: 'ERP RRHH' } });
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      render(doc);
+      doc.end();
+    });
   }
 
   // ===== ASISTENCIAS MEJORADAS =====

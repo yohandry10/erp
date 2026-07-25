@@ -1,136 +1,100 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useApi } from '@/hooks/use-api'
-import { toast } from '@/components/ui/use-toast'
-import { Truck, AlertTriangle, X } from 'lucide-react'
+import { useState } from "react";
+import { useApi } from "@/hooks/use-api";
+import { toast } from "@/components/ui/use-toast";
+import { Truck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface ConfirmarDespachoButtonProps {
-  pedidoId: string
-  pedidoNumero: string
-  onSuccess?: () => void
+  pedidoId: string;
+  pedidoNumero: string;
+  onSuccess?: () => void;
 }
 
-export function ConfirmarDespachoButton({ 
-  pedidoId, 
-  pedidoNumero, 
-  onSuccess 
+export function ConfirmarDespachoButton({
+  pedidoId,
+  pedidoNumero,
+  onSuccess,
 }: ConfirmarDespachoButtonProps) {
-  const { post } = useApi()
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const { post } = useApi();
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleConfirmar = async () => {
     try {
-      setLoading(true)
-      
-      const response = await post(`/inventario/logistica/${pedidoId}/confirmar-despacho`)
+      setLoading(true);
+
+      const response = await post(
+        `/inventario/logistica/${pedidoId}/confirmar-despacho`,
+      );
 
       if (response?.success) {
         toast({
-          title: 'Despacho Confirmado',
+          title: "Despacho Confirmado",
           description: `El pedido ${pedidoNumero} ha sido despachado exitosamente`,
-        })
-        setShowConfirmModal(false)
-        onSuccess?.()
+        });
+        onSuccess?.();
       } else {
-        throw new Error('Error al confirmar despacho')
+        throw new Error("Error al confirmar despacho");
       }
     } catch (error) {
-      console.error('Error confirming despacho:', error)
+      console.error("Error confirming despacho:", error);
       toast({
-        title: 'Error',
-        description: 'No se pudo confirmar el despacho',
-        variant: 'destructive'
-      })
+        title: "Error",
+        description: "No se pudo confirmar el despacho",
+        variant: "destructive",
+      });
+      throw error;
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <>
-      <button
+      <Button
         type="button"
         onClick={() => setShowConfirmModal(true)}
-        className="btn btn-success btn-sm"
+        variant="success"
+        size="sm"
         disabled={loading}
       >
         <Truck className="w-4 h-4" />
         Confirmar Despacho
-      </button>
+      </Button>
 
-      {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h2 className="modal-title">
-                <AlertTriangle className="w-5 h-5" />
-                Confirmar Despacho
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowConfirmModal(false)}
-                className="modal-close"
-                disabled={loading}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <p className="text-gray-700 mb-4">
-                ¿Estás seguro de que deseas confirmar el despacho del pedido{' '}
-                <span className="font-semibold">{pedidoNumero}</span>?
+      <ConfirmDialog
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirmar}
+        title="Confirmar despacho"
+        confirmText="Confirmar despacho"
+        variant="warning"
+        message={
+          <div className="space-y-4 text-left">
+            <p>
+              ¿Estás seguro de que deseas confirmar el despacho del pedido{" "}
+              <strong className="text-foreground">{pedidoNumero}</strong>?
+            </p>
+            <div className="rounded-lg border border-border bg-muted/50 p-4">
+              <p className="font-semibold text-foreground">
+                Esta acción realizará lo siguiente:
               </p>
-              
-              <div className="modal-info">
-                <p><strong>Esta acción realizará lo siguiente:</strong></p>
-                <ul className="text-sm text-blue-800 mt-2 space-y-1 list-disc list-inside">
-                  <li>Descontará el stock real de los productos</li>
-                  <li>Liberará las reservas de inventario</li>
-                  <li>Cambiará el estado a &quot;Listo para Facturar&quot;</li>
-                  <li>Notificará al equipo de ventas</li>
-                </ul>
-              </div>
-
-              <p className="text-sm text-gray-500">
-                Esta acción no se puede deshacer.
-              </p>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
+                <li>Descontará el stock real de los productos</li>
+                <li>Liberará las reservas de inventario</li>
+                <li>Cambiará el estado a &quot;Listo para Facturar&quot;</li>
+                <li>Notificará al equipo de ventas</li>
+              </ul>
             </div>
-
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="modal-btn modal-btn-secondary"
-                onClick={() => setShowConfirmModal(false)}
-                disabled={loading}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="modal-btn modal-btn-success"
-                onClick={handleConfirmar}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Confirmando...
-                  </>
-                ) : (
-                  <>
-                    <Truck className="w-4 h-4" />
-                    Confirmar Despacho
-                  </>
-                )}
-              </button>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Esta acción no se puede deshacer.
+            </p>
           </div>
-        </div>
-      )}
+        }
+      />
     </>
-  )
+  );
 }

@@ -153,7 +153,7 @@ export default function PedidoDetailPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.back()} className="inline-flex items-center justify-center p-2 text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
+            onClick={() => router.back()} className="inline-flex items-center justify-center p-2 text-[var(--primary-700)] bg-card/80 border cursor-pointer transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--primary-50)'
               e.currentTarget.style.borderColor = 'var(--primary-300)'
@@ -167,14 +167,14 @@ export default function PedidoDetailPage() {
           </button>
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-8 font-black text-[var(--primary-900)] m-0">
+              <h1 className="text-[2rem] font-black text-[var(--primary-900)] m-0">
                 Pedido {pedido.numero}
               </h1>
               <span className="inline-flex items-center py-2 px-4 rounded-full text-[0.875rem] font-semibold">
                 {pedido.estado}
               </span>
             </div>
-            <p className="text-4 text-[var(--primary-600)] m-0">
+            <p className="text-base text-[var(--primary-600)] m-0">
               Creado el {formatDate(pedido.created_at)}
             </p>
           </div>
@@ -231,20 +231,20 @@ export default function PedidoDetailPage() {
         >
           <strong className="text-[var(--primary-800)]">¿Qué sigue?</strong>
           <div className="flex gap-3 flex-wrap text-[0.95rem]">
-            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-white rounded-full border">
+            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-card rounded-full border">
               1) Confirmar pedido
             </span>
-            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-white rounded-full border">
+            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-card rounded-full border">
               2) Preparar en Logística
             </span>
-            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-white rounded-full border">
+            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-card rounded-full border">
               3) Despachar (si aplica)
             </span>
-            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-white rounded-full border">
+            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-card rounded-full border">
               4) Facturar
             </span>
           </div>
-          <span className="text-3.5">
+          <span className="text-sm">
             Usa el botón “Ir a Logística” para preparar y despachar. Luego regresa aquí para facturar cuando el pedido esté listo.
           </span>
         </div>
@@ -294,13 +294,13 @@ export default function PedidoDetailPage() {
           <div className="grid grid-cols-[repeat(2,_1fr)] gap-4">
             <div>
               <p className="text-[0.875rem] text-[var(--primary-600)] mb-1">Razón Social</p>
-              <p className="text-4 font-semibold text-[var(--primary-900)] m-0">
+              <p className="text-base font-semibold text-[var(--primary-900)] m-0">
                 {clienteInfo.razon_social || clienteInfo.nombre_comercial || 'N/D'}
               </p>
             </div>
             <div>
               <p className="text-[0.875rem] text-[var(--primary-600)] mb-1">Documento</p>
-              <p className="text-4 font-semibold text-[var(--primary-900)] m-0">
+              <p className="text-base font-semibold text-[var(--primary-900)] m-0">
                 {clienteInfo.documento_tipo || clienteInfo.tipo_documento || 'N/A'}: {clienteDocumento || 'N/A'}
               </p>
             </div>
@@ -318,17 +318,17 @@ export default function PedidoDetailPage() {
         <div className="overflow-x-auto">
           <table className="w-[100%]">
             <thead>
-              <tr className="bg-[var(--primary-50)]">
-                <th className="p-4 text-left text-3 font-semibold text-[var(--primary-700)]">
+              <tr className="bg-card/85 group-data-[erp-theme=light]/dashboard:bg-muted/30">
+                <th className="p-4 text-left text-xs font-semibold text-[var(--primary-700)]">
                   Descripción
                 </th>
-                <th className="p-4 text-right text-3 font-semibold text-[var(--primary-700)]">
+                <th className="p-4 text-right text-xs font-semibold text-[var(--primary-700)]">
                   Cantidad
                 </th>
-                <th className="p-4 text-right text-3 font-semibold text-[var(--primary-700)]">
+                <th className="p-4 text-right text-xs font-semibold text-[var(--primary-700)]">
                   Precio Unit.
                 </th>
-                <th className="p-4 text-right text-3 font-semibold text-[var(--primary-700)]">
+                <th className="p-4 text-right text-xs font-semibold text-[var(--primary-700)]">
                   Subtotal
                 </th>
               </tr>

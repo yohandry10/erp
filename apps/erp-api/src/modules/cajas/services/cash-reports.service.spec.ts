@@ -18,6 +18,12 @@ const createSupabaseMock = () => {
     select() {
       return this;
     },
+    eq() {
+      return this;
+    },
+    maybeSingle: jest.fn(async function () {
+      return { data: null, error: null };
+    }),
     single: jest.fn(async function () {
       return { data: { id: `id-${this.currentTable}-${inserts[this.currentTable].length}` }, error: null };
     }),
@@ -30,7 +36,7 @@ const createSupabaseMock = () => {
 };
 
 describe('CashReportsService - registrarAsientoCierre', () => {
-  it('genera asiento y detalles balanceados para cierre de caja', async () => {
+  it('NO genera asiento de ingreso en el cierre (el ingreso se contabiliza por-venta)', async () => {
     const { client, inserts } = createSupabaseMock();
     const supabaseService = { getClient: jest.fn(() => client) } as unknown as SupabaseService;
     const service = new CashReportsService(
@@ -64,25 +70,13 @@ describe('CashReportsService - registrarAsientoCierre', () => {
       '40111': 'cta-igv',
     });
 
-    await service.registrarAsientoCierre('tenant-1', 'sesion-1');
+    const resultado = await service.registrarAsientoCierre('tenant-1', 'sesion-1');
 
-    const asientoRaw = inserts['asientos_contables']?.[0];
-    const asiento = Array.isArray(asientoRaw) ? asientoRaw[0] : asientoRaw;
-    expect(asiento).toBeTruthy();
-    expect(asiento.total_debe).toBeCloseTo(200);
-    expect(asiento.total_haber).toBeCloseTo(200);
-    expect(asiento.referencia).toBe('SESION:sesion-1');
-
-    const detallesRaw = inserts['detalle_asientos']?.[0];
-    const detalles = Array.isArray(detallesRaw) ? detallesRaw : [detallesRaw];
-    expect(detalles).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ cuenta_id: 'cta-efectivo', debe: 100, haber: 0 }),
-        expect.objectContaining({ cuenta_id: 'cta-tarjeta', debe: 50, haber: 0 }),
-        expect.objectContaining({ cuenta_id: 'cta-transfer', debe: 50, haber: 0 }),
-        expect.objectContaining({ cuenta_id: 'cta-ventas', debe: 0, haber: 164 }),
-        expect.objectContaining({ cuenta_id: 'cta-igv', debe: 0, haber: 36 }),
-      ]),
-    );
+    // Rediseño: el cierre de caja ya NO contabiliza ingreso (cada venta POS lo
+    // registra en su asiento por-venta). registrarAsientoCierre hace early-return
+    // y no inserta ningún asiento; el cierre solo reconcilia efectivo.
+    expect(resultado).toBeNull();
+    expect(inserts['asientos_contables']).toBeUndefined();
+    expect(inserts['detalle_asientos']).toBeUndefined();
   });
 });

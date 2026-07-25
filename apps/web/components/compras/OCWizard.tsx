@@ -11,17 +11,17 @@ import { Proveedor } from '@/types/compras'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { cn } from '@/lib/utils'
 
-const fieldLabelClass = 'mb-2 block text-sm font-medium text-slate-700'
-const requiredMarkClass = 'text-slate-500'
-const fieldBaseClass = 'w-full rounded-lg border bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60'
-const fieldNormalClass = 'border-slate-300'
+const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
+const requiredMarkClass = 'text-muted-foreground'
+const fieldBaseClass = 'w-full rounded-lg border bg-card px-3 py-3 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60'
+const fieldNormalClass = 'border-border'
 const fieldErrorClass = 'border-slate-500'
-const fieldErrorTextClass = 'mt-1 text-xs text-slate-600'
-const panelSoftClass = 'activity-card bg-slate-50'
-const tableHeadClass = 'px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500'
-const tableCellClass = 'px-4 py-3 text-sm text-slate-700'
-const summaryLabelClass = 'text-xs font-semibold uppercase tracking-[0.08em] text-slate-500'
-const summaryValueClass = 'mt-1 text-sm font-semibold text-slate-950'
+const fieldErrorTextClass = 'mt-1 text-xs text-foreground/80'
+const panelSoftClass = 'relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl bg-muted/30'
+const tableHeadClass = 'px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground'
+const tableCellClass = 'px-4 py-3 text-sm text-foreground/85'
+const summaryLabelClass = 'text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground'
+const summaryValueClass = 'mt-1 text-sm font-semibold text-foreground'
 
 // Validation schemas
 const step1Schema = z.object({
@@ -204,7 +204,7 @@ export function OCWizard({
   }
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       {/* Wizard Header */}
       <div className="mb-8">
         <h2 className="mb-4 text-2xl font-semibold">
@@ -222,7 +222,7 @@ export function OCWizard({
               <div className="flex flex-1 flex-col items-center gap-1">
                 <div
                   className={`flex size-10 items-center justify-center rounded-full text-sm font-semibold ${
-                    currentStep >= step.num ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-500'
+                    currentStep >= step.num ? 'bg-blue-500 text-white' : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   {currentStep > step.num ? <Check size={16} /> : step.icon}
@@ -230,7 +230,7 @@ export function OCWizard({
                 <span
                   className={`text-center text-xs ${
                     currentStep === step.num ? 'font-semibold' : 'font-normal'
-                  } ${currentStep >= step.num ? 'text-blue-500' : 'text-slate-500'}`}
+                  } ${currentStep >= step.num ? 'text-blue-500' : 'text-muted-foreground'}`}
                 >
                   {step.label}
                 </span>
@@ -238,7 +238,7 @@ export function OCWizard({
               {idx < 2 && (
                 <div
                   className={`-mt-6 h-0.5 flex-[0.5] ${
-                    currentStep > step.num ? 'bg-blue-500' : 'bg-slate-200'
+                    currentStep > step.num ? 'bg-blue-500' : 'bg-muted'
                   }`}
                 />
               )}
@@ -408,12 +408,12 @@ export function OCWizard({
       )}
 
       {/* Navigation Buttons */}
-      <div className="mt-8 flex justify-between gap-4 border-t border-slate-200 pt-8">
+      <div className="mt-8 flex justify-between gap-4 border-t border-border pt-8">
         <button
           type="button"
           onClick={currentStep === 1 ? onCancel : handleBack}
           disabled={isLoading}
-          className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 text-sm font-medium text-foreground/85 transition hover:border-blue-300 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronLeft size={16} />
           {currentStep === 1 ? 'Cancelar' : 'Anterior'}
@@ -423,7 +423,7 @@ export function OCWizard({
           <button
             type="button"
             onClick={handleNext}
-            className="refresh-btn flex items-center gap-2 px-6 py-3"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 flex items-center gap-2 px-6 py-3"
           >
             Siguiente
             <ChevronRight size={16} />
@@ -439,7 +439,7 @@ export function OCWizard({
               type="button"
               onClick={handleFinalSubmit}
               disabled={isLoading}
-              className="refresh-btn flex items-center gap-2 px-6 py-3 disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 flex items-center gap-2 px-6 py-3 disabled:cursor-not-allowed disabled:opacity-70"
             >
               <Check size={16} />
               {isLoading ? 'Guardando...' : 'Crear Orden de Compra'}
@@ -495,7 +495,7 @@ function Step2AddProducts({
 
   return (
     <div className="min-h-[400px]">
-      <h3 className="mb-6 text-lg font-semibold text-slate-950">
+      <h3 className="mb-6 text-lg font-semibold text-foreground">
         Agregar Productos
       </h3>
 
@@ -552,7 +552,8 @@ function Step2AddProducts({
           <button
             type="button"
             onClick={handleAdd}
-            className="refresh-btn flex h-12 items-center justify-center px-4"
+            aria-label="Agregar producto"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 flex h-12 items-center justify-center px-4"
           >
             <Plus size={16} />
           </button>
@@ -561,19 +562,19 @@ function Step2AddProducts({
 
       {/* Products List */}
       {detalles.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
-          <Package size={48} className="mx-auto mb-4 text-slate-400" />
-          <h3 className="mb-2 text-lg font-semibold text-slate-700">
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center text-muted-foreground">
+          <Package size={48} className="mx-auto mb-4 text-muted-foreground" />
+          <h3 className="mb-2 text-lg font-semibold text-foreground/85">
             No hay productos agregados
           </h3>
           <p>Agregue al menos un producto para continuar</p>
         </div>
       ) : (
         <>
-          <div className="mb-6 overflow-auto rounded-xl border border-slate-200 bg-white">
+          <div className="mb-6 overflow-auto rounded-xl border border-border bg-card">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b-2 border-slate-200 bg-slate-50">
+                <tr className="border-b-2 border-border bg-muted/30">
                   <th className={cn(tableHeadClass, 'text-left')}>
                     Producto
                   </th>
@@ -593,7 +594,7 @@ function Step2AddProducts({
               </thead>
               <tbody>
                 {detalles.map((detalle: any, index: number) => (
-                  <tr key={index} className="border-b border-slate-100 last:border-b-0">
+                  <tr key={index} className="border-b border-border last:border-b-0">
                     <td className={tableCellClass}>
                       {detalle.descripcion}
                     </td>
@@ -610,7 +611,7 @@ function Step2AddProducts({
                       <button
                         type="button"
                         onClick={() => onRemoveProducto(index)}
-                        className="rounded-md bg-slate-700 p-2 text-white transition hover:bg-slate-900"
+                        className="rounded-md bg-muted p-2 text-white transition hover:bg-card"
                         title="Eliminar"
                       >
                         <Trash2 size={16} />
@@ -640,21 +641,21 @@ function TotalesSummary({ detalles, formatCurrency }: any) {
   return (
     <div className={panelSoftClass}>
       <div className="ml-auto max-w-md">
-        <div className="flex justify-between border-b border-slate-200 py-3">
-          <span className="text-sm text-slate-500">Subtotal:</span>
-          <span className="text-sm font-semibold text-slate-700">
+        <div className="flex justify-between border-b border-border py-3">
+          <span className="text-sm text-muted-foreground">Subtotal:</span>
+          <span className="text-sm font-semibold text-foreground/85">
             {formatCurrency(subtotal)}
           </span>
         </div>
-        <div className="flex justify-between border-b border-slate-200 py-3">
-          <span className="text-sm text-slate-500">IGV (18%):</span>
-          <span className="text-sm font-semibold text-slate-700">
+        <div className="flex justify-between border-b border-border py-3">
+          <span className="text-sm text-muted-foreground">IGV (18%):</span>
+          <span className="text-sm font-semibold text-foreground/85">
             {formatCurrency(igv)}
           </span>
         </div>
         <div className="flex justify-between py-4">
-          <span className="text-lg font-semibold text-slate-950">Total:</span>
-          <span className="text-xl font-bold text-blue-600">
+          <span className="text-lg font-semibold text-foreground">Total:</span>
+          <span className="text-xl font-bold text-primary">
             {formatCurrency(total)}
           </span>
         </div>
@@ -692,13 +693,13 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
 
   return (
     <div className="min-h-[400px]">
-      <h3 className="mb-6 text-lg font-semibold text-slate-950">
+      <h3 className="mb-6 text-lg font-semibold text-foreground">
         Revisión Final
       </h3>
 
       {/* Basic Information Summary */}
       <div className={cn(panelSoftClass, 'mb-6')}>
-        <h4 className="mb-4 text-base font-semibold text-slate-700">
+        <h4 className="mb-4 text-base font-semibold text-foreground/85">
           Información Básica
         </h4>
         <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]">
@@ -718,7 +719,7 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
               {proveedor?.razon_social || 'N/A'}
             </p>
             {proveedor?.ruc && (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 RUC: {proveedor.ruc}
               </p>
             )}
@@ -747,7 +748,7 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
               {getCondicionesPagoLabel(formData.condiciones_pago)}
             </p>
             {formData.dias_credito > 0 && (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 ({formData.dias_credito} días)
               </p>
             )}
@@ -764,11 +765,11 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
           )}
         </div>
         {formData.observaciones && (
-          <div className="mt-4 border-t border-slate-200 pt-4">
+          <div className="mt-4 border-t border-border pt-4">
             <span className={summaryLabelClass}>
               Observaciones
             </span>
-            <p className="mt-1 text-sm text-slate-700">
+            <p className="mt-1 text-sm text-foreground/85">
               {formData.observaciones}
             </p>
           </div>
@@ -776,14 +777,14 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
       </div>
 
       {/* Products Summary */}
-      <div className="activity-card mb-6">
-        <h4 className="mb-4 text-base font-semibold text-slate-700">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-6">
+        <h4 className="mb-4 text-base font-semibold text-foreground/85">
           Productos ({detalles.length})
         </h4>
-        <div className="overflow-auto rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-auto rounded-xl border border-border bg-card">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b-2 border-slate-200 bg-slate-50">
+              <tr className="border-b-2 border-border bg-muted/30">
                 <th className={cn(tableHeadClass, 'text-left')}>
                   Producto
                 </th>
@@ -800,7 +801,7 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
             </thead>
             <tbody>
               {detalles.map((detalle: ProductoDetalle, index: number) => (
-                <tr key={index} className="border-b border-slate-100 last:border-b-0">
+                <tr key={index} className="border-b border-border last:border-b-0">
                   <td className={tableCellClass}>
                     {detalle.descripcion}
                   </td>
@@ -823,21 +824,21 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
       {/* Totals */}
       <div className={panelSoftClass}>
         <div className="ml-auto max-w-md">
-          <div className="flex justify-between border-b border-slate-200 py-3">
-            <span className="text-sm text-slate-500">Subtotal:</span>
-            <span className="text-sm font-semibold text-slate-700">
+          <div className="flex justify-between border-b border-border py-3">
+            <span className="text-sm text-muted-foreground">Subtotal:</span>
+            <span className="text-sm font-semibold text-foreground/85">
               {formatCurrency(subtotal)}
             </span>
           </div>
-          <div className="flex justify-between border-b border-slate-200 py-3">
-            <span className="text-sm text-slate-500">IGV (18%):</span>
-            <span className="text-sm font-semibold text-slate-700">
+          <div className="flex justify-between border-b border-border py-3">
+            <span className="text-sm text-muted-foreground">IGV (18%):</span>
+            <span className="text-sm font-semibold text-foreground/85">
               {formatCurrency(igv)}
             </span>
           </div>
           <div className="flex justify-between py-4">
-            <span className="text-lg font-semibold text-slate-950">Total:</span>
-            <span className="text-xl font-bold text-blue-600">
+            <span className="text-lg font-semibold text-foreground">Total:</span>
+            <span className="text-xl font-bold text-primary">
               {formatCurrency(total)}
             </span>
           </div>

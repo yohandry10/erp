@@ -317,14 +317,33 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
       if (error) {
         this.logger.warn(`⚠️ [ContabilidadEventsListener] No se pudo adquirir lock distribuido: ${error.message}`);
-        return false;
+        return this.shouldContinueWithoutDistributedLock(error);
       }
 
       return data === true || data === 'true';
     } catch (error) {
       this.logger.warn(`⚠️ [ContabilidadEventsListener] Error adquiriendo lock distribuido: ${error?.message || error}`);
-      return false;
+      return this.shouldContinueWithoutDistributedLock(error);
     }
+  }
+
+  private shouldContinueWithoutDistributedLock(error: any): boolean {
+    const message = String(error?.message || error || '').toLowerCase();
+    const lockUnavailable =
+      message.includes('permission denied') ||
+      message.includes('does not exist') ||
+      message.includes('could not find') ||
+      message.includes('schema cache') ||
+      message.includes('blocked for rpc');
+
+    if (lockUnavailable) {
+      this.logger.warn(
+        '⚠️ [ContabilidadEventsListener] Lock distribuido no disponible; se continua con claim idempotente por evento.',
+      );
+      return true;
+    }
+
+    return false;
   }
 
   private async releaseJobLock(): Promise<void> {
@@ -756,6 +775,53 @@ export class ContabilidadEventsListener implements OnModuleInit {
     }
   }
   /**
+   * Normaliza una referencia tipo comprobante (SERIE-numero) al formato canónico
+   * SERIE-NNNNNNNN. Los emisores usan formatos distintos ("F001-1" desde CPE,
+   * "F001-00000001" desde ventas), lo que rompía la deduplicación por referencia
+   * y producía asientos de venta duplicados para la misma factura.
+   */
+  private normalizarReferenciaComprobante(referencia?: string | null): string | null {
+    if (!referencia) return null;
+    const match = /^([A-Za-z0-9]+)-(\d{1,8})$/.exec(String(referencia).trim());
+    if (!match) return String(referencia);
+    return `${match[1].toUpperCase()}-${match[2].padStart(8, '0')}`;
+  }
+
+  /** Variantes con y sin padding para buscar asientos históricos con cualquier formato. */
+  private variantesReferenciaComprobante(referencia: string): string[] {
+    const match = /^([A-Za-z0-9]+)-(\d{1,8})$/.exec(String(referencia).trim());
+    if (!match) return [referencia];
+    const serie = match[1].toUpperCase();
+    return [...new Set([
+      referencia,
+      `${serie}-${String(Number(match[2]))}`,
+      `${serie}-${match[2].padStart(8, '0')}`,
+    ])];
+  }
+
+  /**
+   * Busca un asiento existente para la misma referencia de comprobante (en
+   * cualquiera de sus variantes de formato). Es el guard de idempotencia
+   * compartido por venta.procesada / factura.emitida / cxc.creada, que emiten
+   * eventos distintos para la misma venta.
+   */
+  private async buscarAsientoPorReferenciaVenta(
+    tenantId: string,
+    referencia?: string | null,
+  ): Promise<{ id: string; numero_asiento: string } | null> {
+    if (!referencia) return null;
+    const { data } = await this.supabaseService
+      .getClient()
+      .from('asientos_contables')
+      .select('id, numero_asiento')
+      .eq('tenant_id', tenantId)
+      .in('referencia', this.variantesReferenciaComprobante(referencia))
+      .limit(1)
+      .maybeSingle();
+    return data ?? null;
+  }
+
+  /**
    * 🔴 CRÍTICO FIX: Verifica que un asiento contable se haya creado correctamente en la BD
    * Valida que el asiento exista y tenga detalles asociados
    */
@@ -891,6 +957,26 @@ export class ContabilidadEventsListener implements OnModuleInit {
    * Genera asiento: Dr 12 Clientes / Cr 70 Ventas + Cr 40 IGV
    *                 Dr 69 Costo Ventas / Cr 20 Mercaderías
    */
+  /**
+   * Mapea el método de pago a la cuenta de Caja/Bancos donde entra el cobro contado.
+   * Efectivo → 10111 (Caja POS), tarjeta → 10411 (Bancos - tarjeta),
+   * transferencia/yape/plin/depósito → 10412. Por defecto 10111.
+   */
+  private mapMetodoPagoACuentaCaja(metodoPago?: string | null): string {
+    const m = String(metodoPago ?? '').toUpperCase();
+    if (m.includes('TARJETA') || m.includes('CARD') || m.includes('POS')) return '10411';
+    if (
+      m.includes('TRANSFER') ||
+      m.includes('YAPE') ||
+      m.includes('PLIN') ||
+      m.includes('DEPOSITO') ||
+      m.includes('DEPÓSITO')
+    ) {
+      return '10412';
+    }
+    return '10111';
+  }
+
   private async handleVentaFacturada(evento: OutboxEvent): Promise<void> {
     try {
       const eventData = evento.event_data;
@@ -919,6 +1005,30 @@ export class ContabilidadEventsListener implements OnModuleInit {
       );
       
       // Preparar datos para el generador de asientos
+      const referenciaVenta = this.normalizarReferenciaComprobante(
+        eventData.numeroTicket || eventData.numeroFactura || eventData.cpeId,
+      );
+
+      // Idempotencia cruzada: factura.emitida y cxc.creada emiten la misma venta;
+      // si cualquiera de ellos ya generó el asiento, no duplicar.
+      const asientoPrevio = await this.buscarAsientoPorReferenciaVenta(tenantId, referenciaVenta);
+      if (asientoPrevio) {
+        this.logger.log(
+          `ℹ️ [ContabilidadEventsListener] venta.procesada ${referenciaVenta} ya tiene asiento ${asientoPrevio.numero_asiento}, skip.`,
+        );
+        return;
+      }
+
+      // Determinar si la venta fue al CONTADO (POS es siempre contado; factura según
+      // condición de pago). Si es contado, el asiento debita Caja/Bancos en vez de CxC.
+      const esContado =
+        eventData.source === 'pos.venta.registrada' ||
+        eventData.esCredito === false ||
+        String(eventData.condicionPago ?? eventData.condicion_pago ?? '').toUpperCase() === 'CONTADO';
+      const cuentaCobroCodigo = this.mapMetodoPagoACuentaCaja(
+        eventData.metodoPago ?? eventData.metodo_pago,
+      );
+
       const ventaData = {
         tenant_id: tenantId,
         fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
@@ -927,8 +1037,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
         igv,
         costo_ventas: eventData.costo_ventas || 0,
         centro_costo_id: eventData.centro_costo_id,
-        referencia: eventData.numeroTicket || eventData.numeroFactura || eventData.cpeId,
-        event_id: evento.event_id || eventData.eventId
+        referencia: referenciaVenta,
+        event_id: evento.event_id || eventData.eventId,
+        es_contado: esContado,
+        cuenta_cobro_codigo: cuentaCobroCodigo,
       };
 
       const eventId = ventaData.event_id;
@@ -994,19 +1106,15 @@ export class ContabilidadEventsListener implements OnModuleInit {
       const numero = eventData?.numero !== undefined && eventData?.numero !== null
         ? String(eventData.numero)
         : null;
-      const referencia = serie && numero
-        ? `${serie}-${numero}`
-        : eventData?.cpeId || eventData?.facturaId || evento.event_id;
+      const referencia = this.normalizarReferenciaComprobante(
+        serie && numero
+          ? `${serie}-${numero}`
+          : eventData?.cpeId || eventData?.facturaId || evento.event_id,
+      );
 
-      // Idempotencia: si ya hay asiento para esta referencia, skip.
-      const { data: asientoExistente } = await this.supabaseService
-        .getClient()
-        .from('asientos_contables')
-        .select('id, numero_asiento')
-        .eq('tenant_id', tenantId)
-        .eq('referencia', referencia)
-        .limit(1)
-        .maybeSingle();
+      // Idempotencia: si ya hay asiento para esta referencia (en cualquier
+      // formato con/sin padding), skip.
+      const asientoExistente = await this.buscarAsientoPorReferenciaVenta(tenantId, referencia);
 
       if (asientoExistente?.id) {
         this.logger.log(
@@ -1117,9 +1225,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
       const eventData = evento.event_data;
       const tenantId = this.ensureEventTenant(eventData, 'cxc.creada');
 
-      const referencia = eventData.serie && eventData.numero
-        ? `${eventData.serie}-${eventData.numero}`
-        : eventData.facturaId || eventData.cuentaId;
+      const referencia = this.normalizarReferenciaComprobante(
+        eventData.serie && eventData.numero
+          ? `${eventData.serie}-${eventData.numero}`
+          : eventData.facturaId || eventData.cuentaId,
+      );
 
       const ajustes = eventData.ajustes ?? {
         retencion: 0,
@@ -1178,6 +1288,16 @@ export class ContabilidadEventsListener implements OnModuleInit {
             throw new Error('Asiento contable de nota de crédito no retornó ID válido después de creación');
           }
         } else {
+          // Idempotencia cruzada: venta.procesada / factura.emitida generan el
+          // mismo asiento de venta para esta referencia; si ya existe, skip.
+          const asientoPrevio = await this.buscarAsientoPorReferenciaVenta(tenantId, referencia);
+          if (asientoPrevio) {
+            this.logger.log(
+              `ℹ️ [ContabilidadEventsListener] cxc.creada ${referencia} ya tiene asiento ${asientoPrevio.numero_asiento}, skip.`,
+            );
+            return;
+          }
+
           const asientoCreado = await this.asientosGenerator.generarAsientoVenta(ventaData);
 
           // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente

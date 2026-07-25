@@ -55,6 +55,7 @@ export class ClientesService {
       numero_documento: documentoNumero,
       razon_social: createClienteDto.razon_social,
       nombre: createClienteDto.razon_social,
+      nombre_comercial: createClienteDto.nombre_comercial?.trim() || null,
       codigo: documentoTexto,
       direccion: createClienteDto.direccion || null,
       email: createClienteDto.email || null,
@@ -131,6 +132,7 @@ export class ClientesService {
       const textFilters = [
         `razon_social.ilike.${searchTerm}`,
         `nombre.ilike.${searchTerm}`,
+        `nombre_comercial.ilike.${searchTerm}`,
         `codigo.ilike.${searchTerm}`,
         `ruc.ilike.${searchTerm}`,
       ];
@@ -232,6 +234,9 @@ export class ClientesService {
     if (updateClienteDto.razon_social !== undefined) {
       updateData.razon_social = updateClienteDto.razon_social;
       updateData.nombre = updateClienteDto.razon_social;
+    }
+    if (updateClienteDto.nombre_comercial !== undefined) {
+      updateData.nombre_comercial = updateClienteDto.nombre_comercial?.trim() || null;
     }
     if (updateClienteDto.direccion !== undefined) updateData.direccion = updateClienteDto.direccion || null;
     if (updateClienteDto.email !== undefined) updateData.email = updateClienteDto.email || null;
@@ -343,15 +348,11 @@ export class ClientesService {
   }
 
   /**
-   * Validar RUC con API de SUNAT
+   * Validar localmente formato y dígito verificador del RUC
    * Requirements: 1.4, 19.3
    */
   async validarRUC(validarRucDto: ValidarRucDto): Promise<any> {
     try {
-      // Nota: Esta es una implementación de ejemplo
-      // En producción, deberías usar una API real de SUNAT o un servicio de terceros
-      // Por ejemplo: https://api.apis.net.pe/v1/ruc?numero={ruc}
-
       const ruc = validarRucDto.ruc;
 
       // Validación de formato
@@ -375,19 +376,15 @@ export class ClientesService {
         throw new BadRequestException('RUC inválido: dígito verificador no coincide');
       }
 
-      // Aquí iría la integración real con SUNAT
-      // Por ahora retornamos una respuesta de ejemplo
-      console.log('🔍 [ClientesService] Validando RUC:', ruc);
-
-      // Simulación de respuesta (en producción, hacer llamada real a API)
+      // Este endpoint no tiene una fuente registral configurada. Devuelve únicamente
+      // la validación matemática local y nunca inventa razón social, domicilio,
+      // estado ni condición del contribuyente.
       return {
         ruc,
-        razon_social: 'EMPRESA DE EJEMPLO S.A.C.',
-        estado: 'ACTIVO',
-        condicion: 'HABIDO',
-        direccion: 'AV. EJEMPLO 123, LIMA',
-        validado: true,
-        mensaje: 'RUC válido (simulado)',
+        validado_formato: true,
+        consulta_sunat: false,
+        fuente: 'VALIDACION_LOCAL',
+        mensaje: 'RUC válido por formato y dígito verificador; no se consultó el padrón SUNAT',
       };
     } catch (error) {
       console.error('Error validating RUC:', error);
@@ -396,7 +393,7 @@ export class ClientesService {
         throw error;
       }
 
-      throw new BadRequestException('Error al validar el RUC con SUNAT');
+      throw new BadRequestException('Error al validar el RUC');
     }
   }
 }

@@ -88,19 +88,19 @@ export default function PipelineReport({ filters }: Props) {
         label: 'Cotización → Pedido',
         value: data.conversiones.cotizaciones_a_pedidos,
         icon: data.conversiones.cotizaciones_a_pedidos >= 50 ? ArrowUpRight : ArrowDownRight,
-        tone: data.conversiones.cotizaciones_a_pedidos >= 50 ? 'text-emerald-600' : 'text-amber-600'
+        tone: data.conversiones.cotizaciones_a_pedidos >= 50 ? 'text-emerald-400' : 'text-amber-400'
       },
       {
         label: 'Pedido → Factura',
         value: data.conversiones.pedidos_a_facturas,
         icon: data.conversiones.pedidos_a_facturas >= 70 ? ArrowUpRight : ArrowRight,
-        tone: data.conversiones.pedidos_a_facturas >= 70 ? 'text-blue-600' : 'text-slate-600'
+        tone: data.conversiones.pedidos_a_facturas >= 70 ? 'text-primary' : 'text-foreground/80'
       },
       {
         label: 'Cotización → Factura',
         value: data.conversiones.total,
         icon: BarChart2,
-        tone: 'text-purple-600'
+        tone: 'text-violet-400'
       }
     ]
     return items
@@ -120,7 +120,7 @@ export default function PipelineReport({ filters }: Props) {
           <CardTitle>Pipeline Comercial</CardTitle>
           <CardDescription>Analizando conversiones del flujo comercial…</CardDescription>
         </CardHeader>
-        <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-slate-600">
+        <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-foreground/80">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span>Procesando métricas</span>
         </CardContent>
@@ -135,7 +135,7 @@ export default function PipelineReport({ filters }: Props) {
           <CardTitle>Pipeline Comercial</CardTitle>
           <CardDescription>No hay datos disponibles para el periodo seleccionado</CardDescription>
         </CardHeader>
-        <CardContent className="py-12 text-center text-slate-500">
+        <CardContent className="py-12 text-center text-muted-foreground">
           Ajusta los filtros para visualizar información del pipeline comercial.
         </CardContent>
       </Card>
@@ -185,11 +185,11 @@ export default function PipelineReport({ filters }: Props) {
               return (
                 <div
                   key={item.label}
-                  className="border border-slate-200 rounded-lg p-4 bg-slate-50 flex items-center justify-between"
+                  className="border border-border rounded-lg p-4 bg-muted/30 flex items-center justify-between"
                 >
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-500">{item.label}</p>
-                    <p className="text-3xl font-semibold text-slate-900 mt-1">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.label}</p>
+                    <p className="text-3xl font-semibold text-foreground mt-1">
                       {item.value.toFixed(1)}%
                     </p>
                   </div>
@@ -212,19 +212,19 @@ export default function PipelineReport({ filters }: Props) {
               const stage = data.pipeline[stageKey]
               return (
                 <div key={stageKey}>
-                  <p className="font-medium text-slate-700 mb-2 capitalize">{stageKey}</p>
+                  <p className="font-medium text-foreground/85 mb-2 capitalize">{stageKey}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(stage.estados).map(([estado, cantidad]) => (
                       <div
                         key={`${stageKey}-${estado}`}
-                        className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm flex justify-between"
+                        className="rounded-md border border-border bg-card px-3 py-2 text-sm flex justify-between"
                       >
-                        <span className="text-slate-600">{estado}</span>
-                        <span className="font-semibold text-slate-900">{cantidad}</span>
+                        <span className="text-foreground/80">{estado}</span>
+                        <span className="font-semibold text-foreground">{cantidad}</span>
                       </div>
                     ))}
                     {Object.keys(stage.estados).length === 0 && (
-                      <div className="text-sm text-slate-500">Sin registros</div>
+                      <div className="text-sm text-muted-foreground">Sin registros</div>
                     )}
                   </div>
                 </div>
@@ -240,32 +240,32 @@ export default function PipelineReport({ filters }: Props) {
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50">
+              <thead className="bg-muted/30">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-slate-600">Periodo</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">Cotizaciones</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">Pedidos</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">Facturas</th>
+                  <th className="px-3 py-2 text-left font-medium text-foreground/80">Periodo</th>
+                  <th className="px-3 py-2 text-right font-medium text-foreground/80">Cotizaciones</th>
+                  <th className="px-3 py-2 text-right font-medium text-foreground/80">Pedidos</th>
+                  <th className="px-3 py-2 text-right font-medium text-foreground/80">Facturas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {tendenciaRows.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-3 py-4 text-center text-slate-500">
+                    <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">
                       No hay datos de tendencia en el intervalo analizado.
                     </td>
                   </tr>
                 ) : (
                   tendenciaRows.map((row) => (
                     <tr key={row.periodo}>
-                      <td className="px-3 py-2 text-slate-600">{row.periodo}</td>
-                      <td className="px-3 py-2 text-right text-slate-900 font-medium">
+                      <td className="px-3 py-2 text-foreground/80">{row.periodo}</td>
+                      <td className="px-3 py-2 text-right text-foreground font-medium">
                         {row.cotizaciones}
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-900 font-medium">
+                      <td className="px-3 py-2 text-right text-foreground font-medium">
                         {row.pedidos}
                       </td>
-                      <td className="px-3 py-2 text-right text-slate-900 font-medium">
+                      <td className="px-3 py-2 text-right text-foreground font-medium">
                         {row.facturas}
                       </td>
                     </tr>

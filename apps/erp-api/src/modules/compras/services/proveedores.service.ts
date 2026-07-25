@@ -126,26 +126,23 @@ export class ProveedoresService {
       throw new BadRequestException('El RUC debe contener solo números');
     }
 
-    // Validar longitud según país
-    // Perú: 11 dígitos, Colombia: 9 dígitos
-    if (cleanRuc.length !== 11 && cleanRuc.length !== 9) {
-      throw new BadRequestException('El RUC debe tener 11 dígitos (Perú) o 9 dígitos (Colombia)');
+    // Scope inicial: Peru/SUNAT. Otros paises quedan en roadmap.
+    if (cleanRuc.length !== 11) {
+      throw new BadRequestException('El RUC debe tener 11 dígitos');
     }
 
     // Validar dígito verificador para RUC peruano (módulo 11 SUNAT)
-    if (cleanRuc.length === 11) {
-      const prefijo = cleanRuc.substring(0, 2);
-      if (!['10', '15', '17', '20'].includes(prefijo)) {
-        throw new BadRequestException(`Prefijo de RUC inválido: ${prefijo}. Debe iniciar con 10, 15, 17 o 20`);
-      }
-      const factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
-      const digitos = cleanRuc.split('').map(Number);
-      const suma = factores.reduce((acc, factor, i) => acc + factor * digitos[i], 0);
-      const resto = 11 - (suma % 11);
-      const digitoVerificador = resto === 10 ? 0 : resto === 11 ? 1 : resto;
-      if (digitoVerificador !== digitos[10]) {
-        throw new BadRequestException('RUC inválido: dígito verificador no coincide');
-      }
+    const prefijo = cleanRuc.substring(0, 2);
+    if (!['10', '15', '17', '20'].includes(prefijo)) {
+      throw new BadRequestException(`Prefijo de RUC inválido: ${prefijo}. Debe iniciar con 10, 15, 17 o 20`);
+    }
+    const factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+    const digitos = cleanRuc.split('').map(Number);
+    const suma = factores.reduce((acc, factor, i) => acc + factor * digitos[i], 0);
+    const resto = 11 - (suma % 11);
+    const digitoVerificador = resto === 10 ? 0 : resto === 11 ? 1 : resto;
+    if (digitoVerificador !== digitos[10]) {
+      throw new BadRequestException('RUC inválido: dígito verificador no coincide');
     }
   }
 

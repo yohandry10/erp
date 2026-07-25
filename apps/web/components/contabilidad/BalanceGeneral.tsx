@@ -126,7 +126,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
     const { absolute, percentage } = calculateVariation(current, previous)
 
     return (
-      <span className="ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-xs font-semibold text-cyan-100">
+      <span className="ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-xs font-semibold text-primary">
         {absolute >= 0 ? '+' : '-'}{Math.abs(percentage).toFixed(1)}%
       </span>
     )
@@ -210,8 +210,8 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
 
   const renderLine = (item: LineItem) => (
     <div key={item.label} className="flex items-center justify-between gap-4 border-b border-cyan-400/10 py-2 last:border-b-0">
-      <span className={`text-sm ${item.subdued ? 'text-slate-400' : 'text-slate-300'}`}>{item.label}</span>
-      <span className="text-right text-sm font-semibold text-white">
+      <span className={`text-sm ${item.subdued ? 'text-muted-foreground' : 'text-muted-foreground'}`}>{item.label}</span>
+      <span className="text-right text-sm font-semibold text-foreground">
         {formatCurrency(item.value)}
         {renderVariation(item.value, item.previous)}
       </span>
@@ -225,19 +225,19 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
     grandTotalLabel: string,
     grandTotal: number,
   ) => (
-    <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+    <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
       <CardHeader className="border-b border-cyan-400/10 bg-white/[0.03]">
-        <CardTitle className="flex items-center gap-3 text-lg text-white">
-          <span className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 p-2 text-cyan-100">{icon}</span>
+        <CardTitle className="flex items-center gap-3 text-lg text-foreground">
+          <span className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 p-2 text-primary">{icon}</span>
           {title}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
         {groups.map((group) => (
           <div key={group.title} className="rounded-xl border border-cyan-400/10 bg-white/[0.03] p-4">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200/70">{group.title}</div>
+            <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-primary/80">{group.title}</div>
             <div>{group.items.map(renderLine)}</div>
-            <div className="mt-3 flex items-center justify-between rounded-lg bg-cyan-400/10 px-3 py-2 text-sm font-bold text-cyan-50">
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-cyan-400/10 px-3 py-2 text-sm font-bold text-primary">
               <span>{group.totalLabel}</span>
               <span>
                 {formatCurrency(group.total)}
@@ -246,7 +246,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
             </div>
           </div>
         ))}
-        <div className="flex items-center justify-between rounded-xl border border-cyan-300/30 bg-cyan-400/15 px-4 py-3 text-base font-bold text-white">
+        <div className="flex items-center justify-between rounded-xl border border-cyan-300/30 bg-cyan-400/15 px-4 py-3 text-base font-bold text-foreground">
           <span>{grandTotalLabel}</span>
           <span>{formatCurrency(grandTotal)}</span>
         </div>
@@ -256,10 +256,10 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
 
   if (loading) {
     return (
-      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100">
+      <Card className="border-cyan-400/20 bg-card/65 text-foreground">
         <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-400/20 border-t-cyan-300" />
-          <p className="text-sm font-medium text-slate-300">Cargando Balance General...</p>
+          <p className="text-sm font-medium text-muted-foreground">Cargando Balance General...</p>
         </CardContent>
       </Card>
     )
@@ -267,8 +267,8 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
 
   if (!data) {
     return (
-      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100">
-        <CardContent className="flex min-h-[220px] items-center justify-center p-8 text-center text-slate-300">
+      <Card className="border-cyan-400/20 bg-card/65 text-foreground">
+        <CardContent className="flex min-h-[220px] items-center justify-center p-8 text-center text-muted-foreground">
           No hay datos disponibles para el período seleccionado
         </CardContent>
       </Card>
@@ -284,12 +284,12 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
 
   return (
     <div className="space-y-6">
-      <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-xl shadow-blue-950/20">
+      <Card className="border-cyan-400/20 bg-card/70 text-foreground shadow-xl shadow-blue-950/20">
         <CardHeader className="border-b border-cyan-400/10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <CardTitle className="text-2xl text-white">Balance General</CardTitle>
-              <p className="mt-2 text-sm text-slate-300">
+              <CardTitle className="text-2xl text-foreground">Balance General</CardTitle>
+              <p className="mt-2 text-sm text-muted-foreground">
                 Período: {anio} - {String(mes).padStart(2, '0')}
                 {showComparison && ` vs ${prevAnio} - ${String(prevMes).padStart(2, '0')}`}
               </p>
@@ -299,7 +299,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
                 <Download className="h-4 w-4" />
                 Exportar Excel
               </Button>
-              <Button onClick={handleExportPDF} variant="outline" className="gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white">
+              <Button onClick={handleExportPDF} variant="outline" className="gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-white">
                 <FileText className="h-4 w-4" />
                 Exportar PDF
               </Button>
@@ -308,8 +308,8 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
         </CardHeader>
         {(error || !isBalanced) && (
           <CardContent className="p-5">
-            <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-50">
-              <AlertCircle className="mt-0.5 h-5 w-5 text-cyan-200" />
+            <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-primary">
+              <AlertCircle className="mt-0.5 h-5 w-5 text-primary" />
               <p className="m-0">
                 {error || 'El balance no está cuadrado. Activos no coincide con Pasivos + Patrimonio.'}
               </p>
@@ -397,19 +397,19 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
           ['Total patrimonio', data.patrimonio.total_patrimonio],
           ['Estado', isBalanced ? 'Cuadrado' : 'Descuadrado'],
         ].map(([label, value]) => (
-          <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100">
+          <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground">
             <CardContent className="p-4 text-center">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200/70">{label}</div>
-              <div className="mt-2 text-xl font-bold text-white">{typeof value === 'number' ? formatCurrency(value) : value}</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/80">{label}</div>
+              <div className="mt-2 text-xl font-bold text-foreground">{typeof value === 'number' ? formatCurrency(value) : value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100">
+      <Card className="border-cyan-400/20 bg-card/65 text-foreground">
         <CardHeader>
-          <CardTitle className="flex items-center justify-center gap-2 text-base text-white">
-            <Scale className="h-5 w-5 text-cyan-200" />
+          <CardTitle className="flex items-center justify-center gap-2 text-base text-foreground">
+            <Scale className="h-5 w-5 text-primary" />
             Distribución: Activos, Pasivos y Patrimonio
           </CardTitle>
         </CardHeader>

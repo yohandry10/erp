@@ -30,6 +30,7 @@ export interface VentaProcessedEvent {
   }>;
   cpeId?: string;
   inventarioAplicado?: boolean;
+  almacenId?: string | null;
 }
 
 export interface ComprobanteCreadoEvent {
@@ -182,6 +183,9 @@ export interface FacturaEmitidaEvent {
   fechaVencimiento: string;
   idempotencyKey: string;
   source: string;
+  // Cuando es false (venta al contado/POS ya pagada), no debe generarse CxC.
+  // undefined = comportamiento legacy (se crea CxC) para no romper flujos previos.
+  esCredito?: boolean;
   sunatStatus?: string;
   hashFirma?: string;
   hash?: string;
@@ -652,6 +656,7 @@ export interface DashboardMetricsUpdatedEvent {
 export class EventBusService {
   private eventEmitter = new EventEmitter();
   private readonly canonicalOutboxEventTypes = new Set([
+    'factura.emitida',
     'cxc.creada',
     'cobro.registrado',
     'recepcion.registrada',

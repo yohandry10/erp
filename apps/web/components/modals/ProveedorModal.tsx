@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { useToast } from '@/components/ui/use-toast'
 
 interface Proveedor {
   id?: number | string
@@ -56,6 +57,7 @@ export default function ProveedorModal({
   proveedor,
 }: ProveedorModalProps) {
   const { post, put } = useApi()
+  const { toast } = useToast()
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -94,7 +96,11 @@ export default function ProveedorModal({
       newErrors.razon_social = 'Razón Social es obligatoria'
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    // El backend exige email (CreateProveedorDto: @IsEmail sin @IsOptional). Se valida
+    // como obligatorio aquí para no enviar un POST que fallaría con 400 en silencio.
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email es obligatorio'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Email no válido'
     }
 
@@ -118,11 +124,11 @@ export default function ProveedorModal({
         onClose()
         resetForm()
       } else {
-        alert('Error: ' + (result?.error || 'Error al procesar el proveedor'))
+        toast({ variant: 'destructive', title: 'Error', description: result?.error || 'Error al procesar el proveedor' })
       }
     } catch (error) {
       console.error('Error submitting proveedor:', error)
-      alert('Error al procesar el proveedor')
+      toast({ variant: 'destructive', title: 'Error', description: 'Error al procesar el proveedor' })
     } finally {
       setIsLoading(false)
     }
@@ -146,18 +152,18 @@ export default function ProveedorModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]"
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1100]"
     >
-      <div className="bg-white rounded-2 p-8 w-[90%] max-w-[600px] overflow-auto"
+      <div className="bg-card rounded-lg p-8 w-[90%] max-w-[600px] overflow-auto"
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-6"
         >
-          <h2 className="m-0 text-6 font-semibold">
+          <h2 className="m-0 text-2xl font-semibold">
             {proveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}
           </h2>
           <button
-            onClick={onClose} className="border-0 text-6 cursor-pointer text-gray-500"
+            onClick={onClose} className="border-0 text-2xl cursor-pointer text-muted-foreground"
           >
             ×
           </button>
@@ -166,13 +172,13 @@ export default function ProveedorModal({
         <form onSubmit={handleSubmit}>
           {/* Información fiscal */}
           <div className="mb-6">
-            <h3 className="text-4 font-semibold mb-4 text-gray-700">
+            <h3 className="text-base font-semibold mb-4 text-foreground/85">
               Información Fiscal
             </h3>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4"
             >
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   RUC *
                 </label>
@@ -180,51 +186,51 @@ export default function ProveedorModal({
                   type="text"
                   value={formData.ruc}
                   onChange={(e) => handleInputChange('ruc', e.target.value)}
-                  maxLength={11} className="w-[100%] p-2 rounded-1.5 bg-white"
+                  maxLength={11} className="w-[100%] p-2 rounded-md bg-card"
                   placeholder="Ingrese RUC (11 dígitos)"
                 />
                 {errors.ruc && (
-                  <p className="text-red-500 text-3 mt-1">{errors.ruc}</p>
+                  <p className="text-red-500 text-xs mt-1">{errors.ruc}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Razón Social *
                 </label>
                 <input
                   type="text"
                   value={formData.razon_social}
-                  onChange={(e) => handleInputChange('razon_social', e.target.value)} className="w-[100%] p-2 rounded-1.5 bg-white"
+                  onChange={(e) => handleInputChange('razon_social', e.target.value)} className="w-[100%] p-2 rounded-md bg-card"
                   placeholder="Razón social completa"
                 />
                 {errors.razon_social && (
-                  <p className="text-red-500 text-3 mt-1">{errors.razon_social}</p>
+                  <p className="text-red-500 text-xs mt-1">{errors.razon_social}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Nombre Comercial
                 </label>
                 <input
                   type="text"
                   value={formData.nombre_comercial}
-                  onChange={(e) => handleInputChange('nombre_comercial', e.target.value)} className="w-[100%] p-2 border rounded-1.5 bg-white"
+                  onChange={(e) => handleInputChange('nombre_comercial', e.target.value)} className="w-[100%] p-2 border rounded-md bg-card"
                   placeholder="Nombre comercial (opcional)"
                 />
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Condiciones de Pago
                 </label>
                 <select
                   value={formData.condiciones_pago}
-                  onChange={(e) => handleInputChange('condiciones_pago', e.target.value)} className="w-[100%] p-2 border rounded-1.5 bg-white"
+                  onChange={(e) => handleInputChange('condiciones_pago', e.target.value)} className="w-[100%] p-2 border rounded-md bg-card"
                 >
                   <option value="CONTADO">Contado</option>
                   <option value="CREDITO_15">Crédito 15 días</option>
@@ -238,49 +244,49 @@ export default function ProveedorModal({
 
           {/* Información de contacto */}
           <div className="mb-6">
-            <h3 className="text-4 font-semibold mb-4 text-gray-700">
+            <h3 className="text-base font-semibold mb-4 text-foreground/85">
               Información de Contacto
             </h3>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4"
             >
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Teléfono
                 </label>
                 <input
                   type="text"
                   value={formData.telefono}
-                  onChange={(e) => handleInputChange('telefono', e.target.value)} className="w-[100%] p-2 border rounded-1.5 bg-white"
+                  onChange={(e) => handleInputChange('telefono', e.target.value)} className="w-[100%] p-2 border rounded-md bg-card"
                   placeholder="Teléfono principal"
                 />
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Email
                 </label>
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)} className="w-[100%] p-2 rounded-1.5 bg-white"
+                  onChange={(e) => handleInputChange('email', e.target.value)} className="w-[100%] p-2 rounded-md bg-card"
                   placeholder="email@ejemplo.com"
                 />
                 {errors.email && (
-                  <p className="text-red-500 text-3 mt-1">{errors.email}</p>
+                  <p className="text-red-500 text-xs mt-1">{errors.email}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Persona de Contacto
                 </label>
                 <input
                   type="text"
                   value={formData.contacto}
-                  onChange={(e) => handleInputChange('contacto', e.target.value)} className="w-[100%] p-2 border rounded-1.5 bg-white"
+                  onChange={(e) => handleInputChange('contacto', e.target.value)} className="w-[100%] p-2 border rounded-md bg-card"
                   placeholder="Nombre del contacto"
                 />
               </div>
@@ -289,14 +295,14 @@ export default function ProveedorModal({
 
           {/* Dirección */}
           <div className="mb-6">
-            <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
+            <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
             >
               Dirección
             </label>
             <textarea
               value={formData.direccion}
               onChange={(e) => handleInputChange('direccion', e.target.value)}
-              rows={3} className="w-[100%] p-2 border rounded-1.5 bg-white"
+              rows={3} className="w-[100%] p-2 border rounded-md bg-card"
               placeholder="Dirección completa del proveedor"
             />
           </div>
@@ -306,13 +312,13 @@ export default function ProveedorModal({
           >
             <button
               type="button"
-              onClick={onClose} className="py-2 px-4 border rounded-1.5 bg-white text-gray-700 cursor-pointer"
+              onClick={onClose} className="py-2 px-4 border rounded-md bg-card text-foreground/85 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={isLoading} className="py-2 px-4 border-0 rounded-1.5 text-white font-medium"
+              disabled={isLoading} className="py-2 px-4 border-0 rounded-md text-white font-medium"
             >
               {isLoading ? 'Guardando...' : proveedor ? 'Actualizar' : 'Crear Proveedor'}
             </button>

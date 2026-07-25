@@ -260,6 +260,10 @@ export class ImportExportService {
         const stockReservado = Number(row['stock_reservado'] || 0);
         const moneda = row['moneda'] || 'PEN';
         const sucursalId = row['sucursal_id'] || null;
+        const almacenId = row['almacen_id'] || null;
+        if (controlaStock && (stockInicial > 0 || stockReservado > 0) && !almacenId) {
+          throw new Error('almacen_id es obligatorio cuando se importa stock inicial o reservado');
+        }
 
         // Upsert producto por codigo+tenant
         const baseProducto = {
@@ -277,7 +281,6 @@ export class ImportExportService {
           precio_venta: precioVenta,
           precio_compra: precioCompra,
           stock_minimo: stockMinimo,
-          stock_reservado: stockReservado,
           imagen_url: row['imagen_url'] || '',
           activo: true,
         };
@@ -290,7 +293,11 @@ export class ImportExportService {
           .maybeSingle();
 
         let productoId: string;
+        let productoCreado = false;
         if (existing?.id) {
+          if (controlaStock && (stockInicial > 0 || stockReservado > 0)) {
+            throw new Error('El catálogo no puede sobrescribir stock de un producto existente; use la importación de stock inicial');
+          }
           const { data, error } = await this.supabase.getClient()
             .from('productos')
             .update(baseProducto)
@@ -304,12 +311,45 @@ export class ImportExportService {
         } else {
           const { data, error } = await this.supabase.getClient()
             .from('productos')
-            .insert([{ ...baseProducto, stock: controlaStock ? stockInicial : 0 }])
+            .insert([{ ...baseProducto, stock_actual: 0, stock: 0, stock_reservado: 0 }])
             .select('id')
             .single();
           if (error) throw error;
           productoId = data.id;
+          productoCreado = true;
           created++;
+        }
+
+        if (productoCreado && controlaStock && stockInicial > 0) {
+          const { error: initialStockError } = await this.supabase.getClient().rpc(
+            'aplicar_movimiento_inventario_tx',
+            {
+              p_tenant_id: tenantId,
+              p_producto_id: productoId,
+              p_almacen_id: almacenId,
+              p_tipo: 'ENTRADA',
+              p_cantidad: stockInicial,
+              p_referencia_tipo: 'CATALOGO_STOCK_INICIAL',
+              p_referencia_id: productoId,
+              p_notas: 'Stock inicial por importación de catálogo',
+              p_metadata: { source: 'catalog_import', costo_unitario: precioCompra },
+            },
+          );
+          if (initialStockError) throw initialStockError;
+        }
+
+        if (productoCreado && controlaStock && stockReservado > 0) {
+          const { error: reserveError } = await this.supabase.getClient().rpc('reservar_stock_en_almacen_tx', {
+            p_tenant_id: tenantId,
+            p_producto_id: productoId,
+            p_almacen_id: almacenId,
+            p_cantidad: stockReservado,
+            p_referencia_tipo: 'CATALOGO_RESERVA_INICIAL',
+            p_referencia_id: productoId,
+            p_notas: 'Reserva inicial por importación de catálogo',
+            p_metadata: { source: 'catalog_import' },
+          });
+          if (reserveError) throw reserveError;
         }
 
         // Upsert precio por sucursal
@@ -326,21 +366,8 @@ export class ImportExportService {
           if (priceError) throw priceError;
         }
 
-        // Upsert stock por sucursal/almacén si controla stock
-        if (controlaStock && sucursalId) {
-          const stockData = {
-            producto_id: productoId,
-            sucursal_id: sucursalId,
-            almacen_id: row['almacen_id'] || null,
-            stock: stockInicial,
-            reservado: stockReservado,
-            minimo: stockMinimo,
-          };
-          const { error: stockError } = await this.supabase.getClient()
-            .from('producto_stock_sucursal')
-            .upsert([stockData], { onConflict: 'producto_id,sucursal_id,almacen_id' });
-          if (stockError) throw stockError;
-        }
+        // producto_stock_sucursal es una proyección derivada. El saldo físico
+        // ya fue inicializado por la RPC canónica usando almacen_id.
       } catch (err: any) {
         this.logger.error(`Error importando fila ${i + 1}: ${err.message}`);
         errors.push(`Fila ${i + 1}: ${err.message}`);

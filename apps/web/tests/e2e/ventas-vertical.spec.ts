@@ -99,6 +99,12 @@ test.describe('T07 Ventas vertical completo', () => {
     );
     expect(cliente.id).toBeTruthy();
 
+    const almacenes = await parseOk<any[]>(
+      await apiContext.get(api('/inventario/almacenes')),
+      'listar almacenes para producto de venta',
+    );
+    expect(almacenes.length, 'debe existir al menos un almacén operativo').toBeGreaterThan(0);
+
     const producto = await parseOk<any>(
       await apiContext.post(api('/inventario/productos'), {
         data: {
@@ -108,6 +114,7 @@ test.describe('T07 Ventas vertical completo', () => {
           precio_compra: 30,
           precio_venta: 90,
           stock: cantidadInicial,
+          almacen_id: almacenes[0].id,
           stock_minimo: 0,
           controla_stock: true,
         },

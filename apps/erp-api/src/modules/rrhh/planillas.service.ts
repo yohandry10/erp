@@ -1528,23 +1528,6 @@ export class PlanillasService {
     }
   }
 
-  private async getSiguienteNumeroAsiento(tenantId: string): Promise<number> {
-    const { data, error } = await this.supabaseService.getClient()
-      .from('asientos_contables')
-      .select('numero_asiento')
-      .eq('tenant_id', tenantId)
-      .order('numero_asiento', { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`No se pudo obtener el correlativo contable: ${error.message}`);
-    }
-
-    const ultimoNumero = Number(data?.numero_asiento ?? 0);
-    return Number.isFinite(ultimoNumero) ? ultimoNumero + 1 : 1;
-  }
-
   /**
    * Generar asientos contables para planilla
    */
@@ -1638,7 +1621,11 @@ export class PlanillasService {
       const totalNeto = planilla.empleado_planilla.reduce(
         (sum, emp) => sum + (parseFloat(emp.neto_pagar) || 0), 0
       );
-      const totalAportes = (planilla.total_aportes ?? 0) || totalDescuentos;
+      const totalAportesEmpleados = planilla.empleado_planilla.reduce(
+        (sum, emp) => sum + (parseFloat(emp.total_aportes) || 0), 0
+      );
+      const totalAportesPlanilla = Number(planilla.total_aportes ?? 0);
+      const totalAportes = totalAportesPlanilla > 0 ? totalAportesPlanilla : totalAportesEmpleados;
 
       // Encolado outbox opcional para que Contabilidad genere asiento de planilla (pipeline resiliente)
       const usarOutboxPlanilla = process.env.PLANILLA_OUTBOX_ENABLED === 'true';
@@ -1666,7 +1653,7 @@ export class PlanillasService {
             `♻️ [RRHH] Evento planilla.liquidada ya estaba encolado (${eventoPrevio.event_id}); se garantiza asiento sincronico por idempotencia`
           );
         } else {
-          const eventId = uuidv4();
+          const eventId = sourceEventId;
           const outboxEvent = OutboxEventBuilder.build({
             tenantId: planilla.tenant_id,
             eventType: 'planilla.liquidada',
@@ -1730,18 +1717,13 @@ export class PlanillasService {
       if (cuentaSeguridadSocial) this.logger.debug(`   - Seguridad Social (627): ${cuentaSeguridadSocial}`);
       if (cuentaEssalud) this.logger.debug(`   - ESSALUD (407): ${cuentaEssalud}`);
 
-      // 2. Crear cabecera del asiento en tabla principal
-      const numeroAsiento = await this.getSiguienteNumeroAsiento(tenantIdPlanilla);
-      const codigoAsiento = `RRHH-${planilla.periodo}-${numeroAsiento.toString().padStart(6, '0')}`;
-
-      this.logger.debug(`📊 [RRHH] Creando cabecera del asiento: ${codigoAsiento}`);
+      // 2. Crear cabecera del asiento en tabla principal. La BD asigna numero_asiento/codigo.
+      this.logger.debug(`📊 [RRHH] Creando cabecera del asiento de planilla ${planilla.periodo}`);
 
       const { data: asientoCreado, error: asientoError } = await this.supabaseService.getClient()
         .from('asientos_contables')
         .insert({
           tenant_id: tenantIdPlanilla,
-          codigo: codigoAsiento,
-          numero_asiento: numeroAsiento,
           fecha: fechaAsiento,
           tipo_asiento: 'PLANILLA',
           origen: 'RRHH',
@@ -1835,7 +1817,12 @@ export class PlanillasService {
         throw new Error(`Error creando detalles del asiento: ${detallesError.message}`);
       }
 
-      this.logger.debug('✅ [RRHH] Asiento contable completo creado exitosamente:', numeroAsiento);
+      const numeroAsientoGenerado = asientoCreado.numero_asiento;
+      const codigoAsientoGenerado = asientoCreado.codigo;
+      this.logger.debug(
+        '✅ [RRHH] Asiento contable completo creado exitosamente:',
+        codigoAsientoGenerado ?? numeroAsientoGenerado ?? asientoCreado.id
+      );
 
       // Marcar planilla como con asientos generados
       try {
@@ -1856,8 +1843,8 @@ export class PlanillasService {
         success: true,
         message: 'Asientos contables generados correctamente en sistema principal',
         data: {
-          numero_asiento: numeroAsiento,
-          codigo_asiento: codigoAsiento,
+          numero_asiento: numeroAsientoGenerado,
+          codigo_asiento: codigoAsientoGenerado,
           asiento_id: asientoCreado.id,
           registros: detallesAsiento.length,
           monto_total: totalIngresos + totalAportes,

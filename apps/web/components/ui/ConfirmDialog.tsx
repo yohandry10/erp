@@ -1,18 +1,58 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { cn } from '@/lib/utils'
+import { type ReactNode, useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  HelpCircle,
+  ShieldAlert,
+} from "lucide-react";
+
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface ConfirmDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  onConfirm: () => void | Promise<void>
-  title: string
-  message: string
-  confirmText?: string
-  cancelText?: string
-  variant?: 'default' | 'danger' | 'warning'
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+  title: string;
+  message: ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: "default" | "danger" | "warning" | "success";
 }
+
+const variantStyles = {
+  default: {
+    icon: HelpCircle,
+    accent: "bg-primary",
+    button: "bg-primary text-primary-foreground hover:bg-primary/90",
+  },
+  danger: {
+    icon: ShieldAlert,
+    accent: "bg-destructive",
+    button:
+      "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+  },
+  warning: {
+    icon: AlertTriangle,
+    accent: "bg-amber-500",
+    button: "bg-amber-500 text-foreground hover:bg-amber-400",
+  },
+  success: {
+    icon: CheckCircle2,
+    accent: "bg-emerald-600",
+    button: "bg-emerald-600 text-white hover:bg-emerald-700",
+  },
+} as const;
 
 export default function ConfirmDialog({
   isOpen,
@@ -20,97 +60,80 @@ export default function ConfirmDialog({
   onConfirm,
   title,
   message,
-  confirmText = 'Confirmar',
-  cancelText = 'Cancelar',
-  variant = 'default'
+  confirmText = "Confirmar",
+  cancelText = "Cancelar",
+  variant = "default",
 }: ConfirmDialogProps) {
-  const [isLoading, setIsLoading] = useState(false)
-
-  if (!isOpen) return null
+  const [isLoading, setIsLoading] = useState(false);
+  const appearance = variantStyles[variant];
+  const Icon = appearance.icon;
 
   const handleConfirm = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      await onConfirm()
-      onClose()
+      await onConfirm();
+      onClose();
     } catch (error) {
-      console.error('Error en confirmación:', error)
+      console.error("Error en confirmación:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
-
-  const getVariantClasses = () => {
-    switch (variant) {
-      case 'danger':
-        return 'bg-gradient-to-br from-slate-700 to-slate-500 text-white'
-      case 'warning':
-        return 'bg-gradient-to-br from-blue-800 to-cyan-400 text-white'
-      default:
-        return 'bg-gradient-to-br from-blue-800 via-blue-500 to-cyan-500 text-white'
-    }
-  }
+  };
 
   return (
-    <div 
-      onClick={onClose}
-      className="modal-overlay fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur"
+    <AlertDialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open && !isLoading) onClose();
+      }}
     >
-      <div 
-        className="modal-content relative w-[90%] max-w-[500px] overflow-hidden rounded-2xl border border-white/30 bg-gradient-to-br from-white/95 to-slate-50/90 p-8 shadow-2xl backdrop-blur-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header bar */}
-        <div className={cn('absolute inset-x-0 top-0 h-1 rounded-t-2xl', getVariantClasses())} />
+      <AlertDialogContent className="overflow-hidden border-border bg-card p-0 text-card-foreground sm:max-w-[500px]">
+        <div
+          className={cn("h-1 w-full", appearance.accent)}
+          aria-hidden="true"
+        />
+        <div className="space-y-6 p-6">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-xl">
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              {title}
+            </AlertDialogTitle>
+            {/* asChild → la descripción se renderiza como <div>, no como <p>.
+                message puede traer bloques (div/ul/p) y un <p> no puede
+                contenerlos (causaba errores de hidratación/HTML inválido). */}
+            <AlertDialogDescription asChild>
+              <div className="whitespace-pre-line text-left leading-relaxed text-sm text-muted-foreground">
+                {message}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-        {/* Header */}
-        <div className="modal-header mb-6 flex items-center justify-between">
-          <h2 className={cn('modal-title m-0 flex items-center gap-2 bg-clip-text text-2xl font-bold text-transparent', getVariantClasses())}>
-            {variant === 'danger' && '⚠️'}
-            {variant === 'warning' && '⚡'}
-            {variant === 'default' && '❓'}
-            {title}
-          </h2>
-          <button
-            onClick={onClose}
-            className="modal-close flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-          >
-            ✕
-          </button>
+          <AlertDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isLoading}
+            >
+              {cancelText}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleConfirm()}
+              disabled={isLoading}
+              className={appearance.button}
+            >
+              {isLoading && (
+                <span
+                  className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                  aria-hidden="true"
+                />
+              )}
+              {isLoading ? "Procesando..." : confirmText}
+            </Button>
+          </AlertDialogFooter>
         </div>
-
-        {/* Body */}
-        <div className="modal-body mb-6">
-          <p className="m-0 whitespace-pre-line text-base leading-relaxed text-slate-700">
-            {message}
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="modal-actions flex flex-wrap justify-end gap-4">
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="modal-btn modal-btn-secondary flex min-w-[120px] items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-100 px-6 py-3 text-sm font-semibold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {cancelText}
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={isLoading}
-            className={cn('modal-btn flex min-w-[120px] items-center justify-center gap-2 rounded-xl border-0 px-6 py-3 text-sm font-semibold shadow-md transition disabled:cursor-not-allowed disabled:opacity-60', getVariantClasses())}
-          >
-            {isLoading ? (
-              <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                Procesando...
-              </>
-            ) : (
-              confirmText
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }

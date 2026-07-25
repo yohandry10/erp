@@ -1,0 +1,4 @@
+{
+  "passed": false,
+  "error": "Error: consultar asiento cierre: invalid input syntax for type uuid: \"caja.cierre:c68b19fc-5748-4a2d-b356-e516d3251505\"\n    at main (file:///C:/Users/PC/AppData/Local/Temp/erp-concurrent-pos-write-close-20260617-213529.mjs:265:28)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)"
+}

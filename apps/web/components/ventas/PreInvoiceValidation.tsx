@@ -1,7 +1,7 @@
 /**
  * Pre-Invoice Validation Component
  * Requirements: 15.5, 19.6, 19.7
- * 
+ *
  * Validates all requirements before allowing invoice generation
  */
 
@@ -29,7 +29,7 @@ interface PreInvoiceValidationProps {
 
 /**
  * Wrapper component that validates certificate before allowing invoice generation
- * 
+ *
  * @example
  * ```tsx
  * <PreInvoiceValidation onValidationSuccess={handleGenerateInvoice}>
@@ -43,13 +43,13 @@ export function PreInvoiceValidation({
   children
 }: PreInvoiceValidationProps) {
   const [showDialog, setShowDialog] = useState(false)
-  const { 
-    validation, 
-    isLoading, 
-    canProceed, 
+  const {
+    validation,
+    isLoading,
+    canProceed,
     errorMessage,
     warningMessage,
-    refetch 
+    refetch
   } = useCertificateValidation()
 
   const handleClick = async () => {
@@ -84,7 +84,7 @@ export function PreInvoiceValidation({
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-red-600" />
+              <XCircle className="h-5 w-5 text-destructive" />
               No se puede generar la factura
             </DialogTitle>
             <DialogDescription>
@@ -96,7 +96,7 @@ export function PreInvoiceValidation({
             <CertificateValidationAlert />
 
             {errorMessage && (
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-foreground/80">
                 <p className="font-medium mb-2">¿Qué debo hacer?</p>
                 <ol className="list-decimal list-inside space-y-1">
                   <li>Vaya a Configuración &gt; Empresa &gt; Certificado Digital</li>
@@ -151,33 +151,33 @@ export function ValidationChecklist({ className }: ValidationChecklistProps) {
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <h4 className="text-sm font-medium text-gray-700">
+      <h4 className="text-sm font-medium text-foreground/85">
         Validaciones pre-emisión:
       </h4>
       <div className="space-y-1">
         {checks.map((check) => (
           <div key={check.id} className="flex items-start gap-2 text-sm">
             {check.status === 'loading' && (
-              <Loader2 className="h-4 w-4 mt-0.5 animate-spin text-gray-400" />
+              <Loader2 className="h-4 w-4 mt-0.5 animate-spin text-muted-foreground" />
             )}
             {check.status === 'success' && (
-              <CheckCircle className="h-4 w-4 mt-0.5 text-green-600" />
+              <CheckCircle className="h-4 w-4 mt-0.5 text-emerald-400" />
             )}
             {check.status === 'error' && (
-              <XCircle className="h-4 w-4 mt-0.5 text-red-600" />
+              <XCircle className="h-4 w-4 mt-0.5 text-destructive" />
             )}
             <div>
               <p className={
-                check.status === 'error' 
-                  ? 'text-red-700' 
+                check.status === 'error'
+                  ? 'text-destructive'
                   : check.status === 'success'
-                  ? 'text-green-700'
-                  : 'text-gray-700'
+                  ? 'text-emerald-400'
+                  : 'text-foreground/85'
               }>
                 {check.label}
               </p>
               {check.message && (
-                <p className="text-xs text-gray-500 mt-0.5">{check.message}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{check.message}</p>
               )}
             </div>
           </div>

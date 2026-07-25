@@ -1,16 +1,18 @@
 /**
- * Boleta Validation Rules
+ * Boleta validation rules for Peru.
  * Requirements: 15.4, 19.4
- * 
- * According to SUNAT regulations:
- * - Boletas issued to clients without RUC and total > S/ 700 require GRE (Guía de Remisión Electrónica)
+ *
+ * SUNAT requires buyer/user identification on boletas when the total exceeds S/ 700.
+ * This threshold does not by itself create a GRE requirement.
  */
 
 import { TipoDocumento } from '@/types/ventas'
 
-export const BOLETA_GRE_THRESHOLD = 700
+export const BOLETA_IDENTIFICATION_THRESHOLD = 700
+export const BOLETA_GRE_THRESHOLD = BOLETA_IDENTIFICATION_THRESHOLD
 
 export interface BoletaValidationResult {
+  requiresBuyerIdentity: boolean
   requiresGRE: boolean
   reason?: string
   threshold: number
@@ -18,32 +20,42 @@ export interface BoletaValidationResult {
 }
 
 /**
- * Validates if a boleta requires GRE based on client document type and total amount
- * 
+ * Validates if a boleta must include buyer/user identity data.
+ *
  * @param documentoTipo - Client's document type
  * @param total - Total amount of the sale
- * @returns Validation result indicating if GRE is required
+ * @returns Validation result indicating if buyer identity is required
+ */
+export function validateBoletaBuyerIdentityRequirement(
+  documentoTipo: TipoDocumento,
+  total: number
+): BoletaValidationResult {
+  const requiresBuyerIdentity = total > BOLETA_IDENTIFICATION_THRESHOLD
+
+  void documentoTipo
+
+  return {
+    requiresBuyerIdentity,
+    // Backwards-compatible field. A boleta over S/ 700 requires buyer identity,
+    // not a GRE by amount alone.
+    requiresGRE: false,
+    reason: requiresBuyerIdentity
+      ? `Boleta con monto mayor a S/ ${BOLETA_IDENTIFICATION_THRESHOLD} requiere identificar al adquirente o usuario`
+      : undefined,
+    threshold: BOLETA_IDENTIFICATION_THRESHOLD,
+    total
+  }
+}
+
+/**
+ * Backwards-compatible alias. Kept to avoid breaking older imports; do not use the
+ * returned requiresGRE flag for new behavior.
  */
 export function validateBoletaGRERequirement(
   documentoTipo: TipoDocumento,
   total: number
 ): BoletaValidationResult {
-  // GRE is required if:
-  // 1. Client doesn't have RUC (DNI, CE, or PASAPORTE)
-  // 2. Total amount exceeds S/ 700
-  const clientWithoutRUC = documentoTipo !== TipoDocumento.RUC
-  const exceedsThreshold = total > BOLETA_GRE_THRESHOLD
-
-  const requiresGRE = clientWithoutRUC && exceedsThreshold
-
-  return {
-    requiresGRE,
-    reason: requiresGRE
-      ? `Boleta sin RUC con monto mayor a S/ ${BOLETA_GRE_THRESHOLD} requiere Guía de Remisión Electrónica`
-      : undefined,
-    threshold: BOLETA_GRE_THRESHOLD,
-    total
-  }
+  return validateBoletaBuyerIdentityRequirement(documentoTipo, total)
 }
 
 /**
@@ -60,17 +72,17 @@ export function getBoletaWarningMessage(
   documentoTipo: TipoDocumento,
   total: number
 ): string | null {
-  const validation = validateBoletaGRERequirement(documentoTipo, total)
+  const validation = validateBoletaBuyerIdentityRequirement(documentoTipo, total)
 
-  if (validation.requiresGRE) {
-    return `⚠️ Esta venta requiere Guía de Remisión Electrónica (GRE) porque el cliente no tiene RUC y el monto (S/ ${total.toFixed(2)}) supera los S/ ${BOLETA_GRE_THRESHOLD}.`
+  if (validation.requiresBuyerIdentity) {
+    return `Esta boleta supera S/ ${BOLETA_IDENTIFICATION_THRESHOLD}. Debe consignar apellidos y nombres o razón social, y número de documento del adquirente o usuario.`
   }
 
   // Show warning when approaching threshold
-  if (!clientHasRUC(documentoTipo) && total > BOLETA_GRE_THRESHOLD * 0.8) {
-    const remaining = BOLETA_GRE_THRESHOLD - total
+  if (total > BOLETA_IDENTIFICATION_THRESHOLD * 0.8) {
+    const remaining = BOLETA_IDENTIFICATION_THRESHOLD - total
     if (remaining > 0) {
-      return `Advertencia: Si el monto supera S/ ${BOLETA_GRE_THRESHOLD}, será necesario generar una Guía de Remisión Electrónica. Faltan S/ ${remaining.toFixed(2)} para alcanzar el límite.`
+      return `Si la boleta supera S/ ${BOLETA_IDENTIFICATION_THRESHOLD}, será obligatorio consignar los datos de identificación del adquirente o usuario. Faltan S/ ${remaining.toFixed(2)} para alcanzar el límite.`
     }
   }
 
@@ -78,11 +90,19 @@ export function getBoletaWarningMessage(
 }
 
 /**
- * Gets the action message for GRE requirement
+ * Gets the action message for buyer identity requirement.
+ */
+export function getBuyerIdentityActionMessage(requiresBuyerIdentity: boolean): string | null {
+  if (requiresBuyerIdentity) {
+    return 'Confirme que el comprobante incluye nombre completo o razón social y documento del receptor antes de emitir.'
+  }
+  return null
+}
+
+/**
+ * Backwards-compatible alias for older UI code.
  */
 export function getGREActionMessage(requiresGRE: boolean): string | null {
-  if (requiresGRE) {
-    return 'Deberá generar una Guía de Remisión Electrónica (GRE) después de emitir la factura.'
-  }
+  void requiresGRE
   return null
 }

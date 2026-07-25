@@ -199,7 +199,7 @@ export default function ConciliacionDetailPage() {
   const handleOpenCloseModal = async () => {
     setLoadingDiferencias(true);
     setShowCloseModal(true);
-    
+
     try {
       const response = await fetchApi(
         `/api/finanzas/conciliacion/${conciliacionId}/diferencias`,
@@ -224,7 +224,7 @@ export default function ConciliacionDetailPage() {
 
   const handleCerrarConciliacion = async (forzarCierre: boolean = false) => {
     setClosingConciliacion(true);
-    
+
     try {
       const response = await fetchApi(
         `/api/finanzas/conciliacion/${conciliacionId}/cerrar`,
@@ -259,11 +259,11 @@ export default function ConciliacionDetailPage() {
 
   const getEstadoBadge = (estado: string) => {
     const badges = {
-      ABIERTA: 'bg-blue-100 text-blue-800',
-      EN_PROCESO: 'bg-yellow-100 text-yellow-800',
-      CERRADA: 'bg-green-100 text-green-800',
+      ABIERTA: 'bg-primary/10 text-primary',
+      EN_PROCESO: 'bg-amber-500/10 text-amber-400',
+      CERRADA: 'bg-emerald-500/10 text-emerald-400',
     };
-    return badges[estado as keyof typeof badges] || 'bg-gray-100 text-gray-800';
+    return badges[estado as keyof typeof badges] || 'bg-muted text-foreground';
   };
 
   if (loading) {
@@ -277,7 +277,7 @@ export default function ConciliacionDetailPage() {
   if (!conciliacion) {
     return (
       <div className="p-6">
-        <div className="text-center text-gray-600">Conciliación no encontrada</div>
+        <div className="text-center text-foreground/80">Conciliación no encontrada</div>
       </div>
     );
   }
@@ -287,8 +287,8 @@ export default function ConciliacionDetailPage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Conciliación Bancaria</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-foreground">Conciliación Bancaria</h1>
+          <p className="text-foreground/80 mt-1">
             {conciliacion.cuentas_bancarias?.banco || 'Banco'} - {conciliacion.cuentas_bancarias?.numero_cuenta || 'N/A'}
           </p>
         </div>
@@ -301,11 +301,11 @@ export default function ConciliacionDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Período</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground/80">Período</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-lg font-semibold">{conciliacion.periodo}</p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {formatDateLong(conciliacion.fecha_desde)} - {formatDateLong(conciliacion.fecha_hasta)}
             </p>
           </CardContent>
@@ -313,7 +313,7 @@ export default function ConciliacionDetailPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Saldo Libro</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground/80">Saldo Libro</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-lg font-semibold">{formatCurrency(conciliacion.saldo_libro)}</p>
@@ -322,7 +322,7 @@ export default function ConciliacionDetailPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Saldo Banco</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground/80">Saldo Banco</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-lg font-semibold">{formatCurrency(conciliacion.saldo_banco)}</p>
@@ -331,12 +331,12 @@ export default function ConciliacionDetailPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Diferencia</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground/80">Diferencia</CardTitle>
           </CardHeader>
           <CardContent>
             <p
               className={`text-lg font-semibold ${
-                conciliacion.diferencia === 0 ? 'text-green-600' : 'text-red-600'
+                conciliacion.diferencia === 0 ? 'text-emerald-400' : 'text-destructive'
               }`}
             >
               {formatCurrency(conciliacion.diferencia)}
@@ -420,7 +420,7 @@ export default function ConciliacionDetailPage() {
       {/* Import CSV Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <ImportarExtractoCSV
                 conciliacionId={conciliacionId}
@@ -445,9 +445,9 @@ export default function ConciliacionDetailPage() {
       {/* Close Confirmation Modal */}
       {showCloseModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              <h2 className="text-2xl font-bold text-foreground mb-4">
                 Confirmar Cierre de Conciliación
               </h2>
 
@@ -458,15 +458,15 @@ export default function ConciliacionDetailPage() {
               ) : reporteDiferencias ? (
                 <div className="space-y-6">
                   {/* Summary */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-900 mb-2">Resumen de Conciliación</h3>
+                  <div className="bg-primary/10 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-primary mb-2">Resumen de Conciliación</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <p className="text-blue-700">Período:</p>
+                        <p className="text-primary">Período:</p>
                         <p className="font-semibold">{reporteDiferencias.conciliacion.periodo}</p>
                       </div>
                       <div>
-                        <p className="text-blue-700">Cuenta:</p>
+                        <p className="text-primary">Cuenta:</p>
                         <p className="font-semibold">
                           {reporteDiferencias.conciliacion.cuenta_bancaria.banco} -{' '}
                           {reporteDiferencias.conciliacion.cuenta_bancaria.numero_cuenta}
@@ -479,7 +479,7 @@ export default function ConciliacionDetailPage() {
                   <div className="grid grid-cols-3 gap-4">
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-600">Saldo Libro</CardTitle>
+                        <CardTitle className="text-sm font-medium text-foreground/80">Saldo Libro</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <p className="text-lg font-semibold">
@@ -490,7 +490,7 @@ export default function ConciliacionDetailPage() {
 
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-600">Saldo Banco</CardTitle>
+                        <CardTitle className="text-sm font-medium text-foreground/80">Saldo Banco</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <p className="text-lg font-semibold">
@@ -501,14 +501,14 @@ export default function ConciliacionDetailPage() {
 
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-600">Diferencia</CardTitle>
+                        <CardTitle className="text-sm font-medium text-foreground/80">Diferencia</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <p
                           className={`text-lg font-semibold ${
                             reporteDiferencias.saldos.diferencia_neta === 0
-                              ? 'text-green-600'
-                              : 'text-red-600'
+                              ? 'text-emerald-400'
+                              : 'text-destructive'
                           }`}
                         >
                           {formatCurrency(reporteDiferencias.saldos.diferencia_neta)}
@@ -521,7 +521,7 @@ export default function ConciliacionDetailPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-600">
+                        <CardTitle className="text-sm font-medium text-foreground/80">
                           Movimientos del Sistema
                         </CardTitle>
                       </CardHeader>
@@ -534,7 +534,7 @@ export default function ConciliacionDetailPage() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Conciliados:</span>
-                          <span className="font-semibold text-green-600">
+                          <span className="font-semibold text-emerald-400">
                             {reporteDiferencias.movimientos_sistema.conciliados}
                           </span>
                         </div>
@@ -543,8 +543,8 @@ export default function ConciliacionDetailPage() {
                           <span
                             className={`font-semibold ${
                               reporteDiferencias.movimientos_sistema.pendientes > 0
-                                ? 'text-red-600'
-                                : 'text-gray-600'
+                                ? 'text-destructive'
+                                : 'text-foreground/80'
                             }`}
                           >
                             {reporteDiferencias.movimientos_sistema.pendientes}
@@ -553,13 +553,13 @@ export default function ConciliacionDetailPage() {
                         <div className="pt-2 border-t">
                           <div className="flex justify-between text-sm">
                             <span>Abonos:</span>
-                            <span className="font-semibold text-green-600">
+                            <span className="font-semibold text-emerald-400">
                               {formatCurrency(reporteDiferencias.movimientos_sistema.total_abonos)}
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Cargos:</span>
-                            <span className="font-semibold text-red-600">
+                            <span className="font-semibold text-destructive">
                               {formatCurrency(reporteDiferencias.movimientos_sistema.total_cargos)}
                             </span>
                           </div>
@@ -569,7 +569,7 @@ export default function ConciliacionDetailPage() {
 
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-600">
+                        <CardTitle className="text-sm font-medium text-foreground/80">
                           Movimientos del Extracto
                         </CardTitle>
                       </CardHeader>
@@ -582,7 +582,7 @@ export default function ConciliacionDetailPage() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Conciliados:</span>
-                          <span className="font-semibold text-green-600">
+                          <span className="font-semibold text-emerald-400">
                             {reporteDiferencias.movimientos_extracto.conciliados}
                           </span>
                         </div>
@@ -591,8 +591,8 @@ export default function ConciliacionDetailPage() {
                           <span
                             className={`font-semibold ${
                               reporteDiferencias.movimientos_extracto.pendientes > 0
-                                ? 'text-red-600'
-                                : 'text-gray-600'
+                                ? 'text-destructive'
+                                : 'text-foreground/80'
                             }`}
                           >
                             {reporteDiferencias.movimientos_extracto.pendientes}
@@ -601,13 +601,13 @@ export default function ConciliacionDetailPage() {
                         <div className="pt-2 border-t">
                           <div className="flex justify-between text-sm">
                             <span>Abonos:</span>
-                            <span className="font-semibold text-green-600">
+                            <span className="font-semibold text-emerald-400">
                               {formatCurrency(reporteDiferencias.movimientos_extracto.total_abonos)}
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Cargos:</span>
-                            <span className="font-semibold text-red-600">
+                            <span className="font-semibold text-destructive">
                               {formatCurrency(reporteDiferencias.movimientos_extracto.total_cargos)}
                             </span>
                           </div>
@@ -619,27 +619,27 @@ export default function ConciliacionDetailPage() {
                   {/* Metrics */}
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-600">
+                      <CardTitle className="text-sm font-medium text-foreground/80">
                         Métricas de Conciliación
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-3 gap-4">
                         <div>
-                          <p className="text-xs text-gray-600">Sistema</p>
-                          <p className="text-2xl font-bold text-blue-600">
+                          <p className="text-xs text-foreground/80">Sistema</p>
+                          <p className="text-2xl font-bold text-primary">
                             {reporteDiferencias.metricas.porcentaje_conciliado_sistema.toFixed(1)}%
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-600">Extracto</p>
-                          <p className="text-2xl font-bold text-blue-600">
+                          <p className="text-xs text-foreground/80">Extracto</p>
+                          <p className="text-2xl font-bold text-primary">
                             {reporteDiferencias.metricas.porcentaje_conciliado_extracto.toFixed(1)}%
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-600">General</p>
-                          <p className="text-2xl font-bold text-green-600">
+                          <p className="text-xs text-foreground/80">General</p>
+                          <p className="text-2xl font-bold text-emerald-400">
                             {reporteDiferencias.metricas.porcentaje_conciliado_general.toFixed(1)}%
                           </p>
                         </div>
@@ -650,17 +650,17 @@ export default function ConciliacionDetailPage() {
                   {/* Pending Items Warning */}
                   {(reporteDiferencias.movimientos_sistema.pendientes > 0 ||
                     reporteDiferencias.movimientos_extracto.pendientes > 0) && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-yellow-900 mb-2">
+                    <div className="bg-amber-500/10 border border-yellow-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-amber-400 mb-2">
                         ⚠️ Advertencia: Movimientos Pendientes
                       </h4>
-                      <p className="text-sm text-yellow-800 mb-3">
+                      <p className="text-sm text-amber-400 mb-3">
                         Hay movimientos sin conciliar. Se recomienda conciliar todos los movimientos
                         antes de cerrar. Si continúa, estos movimientos quedarán sin conciliar.
                       </p>
                       {reporteDiferencias.movimientos_sistema.pendientes_detalle.length > 0 && (
                         <div className="mb-3">
-                          <p className="text-sm font-semibold text-yellow-900 mb-1">
+                          <p className="text-sm font-semibold text-amber-400 mb-1">
                             Movimientos del Sistema Pendientes:
                           </p>
                           <div className="max-h-32 overflow-y-auto space-y-1">
@@ -668,7 +668,7 @@ export default function ConciliacionDetailPage() {
                               (mov: any) => (
                                 <div
                                   key={mov.id}
-                                  className="text-xs bg-white rounded px-2 py-1 flex justify-between"
+                                  className="text-xs bg-card rounded px-2 py-1 flex justify-between"
                                 >
                                   <span>
                                     {mov.fecha} - {mov.descripcion}
@@ -682,7 +682,7 @@ export default function ConciliacionDetailPage() {
                       )}
                       {reporteDiferencias.movimientos_extracto.pendientes_detalle.length > 0 && (
                         <div>
-                          <p className="text-sm font-semibold text-yellow-900 mb-1">
+                          <p className="text-sm font-semibold text-amber-400 mb-1">
                             Movimientos del Extracto Pendientes:
                           </p>
                           <div className="max-h-32 overflow-y-auto space-y-1">
@@ -690,7 +690,7 @@ export default function ConciliacionDetailPage() {
                               (mov: any) => (
                                 <div
                                   key={mov.id}
-                                  className="text-xs bg-white rounded px-2 py-1 flex justify-between"
+                                  className="text-xs bg-card rounded px-2 py-1 flex justify-between"
                                 >
                                   <span>
                                     {mov.fecha} - {mov.descripcion}
@@ -708,11 +708,11 @@ export default function ConciliacionDetailPage() {
                   {/* Success Message */}
                   {reporteDiferencias.movimientos_sistema.pendientes === 0 &&
                     reporteDiferencias.movimientos_extracto.pendientes === 0 && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <h4 className="font-semibold text-green-900 mb-2">
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+                        <h4 className="font-semibold text-emerald-400 mb-2">
                           ✓ Listo para Cerrar
                         </h4>
-                        <p className="text-sm text-green-800">
+                        <p className="text-sm text-emerald-400">
                           Todos los movimientos han sido conciliados. La conciliación está lista para
                           ser cerrada.
                         </p>
@@ -752,7 +752,7 @@ export default function ConciliacionDetailPage() {
                   </div>
                 </div>
               ) : (
-                <div className="text-center text-gray-600 py-12">
+                <div className="text-center text-foreground/80 py-12">
                   No se pudo cargar el reporte de diferencias
                 </div>
               )}

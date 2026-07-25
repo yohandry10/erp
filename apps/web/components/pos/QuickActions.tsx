@@ -1,6 +1,8 @@
 'use client'
 
 import React from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 type Props = {
   mensaje: string
@@ -21,13 +23,15 @@ export const QuickActions: React.FC<Props> = ({ mensaje, emailDestino }) => {
   }
 
   return (
-    <div className="stat-card p-4 flex gap-3 flex-wrap">
-      <button className="btn btn-primary flex-[1_1_auto] min-w-[140px]" onClick={enviarWhatsApp}>
+    <Card className="border-border bg-card text-card-foreground">
+      <CardContent className="flex flex-wrap gap-3 p-4">
+      <Button className="min-w-[140px] flex-[1_1_auto]" onClick={enviarWhatsApp}>
         📲 WhatsApp
-      </button>
-      <button className="btn btn-secondary flex-[1_1_auto] min-w-[140px]" onClick={enviarEmail}>
+      </Button>
+      <Button variant="secondary" className="min-w-[140px] flex-[1_1_auto]" onClick={enviarEmail}>
         📧 Email
-      </button>
-    </div>
+      </Button>
+      </CardContent>
+    </Card>
   )
 }

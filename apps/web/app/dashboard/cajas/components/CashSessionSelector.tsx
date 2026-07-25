@@ -11,8 +11,11 @@ interface SesionCaja {
     monto_cierre?: number;
     diferencia?: number;
     usuario?: {
-        nombres: string;
-        apellidos: string;
+        nombres?: string;
+        apellidos?: string;
+        nombre?: string;
+        apellido?: string;
+        email?: string;
     };
     caja?: {
         nombre: string;
@@ -66,13 +69,13 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
     const getEstadoColor = (estado: string) => {
         switch (estado) {
             case 'ABIERTA':
-                return 'bg-green-100 text-green-800 border-green-200';
+                return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
             case 'CERRADA':
-                return 'bg-gray-100 text-gray-800 border-gray-200';
+                return 'bg-muted text-foreground border-border';
             case 'CONGELADA':
-                return 'bg-blue-100 text-blue-800 border-blue-200';
+                return 'bg-primary/10 text-primary border-blue-200';
             default:
-                return 'bg-gray-100 text-gray-800';
+                return 'bg-muted text-foreground';
         }
     };
 
@@ -82,16 +85,16 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
     };
 
     if (loading) {
-        return <div className="p-4 text-center text-gray-500">Cargando sesiones...</div>;
+        return <div className="p-4 text-center text-muted-foreground">Cargando sesiones...</div>;
     }
 
     if (error) {
         return (
-            <div className="p-4 text-center text-red-500 bg-red-50 rounded-lg">
+            <div className="p-4 text-center text-red-500 bg-destructive/10 rounded-lg">
                 Error: {error}
                 <button
                     onClick={cargarSesiones}
-                    className="block mx-auto mt-2 text-sm text-blue-600 hover:underline"
+                    className="block mx-auto mt-2 text-sm text-primary hover:underline"
                 >
                     Reintentar
                 </button>
@@ -125,7 +128,7 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
     const buttonGhostStyle: React.CSSProperties = {
         background: 'transparent',
         border: 'none',
-        color: 'var(--primary, #2563eb)',
+        color: 'hsl(var(--primary))',
         cursor: 'pointer',
         fontSize: '0.9rem',
     };
@@ -175,7 +178,7 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
             >
                 <p className="text-[var(--text-secondary,_#6b7280)] mb-2">No hay sesiones recientes</p>
                 <button
-                    onClick={() => {/* placeholder for abrir caja */}} className="py-2.5 px-3.5 bg-[var(--gradient-primary,_linear-gradient(90deg,#2563eb,#1d4ed8))] text-[#fff] border-0 rounded-2.5 cursor-pointer"
+                    onClick={() => {/* placeholder for abrir caja */}} className="py-2.5 px-3.5 bg-[var(--gradient-primary,_linear-gradient(90deg,#2563eb,#1d4ed8))] text-[#fff] border-0 rounded-[0.625rem] cursor-pointer"
                 >
                     Abrir Nueva Caja
                 </button>
@@ -184,10 +187,10 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
     }
 
     return (
-        <div className={cn(className, "bg-[var(--bg-card,_#fff)] border rounded-3 shadow overflow-hidden")}>
+        <div className={cn(className, "bg-[var(--bg-card,_#fff)] border rounded-xl shadow overflow-hidden")}>
             <div className="py-3.5 px-4 border-b flex justify-between items-center bg-[var(--bg-subtle,_#f8fafc)]">
                 <h3 className="font-semibold text-[var(--text-primary,_#1f2937)] m-0">Sesiones de Caja</h3>
-                <button onClick={cargarSesiones} className="bg-transparent border-0 text-[var(--primary,_#2563eb)] cursor-pointer text-3.5">
+                <button onClick={cargarSesiones} className="bg-transparent border-0 text-[hsl(var(--primary))] cursor-pointer text-sm">
                     Actualizar
                 </button>
             </div>
@@ -202,17 +205,25 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
                     >
                         <div className="flex flex-col gap-[4px]">
                             <div className="flex items-center gap-2">
-                                <span>{sesion.estado}</span>
+                                <span className={cn(
+                                    'rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+                                    sesion.estado === 'ABIERTA'
+                                        ? 'bg-emerald-500/15 text-emerald-500'
+                                        : 'bg-slate-500/15 text-muted-foreground',
+                                )}>{sesion.estado}</span>
                                 <span className="font-semibold text-[var(--text-primary,_#111827)]">
                                     {sesion.caja?.nombre || 'Caja Principal'}
                                 </span>
                             </div>
-                            <div className="text-[var(--text-secondary,_#6b7280)] text-3.5">
+                            <div className="text-[var(--text-secondary,_#6b7280)] text-sm">
                                 {formatearFecha(sesion.hora_apertura)}
                                 {sesion.hora_cierre && ` - ${formatearFecha(sesion.hora_cierre)}`}
                             </div>
                             <div className="text-[var(--text-tertiary,_#9ca3af)] text-[0.8rem]">
-                                Por: {sesion.usuario?.nombres} {sesion.usuario?.apellidos}
+                                Por: {[
+                                    sesion.usuario?.nombres || sesion.usuario?.nombre,
+                                    sesion.usuario?.apellidos || sesion.usuario?.apellido,
+                                ].filter(Boolean).join(' ') || sesion.usuario?.email || '—'}
                             </div>
                         </div>
 
@@ -221,12 +232,12 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
                                 Ini: S/ {formatMonto(sesion.monto_inicio)}
                             </div>
                             {sesion.monto_cierre !== undefined && (
-                                <div className="text-3.5">
+                                <div className="text-sm">
                                     Fin: S/ {formatMonto(sesion.monto_cierre)}
                                 </div>
                             )}
                             {sesion.diferencia !== undefined && sesion.diferencia !== 0 && (
-                                <div className="text-3.5 font-semibold"
+                                <div className="text-sm font-semibold"
                                 >
                                     Dif: {sesion.diferencia > 0 ? '+' : ''}{formatMonto(sesion.diferencia)}
                                 </div>

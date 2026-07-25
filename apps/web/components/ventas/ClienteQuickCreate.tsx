@@ -49,7 +49,7 @@ export default function ClienteQuickCreate({
   onClose,
   onSuccess
 }: ClienteQuickCreateProps) {
-  const { post } = useApi()
+  const { post, unwrap } = useApi()
   const [validatingRuc, setValidatingRuc] = useState(false)
   const [rucValidated, setRucValidated] = useState(false)
 
@@ -88,15 +88,18 @@ export default function ClienteQuickCreate({
       const response = await post('/api/ventas/clientes/validar-ruc', {
         ruc: documentoNumero
       })
+      const responseData: any = unwrap(response)
 
-      if (response?.success && response.data) {
-        if (response.data.razon_social) {
-          setValue('razon_social', response.data.razon_social)
+      if (responseData) {
+        if (responseData.consulta_sunat && responseData.razon_social) {
+          setValue('razon_social', responseData.razon_social)
         }
         setRucValidated(true)
         toast({
           title: 'RUC Validado',
-          description: 'Datos obtenidos de SUNAT'
+          description: responseData.consulta_sunat
+            ? 'Datos obtenidos de SUNAT'
+            : 'Formato y dígito verificador válidos. Complete la razón social manualmente.'
         })
       }
     } catch (error: any) {
@@ -113,13 +116,14 @@ export default function ClienteQuickCreate({
   const onSubmit = async (data: QuickClienteFormData) => {
     try {
       const response = await post('/api/ventas/clientes', data)
-      
-      if (response?.success && response.data) {
+      const responseData: any = unwrap(response)
+
+      if (responseData?.id) {
         toast({
           title: 'Cliente creado',
           description: `${data.razon_social} creado exitosamente`
         })
-        onSuccess(response.data)
+        onSuccess(responseData)
         handleClose()
       } else {
         throw new Error(response?.error || 'Error al crear cliente')
@@ -142,7 +146,7 @@ export default function ClienteQuickCreate({
   if (!isOpen) return null
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -150,18 +154,18 @@ export default function ClienteQuickCreate({
         }
       }}
     >
-      <div 
-        className="bg-white rounded-lg shadow-xl max-w-md w-full"
+      <div
+        className="bg-card rounded-lg shadow-xl max-w-md w-full"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <h2 className="text-xl font-semibold text-foreground">
             Crear Cliente Rápido
           </h2>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-muted-foreground hover:text-foreground/80 transition-colors"
             disabled={isSubmitting}
           >
             <X className="w-5 h-5" />
@@ -176,14 +180,14 @@ export default function ClienteQuickCreate({
             <select
               id="quick-tipo"
               {...register('tipo')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={isSubmitting}
             >
               <option value={TipoCliente.PERSONA}>Persona Natural</option>
               <option value={TipoCliente.EMPRESA}>Empresa</option>
             </select>
             {errors.tipo && (
-              <p className="text-sm text-red-600">{errors.tipo.message}</p>
+              <p className="text-sm text-destructive">{errors.tipo.message}</p>
             )}
           </div>
 
@@ -193,7 +197,7 @@ export default function ClienteQuickCreate({
             <select
               id="quick-documento-tipo"
               {...register('documento_tipo')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={isSubmitting}
               onChange={() => setRucValidated(false)}
             >
@@ -203,7 +207,7 @@ export default function ClienteQuickCreate({
               <option value={TipoDocumento.PASAPORTE}>Pasaporte</option>
             </select>
             {errors.documento_tipo && (
-              <p className="text-sm text-red-600">{errors.documento_tipo.message}</p>
+              <p className="text-sm text-destructive">{errors.documento_tipo.message}</p>
             )}
           </div>
 
@@ -237,7 +241,7 @@ export default function ClienteQuickCreate({
                   {validatingRuc ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : rucValidated ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   ) : (
                     'Validar'
                   )}
@@ -245,7 +249,7 @@ export default function ClienteQuickCreate({
               )}
             </div>
             {errors.documento_numero && (
-              <p className="text-sm text-red-600">{errors.documento_numero.message}</p>
+              <p className="text-sm text-destructive">{errors.documento_numero.message}</p>
             )}
           </div>
 
@@ -261,19 +265,19 @@ export default function ClienteQuickCreate({
               disabled={isSubmitting}
             />
             {errors.razon_social && (
-              <p className="text-sm text-red-600">{errors.razon_social.message}</p>
+              <p className="text-sm text-destructive">{errors.razon_social.message}</p>
             )}
           </div>
 
           {/* Info Message */}
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-            <p className="text-sm text-blue-800">
+          <div className="bg-primary/10 border border-blue-200 rounded-md p-3">
+            <p className="text-sm text-primary">
               Este formulario crea un cliente con datos mínimos. Puedes completar más información después desde el detalle del cliente.
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
               type="button"
               variant="outline"

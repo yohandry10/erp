@@ -53,9 +53,9 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await get(`/api/contabilidad/estados/estado-resultados?anio=${anio}&mes=${mes}`)
-      
+
       if (response?.success && response.data) {
         setData(response.data)
       } else {
@@ -66,7 +66,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
       if (showComparison) {
         const { anio: prevAnio, mes: prevMes } = getPreviousPeriod()
         const prevResponse = await get(`/api/contabilidad/estados/estado-resultados?anio=${prevAnio}&mes=${prevMes}`)
-        
+
         if (prevResponse?.success && prevResponse.data) {
           setPreviousData(prevResponse.data)
         } else {
@@ -110,9 +110,9 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
   const renderVariation = (current: number, previous: number) => {
     const { absolute, percentage } = calculateVariation(current, previous)
     const isPositive = absolute >= 0
-    
+
     return (
-      <div className={cn('flex items-center gap-2 text-xs font-semibold', isPositive ? 'text-cyan-200' : 'text-blue-200')}>
+      <div className={cn('flex items-center gap-2 text-xs font-semibold', isPositive ? 'text-primary' : 'text-primary dark:text-blue-200')}>
         {isPositive ? '↑' : '↓'}
         {formatCurrency(Math.abs(absolute))} ({Math.abs(percentage).toFixed(1)}%)
       </div>
@@ -125,11 +125,11 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
       return
     }
 
-    const margenBruto = data.ingresos.total_ingresos > 0 
-      ? (data.costos.utilidad_bruta / data.ingresos.total_ingresos) * 100 
+    const margenBruto = data.ingresos.total_ingresos > 0
+      ? (data.costos.utilidad_bruta / data.ingresos.total_ingresos) * 100
       : 0
-    const margenNeto = data.ingresos.total_ingresos > 0 
-      ? (data.utilidad_neta / data.ingresos.total_ingresos) * 100 
+    const margenNeto = data.ingresos.total_ingresos > 0
+      ? (data.utilidad_neta / data.ingresos.total_ingresos) * 100
       : 0
 
     const exportData = [
@@ -178,10 +178,10 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
 
   if (loading) {
     return (
-      <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100">
+      <Card className="border-cyan-400/20 bg-card/70 text-foreground">
         <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-cyan-400/20 border-t-cyan-300" />
-          <p className="text-sm font-medium text-slate-300">Cargando Estado de Resultados...</p>
+          <p className="text-sm font-medium text-muted-foreground">Cargando Estado de Resultados...</p>
         </CardContent>
       </Card>
     )
@@ -189,19 +189,19 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
 
   if (!data) {
     return (
-      <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100">
-        <CardContent className="flex min-h-[160px] items-center justify-center p-6 text-center text-sm text-slate-300">
+      <Card className="border-cyan-400/20 bg-card/70 text-foreground">
+        <CardContent className="flex min-h-[160px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
           No hay datos disponibles para el período seleccionado
         </CardContent>
       </Card>
     )
   }
 
-  const margenBruto = data.ingresos.total_ingresos > 0 
-    ? (data.costos.utilidad_bruta / data.ingresos.total_ingresos) * 100 
+  const margenBruto = data.ingresos.total_ingresos > 0
+    ? (data.costos.utilidad_bruta / data.ingresos.total_ingresos) * 100
     : 0
-  const margenNeto = data.ingresos.total_ingresos > 0 
-    ? (data.utilidad_neta / data.ingresos.total_ingresos) * 100 
+  const margenNeto = data.ingresos.total_ingresos > 0
+    ? (data.utilidad_neta / data.ingresos.total_ingresos) * 100
     : 0
 
   const { anio: prevAnio, mes: prevMes } = getPreviousPeriod()
@@ -209,9 +209,9 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
   const renderRow = (label: string, current: number, isNegative: boolean = false) => {
     return (
       <div className="flex items-center justify-between gap-4 border-b border-cyan-400/10 py-2 last:border-b-0">
-        <span className="text-sm text-slate-300">{label}</span>
+        <span className="text-sm text-muted-foreground">{label}</span>
         <div className="flex items-center gap-4 text-right">
-          <span className={cn('font-semibold', isNegative ? 'text-blue-200' : 'text-cyan-100')}>
+          <span className={cn('font-semibold', isNegative ? 'text-primary dark:text-blue-200' : 'text-primary')}>
             {isNegative ? `(${formatCurrency(current)})` : formatCurrency(current)}
           </span>
           {showComparison && previousData && (
@@ -226,7 +226,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
 
   const getPreviousValue = (label: string): number => {
     if (!previousData) return 0
-    
+
     switch (label) {
       case 'Ventas': return previousData.ingresos.ventas
       case 'Otros Ingresos': return previousData.ingresos.otros_ingresos
@@ -243,24 +243,24 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
   }
 
   return (
-    <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-2xl shadow-blue-950/20">
+    <Card className="overflow-hidden border-cyan-400/20 bg-card/70 text-foreground shadow-2xl shadow-blue-950/20">
       <CardHeader className="border-b border-cyan-400/10 bg-white/[0.03] px-5 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="text-xl text-white">
+            <CardTitle className="text-xl text-foreground">
             Estado de Resultados (P&L)
             </CardTitle>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-muted-foreground">
               Período: {anio} - {String(mes).padStart(2, '0')}
               {showComparison && ` vs ${prevAnio} - ${String(prevMes).padStart(2, '0')}`}
             </p>
           </div>
-        
+
           <div className="flex flex-wrap gap-2">
             <Button
             onClick={handleExportExcel}
               variant="outline"
-              className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
+              className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-white"
           >
               <Download className="h-4 w-4" />
               Exportar Excel
@@ -268,7 +268,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
             <Button
             onClick={handleExportPDF}
               variant="outline"
-              className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
+              className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-white"
           >
               <FileText className="h-4 w-4" />
               Exportar PDF
@@ -280,8 +280,8 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
       <CardContent className="space-y-4 p-5">
       {error && (
           <div className="flex items-center gap-3 rounded-xl border border-blue-300/20 bg-blue-400/10 p-4">
-            <AlertCircle className="h-5 w-5 text-blue-100" />
-            <p className="text-sm text-blue-50">
+            <AlertCircle className="h-5 w-5 text-primary dark:text-blue-200" />
+            <p className="text-sm text-primary dark:text-blue-200">
             {error}
           </p>
         </div>
@@ -290,16 +290,16 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
           <div className="space-y-4">
             <section className="overflow-hidden rounded-xl border border-cyan-400/15 bg-white/[0.03]">
-              <div className="border-b border-cyan-400/10 bg-cyan-400/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-cyan-100">
+              <div className="border-b border-cyan-400/10 bg-cyan-400/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-primary">
             INGRESOS
           </div>
               <div className="p-4">
             {renderRow('Ventas', data.ingresos.ventas)}
             {renderRow('Otros Ingresos', data.ingresos.otros_ingresos)}
                 <div className="mt-3 flex items-center justify-between gap-4 border-t border-cyan-400/20 pt-3 text-base font-bold">
-                  <span className="text-cyan-100">Total Ingresos</span>
+                  <span className="text-primary">Total Ingresos</span>
                   <div className="flex items-center gap-4 text-right">
-                    <span className="text-cyan-100">
+                    <span className="text-primary">
                   {formatCurrency(data.ingresos.total_ingresos)}
                 </span>
                 {showComparison && previousData && (
@@ -313,20 +313,20 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
             </section>
 
             <section className="overflow-hidden rounded-xl border border-cyan-400/15 bg-white/[0.03]">
-              <div className="border-b border-cyan-400/10 bg-blue-400/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-blue-100">
+              <div className="border-b border-cyan-400/10 bg-blue-400/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-primary dark:text-blue-200">
             COSTOS
           </div>
               <div className="p-4">
             {renderRow('Costo de Ventas', data.costos.costo_ventas, true)}
                 <div className="mt-3 flex items-center justify-between gap-4 border-t border-cyan-400/20 pt-3 text-base font-bold">
-                  <span className="text-white">
+                  <span className="text-foreground">
                 Utilidad Bruta
-                    <span className="ml-2 text-xs font-semibold text-slate-400">
+                    <span className="ml-2 text-xs font-semibold text-muted-foreground">
                   ({margenBruto.toFixed(2)}%)
                 </span>
               </span>
                   <div className="flex items-center gap-4 text-right">
-                    <span className="text-cyan-100">
+                    <span className="text-primary">
                   {formatCurrency(data.costos.utilidad_bruta)}
                 </span>
                 {showComparison && previousData && (
@@ -340,7 +340,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
             </section>
 
             <section className="overflow-hidden rounded-xl border border-cyan-400/15 bg-white/[0.03]">
-              <div className="border-b border-cyan-400/10 bg-slate-800 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-100">
+              <div className="border-b border-cyan-400/10 bg-muted px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-foreground">
             GASTOS OPERATIVOS
           </div>
               <div className="p-4">
@@ -348,9 +348,9 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
             {renderRow('Gastos de Ventas', data.gastos.gastos_ventas, true)}
             {renderRow('Gastos Financieros', data.gastos.gastos_financieros, true)}
                 <div className="mt-3 flex items-center justify-between gap-4 border-t border-cyan-400/20 pt-3 text-base font-bold">
-                  <span className="text-blue-100">Total Gastos</span>
+                  <span className="text-primary dark:text-blue-200">Total Gastos</span>
                   <div className="flex items-center gap-4 text-right">
-                    <span className="text-blue-100">
+                    <span className="text-primary dark:text-blue-200">
                   ({formatCurrency(data.gastos.total_gastos)})
                 </span>
                 {showComparison && previousData && (
@@ -367,11 +367,11 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
           <div className="space-y-4">
             <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-5">
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200/80">Utilidad neta</div>
-              <div className="mt-3 flex items-center gap-3 text-3xl font-bold text-white">
+              <div className="mt-3 flex items-center gap-3 text-3xl font-bold text-foreground">
                 {data.utilidad_neta >= 0 ? (
-                  <TrendingUp className="h-8 w-8 text-cyan-200" />
+                  <TrendingUp className="h-8 w-8 text-primary" />
                 ) : (
-                  <TrendingDown className="h-8 w-8 text-blue-200" />
+                  <TrendingDown className="h-8 w-8 text-primary dark:text-blue-200" />
                 )}
                 {formatCurrency(data.utilidad_neta)}
               </div>
@@ -380,22 +380,22 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
                   {renderVariation(data.utilidad_neta, previousData.utilidad_neta)}
                 </div>
               )}
-              <div className="mt-5 rounded-xl border border-cyan-400/15 bg-slate-950/40 p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <div className="mt-5 rounded-xl border border-cyan-400/15 bg-card/40 p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 MARGEN NETO
               </div>
-                <div className="mt-2 text-2xl font-bold text-cyan-100">
+                <div className="mt-2 text-2xl font-bold text-primary">
                 {margenNeto.toFixed(2)}%
               </div>
             </div>
           </div>
 
             <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4">
-              <h3 className="text-center text-sm font-bold text-white">
+              <h3 className="text-center text-sm font-bold text-foreground">
             Comparación: Ingresos vs Costos y Gastos
           </h3>
               <div className="mt-4">
-          <IngresosVsGastosChart 
+          <IngresosVsGastosChart
             ingresos={data.ingresos.total_ingresos}
             costos={data.costos.costo_ventas}
             gastos={data.gastos.total_gastos}
@@ -407,26 +407,26 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-center">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary/80">
               Total Ingresos
             </div>
-            <div className="text-xl font-bold text-cyan-100">
+            <div className="text-xl font-bold text-primary">
               {formatCurrency(data.ingresos.total_ingresos)}
             </div>
           </div>
           <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-center">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary/80">
               Total Costos y Gastos
             </div>
-            <div className="text-xl font-bold text-blue-100">
+            <div className="text-xl font-bold text-primary dark:text-blue-200">
               {formatCurrency(data.costos.costo_ventas + data.gastos.total_gastos)}
             </div>
           </div>
           <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-center">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary/80">
               Margen Bruto
             </div>
-            <div className="text-xl font-bold text-white">
+            <div className="text-xl font-bold text-foreground">
               {margenBruto.toFixed(2)}%
             </div>
           </div>

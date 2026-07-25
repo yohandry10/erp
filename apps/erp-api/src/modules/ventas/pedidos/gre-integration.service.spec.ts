@@ -52,5 +52,22 @@ describe('GREIntegrationService', () => {
     expect(result.pedidoNumero).toBe(pedido.numero);
     expect(result.idempotencyKey).toBe(`ventas.gre:${tenantId}:${facturaId}`);
   });
-});
 
+  it('no habilita sugerencia GRE automática si falla la lectura de configuración', async () => {
+    const chain = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: { message: 'unavailable' } }),
+    };
+    const localService = new GREIntegrationService(
+      { getClient: jest.fn(() => ({ from: jest.fn(() => chain) })) } as any,
+      {} as any,
+    );
+
+    await expect((localService as any).obtenerConfiguracionGRE('tenant-1')).resolves.toEqual({
+      gre_obligatorio: false,
+      gre_automatico_habilitado: false,
+      umbral_gre_automatico: 700,
+    });
+  });
+});

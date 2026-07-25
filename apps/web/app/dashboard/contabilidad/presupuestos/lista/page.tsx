@@ -75,10 +75,10 @@ interface Periodo {
 }
 
 const fieldClass =
-  'border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-inner shadow-cyan-950/20 placeholder:text-slate-500 focus-visible:ring-cyan-400/40 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950'
+  'border-cyan-400/20 bg-card/60 text-foreground shadow-inner shadow-cyan-950/20 placeholder:text-muted-foreground focus-visible:ring-cyan-400/40 group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground'
 
 const selectContentClass =
-  'border-cyan-400/20 bg-slate-950 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950'
+  'border-cyan-400/20 bg-background text-foreground group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground'
 
 const toNumber = (value: unknown) => {
   const numeric = Number(value)
@@ -87,10 +87,10 @@ const toNumber = (value: unknown) => {
 
 function BudgetStatusBadge({ estado }: { estado: string }) {
   const status = {
-    ACTIVO: { icon: CheckCircle, label: 'Activo', className: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-100' },
-    BLOQUEADO: { icon: AlertTriangle, label: 'Bloqueado', className: 'border-amber-300/35 bg-amber-300/10 text-amber-100' },
-    CERRADO: { icon: XCircle, label: 'Cerrado', className: 'border-slate-400/30 bg-slate-400/10 text-slate-200' },
-  }[estado] ?? { icon: CheckCircle, label: 'Activo', className: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-100' }
+    ACTIVO: { icon: CheckCircle, label: 'Activo', className: 'border-cyan-400/30 bg-cyan-400/10 text-primary' },
+    BLOQUEADO: { icon: AlertTriangle, label: 'Bloqueado', className: 'border-amber-300/35 bg-amber-300/10 text-amber-400 dark:text-amber-200' },
+    CERRADO: { icon: XCircle, label: 'Cerrado', className: 'border-border/30 bg-slate-400/10 text-foreground/90' },
+  }[estado] ?? { icon: CheckCircle, label: 'Activo', className: 'border-cyan-400/30 bg-cyan-400/10 text-primary' }
 
   const Icon = status.icon
 
@@ -105,7 +105,7 @@ function BudgetStatusBadge({ estado }: { estado: string }) {
 function AlertBadge({ porcentaje }: { porcentaje: number }) {
   if (porcentaje >= 100) {
     return (
-      <Badge variant="outline" className="gap-1.5 border-amber-300/35 bg-amber-300/10 text-amber-100">
+      <Badge variant="outline" className="gap-1.5 border-amber-300/35 bg-amber-300/10 text-amber-400 dark:text-amber-200">
         <AlertCircle className="h-3 w-3" />
         Sobregiro
       </Badge>
@@ -114,7 +114,7 @@ function AlertBadge({ porcentaje }: { porcentaje: number }) {
 
   if (porcentaje >= 90) {
     return (
-      <Badge variant="outline" className="gap-1.5 border-sky-300/35 bg-sky-300/10 text-sky-100">
+      <Badge variant="outline" className="gap-1.5 border-sky-300/35 bg-sky-300/10 text-primary dark:text-sky-200">
         <AlertTriangle className="h-3 w-3" />
         Advertencia
       </Badge>
@@ -122,7 +122,7 @@ function AlertBadge({ porcentaje }: { porcentaje: number }) {
   }
 
   return (
-    <Badge variant="outline" className="gap-1.5 border-cyan-300/35 bg-cyan-300/10 text-cyan-100">
+    <Badge variant="outline" className="gap-1.5 border-cyan-300/35 bg-cyan-300/10 text-primary">
       <CheckCircle className="h-3 w-3" />
       Normal
     </Badge>
@@ -251,11 +251,11 @@ export default function PresupuestosListaPage() {
 
   if (loading) {
     return (
-      <div className="min-h-full bg-slate-950 p-6 text-slate-100">
-        <Card className="border-cyan-400/20 bg-slate-950/70">
+      <div className="min-h-full bg-background p-6 text-foreground">
+        <Card className="border-cyan-400/20 bg-card/70">
           <CardContent className="flex min-h-80 flex-col items-center justify-center gap-4">
-            <RefreshCw className="h-8 w-8 animate-spin text-cyan-300" />
-            <p className="text-sm text-slate-300">Cargando presupuestos...</p>
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Cargando presupuestos...</p>
           </CardContent>
         </Card>
       </div>
@@ -263,29 +263,29 @@ export default function PresupuestosListaPage() {
   }
 
   return (
-    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.20),transparent_34%),linear-gradient(135deg,#020617_0%,#061a2f_58%,#020617_100%)] p-4 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:p-6">
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.20),transparent_34%),linear-gradient(135deg,#020617_0%,#061a2f_58%,#020617_100%)] p-4 text-foreground group-data-[erp-theme=light]/dashboard:bg-muted/30 group-data-[erp-theme=light]/dashboard:text-foreground lg:p-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-        <Card className="border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-cyan-950/20 group-data-[erp-theme=light]/dashboard:bg-white">
+        <Card className="border-cyan-400/20 bg-card/75 shadow-2xl shadow-cyan-950/20 group-data-[erp-theme=light]/dashboard:bg-card">
           <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-200">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-primary">
                 <DollarSign className="h-6 w-6" />
               </div>
               <div>
-                <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-cyan-100">
+                <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-primary">
                   ERP Budget Control
                 </Badge>
-                <h1 className="text-2xl font-semibold tracking-normal text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:text-3xl">
+                <h1 className="text-2xl font-semibold tracking-normal text-foreground group-data-[erp-theme=light]/dashboard:text-foreground lg:text-3xl">
                   Gestión de Presupuestos
                 </h1>
-                <p className="mt-1 text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                   Presupuestos por centro de costo, cuenta contable y periodo operativo.
                 </p>
               </div>
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button variant="outline" className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10" onClick={loadData}>
+              <Button variant="outline" className="border-cyan-400/30 bg-card/50 text-primary hover:bg-cyan-400/10" onClick={loadData}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Actualizar
               </Button>
@@ -306,17 +306,17 @@ export default function PresupuestosListaPage() {
           <StatCard label="Ejecutado" value={formatCurrency(stats.totalEjecutado)} compact />
         </div>
 
-        <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+        <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
           <CardHeader className="border-b border-cyan-400/10 p-4">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">
-              <Filter className="h-4 w-4 text-cyan-300" />
+            <CardTitle className="flex items-center gap-2 text-base text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">
+              <Filter className="h-4 w-4 text-primary" />
               Filtros
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase text-slate-400">Buscar</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Buscar</Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300/70" />
                   <Input
@@ -365,7 +365,7 @@ export default function PresupuestosListaPage() {
               <div className="mt-4 flex justify-end">
                 <Button
                   variant="outline"
-                  className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10"
+                  className="border-cyan-400/30 bg-card/50 text-primary hover:bg-cyan-400/10"
                   onClick={() => {
                     setSearchTerm('')
                     setCentroCostoFilter('TODOS')
@@ -381,11 +381,11 @@ export default function PresupuestosListaPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+        <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
           <CardContent className="p-0">
             {error && (
               <div className="p-4">
-                <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-100">
+                <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
@@ -394,12 +394,12 @@ export default function PresupuestosListaPage() {
 
             {filteredPresupuestos.length === 0 ? (
               <div className="flex min-h-80 flex-col items-center justify-center gap-4 p-8 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-primary">
                   <DollarSign className="h-7 w-7" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">No hay presupuestos</h2>
-                  <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                  <h2 className="text-lg font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">No hay presupuestos</h2>
+                  <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                     {presupuestos.length === 0
                       ? 'Aún no se han creado presupuestos.'
                       : 'No se encontraron presupuestos con los filtros aplicados.'}
@@ -437,33 +437,33 @@ export default function PresupuestosListaPage() {
                         onClick={() => router.push(`/dashboard/contabilidad/presupuestos/${presupuesto.id}`)}
                       >
                         <TableCell>
-                          <div className="font-semibold text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
+                          <div className="font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">
                             {presupuesto.centro_costo?.nombre || '-'}
                           </div>
-                          <div className="mt-1 text-xs text-slate-400">{presupuesto.centro_costo?.codigo || '-'}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{presupuesto.centro_costo?.codigo || '-'}</div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-semibold text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
+                          <div className="font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">
                             {presupuesto.cuenta?.nombre || '-'}
                           </div>
-                          <div className="mt-1 text-xs text-slate-400">{presupuesto.cuenta?.codigo || '-'}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{presupuesto.cuenta?.codigo || '-'}</div>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className="gap-1.5 border-cyan-400/25 bg-cyan-400/10 text-cyan-100">
+                          <Badge variant="outline" className="gap-1.5 border-cyan-400/25 bg-cyan-400/10 text-primary">
                             <Calendar className="h-3 w-3" />
                             {formatPeriodo(presupuesto.periodo)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right font-semibold text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
+                        <TableCell className="text-right font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">
                           {formatCurrency(presupuesto.monto_presupuestado)}
                         </TableCell>
-                        <TableCell className="text-right font-semibold text-cyan-200">
+                        <TableCell className="text-right font-semibold text-primary">
                           {formatCurrency(presupuesto.monto_ejecutado)}
                         </TableCell>
                         <TableCell
                           className={cn(
                             'text-right font-semibold',
-                            presupuesto.monto_disponible < 0 ? 'text-amber-200' : 'text-cyan-200',
+                            presupuesto.monto_disponible < 0 ? 'text-amber-400 dark:text-amber-200' : 'text-primary',
                           )}
                         >
                           {formatCurrency(presupuesto.monto_disponible)}
@@ -488,7 +488,7 @@ export default function PresupuestosListaPage() {
                             <Button
                               variant="outline"
                               size="icon"
-                              className="h-8 w-8 border-cyan-400/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
+                              className="h-8 w-8 border-cyan-400/25 bg-cyan-400/10 text-primary hover:bg-cyan-400/20"
                               onClick={(event) => {
                                 event.stopPropagation()
                                 router.push(`/dashboard/contabilidad/presupuestos/${presupuesto.id}`)
@@ -500,7 +500,7 @@ export default function PresupuestosListaPage() {
                             <Button
                               variant="outline"
                               size="icon"
-                              className="h-8 w-8 border-amber-300/25 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20"
+                              className="h-8 w-8 border-amber-300/25 bg-amber-300/10 text-amber-400 dark:text-amber-200 hover:bg-amber-300/20"
                               onClick={(event) => {
                                 event.stopPropagation()
                                 handleDelete(presupuesto.id)
@@ -516,7 +516,7 @@ export default function PresupuestosListaPage() {
                   </TableBody>
                 </Table>
 
-                <div className="border-t border-cyan-400/10 px-4 py-3 text-sm text-slate-400">
+                <div className="border-t border-cyan-400/10 px-4 py-3 text-sm text-muted-foreground">
                   Mostrando {filteredPresupuestos.length} de {presupuestos.length} presupuestos
                 </div>
               </>
@@ -530,10 +530,10 @@ export default function PresupuestosListaPage() {
 
 function StatCard({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
-    <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+    <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
       <CardContent className="p-4">
-        <p className="text-xs font-semibold uppercase text-cyan-200/75 group-data-[erp-theme=light]/dashboard:text-slate-500">{label}</p>
-        <p className={cn('mt-2 font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950', compact ? 'text-lg' : 'text-2xl')}>
+        <p className="text-xs font-semibold uppercase text-cyan-200/75 group-data-[erp-theme=light]/dashboard:text-muted-foreground">{label}</p>
+        <p className={cn('mt-2 font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground', compact ? 'text-lg' : 'text-2xl')}>
           {value}
         </p>
       </CardContent>
@@ -554,7 +554,7 @@ function FilterSelect({
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-semibold uppercase text-slate-400">{label}</Label>
+      <Label className="text-xs font-semibold uppercase text-muted-foreground">{label}</Label>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className={fieldClass}>
           <SelectValue />

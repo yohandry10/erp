@@ -1,0 +1,93 @@
+{
+  "runId": "2026-06-17T07-04-03-049Z-1489",
+  "executedAt": "2026-06-17T07:04:27.503Z",
+  "environment": "homologacion",
+  "endpoints": "SUNAT beta defaults from OseService",
+  "ruc": "20100066603",
+  "username": "20100066603MODDATOS",
+  "productionUsed": false,
+  "artifactDirectory": "C:\\Users\\PC\\Desktop\\erp\\docs\\audits\\artifacts\\sunat-beta-ra-rc-gre\\2026-06-17T07-04-03-049Z-1489",
+  "steps": [
+    {
+      "step": "base-factura-para-ra",
+      "fileName": "20100066603-01-F001-39234513",
+      "response": {
+        "success": true,
+        "codigoRespuesta": "0",
+        "descripcionRespuesta": "La Factura numero F001-39234513, ha sido aceptada",
+        "observaciones": [],
+        "numeroComprobante": "20100066603-01-F001-39234513",
+        "hashCPE": "9EF78372446A4DA986C6C5A15CC6B82C",
+        "cdrSha256": "0F5775FCE2E89E0A01F71BA862F15F860908038C5567D956024A7D78B617C867",
+        "cdrLength": 1784
+      }
+    },
+    {
+      "step": "ra-sendSummary",
+      "fileName": "20100066603-RA-20260617-34513",
+      "ticket": "1781679870729",
+      "response": {
+        "success": true,
+        "codigoRespuesta": "0",
+        "descripcionRespuesta": "Ticket SUNAT recibido",
+        "ticket": "1781679870729",
+        "numeroComprobante": "20100066603-RA-20260617-34513",
+        "hashCPE": "3D72C7C3658B0E1A621CDFA862C9BDD4"
+      }
+    },
+    {
+      "step": "ra-getStatus-1",
+      "ticket": "1781679870729",
+      "response": {
+        "success": false,
+        "codigoRespuesta": "401",
+        "descripcionRespuesta": "401 Authorization Required"
+      }
+    },
+    {
+      "step": "base-boleta-para-rc",
+      "fileName": "20100066603-03-B001-39234514",
+      "response": {
+        "success": true,
+        "codigoRespuesta": "0",
+        "descripcionRespuesta": "La Boleta numero B001-39234514, ha sido aceptada",
+        "observaciones": [],
+        "numeroComprobante": "20100066603-03-B001-39234514",
+        "hashCPE": "D489FB95341DED81D5043F2D218F586C",
+        "cdrSha256": "24DED742AC4A1876AA87B939898D44B7EE78477C33FBBAB4872663352A7B63E3",
+        "cdrLength": 1780
+      }
+    },
+    {
+      "step": "rc-sendSummary",
+      "fileName": "20100066603-RC-20260617-34514",
+      "ticket": "1781679882872",
+      "response": {
+        "success": true,
+        "codigoRespuesta": "0",
+        "descripcionRespuesta": "Ticket SUNAT recibido",
+        "ticket": "1781679882872",
+        "numeroComprobante": "20100066603-RC-20260617-34514",
+        "hashCPE": "DC80206C6049E0351F85720CA12C0C61"
+      }
+    },
+    {
+      "step": "rc-getStatus-1",
+      "ticket": "1781679882872",
+      "response": {
+        "success": false,
+        "codigoRespuesta": "401",
+        "descripcionRespuesta": "401 Authorization Required"
+      }
+    },
+    {
+      "step": "gre-sendBill",
+      "fileName": "20100066603-09-T001-39234515",
+      "response": {
+        "success": false,
+        "codigoRespuesta": "2112",
+        "descripcionRespuesta": "2112"
+      }
+    }
+  ]
+}

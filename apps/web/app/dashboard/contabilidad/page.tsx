@@ -20,6 +20,7 @@ import { useApi } from '@/hooks/use-api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useDashboardTheme } from '@/hooks/use-dashboard-theme'
 
 type VistaContable =
   | 'estado-resultados'
@@ -104,7 +105,8 @@ const vistas: Array<{
 export default function ContabilidadPage() {
   const [vistaActual, setVistaActual] = useState<VistaContable>('registro-compras')
   const [loading, setLoading] = useState(false)
-  const darkMode = true
+  const { theme } = useDashboardTheme()
+  const darkMode = theme === 'dark'
 
   const [registroCompras, setRegistroCompras] = useState<any>(null)
   const [balanceComprobacion, setBalanceComprobacion] = useState<any>(null)
@@ -265,17 +267,17 @@ export default function ContabilidadPage() {
 
   const metricClass = cn(
     'rounded-lg border p-4',
-    darkMode ? 'border-cyan-400/15 bg-slate-950/45' : 'border-slate-200 bg-white',
+    darkMode ? 'border-cyan-400/15 bg-card/45' : 'border-border bg-card',
   )
 
-  const labelClass = cn('text-xs font-semibold uppercase tracking-[0.16em]', darkMode ? 'text-cyan-200/70' : 'text-slate-500')
-  const valueClass = cn('mt-2 text-2xl font-bold', darkMode ? 'text-white' : 'text-slate-950')
+  const labelClass = cn('text-xs font-semibold uppercase tracking-[0.16em]', darkMode ? 'text-primary/80' : 'text-muted-foreground')
+  const valueClass = cn('mt-2 text-2xl font-bold', darkMode ? 'text-foreground' : 'text-foreground')
 
   const renderLoading = () => (
-    <Card className={cn('border-dashed', darkMode && 'border-cyan-400/20 bg-slate-950/45 text-slate-200')}>
+    <Card className={cn('border-dashed', darkMode && 'border-cyan-400/20 bg-card/45 text-foreground/90')}>
       <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-400/20 border-t-cyan-300" />
-        <p className={cn('text-sm font-medium', darkMode ? 'text-slate-300' : 'text-slate-600')}>
+        <p className={cn('text-sm font-medium', darkMode ? 'text-muted-foreground' : 'text-foreground/80')}>
           Cargando información contable...
         </p>
       </CardContent>
@@ -286,14 +288,14 @@ export default function ContabilidadPage() {
     if (loading) return renderLoading()
 
     return (
-      <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-2xl shadow-blue-950/20')}>
-        <CardHeader className={cn('border-b', darkMode ? 'border-cyan-400/10 bg-slate-950/45' : 'border-slate-200 bg-white')}>
+      <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-card/70 text-foreground shadow-2xl shadow-blue-950/20')}>
+        <CardHeader className={cn('border-b', darkMode ? 'border-cyan-400/10 bg-card/45' : 'border-border bg-card')}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <CardTitle className={cn('text-2xl', darkMode && 'text-white')}>{title}</CardTitle>
-              <p className={cn('mt-2 max-w-2xl text-sm', darkMode ? 'text-slate-300' : 'text-slate-500')}>{description}</p>
+              <CardTitle className={cn('text-2xl', darkMode && 'text-foreground')}>{title}</CardTitle>
+              <p className={cn('mt-2 max-w-2xl text-sm', darkMode ? 'text-muted-foreground' : 'text-muted-foreground')}>{description}</p>
             </div>
-            <div className={cn('rounded-full border px-3 py-1 text-xs font-semibold', darkMode ? 'border-cyan-400/20 bg-cyan-400/10 text-cyan-100' : 'border-blue-100 bg-blue-50 text-blue-700')}>
+            <div className={cn('rounded-full border px-3 py-1 text-xs font-semibold', darkMode ? 'border-cyan-400/20 bg-cyan-400/10 text-primary' : 'border-blue-100 bg-primary/10 text-primary')}>
               Datos reales del tenant
             </div>
           </div>
@@ -446,31 +448,31 @@ export default function ContabilidadPage() {
       className={cn(
         'min-h-screen p-4 transition-colors',
         darkMode
-          ? 'bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 text-slate-100'
-          : 'bg-slate-50 text-slate-950',
+          ? 'bg-gradient-to-br from-background via-muted/50 to-background text-foreground'
+          : 'bg-muted/30 text-foreground',
       )}
     >
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className={cn('rounded-2xl border px-5 py-4 shadow-2xl', darkMode ? 'border-cyan-400/20 bg-slate-950/70 shadow-blue-950/20' : 'border-slate-200 bg-white shadow-slate-200/70')}>
+        <section className={cn('rounded-2xl border px-5 py-4 shadow-2xl', darkMode ? 'border-cyan-400/20 bg-card/70 shadow-blue-950/20' : 'border-border bg-card shadow-slate-200/70')}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className={cn('mb-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]', darkMode ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-100' : 'border-blue-100 bg-blue-50 text-blue-700')}>
+              <div className={cn('mb-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]', darkMode ? 'border-cyan-400/25 bg-cyan-400/10 text-primary' : 'border-blue-100 bg-primary/10 text-primary')}>
                 ERP Ledger Center
               </div>
               <h1 className="text-3xl font-bold tracking-tight">Contabilidad</h1>
-              <p className={cn('mt-2 max-w-3xl text-sm leading-6', darkMode ? 'text-slate-300' : 'text-slate-500')}>
+              <p className={cn('mt-2 max-w-3xl text-sm leading-6', darkMode ? 'text-muted-foreground' : 'text-muted-foreground')}>
                 Libros, balances y registros contables conectados a operaciones reales del ERP.
               </p>
             </div>
           </div>
         </section>
 
-        <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20')}>
+        <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20')}>
           <CardHeader className="border-b border-cyan-400/10 px-4 py-3">
-            <CardTitle className={cn('text-sm uppercase tracking-[0.16em]', darkMode && 'text-cyan-100')}>Vistas contables</CardTitle>
+            <CardTitle className={cn('text-sm uppercase tracking-[0.16em]', darkMode && 'text-primary')}>Vistas contables</CardTitle>
           </CardHeader>
           <CardContent className="p-3">
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
               {vistas.map((vista) => {
                 const Icon = vista.icon
                 const active = vistaActual === vista.id
@@ -484,19 +486,19 @@ export default function ContabilidadPage() {
                       'flex min-h-[76px] w-full items-start gap-3 rounded-xl border p-3 text-left transition',
                       active
                         ? darkMode
-                          ? 'border-cyan-300/40 bg-cyan-400/15 text-white shadow-lg shadow-cyan-950/20'
-                          : 'border-blue-200 bg-blue-50 text-blue-950'
+                          ? 'border-primary/60 bg-accent text-accent-foreground shadow-lg shadow-cyan-950/20'
+                          : 'border-blue-200 bg-primary/10 text-blue-950'
                         : darkMode
-                          ? 'border-cyan-400/15 bg-slate-950/45 text-slate-300 hover:bg-cyan-400/10'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                          ? 'border-cyan-400/15 bg-card/45 text-muted-foreground hover:bg-cyan-400/10'
+                          : 'border-border bg-card text-foreground/85 hover:bg-muted/30',
                     )}
                     >
-                    <span className={cn('mt-0.5 shrink-0 rounded-lg p-2', active ? 'bg-blue-500 text-white' : darkMode ? 'bg-slate-900 text-cyan-200' : 'bg-slate-100 text-blue-700')}>
+                    <span className={cn('mt-0.5 shrink-0 rounded-lg p-2', active ? 'bg-primary text-primary-foreground' : darkMode ? 'bg-card text-primary' : 'bg-muted text-primary')}>
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold">{vista.title}</span>
-                      <span className={cn('mt-1 line-clamp-2 block text-xs leading-5', darkMode ? 'text-slate-400' : 'text-slate-500')}>{vista.description}</span>
+                      <span className="block text-sm font-semibold leading-tight">{vista.title}</span>
+                      <span className={cn('mt-1 line-clamp-2 block text-xs leading-5', darkMode ? 'text-muted-foreground' : 'text-muted-foreground')}>{vista.description}</span>
                     </span>
                   </button>
                 )
@@ -509,8 +511,8 @@ export default function ContabilidadPage() {
           <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
             <div className={cn(metricClass, 'md:col-span-2 xl:col-span-2')}>
               <div className={labelClass}>Vista activa</div>
-              <div className={cn('mt-2 flex items-center gap-2 text-lg font-bold', darkMode ? 'text-white' : 'text-slate-950')}>
-                <CurrentIcon className="h-5 w-5 text-cyan-300" />
+              <div className={cn('mt-2 flex items-center gap-2 text-lg font-bold', darkMode ? 'text-foreground' : 'text-foreground')}>
+                <CurrentIcon className="h-5 w-5 text-primary" />
                 {currentVista.title}
               </div>
             </div>
@@ -535,21 +537,21 @@ export default function ContabilidadPage() {
           {renderContent()}
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.42fr)]">
-            <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20')}>
+            <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20')}>
               <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-                <CardTitle className={cn('text-base', darkMode && 'text-white')}>Radar operativo contable</CardTitle>
-                <p className={cn('text-xs', darkMode ? 'text-slate-400' : 'text-slate-500')}>
+                <CardTitle className={cn('text-base', darkMode && 'text-foreground')}>Radar operativo contable</CardTitle>
+                <p className={cn('text-xs', darkMode ? 'text-muted-foreground' : 'text-muted-foreground')}>
                   Señales conectadas a módulos reales; no se agregan métricas inventadas.
                 </p>
               </CardHeader>
               <CardContent className="grid gap-4 p-5 lg:grid-cols-2">
                 {barMetrics.map((metric) => (
-                  <div key={metric.label} className={cn('rounded-xl border p-4', darkMode ? 'border-cyan-400/15 bg-slate-950/45' : 'border-slate-200 bg-white')}>
+                  <div key={metric.label} className={cn('rounded-xl border p-4', darkMode ? 'border-cyan-400/15 bg-card/45' : 'border-border bg-card')}>
                     <div className="flex items-center justify-between gap-3">
-                      <span className={cn('text-sm font-semibold', darkMode ? 'text-slate-200' : 'text-slate-700')}>{metric.label}</span>
-                      <span className={cn('text-sm font-bold', darkMode ? 'text-white' : 'text-slate-950')}>{metric.value}</span>
+                      <span className={cn('text-sm font-semibold', darkMode ? 'text-foreground/90' : 'text-foreground/85')}>{metric.label}</span>
+                      <span className={cn('text-sm font-bold', darkMode ? 'text-foreground' : 'text-foreground')}>{metric.value}</span>
                     </div>
-                    <div className={cn('mt-3 h-2 overflow-hidden rounded-full', darkMode ? 'bg-slate-900' : 'bg-slate-100')}>
+                    <div className={cn('mt-3 h-2 overflow-hidden rounded-full', darkMode ? 'bg-card' : 'bg-muted')}>
                       <div className={cn('h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-300', metric.widthClass)} />
                     </div>
                   </div>
@@ -557,25 +559,25 @@ export default function ContabilidadPage() {
               </CardContent>
             </Card>
 
-            <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20')}>
+            <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20')}>
               <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-                <CardTitle className={cn('text-base', darkMode && 'text-white')}>Control de consistencia</CardTitle>
+                <CardTitle className={cn('text-base', darkMode && 'text-foreground')}>Control de consistencia</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-1">
                 {controlItems.map(([label, value]) => (
-                  <div key={label} className={cn('flex items-center justify-between rounded-xl border px-3 py-3', darkMode ? 'border-cyan-400/15 bg-slate-950/45' : 'border-slate-200 bg-white')}>
-                    <span className={cn('text-xs font-semibold uppercase tracking-[0.14em]', darkMode ? 'text-cyan-200/70' : 'text-slate-500')}>{label}</span>
-                    <span className={cn('text-sm font-bold', darkMode ? 'text-white' : 'text-slate-950')}>{value}</span>
+                  <div key={label} className={cn('flex items-center justify-between rounded-xl border px-3 py-3', darkMode ? 'border-cyan-400/15 bg-card/45' : 'border-border bg-card')}>
+                    <span className={cn('text-xs font-semibold uppercase tracking-[0.14em]', darkMode ? 'text-primary/80' : 'text-muted-foreground')}>{label}</span>
+                    <span className={cn('text-sm font-bold', darkMode ? 'text-foreground' : 'text-foreground')}>{value}</span>
                   </div>
                 ))}
               </CardContent>
             </Card>
           </div>
 
-          <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20')}>
+          <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20')}>
             <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-              <CardTitle className={cn('text-base', darkMode && 'text-white')}>Flujos contables principales</CardTitle>
-              <p className={cn('text-xs', darkMode ? 'text-slate-400' : 'text-slate-500')}>
+              <CardTitle className={cn('text-base', darkMode && 'text-foreground')}>Flujos contables principales</CardTitle>
+              <p className={cn('text-xs', darkMode ? 'text-muted-foreground' : 'text-muted-foreground')}>
                 Accesos compactos a las pantallas que sostienen la operación diaria.
               </p>
             </CardHeader>
@@ -590,16 +592,16 @@ export default function ContabilidadPage() {
                     className={cn(
                       'group flex items-start gap-3 rounded-xl border p-4 transition',
                       darkMode
-                        ? 'border-cyan-400/15 bg-slate-950/45 text-slate-200 hover:border-cyan-300/35 hover:bg-cyan-400/10'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50',
+                        ? 'border-cyan-400/15 bg-card/45 text-foreground/90 hover:border-cyan-300/35 hover:bg-cyan-400/10'
+                        : 'border-border bg-card text-foreground/85 hover:border-blue-200 hover:bg-primary/10',
                     )}
                   >
-                    <span className={cn('rounded-lg p-2', darkMode ? 'bg-slate-900 text-cyan-200 group-hover:bg-blue-600 group-hover:text-white' : 'bg-slate-100 text-blue-700')}>
+                    <span className={cn('rounded-lg p-2', darkMode ? 'bg-card text-primary group-hover:bg-blue-600 group-hover:text-white' : 'bg-muted text-primary')}>
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0">
-                      <span className={cn('block text-sm font-bold', darkMode ? 'text-white' : 'text-slate-950')}>{link.title}</span>
-                      <span className={cn('mt-1 block text-xs leading-5', darkMode ? 'text-slate-400' : 'text-slate-500')}>{link.description}</span>
+                      <span className={cn('block text-sm font-bold', darkMode ? 'text-foreground' : 'text-foreground')}>{link.title}</span>
+                      <span className={cn('mt-1 block text-xs leading-5', darkMode ? 'text-muted-foreground' : 'text-muted-foreground')}>{link.description}</span>
                     </span>
                   </a>
                 )

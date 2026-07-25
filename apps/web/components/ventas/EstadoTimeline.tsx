@@ -34,29 +34,29 @@ export default function EstadoTimeline({
 
   const getEstadoBadgeColor = (estado: string) => {
     const colors: Record<string, string> = {
-      PENDIENTE: 'bg-gray-100 text-gray-800',
-      CONFIRMADO: 'bg-blue-100 text-blue-800',
-      EN_PREPARACION: 'bg-yellow-100 text-yellow-800',
-      LISTO_DESPACHO: 'bg-purple-100 text-purple-800',
-      DESPACHO_PARCIAL: 'bg-amber-100 text-amber-800',
-      LISTO_FACTURAR: 'bg-indigo-100 text-indigo-800',
-      FACTURADO: 'bg-green-100 text-green-800',
-      COMPLETADO: 'bg-green-100 text-green-800',
-      COMPLETADO_CON_GRE: 'bg-green-100 text-green-800',
-      CANCELADO: 'bg-red-100 text-red-800',
-      BORRADOR: 'bg-gray-100 text-gray-800',
-      ENVIADA: 'bg-blue-100 text-blue-800',
-      APROBADA: 'bg-green-100 text-green-800',
-      RECHAZADA: 'bg-red-100 text-red-800',
-      CONVERTIDA: 'bg-purple-100 text-purple-800',
-      VENCIDA: 'bg-orange-100 text-orange-800'
+      PENDIENTE: 'bg-muted text-foreground',
+      CONFIRMADO: 'bg-primary/10 text-primary',
+      EN_PREPARACION: 'bg-amber-500/10 text-amber-400',
+      LISTO_DESPACHO: 'bg-violet-500/10 text-violet-400',
+      DESPACHO_PARCIAL: 'bg-amber-500/10 text-amber-400',
+      LISTO_FACTURAR: 'bg-primary/10 text-primary',
+      FACTURADO: 'bg-emerald-500/10 text-emerald-400',
+      COMPLETADO: 'bg-emerald-500/10 text-emerald-400',
+      COMPLETADO_CON_GRE: 'bg-emerald-500/10 text-emerald-400',
+      CANCELADO: 'bg-destructive/10 text-destructive',
+      BORRADOR: 'bg-muted text-foreground',
+      ENVIADA: 'bg-primary/10 text-primary',
+      APROBADA: 'bg-emerald-500/10 text-emerald-400',
+      RECHAZADA: 'bg-destructive/10 text-destructive',
+      CONVERTIDA: 'bg-violet-500/10 text-violet-400',
+      VENCIDA: 'bg-amber-500/10 text-amber-400'
     }
-    return colors[estado] || 'bg-gray-100 text-gray-800'
+    return colors[estado] || 'bg-muted text-foreground'
   }
 
   if (!cambios || cambios.length === 0) {
     return (
-      <div className={`text-center py-8 text-gray-500 ${className}`}>
+      <div className={`text-center py-8 text-muted-foreground ${className}`}>
         No hay historial de cambios disponible
       </div>
     )
@@ -69,20 +69,20 @@ export default function EstadoTimeline({
           <div key={cambio.id} className="relative">
             {/* Timeline line */}
             {index < cambios.length - 1 && (
-              <div className="absolute left-4 top-10 bottom-0 w-0.5 bg-gray-200" />
+              <div className="absolute left-4 top-10 bottom-0 w-0.5 bg-muted" />
             )}
 
             <div className="flex gap-4">
               {/* Timeline dot */}
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center relative z-10">
-                  <Clock className="w-4 h-4 text-blue-600" />
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center relative z-10">
+                  <Clock className="w-4 h-4 text-primary" />
                 </div>
               </div>
 
               {/* Content */}
               <div className="flex-1 pb-4">
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="bg-card border border-border rounded-lg p-4">
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -95,7 +95,7 @@ export default function EstadoTimeline({
                             >
                               {cambio.estado_anterior}
                             </span>
-                            <ArrowRight className="w-4 h-4 text-gray-400" />
+                            <ArrowRight className="w-4 h-4 text-muted-foreground" />
                           </>
                         )}
                         <span
@@ -110,13 +110,13 @@ export default function EstadoTimeline({
                   </div>
 
                   <div className="space-y-1 text-sm">
-                    <div className="flex items-center gap-2 text-gray-600">
+                    <div className="flex items-center gap-2 text-foreground/80">
                       <Clock className="w-3.5 h-3.5" />
                       <span>{formatDate(cambio.fecha)}</span>
                     </div>
 
                     {(cambio.usuario_nombre || cambio.usuario) && (
-                      <div className="flex items-center gap-2 text-gray-600">
+                      <div className="flex items-center gap-2 text-foreground/80">
                         <User className="w-3.5 h-3.5" />
                         <span>
                           {cambio.usuario_nombre || `Usuario ${cambio.usuario}`}
@@ -125,8 +125,8 @@ export default function EstadoTimeline({
                     )}
 
                     {cambio.notas && (
-                      <div className="mt-2 pt-2 border-t border-gray-100">
-                        <p className="text-gray-700 text-sm">{cambio.notas}</p>
+                      <div className="mt-2 pt-2 border-t border-border">
+                        <p className="text-foreground/85 text-sm">{cambio.notas}</p>
                       </div>
                     )}
                   </div>
