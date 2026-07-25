@@ -44,6 +44,18 @@ const NORMATIVA_PERU_2026_DEFAULT: NormativaPeruPeriodo = {
   essaludAporte: 0.09,
   quintaDeduccionUit: 7,
 };
+
+// Estados en los que el contrato rige la relación laboral. Mismo criterio que usa
+// el trigger normalize_contratos_row para derivar contratos.activo: un contrato
+// renovado o en periodo de prueba sigue vigente y debe entrar a planilla.
+export const ESTADOS_CONTRATO_VIGENTE = ['vigente', 'renovado', 'en_periodo_prueba'];
+
+export function contratoVigenteDe(empleado: any): any | undefined {
+  return empleado?.contratos?.find((contrato: any) =>
+    ESTADOS_CONTRATO_VIGENTE.includes(String(contrato?.estado ?? '').toLowerCase()),
+  );
+}
+
 const RRHH_CUENTAS_PLANILLA_DEFAULT: Record<string, { nombre: string; tipo: string; tipo_cuenta: string; nivel: number }> = {
   '401': { nombre: 'Gobierno central', tipo: 'PASIVO', tipo_cuenta: 'PASIVO', nivel: 3 },
   '403': { nombre: 'Instituciones publicas', tipo: 'PASIVO', tipo_cuenta: 'PASIVO', nivel: 3 },
@@ -209,7 +221,7 @@ export class PlanillasService {
 
     // Procesar cada empleado
     for (const empleado of empleados) {
-      const contratoActual = empleado.contratos?.find(c => c.estado === 'vigente');
+      const contratoActual = contratoVigenteDe(empleado);
       if (!contratoActual) {
         this.logger.debug(`Empleado sin contrato vigente: ID=${empleado.id}`);
         continue;
@@ -431,7 +443,7 @@ export class PlanillasService {
 
     // 2. DESCUENTOS
 
-    const contratoActual = empleado.contratos?.find(c => c.estado === 'vigente');
+    const contratoActual = contratoVigenteDe(empleado);
     const regimenPensionario = contratoActual?.regimen_pensionario || 'AFP';
 
     if (regimenPensionario === 'AFP') {
@@ -1074,11 +1086,12 @@ export class PlanillasService {
     }
 
     // Descuentos automáticos (AFP/ONP) - usar datos del empleado si están disponibles
-    const regimenPensionario = empleado.contratos?.[0]?.regimen_pensionario || 'AFP';
+    const contratoVigente = contratoVigenteDe(empleado);
+    const regimenPensionario = contratoVigente?.regimen_pensionario || 'AFP';
 
     if (regimenPensionario === 'AFP') {
       // TODO: Tasas AFP deben ser configurables por tenant y AFP del empleado
-      const contratoEmpleado = empleado.contratos?.[0];
+      const contratoEmpleado = contratoVigente;
       const tasaComisionAFP2 = contratoEmpleado?.tasa_comision_afp ?? normativa.afpComisionFlujoDefault;
       const tasaSeguroAFP2 = contratoEmpleado?.tasa_seguro_afp ?? normativa.afpPrimaSeguro;
       const aporteAFP = new Decimal(totalIngresos).times(normativa.afpAporte).toDecimalPlaces(2).toNumber();
