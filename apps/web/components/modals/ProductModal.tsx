@@ -16,6 +16,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
     descripcion: '',
     categoria: '',
     unidadMedida: 'UND',
+    afectacionIgv: '10',
     precioCompra: '',
     precioVenta: '',
     stock: '',
@@ -35,6 +36,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
       descripcion: formData.descripcion,
       categoria: formData.categoria,
       unidadMedida: formData.unidadMedida,
+      afectacionIgv: formData.afectacionIgv,
       precioCompra: parseFloat(formData.precioCompra),
       precioVenta: parseFloat(formData.precioVenta),
       stock: parseInt(formData.stock),
@@ -54,6 +56,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
         descripcion: '',
         categoria: '',
         unidadMedida: 'UND',
+    afectacionIgv: '10',
         precioCompra: '',
         precioVenta: '',
         stock: '',
@@ -160,6 +163,25 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 <option value="PKG">Paquete</option>
                 <option value="CJA">Caja</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block mb-2 font-semibold text-foreground/85">
+                Afectación IGV
+              </label>
+              <select
+                name="afectacionIgv"
+                value={formData.afectacionIgv}
+                onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
+              >
+                <option value="10">Gravado (18% IGV)</option>
+                <option value="20">Exonerado (sin IGV)</option>
+                <option value="30">Inafecto (sin IGV)</option>
+                <option value="40">Exportación</option>
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Determina si el producto paga IGV y cómo se declara ante SUNAT.
+              </p>
             </div>
 
             <div>

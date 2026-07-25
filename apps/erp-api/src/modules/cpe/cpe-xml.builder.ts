@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { CreateFacturaDto } from '@erp-suite/dtos';
 import { DocumentoFiscal } from '../documentos/interfaces/documento-fiscal.interface';
+import { ESQUEMA_TRIBUTARIO, categoriaDeAfectacion } from '../../shared/utils/igv-afectacion.util';
 
 /**
  * Construye y normaliza XML UBL 2.1 para SUNAT.
@@ -218,17 +219,10 @@ generateXmlContent(factura: CreateFacturaDto): string {
   </cac:AccountingCustomerParty>${formaPagoXml}
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(factura.total_igv)}</cbc:TaxAmount>
-    <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(factura.total_gravadas)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(factura.total_igv)}</cbc:TaxAmount>
-      <cac:TaxCategory>
-        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">S</cbc:ID>
-        ${this.buildIgvTaxSchemeXml()}
-      </cac:TaxCategory>
-    </cac:TaxSubtotal>
+${this.buildTaxSubtotalsXml(factura, moneda)}
   </cac:TaxTotal>
   <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="${moneda}">${this.formatAmount(factura.total_gravadas)}</cbc:LineExtensionAmount>
+    <cbc:LineExtensionAmount currencyID="${moneda}">${this.formatAmount(this.totalBaseImponible(factura))}</cbc:LineExtensionAmount>
     <cbc:TaxInclusiveAmount currencyID="${moneda}">${this.formatAmount(factura.total_venta)}</cbc:TaxInclusiveAmount>
     <cbc:AllowanceTotalAmount currencyID="${moneda}">${this.formatAmount((factura as any).total_descuentos ?? 0)}</cbc:AllowanceTotalAmount>
     <cbc:ChargeTotalAmount currencyID="${moneda}">${this.formatAmount((factura as any).total_cargos ?? 0)}</cbc:ChargeTotalAmount>
@@ -263,10 +257,10 @@ private buildInvoiceLineXml(item: any, index: number, moneda: string): string {
         <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(valorVenta)}</cbc:TaxableAmount>
         <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(igv)}</cbc:TaxAmount>
         <cac:TaxCategory>
-          <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">S</cbc:ID>
+          <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">${this.categoriaTributariaUbl(afectacionIgv)}</cbc:ID>
           <cbc:Percent>${this.formatAmount(percent)}</cbc:Percent>
           <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${afectacionIgv}</cbc:TaxExemptionReasonCode>
-          ${this.buildIgvTaxSchemeXml()}
+          ${this.buildTaxSchemePorAfectacionXml(afectacionIgv)}
         </cac:TaxCategory>
       </cac:TaxSubtotal>
     </cac:TaxTotal>
@@ -455,10 +449,10 @@ private buildNoteLineXml(
         <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(valorVenta)}</cbc:TaxableAmount>
         <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(igv)}</cbc:TaxAmount>
         <cac:TaxCategory>
-          <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">S</cbc:ID>
+          <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">${this.categoriaTributariaUbl(afectacionIgv)}</cbc:ID>
           <cbc:Percent>${this.formatAmount(percent)}</cbc:Percent>
           <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${afectacionIgv}</cbc:TaxExemptionReasonCode>
-          ${this.buildIgvTaxSchemeXml()}
+          ${this.buildTaxSchemePorAfectacionXml(afectacionIgv)}
         </cac:TaxCategory>
       </cac:TaxSubtotal>
     </cac:TaxTotal>
@@ -532,6 +526,101 @@ private buildIgvTaxSchemeXml(): string {
           <cbc:Name>IGV</cbc:Name>
           <cbc:TaxTypeCode>VAT</cbc:TaxTypeCode>
         </cac:TaxScheme>`;
+  }
+
+/**
+ * Categoría tributaria UBL (UN/ECE 5305) que corresponde a la afectación:
+ * S = gravado estándar, E = exento/exonerado, O = fuera del ámbito (inafecto).
+ * Enviar siempre "S" haría que SUNAT interprete como gravada una línea exonerada.
+ */
+private categoriaTributariaUbl(afectacionIgv?: string | null): string {
+    switch (categoriaDeAfectacion(afectacionIgv)) {
+      case 'EXONERADO':
+        return 'E';
+      case 'INAFECTO':
+      case 'EXPORTACION':
+        return 'O';
+      default:
+        return 'S';
+    }
+  }
+
+/** TaxScheme por afectación: 1000 (IGV), 9997 (exonerado), 9998 (inafecto). */
+private buildTaxSchemePorAfectacionXml(afectacionIgv?: string | null): string {
+    const esquema = ESQUEMA_TRIBUTARIO[categoriaDeAfectacion(afectacionIgv)];
+    return `<cac:TaxScheme>
+          <cbc:ID schemeID="UN/ECE 5153" schemeName="Codigo de tributos" schemeAgencyName="PE:SUNAT">${esquema.id}</cbc:ID>
+          <cbc:Name>${esquema.nombre}</cbc:Name>
+          <cbc:TaxTypeCode>${esquema.tipo}</cbc:TaxTypeCode>
+        </cac:TaxScheme>`;
+  }
+
+/**
+ * Construye los TaxSubtotal del comprobante separando las bases por tipo de
+ * afectación. SUNAT exige un bloque por categoría: 1000 (IGV gravado),
+ * 9997 (exonerado) y 9998 (inafecto). Declarar una base exonerada dentro del
+ * subtotal gravado implica reportar IGV que no se cobró.
+ */
+private buildTaxSubtotalsXml(factura: CreateFacturaDto, moneda: string): string {
+    const gravadas = Number((factura as any).total_gravadas ?? 0);
+    const exoneradas = Number((factura as any).total_exoneradas ?? 0);
+    const inafectas = Number((factura as any).total_inafectas ?? 0);
+    const igv = Number((factura as any).total_igv ?? 0);
+
+    const subtotales: string[] = [];
+
+    // El bloque gravado se emite siempre: un comprobante sin operaciones
+    // gravadas igual debe declarar la base en cero.
+    subtotales.push(`    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(gravadas)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(igv)}</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">S</cbc:ID>
+        ${this.buildIgvTaxSchemeXml()}
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>`);
+
+    if (exoneradas > 0) {
+      subtotales.push(`    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(exoneradas)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(0)}</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">E</cbc:ID>
+        <cac:TaxScheme>
+          <cbc:ID schemeID="UN/ECE 5153" schemeName="Codigo de tributos" schemeAgencyName="PE:SUNAT">9997</cbc:ID>
+          <cbc:Name>EXO</cbc:Name>
+          <cbc:TaxTypeCode>VAT</cbc:TaxTypeCode>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>`);
+    }
+
+    if (inafectas > 0) {
+      subtotales.push(`    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(inafectas)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(0)}</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">O</cbc:ID>
+        <cac:TaxScheme>
+          <cbc:ID schemeID="UN/ECE 5153" schemeName="Codigo de tributos" schemeAgencyName="PE:SUNAT">9998</cbc:ID>
+          <cbc:Name>INA</cbc:Name>
+          <cbc:TaxTypeCode>FRE</cbc:TaxTypeCode>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>`);
+    }
+
+    return subtotales.join('\n');
+  }
+
+/** Suma de todas las bases del comprobante, sin importar su afectación. */
+private totalBaseImponible(factura: CreateFacturaDto): number {
+    return (
+      Number((factura as any).total_gravadas ?? 0) +
+      Number((factura as any).total_exoneradas ?? 0) +
+      Number((factura as any).total_inafectas ?? 0) +
+      Number((factura as any).total_exportacion ?? 0)
+    );
   }
 
 private buildPaymentTermsXml(factura: CreateFacturaDto, moneda: string): string {
