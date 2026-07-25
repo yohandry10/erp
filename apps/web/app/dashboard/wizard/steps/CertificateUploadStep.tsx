@@ -112,14 +112,14 @@ export function CertificateUploadStep() {
 
   return (
     <div className="py-4 px-0">
-      <div className="flex items-center gap-3 mb-6 p-4 bg-[rgba(139,_92,_246,_0.1)] rounded-2">
+      <div className="flex items-center gap-3 mb-6 p-4 bg-[rgba(139,_92,_246,_0.1)] rounded-lg">
         <FileCheck size={24} className="text-[var(--primary-600)]" />
         <p className="text-[0.875rem] text-[var(--primary-700)] m-0">
           Carga tu certificado digital para firmar comprobantes electrónicos
         </p>
       </div>
 
-      <div className="flex items-start gap-3 mb-6 p-4 bg-[rgba(251,_191,_36,_0.12)] rounded-2 border">
+      <div className="flex items-start gap-3 mb-6 p-4 bg-[rgba(251,_191,_36,_0.12)] rounded-lg border">
         <AlertCircle size={20} className="text-[#d97706] mt-[2px] shrink-0" />
         <div>
           <p className="text-[0.875rem] font-semibold text-[#78350f] m-0">
@@ -149,7 +149,7 @@ export function CertificateUploadStep() {
           />
           
           <div
-            onClick={() => fileInputRef.current?.click()} className="rounded-2 p-8 text-center cursor-pointer transition"
+            onClick={() => fileInputRef.current?.click()} className="rounded-lg p-8 text-center cursor-pointer transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = 'var(--primary-500)'
               e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)'
@@ -164,7 +164,7 @@ export function CertificateUploadStep() {
             {state.configuration.certificateFile ? (
               <div className="flex flex-col items-center gap-2">
                 <CheckCircle size={48} className="text-[var(--success-600)]" />
-                <p className="text-4 font-semibold text-[var(--success-700)] m-0">
+                <p className="text-base font-semibold text-[var(--success-700)] m-0">
                   {state.configuration.certificateFile.name}
                 </p>
                 <p className="text-[0.875rem] text-[var(--primary-600)] m-0">
@@ -174,7 +174,7 @@ export function CertificateUploadStep() {
             ) : (
               <div className="flex flex-col items-center gap-2">
                 <Upload size={48} className="text-[var(--primary-400)]" />
-                <p className="text-4 font-semibold text-[var(--primary-700)] m-0">
+                <p className="text-base font-semibold text-[var(--primary-700)] m-0">
                   Haz clic para seleccionar tu certificado
                 </p>
                 <p className="text-[0.875rem] text-[var(--primary-500)] m-0">
@@ -190,14 +190,14 @@ export function CertificateUploadStep() {
               <div className="w-[100%] h-2 bg-[rgba(0,_0,_0,_0.1)] rounded-full overflow-hidden">
                 <div className="h-[100%] bg-[var(--primary-600)] rounded-full transition" />
               </div>
-              <p className="text-3 text-[var(--primary-600)] mt-1 text-center">
+              <p className="text-xs text-[var(--primary-600)] mt-1 text-center">
                 Cargando... {uploadProgress}%
               </p>
             </div>
           )}
 
           {validationError && (
-            <div className="mt-2 flex items-center gap-2 text-red-600 text-[0.875rem]">
+            <div className="mt-2 flex items-center gap-2 text-destructive text-[0.875rem]">
               <AlertCircle size={16} />
               <span>{validationError}</span>
             </div>
@@ -215,7 +215,7 @@ export function CertificateUploadStep() {
               type={showPassword ? 'text' : 'password'}
               placeholder="Ingresa la contraseña"
               value={state.configuration.certificatePassword || ''}
-              onChange={(e) => handlePasswordChange(e.target.value)} className="text-4 pr-12"
+              onChange={(e) => handlePasswordChange(e.target.value)} className="text-base pr-12"
             />
             <button
               type="button"
@@ -224,14 +224,14 @@ export function CertificateUploadStep() {
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
-          <p className="text-3 text-[var(--primary-500)] mt-1">
+          <p className="text-xs text-[var(--primary-500)] mt-1">
             La contraseña que usaste al crear el certificado
           </p>
         </div>
 
       </div>
 
-      <div className="mt-8 p-4 bg-[rgba(59,_130,_246,_0.1)] rounded-2 border">
+      <div className="mt-8 p-4 bg-[rgba(59,_130,_246,_0.1)] rounded-lg border">
         <p className="text-[0.875rem] text-[var(--primary-700)] m-0 leading-6">
           <strong>🔒 Seguridad:</strong> Tu certificado se almacena de forma encriptada y segura.
           Solo se usa para firmar tus comprobantes electrónicos.

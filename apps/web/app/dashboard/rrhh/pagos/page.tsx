@@ -4,6 +4,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { fetchApi } from '@/lib/api-fetch';
+import { Banknote, CheckCircle2, Clock3, Receipt, RefreshCw } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const PagosPage = () => {
   const [pagos, setPagos] = useState<any[]>([]);
@@ -41,12 +44,12 @@ const PagosPage = () => {
     }
     try {
       setLoading(true);
-      
+
       // Cargar pagos
       console.log('🔍 [Frontend] Cargando pagos desde /api/rrhh/pagos...');
       const pagosResponse = await get('/api/rrhh/pagos');
       console.log('📦 [Frontend] Respuesta pagos:', pagosResponse);
-      
+
       // Verificar si la respuesta tiene la estructura correcta
       let pagosData = [];
       if (pagosResponse?.success && Array.isArray(pagosResponse.data)) {
@@ -58,7 +61,7 @@ const PagosPage = () => {
       } else {
         console.warn('⚠️ [Frontend] Respuesta no es array:', typeof pagosResponse, pagosResponse);
       }
-      
+
       setPagos(pagosData);
       console.log(`🎯 [Frontend] Estado actualizado con ${pagosData.length} pagos`);
 
@@ -104,7 +107,7 @@ const PagosPage = () => {
   const generarComprobante = async (pagoId: string) => {
     try {
       const response = await fetchApi(`/api/rrhh/pagos/${pagoId}/comprobante`);
-      
+
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -123,25 +126,25 @@ const PagosPage = () => {
 
   const filtrarPagos = () => {
     let filtrados = pagos;
-    
+
     if (filtroEstado !== 'todos') {
       filtrados = filtrados.filter(p => p.estado === filtroEstado);
     }
-    
+
     if (filtroPeriodo !== 'todos') {
       filtrados = filtrados.filter(p => p.periodo === filtroPeriodo);
     }
-    
+
     return filtrados;
   };
 
   const getEstadoColor = (estado: string) => {
     const colores: Record<string, string> = {
-      'pendiente': 'bg-yellow-100 text-yellow-800',
-      'procesado': 'bg-green-100 text-green-800',
-      'rechazado': 'bg-red-100 text-red-800'
+      'pendiente': 'bg-amber-500/10 text-amber-400',
+      'procesado': 'bg-emerald-500/10 text-emerald-400',
+      'rechazado': 'bg-destructive/10 text-destructive'
     };
-    return colores[estado] || 'bg-gray-100 text-gray-800';
+    return colores[estado] || 'bg-muted text-foreground';
   };
 
   const calcularEstadisticas = () => {
@@ -149,7 +152,7 @@ const PagosPage = () => {
     const pendientes = pagos.filter(p => p.estado === 'pendiente').length;
     const procesados = pagos.filter(p => p.estado === 'procesado').length;
     const montoTotal = pagos.filter(p => p.estado === 'procesado').reduce((sum, p) => sum + (p.monto_neto || 0), 0);
-    
+
     return { total, pendientes, procesados, montoTotal };
   };
 
@@ -165,10 +168,10 @@ const PagosPage = () => {
 
   if (!rrhhEnabled) {
     return (
-      <div className="dashboard-container">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
         <div className="alert alert-warning">
           <h1 className="text-xl font-semibold">RRHH deshabilitado</h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-foreground/80">
             {/* // HARDENING: pagos RRHH bloqueados hasta completar la validación legal. */}
             El seguimiento de pagos de planilla estará disponible cuando el módulo de RRHH se habilite en este entorno.
           </p>
@@ -181,15 +184,15 @@ const PagosPage = () => {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
           <div>
-            <h1 className="dashboard-title">Pagos & Comprobantes</h1>
-            <p className="dashboard-subtitle">Cargando pagos de empleados, planillas y comprobantes asociados.</p>
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Pagos & Comprobantes</h1>
+            <p className="mt-2 text-base text-muted-foreground">Cargando pagos de empleados, planillas y comprobantes asociados.</p>
           </div>
         </div>
-        <div className="loading">
-          <div className="loading-spinner"></div>
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando pagos...</p>
         </div>
       </div>
@@ -197,91 +200,85 @@ const PagosPage = () => {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">Pagos & Comprobantes</h1>
-          <p className="dashboard-subtitle">Control de pagos mensuales a empleados</p>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Pagos & Comprobantes</h1>
+          <p className="mt-2 text-base text-muted-foreground">Control de pagos mensuales a empleados</p>
         </div>
         <div className="flex gap-4">
-          <button className="refresh-btn" onClick={loadData}>
-            🔄 Actualizar
+          <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50" onClick={loadData}>
+            <RefreshCw className="size-4" aria-hidden="true" /> Actualizar
           </button>
         </div>
       </div>
 
       {/* Estadísticas */}
-      <div className="stats-grid mb-6">
-        <div className="stat-card">
-          <div className="stat-header">
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 mb-6">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Total Pagos</h3>
-            <div className="stat-icon">💰</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Receipt className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-blue-600">{stats.total}</div>
-          <div className="stat-subtitle">Registros de pago</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-primary">{stats.total}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Registros de pago</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Pendientes</h3>
-            <div className="stat-icon">⏳</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-yellow-600">{stats.pendientes}</div>
-          <div className="stat-subtitle">Por procesar</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-amber-400">{stats.pendientes}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Por procesar</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Procesados</h3>
-            <div className="stat-icon">✅</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><CheckCircle2 className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-green-600">{stats.procesados}</div>
-          <div className="stat-subtitle">Pagos completados</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-emerald-400">{stats.procesados}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Pagos completados</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Monto Total</h3>
-            <div className="stat-icon">💸</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Banknote className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-purple-600">S/ {stats.montoTotal.toLocaleString()}</div>
-          <div className="stat-subtitle">Pagos procesados</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-violet-400">S/ {stats.montoTotal.toLocaleString()}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Pagos procesados</div>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-4 mb-6 p-4 bg-[#f8f9fa] rounded-2">
-        <div>
-          <label className="block mb-2 font-medium">
-            Estado:
-          </label>
-          <select 
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
-            className="form-control w-[150px]"
-          >
-            <option value="todos">Todos</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="procesado">Procesado</option>
-            <option value="rechazado">Rechazado</option>
-          </select>
+      <div className="mb-6 grid gap-4 rounded-2xl border border-border bg-card/80 p-4 sm:grid-cols-2">
+        <div className="min-w-0">
+          <Label htmlFor="filtro-estado-pagos" className="mb-2">Estado</Label>
+          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+            <SelectTrigger id="filtro-estado-pagos" aria-label="Filtrar pagos por estado"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="pendiente">Pendiente</SelectItem>
+              <SelectItem value="procesado">Procesado</SelectItem>
+              <SelectItem value="rechazado">Rechazado</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        <div>
-          <label className="block mb-2 font-medium">
-            Período:
-          </label>
-          <select 
-            value={filtroPeriodo}
-            onChange={(e) => setFiltroPeriodo(e.target.value)}
-            className="form-control w-[150px]"
-          >
-            <option value="todos">Todos</option>
-            {getPeriodosUnicos().map(periodo => (
-              <option key={periodo} value={periodo}>{periodo}</option>
-            ))}
-          </select>
+        <div className="min-w-0">
+          <Label htmlFor="filtro-periodo-pagos" className="mb-2">Período</Label>
+          <Select value={filtroPeriodo} onValueChange={setFiltroPeriodo}>
+            <SelectTrigger id="filtro-periodo-pagos" aria-label="Filtrar pagos por período"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              {getPeriodosUnicos().map(periodo => (
+                <SelectItem key={periodo} value={periodo}>{periodo}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -311,13 +308,13 @@ const PagosPage = () => {
                   <td>
                     <div>
                       <div className="font-medium">{getEmpleadoNombre(pago.empleado_id)}</div>
-                      <div className="text-sm text-gray-500">ID: {pago.empleado_id?.substring(0, 8)}...</div>
+                      <div className="text-sm text-muted-foreground">ID: {pago.empleado_id?.substring(0, 8)}...</div>
                     </div>
                   </td>
                   <td>{pago.periodo}</td>
                   <td className="text-right">S/ {(pago.monto_bruto || 0).toLocaleString()}</td>
-                  <td className="text-right text-red-600">S/ {(pago.total_descuentos || 0).toLocaleString()}</td>
-                  <td className="text-right font-bold text-green-600">S/ {(pago.monto_neto || 0).toLocaleString()}</td>
+                  <td className="text-right text-destructive">S/ {(pago.total_descuentos || 0).toLocaleString()}</td>
+                  <td className="text-right font-bold text-emerald-400">S/ {(pago.monto_neto || 0).toLocaleString()}</td>
                   <td>{pago.fecha_pago ? new Date(pago.fecha_pago).toLocaleDateString('es-PE') : '-'}</td>
                   <td>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoColor(pago.estado)}`}>
@@ -372,7 +369,7 @@ MONTO NETO: S/ ${(pago.monto_neto || 0).toLocaleString()}
           </table>
 
           {filtrarPagos().length === 0 && (
-            <div className="text-center p-8 text-gray-500">
+            <div className="text-center p-8 text-muted-foreground">
               No hay pagos que coincidan con los filtros seleccionados.
             </div>
           )}
@@ -408,7 +405,7 @@ MONTO NETO: S/ ${(pago.monto_neto || 0).toLocaleString()}
                     <td>
                       <div>
                         <div className="font-medium">{empleado.nombres} {empleado.apellidos}</div>
-                        <div className="text-sm text-gray-500">{empleado.puesto || 'N/A'}</div>
+                        <div className="text-sm text-muted-foreground">{empleado.puesto || 'N/A'}</div>
                       </div>
                     </td>
                     <td>{ultimoPago?.periodo || 'Sin pagos'}</td>

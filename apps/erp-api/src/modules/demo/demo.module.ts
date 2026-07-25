@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { DemoController } from './demo.controller';
 import { WebhookController } from './webhook.controller';
 import { DemoService } from './demo.service';
@@ -8,25 +7,13 @@ import { StripeService } from './stripe.service';
 import { DemoExpiredGuard } from './guards/demo-expired.guard';
 import { DemoRestrictionsInterceptor } from './interceptors/demo-restrictions.interceptor';
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     SupabaseModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const jwtSecret = configService.get<string>('JWT_SECRET');
-        if (!jwtSecret) {
-          throw new Error('JWT_SECRET is required for DemoModule JWT signing');
-        }
-
-        return {
-          secret: jwtSecret,
-          signOptions: { expiresIn: '30d' },
-        };
-      },
-    }),
+    ConfigModule,
+    AuthModule,
   ],
   controllers: [DemoController, WebhookController],
   providers: [DemoService, StripeService, DemoExpiredGuard, DemoRestrictionsInterceptor],

@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class UpdateCajaDto {
   @IsString()
@@ -13,7 +13,7 @@ export class UpdateCajaDto {
   @IsOptional()
   sucursal_id?: string;
 
-  @IsString()
+  @IsUUID()
   @IsOptional()
   almacen_id?: string;
 

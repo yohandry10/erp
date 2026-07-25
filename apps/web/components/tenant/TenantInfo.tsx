@@ -11,7 +11,7 @@ export function TenantInfo() {
   const { tenant, user, isSuperAdmin, loading, error } = useTenant()
 
   if (loading) {
-    return <div className="p-4 text-sm text-gray-500">Loading tenant information...</div>
+    return <div className="p-4 text-sm text-muted-foreground">Loading tenant information...</div>
   }
 
   if (error) {
@@ -19,11 +19,11 @@ export function TenantInfo() {
   }
 
   if (!tenant || !user) {
-    return <div className="p-4 text-sm text-gray-500">No tenant information available</div>
+    return <div className="p-4 text-sm text-muted-foreground">No tenant information available</div>
   }
 
   return (
-    <div className="p-4 border rounded-lg bg-white shadow-sm">
+    <div className="p-4 border rounded-lg bg-card shadow-sm">
       <h3 className="text-lg font-semibold mb-2">Tenant Information</h3>
       <div className="space-y-2 text-sm">
         <div>

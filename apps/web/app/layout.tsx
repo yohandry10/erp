@@ -22,7 +22,17 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning data-scroll-behavior="smooth">
+      <head>
+        {/* Fija el tema antes del primer paint solo en superficies que usan el
+            contrato del dashboard. Las rutas públicas conservan sus propios
+            estilos y no heredan accidentalmente la preferencia almacenada. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=location.pathname;var uses=p==='/dashboard'||p.indexOf('/dashboard/')===0||p==='/superadmin'||p.indexOf('/superadmin/')===0||p==='/demo/convert'||p.indexOf('/demo/convert/')===0;if(!uses){delete document.documentElement.dataset.erpTheme;return;}var t=localStorage.getItem('erp-dashboard-theme');document.documentElement.dataset.erpTheme=(t==='light')?'light':'dark';}catch(e){delete document.documentElement.dataset.erpTheme;}})();`,
+          }}
+        />
+      </head>
       <body className={inter.className} suppressHydrationWarning>
         <div className="app-wrapper">
           <ErrorBoundary>
@@ -32,7 +42,15 @@ export default function RootLayout({
                   <TenantProvider>
                     {children}
                     <Toaster />
-                    <HotToaster />
+                    <HotToaster
+                      toastOptions={{
+                        style: {
+                          background: 'hsl(var(--background))',
+                          color: 'hsl(var(--foreground))',
+                          border: '1px solid hsl(var(--border))',
+                        },
+                      }}
+                    />
                   </TenantProvider>
                 </SessionProvider>
               </AuthProvider>

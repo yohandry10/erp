@@ -21,6 +21,9 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
       headers.set('Authorization', `Bearer ${token}`)
     }
   }
+  if (!headers.has('x-tenant-id') && session?.user?.tenant_id) {
+    headers.set('x-tenant-id', session.user.tenant_id)
+  }
 
   return fetchWithOfflineSupport(buildApiUrl(normalizedEndpoint), {
     credentials: 'include',

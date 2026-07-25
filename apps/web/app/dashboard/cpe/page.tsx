@@ -218,16 +218,16 @@ export default function CPEPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+        <section className="rounded-3xl border border-cyan-400/20 bg-card/80 p-5 shadow-2xl shadow-blue-950/30">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 ERP CPE Center
               </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Comprobantes de Pago Electronicos</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-300">Facturas, boletas y notas conectadas a {fiscalLabel}.</p>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">Comprobantes de Pago Electrónicos</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Facturas, boletas y notas conectadas a {fiscalLabel}.</p>
             </div>
             <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <Plus className="h-4 w-4" />
@@ -243,14 +243,14 @@ export default function CPEPage() {
             ['Monto facturado', `S/ ${stats?.montoFacturado?.toLocaleString() || '0'}`, 'Ingresos del mes'],
             ['Rechazados', stats?.rechazados || 0, 'Requieren correccion'],
           ].map(([label, value, description]) => (
-            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">{label}</div>
-                  <div className="mt-3 text-3xl font-black text-white">{value}</div>
-                  <div className="mt-1 text-xs text-cyan-100/55">{description}</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">{label}</div>
+                  <div className="mt-3 text-3xl font-black text-foreground">{value}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{description}</div>
                 </div>
-                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
                   <FileText className="h-5 w-5" />
                 </span>
               </CardContent>
@@ -258,7 +258,7 @@ export default function CPEPage() {
           ))}
         </section>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="p-4">
             <ComprobantesFilters
               filters={{ ...filters }}
@@ -278,7 +278,7 @@ export default function CPEPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="p-4">
             <ComprobantesTable
               documents={documents}

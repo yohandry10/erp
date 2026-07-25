@@ -116,6 +116,12 @@ async function createSaleWithCxc(apiContext: APIRequestContext) {
     'crear cliente T13',
   );
 
+  const almacenes = await parseOk<any[]>(
+    await apiContext.get(api('/inventario/almacenes')),
+    'listar almacenes venta T13',
+  );
+  expect(almacenes.length, 'T13 requiere almacén operativo').toBeGreaterThan(0);
+
   const producto = await parseOk<any>(
     await apiContext.post(api('/inventario/productos'), {
       data: {
@@ -125,6 +131,7 @@ async function createSaleWithCxc(apiContext: APIRequestContext) {
         precio_compra: 40,
         precio_venta: 118,
         stock: 5,
+        almacen_id: almacenes[0].id,
         stock_minimo: 0,
         controla_stock: true,
       },
@@ -294,9 +301,21 @@ async function createPosCashMovement(apiContext: APIRequestContext, supabase: Su
     updated_at: new Date().toISOString(),
   }, { onConflict: 'tenant_id' });
 
+  const { data: almacen, error: almacenError } = await supabase
+    .from('almacenes')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('activo', true)
+    .order('es_principal', { ascending: false })
+    .limit(1)
+    .single();
+  expect(almacenError?.message || '', 'consultar almacen POS Finanzas T13').toBe('');
+  expect(almacen?.id, 'debe existir almacen POS Finanzas T13').toBeTruthy();
+
   const { data: caja, error: cajaError } = await supabase.from('cajas').insert({
     id: crypto.randomUUID(),
     tenant_id: tenantId,
+    almacen_id: almacen!.id,
     codigo: `CAJA-FIN-${runId}`,
     nombre: `Caja Finanzas ${runId}`,
     estado: 'ACTIVO',
@@ -315,9 +334,6 @@ async function createPosCashMovement(apiContext: APIRequestContext, supabase: Su
     precio: 50,
     precio_venta: 50,
     precio_unitario: 50,
-    stock: '3',
-    stock_actual: '3',
-    stock_reservado: '0',
     stock_minimo: '0',
     unidad_medida: 'NIU',
     activo: true,
@@ -326,6 +342,20 @@ async function createPosCashMovement(apiContext: APIRequestContext, supabase: Su
     es_servicio: false,
   }).select('*').single();
   expect(productoError?.message || '', 'crear producto POS Finanzas T13').toBe('');
+
+  const { error: stockError } = await supabase.rpc('aplicar_movimiento_inventario_tx', {
+    p_tenant_id: tenantId,
+    p_producto_id: producto!.id,
+    p_almacen_id: almacen!.id,
+    p_tipo: 'ENTRADA',
+    p_cantidad: 3,
+    p_referencia_tipo: 'QA_FINANZAS_E2E',
+    p_referencia_id: crypto.randomUUID(),
+    p_notas: 'Stock controlado para flujo POS/Finanzas E2E',
+    p_created_by: 'playwright',
+    p_metadata: { source: 'finanzas-completo.spec.ts', run_id: runId },
+  });
+  expect(stockError?.message || '', 'cargar stock por ledger POS Finanzas T13').toBe('');
 
   const sesionActual = await parseOk<any>(await apiContext.get(api('/pos/sesion-caja')), 'consultar sesion POS T13');
   let sesionId = sesionActual?.id;
@@ -520,7 +550,26 @@ test.describe('T13 Finanzas completo', () => {
       'aging debe reflejar la CxP vencida creada por el test',
     ).toBeTruthy();
 
-    await createPosCashMovement(apiContext, supabase, tenantId);
+    const ventaPos = await createPosCashMovement(apiContext, supabase, tenantId);
+    const numeroDocumentoVenta = `${venta.documento.serie}-${String(venta.documento.numero).padStart(8, '0')}`;
+    expect(
+      ventaPos.numero_ticket,
+      'POS y Ventas deben reservar una única secuencia fiscal por serie',
+    ).not.toBe(numeroDocumentoVenta);
+
+    const facturacionPos = await parseOk<any>(
+      await apiContext.post(api(`/pos/reintentar-facturacion/${ventaPos.venta_id}`)),
+      'facturar POS después de reservar correlativo fiscal compartido',
+    );
+    expect(facturacionPos.success).toBe(true);
+    expect(facturacionPos.cpe_id, 'POS debe quedar vinculado a un CPE sin conflicto de numeración').toBeTruthy();
+
+    const estadoFiscalPos = await parseOk<any>(
+      await apiContext.get(api(`/pos/facturacion/${ventaPos.venta_id}`)),
+      'consultar estado fiscal POS T13',
+    );
+    expect(estadoFiscalPos.cpe_pendiente).toBe(false);
+    expect(estadoFiscalPos.cpe_id).toBe(facturacionPos.cpe_id);
 
     const autoMov = await parseOk<any>(
       await apiContext.post(api('/finanzas/bancos/movimientos'), {

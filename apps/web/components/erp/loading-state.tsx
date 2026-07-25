@@ -9,10 +9,10 @@ export function PageLoadingState({ label = "Cargando datos..." }: { label?: stri
         <Skeleton className="h-32" />
         <Skeleton className="h-32" />
       </div>
-      <div className="rounded-2xl border border-cyan-400/20 bg-slate-950/65 p-6 shadow-xl shadow-blue-950/20">
+      <div className="rounded-2xl border border-cyan-400/20 bg-card/65 p-6 shadow-xl shadow-blue-950/20">
         <Skeleton className="h-5 w-48" />
         <Skeleton className="mt-6 h-56 w-full" />
-        <p className="mt-4 text-sm text-slate-300">{label}</p>
+        <p className="mt-4 text-sm text-muted-foreground">{label}</p>
       </div>
     </div>
   )

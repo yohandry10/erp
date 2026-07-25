@@ -327,19 +327,10 @@ export class DocumentosController {
     @CurrentTenant() tenantId: string,
     @Req() req: Request
   ) {
-    try {
-      console.log('❌ Anulando documento:', id, 'motivo:', data.motivo);
-      const user = req.user as any;
-      const userId = user?.id;
-      
-      return await this.documentosService.anularDocumento(id, data.motivo, tenantId, userId);
-    } catch (error) {
-      console.error('❌ Error anulando documento:', error);
-      return {
-        success: false,
-        data: null,
-        error: error.message
-      };
-    }
+    console.log('❌ Anulando documento:', id, 'motivo:', data.motivo);
+    const user = req.user as any;
+    const userId = user?.id;
+
+    return this.documentosService.anularDocumento(id, data.motivo, tenantId, userId);
   }
-} 
+}

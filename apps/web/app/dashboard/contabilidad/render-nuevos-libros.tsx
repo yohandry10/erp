@@ -1,17 +1,17 @@
-const panelClass = 'rounded-2xl border border-cyan-400/20 bg-slate-950/65 p-5 text-slate-100 shadow-xl shadow-blue-950/20'
-const emptyClass = 'flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-cyan-400/20 bg-slate-950/65 p-8 text-center text-slate-300'
-const tableClass = '!m-0 w-full min-w-full border-collapse !bg-slate-950/80 text-sm !shadow-none'
-const thClass = '!border-cyan-400/10 !bg-slate-900/90 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
-const tdClass = '!border-cyan-400/10 !bg-transparent px-3 py-3 text-slate-200'
-const metricClass = 'rounded-xl border border-cyan-400/15 bg-slate-950/45 p-4'
-const metricLabelClass = 'text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70'
+const panelClass = 'rounded-2xl border border-cyan-400/20 bg-card/65 p-5 text-foreground shadow-xl shadow-blue-950/20'
+const emptyClass = 'flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-cyan-400/20 bg-card/65 p-8 text-center text-muted-foreground'
+const tableClass = '!m-0 w-full min-w-full border-collapse !bg-card/80 text-sm !shadow-none'
+const thClass = '!border-cyan-400/10 !bg-card/90 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
+const tdClass = '!border-cyan-400/10 !bg-transparent px-3 py-3 text-foreground/90'
+const metricClass = 'rounded-xl border border-cyan-400/15 bg-card/45 p-4'
+const metricLabelClass = 'text-xs font-semibold uppercase tracking-[0.14em] text-primary/80'
 const metricValueClass = 'mt-2 text-2xl font-black text-white'
-const exportButtonClass = 'rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-400/15'
+const exportButtonClass = 'rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-cyan-400/15'
 
 function LoadingPanel({ label }: { label: string }) {
   return (
     <div className={emptyClass}>
-      <div className="mb-4 size-10 animate-spin rounded-full border-4 border-slate-800 border-t-cyan-300" />
+      <div className="mb-4 size-10 animate-spin rounded-full border-4 border-border border-t-cyan-300" />
       <p>{label}</p>
     </div>
   )
@@ -19,7 +19,7 @@ function LoadingPanel({ label }: { label: string }) {
 
 function StatusPill({ children, active = false }: { children: React.ReactNode; active?: boolean }) {
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${active ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100' : 'border-slate-400/30 bg-slate-400/10 text-slate-200'}`}>
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${active ? 'border-cyan-300/30 bg-cyan-300/10 text-primary' : 'border-border/30 bg-slate-400/10 text-foreground/90'}`}>
       {children}
     </span>
   )
@@ -68,7 +68,7 @@ export const renderRegistroCompras = (registroCompras: any, loading: boolean, fo
           </thead>
           <tbody className="divide-y divide-cyan-400/10">
             {registroCompras.compras.map((compra: any, index: number) => (
-              <tr key={index} className="!bg-slate-950/50 transition hover:!bg-slate-900/80">
+              <tr key={index} className="!bg-card/50 transition hover:!bg-card/80">
                 <td className={tdClass}>{formatearFecha(compra.fechaEmision)}</td>
                 <td className={tdClass}>
                   <StatusPill active={compra.tipoComprobante === '01'}>{compra.tipoComprobante === '01' ? 'FACTURA' : 'OTROS'}</StatusPill>
@@ -78,7 +78,7 @@ export const renderRegistroCompras = (registroCompras: any, loading: boolean, fo
                 <td className={`${tdClass} font-mono`}>{compra.numeroDocumentoProveedor}</td>
                 <td className={`${tdClass} text-right font-mono`}>{formatearMoneda(compra.baseImponibleOperacionGravada)}</td>
                 <td className={`${tdClass} text-right font-mono`}>{formatearMoneda(compra.igv)}</td>
-                <td className={`${tdClass} text-right font-mono font-bold text-cyan-50`}>{formatearMoneda(compra.importeTotal)}</td>
+                <td className={`${tdClass} text-right font-mono font-bold text-primary`}>{formatearMoneda(compra.importeTotal)}</td>
                 <td className={`${tdClass} text-center`}>
                   <StatusPill active={compra.origen === 'ORDEN_COMPRA'}>{compra.origen === 'ORDEN_COMPRA' ? 'COMPRA' : 'GASTO'}</StatusPill>
                 </td>
@@ -114,7 +114,7 @@ export const renderBalanceComprobacion = (balanceComprobacion: any, loading: boo
         </button>
       </div>
 
-      <div className="mb-5 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-center text-base font-bold text-cyan-100">
+      <div className="mb-5 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-center text-base font-bold text-primary">
         {balanceComprobacion.estadoBalance.mensaje}
       </div>
 
@@ -138,14 +138,14 @@ export const renderBalanceComprobacion = (balanceComprobacion: any, loading: boo
           </thead>
           <tbody className="divide-y divide-cyan-400/10">
             {balanceComprobacion.cuentas.map((cuenta: any, index: number) => (
-              <tr key={index} className="!bg-slate-950/50 transition hover:!bg-slate-900/80">
+              <tr key={index} className="!bg-card/50 transition hover:!bg-card/80">
                 <td className={`${tdClass} font-mono font-bold text-white`}>{cuenta.codigo}</td>
                 <td className={tdClass}>{cuenta.nombre}</td>
                 <td className={`${tdClass} text-center`}><StatusPill active={cuenta.naturaleza === 'DEUDORA'}>{cuenta.naturaleza}</StatusPill></td>
                 <td className={`${tdClass} text-right font-mono`}>{formatearMoneda(cuenta.saldoAnterior)}</td>
-                <td className={`${tdClass} text-right font-mono font-semibold text-cyan-100`}>{formatearMoneda(cuenta.totalDebe)}</td>
-                <td className={`${tdClass} text-right font-mono font-semibold text-slate-200`}>{formatearMoneda(cuenta.totalHaber)}</td>
-                <td className={`${tdClass} text-right font-mono font-bold text-cyan-50`}>{formatearMoneda(Math.abs(cuenta.saldoActual))}</td>
+                <td className={`${tdClass} text-right font-mono font-semibold text-primary`}>{formatearMoneda(cuenta.totalDebe)}</td>
+                <td className={`${tdClass} text-right font-mono font-semibold text-foreground/90`}>{formatearMoneda(cuenta.totalHaber)}</td>
+                <td className={`${tdClass} text-right font-mono font-bold text-primary`}>{formatearMoneda(Math.abs(cuenta.saldoActual))}</td>
                 <td className={`${tdClass} text-center font-mono`}>{cuenta.cantidadMovimientos}</td>
               </tr>
             ))}
@@ -175,7 +175,7 @@ export const renderKardexValorizado = (kardexValorizado: any, loading: boolean, 
       <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h2 className="text-xl font-black text-white">Kardex Valorizado</h2>
-          <p className="mt-1 text-sm text-slate-400">Metodo: {kardexValorizado.metodoValuacion}</p>
+          <p className="mt-1 text-sm text-muted-foreground">Metodo: {kardexValorizado.metodoValuacion}</p>
         </div>
         <button type="button" onClick={() => exportarExcel('kardex-valorizado')} className={exportButtonClass}>
           Exportar Excel
@@ -193,16 +193,16 @@ export const renderKardexValorizado = (kardexValorizado: any, loading: boolean, 
 
       <div className="space-y-4">
         {kardexValorizado.kardex.map((producto: any, index: number) => (
-          <div key={index} className="overflow-hidden rounded-2xl border border-cyan-400/15 bg-slate-950/45">
+          <div key={index} className="overflow-hidden rounded-2xl border border-cyan-400/15 bg-card/45">
             <div className="flex flex-col gap-3 border-b border-cyan-400/10 p-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">{producto.producto.codigo} - {producto.producto.nombre}</h3>
-                <p className="mt-1 text-sm text-slate-400">Categoria: {producto.producto.categoria}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Categoria: {producto.producto.categoria}</p>
               </div>
-              <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-3 lg:text-right">
-                <span>Stock: <strong className="text-cyan-50">{producto.stockFinal.toLocaleString()}</strong></span>
-                <span>Valor: <strong className="text-cyan-50">{formatearMoneda(producto.valorFinal)}</strong></span>
-                <span>Costo prom.: <strong className="text-cyan-50">{formatearMoneda(producto.costoPromedio)}</strong></span>
+              <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3 lg:text-right">
+                <span>Stock: <strong className="text-primary">{producto.stockFinal.toLocaleString()}</strong></span>
+                <span>Valor: <strong className="text-primary">{formatearMoneda(producto.valorFinal)}</strong></span>
+                <span>Costo prom.: <strong className="text-primary">{formatearMoneda(producto.costoPromedio)}</strong></span>
               </div>
             </div>
 
@@ -218,15 +218,15 @@ export const renderKardexValorizado = (kardexValorizado: any, loading: boolean, 
                   </thead>
                   <tbody className="divide-y divide-cyan-400/10">
                     {producto.movimientos.map((mov: any, movIndex: number) => (
-                      <tr key={movIndex} className="!bg-slate-950/50 transition hover:!bg-slate-900/80">
+                      <tr key={movIndex} className="!bg-card/50 transition hover:!bg-card/80">
                         <td className={tdClass}>{formatearFecha(mov.fecha)}</td>
                         <td className={tdClass}><StatusPill active={mov.tipoMovimiento === 'ENTRADA'}>{mov.tipoMovimiento}</StatusPill></td>
                         <td className={`${tdClass} text-xs`}>{mov.motivo}</td>
                         <td className={`${tdClass} text-right font-mono`}>{mov.cantidad.toLocaleString()}</td>
                         <td className={`${tdClass} text-right font-mono`}>{formatearMoneda(mov.costoUnitario)}</td>
                         <td className={`${tdClass} text-right font-mono`}>{formatearMoneda(mov.valorMovimiento)}</td>
-                        <td className={`${tdClass} text-right font-mono font-bold text-cyan-50`}>{mov.stockAcumulado.toLocaleString()}</td>
-                        <td className={`${tdClass} text-right font-mono font-bold text-cyan-50`}>{formatearMoneda(mov.valorAcumulado)}</td>
+                        <td className={`${tdClass} text-right font-mono font-bold text-primary`}>{mov.stockAcumulado.toLocaleString()}</td>
+                        <td className={`${tdClass} text-right font-mono font-bold text-primary`}>{formatearMoneda(mov.valorAcumulado)}</td>
                       </tr>
                     ))}
                   </tbody>

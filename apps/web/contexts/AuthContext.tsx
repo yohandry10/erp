@@ -28,6 +28,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const AUTH_SESSION_STORAGE_KEY = 'erp.auth.session.snapshot'
+const LEGACY_SENSITIVE_STORAGE_KEYS = ['token', 'demo_credentials'] as const
 
 function readStoredSession(): Session | null {
   if (typeof window === 'undefined') return null
@@ -40,26 +41,16 @@ function readStoredSession(): Session | null {
 
     const parsed = JSON.parse(raw) as Session
     if (!parsed?.user?.id || !parsed.user.email) return null
-
-    return parsed
+    const sanitized = { ...parsed, access_token: undefined }
+    if (parsed.access_token) {
+      const json = JSON.stringify(sanitized)
+      window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, json)
+      window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, json)
+    }
+    return sanitized
   } catch {
     return null
   }
-}
-
-// ¿Persistir el access_token en el snapshot de localStorage/sessionStorage?
-// - Desktop (Tauri): SIEMPRE. Corre en origin propio (tauri://localhost), cross-site
-//   respecto al API → la cookie de subdominio no se le envía → autentica con Bearer.
-// - Web navegador: solo si la auth por cookie de subdominio NO está activa. Con
-//   NEXT_PUBLIC_COOKIE_AUTH=true (topología app.<root> + api.<root> ya viva) la cookie
-//   HttpOnly autentica los fetch, así que NO persistimos el JWT (reduce superficie XSS).
-//   Flag ausente/false → comportamiento actual (token persistido). NO encender el flag
-//   hasta que la infra de subdominios esté desplegada, o la web se queda sin auth.
-function shouldPersistAccessToken(): boolean {
-  if (typeof window === 'undefined') return false
-  const isTauri = !!window.__TAURI__
-  const cookieAuthWeb = process.env.NEXT_PUBLIC_COOKIE_AUTH === 'true'
-  return isTauri || !cookieAuthWeb
 }
 
 function storeSessionSnapshot(session: Session | null) {
@@ -71,7 +62,9 @@ function storeSessionSnapshot(session: Session | null) {
       // /auth/profile remain the source of truth for authorization.
       const sanitized = {
         ...session,
-        access_token: shouldPersistAccessToken() ? session.access_token : undefined,
+        // Nunca persistir JWT en Web Storage. Web autentica con cookie HttpOnly y
+        // Tauri conserva el token mediante DPAPI en desktop-secure-session.ts.
+        access_token: undefined,
         user: {
           ...session.user,
           roles: Array.isArray(session.user.roles) ? session.user.roles : [],
@@ -87,6 +80,18 @@ function storeSessionSnapshot(session: Session | null) {
     }
   } catch {
     // La persistencia es una optimización de UX; la cookie HttpOnly sigue siendo la fuente de verdad.
+  }
+}
+
+function clearLegacySensitiveStorage() {
+  if (typeof window === 'undefined') return
+  try {
+    for (const key of LEGACY_SENSITIVE_STORAGE_KEYS) {
+      window.localStorage.removeItem(key)
+      window.sessionStorage.removeItem(key)
+    }
+  } catch {
+    // La limpieza best-effort no debe impedir el arranque de la aplicación.
   }
 }
 
@@ -137,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    clearLegacySensitiveStorage()
     loadSession()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

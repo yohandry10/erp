@@ -12,7 +12,7 @@ Write-Host ""
 Write-Host "📝 Step 1: Logging in..." -ForegroundColor Yellow
 $loginBody = @{
     email = "admin@vierdes.com"
-    password = "Admin123!"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json
 
 try {

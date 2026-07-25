@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { 
-  Plus, 
+import toast from 'react-hot-toast'
+import {
+  Plus,
   RefreshCw,
   PackageX,
   Clock,
@@ -50,7 +51,7 @@ interface Devolucion {
 export default function DevolucionesPage() {
   const router = useRouter()
   const { get } = useApi()
-  
+
   const [devoluciones, setDevoluciones] = useState<Devolucion[]>([])
   const [loading, setLoading] = useState(true)
   const [filtros, setFiltros] = useState({
@@ -64,25 +65,25 @@ export default function DevolucionesPage() {
   const loadDevoluciones = useCallback(async () => {
     try {
       setLoading(true)
-      
+
       const params = new URLSearchParams()
       if (filtros.estado) params.append('estado', filtros.estado)
       if (filtros.proveedor_id) params.append('proveedor_id', filtros.proveedor_id)
       if (filtros.fecha_desde) params.append('fecha_desde', filtros.fecha_desde)
       if (filtros.fecha_hasta) params.append('fecha_hasta', filtros.fecha_hasta)
-      
+
       const queryString = params.toString()
       const url = `/api/compras/devoluciones${queryString ? `?${queryString}` : ''}`
-      
+
       const response = await get(url)
       const devolucionesData = Array.isArray(response) ? response : response?.data
-      
+
       if (Array.isArray(devolucionesData)) {
         setDevoluciones(devolucionesData)
       }
     } catch (error) {
       console.error('Error loading devoluciones:', error)
-      alert('Error: No se pudieron cargar las devoluciones')
+      toast.error('Error: No se pudieron cargar las devoluciones')
     } finally {
       setLoading(false)
     }
@@ -114,12 +115,12 @@ export default function DevolucionesPage() {
       EMITIDA: { bg: 'var(--emerald-100)', color: 'var(--emerald-800)', icon: CheckCircle },
       ANULADA: { bg: 'var(--red-100)', color: 'var(--red-800)', icon: XCircle }
     }
-    
+
     const style = styles[estado as keyof typeof styles] || styles.PENDIENTE
     const Icon = style.icon
-    
+
     return (
-      <span className="inline-flex items-center gap-[4px] py-[4px] px-3 rounded-3 text-3 font-semibold">
+      <span className="inline-flex items-center gap-[4px] py-[4px] px-3 rounded-xl text-xs font-semibold">
         <Icon size={14} />
         {estado}
       </span>
@@ -140,38 +141,38 @@ export default function DevolucionesPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-6 font-bold mb-[4px]">
+          <h1 className="text-2xl font-bold mb-[4px]">
             Devoluciones a Proveedor
           </h1>
-          <p className="text-[var(--text-secondary)] text-3.5">
+          <p className="text-[var(--text-secondary)] text-sm">
             Gestión de devoluciones de mercancía
           </p>
         </div>
-        
+
         <div className="flex gap-3">
           <button
-            onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2 py-2.5 px-4 border rounded-2 cursor-pointer text-3.5 font-medium"
+            onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2 py-2.5 px-4 border rounded-lg cursor-pointer text-sm font-medium"
           >
             <Filter size={18} />
             Filtros
             {hasActiveFilters && (
-              <span className="bg-[var(--primary-600)] text-white rounded-2.5 py-[2px] px-[6px] text-[11px] font-semibold">
+              <span className="bg-[var(--primary-600)] text-white rounded-[0.625rem] py-[2px] px-[6px] text-[11px] font-semibold">
                 {[filtros.estado, filtros.proveedor_id, filtros.fecha_desde, filtros.fecha_hasta]
                   .filter(Boolean).length}
               </span>
             )}
           </button>
-          
+
           <button
             onClick={loadDevoluciones}
-            disabled={loading} className="flex items-center gap-2 py-2.5 px-4 border rounded-2 bg-white text-3.5 font-medium"
+            disabled={loading} className="flex items-center gap-2 py-2.5 px-4 border rounded-lg bg-card text-sm font-medium"
           >
             <RefreshCw size={18} />
             Actualizar
           </button>
-          
+
           <button
-            onClick={() => router.push('/dashboard/compras/devoluciones/nueva')} className="flex items-center gap-2 py-2.5 px-5 bg-[var(--primary-600)] text-white border-0 rounded-2 cursor-pointer text-3.5 font-semibold"
+            onClick={() => router.push('/dashboard/compras/devoluciones/nueva')} className="flex items-center gap-2 py-2.5 px-5 bg-[var(--primary-600)] text-white border-0 rounded-lg cursor-pointer text-sm font-semibold"
           >
             <Plus size={18} />
             Nueva Devolución
@@ -181,7 +182,7 @@ export default function DevolucionesPage() {
 
       {/* Filtros */}
       {showFilters && (
-        <div className="bg-white border rounded-3 p-5 mb-6">
+        <div className="bg-card border rounded-xl p-5 mb-6">
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-4">
             <div>
               <label className="block mb-[6px] text-[13px] font-medium">
@@ -189,7 +190,7 @@ export default function DevolucionesPage() {
               </label>
               <select
                 value={filtros.estado}
-                onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-3.5"
+                onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-sm"
               >
                 <option value="">Todos</option>
                 <option value="PENDIENTE">Pendiente</option>
@@ -205,7 +206,7 @@ export default function DevolucionesPage() {
               <input
                 type="date"
                 value={filtros.fecha_desde}
-                onChange={(e) => setFiltros({ ...filtros, fecha_desde: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-3.5"
+                onChange={(e) => setFiltros({ ...filtros, fecha_desde: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-sm"
               />
             </div>
 
@@ -216,7 +217,7 @@ export default function DevolucionesPage() {
               <input
                 type="date"
                 value={filtros.fecha_hasta}
-                onChange={(e) => setFiltros({ ...filtros, fecha_hasta: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-3.5"
+                onChange={(e) => setFiltros({ ...filtros, fecha_hasta: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-sm"
               />
             </div>
           </div>
@@ -234,13 +235,13 @@ export default function DevolucionesPage() {
 
       {/* Estadísticas */}
       <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-6">
-        <div className="bg-white border rounded-3 p-5">
+        <div className="bg-card border rounded-xl p-5">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-3 bg-[var(--blue-100)] flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-[var(--blue-100)] flex items-center justify-center">
               <PackageX size={24} className="text-[var(--blue-600)]" />
             </div>
             <div>
-              <p className="text-6 font-bold mb-[2px]">
+              <p className="text-2xl font-bold mb-[2px]">
                 {estadisticas.total}
               </p>
               <p className="text-[13px] text-[var(--text-secondary)]">
@@ -250,13 +251,13 @@ export default function DevolucionesPage() {
           </div>
         </div>
 
-        <div className="bg-white border rounded-3 p-5">
+        <div className="bg-card border rounded-xl p-5">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-3 bg-[var(--amber-100)] flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-[var(--amber-100)] flex items-center justify-center">
               <Clock size={24} className="text-[var(--amber-600)]" />
             </div>
             <div>
-              <p className="text-6 font-bold mb-[2px]">
+              <p className="text-2xl font-bold mb-[2px]">
                 {estadisticas.pendientes}
               </p>
               <p className="text-[13px] text-[var(--text-secondary)]">
@@ -266,13 +267,13 @@ export default function DevolucionesPage() {
           </div>
         </div>
 
-        <div className="bg-white border rounded-3 p-5">
+        <div className="bg-card border rounded-xl p-5">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-3 bg-[var(--emerald-100)] flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-[var(--emerald-100)] flex items-center justify-center">
               <CheckCircle size={24} className="text-[var(--emerald-600)]" />
             </div>
             <div>
-              <p className="text-6 font-bold mb-[2px]">
+              <p className="text-2xl font-bold mb-[2px]">
                 {estadisticas.emitidas}
               </p>
               <p className="text-[13px] text-[var(--text-secondary)]">
@@ -282,13 +283,13 @@ export default function DevolucionesPage() {
           </div>
         </div>
 
-        <div className="bg-white border rounded-3 p-5">
+        <div className="bg-card border rounded-xl p-5">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-3 bg-[var(--red-100)] flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-[var(--red-100)] flex items-center justify-center">
               <XCircle size={24} className="text-[var(--red-600)]" />
             </div>
             <div>
-              <p className="text-6 font-bold mb-[2px]">
+              <p className="text-2xl font-bold mb-[2px]">
                 {estadisticas.anuladas}
               </p>
               <p className="text-[13px] text-[var(--text-secondary)]">
@@ -300,7 +301,7 @@ export default function DevolucionesPage() {
       </div>
 
       {/* Tabla */}
-      <div className="bg-white border rounded-3 overflow-hidden">
+      <div className="bg-card border rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-[60px] text-center text-[var(--text-secondary)]">
             Cargando devoluciones...
@@ -312,7 +313,7 @@ export default function DevolucionesPage() {
               No hay devoluciones registradas
             </p>
             <button
-              onClick={() => router.push('/dashboard/compras/devoluciones/nueva')} className="py-2 px-4 bg-[var(--primary-600)] text-white border-0 rounded-[6px] cursor-pointer text-3.5 font-medium"
+              onClick={() => router.push('/dashboard/compras/devoluciones/nueva')} className="py-2 px-4 bg-[var(--primary-600)] text-white border-0 rounded-[6px] cursor-pointer text-sm font-medium"
             >
               Crear primera devolución
             </button>
@@ -321,60 +322,60 @@ export default function DevolucionesPage() {
           <table className="w-[100%]">
             <thead>
               <tr className="bg-[var(--gray-50)] border-b">
-                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
+                <th className="py-3 px-4 text-left text-xs font-semibold text-[var(--text-secondary)]">
                   NÚMERO
                 </th>
-                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
+                <th className="py-3 px-4 text-left text-xs font-semibold text-[var(--text-secondary)]">
                   PROVEEDOR
                 </th>
-                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
+                <th className="py-3 px-4 text-left text-xs font-semibold text-[var(--text-secondary)]">
                   ORDEN COMPRA
                 </th>
-                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
+                <th className="py-3 px-4 text-left text-xs font-semibold text-[var(--text-secondary)]">
                   RECEPCIÓN
                 </th>
-                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
+                <th className="py-3 px-4 text-left text-xs font-semibold text-[var(--text-secondary)]">
                   FECHA
                 </th>
-                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
+                <th className="py-3 px-4 text-left text-xs font-semibold text-[var(--text-secondary)]">
                   MOTIVO
                 </th>
-                <th className="py-3 px-4 text-right text-3 font-semibold text-[var(--text-secondary)]">
+                <th className="py-3 px-4 text-right text-xs font-semibold text-[var(--text-secondary)]">
                   TOTAL
                 </th>
-                <th className="py-3 px-4 text-center text-3 font-semibold text-[var(--text-secondary)]">
+                <th className="py-3 px-4 text-center text-xs font-semibold text-[var(--text-secondary)]">
                   ESTADO
                 </th>
-                <th className="py-3 px-4 text-center text-3 font-semibold text-[var(--text-secondary)]">
+                <th className="py-3 px-4 text-center text-xs font-semibold text-[var(--text-secondary)]">
                   ACCIONES
                 </th>
               </tr>
             </thead>
             <tbody>
               {devoluciones.map((devolucion) => (
-                <tr 
+                <tr
                   key={devolucion.id} className="border-b transition"
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-50)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
-                  <td className="p-4 text-3.5 font-semibold">
+                  <td className="p-4 text-sm font-semibold">
                     {devolucion.numero}
                   </td>
-                  <td className="p-4 text-3.5">
+                  <td className="p-4 text-sm">
                     <div>
                       <div className="font-medium">{devolucion.proveedor?.razon_social || '-'}</div>
-                      <div className="text-3 text-[var(--text-secondary)]">
+                      <div className="text-xs text-[var(--text-secondary)]">
                         RUC: {devolucion.proveedor?.ruc || '-'}
                       </div>
                     </div>
                   </td>
-                  <td className="p-4 text-3.5">
+                  <td className="p-4 text-sm">
                     {devolucion.orden?.numero || '-'}
                   </td>
-                  <td className="p-4 text-3.5">
+                  <td className="p-4 text-sm">
                     {devolucion.recepcion?.numero || '-'}
                   </td>
-                  <td className="p-4 text-3.5">
+                  <td className="p-4 text-sm">
                     {formatDate(devolucion.fecha_devolucion)}
                   </td>
                   <td className="p-4 text-[13px] max-w-[200px]">
@@ -382,7 +383,7 @@ export default function DevolucionesPage() {
                       {devolucion.motivo}
                     </div>
                   </td>
-                  <td className="p-4 text-3.5 font-semibold text-right">
+                  <td className="p-4 text-sm font-semibold text-right">
                     {formatCurrency(devolucion.total)}
                   </td>
                   <td className="p-4 text-center">

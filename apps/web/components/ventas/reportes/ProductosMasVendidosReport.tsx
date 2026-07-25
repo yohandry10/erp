@@ -100,10 +100,10 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Cargando reporte...</p>
+            <p className="mt-2 text-foreground/80">Cargando reporte...</p>
           </div>
         ) : data.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-muted-foreground">
             <p className="text-lg font-medium">No hay datos disponibles</p>
             <p className="text-sm">Ajusta los filtros para ver resultados</p>
           </div>
@@ -111,17 +111,17 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
           <>
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-sm text-blue-600 font-medium">Total Productos</p>
-                <p className="text-2xl font-bold text-blue-900">{totalProductos}</p>
+              <div className="bg-primary/10 rounded-lg p-4">
+                <p className="text-sm text-primary font-medium">Total Productos</p>
+                <p className="text-2xl font-bold text-primary">{totalProductos}</p>
               </div>
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-sm text-green-600 font-medium">Unidades Vendidas</p>
-                <p className="text-2xl font-bold text-green-900">{totalUnidades.toFixed(0)}</p>
+              <div className="bg-emerald-500/10 rounded-lg p-4">
+                <p className="text-sm text-emerald-400 font-medium">Unidades Vendidas</p>
+                <p className="text-2xl font-bold text-emerald-400">{totalUnidades.toFixed(0)}</p>
               </div>
-              <div className="bg-purple-50 rounded-lg p-4">
-                <p className="text-sm text-purple-600 font-medium">Importe Total</p>
-                <p className="text-2xl font-bold text-purple-900">S/ {totalImporte.toFixed(2)}</p>
+              <div className="bg-violet-500/10 rounded-lg p-4">
+                <p className="text-sm text-violet-400 font-medium">Importe Total</p>
+                <p className="text-2xl font-bold text-violet-400">S/ {totalImporte.toFixed(2)}</p>
               </div>
             </div>
 
@@ -152,66 +152,66 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
             {/* Table */}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-muted/30">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       #
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Producto
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Código
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Unidades Vendidas
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Importe Total
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Pedidos
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Precio Promedio
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-gray-200">
                   {sortedData.map((producto, index) => (
-                    <tr key={producto.producto_id} className="hover:bg-gray-50">
+                    <tr key={producto.producto_id} className="hover:bg-muted/30">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 font-bold text-sm">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
                           {index + 1}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           {producto.producto_nombre}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           {producto.producto_codigo}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           {producto.unidades_vendidas.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           S/ {producto.importe_total.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           {producto.cantidad_pedidos}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           S/ {producto.precio_promedio.toFixed(2)}
                         </div>
                       </td>

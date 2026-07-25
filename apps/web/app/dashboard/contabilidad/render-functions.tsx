@@ -3,14 +3,14 @@
 export const renderRegistroCompras = (registroCompras: any, loading: boolean, formatearMoneda: Function) => {
   if (loading) {
     return (
-      <div className="activity-card text-center p-8">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl text-center p-8">
         <p>🛒 Cargando Registro de Compras...</p>
       </div>
     )
   }
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       <h2>🛒 Registro de Compras</h2>
       <p>Funcionalidad implementada - Datos de compras y gastos</p>
       <div className="mt-4">
@@ -39,25 +39,25 @@ export const renderRegistroCompras = (registroCompras: any, loading: boolean, fo
 export const renderBalanceComprobacion = (balanceComprobacion: any, loading: boolean, formatearMoneda: Function) => {
   if (loading) {
     return (
-      <div className="activity-card text-center p-8">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl text-center p-8">
         <p>⚖️ Cargando Balance de Comprobación...</p>
       </div>
     )
   }
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       <h2>⚖️ Balance de Comprobación</h2>
       <p>Funcionalidad implementada - Verificación de cuadre contable</p>
-      
+
       {balanceComprobacion?.estadoBalance && (
-        <div className="mt-4 p-4 rounded-2">
+        <div className="mt-4 p-4 rounded-lg">
           <p className="m-0 font-bold">
             {balanceComprobacion.estadoBalance.mensaje}
           </p>
         </div>
       )}
-      
+
       <div className="mt-4">
         <p><strong>Total cuentas:</strong> {balanceComprobacion?.cuentas?.length || 0}</p>
         <p><strong>Total debe:</strong> {balanceComprobacion?.totales?.totalDebe ? formatearMoneda(balanceComprobacion.totales.totalDebe) : 'S/ 0.00'}</p>
@@ -87,17 +87,17 @@ export const renderBalanceComprobacion = (balanceComprobacion: any, loading: boo
 export const renderKardexValorizado = (kardexValorizado: any, loading: boolean, formatearMoneda: Function) => {
   if (loading) {
     return (
-      <div className="activity-card text-center p-8">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl text-center p-8">
         <p>📦 Cargando Kardex Valorizado...</p>
       </div>
     )
   }
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       <h2>📦 Kardex Valorizado</h2>
       <p>Funcionalidad implementada - Control valorizado de inventarios</p>
-      
+
       <div className="mt-4">
         <p><strong>Método de valuación:</strong> {kardexValorizado?.metodoValuacion || 'PROMEDIO_PONDERADO'}</p>
         <p><strong>Total productos:</strong> {kardexValorizado?.resumen?.totalProductos || 0}</p>
@@ -112,30 +112,30 @@ export const renderKardexValorizado = (kardexValorizado: any, loading: boolean, 
           <h3>Productos con movimientos:</h3>
           <div className="max-h-[400px] overflow-y-auto">
             {kardexValorizado.kardex.map((producto: any, index: number) => (
-              <div key={index} className="p-4 mb-4 border rounded-2 bg-[#f9fafb]">
+              <div key={index} className="p-4 mb-4 border rounded-lg bg-muted">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h4 className="m-0 text-4 font-semibold">
+                    <h4 className="m-0 text-base font-semibold">
                       {producto.producto.codigo} - {producto.producto.nombre}
                     </h4>
-                    <p className="mt-1 mr-0 mb-0 ml-0 text-[0.875rem] text-gray-500">
+                    <p className="mt-1 mr-0 mb-0 ml-0 text-[0.875rem] text-muted-foreground">
                       Categoría: {producto.producto.categoria}
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-[0.875rem] text-gray-500">Stock Final</div>
-                    <div className="text-4 font-bold text-[#10b981]">
+                    <div className="text-[0.875rem] text-muted-foreground">Stock Final</div>
+                    <div className="text-base font-bold text-[#10b981]">
                       {producto.stockFinal?.toLocaleString() || '0'} unidades
                     </div>
-                    <div className="text-[0.875rem] text-gray-500">
+                    <div className="text-[0.875rem] text-muted-foreground">
                       Valor: {formatearMoneda(producto.valorFinal || 0)}
                     </div>
-                    <div className="text-[0.875rem] text-gray-500">
+                    <div className="text-[0.875rem] text-muted-foreground">
                       Costo promedio: {formatearMoneda(producto.costoPromedio || 0)}
                     </div>
                   </div>
                 </div>
-                
+
                 {producto.movimientos?.length > 0 && (
                   <div className="mt-4">
                     <p className="text-[0.875rem] font-semibold mt-0 mr-0 mb-2 ml-0">
@@ -143,7 +143,7 @@ export const renderKardexValorizado = (kardexValorizado: any, loading: boolean, 
                     </p>
                     <div className="max-h-[150px] overflow-y-auto">
                       {producto.movimientos.slice(0, 3).map((mov: any, movIndex: number) => (
-                        <div key={movIndex} className="flex justify-between py-1 px-0 border-b text-3">
+                        <div key={movIndex} className="flex justify-between py-1 px-0 border-b text-xs">
                           <span>{mov.tipoMovimiento}</span>
                           <span>{mov.cantidad} unidades</span>
                           <span>{formatearMoneda(mov.valorMovimiento || 0)}</span>

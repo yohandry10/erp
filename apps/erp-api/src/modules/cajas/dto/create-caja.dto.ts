@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateCajaDto {
   @IsString()
@@ -13,9 +13,9 @@ export class CreateCajaDto {
   @IsOptional()
   sucursal_id?: string;
 
-  @IsString()
-  @IsOptional()
-  almacen_id?: string;
+  @IsUUID()
+  @IsNotEmpty()
+  almacen_id: string;
 
   @IsString()
   @IsOptional()

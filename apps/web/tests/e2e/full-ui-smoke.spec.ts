@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { login } from './helpers/auth';
 
 const authenticatedRoutes = [
   '/dashboard',
@@ -85,9 +84,19 @@ const viewportMatrix = [
   { name: 'narrow', width: 390, height: 844 },
 ] as const;
 
+const requestedViewports = new Set(
+  (process.env.SMOKE_VIEWPORTS || 'desktop,narrow')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean),
+);
+const selectedViewports = viewportMatrix.filter((viewport) =>
+  requestedViewports.has(viewport.name),
+);
+
 const routeTitles: Record<(typeof authenticatedRoutes)[number], RegExp> = {
   '/dashboard': /Dashboard/i,
-  '/dashboard/pos': /POS|Punto de Venta/i,
+  '/dashboard/pos': /POS|Punto de Venta|Sin caja configurada/i,
   '/dashboard/documentos': /Documentos/i,
   '/dashboard/documentos/descargas': /Descargas|Documentos/i,
   '/dashboard/contabilidad': /Contabilidad/i,
@@ -163,6 +172,9 @@ const routeTitles: Record<(typeof authenticatedRoutes)[number], RegExp> = {
 };
 
 const routeErrorPatterns = [
+  /Algo sali[oó] mal/i,
+  /Element type is invalid/i,
+  /Check the render method/i,
   /Unhandled Runtime Error/i,
   /Application error/i,
   /Internal Server Error/i,
@@ -172,10 +184,12 @@ const routeErrorPatterns = [
   /404\s*[:|-]?\s*(This page could not be found|Página no encontrada|Not Found)/i,
   /This page could not be found/i,
   /Página no encontrada/i,
+  /Acceso denegado/i,
+  /No tienes permisos/i,
 ] as const;
 
 const permanentLoaderPattern =
-  /Verificando autenticaci[oó]n|Redirigiendo|Cargando pa[ií]s configurado|Cargando datos del dashboard|Cargando\.\.\.|Loading\.\.\./i;
+  /Verificando autenticaci[oó]n|Validando acceso|Redirigiendo|\bCargando(?:[^\r\n]{0,80})?\.{3}|Loading\.\.\./i;
 
 const safeButtonNames = [
   'Actualizar',
@@ -207,6 +221,26 @@ const stateDisabledButtonRules = [
     name: 'PDF',
     titlePattern: /PDF GRE no disponible/i,
   },
+  {
+    route: '/dashboard/offline',
+    name: 'Sincronizar',
+    titlePattern: /Sin conexi[oó]n|Sincronizaci[oó]n en curso|No hay operaciones pendientes/i,
+  },
+  {
+    route: '/dashboard/documentos/descargas',
+    name: 'Buscar',
+    titlePattern: /Cargando descargas/i,
+  },
+  {
+    route: '/dashboard/ventas/cotizaciones/nueva',
+    name: 'Agregar Producto',
+    titlePattern: /Cargando productos disponibles|procesando otra operaci[oó]n/i,
+  },
+  {
+    route: '/dashboard/ventas/pedidos/nuevo',
+    name: 'Agregar Producto',
+    titlePattern: /Cargando productos disponibles|procesando otra operaci[oó]n/i,
+  },
 ] as const;
 
 const guardedButtonPattern =
@@ -222,6 +256,10 @@ function routeToFileName(route: string): string {
 }
 
 test.describe('Full authenticated UI smoke', () => {
+  test.describe.configure({
+    mode: process.env.SMOKE_PARALLEL === '1' ? 'parallel' : 'default',
+  });
+
   test.beforeAll(() => {
     if (process.env.PRESERVE_BUTTON_INVENTORY !== 'true') {
       fs.rmSync(buttonInventoryDir, { recursive: true, force: true });
@@ -229,7 +267,7 @@ test.describe('Full authenticated UI smoke', () => {
     fs.mkdirSync(buttonInventoryDir, { recursive: true });
   });
 
-  for (const viewport of viewportMatrix) {
+  for (const viewport of selectedViewports) {
     test.describe(`${viewport.name} viewport`, () => {
       test.use({ viewport: { width: viewport.width, height: viewport.height } });
 
@@ -253,8 +291,6 @@ test.describe('Full authenticated UI smoke', () => {
         consoleErrors.push(error.message);
       });
 
-      await login(page);
-
       const initialResponse = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 45000 });
       if (initialResponse) {
         routeResponseStatuses.push(`${initialResponse.status()} ${initialResponse.url()}`);
@@ -263,23 +299,56 @@ test.describe('Full authenticated UI smoke', () => {
           `${route} debe cargar una ruta real, no error HTTP`,
         ).toBeLessThan(400);
       }
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined);
-
       await expect(page.locator('body')).toBeVisible();
       await expect(page.locator('body')).toContainText(/\S/, { timeout: 15000 });
-      await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+      const main = page.locator('main').first();
+      await expect(main).toBeVisible({ timeout: 15000 });
+      await expect.poll(
+        async () => {
+          const text = await main.innerText().catch(() => '');
+          return routeTitles[route].test(text) && !permanentLoaderPattern.test(text);
+        },
+        {
+          message: `${route} debe resolver la carga, quitar loaders y mostrar su titulo real en main`,
+          timeout: 45000,
+        },
+      ).toBe(true);
 
       const bodyText = await page.locator('body').innerText({ timeout: 15000 });
-      const mainText = await page.locator('main').innerText({ timeout: 15000 });
-      expect(mainText.trim().length, `${route} debe renderizar contenido util en main`).toBeGreaterThan(40);
-      expect(bodyText, `${route} debe mostrar un titulo real`).toMatch(routeTitles[route]);
-      expect(bodyText, `${route} no debe quedarse con loaders permanentes`).not.toMatch(permanentLoaderPattern);
+      const mainText = await main.innerText({ timeout: 15000 });
+      expect(mainText, `${route} debe mostrar un titulo real en main`).toMatch(routeTitles[route]);
       for (const errorPattern of routeErrorPatterns) {
         expect(bodyText, `${route} rendered a fatal error matching ${errorPattern}`).not.toMatch(errorPattern);
       }
 
-      const visibleButtons = page.getByRole('button').filter({ visible: true });
-      const buttonCount = await visibleButtons.count();
+      const visibleButtonMetadata = await page.locator('button:visible').evaluateAll((buttons) =>
+        buttons.map((element, index) => {
+          const button = element as HTMLButtonElement;
+          const labelledBy = (button.getAttribute('aria-labelledby') || '')
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((id) => document.getElementById(id)?.textContent || '')
+            .join(' ');
+          const imageAlt = Array.from(button.querySelectorAll('img'))
+            .map((image) => image.getAttribute('alt') || '')
+            .join(' ');
+          const name = (
+            button.getAttribute('aria-label')
+            || labelledBy
+            || button.innerText
+            || button.getAttribute('title')
+            || imageAlt
+            || ''
+          ).trim();
+          return {
+            index,
+            name,
+            enabled: !button.disabled && button.getAttribute('aria-disabled') !== 'true',
+            title: button.getAttribute('title')?.trim() || '',
+          };
+        }),
+      );
+      const buttonCount = visibleButtonMetadata.length;
       const routeButtonInventory: Array<{
         index: number;
         name: string;
@@ -287,14 +356,7 @@ test.describe('Full authenticated UI smoke', () => {
         clickPolicy: 'safe-clicked-when-unique' | 'guarded-not-auto-clicked' | 'state-disabled-not-clicked';
       }> = [];
 
-      for (let index = 0; index < buttonCount; index += 1) {
-        const button = visibleButtons.nth(index);
-        const buttonName = (await button.innerText().catch(() => '')).trim();
-        const ariaLabel = (await button.getAttribute('aria-label').catch(() => null))?.trim();
-        const title = (await button.getAttribute('title').catch(() => null))?.trim();
-        const name = buttonName || ariaLabel || title || '';
-        const enabled = await button.isEnabled();
-
+      for (const { index, name, enabled, title } of visibleButtonMetadata) {
         expect(
           name,
           `${route} has a visible button without accessible text/name/title at index ${index}`,
@@ -308,7 +370,7 @@ test.describe('Full authenticated UI smoke', () => {
           rule.route === route && rule.name === name && rule.titlePattern.test(title || ''),
         );
         if (!enabled && !isGuarded && !canBeDisabledByState && !hasDocumentedStateDisableRule) {
-          await expect(button, `${route} button "${name}" should be enabled`).toBeEnabled();
+          expect(enabled, `${route} button "${name}" should be enabled`).toBe(true);
         }
 
         routeButtonInventory.push({

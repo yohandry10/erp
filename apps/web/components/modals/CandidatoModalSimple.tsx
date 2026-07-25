@@ -159,13 +159,13 @@ export default function CandidatoModalSimple({
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.75)] flex items-center justify-center z-[99999] p-4"
       onClick={onClose}
     >
-      <div className="bg-white rounded-3 p-0 w-[100%] max-w-[800px] overflow-y-auto shadow"
+      <div className="bg-card rounded-xl p-0 w-[100%] max-w-[800px] overflow-y-auto shadow"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex justify-between items-center pt-8 pr-8 pb-4 pl-8 text-white">
           <div>
-            <h2 className="text-7 font-bold m-0 flex items-center gap-3">
+            <h2 className="text-[1.75rem] font-bold m-0 flex items-center gap-3">
               <User size={28} />
               {candidato?.id ? 'Editar Candidato' : 'Nuevo Candidato'}
             </h2>
@@ -175,7 +175,7 @@ export default function CandidatoModalSimple({
           </div>
 
           <button
-            onClick={onClose} className="w-10 h-10 rounded-full bg-[rgba(255,_255,_255,_0.2)] text-white border-0 cursor-pointer flex items-center justify-center font-bold text-5 transition"
+            onClick={onClose} className="w-10 h-10 rounded-full bg-[rgba(255,_255,_255,_0.2)] text-white border-0 cursor-pointer flex items-center justify-center font-bold text-xl transition"
             onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)'}
             onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
           >
@@ -185,7 +185,7 @@ export default function CandidatoModalSimple({
 
         {/* Información de vacante seleccionada */}
         {vacanteSeleccionada && (
-          <div className="mt-6 mr-8 mb-0 ml-8 p-4 bg-[#dbeafe] rounded-2 border">
+          <div className="mt-6 mr-8 mb-0 ml-8 p-4 bg-[#dbeafe] rounded-lg border">
             <div className="text-[0.875rem] text-[#1e40af] flex items-center gap-2 flex-wrap">
               <Briefcase size={16} />
               <strong>Vacante:</strong> {vacanteSeleccionada.titulo}
@@ -198,15 +198,15 @@ export default function CandidatoModalSimple({
 
         <form onSubmit={handleSubmit} className="p-8">
           {/* Sección 1: Datos Básicos */}
-          <div className="mb-8 p-6 bg-slate-50 rounded-2 border">
-            <h3 className="text-[1.125rem] font-semibold text-slate-800 mt-0 mr-0 mb-6 ml-0 flex items-center gap-2">
+          <div className="mb-8 p-6 bg-muted/30 rounded-lg border">
+            <h3 className="text-[1.125rem] font-semibold text-foreground mt-0 mr-0 mb-6 ml-0 flex items-center gap-2">
               <User size={20} className="text-blue-500" />
               Información Personal
             </h3>
 
             <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Nombres *
                 </label>
                 <input
@@ -217,14 +217,14 @@ export default function CandidatoModalSimple({
                   placeholder="Juan Carlos"
                 />
                 {errors.nombres && (
-                  <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">
+                  <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">
                     {errors.nombres}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Apellidos *
                 </label>
                 <input
@@ -235,7 +235,7 @@ export default function CandidatoModalSimple({
                   placeholder="Pérez García"
                 />
                 {errors.apellidos && (
-                  <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">
+                  <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">
                     {errors.apellidos}
                   </p>
                 )}
@@ -244,7 +244,7 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   <Mail size={16} className="mr-2" />
                   Email *
                 </label>
@@ -256,14 +256,14 @@ export default function CandidatoModalSimple({
                   placeholder="juan.perez@gmail.com"
                 />
                 {errors.email && (
-                  <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">
+                  <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">
                     {errors.email}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   <Phone size={16} className="mr-2" />
                   Teléfono
                 </label>
@@ -279,7 +279,7 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[2fr_1fr_1fr] gap-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   <MapPin size={16} className="mr-2" />
                   Dirección
                 </label>
@@ -293,13 +293,13 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Tipo Doc.
                 </label>
                 <select
                   name="tipo_documento"
                   value={formData.tipo_documento}
-                  onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-white"
+                  onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-card"
                 >
                   <option value="DNI">DNI</option>
                   <option value="CE">CE</option>
@@ -308,7 +308,7 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Número Doc.
                 </label>
                 <input
@@ -323,7 +323,7 @@ export default function CandidatoModalSimple({
           </div>
 
           {/* Sección 2: Información Profesional */}
-          <div className="mb-8 p-6 bg-[#f0fdf4] rounded-2 border">
+          <div className="mb-8 p-6 bg-muted rounded-lg border">
             <h3 className="text-[1.125rem] font-semibold text-[#14532d] mt-0 mr-0 mb-6 ml-0 flex items-center gap-2">
               <Briefcase size={20} className="text-[#16a34a]" />
               Información Profesional
@@ -331,13 +331,13 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr] gap-4 mb-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Vacante que Postula *
                 </label>
                 <select
                   name="id_vacante"
                   value={formData.id_vacante}
-                  onChange={handleInputChange} className="w-[100%] p-3 rounded-[6px] text-[0.875rem] bg-white"
+                  onChange={handleInputChange} className="w-[100%] p-3 rounded-[6px] text-[0.875rem] bg-card"
                 >
                   <option value="">Seleccionar vacante...</option>
                   {vacantes.map(vacante => (
@@ -347,7 +347,7 @@ export default function CandidatoModalSimple({
                   ))}
                 </select>
                 {errors.id_vacante && (
-                  <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">
+                  <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">
                     {errors.id_vacante}
                   </p>
                 )}
@@ -356,14 +356,14 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 mb-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   <GraduationCap size={16} className="mr-2" />
                   Nivel Educación
                 </label>
                 <select
                   name="nivel_educacion"
                   value={formData.nivel_educacion}
-                  onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-white"
+                  onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-card"
                 >
                   <option value="secundaria">Secundaria</option>
                   <option value="tecnico">Técnico</option>
@@ -373,7 +373,7 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Experiencia (años)
                 </label>
                 <input
@@ -388,7 +388,7 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Pretensión Salarial (S/)
                 </label>
                 <input
@@ -405,7 +405,7 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr_1fr] gap-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   URL del CV
                 </label>
                 <input
@@ -418,7 +418,7 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   LinkedIn
                 </label>
                 <input
@@ -433,7 +433,7 @@ export default function CandidatoModalSimple({
           </div>
 
           {/* Sección 3: Estado y Observaciones */}
-          <div className="mb-8 p-6 bg-[#fef3c7] rounded-2 border">
+          <div className="mb-8 p-6 bg-[#fef3c7] rounded-lg border">
             <h3 className="text-[1.125rem] font-semibold text-[#92400e] mt-0 mr-0 mb-6 ml-0 flex items-center gap-2">
               <Star size={20} className="text-amber-500" />
               Estado del Proceso
@@ -441,13 +441,13 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr_2fr] gap-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Estado
                 </label>
                 <select
                   name="estado"
                   value={formData.estado}
-                  onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-white"
+                  onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-card"
                 >
                   <option value="postulante">📝 Postulante</option>
                   <option value="entrevista">🤝 En Entrevista</option>
@@ -458,7 +458,7 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Observaciones
                 </label>
                 <textarea
@@ -476,7 +476,7 @@ export default function CandidatoModalSimple({
           <div className="flex justify-end gap-4 pt-4 border-t">
             <button
               type="button"
-              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 text-[0.875rem] font-medium cursor-pointer transition"
+              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-card text-foreground/85 text-[0.875rem] font-medium cursor-pointer transition"
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
             >

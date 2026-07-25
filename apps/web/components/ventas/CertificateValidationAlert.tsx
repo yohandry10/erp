@@ -1,7 +1,7 @@
 /**
  * Certificate Validation Alert Component
  * Requirements: 15.5, 19.6, 19.7
- * 
+ *
  * Displays certificate validation status before generating invoices
  */
 
@@ -23,18 +23,18 @@ interface CertificateValidationAlertProps {
   showOnlyErrors?: boolean
 }
 
-export function CertificateValidationAlert({ 
+export function CertificateValidationAlert({
   className,
   showOnlyErrors = false
 }: CertificateValidationAlertProps) {
-  const { 
-    validation, 
-    status, 
-    isLoading, 
-    errorMessage, 
+  const {
+    validation,
+    status,
+    isLoading,
+    errorMessage,
     warningMessage,
     actionMessage,
-    canProceed 
+    canProceed
   } = useCertificateValidation()
 
   if (isLoading) {
@@ -110,11 +110,11 @@ export function CertificateValidationAlert({
   if (!showOnlyErrors) {
     return (
       <Alert className={className}>
-        <CheckCircle className="h-4 w-4 text-green-600" />
+        <CheckCircle className="h-4 w-4 text-emerald-400" />
         <AlertDescription>
           Certificado digital válido
           {status.expiresAt && status.daysUntilExpiration && (
-            <span className="text-sm text-gray-600 ml-2">
+            <span className="text-sm text-foreground/80 ml-2">
               (vence en {status.daysUntilExpiration} días)
             </span>
           )}
@@ -138,7 +138,7 @@ export function CertificateStatusBadge({ className }: CertificateStatusBadgeProp
 
   if (isLoading) {
     return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 ${className}`}>
+      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground/85 ${className}`}>
         <Shield className="h-3 w-3 animate-pulse" />
         Validando...
       </span>
@@ -165,33 +165,33 @@ export function CertificateValidationExplanation() {
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
-        <Shield className="h-5 w-5 text-blue-600 mt-0.5" />
+        <Shield className="h-5 w-5 text-primary mt-0.5" />
         <div>
           <h4 className="font-medium text-sm">¿Qué es el Certificado Digital?</h4>
-          <p className="text-sm text-gray-600 mt-1">
-            El certificado digital es un archivo PFX/P12 que permite firmar electrónicamente 
+          <p className="text-sm text-foreground/80 mt-1">
+            El certificado digital es un archivo PFX/P12 que permite firmar electrónicamente
             los comprobantes de pago (facturas, boletas, notas) para enviarlos a SUNAT.
           </p>
         </div>
       </div>
 
       <div className="flex items-start gap-3">
-        <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
+        <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5" />
         <div>
           <h4 className="font-medium text-sm">¿Por qué es obligatorio?</h4>
-          <p className="text-sm text-gray-600 mt-1">
-            SUNAT requiere que todos los comprobantes electrónicos estén firmados digitalmente 
+          <p className="text-sm text-foreground/80 mt-1">
+            SUNAT requiere que todos los comprobantes electrónicos estén firmados digitalmente
             para garantizar su autenticidad e integridad.
           </p>
         </div>
       </div>
 
       <div className="flex items-start gap-3">
-        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+        <CheckCircle className="h-5 w-5 text-emerald-400 mt-0.5" />
         <div>
           <h4 className="font-medium text-sm">¿Cómo obtenerlo?</h4>
-          <p className="text-sm text-gray-600 mt-1">
-            Puede obtener un certificado digital de entidades certificadoras autorizadas 
+          <p className="text-sm text-foreground/80 mt-1">
+            Puede obtener un certificado digital de entidades certificadoras autorizadas
             por SUNAT. Una vez obtenido, cárguelo en Configuración &gt; Empresa &gt; Certificado Digital.
           </p>
         </div>

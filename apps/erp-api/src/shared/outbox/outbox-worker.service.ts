@@ -39,6 +39,8 @@ export class OutboxWorker implements OnModuleInit {
     'DepreciacionGenerada',
     'cpe.anulado',
     'CPEAnulado',
+    'factura.emitida',
+    'FacturaEmitida',
     'producto.stock_bajo',
     'producto.stock.bajo',
     'ProductoStockBajo',
@@ -198,14 +200,33 @@ export class OutboxWorker implements OnModuleInit {
 
       if (error) {
         this.logger.warn(`⚠️ [OutboxWorker] No se pudo adquirir lock distribuido: ${error.message}`);
-        return false;
+        return this.shouldContinueWithoutDistributedLock(error);
       }
 
       return data === true || data === 'true';
     } catch (error) {
       this.logger.warn(`⚠️ [OutboxWorker] Error adquiriendo lock distribuido: ${error?.message || error}`);
-      return false;
+      return this.shouldContinueWithoutDistributedLock(error);
     }
+  }
+
+  private shouldContinueWithoutDistributedLock(error: any): boolean {
+    const message = String(error?.message || error || '').toLowerCase();
+    const lockUnavailable =
+      message.includes('permission denied') ||
+      message.includes('does not exist') ||
+      message.includes('could not find') ||
+      message.includes('schema cache') ||
+      message.includes('blocked for rpc');
+
+    if (lockUnavailable) {
+      this.logger.warn(
+        '⚠️ [OutboxWorker] Lock distribuido no disponible; se continua con claim idempotente por evento.',
+      );
+      return true;
+    }
+
+    return false;
   }
 
   private async releaseJobLock(): Promise<void> {

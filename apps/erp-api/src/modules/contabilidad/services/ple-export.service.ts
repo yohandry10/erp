@@ -49,13 +49,13 @@ export class PleExportService {
     const raw = String(value || '').trim();
     if (!raw) return '';
     const isoDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (isoDate) return `${isoDate[1]}${isoDate[2]}${isoDate[3]}`;
+    if (isoDate) return `${isoDate[3]}/${isoDate[2]}/${isoDate[1]}`;
     const parsed = new Date(raw);
     if (Number.isNaN(parsed.getTime())) return '';
     const yyyy = parsed.getUTCFullYear().toString().padStart(4, '0');
     const mm = (parsed.getUTCMonth() + 1).toString().padStart(2, '0');
     const dd = parsed.getUTCDate().toString().padStart(2, '0');
-    return `${yyyy}${mm}${dd}`;
+    return `${dd}/${mm}/${yyyy}`;
   }
 
   private formatPleAmount(value: unknown): string {
@@ -73,6 +73,19 @@ export class PleExportService {
 
   private toPleLine(fields: Array<string | number>): string {
     return `${fields.map((field) => String(field ?? '')).join('|')}|`;
+  }
+
+  private getPeriodoPle(anio: number, mes: number): string {
+    return `${anio}${mes.toString().padStart(2, '0')}00`;
+  }
+
+  private getFechaFinMes(anio: number, mes: number): string {
+    const ultimoDia = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+    return `${anio}-${mes.toString().padStart(2, '0')}-${ultimoDia.toString().padStart(2, '0')}`;
+  }
+
+  private getCorrelativoPle(correlativo: number): string {
+    return `M${correlativo.toString().padStart(6, '0')}`;
   }
 
   /**
@@ -118,7 +131,7 @@ export class PleExportService {
 
     // Obtener asientos del período
     const fechaInicio = `${anio}-${mes.toString().padStart(2, '0')}-01`;
-    const fechaFin = new Date(anio, mes, 0).toISOString().split('T')[0];
+    const fechaFin = this.getFechaFinMes(anio, mes);
 
     const { data: asientos, error } = await this.supabase.getClient()
       .from('asientos_contables')
@@ -171,8 +184,9 @@ export class PleExportService {
         // 20. Dato estructurado
         // 21. Estado
 
-        const periodo = `${anio}${mes.toString().padStart(2, '0')}00`;
+        const periodo = this.getPeriodoPle(anio, mes);
         const cuo = `M${(asiento as any).numero_asiento?.toString().padStart(8, '0') || correlativo.toString().padStart(8, '0')}`;
+        const correlativoPle = this.getCorrelativoPle(correlativo);
         const codigoCuenta = cuenta?.codigo || '';
         const fechaContable = this.formatPleDate((asiento as any).fecha);
         const glosa = this.sanitizePleText(detalle.concepto || (asiento as any).concepto);
@@ -182,7 +196,7 @@ export class PleExportService {
         const linea = this.toPleLine([
           periodo,                    // 1. Período
           cuo,                        // 2. CUO
-          correlativo.toString(),     // 3. Correlativo
+          correlativoPle,             // 3. Correlativo: SUNAT exige prefijo A/M/C
           codigoCuenta,               // 4. Código cuenta
           '',                         // 5. Unidad operación
           '',                         // 6. Centro costos
@@ -234,7 +248,7 @@ export class PleExportService {
 
     // Obtener movimientos agrupados por cuenta
     const fechaInicio = `${anio}-${mes.toString().padStart(2, '0')}-01`;
-    const fechaFin = new Date(anio, mes, 0).toISOString().split('T')[0];
+    const fechaFin = this.getFechaFinMes(anio, mes);
 
     const { data: movimientos, error } = await this.supabase.getClient()
       .from('detalle_asientos')
@@ -263,8 +277,9 @@ export class PleExportService {
       const cuenta = mov.plan_cuentas as { codigo: string; nombre: string } | null;
       const asiento = mov.asientos_contables as { id: string; numero_asiento: number; fecha: string; concepto: string } | null;
       
-      const periodo = `${anio}${mes.toString().padStart(2, '0')}00`;
+      const periodo = this.getPeriodoPle(anio, mes);
       const cuo = `M${asiento?.numero_asiento?.toString().padStart(8, '0') || correlativo.toString().padStart(8, '0')}`;
+      const correlativoPle = this.getCorrelativoPle(correlativo);
       const codigoCuenta = cuenta?.codigo || '';
       const fechaContable = this.formatPleDate(asiento?.fecha);
       const glosa = this.sanitizePleText(mov.concepto || asiento?.concepto);
@@ -272,7 +287,7 @@ export class PleExportService {
       const linea = this.toPleLine([
         periodo,
         cuo,
-        correlativo.toString(),
+        correlativoPle,
         codigoCuenta,
         '',
         '',

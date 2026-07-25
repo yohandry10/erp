@@ -2,10 +2,10 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  AlertTriangle, 
-  AlertCircle, 
-  TrendingUp, 
+import {
+  AlertTriangle,
+  AlertCircle,
+  TrendingUp,
   DollarSign,
   Calendar,
   Building2,
@@ -117,7 +117,7 @@ export default function AlertasSobregirosPage() {
 
   const getAlertasFiltradas = (): Alerta[] => {
     if (!resumen) return []
-    
+
     if (filtroNivel === 'SOBREGIRO') {
       return resumen.sobregiros?.alertas ?? []
     } else if (filtroNivel === 'ADVERTENCIA') {
@@ -148,11 +148,11 @@ export default function AlertasSobregirosPage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header mb-8">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8 mb-8">
           <div>
-            <h1 className="dashboard-title">Alertas de Sobregiro Presupuestal</h1>
-            <p className="dashboard-subtitle">
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Alertas de Sobregiro Presupuestal</h1>
+            <p className="mt-2 text-base text-muted-foreground">
               Monitoreo de presupuestos con advertencias, sobregiros y límites de ejecución.
             </p>
           </div>
@@ -160,7 +160,7 @@ export default function AlertasSobregirosPage() {
         <div className="flex justify-center items-center min-h-[400px]">
           <div className="text-center">
             <RefreshCw size={48} className="text-blue-500" />
-            <p className="text-gray-500 text-4">
+            <p className="text-muted-foreground text-base">
               Cargando alertas de sobregiro...
             </p>
           </div>
@@ -171,13 +171,13 @@ export default function AlertasSobregirosPage() {
 
   if (error) {
     return (
-      <div className="dashboard-container">
-        <div className="p-8 bg-[#fef2f2] border rounded-3 text-center">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="p-8 bg-[#fef2f2] border rounded-xl text-center">
           <AlertCircle size={48} className="text-red-500" />
-          <h3 className="text-red-800 mb-2">Error al cargar alertas</h3>
-          <p className="text-red-600 mb-4">{error}</p>
+          <h3 className="text-destructive mb-2">Error al cargar alertas</h3>
+          <p className="text-destructive mb-4">{error}</p>
           <button
-            onClick={handleRefresh} className="py-3 px-6 bg-red-500 text-white border-0 rounded-2 cursor-pointer text-[0.875rem] font-semibold"
+            onClick={handleRefresh} className="py-3 px-6 bg-red-500 text-white border-0 rounded-lg cursor-pointer text-[0.875rem] font-semibold"
           >
             Reintentar
           </button>
@@ -189,29 +189,29 @@ export default function AlertasSobregirosPage() {
   const alertasFiltradas = getAlertasFiltradas()
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header mb-8">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8 mb-8">
         <div className="flex items-center gap-4">
           <button
             aria-label="Volver a presupuestos"
-            onClick={() => router.push('/dashboard/contabilidad/presupuestos')} className="p-2 bg-white border rounded-2 cursor-pointer flex items-center justify-center"
+            onClick={() => router.push('/dashboard/contabilidad/presupuestos')} className="p-2 bg-card border rounded-lg cursor-pointer flex items-center justify-center"
           >
-            <ArrowLeft size={20} className="text-gray-500" />
+            <ArrowLeft size={20} className="text-muted-foreground" />
           </button>
           <div>
-            <h1 className="dashboard-title">Alertas de Sobregiro Presupuestal</h1>
-            <p className="dashboard-subtitle">
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Alertas de Sobregiro Presupuestal</h1>
+            <p className="mt-2 text-base text-muted-foreground">
               Monitoreo de presupuestos con advertencias y sobregiros
             </p>
           </div>
         </div>
         <button
           onClick={handleRefresh}
-          disabled={refreshing} className="py-3 px-6 text-white border-0 rounded-2 text-[0.875rem] font-semibold flex items-center gap-2"
+          disabled={refreshing} className="py-3 px-6 text-white border-0 rounded-lg text-[0.875rem] font-semibold flex items-center gap-2"
         >
-          <RefreshCw 
-            size={16} 
+          <RefreshCw
+            size={16}
           />
           {refreshing ? 'Actualizando...' : 'Actualizar'}
         </button>
@@ -221,16 +221,16 @@ export default function AlertasSobregirosPage() {
       {resumen && (
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-6 mb-8">
           {/* Total Alertas */}
-          <div className="p-6 bg-white rounded-3 shadow">
+          <div className="p-6 bg-card rounded-xl shadow">
             <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-[#eff6ff] rounded-2.5 flex items-center justify-center">
+              <div className="p-3 bg-muted rounded-[0.625rem] flex items-center justify-center">
                 <AlertCircle size={24} className="text-blue-500" />
               </div>
               <div>
-                <p className="text-[0.875rem] text-gray-500 m-0">
+                <p className="text-[0.875rem] text-muted-foreground m-0">
                   Total Alertas
                 </p>
-                <p className="text-8 font-bold text-gray-900 m-0">
+                <p className="text-[2rem] font-bold text-foreground m-0">
                   {resumen.total_alertas}
                 </p>
               </div>
@@ -238,36 +238,36 @@ export default function AlertasSobregirosPage() {
           </div>
 
           {/* Sobregiros */}
-          <div className="p-6 bg-white rounded-3 shadow">
+          <div className="p-6 bg-card rounded-xl shadow">
             <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-[#fef2f2] rounded-2.5 flex items-center justify-center">
+              <div className="p-3 bg-[#fef2f2] rounded-[0.625rem] flex items-center justify-center">
                 <AlertTriangle size={24} className="text-red-500" />
               </div>
               <div>
-                <p className="text-[0.875rem] text-gray-500 m-0">
+                <p className="text-[0.875rem] text-muted-foreground m-0">
                   Sobregiros (&gt;100%)
                 </p>
-                <p className="text-8 font-bold text-red-500 m-0">
+                <p className="text-[2rem] font-bold text-red-500 m-0">
                   {resumen.sobregiros.cantidad}
                 </p>
               </div>
             </div>
-            <p className="text-[0.875rem] text-red-800 m-0">
+            <p className="text-[0.875rem] text-destructive m-0">
               Excedente: {formatCurrency(resumen.sobregiros.total_excedente)}
             </p>
           </div>
 
           {/* Advertencias */}
-          <div className="p-6 bg-white rounded-3 shadow">
+          <div className="p-6 bg-card rounded-xl shadow">
             <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-[#fffbeb] rounded-2.5 flex items-center justify-center">
+              <div className="p-3 bg-[#fffbeb] rounded-[0.625rem] flex items-center justify-center">
                 <AlertCircle size={24} className="text-amber-500" />
               </div>
               <div>
-                <p className="text-[0.875rem] text-gray-500 m-0">
+                <p className="text-[0.875rem] text-muted-foreground m-0">
                   Advertencias (&gt;90%)
                 </p>
-                <p className="text-8 font-bold text-amber-500 m-0">
+                <p className="text-[2rem] font-bold text-amber-500 m-0">
                   {resumen.advertencias.cantidad}
                 </p>
               </div>
@@ -284,7 +284,7 @@ export default function AlertasSobregirosPage() {
         {(['TODOS', 'SOBREGIRO', 'ADVERTENCIA'] as const).map((nivel) => (
           <button
             key={nivel}
-            onClick={() => setFiltroNivel(nivel)} className="py-3 px-6 rounded-2 cursor-pointer text-[0.875rem] font-semibold transition"
+            onClick={() => setFiltroNivel(nivel)} className="py-3 px-6 rounded-lg cursor-pointer text-[0.875rem] font-semibold transition"
           >
             {nivel === 'TODOS' ? 'Todas' : nivel === 'SOBREGIRO' ? 'Sobregiros' : 'Advertencias'}
           </button>
@@ -293,12 +293,12 @@ export default function AlertasSobregirosPage() {
 
       {/* Lista de Alertas */}
       {alertasFiltradas.length === 0 ? (
-        <div className="p-12 bg-white rounded-3 text-center">
+        <div className="p-12 bg-card rounded-xl text-center">
           <CheckCircle2 size={64} className="text-[#10b981]" />
-          <h3 className="text-gray-900 mb-2">
+          <h3 className="text-foreground mb-2">
             ¡No hay alertas activas!
           </h3>
-          <p className="text-gray-500 m-0">
+          <p className="text-muted-foreground m-0">
             Todos los presupuestos están dentro de los límites normales
           </p>
         </div>
@@ -306,7 +306,7 @@ export default function AlertasSobregirosPage() {
         <div className="flex flex-col gap-4">
           {alertasFiltradas.map((alerta) => (
             <div
-              key={alerta.presupuesto_id} className="p-6 rounded-3 transition"
+              key={alerta.presupuesto_id} className="p-6 rounded-xl transition"
             >
               {/* Header */}
               <div className="flex justify-between items-start mb-4 flex-wrap gap-4">
@@ -317,49 +317,49 @@ export default function AlertasSobregirosPage() {
                     <AlertCircle size={32} />
                   )}
                   <div>
-                    <div className="inline-block py-1 px-3 text-white rounded-[6px] text-3 font-bold mb-2">
+                    <div className="inline-block py-1 px-3 text-white rounded-[6px] text-xs font-bold mb-2">
                       {alerta.nivel_alerta}
                     </div>
-                    <h3 className="text-[1.125rem] font-semibold text-gray-900 m-0">
+                    <h3 className="text-[1.125rem] font-semibold text-foreground m-0">
                       {alerta.centro_costo?.nombre ?? 'Centro de costo'}
                     </h3>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-8 font-bold m-0 leading-[1]">
+                  <p className="text-[2rem] font-bold m-0 leading-[1]">
                     {toNumber(alerta.porcentaje_ejecutado).toFixed(1)}%
                   </p>
-                  <p className="text-3 text-gray-500 m-0">
+                  <p className="text-xs text-muted-foreground m-0">
                     Ejecutado
                   </p>
                 </div>
               </div>
 
               {/* Mensaje */}
-              <p className="text-[0.875rem] text-gray-700 mt-0 mr-0 mb-4 ml-0 leading-6">
+              <p className="text-[0.875rem] text-foreground/85 mt-0 mr-0 mb-4 ml-0 leading-6">
                 {alerta.mensaje}
               </p>
 
               {/* Detalles */}
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-4">
                 <div className="flex items-center gap-2">
-                  <FileText size={16} className="text-gray-500" />
+                  <FileText size={16} className="text-muted-foreground" />
                   <div>
-                    <p className="text-3 text-gray-500 m-0">
+                    <p className="text-xs text-muted-foreground m-0">
                       Cuenta
                     </p>
-                    <p className="text-[0.875rem] font-semibold text-gray-900 m-0">
+                    <p className="text-[0.875rem] font-semibold text-foreground m-0">
                       {alerta.cuenta?.codigo ?? 'N/A'} - {alerta.cuenta?.nombre ?? 'Cuenta'}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Calendar size={16} className="text-gray-500" />
+                  <Calendar size={16} className="text-muted-foreground" />
                   <div>
-                    <p className="text-3 text-gray-500 m-0">
+                    <p className="text-xs text-muted-foreground m-0">
                       Período
                     </p>
-                    <p className="text-[0.875rem] font-semibold text-gray-900 m-0">
+                    <p className="text-[0.875rem] font-semibold text-foreground m-0">
                       {alerta.periodo?.descripcion ?? 'Periodo no disponible'}
                     </p>
                   </div>
@@ -367,37 +367,37 @@ export default function AlertasSobregirosPage() {
               </div>
 
               {/* Montos */}
-              <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4 p-4 bg-white rounded-2">
+              <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4 p-4 bg-card rounded-lg">
                 <div>
-                  <p className="text-3 text-gray-500 mt-0 mr-0 mb-1 ml-0">
+                  <p className="text-xs text-muted-foreground mt-0 mr-0 mb-1 ml-0">
                     Presupuestado
                   </p>
-                  <p className="text-4 font-semibold text-gray-900 m-0">
+                  <p className="text-base font-semibold text-foreground m-0">
                     {formatCurrency(alerta.monto_presupuestado)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-3 text-gray-500 mt-0 mr-0 mb-1 ml-0">
+                  <p className="text-xs text-muted-foreground mt-0 mr-0 mb-1 ml-0">
                     Ejecutado
                   </p>
-                  <p className="text-4 font-semibold m-0">
+                  <p className="text-base font-semibold m-0">
                     {formatCurrency(alerta.monto_ejecutado)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-3 text-gray-500 mt-0 mr-0 mb-1 ml-0">
+                  <p className="text-xs text-muted-foreground mt-0 mr-0 mb-1 ml-0">
                     Disponible
                   </p>
-                  <p className="text-4 font-semibold m-0">
+                  <p className="text-base font-semibold m-0">
                     {formatCurrency(alerta.monto_disponible)}
                   </p>
                 </div>
                 {alerta.nivel_alerta === 'SOBREGIRO' && (
                   <div>
-                    <p className="text-3 text-gray-500 mt-0 mr-0 mb-1 ml-0">
+                    <p className="text-xs text-muted-foreground mt-0 mr-0 mb-1 ml-0">
                       Excedente
                     </p>
-                    <p className="text-4 font-semibold text-red-500 m-0">
+                    <p className="text-base font-semibold text-red-500 m-0">
                       {formatCurrency(alerta.excedente)}
                     </p>
                   </div>
@@ -410,7 +410,7 @@ export default function AlertasSobregirosPage() {
 
       {/* Info Footer */}
       {resumen && (
-        <div className="mt-8 p-4 bg-[#f9fafb] border rounded-2 text-3 text-gray-500 text-center">
+        <div className="mt-8 p-4 bg-muted border rounded-lg text-xs text-muted-foreground text-center">
           Última actualización: {new Date(resumen.fecha_generacion).toLocaleString('es-PE')}
         </div>
       )}

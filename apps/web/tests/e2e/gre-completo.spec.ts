@@ -112,6 +112,12 @@ test.describe('T11 GRE completo', () => {
       'crear cliente GRE',
     );
 
+    const almacenes = await parseOk<any[]>(
+      await apiContext.get(api('/inventario/almacenes')),
+      'listar almacenes GRE',
+    );
+    expect(almacenes.length, 'GRE requiere almacén operativo').toBeGreaterThan(0);
+
     const producto = await parseOk<any>(
       await apiContext.post(api('/inventario/productos'), {
         data: {
@@ -121,6 +127,7 @@ test.describe('T11 GRE completo', () => {
           precio_compra: 30,
           precio_venta: 80,
           stock: 10,
+          almacen_id: almacenes[0].id,
           stock_minimo: 0,
           controla_stock: true,
         },
@@ -168,6 +175,7 @@ test.describe('T11 GRE completo', () => {
         data: {
           destinatario: cliente.razon_social,
           direccionDestino: cliente.direccion,
+          ubigeoDestino: '150101',
           fechaTraslado: new Date(Date.now() + 86400000).toISOString(),
           modalidad: 'TRANSPORTE_PUBLICO',
           motivo: 'VENTA',
@@ -185,11 +193,13 @@ test.describe('T11 GRE completo', () => {
         data: {
           destinatario: cliente.razon_social,
           direccionDestino: cliente.direccion,
+          ubigeoDestino: '150101',
           fechaTraslado: new Date(Date.now() + 86400000).toISOString(),
           modalidad: 'TRANSPORTE_PUBLICO',
           motivo: 'VENTA',
           pesoTotal: 3,
           transportista: 'Transportes GRE',
+          transportistaDocumento: '20555555555',
           pedidoId: '11111111-1111-4111-8111-111111111111',
           idempotencyKey: `${qaPrefix}-gre-invalid-origin`,
         },
@@ -201,12 +211,17 @@ test.describe('T11 GRE completo', () => {
     const grePayload = {
       destinatario: cliente.razon_social,
       direccionDestino: cliente.direccion,
+      ubigeoDestino: '150101',
       fechaTraslado: new Date(Date.now() + 86400000).toISOString(),
       modalidad: 'TRANSPORTE_PRIVADO',
       motivo: 'VENTA',
       pesoTotal: 7.5,
       placaVehiculo: `T${runId.slice(-5)}`,
       licenciaConducir: `Q${runId.slice(-8)}`,
+      conductorDocumentoTipo: '1',
+      conductorDocumentoNumero: `1${runId.slice(-7)}`,
+      conductorNombres: 'QA GRE',
+      conductorApellidos: `Conductor ${runId}`,
       pedidoId: pedido.id,
       pedidoNumero: pedido.numero,
       despachosAsociados: [`${qaPrefix}-DESP-T11`],
@@ -223,11 +238,16 @@ test.describe('T11 GRE completo', () => {
     await expect(page.locator('body')).toContainText(pedido.numero);
     await expect(page.locator('body')).toContainText(producto.nombre);
     await page.getByLabel('Dirección de Destino *').fill(grePayload.direccionDestino);
+    await page.getByLabel('Ubigeo de Destino *').fill(grePayload.ubigeoDestino);
     await page.getByLabel('Fecha de Traslado *').fill(grePayload.fechaTraslado.split('T')[0]);
     await page.getByLabel('Modalidad de Transporte *').selectOption(grePayload.modalidad);
     await page.getByLabel('Peso Total (Kg) *').fill(String(grePayload.pesoTotal));
-    await page.getByLabel('Placa del Vehículo').fill(grePayload.placaVehiculo);
-    await page.getByLabel('Licencia de Conducir').fill(grePayload.licenciaConducir);
+    await page.getByLabel('Placa del Vehículo *').fill(grePayload.placaVehiculo);
+    await page.getByLabel('Licencia de Conducir *').fill(grePayload.licenciaConducir);
+    await page.getByLabel('Tipo Doc. Conductor *').selectOption(grePayload.conductorDocumentoTipo);
+    await page.getByLabel('Documento Conductor *').fill(grePayload.conductorDocumentoNumero);
+    await page.getByLabel('Nombres Conductor *').fill(grePayload.conductorNombres);
+    await page.getByLabel('Apellidos Conductor *').fill(grePayload.conductorApellidos);
     await page.getByLabel('Observaciones').fill(grePayload.observaciones);
     const createGreResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/gre/guias') && response.request().method() === 'POST',
@@ -270,17 +290,31 @@ test.describe('T11 GRE completo', () => {
     const envioInvalido = await apiContext.post(api(`/gre/guias/${gre.id}/enviar-sunat`), {
       headers: { 'idempotency-key': `gre-send-${runId}` },
     });
+    let envioSunatSuccess: boolean | null = null;
     if (String(gre.estado) !== 'FIRMADO') {
       await expectRejected(envioInvalido, 'no debe enviar a SUNAT si no está FIRMADO', /FIRMADO|estado/i);
     } else {
-      const envio = await parseOk<any>(envioInvalido, 'enviar GRE FIRMADA a SUNAT/mock');
-      expect(envio.id).toBe(gre.id);
-      expect(envio.timestamp).toBeTruthy();
+      const envioText = await envioInvalido.text();
+      expect(
+        envioInvalido.ok(),
+        `el endpoint de envío GRE debe responder de forma controlada: ${envioText}`,
+      ).toBeTruthy();
+      const envioBody = JSON.parse(envioText) as ApiEnvelope<{ id: string; timestamp: string }>;
+      envioSunatSuccess = envioBody.success !== false;
+      if (envioSunatSuccess) {
+        expect(envioBody.data?.id).toBe(gre.id);
+        expect(envioBody.data?.timestamp).toBeTruthy();
+      } else {
+        expect(
+          envioBody.message || '',
+          'un rechazo/indisponibilidad externa debe quedar explicado',
+        ).toMatch(/SUNAT|GRE|HTTP|servicio/i);
+      }
     }
 
     const { data: greDb, error: greDbError } = await supabase
       .from('gre_guias')
-      .select('id, venta_id, movimiento_inventario_id, estado, sunat_status, xml_firmado, hash_gre, error_message, idempotency_key, datos_adicionales')
+      .select('id, venta_id, movimiento_inventario_id, estado, sunat_status, xml_firmado, hash_gre, error_message, retry_count, idempotency_key, datos_adicionales')
       .eq('tenant_id', tenantId)
       .eq('id', gre.id)
       .single();
@@ -288,6 +322,10 @@ test.describe('T11 GRE completo', () => {
     expect(greDb?.idempotency_key).toBe(expectedIdempotencyKey);
     expect(greDb?.xml_firmado || greDb?.hash_gre || greDb?.error_message).toBeTruthy();
     expect(JSON.stringify(greDb?.datos_adicionales || {})).toContain(`${qaPrefix}-DESP-T11`);
+    if (envioSunatSuccess === false && /HTTP 5\d{2}/i.test(greDb?.error_message || '')) {
+      expect(greDb?.sunat_status, 'HTTP 5xx SUNAT debe quedar como error reintentable').toBe('ERROR');
+      expect(Number(greDb?.retry_count), 'HTTP 5xx SUNAT conserva contador de reintento').toBe(0);
+    }
 
     const { data: greDetalles, error: greDetallesError } = await supabase
       .from('gre_detalles')

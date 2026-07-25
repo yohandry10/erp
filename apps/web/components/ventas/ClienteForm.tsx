@@ -68,7 +68,7 @@ export default function ClienteForm({
   submitLabel = 'Guardar Cliente',
   loading: externalLoading = false
 }: ClienteFormProps) {
-  const { post } = useApi()
+  const { post, unwrap } = useApi()
   const [validatingRuc, setValidatingRuc] = useState(false)
   const [rucValidated, setRucValidated] = useState(false)
 
@@ -102,7 +102,7 @@ export default function ClienteForm({
     if (documentoTipo !== TipoDocumento.RUC) {
       toast({
         title: 'Error',
-        description: 'Solo se puede validar RUC',
+        description: 'La validación local solo aplica a RUC',
         variant: 'destructive'
       })
       return
@@ -122,29 +122,32 @@ export default function ClienteForm({
       const response = await post('/api/ventas/clientes/validar-ruc', {
         ruc: documentoNumero
       })
+      const responseData: any = unwrap(response)
 
-      if (response?.success && response.data) {
-        // Auto-fill form with SUNAT data
-        if (response.data.razon_social) {
-          setValue('razon_social', response.data.razon_social)
+      if (responseData) {
+        // Solo autocompletar si el backend confirma una consulta registral real.
+        if (responseData.consulta_sunat && responseData.razon_social) {
+          setValue('razon_social', responseData.razon_social)
         }
-        if (response.data.direccion) {
-          setValue('direccion', response.data.direccion)
+        if (responseData.consulta_sunat && responseData.direccion) {
+          setValue('direccion', responseData.direccion)
         }
-        if (response.data.nombre_comercial) {
-          setValue('nombre_comercial', response.data.nombre_comercial)
+        if (responseData.consulta_sunat && responseData.nombre_comercial) {
+          setValue('nombre_comercial', responseData.nombre_comercial)
         }
-        
+
         setRucValidated(true)
         toast({
           title: 'RUC Validado',
-          description: 'Datos obtenidos de SUNAT correctamente'
+          description: responseData.consulta_sunat
+            ? 'Datos obtenidos de SUNAT correctamente'
+            : 'Formato y dígito verificador válidos. Complete los datos registrales manualmente.'
         })
       }
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo validar el RUC con SUNAT',
+        description: error.message || 'No se pudo validar el RUC',
         variant: 'destructive'
       })
     } finally {
@@ -174,14 +177,14 @@ export default function ClienteForm({
       {/* Tipo de Cliente y Documento */}
       <div className="bg-[var(--primary-50)] p-6 flex flex-col gap-4">
         <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] m-0">Información Básica</h3>
-        
+
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4">
           {/* Tipo de Cliente */}
           <div className="flex flex-col gap-2">
             <Label htmlFor="tipo">Tipo de Cliente *</Label>
             <select
               id="tipo"
-              {...register('tipo')} className="w-[100%] py-[0.875rem] px-4 border text-4 bg-white text-[var(--primary-800)] cursor-pointer"
+              {...register('tipo')} className="w-[100%] py-[0.875rem] px-4 border text-base bg-card text-[var(--primary-800)] cursor-pointer"
               disabled={loading}
             >
               <option value={TipoCliente.PERSONA}>Persona Natural</option>
@@ -201,7 +204,7 @@ export default function ClienteForm({
               id="documento_tipo"
               name={documentoTipoField.name}
               ref={documentoTipoField.ref}
-              onBlur={documentoTipoField.onBlur} className="w-[100%] py-[0.875rem] px-4 border text-4 bg-white text-[var(--primary-800)] cursor-pointer"
+              onBlur={documentoTipoField.onBlur} className="w-[100%] py-[0.875rem] px-4 border text-base bg-card text-[var(--primary-800)] cursor-pointer"
               disabled={loading}
               onChange={(event) => {
                 documentoTipoField.onChange(event)
@@ -221,7 +224,7 @@ export default function ClienteForm({
           </div>
         </div>
 
-        {/* Número de Documento con Validación SUNAT */}
+        {/* Número de Documento con validación local de RUC */}
         <div className="flex flex-col gap-2">
           <Label htmlFor="documento_numero">
             Número de Documento *
@@ -265,7 +268,7 @@ export default function ClienteForm({
                     Validado
                   </>
                 ) : (
-                  'Validar con SUNAT'
+                    'Validar RUC'
                 )}
               </Button>
             )}
@@ -276,8 +279,8 @@ export default function ClienteForm({
             </p>
           )}
           {documentoTipo === TipoDocumento.RUC && (
-            <p className="text-3 text-[var(--primary-500)] m-0">
-              Opcional: Valida el RUC con SUNAT para autocompletar datos
+            <p className="text-xs text-[var(--primary-500)] m-0">
+              Opcional: valida formato y dígito verificador. No consulta datos registrales de SUNAT.
             </p>
           )}
         </div>
@@ -286,7 +289,7 @@ export default function ClienteForm({
       {/* Datos del Cliente */}
       <div className="bg-[var(--primary-50)] p-6 flex flex-col gap-4">
         <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] m-0">Datos del Cliente</h3>
-        
+
         <div className="flex flex-col gap-4">
           {/* Razón Social */}
           <div className="flex flex-col gap-2">
@@ -342,7 +345,7 @@ export default function ClienteForm({
       {/* Datos de Contacto */}
       <div className="bg-[var(--primary-50)] p-6 flex flex-col gap-4">
         <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] m-0">Datos de Contacto</h3>
-        
+
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4">
           {/* Email */}
           <div className="flex flex-col gap-2">

@@ -152,6 +152,16 @@ describe('TenantManagementService', () => {
             expect(result).toBeDefined();
         });
 
+        it('should reject non-Peru country changes while countries are roadmap', async () => {
+            mockClient.single.mockResolvedValueOnce({ data: mockTenant, error: null });
+
+            await expect(service.updateTenant('tenant-123', {
+                pais_id: 2,
+                pais: 'CO',
+            } as any))
+                .rejects.toThrow(BadRequestException);
+        });
+
         it('should throw NotFoundException when tenant not found', async () => {
             mockClient.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
 
@@ -261,6 +271,20 @@ describe('TenantManagementService', () => {
                 .rejects.toThrow(ConflictException);
         });
 
+        it('should reject non-Peru country creation while countries are roadmap', async () => {
+            const createDto = {
+                razon_social: 'Colombia Company',
+                ruc: '900123456',
+                email: 'co@company.com',
+                pais_id: 2,
+                pais: 'CO',
+            };
+
+            await expect(service.createTenant(createDto as any))
+                .rejects.toThrow(BadRequestException);
+            expect(mockClient.from).not.toHaveBeenCalledWith('paises');
+        });
+
         it('should create canonical tenant and seed operational RBAC before admin user', async () => {
             const createDto = {
                 razon_social: 'New Company S.A.C.',
@@ -283,7 +307,7 @@ describe('TenantManagementService', () => {
                 .mockReturnValueOnce({ error: null })
                 .mockReturnValueOnce(mockClient);
             mockClient.rpc.mockResolvedValueOnce({
-                data: [{ permisos_seeded: 195, roles_seeded: 10, role_permissions_seeded: 466 }],
+                data: [{ permisos_seeded: 195, roles_seeded: 10, role_permissions_seeded: 465 }],
                 error: null,
             });
 

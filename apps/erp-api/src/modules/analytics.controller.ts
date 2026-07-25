@@ -28,20 +28,12 @@ export class AnalyticsController {
 
       const { fechaInicio, fechaFin } = this.resolveDateRange(filtros);
 
-      const { data: ventas, error: ventasError } = await this.supabase.getClient()
-        .from('ventas')
-        .select('fecha, total')
-        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
-        .gte('fecha', fechaInicio.toISOString())
-        .lte('fecha', fechaFin.toISOString())
-        .order('fecha');
+      const ventas = await this.obtenerVentasEmitidas(tenantId, {
+        gte: fechaInicio.toISOString(),
+        lte: fechaFin.toISOString(),
+      });
 
-      if (ventasError) {
-        console.error('❌ Error obteniendo ventas:', ventasError);
-        throw new Error(`Error consultando ventas: ${ventasError.message}`);
-      }
-
-      console.log(`📊 Se encontraron ${ventas?.length || 0} ventas en los últimos 30 días`);
+      console.log(`📊 Se encontraron ${ventas?.length || 0} ventas en el período`);
 
       // Procesar datos para el gráfico
       const ventasPorDia = ventas ? this.procesarVentasDiarias(ventas) : [];
@@ -49,7 +41,7 @@ export class AnalyticsController {
       const data = ventasPorDia.map(v => v.total);
 
       // Calcular totales
-      const ventasActuales = ventas?.reduce((sum, v) => sum + parseFloat(v.total || 0), 0) || 0;
+      const ventasActuales = ventas?.reduce((sum, v) => sum + Number(v.total || 0), 0) || 0;
       const ventasAnterior = await this.calcularVentasPeriodoAnterior(tenantId, fechaInicio, fechaFin);
       const crecimiento = ventasAnterior > 0 ? 
         ((ventasActuales - ventasAnterior) / ventasAnterior * 100).toFixed(1) + '%' : 
@@ -158,6 +150,38 @@ export class AnalyticsController {
     return parsed;
   }
 
+  /**
+   * Fuente unificada de ventas para analytics: comprobantes de venta EMITIDOS
+   * (tabla `documentos`), que incluye tanto las facturas del flujo de ventas como
+   * las boletas del POS. La tabla legacy `ventas` no la puebla ningún flujo (los
+   * flujos reales escriben en pedidos_venta / ventas_pos → documentos), por eso
+   * los KPIs quedaban en 0. Se excluyen comprobantes anulados/cancelados.
+   */
+  private async obtenerVentasEmitidas(
+    tenantId: string,
+    opts: { gte: string; lte?: string; lt?: string },
+  ): Promise<Array<{ fecha: string; total: number }>> {
+    let query = this.supabase.getClient()
+      .from('documentos')
+      .select('fecha_emision, total')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
+      .in('tipo_documento', ['FACTURA', 'BOLETA'])
+      .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")')
+      .gte('fecha_emision', opts.gte);
+
+    if (opts.lt) query = query.lt('fecha_emision', opts.lt);
+    if (opts.lte) query = query.lte('fecha_emision', opts.lte);
+
+    const { data, error } = await query.order('fecha_emision');
+    if (error) {
+      throw new Error(`Error consultando ventas: ${error.message}`);
+    }
+    return (data ?? []).map((d: any) => ({
+      fecha: d.fecha_emision,
+      total: Number(d.total ?? 0),
+    }));
+  }
+
   private async calcularVentasPeriodoAnterior(tenantId: string, fechaInicio: Date, fechaFin: Date): Promise<number> {
     // ✅ MULTI-TENANT: Filtrar por tenant
     try {
@@ -165,14 +189,12 @@ export class AnalyticsController {
       const inicioAnterior = new Date(fechaInicio.getTime() - durationMs - 1);
       const finAnterior = new Date(fechaInicio.getTime() - 1);
 
-      const { data: ventas } = await this.supabase.getClient()
-        .from('ventas')
-        .select('total')
-        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
-        .gte('fecha', inicioAnterior.toISOString())
-        .lte('fecha', finAnterior.toISOString());
+      const ventas = await this.obtenerVentasEmitidas(tenantId, {
+        gte: inicioAnterior.toISOString(),
+        lte: finAnterior.toISOString(),
+      });
 
-      return ventas?.reduce((sum, venta) => sum + parseFloat(venta.total || 0), 0) || 0;
+      return ventas?.reduce((sum, venta) => sum + parseFloat(String(venta.total || 0)), 0) || 0;
     } catch (error) {
       console.error('❌ Error calculando ventas mes anterior:', error);
       return 0;
@@ -322,18 +344,46 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Datos de ventas por categoría obtenidos exitosamente' })
   async getVentasCategoria(@CurrentTenant() tenantId: string) {
     try {
-      const { data: productos, error } = await this.supabase.getClient()
-        .from('productos')
-        .select('categoria')
-        .eq('tenant_id', tenantId);
+      // Ventas reales por categoría: montos de líneas de comprobantes emitidos.
+      // (Antes contaba productos del catálogo, lo que mostraba "S/ 5" con 5 productos.)
+      const client = this.supabase.getClient();
 
-      if (error) throw error;
+      const { data: documentos, error: docsError } = await client
+        .from('documentos')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .neq('estado', 'ANULADO');
+      if (docsError) throw docsError;
 
       const categorias = new Map<string, number>();
-      productos?.forEach((producto) => {
-        const categoria = producto.categoria || 'Sin categoría';
-        categorias.set(categoria, (categorias.get(categoria) || 0) + 1);
-      });
+      const documentoIds = (documentos || []).map((d: any) => d.id);
+
+      if (documentoIds.length > 0) {
+        const { data: detalles, error: detError } = await client
+          .from('documento_detalles')
+          .select('producto_id, total_item, valor_venta')
+          .eq('tenant_id', tenantId)
+          .in('documento_id', documentoIds);
+        if (detError) throw detError;
+
+        const productoIds = [...new Set((detalles || []).map((d: any) => d.producto_id).filter(Boolean))];
+        const categoriaPorProducto = new Map<string, string>();
+        if (productoIds.length > 0) {
+          const { data: productos, error: prodError } = await client
+            .from('productos')
+            .select('id, categoria')
+            .eq('tenant_id', tenantId)
+            .in('id', productoIds);
+          if (prodError) throw prodError;
+          (productos || []).forEach((p: any) => categoriaPorProducto.set(p.id, p.categoria || 'Sin categoría'));
+        }
+
+        (detalles || []).forEach((detalle: any) => {
+          const categoria = categoriaPorProducto.get(detalle.producto_id) || 'Sin categoría';
+          const monto = Number(detalle.total_item ?? detalle.valor_venta ?? 0);
+          categorias.set(categoria, (categorias.get(categoria) || 0) + monto);
+        });
+      }
 
       return {
         success: true,
@@ -369,14 +419,14 @@ export class AnalyticsController {
       const desde = new Date();
       desde.setMonth(desde.getMonth() - 1);
 
-      const [ventasResult, gastosResult, cxcResult, cxpResult] = await Promise.all([
-        this.supabase.getClient().from('ventas').select('total').eq('tenant_id', tenantId).gte('fecha', desde.toISOString()),
+      const [ventasRows, gastosResult, cxcResult, cxpResult] = await Promise.all([
+        this.obtenerVentasEmitidas(tenantId, { gte: desde.toISOString() }),
         this.supabase.getClient().from('gastos').select('monto').eq('tenant_id', tenantId).gte('fecha', desde.toISOString()),
         this.supabase.getClient().from('cuentas_por_cobrar').select('saldo, monto').eq('tenant_id', tenantId),
         this.supabase.getClient().from('cuentas_por_pagar').select('saldo, total').eq('tenant_id', tenantId),
       ]);
 
-      const ventas = ventasResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.total || 0), 0) || 0;
+      const ventas = ventasRows.reduce((sum, row) => sum + Number(row.total || 0), 0) || 0;
       const gastos = gastosResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.monto || 0), 0) || 0;
       const porCobrar = cxcResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.saldo ?? row.monto ?? 0), 0) || 0;
       const porPagar = cxpResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.saldo ?? row.total ?? 0), 0) || 0;
@@ -709,14 +759,12 @@ export class AnalyticsController {
       const fechaFin = new Date(fechaInicio);
       fechaFin.setMonth(fechaFin.getMonth() + 1);
       
-      const { data } = await this.supabase.getClient()
-        .from('ventas')
-        .select('total')
-        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
-        .gte('fecha', fechaInicio.toISOString())
-        .lt('fecha', fechaFin.toISOString());
-      
-      ventas.push(data?.reduce((sum, v) => sum + parseFloat(v.total || 0), 0) || 0);
+      const data = await this.obtenerVentasEmitidas(tenantId, {
+        gte: fechaInicio.toISOString(),
+        lt: fechaFin.toISOString(),
+      });
+
+      ventas.push(data.reduce((sum, v) => sum + parseFloat(String(v.total || 0)), 0) || 0);
     }
     return ventas;
   }

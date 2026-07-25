@@ -6,7 +6,7 @@ $tenantId = "550e8400-e29b-41d4-a716-446655440000"
 # Login
 $loginData = @{
     email = "superadmin@neon.com"
-    password = "6559234.Yoandri1"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json
 
 Write-Host "Login..." -ForegroundColor Yellow

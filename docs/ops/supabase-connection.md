@@ -10,11 +10,15 @@
 > Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
 <!-- DOC-NAV:END -->
 
-Fecha de corte: 2026-05-16
+Fecha de corte: 2026-07-14
 
 ## Estado
 
 La conexion directa al pooler de Supabase fue verificada con `psql`.
+
+Contrato vigente: DEV usa `hbueraexcbowpfnjlppi` y `.env.local`; PROD usa `wypnbcptofqdmoynlonq` y `.env.production`. Antes de cualquier operacion ejecutar `scripts/db-environment-preflight.ps1`. La politica completa esta en `docs/architecture/ENVIRONMENT_DATABASE_BOUNDARIES.md`.
+
+Actualizacion 2026-06-18: la conexion PROD de `.env.production` vuelve a ser operativa por `psql` contra el proyecto `wypnbcptofqdmoynlonq` (Postgres 17.6). Con esa conexion se aplicaron y verificaron `342`, `343`, `344` y `345` en PROD. El fallo previo `FATAL: (ENOTFOUND) tenant/user postgres.wypnbcptofqdmoynlonq not found` queda documentado como incidente historico, no como bloqueo vigente. Antes de aplicar cualquier migracion nueva en PROD, repetir prueba read-only con `psql` y ejecutar archivos con `--set=ON_ERROR_STOP=1`.
 
 Host:
 
@@ -36,15 +40,16 @@ Usuario:
 
 La contrasena no debe documentarse ni versionarse.
 
-En esta maquina se guardo la cadena de conexion en:
+En esta maquina las cadenas estan separadas:
 
-- `.env.local`
+- DEV: `.env.local`
+- PROD: `.env.production`
 
 Ese archivo esta ignorado por Git mediante:
 
 - `.gitignore`: `*.env.*`
 
-Variables disponibles en `.env.local`:
+Variables disponibles en ambos archivos, con valores propios de cada proyecto:
 
 - `DATABASE_URL`
 - `POSTGRES_URL`
@@ -55,12 +60,17 @@ Variables disponibles en `.env.local`:
 
 ## Cargar conexion en PowerShell
 
+Elegir explicitamente un entorno. Nunca cargar `.env.local` para operar PROD.
+
 ```powershell
-Get-Content .env.local | ForEach-Object {
+$envFile = '.env.production' # usar '.env.local' solo para DEV
+Get-Content $envFile | ForEach-Object {
   if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
     [Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim(), 'Process')
   }
 }
+
+./scripts/db-environment-preflight.ps1 -Environment PROD -EnvFile $envFile
 ```
 
 ## Probar conexion
@@ -102,6 +112,33 @@ Se aplicaron con `psql --set=ON_ERROR_STOP=1`:
 - `326__outbox_accounting_event_id_reconciliation.sql`
 
 Nota: `321__tesoreria_cxp_payment_idempotency.sql` se habia creado inicialmente como `307__tesoreria_cxp_payment_idempotency.sql`, pero se renombro para evitar conflicto con `307__runtime_accounting_inventory_purchase_accounts.sql`.
+
+## Migraciones aplicadas/verificadas el 2026-06-18
+
+Se aplicaron con `psql --set=ON_ERROR_STOP=1` y conexion directa por `.env.production`:
+
+- `342__sunat_tenant_onboarding_credentials.sql`
+- `343__job_lock_rpc_security_definer_hardening.sql`
+- `344__cxc_total_alias_runtime_alignment.sql`
+- `345__supabase_advisor_security_hardening.sql`
+
+Verificacion PROD posterior:
+
+- `acquire_job_lock` y `release_job_lock`: `anon=false`, `authenticated=false`, `service_role=true`, `search_path` fijo y `SECURITY DEFINER=true`.
+- `empresa_config`: 15 columnas SUNAT tenant-level presentes, 3 constraints validadas, defaults correctos y 0 filas invalidas para `342`.
+- Smoke lock no destructivo: primer lock `true`, segundo lock simultaneo `false`, release `true`.
+- `cuentas_por_cobrar.total`: columna presente y `cxc_total_mismatches=0`.
+- Supabase Advisor hardening por catalogo: `security_definer_views_remaining=0`, `rls_disabled_public_tables_remaining=0`, `user_functions_without_search_path=0`, `secdef_user_functions_client_executable=0`.
+- `financial_forensic_repair_log`: RLS habilitado y forzado; `anon=false`, `authenticated=false`, `service_role=true`.
+
+## Separacion de entornos verificada el 2026-07-14
+
+- `346__deployment_environment_boundary.sql` aplicada en DEV y PROD.
+- DEV: marca `DEV`, ref `hbueraexcbowpfnjlppi`, demos permitidas.
+- PROD: marca `PROD`, ref `wypnbcptofqdmoynlonq`, demos prohibidas.
+- PROD fue purgada de 41 tenants QA/demo y 133 usuarios de prueba; quedo con cero filas tenant-scoped.
+- Preflight `DEV` y `PROD`: OK.
+- Evidencia: `docs/audits/2026-07-14-prod-demo-data-cleanup.md`.
 
 ## Verificacion posterior
 

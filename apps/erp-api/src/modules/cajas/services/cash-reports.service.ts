@@ -35,6 +35,14 @@ export interface DatosReporteCierre {
     totales_por_tipo: Record<string, number>;
 }
 
+const POS_CUENTAS_RUNTIME: Record<string, { nombre: string; tipo: string; nivel: number }> = {
+    '10111': { nombre: 'Caja operativa POS', tipo: 'ACTIVO', nivel: 5 },
+    '10411': { nombre: 'Bancos - abonos por tarjeta POS', tipo: 'ACTIVO', nivel: 5 },
+    '10412': { nombre: 'Bancos - transferencias billeteras digitales POS', tipo: 'ACTIVO', nivel: 5 },
+    '40111': { nombre: 'IGV por pagar', tipo: 'PASIVO', nivel: 5 },
+    '7011': { nombre: 'Ventas de mercaderias POS', tipo: 'INGRESO', nivel: 4 },
+};
+
 /**
  * Servicio para generación de reportes de caja
  * 
@@ -59,6 +67,22 @@ export class CashReportsService {
         private readonly movementsService: CashMovementsService,
         private readonly reconciliationService: CashReconciliationService,
     ) { }
+
+    private buildDeterministicUuid(input: string): string {
+        const hash = crypto.createHash('sha256').update(input).digest('hex');
+        const bytes = hash.slice(0, 32).split('');
+
+        bytes[12] = '5';
+        bytes[16] = ((parseInt(bytes[16], 16) & 0x3) | 0x8).toString(16);
+
+        return [
+            bytes.slice(0, 8).join(''),
+            bytes.slice(8, 12).join(''),
+            bytes.slice(12, 16).join(''),
+            bytes.slice(16, 20).join(''),
+            bytes.slice(20, 32).join(''),
+        ].join('-');
+    }
 
     /**
      * Obtiene todos los datos necesarios para generar un reporte de cierre
@@ -743,6 +767,17 @@ export class CashReportsService {
      *   - IGV por pagar -> 40111
      */
     async registrarAsientoCierre(tenantId: string, sesionId: string) {
+        // Rediseño contable (modelo elegido 2026-07-24): cada venta POS contabiliza su
+        // ingreso al contado en el asiento POR-VENTA (Dr Caja/Bancos / Cr Ventas + IGV).
+        // El cierre de caja NO debe generar un asiento de ingreso: solo reconcilia el
+        // efectivo físico. Generarlo aquí DUPLICARÍA ingresos e IGV en el mayor.
+        this.logger.log(
+            `ℹ️ [Cierre POS] Sesión ${sesionId}: el ingreso ya se contabiliza por-venta; ` +
+            'el cierre solo reconcilia efectivo, no se genera asiento de ingreso.',
+        );
+        return null;
+
+        // eslint-disable-next-line no-unreachable
         const datos = await this.obtenerDatosReporteCierre(sesionId, tenantId);
         const resumenFiscal = datos.resumen_fiscal || { base_imponible: 0, igv: 0, total: 0 };
         const mp = datos.resumen_metodos_pago || {
@@ -786,17 +821,45 @@ export class CashReportsService {
         }
 
         const asientoConcepto = `Cierre diario/turno POS - sesión ${sesionId}`;
-        const numeroAsiento = `POS-${new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 12)}`;
+        const referencia = `SESION:${sesionId}`;
+        const sourceEventId = this.buildDeterministicUuid(`caja.cierre:${sesionId}`);
+
+        const { data: asientoExistente, error: asientoExistenteError } = await this.supabase
+            .getClient()
+            .from('asientos_contables')
+            .select('id, numero_asiento, codigo')
+            .eq('tenant_id', tenantId)
+            .eq('source_event_id', sourceEventId)
+            .maybeSingle();
+
+        if (asientoExistenteError) {
+            this.logger.error(`No se pudo validar asiento de cierre existente: ${asientoExistenteError.message}`);
+            throw asientoExistenteError;
+        }
+
+        if (asientoExistente?.id) {
+            this.logger.log(
+                `♻️ Asiento de cierre POS ya registrado (${asientoExistente.codigo ?? asientoExistente.numero_asiento ?? asientoExistente.id}) para sesión ${sesionId}`,
+            );
+            return asientoExistente;
+        }
 
         const asientoPayload = {
             tenant_id: tenantId,
-            numero_asiento: numeroAsiento,
             fecha: new Date().toISOString().slice(0, 10),
+            tipo_asiento: 'POS_CIERRE',
+            origen: 'POS',
             concepto: asientoConcepto,
-            referencia: `SESION:${sesionId}`,
+            referencia,
             total_debe: Number(totalDebe.toFixed(2)),
             total_haber: Number(totalHaber.toFixed(2)),
+            // BORRADOR intencional: el asiento por-venta ya contabiliza el ingreso
+            // (Dr CxC/Caja, Cr Ventas+IGV). Este cierre re-registra la venta en
+            // cuentas POS (10111/7011/40111); confirmarlo DUPLICARÍA ingresos e
+            // IGV en el mayor. Se deja en BORRADOR hasta rediseñar el flujo para
+            // que solo exista UN registro de ingreso por venta POS.
             estado: 'BORRADOR',
+            source_event_id: sourceEventId,
             usuario_id: datos.sesion.cajero_id ?? datos.sesion.abierto_por ?? null,
         };
 
@@ -825,7 +888,6 @@ export class CashReportsService {
                     debe: Number((d.debe || 0).toFixed(2)),
                     haber: Number((d.haber || 0).toFixed(2)),
                     concepto: asientoConcepto,
-                    referencia: `SESION:${sesionId}`,
                 };
             })
             .filter(Boolean) as any[];
@@ -845,7 +907,9 @@ export class CashReportsService {
             throw detalleError;
         }
 
-        this.logger.log(`✅ Asiento de cierre registrado (${numeroAsiento}) con ${detallesInsert.length} líneas`);
+        this.logger.log(
+            `✅ Asiento de cierre registrado (${asiento.codigo ?? asiento.numero_asiento ?? asiento.id}) con ${detallesInsert.length} líneas`,
+        );
         return asiento;
     }
 
@@ -866,6 +930,49 @@ export class CashReportsService {
         (data || []).forEach((pc: any) => {
             map[pc.codigo] = pc.id;
         });
+
+        const faltantes = codigos.filter((codigo) => !map[codigo] && POS_CUENTAS_RUNTIME[codigo]);
+        for (const codigo of faltantes) {
+            const cuenta = POS_CUENTAS_RUNTIME[codigo];
+            const { data: creada, error: createError } = await this.supabase
+                .getClient()
+                .from('plan_cuentas')
+                .insert({
+                    tenant_id: tenantId,
+                    codigo,
+                    nombre: cuenta.nombre,
+                    tipo: cuenta.tipo,
+                    tipo_cuenta: cuenta.tipo,
+                    nivel: cuenta.nivel,
+                    acepta_movimiento: true,
+                    activo: true,
+                    estado: 'ACTIVO',
+                    metadata: {
+                        source: 'runtime_pos_close_standard_account',
+                    },
+                })
+                .select('id, codigo')
+                .single();
+
+            if (!createError && creada?.id) {
+                map[codigo] = creada.id;
+                continue;
+            }
+
+            if (createError?.code === '23505') {
+                const { data: existente } = await this.supabase
+                    .getClient()
+                    .from('plan_cuentas')
+                    .select('id, codigo')
+                    .eq('tenant_id', tenantId)
+                    .eq('codigo', codigo)
+                    .maybeSingle();
+
+                if (existente?.id) {
+                    map[codigo] = existente.id;
+                }
+            }
+        }
         return map;
     }
 

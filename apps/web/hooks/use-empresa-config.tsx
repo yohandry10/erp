@@ -41,7 +41,7 @@ const defaultConfig: EmpresaConfig = {
   tipo_empresa: 'MICRO',
   usar_flujo_logistica: false,
   gre_obligatorio: false,
-  gre_automatico_habilitado: true,
+  gre_automatico_habilitado: false,
   umbral_gre_automatico: 700,
 }
 
@@ -84,9 +84,9 @@ export function EmpresaConfigProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await get('/api/configuration/context/country')
-      
+
       if (response) {
         setConfig(normalizeEmpresaConfig(response))
       } else {
@@ -145,9 +145,9 @@ export function useEmpresaConfigStandalone() {
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await get('/api/configuration/context/country')
-      
+
       if (response) {
         setConfig(normalizeEmpresaConfig(response))
       } else {

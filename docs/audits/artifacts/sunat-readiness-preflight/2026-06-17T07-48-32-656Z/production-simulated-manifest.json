@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-06-17T07:48:33.744Z",
+  "productionUsed": false,
+  "sunatEnvironment": "produccion",
+  "expectedRuc": "20616053575",
+  "greTransport": "soap",
+  "canAttemptProductionSend": false,
+  "checks": [
+    {
+      "id": "sunat.environment",
+      "severity": "PASS",
+      "message": "SUNAT_ENVIRONMENT esta en produccion; se aplican compuertas estrictas."
+    },
+    {
+      "id": "sunat.expected_ruc",
+      "severity": "PASS",
+      "message": "RUC esperado configurado: 20616053575."
+    },
+    {
+      "id": "certificate.config",
+      "severity": "PASS",
+      "message": "PFX_PATH y PFX_PASS estan configurados."
+    },
+    {
+      "id": "certificate.load",
+      "severity": "PASS",
+      "message": "El PFX local carga con certificado real no-demo."
+    },
+    {
+      "id": "certificate.ruc_match",
+      "severity": "FAIL",
+      "message": "El certificado fiscal no contiene el RUC esperado o no se pudo verificar. No emitir en produccion."
+    },
+    {
+      "id": "gre.transport",
+      "severity": "WARN",
+      "message": "GRE usa SOAP; la evidencia beta actual deja SOAP no concluyente para GRE 2.0. Usar REST si el contribuyente emitira guias."
+    },
+    {
+      "id": "ra_rc.ticket_cdr",
+      "severity": "WARN",
+      "message": "RA/RC requieren CDR de ticket por getStatus en beta/homologacion o produccion controlada; este preflight no consulta SUNAT."
+    }
+  ],
+  "certificate": {
+    "loaded": true,
+    "demoMode": false,
+    "subject": "emailAddress=angric.galir@gmail.com, commonName=GADEA LIRA ANGEL RICARDO CE:003581663, serialNumber=CE:003581663, organizationalUnitName=Validado por Llama.pe ER, localityName=LIMA, countryName=PE",
+    "issuer": "commonName=Llama.pe SHA256 Standard CA, organizationName=LLAMA.PE, countryName=PE",
+    "serialNumber": "2e292f6b3a76387d",
+    "validFrom": "2026-04-28T15:27:33.000Z",
+    "validTo": "2027-04-28T15:27:00.000Z",
+    "expectedRuc": "20616053575",
+    "rucMatches": false
+  }
+}

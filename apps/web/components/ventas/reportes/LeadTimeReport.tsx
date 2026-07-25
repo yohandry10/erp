@@ -70,9 +70,9 @@ export default function LeadTimeReport({ filters }: Props) {
     const ultimo = data.tendencia[data.tendencia.length - 1].promedio_dias
 
     if (ultimo < primero) {
-      return <TrendingDown className="w-5 h-5 text-green-600" />
+      return <TrendingDown className="w-5 h-5 text-emerald-400" />
     } else if (ultimo > primero) {
-      return <TrendingUp className="w-5 h-5 text-red-600" />
+      return <TrendingUp className="w-5 h-5 text-destructive" />
     }
     return null
   }
@@ -107,10 +107,10 @@ export default function LeadTimeReport({ filters }: Props) {
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Cargando reporte...</p>
+            <p className="mt-2 text-foreground/80">Cargando reporte...</p>
           </div>
         ) : !data || data.total_conversiones === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-muted-foreground">
             <p className="text-lg font-medium">No hay datos disponibles</p>
             <p className="text-sm">No se encontraron conversiones de cotización a factura en el periodo</p>
           </div>
@@ -120,63 +120,63 @@ export default function LeadTimeReport({ filters }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-4 h-4 text-blue-600" />
-                  <p className="text-sm text-blue-600 font-medium">Promedio</p>
+                  <Clock className="w-4 h-4 text-primary" />
+                  <p className="text-sm text-primary font-medium">Promedio</p>
                 </div>
-                <p className="text-3xl font-bold text-blue-900">{data.promedio_dias.toFixed(1)}</p>
-                <p className="text-xs text-blue-700">días</p>
+                <p className="text-3xl font-bold text-primary">{data.promedio_dias.toFixed(1)}</p>
+                <p className="text-xs text-primary">días</p>
               </div>
 
               <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-4 h-4 text-green-600" />
-                  <p className="text-sm text-green-600 font-medium">Mediana</p>
+                  <Clock className="w-4 h-4 text-emerald-400" />
+                  <p className="text-sm text-emerald-400 font-medium">Mediana</p>
                 </div>
-                <p className="text-3xl font-bold text-green-900">{data.mediana_dias.toFixed(1)}</p>
-                <p className="text-xs text-green-700">días</p>
+                <p className="text-3xl font-bold text-emerald-400">{data.mediana_dias.toFixed(1)}</p>
+                <p className="text-xs text-emerald-400">días</p>
               </div>
 
               <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-4 h-4 text-purple-600" />
-                  <p className="text-sm text-purple-600 font-medium">Mínimo</p>
+                  <Clock className="w-4 h-4 text-violet-400" />
+                  <p className="text-sm text-violet-400 font-medium">Mínimo</p>
                 </div>
-                <p className="text-3xl font-bold text-purple-900">{data.minimo_dias.toFixed(1)}</p>
-                <p className="text-xs text-purple-700">días</p>
+                <p className="text-3xl font-bold text-violet-400">{data.minimo_dias.toFixed(1)}</p>
+                <p className="text-xs text-violet-400">días</p>
               </div>
 
               <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-4 h-4 text-orange-600" />
-                  <p className="text-sm text-orange-600 font-medium">Máximo</p>
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <p className="text-sm text-amber-400 font-medium">Máximo</p>
                 </div>
-                <p className="text-3xl font-bold text-orange-900">{data.maximo_dias.toFixed(1)}</p>
-                <p className="text-xs text-orange-700">días</p>
+                <p className="text-3xl font-bold text-amber-400">{data.maximo_dias.toFixed(1)}</p>
+                <p className="text-xs text-amber-400">días</p>
               </div>
             </div>
 
             {/* Conversions Summary */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <p className="text-sm text-gray-600 font-medium">Total de Conversiones</p>
-              <p className="text-2xl font-bold text-gray-900">{data.total_conversiones}</p>
-              <p className="text-xs text-gray-500 mt-1">
+            <div className="bg-muted/30 rounded-lg p-4 mb-6">
+              <p className="text-sm text-foreground/80 font-medium">Total de Conversiones</p>
+              <p className="text-2xl font-bold text-foreground">{data.total_conversiones}</p>
+              <p className="text-xs text-muted-foreground mt-1">
                 Cotizaciones convertidas a facturas en el periodo
               </p>
             </div>
 
             {/* Distribution by Range */}
             <div className="mb-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Distribución por Rango de Tiempo</h3>
+              <h3 className="text-sm font-medium text-foreground/85 mb-3">Distribución por Rango de Tiempo</h3>
               <div className="space-y-3">
                 {data.por_rango.map((rango, index) => (
                   <div key={index} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-gray-700">{rango.rango}</span>
-                      <span className="text-gray-600">
+                      <span className="font-medium text-foreground/85">{rango.rango}</span>
+                      <span className="text-foreground/80">
                         {rango.cantidad} conversiones ({rango.porcentaje.toFixed(1)}%)
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
                       />
@@ -190,32 +190,32 @@ export default function LeadTimeReport({ filters }: Props) {
             {data.tendencia.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-gray-700">Tendencia Temporal</h3>
+                  <h3 className="text-sm font-medium text-foreground/85">Tendencia Temporal</h3>
                   <div className="flex items-center gap-2 text-sm">
                     {getTendenciaIcon()}
-                    <span className="font-medium text-gray-700">{getTendenciaText()}</span>
+                    <span className="font-medium text-foreground/85">{getTendenciaText()}</span>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-muted/30">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                           Periodo
                         </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                           Promedio (días)
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-card divide-y divide-gray-200">
                       {data.tendencia.map((item, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
+                        <tr key={index} className="hover:bg-muted/30">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{item.periodo}</div>
+                            <div className="text-sm text-foreground">{item.periodo}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-medium text-foreground">
                               {item.promedio_dias.toFixed(1)}
                             </div>
                           </td>
@@ -228,9 +228,9 @@ export default function LeadTimeReport({ filters }: Props) {
             )}
 
             {/* Insights */}
-            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-blue-900 mb-2">Insights</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
+            <div className="mt-6 bg-primary/10 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-primary mb-2">Insights</h4>
+              <ul className="text-sm text-primary space-y-1">
                 <li>• El lead time promedio es de {data.promedio_dias.toFixed(1)} días</li>
                 <li>• El 50% de las conversiones ocurren en {data.mediana_dias.toFixed(1)} días o menos</li>
                 {data.promedio_dias > 7 && (

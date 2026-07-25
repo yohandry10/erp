@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
+import toast from 'react-hot-toast'
 import {
   ArrowLeft,
   Package,
@@ -64,18 +65,18 @@ interface RecepcionDetalle {
 }
 
 const CALIDAD_CONFIG = {
-  OK: { label: 'OK', icon: CheckCircle, badge: 'bg-blue-100 text-blue-700 ring-blue-200' },
-  OBSERVADO: { label: 'Observado', icon: AlertCircle, badge: 'bg-slate-100 text-slate-700 ring-slate-200' },
-  RECHAZADO: { label: 'Rechazado', icon: XCircle, badge: 'bg-slate-200 text-slate-800 ring-slate-300' }
+  OK: { label: 'OK', icon: CheckCircle, badge: 'bg-primary/10 text-primary ring-blue-200' },
+  OBSERVADO: { label: 'Observado', icon: AlertCircle, badge: 'bg-muted text-foreground/85 ring-slate-200' },
+  RECHAZADO: { label: 'Rechazado', icon: XCircle, badge: 'bg-muted text-foreground ring-slate-300' }
 }
 
-const pageClass = 'min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 text-slate-100'
-const cardClass = 'rounded-2xl border border-blue-400/20 bg-slate-950/70 p-5 shadow-xl shadow-blue-950/20 backdrop-blur'
-const mutedTextClass = 'text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-const bodyTextClass = 'text-sm font-semibold text-slate-100'
-const iconBoxClass = 'flex size-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-200'
-const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-const tableCellClass = 'px-4 py-3 text-sm text-slate-200'
+const pageClass = 'min-h-full bg-gradient-to-br from-background via-muted/50 to-background p-6 text-foreground'
+const cardClass = 'rounded-2xl border border-blue-400/20 bg-card/70 p-5 shadow-xl shadow-blue-950/20 backdrop-blur'
+const mutedTextClass = 'text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground'
+const bodyTextClass = 'text-sm font-semibold text-foreground'
+const iconBoxClass = 'flex size-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-primary dark:text-blue-200'
+const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground'
+const tableCellClass = 'px-4 py-3 text-sm text-foreground/90'
 
 export default function RecepcionDetallePage() {
   const router = useRouter()
@@ -95,12 +96,12 @@ export default function RecepcionDetallePage() {
       if (recepcionData?.id) {
         setRecepcion(recepcionData)
       } else {
-        alert('Error al cargar la recepción')
+        toast.error('Error al cargar la recepción')
         router.push('/dashboard/compras/recepciones')
       }
     } catch (error) {
       console.error('Error loading recepcion:', error)
-      alert('Error al cargar la recepción')
+      toast.error('Error al cargar la recepción')
       router.push('/dashboard/compras/recepciones')
     } finally {
       setLoading(false)
@@ -115,7 +116,7 @@ export default function RecepcionDetallePage() {
     return (
       <div className={pageClass}>
         <div className="flex min-h-[40vh] items-center justify-center">
-          <div className="rounded-2xl border border-blue-400/20 bg-slate-950/70 px-8 py-6 text-lg font-semibold text-slate-300 shadow-xl">
+          <div className="rounded-2xl border border-blue-400/20 bg-card/70 px-8 py-6 text-lg font-semibold text-muted-foreground shadow-xl">
             Cargando recepción...
           </div>
         </div>
@@ -127,7 +128,7 @@ export default function RecepcionDetallePage() {
     return (
       <div className={pageClass}>
         <div className="flex min-h-[40vh] items-center justify-center">
-          <div className="rounded-2xl border border-slate-500/30 bg-slate-950/70 px-8 py-6 text-lg font-semibold text-slate-300 shadow-xl">
+          <div className="rounded-2xl border border-slate-500/30 bg-card/70 px-8 py-6 text-lg font-semibold text-muted-foreground shadow-xl">
             Recepción no encontrada
           </div>
         </div>
@@ -143,27 +144,27 @@ export default function RecepcionDetallePage() {
   return (
     <div className={pageClass}>
       {/* Header */}
-      <div className="mb-6 rounded-3xl border border-blue-400/20 bg-slate-950/80 p-6 shadow-2xl shadow-blue-950/30">
+      <div className="mb-6 rounded-3xl border border-blue-400/20 bg-card/80 p-6 shadow-2xl shadow-blue-950/30">
         <div>
           <button
             onClick={() => router.push('/dashboard/compras/recepciones')}
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20"
+            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-primary dark:text-blue-200 transition hover:bg-blue-500/20"
           >
             <ArrowLeft size={16} />
             Volver a Recepciones
           </button>
           <div className="mb-2 flex flex-wrap items-center gap-4">
-            <h1 className="m-0 text-3xl font-bold text-white">
+            <h1 className="m-0 text-3xl font-bold text-foreground">
               Recepción {recepcion.numero}
             </h1>
             <span
-              className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-4 py-2 text-sm font-semibold text-blue-100 ring-1 ring-blue-400/30"
+              className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-4 py-2 text-sm font-semibold text-primary dark:text-blue-200 ring-1 ring-blue-400/30"
             >
               {estadoCerrada ? <CheckCircle size={16} /> : <Clock size={16} />}
               {estadoCerrada ? 'Cerrada' : 'Borrador'}
             </span>
           </div>
-          <p className="m-0 text-sm text-slate-300">
+          <p className="m-0 text-sm text-muted-foreground">
             Orden: {recepcion.orden?.numero || 'N/A'} - Proveedor: {recepcion.orden?.proveedores?.razon_social || 'N/A'}
           </p>
         </div>
@@ -172,7 +173,7 @@ export default function RecepcionDetallePage() {
         <div className="mt-5 flex gap-3">
           <button
             onClick={() => router.push(`/dashboard/compras/ordenes/${recepcion.orden_id}`)}
-            className="inline-flex items-center gap-2 rounded-lg border border-blue-400/40 bg-slate-900/80 px-5 py-2.5 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20"
+            className="inline-flex items-center gap-2 rounded-lg border border-blue-400/40 bg-card/80 px-5 py-2.5 text-sm font-semibold text-primary dark:text-blue-200 transition hover:bg-blue-500/20"
           >
             <FileText size={16} />
             Ver Orden
@@ -186,11 +187,11 @@ export default function RecepcionDetallePage() {
           <div className="flex items-center justify-between">
             <div>
               <div className={mutedTextClass}>Total Items</div>
-              <div className="mt-1 text-2xl font-bold text-white">
+              <div className="mt-1 text-2xl font-bold text-foreground">
                 {recepcion.items?.length || 0}
               </div>
             </div>
-            <Package className="size-6 text-blue-200" />
+            <Package className="size-6 text-primary dark:text-blue-200" />
           </div>
         </div>
 
@@ -198,11 +199,11 @@ export default function RecepcionDetallePage() {
           <div className="flex items-center justify-between">
             <div>
               <div className={mutedTextClass}>OK</div>
-              <div className="mt-1 text-2xl font-bold text-blue-100">
+              <div className="mt-1 text-2xl font-bold text-primary dark:text-blue-200">
                 {itemsOK}
               </div>
             </div>
-            <CheckCircle className="size-6 text-blue-200" />
+            <CheckCircle className="size-6 text-primary dark:text-blue-200" />
           </div>
         </div>
 
@@ -210,11 +211,11 @@ export default function RecepcionDetallePage() {
           <div className="flex items-center justify-between">
             <div>
               <div className={mutedTextClass}>Observados</div>
-              <div className="mt-1 text-2xl font-bold text-blue-100">
+              <div className="mt-1 text-2xl font-bold text-primary dark:text-blue-200">
                 {itemsObservados}
               </div>
             </div>
-            <AlertCircle className="size-6 text-blue-200" />
+            <AlertCircle className="size-6 text-primary dark:text-blue-200" />
           </div>
         </div>
 
@@ -222,11 +223,11 @@ export default function RecepcionDetallePage() {
           <div className="flex items-center justify-between">
             <div>
               <div className={mutedTextClass}>Rechazados</div>
-              <div className="mt-1 text-2xl font-bold text-blue-100">
+              <div className="mt-1 text-2xl font-bold text-primary dark:text-blue-200">
                 {itemsRechazados}
               </div>
             </div>
-            <XCircle className="size-6 text-blue-200" />
+            <XCircle className="size-6 text-primary dark:text-blue-200" />
           </div>
         </div>
       </div>
@@ -234,7 +235,7 @@ export default function RecepcionDetallePage() {
       <div className="mb-6 grid gap-6 xl:grid-cols-2">
         {/* Información General */}
         <div className={cardClass}>
-          <h3 className="mb-4 text-base font-semibold text-white">
+          <h3 className="mb-4 text-base font-semibold text-foreground">
             Información General
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -292,7 +293,7 @@ export default function RecepcionDetallePage() {
 
         {/* Información de la Orden */}
         <div className={cardClass}>
-          <h3 className="mb-4 text-base font-semibold text-white">
+          <h3 className="mb-4 text-base font-semibold text-foreground">
             Orden de Compra
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -331,7 +332,7 @@ export default function RecepcionDetallePage() {
 
       {/* Items Recibidos */}
       <div className={`${cardClass} mb-6`}>
-        <h3 className="mb-4 text-base font-semibold text-white">
+        <h3 className="mb-4 text-base font-semibold text-foreground">
           Items Recibidos
         </h3>
         <div className="overflow-x-auto rounded-xl border border-blue-400/10">
@@ -374,7 +375,7 @@ export default function RecepcionDetallePage() {
                     <td className={tableCellClass}>
                       {item.productos?.codigo || 'N/A'}
                     </td>
-                    <td className={`${tableCellClass} font-semibold text-white`}>
+                    <td className={`${tableCellClass} font-semibold text-foreground`}>
                       {item.productos?.nombre || 'N/A'}
                     </td>
                     <td className={`${tableCellClass} text-center`}>
@@ -400,7 +401,7 @@ export default function RecepcionDetallePage() {
                         : '-'
                       }
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-400">
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
                       {item.observaciones || '-'}
                     </td>
                   </tr>
@@ -414,10 +415,10 @@ export default function RecepcionDetallePage() {
       {/* Observaciones Generales */}
       {recepcion.observaciones && (
         <div className={`${cardClass} mb-6`}>
-          <h3 className="mb-3 text-base font-semibold text-white">
+          <h3 className="mb-3 text-base font-semibold text-foreground">
             Observaciones Generales
           </h3>
-          <p className="text-sm leading-6 text-slate-300">
+          <p className="text-sm leading-6 text-muted-foreground">
             {recepcion.observaciones}
           </p>
         </div>
@@ -426,7 +427,7 @@ export default function RecepcionDetallePage() {
       {/* Timeline */}
       {recepcion.cerrado_at && (
         <div className={cardClass}>
-          <h3 className="mb-4 text-base font-semibold text-white">
+          <h3 className="mb-4 text-base font-semibold text-foreground">
             Historial
           </h3>
           <div className="grid gap-4 md:grid-cols-2">
@@ -434,7 +435,7 @@ export default function RecepcionDetallePage() {
               <div className={iconBoxClass}><Package size={16} /></div>
               <div>
                 <div className={bodyTextClass}>Creada</div>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-muted-foreground">
                   {new Date(recepcion.created_at).toLocaleString('es-PE')}
                 </div>
               </div>
@@ -444,11 +445,11 @@ export default function RecepcionDetallePage() {
               <div className={iconBoxClass}><CheckCircle size={16} /></div>
               <div>
                 <div className={bodyTextClass}>Cerrada</div>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-muted-foreground">
                   {new Date(recepcion.cerrado_at).toLocaleString('es-PE')}
                 </div>
                 {recepcion.recibido_por && (
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs text-muted-foreground">
                     Por: {recepcion.recibido_por}
                   </div>
                 )}

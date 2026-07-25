@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Briefcase, MapPin, DollarSign, Users, Calendar, FileText } from 'lucide-react';
+import { Briefcase, Loader2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api-fetch';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface VacanteModalProps {
   isOpen: boolean;
@@ -119,28 +121,17 @@ export default function VacanteModal({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.75)] flex items-center justify-center z-[99999] p-4"
-      onClick={onClose}
-    >
-      <div className="bg-white rounded-3 p-8 w-[100%] max-w-[600px] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-6 font-bold m-0">
-            🏢 Nueva Vacante
-          </h2>
-          <button onClick={onClose} className="border-0 cursor-pointer">
-            <X size={20} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !loading && onClose()}>
+      <DialogContent className="max-h-[calc(100dvh-1rem)] max-w-2xl overflow-y-auto sm:max-h-[calc(100dvh-2rem)]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Briefcase className="size-5 text-primary" aria-hidden="true" /> Nueva vacante</DialogTitle>
+          <DialogDescription>Defina el puesto, condiciones y fecha límite de la convocatoria.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-input [&_input]:bg-background [&_input]:p-3 [&_select]:w-full [&_select]:rounded-md [&_select]:border [&_select]:border-input [&_select]:bg-background [&_select]:p-3 [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-input [&_textarea]:bg-background [&_textarea]:p-3">
           <div className="mb-4">
             <label className="block mb-2 font-semibold">
-              🎯 Título de la Vacante *
+              Título de la Vacante *
             </label>
             <input
               type="text"
@@ -149,13 +140,13 @@ export default function VacanteModal({
               onChange={handleInputChange} className="w-[100%] p-3 rounded-[4px]"
               placeholder="Ej: Desarrollador Full Stack Senior"
             />
-            {errors.titulo && <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">{errors.titulo}</p>}
+            {errors.titulo && <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">{errors.titulo}</p>}
           </div>
 
-          <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block mb-2 font-semibold">
-                👔 Puesto Solicitado *
+                Puesto Solicitado *
               </label>
               <input
                 type="text"
@@ -164,12 +155,12 @@ export default function VacanteModal({
                 onChange={handleInputChange} className="w-[100%] p-3 rounded-[4px]"
                 placeholder="Ej: Desarrollador"
               />
-              {errors.puesto_solicitado && <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">{errors.puesto_solicitado}</p>}
+              {errors.puesto_solicitado && <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">{errors.puesto_solicitado}</p>}
             </div>
 
             <div>
               <label className="block mb-2 font-semibold">
-                🏢 Departamento *
+                Departamento *
               </label>
               <select
                 name="departamento_id"
@@ -181,14 +172,14 @@ export default function VacanteModal({
                   <option key={dept.id} value={dept.id}>{dept.nombre}</option>
                 ))}
               </select>
-              {errors.departamento_id && <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">{errors.departamento_id}</p>}
+              {errors.departamento_id && <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">{errors.departamento_id}</p>}
             </div>
           </div>
 
-          <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block mb-2 font-semibold">
-                📍 Ubicación
+                Ubicación
               </label>
               <input
                 type="text"
@@ -201,7 +192,7 @@ export default function VacanteModal({
 
             <div>
               <label className="block mb-2 font-semibold">
-                📝 Tipo de Contrato
+                Tipo de Contrato
               </label>
               <select
                 name="tipo_contrato"
@@ -216,10 +207,10 @@ export default function VacanteModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 mb-4">
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="block mb-2 font-semibold">
-                💰 Salario Mín (S/)
+                Salario Mín (S/)
               </label>
               <input
                 type="number"
@@ -234,7 +225,7 @@ export default function VacanteModal({
 
             <div>
               <label className="block mb-2 font-semibold">
-                💰 Salario Máx (S/)
+                Salario Máx (S/)
               </label>
               <input
                 type="number"
@@ -245,12 +236,12 @@ export default function VacanteModal({
                 min="0"
                 step="100"
               />
-              {errors.salario_maximo && <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">{errors.salario_maximo}</p>}
+              {errors.salario_maximo && <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">{errors.salario_maximo}</p>}
             </div>
 
             <div>
               <label className="block mb-2 font-semibold">
-                📅 Fecha Límite *
+                Fecha Límite *
               </label>
               <input
                 type="date"
@@ -259,13 +250,13 @@ export default function VacanteModal({
                 onChange={handleInputChange} className="w-[100%] p-3 rounded-[4px]"
                 min={new Date().toISOString().split('T')[0]}
               />
-              {errors.fecha_limite && <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">{errors.fecha_limite}</p>}
+              {errors.fecha_limite && <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">{errors.fecha_limite}</p>}
             </div>
           </div>
 
           <div className="mb-4">
             <label className="block mb-2 font-semibold">
-              📝 Descripción del Puesto *
+              Descripción del Puesto *
             </label>
             <textarea
               name="descripcion"
@@ -274,13 +265,13 @@ export default function VacanteModal({
               rows={4} className="w-[100%] p-3 rounded-[4px]"
               placeholder="Describe las responsabilidades y funciones del puesto..."
             />
-            {errors.descripcion && <p className="text-red-500 text-3 mt-1 mr-0 mb-0 ml-0">{errors.descripcion}</p>}
+            {errors.descripcion && <p className="text-red-500 text-xs mt-1 mr-0 mb-0 ml-0">{errors.descripcion}</p>}
           </div>
 
-          <div className="grid grid-cols-[1fr_1fr] gap-4 mb-6">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block mb-2 font-semibold">
-                ✅ Requisitos
+                Requisitos
               </label>
               <textarea
                 name="requisitos"
@@ -293,7 +284,7 @@ export default function VacanteModal({
 
             <div>
               <label className="block mb-2 font-semibold">
-                🎁 Beneficios
+                Beneficios
               </label>
               <textarea
                 name="beneficios"
@@ -305,22 +296,25 @@ export default function VacanteModal({
             </div>
           </div>
 
-          <div className="flex justify-end gap-4 pt-4 border-t">
-            <button
+          <DialogFooter className="border-t border-border pt-4">
+            <Button
               type="button"
-              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white cursor-pointer font-medium"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              disabled={loading} className="py-3 px-6 border-0 rounded-[6px] text-white font-medium flex items-center gap-2"
+              disabled={loading}
             >
-              {loading ? '⏳ Creando...' : '📋 Crear Vacante'}
-            </button>
-          </div>
+              {loading && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />}
+              {loading ? 'Creando...' : 'Crear vacante'}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

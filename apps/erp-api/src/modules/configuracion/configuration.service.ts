@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { ValidationService } from '../validations/validation.service';
 import {
@@ -11,8 +12,17 @@ import {
   ValidateWizardCertificateDto,
   WizardCertificateValidationResult,
 } from './configuration.types';
-import { normalizeCertificateInput, parseCertificateBuffer } from '../../shared/utils/certificate.utils';
+import { parseCertificateBuffer, toPostgresBytea } from '../../shared/utils/certificate.utils';
 import { createHash } from 'crypto';
+import { decryptBuffer, decryptText, encryptBuffer, encryptText } from '../../shared/utils/secure-config.utils';
+import {
+  INITIAL_ACTIVE_COUNTRY_CODE,
+  INITIAL_ACTIVE_COUNTRY_ID,
+  INITIAL_ACTIVE_COUNTRY_CURRENCY,
+  INITIAL_ACTIVE_COUNTRY_MESSAGE,
+  isInitialActiveCountryCode,
+  isInitialActiveCountryId,
+} from '../paises/initial-country';
 
 export const TOTAL_WIZARD_STEPS = 7;
 
@@ -23,6 +33,7 @@ export class ConfigurationService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly validationService: ValidationService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -44,6 +55,14 @@ export class ConfigurationService {
           .select([
             'pais',
             'emision_cpe_modo',
+            'gre_obligatorio',
+            'gre_automatico_habilitado',
+            'sunat_environment',
+            'sunat_username',
+            'sunat_password',
+            'sunat_gre_transport',
+            'sunat_gre_client_id',
+            'sunat_gre_client_secret',
             'ose_activo',
             'ose_url',
             'ose_status_url',
@@ -94,14 +113,20 @@ export class ConfigurationService {
       }
 
       const typedEmpresaConfig = empresaConfig as any;
-      const paisCodigo = (typedEmpresaConfig?.pais || 'PE').toString().toUpperCase();
+      const rawPaisCodigo = (typedEmpresaConfig?.pais || INITIAL_ACTIVE_COUNTRY_CODE).toString().toUpperCase();
+      if (!isInitialActiveCountryCode(rawPaisCodigo)) {
+        missingItems.push(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+      }
+      const paisCodigo = INITIAL_ACTIVE_COUNTRY_CODE;
       const emisionModo = (typedEmpresaConfig?.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
       const oseAuthTipo = (typedEmpresaConfig?.ose_auth_tipo || 'BASIC').toString().toUpperCase();
       const oseActivo = typedEmpresaConfig?.ose_activo === true;
       const requiereOse = emisionModo === 'OSE_API';
       const dianEnvironment = (typedEmpresaConfig?.dian_environment || 'HOMOLOGACION').toString().toUpperCase();
       const dianActivo = typedEmpresaConfig?.dian_activo === true;
-      const requiereDian = paisCodigo === 'CO';
+      const requiereDian: boolean = false;
+      const requiereSunatDirecto = paisCodigo === 'PE' && emisionModo === 'SUNAT_DIRECTO';
+      const sunatGreTransport = (typedEmpresaConfig?.sunat_gre_transport || 'soap').toString().toLowerCase();
 
       if (requiereOse) {
         if (!oseActivo) {
@@ -119,6 +144,15 @@ export class ConfigurationService {
         } else if (oseAuthTipo === 'API_KEY') {
           if (!typedEmpresaConfig?.ose_api_key) missingItems.push('API key OSE');
           if (!typedEmpresaConfig?.ose_api_header) missingItems.push('Header API key OSE');
+        }
+      }
+
+      if (requiereSunatDirecto) {
+        if (!typedEmpresaConfig?.sunat_username) missingItems.push('Usuario SOL secundario');
+        if (!typedEmpresaConfig?.sunat_password) missingItems.push('Clave SOL secundaria');
+        if (sunatGreTransport === 'rest') {
+          if (!typedEmpresaConfig?.sunat_gre_client_id) missingItems.push('Client ID GRE REST');
+          if (!typedEmpresaConfig?.sunat_gre_client_secret) missingItems.push('Client secret GRE REST');
         }
       }
 
@@ -144,8 +178,15 @@ export class ConfigurationService {
 
       // Calculate completion percentage
       const baseRequirements = 4; // Certificate, RUC, Razon Social, Direccion
+      let sunatRequirements = 0;
       let oseRequirements = 0;
       let dianRequirements = 0;
+      if (requiereSunatDirecto) {
+        sunatRequirements += 2; // usuario y clave SOL secundaria
+        if (sunatGreTransport === 'rest') {
+          sunatRequirements += 2; // client_id/client_secret GRE REST
+        }
+      }
       if (requiereOse) {
         oseRequirements += 1; // ose_activo
         oseRequirements += 1; // ose_url
@@ -170,7 +211,7 @@ export class ConfigurationService {
         dianRequirements += 1; // dian_resolucion_fecha_inicio
         dianRequirements += 1; // dian_resolucion_fecha_fin
       }
-      const totalRequirements = baseRequirements + oseRequirements + dianRequirements;
+      const totalRequirements = baseRequirements + sunatRequirements + oseRequirements + dianRequirements;
       const completedRequirements = Math.max(totalRequirements - missingItems.length, 0);
       const completionPercentage = Math.round((completedRequirements / totalRequirements) * 100);
 
@@ -225,6 +266,31 @@ export class ConfigurationService {
     try {
       this.logger.log(`Updating empresa config for tenant: ${tenantId}`);
 
+      const dianConfigFields = [
+        'dianActivo',
+        'dianUrl',
+        'dianUsuario',
+        'dianPassword',
+        'dianSoftwareId',
+        'dianSoftwarePin',
+        'dianTestSetId',
+        'dianEnvironment',
+        'dianRegimenFiscal',
+        'dianTipoContribuyente',
+        'dianResolucionNumero',
+        'dianResolucionPrefijo',
+        'dianResolucionDesde',
+        'dianResolucionHasta',
+        'dianResolucionFechaInicio',
+        'dianResolucionFechaFin',
+      ];
+      if (dianConfigFields.some((field) => {
+        const value = (config as any)[field];
+        return value !== undefined && value !== null && value !== '' && value !== false;
+      })) {
+        throw new Error(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+      }
+
       const updateData: any = {};
 
       if (config.ruc !== undefined) updateData.ruc = config.ruc;
@@ -236,6 +302,27 @@ export class ConfigurationService {
       if (config.umbralGREAutomatico !== undefined) updateData.umbral_gre_automatico = config.umbralGREAutomatico;
       if (config.greAutomaticoHabilitado !== undefined) updateData.gre_automatico_habilitado = config.greAutomaticoHabilitado;
       if (config.emisionCpeModo !== undefined) updateData.emision_cpe_modo = config.emisionCpeModo;
+      if (config.sunatEnvironment !== undefined) updateData.sunat_environment = config.sunatEnvironment;
+      if (config.sunatUsername !== undefined) updateData.sunat_username = config.sunatUsername;
+      if (config.sunatPassword !== undefined) {
+        updateData.sunat_password = config.sunatPassword ? encryptText(this.configService, config.sunatPassword) : '';
+      }
+      if (config.sunatCpeUrl !== undefined) updateData.sunat_cpe_url = config.sunatCpeUrl;
+      if (config.sunatSummaryUrl !== undefined) updateData.sunat_summary_url = config.sunatSummaryUrl;
+      if (config.sunatQueryUrl !== undefined) updateData.sunat_query_url = config.sunatQueryUrl;
+      if (config.sunatGreUrl !== undefined) updateData.sunat_gre_url = config.sunatGreUrl;
+      if (config.sunatGreTransport !== undefined) updateData.sunat_gre_transport = config.sunatGreTransport;
+      if (config.sunatGreRestBaseUrl !== undefined) updateData.sunat_gre_rest_base_url = config.sunatGreRestBaseUrl;
+      if (config.sunatGreAuthUrl !== undefined) updateData.sunat_gre_auth_url = config.sunatGreAuthUrl;
+      if (config.sunatGreClientId !== undefined) updateData.sunat_gre_client_id = config.sunatGreClientId;
+      if (config.sunatGreClientSecret !== undefined) {
+        updateData.sunat_gre_client_secret = config.sunatGreClientSecret
+          ? encryptText(this.configService, config.sunatGreClientSecret)
+          : '';
+      }
+      if (config.sunatCertExpectedRuc !== undefined) updateData.sunat_cert_expected_ruc = config.sunatCertExpectedRuc;
+      if (config.sunatCertRucMismatchConfirmed !== undefined) updateData.sunat_cert_ruc_mismatch_confirmed = config.sunatCertRucMismatchConfirmed;
+      if (config.sunatCertRucMismatchReason !== undefined) updateData.sunat_cert_ruc_mismatch_reason = config.sunatCertRucMismatchReason;
       if (config.oseUrl !== undefined) updateData.ose_url = config.oseUrl;
       if (config.oseStatusUrl !== undefined) updateData.ose_status_url = config.oseStatusUrl;
       if (config.oseUsername !== undefined) updateData.ose_username = config.oseUsername;
@@ -316,14 +403,14 @@ export class ConfigurationService {
       const typedData = data as any;
       return {
         umbralGREAutomatico: typedData?.umbral_gre_automatico || 700.0,
-        greAutomaticoHabilitado: typedData?.gre_automatico_habilitado !== false,
+        greAutomaticoHabilitado: typedData?.gre_automatico_habilitado === true,
       };
     } catch (error) {
       this.logger.error(`Error getting GRE thresholds for tenant ${tenantId}:`, error);
-      // Return defaults on error
+      // Fail closed: no activar GRE automática si la configuración no se puede leer.
       return {
         umbralGREAutomatico: 700.0,
-        greAutomaticoHabilitado: true,
+        greAutomaticoHabilitado: false,
       };
     }
   }
@@ -567,10 +654,34 @@ export class ConfigurationService {
         config = progress.configuracionTemporal;
       }
 
-      this.logger.log(`Configuration data to save:`, config);
+      this.logger.log('Configuration payload received', {
+        tenantId,
+        hasCertificate: Boolean(config.certificateBase64),
+        emisionCpeModo: config.emision_cpe_modo || 'SUNAT_DIRECTO',
+        sunatEnvironment: config.sunat_environment || 'homologacion',
+        greTransport: config.sunat_gre_transport || 'soap',
+      });
+
+      if (config.pais && !isInitialActiveCountryCode(config.pais)) {
+        throw new Error(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+      }
+
+      if (
+        config.pais_id !== undefined &&
+        config.pais_id !== null &&
+        !isInitialActiveCountryId(config.pais_id)
+      ) {
+        throw new Error(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+      }
 
       if (!config.certificateBase64) {
         throw new Error('No se encontró el certificado digital en la configuración');
+      }
+
+      if (!/^\d{6}$/.test(String(config.ubigeo || '').trim())) {
+        throw new Error(
+          'La configuración fiscal de Perú requiere un ubigeo de 6 dígitos para emitir GRE',
+        );
       }
 
       if (config.certificatePassword === undefined || config.certificatePassword === null) {
@@ -582,12 +693,24 @@ export class ConfigurationService {
         certificatePassword: config.certificatePassword,
       });
 
+      const paisCodigo = INITIAL_ACTIVE_COUNTRY_CODE;
+      const emisionModo = (config.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
+      const sunatGreTransport = (config.sunat_gre_transport || 'soap').toString().toLowerCase();
+      if (paisCodigo === 'PE' && emisionModo === 'SUNAT_DIRECTO') {
+        if (!config.sunat_username || !config.sunat_password) {
+          throw new Error('SUNAT directo requiere usuario y clave SOL secundaria');
+        }
+        if (sunatGreTransport === 'rest' && (!config.sunat_gre_client_id || !config.sunat_gre_client_secret)) {
+          throw new Error('GRE REST requiere client_id y client_secret SUNAT');
+        }
+      }
+
       // 2. Save RUC, company data AND certificate to empresa_config
       this.logger.log(`Saving all configuration to empresa_config...`);
       
       // Convert base64 certificate to Buffer for bytea storage
       const certificateBuffer = Buffer.from(config.certificateBase64.replace(/\s+/g, ''), 'base64');
-      const certificateHexValue = `\\x${certificateBuffer.toString('hex')}`;
+      const encryptedCertificate = encryptBuffer(this.configService, certificateBuffer);
       const certificateHash = createHash('sha256').update(certificateBuffer).digest('hex');
       this.logger.log(
         `Certificate payload size=${certificateBuffer.length}, hash=${certificateHash.substr(0, 16)}...`,
@@ -601,15 +724,22 @@ export class ConfigurationService {
           ruc: config.ruc,
           razon_social: config.razonSocial,
           direccion_fiscal: config.direccion,
-          certificado_pfx: certificateHexValue,
-          certificado_password: config.certificatePassword,
+          ubigeo: config.ubigeo,
+          departamento: config.departamento || null,
+          provincia: config.provincia || null,
+          distrito: config.distrito || null,
+          pais: INITIAL_ACTIVE_COUNTRY_CODE,
+          pais_id: INITIAL_ACTIVE_COUNTRY_ID,
+          moneda_defecto: INITIAL_ACTIVE_COUNTRY_CURRENCY,
+          certificado_pfx: toPostgresBytea(encryptedCertificate),
+          certificado_password: encryptText(this.configService, config.certificatePassword),
           certificado_expira_en: certificateValidation.validTo.toISOString(),
           configuracion_completa: true,
           // Configuración de ventas
           tipo_empresa: config.tipo_empresa || 'MICRO',
           usar_flujo_logistica: config.usar_flujo_logistica !== undefined ? config.usar_flujo_logistica : false,
           gre_obligatorio: config.gre_obligatorio !== undefined ? config.gre_obligatorio : false,
-          gre_automatico_habilitado: config.gre_automatico_habilitado !== undefined ? config.gre_automatico_habilitado : true,
+          gre_automatico_habilitado: config.gre_automatico_habilitado !== undefined ? config.gre_automatico_habilitado : false,
           umbral_gre_automatico: config.umbral_gre_automatico || 700,
           // Configuración fiscal
           regimen_tributario: config.regimen_tributario,
@@ -620,6 +750,23 @@ export class ConfigurationService {
           serie_nota_credito: config.serie_nota_credito,
           // Configuración OSE (opcional)
           emision_cpe_modo: config.emision_cpe_modo || 'SUNAT_DIRECTO',
+          sunat_environment: config.sunat_environment || 'homologacion',
+          sunat_username: config.sunat_username || null,
+          sunat_password: config.sunat_password ? encryptText(this.configService, config.sunat_password) : null,
+          sunat_cpe_url: config.sunat_cpe_url || null,
+          sunat_summary_url: config.sunat_summary_url || null,
+          sunat_query_url: config.sunat_query_url || null,
+          sunat_gre_url: config.sunat_gre_url || null,
+          sunat_gre_transport: config.sunat_gre_transport || 'soap',
+          sunat_gre_rest_base_url: config.sunat_gre_rest_base_url || 'https://api-cpe.sunat.gob.pe/v1',
+          sunat_gre_auth_url: config.sunat_gre_auth_url || null,
+          sunat_gre_client_id: config.sunat_gre_client_id || null,
+          sunat_gre_client_secret: config.sunat_gre_client_secret
+            ? encryptText(this.configService, config.sunat_gre_client_secret)
+            : null,
+          sunat_cert_expected_ruc: config.sunat_cert_expected_ruc || config.ruc || null,
+          sunat_cert_ruc_mismatch_confirmed: config.sunat_cert_ruc_mismatch_confirmed === true,
+          sunat_cert_ruc_mismatch_reason: config.sunat_cert_ruc_mismatch_reason || null,
           ose_url: config.ose_url,
           ose_status_url: config.ose_status_url,
           ose_username: config.ose_username,
@@ -629,23 +776,23 @@ export class ConfigurationService {
           ose_api_header: config.ose_api_header,
           ose_bearer_token: config.ose_bearer_token,
           ose_activo: config.ose_activo || false,
-          // Configuración DIAN (Colombia)
-          dian_activo: config.dian_activo || false,
-          dian_url: config.dian_url,
-          dian_usuario: config.dian_usuario,
-          dian_password: config.dian_password,
-          dian_software_id: config.dian_software_id,
-          dian_software_pin: config.dian_software_pin,
-          dian_test_set_id: config.dian_test_set_id,
-          dian_environment: config.dian_environment || 'HOMOLOGACION',
-          dian_regimen_fiscal: config.dian_regimen_fiscal,
-          dian_tipo_contribuyente: config.dian_tipo_contribuyente,
-          dian_resolucion_numero: config.dian_resolucion_numero,
-          dian_resolucion_prefijo: config.dian_resolucion_prefijo,
-          dian_resolucion_desde: config.dian_resolucion_desde,
-          dian_resolucion_hasta: config.dian_resolucion_hasta,
-          dian_resolucion_fecha_inicio: config.dian_resolucion_fecha_inicio,
-          dian_resolucion_fecha_fin: config.dian_resolucion_fecha_fin,
+          // Colombia/DIAN queda en roadmap: no persistir configuración activa no-PE.
+          dian_activo: false,
+          dian_url: null,
+          dian_usuario: null,
+          dian_password: null,
+          dian_software_id: null,
+          dian_software_pin: null,
+          dian_test_set_id: null,
+          dian_environment: null,
+          dian_regimen_fiscal: null,
+          dian_tipo_contribuyente: null,
+          dian_resolucion_numero: null,
+          dian_resolucion_prefijo: null,
+          dian_resolucion_desde: null,
+          dian_resolucion_hasta: null,
+          dian_resolucion_fecha_inicio: null,
+          dian_resolucion_fecha_fin: null,
           // Logo de la empresa (multi-tenant)
           logo_url: config.logoUrl || config.logoBase64 || null,
           updated_at: new Date().toISOString(),
@@ -675,7 +822,7 @@ export class ConfigurationService {
 
       const typedVerifyData = verifyData as any;
       try {
-        const storedBuffer = normalizeCertificateInput(typedVerifyData.certificado_pfx);
+        const storedBuffer = decryptBuffer(this.configService, typedVerifyData.certificado_pfx);
         if (!storedBuffer) {
           throw new Error('El certificado almacenado está vacío');
         }
@@ -688,7 +835,7 @@ export class ConfigurationService {
             `Hash mismatch between payload and stored certificate for tenant ${tenantId}`,
           );
         }
-        parseCertificateBuffer(storedBuffer, typedVerifyData.certificado_password || '');
+        parseCertificateBuffer(storedBuffer, decryptText(this.configService, typedVerifyData.certificado_password));
       } catch (verifyParseError) {
         this.logger.error(
           `Error verifying stored certificate for tenant ${tenantId}:`,
@@ -773,4 +920,3 @@ export class ConfigurationService {
   }
 
 }
-

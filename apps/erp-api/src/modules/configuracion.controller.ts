@@ -417,21 +417,11 @@ export class ConfiguracionController {
 
   @Post('certificado/upload')
   @RequirePermission('configuracion.write')
-  @ApiOperation({ summary: 'Cargar certificado digital' })
-  async uploadCertificado(@Body() certificadoData: any) {
-    console.log('🔐 Cargando certificado digital...');
-    
-    // TODO: Implementar carga real de certificado
-    return {
-      success: true,
-      message: 'Certificado digital cargado exitosamente',
-      data: {
-        filename: certificadoData.filename || 'certificado.pfx',
-        uploadDate: new Date(),
-        status: 'VALIDADO',
-        validUntil: '2025-12-31'
-      }
-    };
+  @ApiOperation({ summary: 'Endpoint legacy deshabilitado; usar el wizard de configuración' })
+  async uploadCertificado(@Body() _certificadoData: any) {
+    throw new BadRequestException(
+      'Endpoint legacy deshabilitado: valide y guarde el certificado mediante /api/configuration/wizard/validate-certificate y el flujo de configuración.',
+    );
   }
 
   @Get('test-integracion')

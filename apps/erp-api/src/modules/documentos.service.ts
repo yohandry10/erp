@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { CacheInvalidationService } from '../shared/cache/cache-invalidation.service';
@@ -732,7 +732,10 @@ export class DocumentosService {
       };
     } catch (error) {
       console.error('❌ Error generando XML:', error);
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new BadRequestException('Error al generar el XML');
@@ -811,7 +814,10 @@ export class DocumentosService {
       };
     } catch (error) {
       console.error('❌ Error enviando a SUNAT:', error);
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new BadRequestException('Error al enviar el documento a SUNAT');
@@ -832,13 +838,24 @@ export class DocumentosService {
         };
       }
 
-      // Simular consulta a SUNAT (en producción aquí iría la integración real)
-      const datosRUC = await this.consultarRUCSUNAT(ruc);
+      const errorRuc = this.validarRucLocal(ruc);
+      if (errorRuc) {
+        return {
+          success: false,
+          data: null,
+          error: errorRuc,
+        };
+      }
 
       return {
         success: true,
-        data: datosRUC,
-        message: 'RUC validado correctamente',
+        data: {
+          ruc,
+          validado_formato: true,
+          consulta_sunat: false,
+          fuente: 'VALIDACION_LOCAL',
+        },
+        message: 'RUC válido por formato y dígito verificador; no se consultó el padrón SUNAT',
       };
     } catch (error) {
       console.error('❌ Error validando RUC:', error);
@@ -1045,23 +1062,22 @@ export class DocumentosService {
   }
 
   private generarHashXML(xmlContent: string): string {
-    // En producción aquí iría el hash SHA-256 real
-    return `SHA256_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return require('crypto').createHash('sha256').update(xmlContent, 'utf8').digest('hex');
   }
 
-  private async consultarRUCSUNAT(ruc: string) {
-    // Simular consulta a SUNAT
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Datos simulados
-    return {
-      ruc: ruc,
-      razon_social: `EMPRESA DEMO ${ruc.slice(-3)} S.A.C.`,
-      estado: 'ACTIVO',
-      condicion: 'HABIDO',
-      direccion: 'AV. EJEMPLO 123, LIMA, LIMA, LIMA',
-      ubigeo: '150101',
-    };
+  private validarRucLocal(ruc: string): string | null {
+    const prefijo = ruc.substring(0, 2);
+    if (!['10', '15', '17', '20'].includes(prefijo)) {
+      return `Prefijo de RUC inválido: ${prefijo}`;
+    }
+    const factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+    const digitos = ruc.split('').map(Number);
+    const suma = factores.reduce((acc, factor, index) => acc + factor * digitos[index], 0);
+    const resto = 11 - (suma % 11);
+    const digitoVerificador = resto === 10 ? 0 : resto === 11 ? 1 : resto;
+    return digitoVerificador === digitos[10]
+      ? null
+      : 'RUC inválido: dígito verificador no coincide';
   }
 
   private async registrarAuditoria(documentoId: string, accion: string, usuarioId?: string, detalles?: string, tenantId?: string) {
@@ -1226,6 +1242,10 @@ export class DocumentosService {
   async anularDocumento(id: string, motivo: string, tenantId?: string, userId?: string) {
     try {
       const tenant = this.requireTenantId(tenantId);
+      const motivoNormalizado = String(motivo || '').trim();
+      if (!motivoNormalizado) {
+        throw new BadRequestException('El motivo de anulación es obligatorio');
+      }
       const documento = await this.getDocumento(id, tenant);
       if (!documento.success) {
         throw new NotFoundException('Documento no encontrado');
@@ -1235,12 +1255,29 @@ export class DocumentosService {
         throw new BadRequestException('El documento ya está anulado');
       }
 
+      const cpe = await this.resolveCpeVinculado(documento.data, tenant);
+      if (cpe?.id) {
+        // Un documento fiscal emitido se anula únicamente mediante el agregado
+        // CPE, que genera la nota de crédito y ejecuta los reversos contables,
+        // de CxC, inventario, caja y venta. Nunca adelantar el estado local.
+        return this.cpeService.anularComprobante(cpe.id, motivoNormalizado, tenant, userId);
+      }
+
+      const tipoDocumento = String(documento.data.tipo_documento || '').toUpperCase();
+      const estadoDocumento = String(documento.data.estado || '').toUpperCase();
+      const esFiscal = ['FACTURA', 'BOLETA', 'NOTA_CREDITO', 'NOTA_DEBITO'].includes(tipoDocumento);
+      if (esFiscal && estadoDocumento !== 'BORRADOR') {
+        throw new ConflictException(
+          'No se puede anular el documento fiscal porque no tiene un CPE vinculado. Revise la trazabilidad fiscal antes de continuar.',
+        );
+      }
+
       const { error } = await this.supabaseService
         .getClient()
         .from('documentos')
         .update({
           estado: 'ANULADO',
-          motivo_anulacion: motivo,
+          motivo_anulacion: motivoNormalizado,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
@@ -1251,7 +1288,7 @@ export class DocumentosService {
       }
 
       // Registrar auditoría
-      await this.registrarAuditoria(id, 'ANULADO', userId, `Documento anulado: ${motivo}`, tenant);
+      await this.registrarAuditoria(id, 'ANULADO', userId, `Documento anulado: ${motivoNormalizado}`, tenant);
 
       return {
         success: true,
@@ -1260,11 +1297,52 @@ export class DocumentosService {
       };
     } catch (error) {
       console.error('❌ Error anulando documento:', error);
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException ||
+        error instanceof ConflictException
+      ) {
         throw error;
       }
       throw new BadRequestException('Error al anular el documento');
     }
+  }
+
+  private async resolveCpeVinculado(documento: any, tenantId: string): Promise<{ id: string } | null> {
+    const client = this.supabaseService.getClient();
+    const { data: directo, error: directoError } = await client
+      .from('cpe')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('documento_id', documento.id)
+      .maybeSingle();
+
+    if (directoError && directoError.code !== 'PGRST116') {
+      throw new BadRequestException(`No se pudo resolver el CPE vinculado: ${directoError.message}`);
+    }
+    if (directo?.id) return directo;
+
+    const numero = Number(documento.numero);
+    if (!documento.serie || !Number.isFinite(numero)) return null;
+
+    const { data: candidatos, error: candidatosError } = await client
+      .from('cpe')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('serie', documento.serie)
+      .eq('numero', numero)
+      .limit(2);
+
+    if (candidatosError) {
+      throw new BadRequestException(`No se pudo resolver el CPE por numeración fiscal: ${candidatosError.message}`);
+    }
+    if ((candidatos?.length ?? 0) > 1) {
+      throw new ConflictException(
+        `La numeración ${documento.serie}-${documento.numero} está vinculada a más de un CPE.`,
+      );
+    }
+
+    return candidatos?.[0] ?? null;
   }
 
   async generarPDF(id: string, tenantId?: string) {

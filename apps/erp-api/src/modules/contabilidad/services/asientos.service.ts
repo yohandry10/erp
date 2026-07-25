@@ -272,16 +272,12 @@ export class AsientosService {
         throw new BadRequestException('Una o más cuentas no existen o no pertenecen a su organización');
       }
 
-      // Generar número de asiento
-      const numeroAsiento = await this.generarNumeroAsiento(tenantId, fecha);
-
       // Crear asiento contable
       const { data: asiento, error: asientoError } = await this.supabaseService
         .getClient()
         .from('asientos_contables')
         .insert({
           tenant_id: tenantId,
-          numero_asiento: numeroAsiento,
           fecha: fecha.toISOString(),
           concepto: createAsientoDto.concepto,
           referencia: createAsientoDto.referencia,
@@ -324,7 +320,7 @@ export class AsientosService {
       }
 
       this.logger.log(
-        `✅ Asiento manual ${numeroAsiento} creado exitosamente para tenant ${tenantId}`
+        `✅ Asiento manual ${asiento.codigo ?? asiento.numero_asiento ?? asiento.id} creado exitosamente para tenant ${tenantId}`
       );
 
       // Obtener el asiento completo con detalles
@@ -333,61 +329,6 @@ export class AsientosService {
       this.logger.error(`❌ Error creando asiento manual: ${error.message}`);
       throw error;
     }
-  }
-
-  /**
-   * Genera un número de asiento único para el tenant y período
-   * @param tenantId - ID del tenant
-   * @param fecha - Fecha del asiento
-   * @returns Número de asiento generado
-   */
-  private async generarNumeroAsiento(tenantId: string, fecha: Date): Promise<number> {
-    // Usar RPC atómica para evitar race conditions en numeración concurrente
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .rpc('obtener_siguiente_numero_asiento', {
-        p_tenant_id: tenantId,
-        p_fecha: fecha.toISOString(),
-      });
-
-    if (!error && data && data.length > 0) {
-      return data[0].numero;
-    }
-
-    // Fallback: si la RPC no existe (migración no aplicada), usar MAX+1 legacy
-    const anio = fecha.getFullYear();
-    const mes = fecha.getMonth() + 1;
-    const inicioMes = new Date(Date.UTC(anio, mes - 1, 1)).toISOString().slice(0, 10);
-    const inicioMesSiguiente = new Date(Date.UTC(anio, mes, 1)).toISOString().slice(0, 10);
-
-    const { data: asientosPeriodo, error: fallbackError } = await this.supabaseService
-      .getClient()
-      .from('asientos_contables')
-      .select('numero_asiento')
-      .eq('tenant_id', tenantId)
-      .gte('fecha', inicioMes)
-      .lt('fecha', inicioMesSiguiente)
-      .order('created_at', { ascending: false })
-      .limit(1000);
-
-    if (fallbackError) {
-      throw new Error(`Error generando número de asiento: ${fallbackError.message}`);
-    }
-
-    let maxSecuencial = 0;
-
-    for (const asiento of asientosPeriodo || []) {
-      if (asiento.numero_asiento === null || asiento.numero_asiento === undefined) {
-        continue;
-      }
-      const numeroAsiento = String(asiento.numero_asiento);
-      const match = numeroAsiento.match(/(\d+)$/);
-      if (match) {
-        maxSecuencial = Math.max(maxSecuencial, parseInt(match[1], 10));
-      }
-    }
-
-    return maxSecuencial + 1;
   }
 
   /**

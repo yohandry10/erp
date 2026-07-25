@@ -29,9 +29,9 @@ Se ha completado la implementación de todas las validaciones y reglas de negoci
    - Funciones de validación y conteo
    - Mensajes de advertencia progresivos
 
-3. **boleta-validation.ts** - Validación de GRE para boletas
-   - Umbral de S/ 700 para boletas sin RUC
-   - Validación de requisito de GRE
+3. **boleta-validation.ts** - Validación de identificación del adquirente en boletas
+   - Umbral de S/ 700 para exigir datos del adquirente o usuario
+   - Validación de identidad requerida sin inferir GRE automática
    - Mensajes contextuales
 
 4. **certificate-validation.ts** - Validación de certificado digital
@@ -49,7 +49,7 @@ Se ha completado la implementación de todas las validaciones y reglas de negoci
    - Mensajes de advertencia
 
 2. **use-boleta-validation.ts** - Hook para validación de boletas
-   - Validación de requisito de GRE
+   - Validación de identificación requerida del adquirente o usuario
    - Mensajes contextuales
    - Integración con tipos de documento
 
@@ -66,8 +66,8 @@ Se ha completado la implementación de todas las validaciones y reglas de negoci
    - Mensajes progresivos
 
 2. **BoletaGREWarning.tsx**
-   - Alerta de requisito de GRE
-   - Badge de GRE requerida
+   - Alerta de identificación requerida en boletas mayores a S/ 700
+   - Badge de identificación requerida
    - Explicación de regulación SUNAT
 
 3. **CertificateValidationAlert.tsx**
@@ -148,16 +148,17 @@ if (!canAddMore) {
 <ItemCountBadge itemCount={items.length} />
 ```
 
-### 3. Validación de Boleta sin RUC ✅
+### 3. Validación de identificación en boleta ✅
 
 **Regla SUNAT:**
-Boletas a clientes sin RUC con monto > S/ 700 requieren GRE.
+Boletas con monto > S/ 700 requieren consignar apellidos y nombres o razón social, y número de documento del adquirente o usuario.
 
 **Características:**
 - Umbral: S/ 700
 - Validación de tipo de documento
 - Advertencia al acercarse al umbral (80%)
 - Mensaje de acción claro
+- No convierte la operación en GRE automática por ese monto
 
 **Uso:**
 ```typescript
@@ -168,14 +169,14 @@ const { validation, warningMessage } = useBoletaValidation(
   pedido.total
 )
 
-if (validation.requiresGRE) {
-  // Mostrar advertencia
+if (validation.requiresBuyerIdentity) {
+  // Mostrar advertencia de identificación requerida
 }
 ```
 
 **Componente:**
 ```tsx
-<BoletaGREWarning
+<BoletaBuyerIdentityWarning
   documentoTipo={cliente.documento_tipo}
   total={pedido.total}
 />
@@ -268,8 +269,8 @@ Si inválido → Mostrar errores y bloquear
 - [x] Mostrar mensaje claro si se alcanza el límite
 
 ### Subtarea 19.3 ✅
-- [x] Si tipo de documento es Boleta AND cliente sin RUC AND total > 700
-- [x] Mostrar alerta y requerir GRE
+- [x] Si tipo de documento es Boleta AND total > 700
+- [x] Mostrar alerta y requerir datos de identificación del adquirente o usuario
 
 ### Subtarea 19.4 ✅
 - [x] Antes de generar factura, verificar certificado vigente
@@ -302,11 +303,11 @@ Si inválido → Mostrar errores y bloquear
    items.length = 1000 → Error: "No puede superar 999 ítems"
    ```
 
-4. **Boleta sin RUC:**
+4. **Boleta mayor a S/ 700:**
    ```typescript
    documento_tipo = DNI, total = 600 → Sin advertencia
-   documento_tipo = DNI, total = 750 → Requiere GRE
-   documento_tipo = RUC, total = 750 → Sin advertencia
+   documento_tipo = DNI, total = 750 → Requiere datos de identidad
+   documento_tipo = RUC, total = 750 → Requiere confirmar identidad del receptor
    ```
 
 5. **Certificado digital:**

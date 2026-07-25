@@ -2,6 +2,9 @@
 
 import { usePosConfig } from '@/hooks/use-pos-config';
 import { ConfigurationStatus } from '@/app/dashboard/hooks/useConfigurationStatus';
+import { AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 
 interface ConfigStatusBannerProps {
   onOpenWizard: () => void;
@@ -38,23 +41,19 @@ export function ConfigStatusBanner({ onOpenWizard, configurationStatus }: Config
 
   // Mostrar banner de configuración incompleta con estilos consistentes del sistema
   return (
-    <div className="py-4 px-6 mb-6 flex items-center gap-4"
-    >
-      <div className="text-8">⚠️</div>
-      <div className="flex-[1]">
-        <h3 className="m-0 text-[#856404] text-4 font-bold">
-          Configuración Incompleta
-        </h3>
-        <p className="mt-2 mr-0 mb-0 ml-0 text-[#856404]">
+    <Alert className="mb-6 border-amber-500/40 bg-amber-500/10 text-foreground">
+      <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden="true" />
+      <div className="flex flex-col gap-3 pr-0 sm:flex-row sm:items-center sm:justify-between sm:pr-2">
+        <div>
+        <AlertTitle>Configuración incompleta</AlertTitle>
+        <AlertDescription className="text-muted-foreground">
           Las ventas pueden fallar si no se completa la configuración.
-        </p>
+        </AlertDescription>
+        </div>
+        <Button type="button" variant="warning" onClick={onOpenWizard} className="shrink-0">
+          Completar configuración
+        </Button>
       </div>
-      <button
-        onClick={onOpenWizard}
-        className="btn bg-[#FFC107] text-[#856404] border-0 font-bold whitespace-nowrap"
-      >
-        Completar Configuración
-      </button>
-    </div>
+    </Alert>
   );
 }

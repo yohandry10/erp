@@ -145,7 +145,7 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                   <div className="bg-[rgba(255,_255,_255,_0.2)] p-2 flex items-center justify-center">
                     <Building2 className="text-white" />
                   </div>
-                  <h2 className="text-7 font-bold text-white m-0">
+                  <h2 className="text-[1.75rem] font-bold text-white m-0">
                     Detalles de la Empresa
                   </h2>
                 </div>
@@ -170,7 +170,7 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                 <div className="p-2 flex items-center justify-center">
                   <Building2 className="text-white" />
                 </div>
-                <h3 className="text-[1.125rem] font-bold text-slate-800 m-0">Información Básica</h3>
+                <h3 className="text-[1.125rem] font-bold text-foreground m-0">Información Básica</h3>
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-5">
@@ -189,15 +189,15 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                 <div className="p-2 flex items-center justify-center">
                   <Settings className="text-white" />
                 </div>
-                <h3 className="text-[1.125rem] font-bold text-slate-800 m-0">Estado y Configuración</h3>
+                <h3 className="text-[1.125rem] font-bold text-foreground m-0">Estado y Configuración</h3>
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-5">
                 <div>
-                  <label className="block text-3 font-semibold text-slate-500 mb-2">
+                  <label className="block text-xs font-semibold text-muted-foreground mb-2">
                     ESTADO
                   </label>
-                  <div className="inline-flex items-center gap-2 py-2 px-4 font-bold text-3.5">
+                  <div className="inline-flex items-center gap-2 py-2 px-4 font-bold text-sm">
                     {tenantState.estado === 'ACTIVO' ? <CheckCircle2 /> : <XCircle />}
                     {tenantState.estado || 'ACTIVO'}
                   </div>
@@ -222,7 +222,7 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                 <div className="p-2 flex items-center justify-center">
                   <FileText className="text-white" />
                 </div>
-                <h3 className="text-[1.125rem] font-bold text-slate-800 m-0">Configuración de Ventas</h3>
+                <h3 className="text-[1.125rem] font-bold text-foreground m-0">Configuración de Ventas</h3>
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-5">
@@ -241,33 +241,33 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                 <div className="p-2 flex items-center justify-center">
                   <Settings className="text-white" />
                 </div>
-                <h3 className="text-[1.125rem] font-bold text-slate-800 m-0">Modo Demo</h3>
+                <h3 className="text-[1.125rem] font-bold text-foreground m-0">Modo Demo</h3>
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-5">
                 <div>
-                  <label className="block text-3 font-semibold text-slate-500 mb-2">
+                  <label className="block text-xs font-semibold text-muted-foreground mb-2">
                     Email demo
                   </label>
                   <input
                     value={demoEmail}
                     onChange={(e) => setDemoEmail(e.target.value)}
-                    placeholder="cliente@empresa.com" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-3.5"
+                    placeholder="cliente@empresa.com" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-3 font-semibold text-slate-500 mb-2">
+                  <label className="block text-xs font-semibold text-muted-foreground mb-2">
                     Contraseña demo
                   </label>
                   <input
                     type="text"
                     value={demoPassword}
                     onChange={(e) => setDemoPassword(e.target.value)}
-                    placeholder="Contraseña temporal" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-3.5"
+                    placeholder="Contraseña temporal" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-3 font-semibold text-slate-500 mb-2">
+                  <label className="block text-xs font-semibold text-muted-foreground mb-2">
                     Días de demo
                   </label>
                   <input
@@ -275,7 +275,7 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                     min={1}
                     max={90}
                     value={demoDays}
-                    onChange={(e) => setDemoDays(Number(e.target.value))} className="w-[100%] border py-[0.65rem] px-[0.8rem] text-3.5"
+                    onChange={(e) => setDemoDays(Number(e.target.value))} className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
                   />
                 </div>
                 <div className="flex gap-3">
@@ -289,7 +289,7 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                   <button
                     type="button"
                     onClick={handleDeactivateDemo}
-                    disabled={demoLoading} className="py-[0.65rem] px-4 border bg-white text-gray-800 font-bold cursor-pointer"
+                    disabled={demoLoading} className="py-[0.65rem] px-4 border bg-card text-foreground font-bold cursor-pointer"
                   >
                     Quitar demo
                   </button>
@@ -297,7 +297,7 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
               </div>
 
               {(demoError || demoSuccess) && (
-                <div className="mt-4 py-3 px-4 font-semibold text-3.5"
+                <div className="mt-4 py-3 px-4 font-semibold text-sm"
                 >
                   {demoError || demoSuccess}
                 </div>
@@ -306,16 +306,16 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
 
             {/* Fecha de Creación */}
             {tenantState.created_at && (
-              <div className="mt-8 p-4 bg-slate-50 text-3.5 text-slate-500">
+              <div className="mt-8 p-4 bg-muted/30 text-sm text-muted-foreground">
                 <strong>Creado:</strong> {new Date(tenantState.created_at).toLocaleString('es-PE')}
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="py-6 px-8 border-t bg-white flex justify-end">
+          <div className="py-6 px-8 border-t bg-card flex justify-end">
             <button
-              onClick={onClose} className="py-3 px-8 border-0 text-white cursor-pointer font-bold text-3.5 shadow transition hover:-translate-y-px"
+              onClick={onClose} className="py-3 px-8 border-0 text-white cursor-pointer font-bold text-sm shadow transition hover:-translate-y-px"
             >
               Cerrar
             </button>
@@ -332,11 +332,11 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
 function InfoField({ icon, label, value, fullWidth }: { icon?: React.ReactNode, label: string, value: string, fullWidth?: boolean }) {
   return (
     <div>
-      <label className="flex items-center gap-2 mb-2 font-semibold text-3 text-slate-500">
-        {icon && <span className="text-slate-500">{icon}</span>}
+      <label className="flex items-center gap-2 mb-2 font-semibold text-xs text-muted-foreground">
+        {icon && <span className="text-muted-foreground">{icon}</span>}
         {label.toUpperCase()}
       </label>
-      <div className="bg-white border py-3 px-4 text-3.5 text-slate-800">
+      <div className="bg-card border py-3 px-4 text-sm text-foreground">
         {value}
       </div>
     </div>
@@ -347,10 +347,10 @@ function InfoField({ icon, label, value, fullWidth }: { icon?: React.ReactNode, 
 function BooleanField({ label, value }: { label: string, value?: boolean }) {
   return (
     <div>
-      <label className="block text-3 font-semibold text-slate-500 mb-2">
+      <label className="block text-xs font-semibold text-muted-foreground mb-2">
         {label.toUpperCase()}
       </label>
-      <div className="inline-flex items-center gap-2 py-2 px-4 font-semibold text-3.5">
+      <div className="inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm">
         {value ? <CheckCircle2 /> : <XCircle />}
         {value ? 'Sí' : 'No'}
       </div>

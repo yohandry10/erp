@@ -28,57 +28,57 @@ export default function PedidoEstadoBadge({
     const configs = {
       [EstadoPedido.PENDIENTE]: {
         label: 'Pendiente',
-        color: 'bg-gray-100 text-gray-800 border-gray-200',
+        color: 'bg-muted text-foreground border-border',
         icon: Clock
       },
       [EstadoPedido.PENDIENTE_APROBACION]: {
         label: 'Pendiente Aprobación',
-        color: 'bg-orange-100 text-orange-800 border-orange-200',
+        color: 'bg-amber-500/10 text-amber-400 border-orange-200',
         icon: Clock
       },
       [EstadoPedido.CONFIRMADO]: {
         label: 'Confirmado',
-        color: 'bg-blue-100 text-blue-800 border-blue-200',
+        color: 'bg-primary/10 text-primary border-blue-200',
         icon: CheckCircle
       },
       [EstadoPedido.EN_PREPARACION]: {
         label: 'En Preparación',
-        color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        color: 'bg-amber-500/10 text-amber-400 border-yellow-200',
         icon: Package
       },
       [EstadoPedido.LISTO_DESPACHO]: {
         label: 'Listo para Despacho',
-        color: 'bg-purple-100 text-purple-800 border-purple-200',
+        color: 'bg-violet-500/10 text-violet-400 border-purple-200',
         icon: Truck
       },
       [EstadoPedido.DESPACHO_PARCIAL]: {
         label: 'Despacho Parcial',
-        color: 'bg-amber-100 text-amber-800 border-amber-200',
+        color: 'bg-amber-500/10 text-amber-400 border-amber-200',
         icon: Truck
       },
       [EstadoPedido.LISTO_FACTURAR]: {
         label: 'Listo para Facturar',
-        color: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+        color: 'bg-primary/10 text-primary border-indigo-200',
         icon: FileText
       },
       [EstadoPedido.FACTURADO]: {
         label: 'Facturado',
-        color: 'bg-green-100 text-green-800 border-green-200',
+        color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
         icon: Receipt
       },
       [EstadoPedido.COMPLETADO]: {
         label: 'Completado',
-        color: 'bg-green-100 text-green-800 border-green-200',
+        color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
         icon: CheckCheck
       },
       [EstadoPedido.COMPLETADO_CON_GRE]: {
         label: 'Completado con GRE',
-        color: 'bg-green-100 text-green-800 border-green-200',
+        color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
         icon: FileCheck
       },
       [EstadoPedido.CANCELADO]: {
         label: 'Cancelado',
-        color: 'bg-red-100 text-red-800 border-red-200',
+        color: 'bg-destructive/10 text-destructive border-red-200',
         icon: XCircle
       }
     }

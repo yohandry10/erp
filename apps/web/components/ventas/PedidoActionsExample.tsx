@@ -87,7 +87,7 @@ export function PedidoActionsExample({ pedido }: PedidoActionsExampleProps) {
   // Ejemplo 3: Mostrar información del flujo actual
   const renderFlowInfo = () => {
     return (
-      <div className="p-4 rounded-2 mb-4">
+      <div className="p-4 rounded-lg mb-4">
         <h3>Configuración Actual</h3>
         <ul>
           <li>Tipo de Empresa: {config?.tipo_empresa}</li>
@@ -141,7 +141,7 @@ export function PedidoActionsExample({ pedido }: PedidoActionsExampleProps) {
 
       {/* Ejemplo 5: Validación de GRE obligatorio */}
       {isGreObligatorio && pedido.estado === 'LISTO_FACTURAR' && (
-        <div className="p-4 bg-[#fee2e2] rounded-2 mt-4">
+        <div className="p-4 bg-[#fee2e2] rounded-lg mt-4">
           <strong>⚠️ Atención:</strong> Este pedido requiere una Guía de Remisión Electrónica
           antes de poder facturar.
         </div>

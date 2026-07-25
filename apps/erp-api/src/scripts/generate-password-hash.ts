@@ -1,19 +1,22 @@
 /**
  * Script para generar hash bcrypt de contraseñas
- * Uso: npx ts-node src/scripts/generate-password-hash.ts
+ * Uso: npx ts-node src/scripts/generate-password-hash.ts <password>
  */
 
 import * as bcrypt from 'bcrypt';
 
 const SALT_ROUNDS = 10;
-const password = '6559234.Yoandri1';
+const password = process.argv[2]?.trim();
+
+if (!password) {
+  throw new Error('Uso: npx ts-node src/scripts/generate-password-hash.ts <password>');
+}
 
 async function generateHash() {
   console.log('=========================================');
   console.log('GENERANDO HASH BCRYPT');
   console.log('=========================================');
   console.log('');
-  console.log('Contraseña:', password);
   console.log('Salt Rounds:', SALT_ROUNDS);
   console.log('');
   console.log('Generando hash...');

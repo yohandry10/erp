@@ -45,7 +45,9 @@ export class CxpEventsListener implements OnModuleInit {
         recepcion_id: data.recepcionId,
         numero_documento: data.numeroRecepcion,
         fecha_emision: data.fechaRecepcion,
-        fecha_vencimiento: data.fechaRecepcion,
+        // No se fija fecha_vencimiento: forzarla a la fecha de recepción hacía vencer
+        // la CxP el mismo día. Se deja que crearCxp la calcule desde fecha_emision +
+        // dias_credito según las condiciones de pago del proveedor/orden.
         condiciones_pago: (data.condicionesPago as CondicionesPagoCxp | undefined) ?? undefined,
         dias_credito: data.diasCredito ?? undefined,
         subtotal: data.subtotalParcial ?? data.subtotal,

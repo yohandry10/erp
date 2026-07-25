@@ -218,18 +218,18 @@ export class GREIntegrationService {
 
     if (error) {
       this.logger.warn(`No se pudo obtener configuración de GRE para tenant ${tenantId}, usando valores por defecto`);
-      
-      // Valores por defecto si no existe configuración
+
+      // Fail closed: sin configuración explícita no se sugiere GRE automática.
       return {
         gre_obligatorio: false,
-        gre_automatico_habilitado: true,
-        umbral_gre_automatico: 700.0, // S/ 700 por defecto según normativa SUNAT
+        gre_automatico_habilitado: false,
+        umbral_gre_automatico: 700.0,
       };
     }
 
     return {
       gre_obligatorio: config.gre_obligatorio || false,
-      gre_automatico_habilitado: config.gre_automatico_habilitado !== false, // true por defecto
+      gre_automatico_habilitado: config.gre_automatico_habilitado === true,
       umbral_gre_automatico: config.umbral_gre_automatico || 700.0,
     };
   }

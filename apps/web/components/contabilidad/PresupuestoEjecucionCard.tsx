@@ -22,7 +22,7 @@ export default function PresupuestoEjecucionCard({
   porcentajeEjecutado,
   onClick
 }: PresupuestoEjecucionCardProps) {
-  
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
@@ -35,7 +35,7 @@ export default function PresupuestoEjecucionCard({
 
   return (
     <div
-      onClick={onClick} className="bg-white rounded-3 p-6 shadow transition"
+      onClick={onClick} className="bg-card rounded-xl p-6 shadow transition"
       onMouseEnter={(e) => {
         if (onClick) {
           e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.15)'
@@ -54,12 +54,12 @@ export default function PresupuestoEjecucionCard({
         <div className="flex-[1]">
           <div className="flex items-center gap-2 mb-1">
             <DollarSign size={18} />
-            <h3 className="m-0 text-4 font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
+            <h3 className="m-0 text-base font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
               {titulo}
             </h3>
           </div>
           {subtitulo && (
-            <p className="m-0 text-3 text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">
+            <p className="m-0 text-xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
               {subtitulo}
             </p>
           )}
@@ -76,18 +76,18 @@ export default function PresupuestoEjecucionCard({
       {/* Amounts */}
       <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
         <div>
-          <p className="m-0 text-3 text-gray-500 mb-1">
+          <p className="m-0 text-xs text-muted-foreground mb-1">
             Presupuestado
           </p>
-          <p className="m-0 text-4 font-bold text-gray-900">
+          <p className="m-0 text-base font-bold text-foreground">
             {formatCurrency(montoPresupuestado)}
           </p>
         </div>
         <div>
-          <p className="m-0 text-3 text-gray-500 mb-1">
+          <p className="m-0 text-xs text-muted-foreground mb-1">
             Ejecutado
           </p>
-          <p className="m-0 text-4 font-bold">
+          <p className="m-0 text-base font-bold">
             {formatCurrency(montoEjecutado)}
           </p>
         </div>
@@ -96,7 +96,7 @@ export default function PresupuestoEjecucionCard({
       {/* Progress Bar */}
       <div className="mb-4">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-3 text-gray-500">
+          <span className="text-xs text-muted-foreground">
             Ejecución
           </span>
           <span className="text-[0.875rem] font-bold">
@@ -109,14 +109,14 @@ export default function PresupuestoEjecucionCard({
       </div>
 
       {/* Available Amount */}
-      <div className="p-3 rounded-2 flex justify-between items-center">
+      <div className="p-3 rounded-lg flex justify-between items-center">
         <div className="flex items-center gap-2">
           {isOverBudget ? (
-            <TrendingUp size={16} className="text-red-600" />
+            <TrendingUp size={16} className="text-destructive" />
           ) : (
-            <TrendingDown size={16} className="text-emerald-600" />
+            <TrendingDown size={16} className="text-emerald-400" />
           )}
-          <span className="text-3 font-semibold">
+          <span className="text-xs font-semibold">
             {isOverBudget ? 'Sobregiro' : 'Disponible'}
           </span>
         </div>

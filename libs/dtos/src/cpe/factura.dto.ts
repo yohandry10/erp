@@ -21,6 +21,11 @@ export enum TipoDocumento {
 
 export type EstadoCPE = 'PENDIENTE' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO';
 
+export enum CondicionPago {
+  CONTADO = 'CONTADO',
+  CREDITO = 'CREDITO',
+}
+
 export class ItemFacturaDto {
   @IsString()
   codigo: string;
@@ -114,6 +119,10 @@ export class CreateFacturaDto {
   @IsOptional()
   @IsISO8601()
   fecha_vencimiento?: string;
+
+  @IsOptional()
+  @IsEnum(CondicionPago)
+  condicion_pago?: CondicionPago;
 
   @IsOptional()
   @IsString()

@@ -15,7 +15,7 @@ export function HelpBotSuggestions({ suggestions, onSelect, isLoading }: HelpBot
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="h-10 animate-pulse rounded-lg bg-slate-100"
+            className="h-10 animate-pulse rounded-lg bg-muted"
           />
         ))}
       </div>
@@ -26,14 +26,14 @@ export function HelpBotSuggestions({ suggestions, onSelect, isLoading }: HelpBot
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="m-0 text-xs font-medium text-slate-500">
+      <p className="m-0 text-xs font-medium text-muted-foreground">
         Preguntas frecuentes:
       </p>
       {suggestions.map((suggestion) => (
         <button
           key={suggestion.id}
           onClick={() => onSelect(suggestion.pregunta)}
-          className="w-full cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-700 transition hover:border-blue-200 hover:bg-blue-50"
+          className="w-full cursor-pointer rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-sm text-foreground/85 transition hover:border-blue-200 hover:bg-primary/10"
         >
           {suggestion.pregunta}
         </button>

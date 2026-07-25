@@ -24,7 +24,7 @@ export default function FinanzasViewToggle({
   onChange
 }: FinanzasViewToggleProps) {
   return (
-    <div className="flex gap-2 bg-[#f3f4f6] p-1 rounded-2">
+    <div className="flex gap-2 bg-muted p-1 rounded-lg">
       {options.map((option) => {
         const Icon = option.icon
         const isActive = value === option.value

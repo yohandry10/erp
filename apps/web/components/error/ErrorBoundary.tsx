@@ -103,7 +103,7 @@ export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps)
     <div className="flex items-center justify-center p-8"
     >
       <div
-        className="activity-card max-w-[800px] w-[100%] p-12 shadow border relative overflow-hidden"
+        className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl max-w-[800px] w-[100%] p-12 shadow border relative overflow-hidden"
       >
         {/* Barra superior decorativa */}
         <div className="absolute top-0 left-0 right-0 h-[4px] bg-[var(--gradient-danger)]"
@@ -130,12 +130,12 @@ export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps)
             </svg>
           </div>
 
-          <h1 className="text-8 font-bold text-[var(--red-700)] mb-2 bg-[var(--gradient-danger)]"
+          <h1 className="text-[2rem] font-bold text-[var(--red-700)] mb-2 bg-[var(--gradient-danger)]"
           >
             Algo salió mal
           </h1>
 
-          <p className="text-4 text-[var(--primary-600)] font-medium"
+          <p className="text-base text-[var(--primary-600)] font-medium"
           >
             Lo sentimos, ha ocurrido un error inesperado en la aplicación
           </p>
@@ -163,7 +163,7 @@ export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps)
                   >
                     Detalles técnicos (solo en desarrollo)
                   </summary>
-                  <pre className="bg-[rgba(239,_68,_68,_0.05)] p-4 overflow-auto text-3 text-[var(--red-800)] mt-2 max-h-[300px]"
+                  <pre className="bg-destructive/5 p-4 overflow-auto text-xs text-[var(--red-800)] mt-2 max-h-[300px]"
                   >
                     {errorStack}
                   </pre>
@@ -178,7 +178,7 @@ export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps)
         >
           <button
             onClick={onReset}
-            className="btn-primary py-[0.875rem] px-6 font-semibold text-[0.875rem] border-0 cursor-pointer transition bg-[var(--gradient-primary)] text-white shadow inline-flex items-center gap-2"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 py-[0.875rem] px-6 font-semibold text-[0.875rem] border-0 cursor-pointer transition bg-[var(--gradient-primary)] text-white shadow inline-flex items-center gap-2"
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-1px)'
               e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
@@ -206,7 +206,7 @@ export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps)
 
           <button
             onClick={() => window.location.href = '/'}
-            className="btn-secondary py-[0.875rem] px-6 font-semibold text-[0.875rem] border cursor-pointer transition bg-[var(--primary-100)] text-[var(--primary-700)] inline-flex items-center gap-2"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold leading-5 text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 py-[0.875rem] px-6 font-semibold text-[0.875rem] border cursor-pointer transition bg-[var(--primary-100)] text-[var(--primary-700)] inline-flex items-center gap-2"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--primary-200)'
               e.currentTarget.style.borderColor = 'var(--primary-400)'

@@ -49,12 +49,12 @@ export default function NuevoPeriodoPage() {
   const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i)
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
           <button
-            onClick={() => router.back()} className="inline-flex items-center gap-2 py-2 px-4 bg-[#f3f4f6] text-gray-700 border-0 rounded-2 cursor-pointer text-[0.875rem] font-semibold mb-4 transition"
+            onClick={() => router.back()} className="inline-flex items-center gap-2 py-2 px-4 bg-muted text-foreground/85 border-0 rounded-lg cursor-pointer text-[0.875rem] font-semibold mb-4 transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = '#e5e7eb'
             }}
@@ -65,19 +65,19 @@ export default function NuevoPeriodoPage() {
             <ArrowLeft size={16} />
             Volver
           </button>
-          <h1 className="dashboard-title">Crear Período Contable</h1>
-          <p className="dashboard-subtitle">
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Crear Período Contable</h1>
+          <p className="mt-2 text-base text-muted-foreground">
             Crea un nuevo período contable para registrar operaciones
           </p>
         </div>
       </div>
 
       {/* Form */}
-      <div className="bg-white rounded-3 shadow p-8 max-w-[600px]">
+      <div className="bg-card rounded-xl shadow p-8 max-w-[600px]">
         {error && (
-          <div className="p-4 bg-[#fee2e2] border rounded-2 mb-6 flex items-start gap-3">
-            <AlertCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
-            <p className="m-0 text-red-800 text-[0.875rem]">
+          <div className="p-4 bg-[#fee2e2] border rounded-lg mb-6 flex items-start gap-3">
+            <AlertCircle size={20} className="text-destructive shrink-0 mt-0.5" />
+            <p className="m-0 text-destructive text-[0.875rem]">
               {error}
             </p>
           </div>
@@ -87,16 +87,16 @@ export default function NuevoPeriodoPage() {
           {/* Año */}
           <div className="mb-6">
             <label
-              htmlFor="anio" className="block mb-2 text-[0.875rem] font-semibold text-gray-700"
+              htmlFor="anio" className="block mb-2 text-[0.875rem] font-semibold text-foreground/85"
             >
-              Año <span className="text-red-600">*</span>
+              Año <span className="text-destructive">*</span>
             </label>
             <select
               id="anio"
               value={formData.anio}
               onChange={(e) => setFormData({ ...formData, anio: parseInt(e.target.value) })}
               required
-              disabled={loading} className="w-[100%] p-3 border rounded-2 text-[0.875rem] text-gray-800 transition"
+              disabled={loading} className="w-[100%] p-3 border rounded-lg text-[0.875rem] text-foreground transition"
             >
               {years.map((year) => (
                 <option key={year} value={year}>
@@ -109,16 +109,16 @@ export default function NuevoPeriodoPage() {
           {/* Mes */}
           <div className="mb-8">
             <label
-              htmlFor="mes" className="block mb-2 text-[0.875rem] font-semibold text-gray-700"
+              htmlFor="mes" className="block mb-2 text-[0.875rem] font-semibold text-foreground/85"
             >
-              Mes <span className="text-red-600">*</span>
+              Mes <span className="text-destructive">*</span>
             </label>
             <select
               id="mes"
               value={formData.mes}
               onChange={(e) => setFormData({ ...formData, mes: parseInt(e.target.value) })}
               required
-              disabled={loading} className="w-[100%] p-3 border rounded-2 text-[0.875rem] text-gray-800 transition"
+              disabled={loading} className="w-[100%] p-3 border rounded-lg text-[0.875rem] text-foreground transition"
             >
               {meses.map((mes, index) => (
                 <option key={index + 1} value={index + 1}>
@@ -129,10 +129,10 @@ export default function NuevoPeriodoPage() {
           </div>
 
           {/* Info Box */}
-          <div className="p-4 bg-[#eff6ff] border rounded-2 mb-8">
+          <div className="p-4 bg-muted border rounded-lg mb-8">
             <p className="m-0 text-[0.875rem] text-[#1e40af] leading-6">
-              <strong>Nota:</strong> El período se creará en estado <strong>ABIERTO</strong>, 
-              permitiendo el registro de asientos contables. Podrás cerrarlo más tarde desde 
+              <strong>Nota:</strong> El período se creará en estado <strong>ABIERTO</strong>,
+              permitiendo el registro de asientos contables. Podrás cerrarlo más tarde desde
               la lista de períodos.
             </p>
           </div>
@@ -142,7 +142,7 @@ export default function NuevoPeriodoPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              disabled={loading} className="py-3 px-6 bg-[#f3f4f6] text-gray-700 border rounded-2 text-[0.875rem] font-semibold transition"
+              disabled={loading} className="py-3 px-6 bg-muted text-foreground/85 border rounded-lg text-[0.875rem] font-semibold transition"
               onMouseEnter={(e) => {
                 if (!loading) {
                   e.currentTarget.style.background = '#e5e7eb'
@@ -156,7 +156,7 @@ export default function NuevoPeriodoPage() {
             </button>
             <button
               type="submit"
-              disabled={loading} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-2 text-[0.875rem] font-semibold transition"
+              disabled={loading} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-lg text-[0.875rem] font-semibold transition"
               onMouseEnter={(e) => {
                 if (!loading) {
                   e.currentTarget.style.background = '#2563eb'

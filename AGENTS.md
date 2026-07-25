@@ -15,6 +15,14 @@
 - No uses comandos destructivos sin aprobacion explicita.
 - No reviertas cambios existentes que no hayas hecho.
 
+## Contrato obligatorio de bases DEV/PROD
+
+- DEV es `hbueraexcbowpfnjlppi`: desarrollo, QA y demos; no datos reales productivos.
+- PROD es `wypnbcptofqdmoynlonq`: solo datos reales; demos, QA y seeds sinteticos estan prohibidos.
+- Antes de operar una base, leer `docs/architecture/ENVIRONMENT_DATABASE_BOUNDARIES.md` y ejecutar `scripts/db-environment-preflight.ps1` para el entorno objetivo.
+- Nunca usar `.env.local` para una operacion PROD; PROD usa `.env.production` o secretos inyectados por el despliegue.
+- Todo borrado PROD exige autorizacion explicita, respaldo, transaccion y evidencia posterior.
+
 ## Primera lectura obligatoria
 
 Antes de iniciar cualquier tarea, leer:
@@ -23,7 +31,9 @@ Antes de iniciar cualquier tarea, leer:
 2. `docs/00_coordination/CURRENT_STATE.md`
 3. `docs/00_coordination/FLOW_STATUS.md`
 4. `docs/00_coordination/AGENT_SYNC.md`
-5. `docs/DOC_NAVIGATION_MANIFEST.md` cuando la tarea toque documentacion, auditorias o seleccion de fuentes
+5. `docs/00_coordination/ANTI_DUPLICATION_PROTOCOL.md`
+6. `docs/00_coordination/DECISIONS.md`
+7. `docs/DOC_NAVIGATION_MANIFEST.md` cuando la tarea toque documentacion, auditorias o seleccion de fuentes
 
 `AGENTS.md` conserva reglas operativas y baseline DB; no reemplaza el estado vivo. Si este archivo contradice `docs/START_HERE.md` o `docs/00_coordination/*`, prevalecen esos documentos salvo en la lista obligatoria de artefactos DB antes de borrar/reconstruir.
 
@@ -31,13 +41,30 @@ Antes de iniciar cualquier tarea, leer:
 
 Antes de escribir codigo, crear migraciones, cambiar tests o auditar un modulo:
 
-1. Ubicar el dominio en `docs/DOC_NAVIGATION_MANIFEST.md`.
-2. Leer el documento fuente y sus `Leer tambien`.
-3. Revisar `docs/00_coordination/FLOW_STATUS.md` para saber si el flujo ya esta cerrado o si falta algo externo.
-4. Buscar en la doc con `rg` para no duplicar analisis o reimplementar algo ya resuelto.
-5. Recién despues buscar en codigo y modificar.
+1. Leer `docs/00_coordination/ANTI_DUPLICATION_PROTOCOL.md`.
+2. Revisar `docs/00_coordination/DECISIONS.md` para no redescubrir ni revertir decisiones vigentes.
+3. Ubicar el dominio en `docs/DOC_NAVIGATION_MANIFEST.md`.
+4. Leer el documento fuente y sus `Leer tambien`.
+5. Revisar `docs/00_coordination/FLOW_STATUS.md` para saber si el flujo ya esta cerrado o si falta algo externo.
+6. Buscar en la doc con `rg` para no duplicar analisis o reimplementar algo ya resuelto.
+7. Recién despues buscar en codigo y modificar.
 
 Si una auditoria historica contradice la doc canonica, no asumir que la auditoria sigue vigente. Verificar en codigo y migraciones actuales.
+
+## Formato obligatorio para proponer analisis
+
+Toda respuesta que proponga un analisis debe iniciar con:
+
+```text
+RECIBO DE LECTURA
+- Base leida: START_HERE, CURRENT_STATE, FLOW_STATUS, AGENT_SYNC, ANTI_DUPLICATION_PROTOCOL, DECISIONS, DOC_NAVIGATION_MANIFEST.
+- Fuente de dominio leida: <archivo(s)>.
+- Busqueda anti-duplicacion ejecutada: <rg usado o pendiente justificado>.
+- Ya cerrado/no reanalizar: <puntos cerrados segun FLOW_STATUS/DECISIONS/CURRENT_STATE>.
+- Analisis propuesto: <solo puntos no cerrados, externos, riesgos residuales o cambios solicitados>.
+```
+
+Si falta ese bloque, la respuesta no cumple las reglas del repo.
 
 ## Baseline BD pre-reconstruccion (obligatorio consultar)
 

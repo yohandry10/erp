@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Logger, InternalServerErrorException, Inject, forwardRef, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger, InternalServerErrorException, Inject, forwardRef, HttpException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EmailService } from '../../shared/email/email.service';
@@ -93,7 +93,7 @@ export class AuthService {
       return result;
     } catch (error) {
       console.error('Error validating user:', error);
-      if (error instanceof UnauthorizedException) {
+      if (error instanceof UnauthorizedException || error instanceof ServiceUnavailableException) {
         throw error;
       }
       return null;
@@ -339,6 +339,37 @@ export class AuthService {
     };
   }
 
+  private isNoRowsError(error: any): boolean {
+    return error?.code === 'PGRST116';
+  }
+
+  private isSupabaseUnavailableError(error: any): boolean {
+    const message = `${error?.message || error || ''}`.toLowerCase();
+    const code = `${error?.code || error?.cause?.code || ''}`.toUpperCase();
+
+    return (
+      error instanceof TypeError ||
+      ['ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'].includes(code) ||
+      message.includes('fetch failed') ||
+      message.includes('network') ||
+      message.includes('timeout') ||
+      message.includes('enotfound') ||
+      message.includes('econnrefused') ||
+      message.includes('etimedout')
+    );
+  }
+
+  private throwIfSupabaseUnavailable(error: any, operation: string): void {
+    if (!error || this.isNoRowsError(error)) {
+      return;
+    }
+
+    if (this.isSupabaseUnavailableError(error)) {
+      this.logger.error(`[AUTH] Supabase no disponible durante ${operation}: ${error?.message || error}`);
+      throw new ServiceUnavailableException('Servicio de autenticación temporalmente no disponible');
+    }
+  }
+
   private async findUserByEmail(email: string): Promise<any> {
     try {
       // Usar cliente público porque el login NO tiene tenant context
@@ -351,6 +382,11 @@ export class AuthService {
         .eq('email', email)
         .single();
 
+      if (this.isNoRowsError(userError)) {
+        console.error('Error finding user by email:', userError);
+        return null;
+      }
+      this.throwIfSupabaseUnavailable(userError, 'consulta de usuario por email');
       if (userError || !user) {
         console.error('Error finding user by email:', userError);
         return null;
@@ -362,12 +398,24 @@ export class AuthService {
         .select('role_id, roles(id, nombre, descripcion)')
         .eq('usuario_sistema_id', user.id);
 
+      this.throwIfSupabaseUnavailable(rolesError, 'consulta de roles de usuario');
+      if (rolesError) {
+        this.logger.error('Error finding user roles by email:', rolesError);
+        return null;
+      }
+
       // Agregar roles al usuario
       user.user_roles = userRoles || [];
 
       return user;
     } catch (error) {
       console.error('Error in findUserByEmail:', error);
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+      if (this.isSupabaseUnavailableError(error)) {
+        throw new ServiceUnavailableException('Servicio de autenticación temporalmente no disponible');
+      }
       return null;
     }
   }
@@ -600,14 +648,28 @@ export class AuthService {
         throw new UnauthorizedException('Usuario no encontrado');
       }
 
+      if (
+        !user.password_reset_token ||
+        !user.password_reset_expires ||
+        new Date(user.password_reset_expires) < new Date() ||
+        !(await bcrypt.compare(token, user.password_reset_token))
+      ) {
+        this.logger.warn(
+          `Password reset token changed or already consumed for user: ${email} from IP: ${clientIp || 'unknown'}`
+        );
+        throw new UnauthorizedException('Token inválido o expirado');
+      }
+
       // ✅ SEGURIDAD: Hash de contraseña nueva (ya validada por DTO)
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
       // Usar cliente público porque password reset NO tiene tenant context
       const client = this.supabaseService.getPublicClient();
       
-      // Update password and clear reset token
-      const { error: updateError } = await client
+      // Update password and clear reset token only if the same reset token is
+      // still present. This makes token consumption atomic under concurrent
+      // reset attempts.
+      const { data: updatedUsers, error: updateError } = await client
         .from('usuarios_sistema')
         .update({
           password_hash: hashedPassword,
@@ -617,11 +679,20 @@ export class AuthService {
           locked_until: null, // Desbloquear cuenta si estaba bloqueada
           updated_at: new Date().toISOString()
         })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .eq('password_reset_token', user.password_reset_token)
+        .select('id');
 
       if (updateError) {
         this.logger.error(`Failed to update password for user ${user.email}:`, updateError);
         throw new Error('Failed to reset password');
+      }
+
+      if (!updatedUsers || updatedUsers.length === 0) {
+        this.logger.warn(
+          `Password reset token already consumed for user: ${user.email} from IP: ${clientIp || 'unknown'}`
+        );
+        throw new UnauthorizedException('Token inválido o expirado');
       }
 
       // ✅ CRÍTICO: Revocar todas las sesiones activas por seguridad
@@ -813,14 +884,31 @@ export class AuthService {
 
   async revokeUserSessions(userId: string): Promise<void> {
     try {
-      // Usar cliente público para revocar sesiones
-      const client = this.supabaseService.getPublicClient();
+      const client = this.supabaseService.getAdminClient();
+
+      const { data: sessions, error: selectError } = await client
+        .from('user_sessions')
+        .select('session_token')
+        .eq('usuario_sistema_id', userId);
+
+      if (selectError) {
+        this.logger.warn(`Could not list sessions before revoke for user ${userId}:`, selectError);
+      }
+
+      const sessionTokens = (sessions || [])
+        .map((session: any) => session?.session_token)
+        .filter((token: unknown): token is string => typeof token === 'string' && token.length > 0);
+
+      await Promise.all(
+        sessionTokens.map((sessionToken) => this.cacheService.del(this.sessionCacheKey(sessionToken)))
+      );
+
       await client
         .from('user_sessions')
         .delete()
         .eq('usuario_sistema_id', userId);
-      
-      console.log('🔒 [AUTH] Sesiones revocadas - Usuario:', userId);
+
+      console.log('🔒 [AUTH] Sesiones revocadas - Usuario:', userId, 'Tokens:', sessionTokens.length);
     } catch (error) {
       console.error('Error revoking user sessions:', error);
     }

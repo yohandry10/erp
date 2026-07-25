@@ -1,6 +1,8 @@
 import Image from 'next/image';
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Package, Plus, Star } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export interface ProductoPOS {
   id: string;
@@ -42,61 +44,66 @@ const formatMoney = (value: any): string => {
 
 export const ProductGrid: React.FC<Props> = ({ productos, onAgregar, productoSeleccionado, onSeleccionar }) => {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(145px,1fr))]">
       {productos.map((producto) => {
         const esServicio = producto.es_servicio;
         const stockDisponible = producto.stock_disponible ?? producto.stock_actual ?? 0;
         const estaSeleccionado = productoSeleccionado === producto.id;
-        
+        const stockBajo = !esServicio && stockDisponible <= producto.stock_minimo;
+
         return (
-          <div 
-            key={producto.id} 
+          <div
+            key={producto.id}
             className={cn(
-              'group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-cyan-400/15 bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(30,41,59,0.76)),radial-gradient(circle_at_100%_0%,rgba(14,165,233,0.18),transparent_12rem)] p-4 text-slate-100 shadow-[0_18px_38px_rgba(2,8,23,0.22)] transition duration-300 hover:-translate-y-1 hover:border-cyan-300/45 hover:shadow-[0_24px_52px_rgba(8,145,178,0.24)]',
-              estaSeleccionado && 'scale-[1.02] border-blue-400 shadow-[0_0_0_3px_rgba(59,130,246,0.2)]',
+              'group relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border bg-card p-3 text-card-foreground shadow-sm transition-colors hover:border-primary/45 hover:bg-accent/30',
+              estaSeleccionado && 'border-primary ring-2 ring-primary/15',
             )}
             onClick={() => onSeleccionar?.(producto.id)}
           >
-            <div className="relative mb-3 flex h-32 w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-400/15 bg-slate-950/90">
-              {producto.imagen_url ? (
-                <Image
-                  src={producto.imagen_url}
-                  alt={producto.nombre}
-                  fill
-                  sizes="(max-width: 768px) 50vw, 160px"
-                  className="object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.9)),radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.16),transparent_10rem)] text-5xl opacity-50">
-                  📦
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/35 text-muted-foreground">
+                {producto.imagen_url ? (
+                  <Image
+                    src={producto.imagen_url}
+                    alt={producto.nombre}
+                    fill
+                    sizes="44px"
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <Package className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{producto.codigo}</span>
+                  {producto.favorito && <Star className="h-3.5 w-3.5 shrink-0 text-primary" aria-label="Producto favorito" />}
                 </div>
-              )}
-              {esServicio && <span className="absolute right-2 top-2 rounded-md bg-cyan-400/15 px-2 py-1 text-xs font-semibold text-cyan-100">Servicio</span>}
-              {producto.favorito && <span className="absolute right-2 top-2 rounded-md bg-gradient-to-br from-amber-400 to-amber-500 px-2 py-1 text-xs font-semibold text-white">★</span>}
+                <div className="mt-1 line-clamp-4 min-h-20 text-sm font-semibold leading-5" title={producto.nombre}>{producto.nombre}</div>
+              </div>
             </div>
-            <div className="flex flex-1 flex-col gap-1">
-              <div className="break-words text-xs font-medium text-sky-300">{producto.codigo}</div>
-              <div className="line-clamp-3 text-sm font-semibold leading-snug text-slate-50">{producto.nombre}</div>
-              <div className="mt-1 text-lg font-bold text-emerald-300">S/ {formatMoney(producto.precio_venta)}</div>
+            <div className="mt-3">
+              <div className="text-lg font-bold tracking-tight">S/ {formatMoney(producto.precio_venta)}</div>
               {!esServicio && (
-                <div className="text-xs text-slate-400">
-                  Stock: {stockDisponible}
-                  {producto.stock_minimo !== undefined && (
-                    <span className={stockDisponible <= producto.stock_minimo ? 'text-red-400' : 'text-emerald-300'}>
-                      {' '}
-                      (min {producto.stock_minimo})
-                    </span>
-                  )}
+                <div className={cn('mt-1 text-xs text-muted-foreground', stockBajo && 'font-medium text-destructive')}>
+                  <div>{stockDisponible} disponibles</div>
+                  {stockBajo && <div>Stock bajo · mín. {producto.stock_minimo}</div>}
                 </div>
               )}
             </div>
-            <button 
-              className="mt-3 w-full rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 px-4 py-3 text-sm font-bold text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)] transition hover:brightness-110"
-              onClick={() => onAgregar(producto)}
+            <Button
+              type="button"
+              size="sm"
+              className="mt-3 min-h-10 w-full gap-2"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAgregar(producto);
+              }}
             >
+              <Plus className="h-4 w-4" />
               Agregar
-            </button>
+            </Button>
           </div>
         );
       })}

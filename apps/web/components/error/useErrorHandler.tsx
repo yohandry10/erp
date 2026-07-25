@@ -50,20 +50,20 @@ export function useErrorHandler() {
       setLoading(true)
       setError(null)
       const result = await fn()
-      
+
       if (options?.onSuccess) {
         options.onSuccess(result)
       }
-      
+
       return result
     } catch (err) {
       const errorMessage = handleError(err, options?.customErrorMessage)
       const errorObj = err instanceof Error ? err : new Error(errorMessage)
-      
+
       if (options?.onError) {
         options.onError(errorObj)
       }
-      
+
       return null
     } finally {
       setLoading(false)
@@ -201,7 +201,7 @@ export function ErrorDisplay({
   // Variant 'card' (default)
   return (
     <div
-      className="activity-card bg-[var(--red-50)] border p-6 mb-6"
+      className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl bg-[var(--red-50)] border p-6 mb-6"
     >
       <div className="flex items-start gap-3"
       >

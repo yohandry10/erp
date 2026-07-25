@@ -568,24 +568,13 @@ export class AccountingEntriesService {
       throw new Error(`Asiento desbalanceado: Debe=${totalDebe}, Haber=${totalHaber}`);
     }
 
-    let numeroAsiento: string | number | null = null;
-    let asientoCreado: { id: string } | null = null;
+    let asientoCreado: { id: string; numero_asiento?: number | string | null; codigo?: string | null } | null = null;
 
     const conceptoClampSequence = [50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
     let ultimoConceptoFinal: string | null = asiento.concepto;
     let ultimaReferenciaFinal: string | null = asiento.referencia ?? null;
 
     for (let intento = 0; intento < conceptoClampSequence.length; intento++) {
-      const { data: ultimoAsiento } = await client
-        .from('asientos_contables')
-        .select('numero_asiento')
-        .eq('tenant_id', tenantId)
-        .order('numero_asiento', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      numeroAsiento = (ultimoAsiento?.numero_asiento || 0) + 1;
-
       const clampLength = conceptoClampSequence[intento];
       const conceptoFinal = this.clampText(asiento.concepto, clampLength);
       const referenciaFinal = asiento.referencia ? this.clampText(asiento.referencia, clampLength) : null;
@@ -595,7 +584,6 @@ export class AccountingEntriesService {
         .from('asientos_contables')
         .insert({
           tenant_id: tenantId, // HARDENING: cada asiento queda ligado al tenant autenticado.
-          numero_asiento: numeroAsiento,
           fecha: asiento.fecha,
           concepto: conceptoFinal,
           referencia: referenciaFinal,
@@ -604,19 +592,36 @@ export class AccountingEntriesService {
           estado: 'CONFIRMADO',
           source_event_id: asiento.sourceEventId ?? null,
         })
-        .select('id')
+        .select('id, numero_asiento, codigo')
         .single();
 
       if (!error && data) {
-        asientoCreado = data as { id: string };
+        asientoCreado = data as { id: string; numero_asiento?: number | string | null; codigo?: string | null };
         break;
       }
 
       if (error?.code === '23505') {
-        this.logger.warn(
-          `⚠️ [AccountingEntries] Número de asiento duplicado (${numeroAsiento}) para tenant ${tenantId}. Reintentando...`,
-        );
-        continue;
+        if (asiento.sourceEventId) {
+          const { data: asientoExistente, error: findExistingError } = await client
+            .from('asientos_contables')
+            .select('id, numero_asiento, codigo')
+            .eq('tenant_id', tenantId)
+            .eq('source_event_id', asiento.sourceEventId)
+            .maybeSingle();
+
+          if (findExistingError) {
+            throw findExistingError;
+          }
+
+          if (asientoExistente?.id) {
+            this.logger.warn(
+              `⚠️ [AccountingEntries] Inserción idempotente detectó asiento existente para evento ${asiento.sourceEventId} (tenant ${tenantId}).`,
+            );
+            return asientoExistente.id;
+          }
+        }
+
+        throw error;
       }
       if (error?.code === '22001') {
         const conceptoStats = this.getTextMetrics(conceptoFinal);
@@ -639,37 +644,10 @@ export class AccountingEntriesService {
       if (error) throw error;
     }
 
-    if (!asientoCreado || numeroAsiento === null) {
-      // Fallback absoluto: usar un identificador monotónico único (timestamp + random) para eliminar colisiones extremas
-      const fallbackNumero = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)
-        .toString()
-        .padStart(6, '0')}`;
-      this.logger.warn(
-        `⚠️ [AccountingEntries] Usando fallback para numero_asiento único ${fallbackNumero} (tenant ${tenantId})`,
+    if (!asientoCreado) {
+      throw new Error(
+        `No se pudo crear el asiento contable tras aplicar truncado de concepto/referencia (concepto=${ultimoConceptoFinal ?? ''}, referencia=${ultimaReferenciaFinal ?? ''})`,
       );
-
-      const { data: dataFallback, error: errorFallback } = await client
-        .from('asientos_contables')
-        .insert({
-          tenant_id: tenantId,
-          numero_asiento: fallbackNumero,
-          fecha: asiento.fecha,
-          concepto: ultimoConceptoFinal ? ultimoConceptoFinal : asiento.concepto,
-          referencia: ultimaReferenciaFinal,
-          total_debe: totalDebe,
-          total_haber: totalHaber,
-          estado: 'CONFIRMADO',
-          source_event_id: asiento.sourceEventId ?? null,
-        })
-        .select('id')
-        .single();
-
-      if (!errorFallback && dataFallback) {
-        asientoCreado = dataFallback as { id: string };
-        numeroAsiento = fallbackNumero as any;
-      } else {
-        throw new Error('No se pudo generar un número de asiento único después de varios intentos');
-      }
     }
 
     const asientoId = asientoCreado.id;
@@ -723,7 +701,9 @@ export class AccountingEntriesService {
       throw errorDetalles;
     }
 
-    this.logger.log(`✅ [AccountingEntries] Asiento ${numeroAsiento} creado para tenant ${tenantId} (ID: ${asientoCreado.id})`);
+    this.logger.log(
+      `✅ [AccountingEntries] Asiento ${asientoCreado.codigo ?? asientoCreado.numero_asiento ?? asientoCreado.id} creado para tenant ${tenantId} (ID: ${asientoCreado.id})`,
+    );
     return asientoCreado.id;
   }
 

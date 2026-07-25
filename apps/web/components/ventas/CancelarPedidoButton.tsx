@@ -25,7 +25,7 @@ export default function CancelarPedidoButton({
   onSuccess
 }: CancelarPedidoButtonProps) {
   const { post } = useApi()
-  
+
   const [showDialog, setShowDialog] = useState(false)
   const [motivo, setMotivo] = useState('')
   const [canceling, setCanceling] = useState(false)
@@ -40,12 +40,12 @@ export default function CancelarPedidoButton({
     try {
       setCanceling(true)
       setError('')
-      
+
       const response = await post(
         `/ventas/pedidos/${pedidoId}/cancelar`,
         { motivo }
       )
-      
+
       if (response?.success) {
         toast({
           title: 'Pedido cancelado',
@@ -93,9 +93,9 @@ export default function CancelarPedidoButton({
               ¿Está seguro que desea cancelar este pedido? Esta acción liberará el stock reservado.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="my-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground/85 mb-2">
               Motivo de cancelación *
             </label>
             <Textarea
@@ -109,7 +109,7 @@ export default function CancelarPedidoButton({
               className={error ? 'border-red-500' : ''}
             />
             {error && (
-              <p className="text-sm text-red-600 mt-1">{error}</p>
+              <p className="text-sm text-destructive mt-1">{error}</p>
             )}
           </div>
 

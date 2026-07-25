@@ -50,27 +50,27 @@ export default function PresupuestoEjecucionPorCentroChart({ centros }: Presupue
     if (active && payload && payload.length) {
       const data = payload[0].payload
       return (
-        <div className="bg-white border rounded-2 p-3 shadow">
-          <p className="mt-0 mr-0 mb-2 ml-0 font-semibold text-gray-900 text-[0.875rem]">
+        <div className="bg-card border rounded-lg p-3 shadow">
+          <p className="mt-0 mr-0 mb-2 ml-0 font-semibold text-foreground text-[0.875rem]">
             {data.nombreCompleto}
           </p>
-          <div className="flex flex-col gap-[4px] text-3">
+          <div className="flex flex-col gap-[4px] text-xs">
             <div className="flex justify-between gap-4">
-              <span className="text-gray-500">Presupuestado:</span>
-              <span className="font-semibold text-gray-900">{formatCurrency(data.presupuestado)}</span>
+              <span className="text-muted-foreground">Presupuestado:</span>
+              <span className="font-semibold text-foreground">{formatCurrency(data.presupuestado)}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-gray-500">Ejecutado:</span>
-              <span className="font-semibold text-gray-900">{formatCurrency(data.ejecutado)}</span>
+              <span className="text-muted-foreground">Ejecutado:</span>
+              <span className="font-semibold text-foreground">{formatCurrency(data.ejecutado)}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-gray-500">Disponible:</span>
+              <span className="text-muted-foreground">Disponible:</span>
               <span className="font-semibold">
                 {formatCurrency(data.disponible)}
               </span>
             </div>
             <div className="mt-[4px] pt-[4px] border-t flex justify-between gap-4">
-              <span className="text-gray-500">% Ejecución:</span>
+              <span className="text-muted-foreground">% Ejecución:</span>
               <span className="font-bold">
                 {formatPercentage(data.porcentaje)}
               </span>
@@ -84,7 +84,7 @@ export default function PresupuestoEjecucionPorCentroChart({ centros }: Presupue
 
   if (centros.length === 0) {
     return (
-      <div className="p-12 bg-[#f9fafb] rounded-3 text-center text-gray-500">
+      <div className="p-12 bg-muted rounded-xl text-center text-muted-foreground">
         <p className="m-0">No hay datos disponibles para mostrar</p>
       </div>
     )
@@ -98,36 +98,36 @@ export default function PresupuestoEjecucionPorCentroChart({ centros }: Presupue
           margin={{ top: 20, right: 30, left: 60, bottom: 80 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis 
+          <XAxis
             dataKey="nombre"
             angle={-45}
             textAnchor="end"
             height={80}
             tick={{ fill: '#6b7280', fontSize: 11 }}
           />
-          <YAxis 
+          <YAxis
             tick={{ fill: '#6b7280', fontSize: 11 }}
             tickFormatter={formatCurrency}
-            label={{ 
-              value: 'Monto (PEN)', 
-              angle: -90, 
+            label={{
+              value: 'Monto (PEN)',
+              angle: -90,
               position: 'insideLeft',
               style: { fill: '#6b7280', fontSize: 12 }
             }}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Legend 
+          <Legend
             wrapperStyle={{ paddingTop: '20px' }}
             iconType="rect"
           />
-          <Bar 
-            dataKey="presupuestado" 
+          <Bar
+            dataKey="presupuestado"
             name="Presupuestado"
-            fill="#3b82f6" 
+            fill="#3b82f6"
             radius={[4, 4, 0, 0]}
           />
-          <Bar 
-            dataKey="ejecutado" 
+          <Bar
+            dataKey="ejecutado"
             name="Ejecutado"
             radius={[4, 4, 0, 0]}
           >

@@ -78,18 +78,18 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   const unreadCount = notifications.filter((item) => !item.leida).length
 
   return (
-    <section className="flex max-h-[640px] min-h-[320px] flex-col bg-slate-950 group-data-[erp-theme=light]/dashboard:bg-white">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-cyan-300/15 bg-slate-900/80 px-5 py-4 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50">
+    <section className="flex max-h-[640px] min-h-[320px] flex-col bg-background group-data-[erp-theme=light]/dashboard:bg-card">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-cyan-300/15 bg-card/80 px-5 py-4 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-cyan-300/25 bg-cyan-400/10 text-cyan-200 group-data-[erp-theme=light]/dashboard:text-cyan-700">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-cyan-300/25 bg-cyan-400/10 text-primary group-data-[erp-theme=light]/dashboard:text-cyan-700">
             <Bell className="h-4 w-4" />
           </span>
           <div className="min-w-0">
-            <h3 className="truncate text-base font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Notificaciones</h3>
-            <p className="text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Eventos operativos y alertas del ERP</p>
+            <h3 className="truncate text-base font-bold text-white group-data-[erp-theme=light]/dashboard:text-foreground">Notificaciones</h3>
+            <p className="text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">Eventos operativos y alertas del ERP</p>
           </div>
           {unreadCount > 0 && (
-            <Badge className="border-cyan-300/25 bg-cyan-300 text-slate-950 hover:bg-cyan-300">
+            <Badge className="border-cyan-300/25 bg-cyan-300 text-foreground hover:bg-cyan-300">
               {unreadCount}
             </Badge>
           )}
@@ -101,7 +101,7 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
             size="sm"
             variant="ghost"
             onClick={handleMarkAllAsRead}
-            className="shrink-0 text-cyan-100 hover:bg-cyan-400/10 hover:text-white group-data-[erp-theme=light]/dashboard:text-cyan-700 group-data-[erp-theme=light]/dashboard:hover:text-cyan-900"
+            className="shrink-0 text-primary hover:bg-cyan-400/10 hover:text-white group-data-[erp-theme=light]/dashboard:text-cyan-700 group-data-[erp-theme=light]/dashboard:hover:text-cyan-900"
           >
             Marcar todas
           </Button>
@@ -110,21 +110,21 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
-          <div className="grid min-h-[260px] place-items-center px-6 text-center text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <div className="grid min-h-[260px] place-items-center px-6 text-center text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             <div className="grid gap-3">
-              <Loader2 className="mx-auto h-7 w-7 animate-spin text-cyan-200" />
+              <Loader2 className="mx-auto h-7 w-7 animate-spin text-primary" />
               <p className="text-sm">Cargando notificaciones</p>
             </div>
           </div>
         ) : error ? (
           <div className="grid min-h-[260px] place-items-center px-6 text-center">
             <div className="grid max-w-xs gap-3">
-              <p className="text-sm font-medium text-cyan-100 group-data-[erp-theme=light]/dashboard:text-cyan-800">{error}</p>
+              <p className="text-sm font-medium text-primary group-data-[erp-theme=light]/dashboard:text-cyan-800">{error}</p>
               <Button
                 type="button"
                 size="sm"
                 onClick={fetchNotifications}
-                className="gap-2 bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+                className="gap-2 bg-cyan-400 text-foreground hover:bg-cyan-300"
               >
                 <RefreshCcw className="h-4 w-4" />
                 Reintentar
@@ -134,12 +134,12 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
         ) : notifications.length === 0 ? (
           <div className="grid min-h-[260px] place-items-center px-6 text-center">
             <div className="grid max-w-xs gap-3">
-              <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-cyan-300/15 bg-cyan-400/10 text-cyan-200 group-data-[erp-theme=light]/dashboard:text-cyan-700">
+              <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-cyan-300/15 bg-cyan-400/10 text-primary group-data-[erp-theme=light]/dashboard:text-cyan-700">
                 <Bell className="h-6 w-6" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Sin notificaciones</p>
-                <p className="mt-1 text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Cuando exista una acción crítica aparecerá aquí.</p>
+                <p className="text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-foreground">Sin notificaciones</p>
+                <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">Cuando exista una acción crítica aparecerá aquí.</p>
               </div>
             </div>
           </div>

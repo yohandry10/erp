@@ -29,7 +29,7 @@ Write-Host ""
 # Set environment variables for test
 Write-Host "🔧 Setting up test environment..." -ForegroundColor Yellow
 $env:TEST_USER_EMAIL = "admin@test.com"
-$env:TEST_USER_PASSWORD = "password123"
+if ([string]::IsNullOrWhiteSpace($env:TEST_USER_PASSWORD)) { throw "Define TEST_USER_PASSWORD antes de ejecutar esta prueba." }
 
 Write-Host "✅ Environment configured" -ForegroundColor Green
 Write-Host ""

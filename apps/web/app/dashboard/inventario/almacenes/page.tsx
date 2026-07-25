@@ -43,7 +43,7 @@ const fallbackStyle: React.CSSProperties = {
 
 function NoPermission() {
   return (
-    <div className="border border-dashed rounded-3 bg-[rgba(191,_219,_254,_0.45)] p-6 text-blue-700 font-semibold">
+    <div className="border border-dashed rounded-xl bg-blue-500/10 p-6 text-primary font-semibold">
       Necesitas el permiso <code>inventario.almacenes.read</code> para administrar los almacenes.
     </div>
   )
@@ -108,23 +108,23 @@ export default function AlmacenesPage() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap gap-3 items-center">
-          <h1 className="m-0 text-7 font-bold text-slate-950">
+          <h1 className="m-0 text-[1.75rem] font-bold text-foreground">
             Almacenes & Ubicaciones
           </h1>
-          <span className="bg-[rgba(59,_130,_246,_0.12)] text-blue-700 rounded-full py-1 px-3 text-3 font-semibold"
+          <span className="bg-[rgba(59,_130,_246,_0.12)] text-primary rounded-full py-1 px-3 text-xs font-semibold"
           >
             Inventario
           </span>
         </div>
-        <p className="m-0 text-slate-600 max-w-[720px] leading-7">
+        <p className="m-0 text-foreground/80 max-w-[720px] leading-7">
           Administra la estructura logística por tenant. Cada almacén y ubicación respeta la política de seguridad
           multitenant y se integra con recepciones, transferencias y kardex valorizado.
         </p>
         <div className="flex gap-3 flex-wrap">
-          <Link href="/dashboard/inventario/recepciones" className="text-blue-600 font-semibold">
+          <Link href="/dashboard/inventario/recepciones" className="text-primary font-semibold">
             Ir a Recepciones →
           </Link>
-          <Link href="/dashboard/inventario/kardex" className="text-teal-700 font-semibold">
+          <Link href="/dashboard/inventario/kardex" className="text-emerald-400 font-semibold">
             Revisar Kardex →
           </Link>
         </div>
@@ -144,7 +144,7 @@ export default function AlmacenesPage() {
               produciendo CLS ~0.32. Ahora los cards arrancan en 0 (estado
               natural) y el catálogo mantiene un min-height fijo. */}
           {error && (
-            <div className="border bg-[rgba(254,_226,_226,_0.65)] rounded-3 py-4 px-5 text-red-700 font-semibold"
+            <div className="border bg-destructive/10 rounded-xl py-4 px-5 text-destructive font-semibold"
             >
               {error}
             </div>
@@ -152,56 +152,56 @@ export default function AlmacenesPage() {
 
           <section className="grid gap-3 grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]"
           >
-            <div className="rounded-3.5 border bg-[rgba(191,_219,_254,_0.35)] p-4 flex items-center gap-3"
+            <div className="rounded-[0.875rem] border bg-blue-500/10 p-4 flex items-center gap-3"
             >
               <Warehouse size={22} color="#1d4ed8" />
               <div>
-                <div className="text-3 text-blue-700 font-bold">
+                <div className="text-xs text-primary font-bold">
                   Almacenes
                 </div>
-                <div className="text-6 font-bold text-slate-950">
+                <div className="text-2xl font-bold text-foreground">
                   {stats.total.toLocaleString('es-PE')}
                 </div>
               </div>
             </div>
-            <div className="rounded-3.5 border bg-[rgba(187,_247,_208,_0.45)] p-4 flex items-center gap-3"
+            <div className="rounded-[0.875rem] border bg-emerald-500/10 p-4 flex items-center gap-3"
             >
               <Building2 size={22} color="#047857" />
               <div>
-                <div className="text-3 text-emerald-700 font-bold">
+                <div className="text-xs text-emerald-400 font-bold">
                   Activos
                 </div>
-                <div className="text-6 font-bold text-[#065f46]">
+                <div className="text-2xl font-bold text-[#065f46]">
                   {stats.activos.toLocaleString('es-PE')}
                 </div>
               </div>
             </div>
-            <div className="rounded-3.5 border bg-[rgba(254,_226,_226,_0.55)] p-4 flex items-center gap-3"
+            <div className="rounded-[0.875rem] border bg-destructive/10 p-4 flex items-center gap-3"
             >
               <MapPin size={22} color="#b91c1c" />
               <div>
-                <div className="text-3 text-red-700 font-bold">
+                <div className="text-xs text-destructive font-bold">
                   Inactivos
                 </div>
-                <div className="text-6 font-bold text-red-800">
+                <div className="text-2xl font-bold text-destructive">
                   {stats.inactivos.toLocaleString('es-PE')}
                 </div>
               </div>
             </div>
           </section>
 
-          <section className="border rounded-4 p-5 bg-white flex flex-col gap-4 min-h-[180px]"
+          <section className="border rounded-2xl p-5 bg-card flex flex-col gap-4 min-h-[180px]"
           >
-            <h2 className="m-0 text-[1.15rem] font-bold text-slate-950">
+            <h2 className="m-0 text-[1.15rem] font-bold text-foreground">
               Catálogo de almacenes
             </h2>
 
             {loading ? (
-              <div className="text-blue-600 font-semibold text-3.5">
+              <div className="text-primary font-semibold text-sm">
                 Cargando almacenes…
               </div>
             ) : almacenes.length === 0 ? (
-              <div className="text-slate-400 text-3.5">
+              <div className="text-muted-foreground text-sm">
                 No hay almacenes registrados. Crea uno desde el módulo de configuración o mediante Supabase Studio.
               </div>
             ) : (
@@ -211,23 +211,23 @@ export default function AlmacenesPage() {
                       const ubicaciones = ubicacionesPorAlmacen[almacen.id] ?? []
                       return (
                         <li
-                          key={almacen.id} className="border rounded-3 bg-[rgba(248,_250,_252,_0.85)] p-4 flex flex-col gap-[0.65rem]"
+                          key={almacen.id} className="border rounded-xl bg-muted/40 p-4 flex flex-col gap-[0.65rem]"
                         >
                           <div className="flex justify-between gap-4 flex-wrap items-center"
                           >
                             <div className="flex flex-col gap-1">
-                              <span className="text-4 font-bold text-slate-950">{almacen.nombre}</span>
-                              <span className="text-[0.8rem] text-slate-500">
+                              <span className="text-base font-bold text-foreground">{almacen.nombre}</span>
+                              <span className="text-[0.8rem] text-muted-foreground">
                                 Código: {almacen.codigo ?? '—'} · Creado: {formatDate(almacen.created_at)}
                               </span>
                               {almacen.direccion && (
-                                <span className="text-3.5 text-slate-600">{almacen.direccion}</span>
+                                <span className="text-sm text-foreground/80">{almacen.direccion}</span>
                               )}
                               {almacen.descripcion && (
-                                <span className="text-3.5 text-slate-600">{almacen.descripcion}</span>
+                                <span className="text-sm text-foreground/80">{almacen.descripcion}</span>
                               )}
                             </div>
-                            <span className="py-1 px-[0.7rem] rounded-full text-3 font-semibold"
+                            <span className="py-1 px-[0.7rem] rounded-full text-xs font-semibold"
                             >
                               {almacen.activo === false ? 'Inactivo' : 'Activo'}
                             </span>
@@ -235,40 +235,40 @@ export default function AlmacenesPage() {
 
                           <div className="flex gap-3 flex-wrap">
                             {almacen.telefono && (
-                              <span className="text-3.5 text-slate-600">Teléfono: {almacen.telefono}</span>
+                              <span className="text-sm text-foreground/80">Teléfono: {almacen.telefono}</span>
                             )}
                           </div>
 
                           <button
                             type="button"
-                            onClick={() => toggleExpanded(almacen.id)} className="py-2 px-3.5 rounded-2 border bg-white text-blue-700 font-semibold cursor-pointer"
+                            onClick={() => toggleExpanded(almacen.id)} className="py-2 px-3.5 rounded-lg border bg-card text-primary font-semibold cursor-pointer"
                           >
                             {isExpanded ? 'Ocultar ubicaciones' : 'Ver ubicaciones'}
                           </button>
 
                           {isExpanded && (
-                            <div className="border rounded-2.5 bg-[rgba(255,_255,_255,_0.65)] p-3.5 flex flex-col gap-2"
+                            <div className="border rounded-[0.625rem] bg-card/65 p-3.5 flex flex-col gap-2"
                             >
-                              <strong className="text-3.5 text-slate-950">
+                              <strong className="text-sm text-foreground">
                                 Ubicaciones ({ubicaciones.length})
                               </strong>
                               {ubicaciones.length === 0 ? (
-                                <span className="text-3.5 text-slate-400">
+                                <span className="text-sm text-muted-foreground">
                                   Este almacén aún no tiene ubicaciones registradas.
                                 </span>
                               ) : (
                                 <ul className="list-none m-0 p-0 grid gap-1.5">
                                   {ubicaciones.map((ubicacion) => (
                                     <li
-                                      key={ubicacion.id} className="border rounded-2 py-2.5 px-3 bg-[rgba(248,_250,_252,_0.9)] flex justify-between gap-3 flex-wrap"
+                                      key={ubicacion.id} className="border rounded-lg py-2.5 px-3 bg-muted/40 flex justify-between gap-3 flex-wrap"
                                     >
                                       <div className="flex flex-col gap-[0.15rem]">
-                                        <span className="font-semibold text-gray-800">{ubicacion.codigo}</span>
+                                        <span className="font-semibold text-foreground">{ubicacion.codigo}</span>
                                         {ubicacion.descripcion && (
-                                          <span className="text-[0.8rem] text-slate-500">{ubicacion.descripcion}</span>
+                                          <span className="text-[0.8rem] text-muted-foreground">{ubicacion.descripcion}</span>
                                         )}
                                       </div>
-                                      <span className="text-3 font-semibold"
+                                      <span className="text-xs font-semibold"
                                       >
                                         {ubicacion.activo === false ? 'Inactiva' : 'Activa'}
                                       </span>

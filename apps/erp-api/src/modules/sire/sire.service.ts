@@ -115,12 +115,12 @@ export class SireService {
     try {
       // ✅ MULTI-TENANT: Usar tenant_id
       const currentTenantId = this.ensureTenant(tenantId);
-      console.log(`📊 [SIRE] Actualizando contador para reporte ${reporteId}...`);
-      
-      // Obtener el total actual
+      console.log(`📊 [SIRE] Recalculando contador para reporte ${reporteId}...`);
+
+      // Obtener el reporte completo para regenerar su contenido
       const { data: reporte, error: selectError } = await this.supabaseService.getClient()
         .from('sire_files')
-        .select('total_registros, estado')
+        .select('*')
         .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
         .eq('id', reporteId)
         .single();
@@ -130,14 +130,19 @@ export class SireService {
         throw selectError;
       }
 
-      const nuevoTotal = (reporte?.total_registros || 0) + 1;
-      console.log(`📊 [SIRE] Incrementando contador de ${reporte?.total_registros || 0} a ${nuevoTotal}`);
-      
-      // Actualizar con el nuevo total
+      // Derivar el total desde el contenido real (fuente de verdad, igual que la descarga)
+      // en vez de un incremento no atómico que se desalinea del archivo generado.
+      const contenido = await this.generarContenidoSire(reporte, currentTenantId);
+      const nuevoTotal = contenido.split('\n').slice(1).filter((line) => line.trim().length > 0).length;
+      const fileSize = Buffer.byteLength(contenido, 'utf8');
+      console.log(`📊 [SIRE] Contador recalculado desde contenido: ${nuevoTotal} registros`);
+
+      // Actualizar con el total real y el tamaño del archivo
       const { error: updateError } = await this.supabaseService.getClient()
         .from('sire_files')
         .update({
           total_registros: nuevoTotal,
+          file_size: fileSize,
           estado: 'GENERADO',
           updated_at: new Date().toISOString()
         })

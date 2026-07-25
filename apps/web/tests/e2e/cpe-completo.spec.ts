@@ -173,11 +173,23 @@ async function crearClienteFiscal(supabase: SupabaseClient, tenantId: string, pa
 
 async function prepararPos(supabase: SupabaseClient, tenantId: string) {
   const efectivo = await ensureMetodoPago(supabase, tenantId);
+  const { data: almacen, error: almacenError } = await supabase
+    .from('almacenes')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('activo', true)
+    .order('es_principal', { ascending: false })
+    .limit(1)
+    .single();
+  expect(almacenError?.message || '', 'consultar almacén para caja POS CPE').toBe('');
+  expect(almacen?.id, 'almacén activo para caja POS CPE').toBeTruthy();
+
   const { data: caja, error: cajaError } = await supabase
     .from('cajas')
     .insert({
       id: crypto.randomUUID(),
       tenant_id: tenantId,
+      almacen_id: almacen!.id,
       codigo: `${qaPrefix}-CAJA-CPE`,
       nombre: `${qaPrefix} Caja CPE T10`,
       estado: 'ACTIVO',
@@ -198,9 +210,6 @@ async function prepararPos(supabase: SupabaseClient, tenantId: string) {
       precio: 20,
       precio_venta: 20,
       precio_unitario: 20,
-      stock: '5',
-      stock_actual: '5',
-      stock_reservado: '0',
       stock_minimo: '0',
       unidad_medida: 'NIU',
       activo: true,
@@ -211,6 +220,21 @@ async function prepararPos(supabase: SupabaseClient, tenantId: string) {
     .select('*')
     .single();
   expect(productoError?.message || '', 'crear producto POS CPE').toBe('');
+
+  const { error: stockError } = await supabase.rpc('aplicar_movimiento_inventario_tx', {
+    p_tenant_id: tenantId,
+    p_producto_id: producto!.id,
+    p_almacen_id: almacen!.id,
+    p_tipo: 'ENTRADA',
+    p_cantidad: 5,
+    p_referencia_tipo: 'QA_CPE_E2E',
+    p_referencia_id: crypto.randomUUID(),
+    p_notas: 'Stock controlado para flujo CPE/POS E2E',
+    p_created_by: 'playwright',
+    p_metadata: { source: 'cpe-completo.spec.ts', run_id: runId },
+  });
+  expect(stockError?.message || '', 'cargar stock por ledger para POS CPE').toBe('');
+
   return { caja, efectivo, producto };
 }
 
@@ -240,7 +264,9 @@ test.describe('T10 CPE completo', () => {
       storageState: { cookies: [], origins: [] },
     });
 
-    const facturaPayloadBase = cpePayload();
+    const facturaPayloadBase = cpePayload({
+      condicion_pago: 'CREDITO',
+    });
     const clienteFiscalId = await crearClienteFiscal(supabase, tenantId, facturaPayloadBase);
     const facturaPayload = { ...facturaPayloadBase, cliente_id: clienteFiscalId };
     const factura = await parseOk<any>(
@@ -470,13 +496,98 @@ test.describe('T10 CPE completo', () => {
           impuestos: 3.6,
           total: 23.6,
           comprobante: { tipo: '03', serie: 'B001' },
-          permite_venta_sin_stock: true,
+          permite_venta_sin_stock: false,
         },
       }),
       'crear boleta POS/CPE',
     );
     expect(boletaPos.numero_ticket).toMatch(/^B001-\d{8}$/);
-    expect(boletaPos.cpe_id || boletaPos.factura_electronica || boletaPos.message).toBeTruthy();
+    expect(boletaPos.venta_id).toBeTruthy();
+    expect(boletaPos.cpe_pendiente, 'POS debe confirmar que el CPE quedó en cola durable').toBe(true);
+
+    const facturacionPos = await parseOk<any>(
+      await apiContext.post(api(`/pos/reintentar-facturacion/${boletaPos.venta_id}`)),
+      'procesar CPE pendiente de la boleta POS',
+    );
+    expect(facturacionPos.cpe_id, 'el reintento POS debe vincular un CPE real').toBeTruthy();
+
+    const { data: cpePos, error: cpePosError } = await supabase
+      .from('cpe')
+      .select('id, documento_id, serie, numero, estado, event_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', facturacionPos.cpe_id)
+      .single();
+    expect(cpePosError?.message || '', 'leer CPE vinculado a POS').toBe('');
+    expect(cpePos?.documento_id, 'la boleta POS debe tener documento operativo').toBeTruthy();
+
+    await expect.poll(async () => {
+      const referencia = `${cpePos!.serie}-${String(cpePos!.numero).padStart(8, '0')}`;
+      const { data, error } = await supabase
+        .from('asientos_contables')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('referencia', referencia)
+        .limit(2);
+      if (error) return { count: -1, error: error.message };
+      return { count: data?.length ?? 0 };
+    }, {
+      message: 'la boleta POS debe tener exactamente un asiento original antes de anularse',
+      timeout: 90000,
+      intervals: [1000, 2000, 5000],
+    }).toEqual({ count: 1 });
+
+    const anulacionPos = await parseOk<any>(
+      await apiContext.post(api(`/documentos/${cpePos!.documento_id}/anular`), {
+        data: { motivo: `${qaPrefix} anulación POS desde Documentos` },
+      }),
+      'anular boleta POS desde Documentos',
+    );
+    expect(anulacionPos.cpe_anulado?.estado).toMatch(/ANULADO/i);
+    expect(anulacionPos.nota_credito?.id).toBeTruthy();
+
+    await expect.poll(async () => {
+      const [venta, cpeActual, documento, producto, reversoStock, reversoCaja, asientoReverso] = await Promise.all([
+        supabase.from('ventas_pos').select('estado').eq('tenant_id', tenantId).eq('id', boletaPos.venta_id).single(),
+        supabase.from('cpe').select('estado, nota_credito_id').eq('tenant_id', tenantId).eq('id', cpePos!.id).single(),
+        supabase.from('documentos').select('estado').eq('tenant_id', tenantId).eq('id', cpePos!.documento_id).single(),
+        supabase.from('productos').select('stock_actual').eq('tenant_id', tenantId).eq('id', posData.producto.id).single(),
+        supabase.from('movimientos_inventario').select('id').eq('tenant_id', tenantId)
+          .eq('referencia_tipo', 'REVERSO_VENTA').eq('referencia_id', anulacionPos.nota_credito.id).maybeSingle(),
+        supabase.from('movimientos_caja').select('id, monto').eq('tenant_id', tenantId)
+          .eq('referencia_tipo', 'reverso_venta_pos').eq('referencia_documento', anulacionPos.nota_credito.id).maybeSingle(),
+        supabase.from('asientos_contables').select('id').eq('tenant_id', tenantId)
+          .eq('referencia', `REV-${cpePos!.serie}-${cpePos!.numero}`).maybeSingle(),
+      ]);
+      const error = [venta, cpeActual, documento, producto, reversoStock, reversoCaja, asientoReverso]
+        .map((result) => result.error?.message)
+        .find(Boolean);
+      if (error) return { ok: false, error };
+      return {
+        ok: true,
+        venta: venta.data?.estado,
+        cpe: cpeActual.data?.estado,
+        nota_credito_id: cpeActual.data?.nota_credito_id,
+        documento: documento.data?.estado,
+        stock: Number(producto.data?.stock_actual),
+        reverso_stock: Boolean(reversoStock.data?.id),
+        reverso_caja: Boolean(reversoCaja.data?.id) && Number(reversoCaja.data?.monto) < 0,
+        reverso_contable: Boolean(asientoReverso.data?.id),
+      };
+    }, {
+      message: 'la anulación POS debe revertir documento, venta, stock, caja y contabilidad',
+      timeout: 90000,
+      intervals: [1000, 2000, 5000],
+    }).toMatchObject({
+      ok: true,
+      venta: 'ANULADA',
+      cpe: 'ANULADO',
+      nota_credito_id: anulacionPos.nota_credito.id,
+      documento: 'ANULADO',
+      stock: 5,
+      reverso_stock: true,
+      reverso_caja: true,
+      reverso_contable: true,
+    });
 
     const { data: empresaConfig, error: empresaError } = await supabase
       .from('empresa_config')

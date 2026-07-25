@@ -147,14 +147,14 @@ export class ClientesController {
   }
 
   /**
-   * POST /api/ventas/clientes/validar-ruc - Validar RUC con SUNAT
+   * POST /api/ventas/clientes/validar-ruc - Validar formato de RUC
    * Requirements: 1.4, 19.3
    */
   @Post('validar-ruc')
   @RequirePermission('ventas.clientes.validar_ruc')
   @ApiOperation({
     summary: 'Validar RUC',
-    description: 'Valida un RUC con la API de SUNAT',
+    description: 'Valida localmente el formato y dígito verificador del RUC; no consulta el padrón SUNAT',
   })
   @ApiResponse({ status: 200, description: 'RUC validado exitosamente' })
   @ApiResponse({ status: 400, description: 'RUC inválido' })

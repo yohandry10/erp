@@ -43,7 +43,7 @@ const ESTADOS_CONFIG: Record<EstadoAsiento, { label: string; icon: typeof FileTe
 }
 
 const inputClass =
-  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/65 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+  'w-full rounded-xl border border-cyan-400/20 bg-card/65 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
 export default function AsientosPage() {
   const router = useRouter()
@@ -103,7 +103,7 @@ export default function AsientosPage() {
     const Icon = config.icon
 
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+      <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-primary">
         <Icon className="h-3 w-3" />
         {config.label}
       </span>
@@ -116,7 +116,7 @@ export default function AsientosPage() {
 
     return (
       <span
-        className="inline-flex items-center gap-1 rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-100"
+        className="inline-flex items-center gap-1 rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-primary dark:text-blue-200"
         title={isAutomatic ? asiento.origen || 'Generado automáticamente' : 'Creado manualmente'}
       >
         <Icon className="h-3 w-3" />
@@ -172,11 +172,11 @@ export default function AsientosPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
-        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-card/70 text-foreground">
           <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
-            <RefreshCw className="h-7 w-7 animate-spin text-cyan-200" />
-            <span className="text-sm font-medium text-slate-300">Cargando asientos contables...</span>
+            <RefreshCw className="h-7 w-7 animate-spin text-primary" />
+            <span className="text-sm font-medium text-muted-foreground">Cargando asientos contables...</span>
           </CardContent>
         </Card>
       </div>
@@ -184,20 +184,20 @@ export default function AsientosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+        <section className="rounded-2xl border border-cyan-400/20 bg-card/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-primary">
                 <FileText className="h-6 w-6" />
               </span>
               <div>
-                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
                   ERP Journal Center
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight text-white">Asientos Contables</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Asientos Contables</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                   Gestione asientos manuales y trazabilidad de asientos generados por operaciones reales.
                 </p>
               </div>
@@ -207,7 +207,7 @@ export default function AsientosPage() {
                 type="button"
                 onClick={loadAsientos}
                 variant="outline"
-                className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
+                className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
               >
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
@@ -231,54 +231,54 @@ export default function AsientosPage() {
             ['Manuales', stats.manuales],
             ['Descuadrados', stats.descuadrados],
           ].map(([label, value]) => (
-            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70">{label}</div>
-                <div className="mt-3 text-3xl font-bold text-white">{value}</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-primary/80">{label}</div>
+                <div className="mt-3 text-3xl font-bold text-foreground">{value}</div>
               </CardContent>
             </Card>
           ))}
         </section>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-            <CardTitle className="flex items-center gap-2 text-base text-white">
-              <Filter className="h-5 w-5 text-cyan-200" />
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
+              <Filter className="h-5 w-5 text-primary" />
               Filtros
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-4">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
               <label className="space-y-2">
-                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Número</span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Número</span>
                 <div className="relative">
-                  <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-200/60" />
+                  <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70" />
                   <input
                     type="text"
                     value={numeroAsientoSearch}
                     onChange={(e) => setNumeroAsientoSearch(e.target.value)}
-                    placeholder="Ej: ASI-2024-001"
+                    placeholder="N° asiento"
                     className={cn(inputClass, 'pl-10')}
                   />
                 </div>
               </label>
 
               <label className="space-y-2">
-                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Concepto</span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Concepto</span>
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-200/60" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70" />
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Concepto, referencia..."
+                    placeholder="Buscar..."
                     className={cn(inputClass, 'pl-10')}
                   />
                 </div>
               </label>
 
               <label className="space-y-2">
-                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Estado</span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Estado</span>
                 <select value={estadoFilter} onChange={(e) => setEstadoFilter(e.target.value)} className={inputClass}>
                   <option value="TODOS">Todos</option>
                   <option value="BORRADOR">Borrador</option>
@@ -288,7 +288,7 @@ export default function AsientosPage() {
               </label>
 
               <label className="space-y-2">
-                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Origen</span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Origen</span>
                 <select value={origenFilter} onChange={(e) => setOrigenFilter(e.target.value)} className={inputClass}>
                   <option value="TODOS">Todos</option>
                   <option value="AUTOMATICO">Automático</option>
@@ -297,19 +297,19 @@ export default function AsientosPage() {
               </label>
 
               <label className="space-y-2">
-                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Desde</span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Desde</span>
                 <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className={inputClass} />
               </label>
 
               <label className="space-y-2">
-                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Hasta</span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Hasta</span>
                 <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className={inputClass} />
               </label>
             </div>
 
             {(numeroAsientoSearch || searchTerm || estadoFilter !== 'TODOS' || origenFilter !== 'TODOS' || fechaDesde || fechaHasta) && (
               <div className="flex justify-end">
-                <Button type="button" variant="outline" onClick={clearFilters} className="border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                <Button type="button" variant="outline" onClick={clearFilters} className="border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground">
                   Limpiar filtros
                 </Button>
               </div>
@@ -317,22 +317,22 @@ export default function AsientosPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-            <CardTitle className="text-base text-white">Lista de asientos</CardTitle>
+            <CardTitle className="text-base text-foreground">Lista de asientos</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {error && (
-              <div className="m-4 flex items-center gap-3 rounded-xl border border-blue-300/20 bg-blue-400/10 p-4 text-sm text-blue-50">
+              <div className="m-4 flex items-center gap-3 rounded-xl border border-blue-300/20 bg-blue-400/10 p-4 text-sm text-primary dark:text-blue-200">
                 <AlertCircle className="h-5 w-5" />
                 {error}
               </div>
             )}
 
             {filteredAsientos.length === 0 ? (
-              <div className="flex min-h-[260px] flex-col items-center justify-center p-8 text-center text-slate-400">
-                <FileText className="mb-4 h-12 w-12 text-cyan-200/60" />
-                <h3 className="text-lg font-semibold text-white">No hay asientos contables</h3>
+              <div className="flex min-h-[260px] flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                <FileText className="mb-4 h-12 w-12 text-primary/70" />
+                <h3 className="text-lg font-semibold text-foreground">No hay asientos contables</h3>
                 <p className="mt-2 max-w-md text-sm">
                   {asientos.length === 0
                     ? 'Aún no se han creado asientos contables.'
@@ -352,7 +352,7 @@ export default function AsientosPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[980px] border-collapse text-sm">
-                  <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.14em] text-cyan-200/70">
+                  <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.14em] text-primary/80">
                     <tr>
                       {['Número', 'Fecha', 'Concepto', 'Origen', 'Total', 'Estado', 'Balance'].map((header) => (
                         <th key={header} className={cn('px-5 py-3 font-semibold', header === 'Total' ? 'text-right' : header === 'Estado' || header === 'Balance' ? 'text-center' : 'text-left')}>
@@ -369,26 +369,26 @@ export default function AsientosPage() {
                         className="cursor-pointer border-t border-cyan-400/10 transition hover:bg-cyan-400/10"
                       >
                         <td className="px-5 py-4">
-                          <div className="font-semibold text-white">{asiento.numero_asiento}</div>
-                          {asiento.referencia && <div className="mt-1 text-xs text-slate-500">Ref: {asiento.referencia}</div>}
+                          <div className="font-semibold text-foreground">{asiento.numero_asiento}</div>
+                          {asiento.referencia && <div className="mt-1 text-xs text-muted-foreground">Ref: {asiento.referencia}</div>}
                         </td>
                         <td className="px-5 py-4">
-                          <div className="flex items-center gap-2 text-slate-300">
-                            <Calendar className="h-4 w-4 text-cyan-200/60" />
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Calendar className="h-4 w-4 text-primary/70" />
                             {formatDate(asiento.fecha)}
                           </div>
                         </td>
                         <td className="max-w-[360px] px-5 py-4">
-                          <div className="truncate text-slate-300">{asiento.concepto}</div>
+                          <div className="truncate text-muted-foreground">{asiento.concepto}</div>
                         </td>
                         <td className="px-5 py-4">{getOrigenBadge(asiento)}</td>
-                        <td className="px-5 py-4 text-right font-semibold text-white">{formatCurrency(asiento.total_debe)}</td>
+                        <td className="px-5 py-4 text-right font-semibold text-foreground">{formatCurrency(asiento.total_debe)}</td>
                         <td className="px-5 py-4 text-center">{getEstadoBadge(asiento.estado)}</td>
                         <td className="px-5 py-4 text-center">
                           {isBalanced(asiento) ? (
-                            <CheckCircle className="mx-auto h-5 w-5 text-cyan-200" />
+                            <CheckCircle className="mx-auto h-5 w-5 text-primary" />
                           ) : (
-                            <AlertCircle className="mx-auto h-5 w-5 text-blue-200" />
+                            <AlertCircle className="mx-auto h-5 w-5 text-primary dark:text-blue-200" />
                           )}
                         </td>
                       </tr>
@@ -399,7 +399,7 @@ export default function AsientosPage() {
             )}
 
             {filteredAsientos.length > 0 && (
-              <div className="flex items-center justify-between border-t border-cyan-400/10 px-5 py-4 text-sm text-slate-400">
+              <div className="flex items-center justify-between border-t border-cyan-400/10 px-5 py-4 text-sm text-muted-foreground">
                 Mostrando {filteredAsientos.length} de {asientos.length} asientos
               </div>
             )}

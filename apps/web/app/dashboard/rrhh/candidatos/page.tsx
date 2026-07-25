@@ -9,8 +9,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Search, Download, Eye, Edit2, Trash2, MapPin, Mail, Phone, Briefcase } from 'lucide-react';
+import {
+  Briefcase,
+  CheckCircle2,
+  Clock3,
+  Edit2,
+  Eye,
+  FileText,
+  Plus,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const CandidatosPage = () => {
   const [candidatos, setCandidatos] = useState<any[]>([]);
@@ -35,24 +48,21 @@ const CandidatosPage = () => {
     }
     try {
       setLoading(true);
-      
+
       // Cargar candidatos
       const candidatosData = await get('/api/rrhh/candidatos');
-      if (candidatosData && Array.isArray(candidatosData)) {
-        setCandidatos(candidatosData);
-      }
+      // El API responde { success, data: [...] }; hay que desempaquetar `.data`.
+      // Antes se hacía Array.isArray(respuestaCruda) → siempre false → nunca cargaba.
+      const asList = (r: any) => Array.isArray(r) ? r : (Array.isArray(r?.data) ? r.data : []);
+      setCandidatos(asList(candidatosData));
 
       // Cargar vacantes
       const vacantesData = await get('/api/rrhh/vacantes');
-      if (vacantesData && Array.isArray(vacantesData)) {
-        setVacantes(vacantesData);
-      }
+      setVacantes(asList(vacantesData));
 
       // Cargar departamentos
       const departamentosData = await get('/api/rrhh/departamentos');
-      if (departamentosData && Array.isArray(departamentosData)) {
-        setDepartamentos(departamentosData);
-      }
+      setDepartamentos(asList(departamentosData));
     } catch (error) {
       console.error('Error cargando candidatos:', error);
     } finally {
@@ -102,27 +112,27 @@ const CandidatosPage = () => {
 
   const filtrarCandidatos = () => {
     let filtrados = candidatos;
-    
+
     if (filtroEstado !== 'todos') {
       filtrados = filtrados.filter(c => c.estado === filtroEstado);
     }
-    
+
     if (filtroVacante !== 'todas') {
       filtrados = filtrados.filter(c => c.vacante_id === filtroVacante);
     }
-    
+
     return filtrados;
   };
 
   const getEstadoColor = (estado: string) => {
     const colores: Record<string, string> = {
-      'postulante': 'bg-blue-100 text-blue-800',
-      'entrevista': 'bg-yellow-100 text-yellow-800',
-      'seleccionado': 'bg-green-100 text-green-800',
-      'rechazado': 'bg-red-100 text-red-800',
-      'contratado': 'bg-purple-100 text-purple-800'
+      'postulante': 'bg-primary/10 text-primary',
+      'entrevista': 'bg-amber-500/10 text-amber-400',
+      'seleccionado': 'bg-emerald-500/10 text-emerald-400',
+      'rechazado': 'bg-destructive/10 text-destructive',
+      'contratado': 'bg-violet-500/10 text-violet-400'
     };
-    return colores[estado] || 'bg-gray-100 text-gray-800';
+    return colores[estado] || 'bg-muted text-foreground';
   };
 
   const calcularEstadisticas = () => {
@@ -130,16 +140,16 @@ const CandidatosPage = () => {
     const postulantes = candidatos.filter(c => c.estado === 'postulante').length;
     const entrevistas = candidatos.filter(c => c.estado === 'entrevista').length;
     const contratados = candidatos.filter(c => c.estado === 'contratado').length;
-    
+
     return { total, postulantes, entrevistas, contratados };
   };
 
   if (!rrhhEnabled) {
     return (
-      <div className="dashboard-container">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
         <div className="alert alert-warning">
           <h1 className="text-xl font-semibold">RRHH deshabilitado</h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-foreground/80">
             {/* // HARDENING: RRHH bloqueado hasta culminar procesos legales. */}
             Las funciones de reclutamiento estarán disponibles cuando el módulo de RRHH se habilite en este entorno.
           </p>
@@ -152,15 +162,15 @@ const CandidatosPage = () => {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
           <div>
-            <h1 className="dashboard-title">Candidatos</h1>
-            <p className="dashboard-subtitle">Cargando postulantes, vacantes activas y departamentos disponibles.</p>
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Candidatos</h1>
+            <p className="mt-2 text-base text-muted-foreground">Cargando postulantes, vacantes activas y departamentos disponibles.</p>
           </div>
         </div>
-        <div className="loading">
-          <div className="loading-spinner"></div>
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando candidatos...</p>
         </div>
       </div>
@@ -168,102 +178,102 @@ const CandidatosPage = () => {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">CVs & Candidatos</h1>
-          <p className="dashboard-subtitle">Gestión de reclutamiento y selección</p>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">CVs & Candidatos</h1>
+          <p className="mt-2 text-base text-muted-foreground">Gestión de reclutamiento y selección</p>
         </div>
         <div className="flex gap-4">
-          <button 
-            className="refresh-btn"
+          <button
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             onClick={() => setShowVacanteModal(true)}
           >
-            📋 Nueva Vacante
+            <Briefcase className="size-4" aria-hidden="true" />
+            Nueva Vacante
           </button>
-          <button 
-            className="refresh-btn"
+          <button
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             onClick={() => setShowModal(true)}
           >
-            👤 Nuevo Candidato
+            <UserPlus className="size-4" aria-hidden="true" />
+            Nuevo Candidato
           </button>
         </div>
       </div>
 
       {/* Estadísticas */}
-      <div className="stats-grid mb-6">
-        <div className="stat-card">
-          <div className="stat-header">
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 mb-6">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Total CVs</h3>
-            <div className="stat-icon">📄</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><FileText className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-blue-600">{stats.total}</div>
-          <div className="stat-subtitle">Candidatos registrados</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-primary">{stats.total}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Candidatos registrados</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>En Proceso</h3>
-            <div className="stat-icon">⏳</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-yellow-600">{stats.entrevistas}</div>
-          <div className="stat-subtitle">En entrevistas</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-amber-400">{stats.entrevistas}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">En entrevistas</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Nuevos</h3>
-            <div className="stat-icon">🆕</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Users className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-green-600">{stats.postulantes}</div>
-          <div className="stat-subtitle">Postulaciones nuevas</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-emerald-400">{stats.postulantes}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Postulaciones nuevas</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
             <h3>Contratados</h3>
-            <div className="stat-icon">🎉</div>
+            <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><CheckCircle2 className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="stat-value text-purple-600">{stats.contratados}</div>
-          <div className="stat-subtitle">Proceso exitoso</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-violet-400">{stats.contratados}</div>
+          <div className="mt-2 text-[0.8125rem] text-muted-foreground">Proceso exitoso</div>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-4 mb-6 p-4 bg-[#f8f9fa] rounded-2">
-        <div>
-          <label className="block mb-2 font-medium">
-            Estado:
-          </label>
-          <select 
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
-            className="form-control w-[150px]"
-          >
-            <option value="todos">Todos</option>
-            <option value="postulante">Postulante</option>
-            <option value="entrevista">En Entrevista</option>
-            <option value="seleccionado">Seleccionado</option>
-            <option value="contratado">Contratado</option>
-            <option value="rechazado">Rechazado</option>
-          </select>
+      <div className="mb-6 grid gap-4 rounded-2xl border border-border bg-card/80 p-4 sm:grid-cols-2">
+        <div className="min-w-0">
+          <Label htmlFor="filtro-estado-candidatos" className="mb-2">Estado</Label>
+          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+            <SelectTrigger id="filtro-estado-candidatos" aria-label="Filtrar candidatos por estado">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="postulante">Postulante</SelectItem>
+              <SelectItem value="entrevista">En Entrevista</SelectItem>
+              <SelectItem value="seleccionado">Seleccionado</SelectItem>
+              <SelectItem value="contratado">Contratado</SelectItem>
+              <SelectItem value="rechazado">Rechazado</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        <div>
-          <label className="block mb-2 font-medium">
-            Vacante:
-          </label>
-          <select 
-            value={filtroVacante}
-            onChange={(e) => setFiltroVacante(e.target.value)}
-            className="form-control w-[200px]"
-          >
-            <option value="todas">Todas las vacantes</option>
-            {vacantes.map(v => (
-              <option key={v.id} value={v.id}>{v.titulo}</option>
-            ))}
-          </select>
+        <div className="min-w-0">
+          <Label htmlFor="filtro-vacante-candidatos" className="mb-2">Vacante</Label>
+          <Select value={filtroVacante} onValueChange={setFiltroVacante}>
+            <SelectTrigger id="filtro-vacante-candidatos" aria-label="Filtrar candidatos por vacante">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas las vacantes</SelectItem>
+              {vacantes.map(v => (
+                <SelectItem key={v.id} value={v.id}>{v.titulo}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -293,7 +303,7 @@ const CandidatosPage = () => {
                   <td>
                     <div>
                       <div className="font-medium">{candidato.nombres} {candidato.apellidos}</div>
-                      <div className="text-sm text-gray-500">{candidato.email}</div>
+                      <div className="text-sm text-muted-foreground">{candidato.email}</div>
                     </div>
                   </td>
                   <td>
@@ -325,7 +335,8 @@ const CandidatosPage = () => {
                         className="action-btn bg-blue-500 hover:bg-blue-600 text-white"
                         title="Ver CV"
                       >
-                        👁️
+                        <Eye className="size-4" aria-hidden="true" />
+                        <span className="sr-only">Ver CV</span>
                       </button>
                       <button
                         onClick={() => {
@@ -335,7 +346,8 @@ const CandidatosPage = () => {
                         className="action-btn bg-green-500 hover:bg-green-600 text-white"
                         title="Editar"
                       >
-                        ✏️
+                        <Edit2 className="size-4" aria-hidden="true" />
+                        <span className="sr-only">Editar candidato</span>
                       </button>
                     </div>
                   </td>
@@ -345,7 +357,7 @@ const CandidatosPage = () => {
           </table>
 
           {filtrarCandidatos().length === 0 && (
-            <div className="text-center p-8 text-gray-500">
+            <div className="text-center p-8 text-muted-foreground">
               No hay candidatos que coincidan con los filtros seleccionados.
             </div>
           )}
@@ -353,40 +365,27 @@ const CandidatosPage = () => {
       </div>
 
       {/* Modal de candidato - Simple y elegante */}
-      {showModal && (
-        <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.75)] flex items-center justify-center z-[99999] p-4"
-          onClick={() => {
+      <Dialog
+        open={showModal}
+        onOpenChange={(open) => {
+          setShowModal(open);
+          if (!open) {
             setShowModal(false);
             setCandidatoEdit(null);
-          }}
-        >
-          <div className="bg-white rounded-3 w-[100%] max-w-[600px] overflow-y-auto shadow"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="pt-8 pr-8 pb-4 pl-8 text-white">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-7 font-bold m-0">
-                    👤 {candidatoEdit?.id ? 'Editar Candidato' : 'Nuevo Candidato'}
-                  </h2>
-                  <p className="text-[0.875rem] opacity-[0.9] mt-2 mr-0 mb-0 ml-0">
-                    {candidatoEdit?.id ? 'Actualizar información del postulante' : 'Registrar nueva postulación de CV'}
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => {
-                    setShowModal(false);
-                    setCandidatoEdit(null);
-                  }} className="w-10 h-10 rounded-full bg-[rgba(255,_255,_255,_0.2)] text-white border-0 cursor-pointer text-5"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <CandidatoFormulario 
+          }
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-1rem)] max-w-2xl gap-0 overflow-y-auto p-0 sm:max-h-[calc(100dvh-2rem)]">
+          <DialogHeader className="sticky top-0 z-10 border-b border-border bg-background px-5 py-5 pr-12 sm:px-6">
+            <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+              <UserPlus className="size-5 text-primary" aria-hidden="true" />
+              {candidatoEdit?.id ? 'Editar Candidato' : 'Nuevo Candidato'}
+            </DialogTitle>
+            <DialogDescription>
+              {candidatoEdit?.id ? 'Actualizar información del postulante' : 'Registrar nueva postulación de CV'}
+            </DialogDescription>
+          </DialogHeader>
+            <CandidatoFormulario
               candidato={candidatoEdit}
               vacantes={vacantes}
               onSuccess={() => {
@@ -399,11 +398,10 @@ const CandidatosPage = () => {
                 setCandidatoEdit(null);
               }}
             />
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      <VacanteModal 
+      <VacanteModal
         isOpen={showVacanteModal}
         onClose={() => setShowVacanteModal(false)}
         onSuccess={loadData}
@@ -434,7 +432,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
     estado: 'postulante',
     observaciones: ''
   });
-  
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -462,7 +460,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.nombres.trim() || !formData.apellidos.trim() || !formData.email.trim() || !formData.id_vacante) {
       toast({
         title: "Error",
@@ -471,7 +469,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
       });
       return;
     }
-    
+
     setLoading(true);
     try {
       // Calcular puntuación automática del CV
@@ -517,23 +515,24 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
   const vacanteSeleccionada = vacantes.find((v: any) => v.id === formData.id_vacante);
 
   return (
-    <form onSubmit={handleSubmit} className="p-8">
+    <form onSubmit={handleSubmit} className="p-4 sm:p-6">
       {/* Info de vacante seleccionada */}
       {vacanteSeleccionada && (
-        <div className="mb-6 p-4 bg-[#dbeafe] rounded-2 border">
-          <div className="text-[0.875rem] text-[#1e40af] font-semibold">
-            📋 <strong>Postula para:</strong> {vacanteSeleccionada.titulo} • <strong>Depto:</strong> {vacanteSeleccionada.departamento}
+        <div className="mb-6 rounded-lg border border-primary/20 bg-primary/10 p-4">
+          <div className="flex items-start gap-2 text-sm font-semibold text-foreground">
+            <Briefcase className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span><strong>Postula para:</strong> {vacanteSeleccionada.titulo} • <strong>Depto:</strong> {vacanteSeleccionada.departamento}</span>
           </div>
         </div>
       )}
 
       {/* Información Básica */}
-      <div className="mb-6 p-6 bg-slate-50 rounded-2 border">
-        <h3 className="text-[1.125rem] font-semibold text-slate-800 mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
-          👤 Información Personal
+      <div className="mb-6 rounded-lg border border-border bg-muted/30 p-4 sm:p-6">
+        <h3 className="text-[1.125rem] font-semibold text-foreground mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
+          <Users className="size-5 text-primary" aria-hidden="true" /> Información Personal
         </h3>
-        
-        <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
+
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-[0.875rem] font-semibold mb-2">
               Nombres *
@@ -561,10 +560,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-[0.875rem] font-semibold mb-2">
-              📧 Email *
+              Email *
             </label>
             <input
               type="email"
@@ -577,7 +576,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
           <div>
             <label className="block text-[0.875rem] font-semibold mb-2">
-              📱 Teléfono
+              Teléfono
             </label>
             <input
               type="tel"
@@ -590,11 +589,11 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
         <div>
           <label className="block text-[0.875rem] font-semibold mb-2">
-            🏢 Vacante que Postula *
+            Vacante que Postula *
           </label>
           <select
             value={formData.id_vacante}
-            onChange={(e) => setFormData({...formData, id_vacante: e.target.value})} className="w-[100%] p-3 border rounded-[6px] bg-white"
+            onChange={(e) => setFormData({...formData, id_vacante: e.target.value})} className="w-[100%] p-3 border rounded-[6px] bg-card"
             required
           >
             <option value="">Seleccionar vacante...</option>
@@ -608,12 +607,12 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
       </div>
 
       {/* Información Profesional */}
-      <div className="mb-6 p-6 bg-[#f0fdf4] rounded-2 border">
-        <h3 className="text-[1.125rem] font-semibold text-[#14532d] mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
-          💼 Información Profesional
+      <div className="mb-6 rounded-lg border border-border bg-accent/35 p-4 sm:p-6">
+        <h3 className="m-0 mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+          <Briefcase className="size-5 text-primary" aria-hidden="true" /> Información Profesional
         </h3>
-        
-        <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 mb-4">
+
+        <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <label className="block text-[0.875rem] font-semibold mb-2">
               Experiencia (años)
@@ -629,7 +628,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
           <div>
             <label className="block text-[0.875rem] font-semibold mb-2">
-              💰 Pretensión Salarial (S/)
+              Pretensión Salarial (S/)
             </label>
             <input
               type="number"
@@ -646,21 +645,21 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
             </label>
             <select
               value={formData.estado}
-              onChange={(e) => setFormData({...formData, estado: e.target.value})} className="w-[100%] p-3 border rounded-[6px] bg-white"
+              onChange={(e) => setFormData({...formData, estado: e.target.value})} className="w-[100%] p-3 border rounded-[6px] bg-card"
             >
-              <option value="postulante">📝 Postulante</option>
-              <option value="entrevista">🤝 En Entrevista</option>
-              <option value="seleccionado">✅ Seleccionado</option>
-              <option value="contratado">🎉 Contratado</option>
-              <option value="rechazado">❌ Rechazado</option>
+              <option value="postulante">Postulante</option>
+              <option value="entrevista">En Entrevista</option>
+              <option value="seleccionado">Seleccionado</option>
+              <option value="contratado">Contratado</option>
+              <option value="rechazado">Rechazado</option>
             </select>
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_1fr] gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-[0.875rem] font-semibold mb-2">
-              📄 URL del CV
+              URL del CV
             </label>
             <input
               type="url"
@@ -672,7 +671,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
           <div>
             <label className="block text-[0.875rem] font-semibold mb-2">
-              🔗 LinkedIn
+              LinkedIn
             </label>
             <input
               type="url"
@@ -687,7 +686,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
       {/* Observaciones */}
       <div className="mb-6">
         <label className="block text-[0.875rem] font-semibold mb-2">
-          📝 Observaciones
+          Observaciones
         </label>
         <textarea
           value={formData.observaciones}
@@ -698,21 +697,21 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
       </div>
 
       {/* Botones */}
-      <div className="flex justify-end gap-4 pt-4 border-t">
+      <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-3 border-t border-border bg-background px-4 pb-1 pt-4 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:px-0">
         <button
           type="button"
-          onClick={onCancel} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-medium"
+          onClick={onCancel} className="rounded-md border border-border bg-background px-6 py-3 font-medium text-foreground hover:bg-muted"
         >
           Cancelar
         </button>
         <button
           type="submit"
-          disabled={loading} className="py-3 px-6 border-0 rounded-[6px] text-white font-medium flex items-center gap-2"
+          disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {loading ? (
-            <>⏳ Guardando...</>
+            <><Clock3 className="size-4 animate-pulse" aria-hidden="true" /> Guardando...</>
           ) : (
-            <>{candidato?.id ? '✏️ Actualizar' : '➕ Registrar'} Candidato</>
+            <>{candidato?.id ? <Edit2 className="size-4" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}{candidato?.id ? 'Actualizar' : 'Registrar'} Candidato</>
           )}
         </button>
       </div>
@@ -720,4 +719,4 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
   );
 }
 
-export default CandidatosPage; 
+export default CandidatosPage;

@@ -257,6 +257,16 @@ test.describe('T15 RRHH completo', () => {
     );
     expect(contrato.id, 'contrato RRHH debe persistir').toBeTruthy();
 
+    const contratoPdfResponse = await apiContext.get(api(`/rrhh/contratos/${contrato.id}/generar`));
+    expect(
+      contratoPdfResponse.ok(),
+      `contrato RRHH debe generar PDF real: ${await contratoPdfResponse.text()}`,
+    ).toBeTruthy();
+    expect(contratoPdfResponse.headers()['content-type']).toContain('application/pdf');
+    const contratoPdf = await contratoPdfResponse.body();
+    expect(contratoPdf.subarray(0, 4).toString(), 'contrato debe tener firma PDF').toBe('%PDF');
+    expect(contratoPdf.length, 'contrato PDF debe tener contenido').toBeGreaterThan(500);
+
     const conceptos = await parseOk<any[]>(await apiContext.get(api('/rrhh/conceptos')), 'listar conceptos planilla T15');
     expect(Array.isArray(conceptos), 'conceptos debe responder arreglo normalizado').toBeTruthy();
 
@@ -338,6 +348,16 @@ test.describe('T15 RRHH completo', () => {
     expect(pagosError?.message || '', 'consultar obligacion de pago RRHH T15').toBe('');
     expect(pagos || [], 'pago RRHH debe persistir obligacion/pago').toHaveLength(1);
     expect(Number(pagos![0].monto_neto), 'monto neto RRHH persistido').toBeCloseTo(3680, 2);
+
+    const comprobantePdfResponse = await apiContext.get(api(`/rrhh/pagos/${pagos![0].id}/comprobante`));
+    expect(
+      comprobantePdfResponse.ok(),
+      `pago RRHH debe generar comprobante PDF real: ${await comprobantePdfResponse.text()}`,
+    ).toBeTruthy();
+    expect(comprobantePdfResponse.headers()['content-type']).toContain('application/pdf');
+    const comprobantePdf = await comprobantePdfResponse.body();
+    expect(comprobantePdf.subarray(0, 4).toString(), 'comprobante debe tener firma PDF').toBe('%PDF');
+    expect(comprobantePdf.length, 'comprobante PDF debe tener contenido').toBeGreaterThan(500);
 
     const asientoRespuesta = await parseOk<any>(
       await apiContext.post(api(`/rrhh/planillas/${planilla.id}/generar-asientos`), { data: {} }),

@@ -15,6 +15,7 @@ import {
   User,
 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { usePermission } from '@/hooks/use-permission'
 import { apiSucceeded, unwrapApiArray, unwrapApiData } from '@/lib/api-contract'
 import { PageShell } from '@/components/erp/page-shell'
 import { Button } from '@/components/ui/button'
@@ -58,21 +59,22 @@ interface Pagination {
 const operationClass = (operation: string) => {
   switch (operation) {
     case 'INSERT':
-      return 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
+      return 'border-cyan-300/30 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
     case 'UPDATE':
-      return 'border-blue-300/25 bg-blue-300/10 text-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
+      return 'border-blue-300/25 bg-blue-300/10 text-blue-700 dark:text-blue-200 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
     case 'DELETE':
-      return 'border-slate-300/25 bg-slate-300/10 text-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700'
+      return 'border-border/25 bg-slate-300/10 text-foreground/90 group-data-[erp-theme=light]/dashboard:bg-muted group-data-[erp-theme=light]/dashboard:text-foreground/85'
     default:
-      return 'border-blue-300/25 bg-blue-300/10 text-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
+      return 'border-blue-300/25 bg-blue-300/10 text-blue-700 dark:text-blue-200 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
   }
 }
 
-const fieldBlockClass = 'rounded-2xl border border-cyan-400/15 bg-slate-950/60 p-3 text-xs text-slate-200 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700'
-const inputClass = 'h-10 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950 group-data-[erp-theme=light]/dashboard:focus:border-blue-400'
+const fieldBlockClass = 'rounded-2xl border border-cyan-400/15 bg-card/60 p-3 text-xs text-foreground/90 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85'
+const inputClass = 'h-10 rounded-md border border-cyan-400/20 bg-card/70 px-3 text-sm text-foreground outline-none transition focus:border-cyan-300 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground group-data-[erp-theme=light]/dashboard:focus:border-blue-400'
 
 export default function AuditLogsViewer() {
-  const { get } = useApi()
+  const { get } = useApi({ showErrorToast: false })
+  const { hasPermission: canLoadUsers, loading: usersPermissionLoading } = usePermission('users', 'manage', '')
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -83,6 +85,11 @@ export default function AuditLogsViewer() {
   const [users, setUsers] = useState<Array<{ id: string; nombre: string; email: string }>>([])
 
   const loadUsers = useCallback(async () => {
+    if (usersPermissionLoading || !canLoadUsers) {
+      setUsers([])
+      return
+    }
+
     try {
       const response = await get('/api/users')
       if (apiSucceeded(response)) {
@@ -92,7 +99,7 @@ export default function AuditLogsViewer() {
     } catch (err) {
       console.error('Error cargando usuarios:', err)
     }
-  }, [get])
+  }, [canLoadUsers, get, usersPermissionLoading])
 
   useEffect(() => { loadUsers() }, [loadUsers])
 
@@ -164,7 +171,7 @@ export default function AuditLogsViewer() {
   if (loading && logs.length === 0) {
     return (
       <PageShell title="Logs de Auditoría" description="Cargando trazabilidad completa del sistema.">
-        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-card/60 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
           <div className="text-center">
             <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
             <p className="text-sm font-semibold">Cargando logs de auditoría...</p>
@@ -176,25 +183,25 @@ export default function AuditLogsViewer() {
 
   return (
     <PageShell
-      title={<span className="inline-flex items-center gap-3"><Shield className="h-7 w-7 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" /> Logs de Auditoría</span>}
+      title={<span className="inline-flex items-center gap-3"><Shield className="h-7 w-7 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" /> Logs de Auditoría</span>}
       description="Trazabilidad completa de cambios críticos, usuarios, documentos y operaciones."
       actions={<Button onClick={loadLogs} disabled={loading} className="gap-2"><RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} /> Actualizar</Button>}
     >
       <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr]">
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950"><Filter className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" /> Filtros</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-foreground"><Filter className="h-5 w-5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" /> Filtros</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Buscar</span>
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-500" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary group-data-[erp-theme=light]/dashboard:text-blue-500" />
                 <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar en logs..." className={`${inputClass} pl-9`} />
               </div>
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Tabla</span>
               <select value={filters.table_name || ''} onChange={(e) => setFilters({ ...filters, table_name: e.target.value || undefined, page: 1 })} className={inputClass}>
                 <option value="">Todas las tablas</option>
@@ -218,7 +225,7 @@ export default function AuditLogsViewer() {
               </select>
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Operación</span>
               <select value={filters.operation || ''} onChange={(e) => setFilters({ ...filters, operation: e.target.value as any || undefined, page: 1 })} className={inputClass}>
                 <option value="">Todas las operaciones</option>
@@ -228,7 +235,7 @@ export default function AuditLogsViewer() {
               </select>
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Usuario</span>
               <select value={filters.user_id || ''} onChange={(e) => setFilters({ ...filters, user_id: e.target.value || undefined, page: 1 })} className={inputClass}>
                 <option value="">Todos los usuarios</option>
@@ -236,12 +243,12 @@ export default function AuditLogsViewer() {
               </select>
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Desde</span>
               <input type="datetime-local" value={filters.start_date?.substring(0, 16) || ''} onChange={(e) => setFilters({ ...filters, start_date: e.target.value ? `${e.target.value}:00` : undefined, page: 1 })} className={inputClass} />
             </label>
 
-            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+            <label className="space-y-2 text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
               <span>Hasta</span>
               <input type="datetime-local" value={filters.end_date?.substring(0, 16) || ''} onChange={(e) => setFilters({ ...filters, end_date: e.target.value ? `${e.target.value}:00` : undefined, page: 1 })} className={inputClass} />
             </label>
@@ -252,67 +259,67 @@ export default function AuditLogsViewer() {
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
-              <FileText className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+            <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-foreground">
+              <FileText className="h-5 w-5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" />
               Registros ({pagination.total})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {error && (
-              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
+              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-700 dark:text-amber-200 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
                 <AlertCircle className="h-5 w-5" />
                 {error}
               </div>
             )}
 
             {filteredLogs.length === 0 ? (
-              <div className="rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-10 text-center group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50">
-                <Database className="mx-auto mb-4 h-10 w-10 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-500" />
-                <h3 className="font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">No hay logs de auditoría</h3>
-                <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">No se encontraron registros con los filtros seleccionados.</p>
+              <div className="rounded-2xl border border-cyan-400/15 bg-card/50 p-10 text-center group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30">
+                <Database className="mx-auto mb-4 h-10 w-10 text-primary group-data-[erp-theme=light]/dashboard:text-blue-500" />
+                <h3 className="font-bold text-white group-data-[erp-theme=light]/dashboard:text-foreground">No hay logs de auditoría</h3>
+                <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">No se encontraron registros con los filtros seleccionados.</p>
               </div>
             ) : (
-              <div className="divide-y divide-cyan-400/10 overflow-hidden rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:divide-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200">
+              <div className="divide-y divide-cyan-400/10 overflow-hidden rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:divide-slate-100 group-data-[erp-theme=light]/dashboard:border-border">
                 {filteredLogs.map((log) => (
                   <div key={log.id} className="p-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <Badge className={operationClass(log.operation)}>{log.operation}</Badge>
-                      <strong className="text-blue-100 group-data-[erp-theme=light]/dashboard:text-slate-950">{log.table_name}</strong>
-                      {log.record_id && <span className="font-mono text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">ID: {log.record_id.substring(0, 8)}...</span>}
+                      <strong className="text-blue-700 dark:text-blue-200 group-data-[erp-theme=light]/dashboard:text-foreground">{log.table_name}</strong>
+                      {log.record_id && <span className="font-mono text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">ID: {log.record_id.substring(0, 8)}...</span>}
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                    <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                       <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{formatDate(log.timestamp)}</span>
                       {log.user_id && <span className="flex items-center gap-1"><User className="h-4 w-4" />{log.user_id.substring(0, 8)}...</span>}
                       {log.ip_address && <span>{log.ip_address}</span>}
-                      {log.changed_fields?.length ? <Badge className="border-blue-300/25 bg-blue-300/10 text-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">{log.changed_fields.length} campo(s)</Badge> : null}
+                      {log.changed_fields?.length ? <Badge className="border-blue-300/25 bg-blue-300/10 text-blue-700 dark:text-blue-200 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">{log.changed_fields.length} campo(s)</Badge> : null}
                     </div>
 
                     {expandedLogs.has(log.id) && (
                       <div className="mt-4 grid gap-4 lg:grid-cols-2">
                         {log.old_values && Object.keys(log.old_values).length > 0 && (
                           <div>
-                            <h4 className="mb-2 text-sm font-semibold text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">Valores anteriores</h4>
+                            <h4 className="mb-2 text-sm font-semibold text-foreground/90 group-data-[erp-theme=light]/dashboard:text-foreground/85">Valores anteriores</h4>
                             <pre className={fieldBlockClass}>{JSON.stringify(log.old_values, null, 2)}</pre>
                           </div>
                         )}
                         {log.new_values && Object.keys(log.new_values).length > 0 && (
                           <div>
-                            <h4 className="mb-2 text-sm font-semibold text-cyan-100 group-data-[erp-theme=light]/dashboard:text-blue-700">Valores nuevos</h4>
+                            <h4 className="mb-2 text-sm font-semibold text-primary group-data-[erp-theme=light]/dashboard:text-blue-700">Valores nuevos</h4>
                             <pre className={fieldBlockClass}>{JSON.stringify(log.new_values, null, 2)}</pre>
                           </div>
                         )}
                         {log.metadata && Object.keys(log.metadata).length > 0 && (
                           <div>
-                            <h4 className="mb-2 text-sm font-semibold text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">Metadatos</h4>
+                            <h4 className="mb-2 text-sm font-semibold text-foreground/90 group-data-[erp-theme=light]/dashboard:text-foreground/85">Metadatos</h4>
                             <pre className={fieldBlockClass}>{JSON.stringify(log.metadata, null, 2)}</pre>
                           </div>
                         )}
                       </div>
                     )}
 
-                    <Button variant="ghost" size="sm" onClick={() => toggleExpand(log.id)} className="mt-3 gap-2 text-slate-300 hover:text-cyan-100 group-data-[erp-theme=light]/dashboard:text-slate-600 group-data-[erp-theme=light]/dashboard:hover:text-blue-700">
+                    <Button variant="ghost" size="sm" onClick={() => toggleExpand(log.id)} className="mt-3 gap-2 text-muted-foreground hover:text-primary group-data-[erp-theme=light]/dashboard:text-foreground/80 group-data-[erp-theme=light]/dashboard:hover:text-blue-700">
                       {expandedLogs.has(log.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       {expandedLogs.has(log.id) ? 'Ocultar detalles' : 'Ver detalles'}
                     </Button>
@@ -322,9 +329,9 @@ export default function AuditLogsViewer() {
             )}
 
             {pagination.totalPages > 1 && (
-              <div className="mt-5 flex flex-col items-center justify-center gap-3 rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-4 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50 sm:flex-row">
+              <div className="mt-5 flex flex-col items-center justify-center gap-3 rounded-2xl border border-cyan-400/15 bg-card/50 p-4 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30 sm:flex-row">
                 <Button variant="secondary" onClick={() => setFilters({ ...filters, page: Math.max(1, pagination.page - 1) })} disabled={pagination.page === 1}>Anterior</Button>
-                <span className="text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">Página {pagination.page} de {pagination.totalPages} ({pagination.total} registros)</span>
+                <span className="text-sm font-semibold text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">Página {pagination.page} de {pagination.totalPages} ({pagination.total} registros)</span>
                 <Button variant="secondary" onClick={() => setFilters({ ...filters, page: Math.min(pagination.totalPages, pagination.page + 1) })} disabled={pagination.page >= pagination.totalPages}>Siguiente</Button>
               </div>
             )}

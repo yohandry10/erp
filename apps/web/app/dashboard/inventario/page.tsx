@@ -81,12 +81,12 @@ const formatDateTime = (value?: string | null) => {
 }
 
 function StatsFallback() {
-  return <div className="rounded-2xl border border-cyan-400/20 bg-slate-950/60 p-4 text-sm text-cyan-100 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">Necesitas el permiso <code>inventario.stats.read</code> para ver los indicadores.</div>
+  return <div className="rounded-2xl border border-cyan-400/20 bg-card/60 p-4 text-sm text-primary group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">Necesitas el permiso <code>inventario.stats.read</code> para ver los indicadores.</div>
 }
 
 function ProductsFallback() {
   return (
-    <div className="rounded-2xl border border-cyan-400/20 bg-slate-950/60 p-4 text-sm text-cyan-100 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
+    <div className="rounded-2xl border border-cyan-400/20 bg-card/60 p-4 text-sm text-primary group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
       Solicita acceso a <code>inventario.productos.read</code> para revisar el catálogo de productos.
     </div>
   )
@@ -94,7 +94,7 @@ function ProductsFallback() {
 
 function MovementsFallback() {
   return (
-    <div className="rounded-2xl border border-cyan-400/20 bg-slate-950/60 p-4 text-sm text-cyan-100 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
+    <div className="rounded-2xl border border-cyan-400/20 bg-card/60 p-4 text-sm text-primary group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
       Necesitas <code>inventario.movimientos.read</code> para consultar la bitácora de movimientos.
     </div>
   )
@@ -243,10 +243,10 @@ export default function InventarioPage() {
         </>
       }
     >
-      {error && <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">{error}</div>}
+      {error && <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-700 dark:text-amber-200 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">{error}</div>}
 
       {loading ? (
-        <div className="grid min-h-[320px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+        <div className="grid min-h-[320px] place-items-center rounded-3xl border border-cyan-400/20 bg-card/60 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
           <div className="text-center">
             <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
             <p className="text-sm font-semibold">Cargando inventario...</p>
@@ -276,10 +276,10 @@ export default function InventarioPage() {
             accion="read"
             fallback={<ProductsFallback />}
           >
-            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+            <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950"><ClipboardList className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" /> Productos</CardTitle>
-                <p className="text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-foreground"><ClipboardList className="h-5 w-5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" /> Productos</CardTitle>
+                <p className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                   Filtros de operación sobre catálogo, stock crítico y última actualización.
                 </p>
               </CardHeader>
@@ -290,14 +290,14 @@ export default function InventarioPage() {
                   value={filters.search}
                   onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
                   placeholder="Buscar por nombre, código o categoría"
-                  className="bg-slate-900/70 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
+                  className="bg-card/70 text-foreground group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground"
                 />
                 <select
                   value={filters.estado}
                   onChange={(event) =>
                     setFilters((prev) => ({ ...prev, estado: event.target.value as Filters['estado'] }))
                   }
-                  className="h-10 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
+                  className="h-10 rounded-md border border-cyan-400/20 bg-card/70 px-3 text-sm text-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground"
                 >
                   {ESTADO_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -308,7 +308,7 @@ export default function InventarioPage() {
                 <select
                   value={filters.categoria}
                   onChange={(event) => setFilters((prev) => ({ ...prev, categoria: event.target.value }))}
-                  className="h-10 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
+                  className="h-10 rounded-md border border-cyan-400/20 bg-card/70 px-3 text-sm text-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground"
                 >
                   <option value="">Todas las categorías</option>
                   {categorias.map((categoria) => (
@@ -317,7 +317,7 @@ export default function InventarioPage() {
                     </option>
                   ))}
                 </select>
-                <label className="flex min-h-10 items-center gap-2 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-200 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-700">
+                <label className="flex min-h-10 items-center gap-2 rounded-md border border-cyan-400/20 bg-card/70 px-3 text-sm text-foreground/90 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30 group-data-[erp-theme=light]/dashboard:text-foreground/85">
                   <input
                     type="checkbox"
                     checked={filters.soloCriticos}
@@ -329,9 +329,9 @@ export default function InventarioPage() {
                 </label>
               </div>
 
-              <div className="overflow-auto rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:border-slate-200">
+              <div className="overflow-auto rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:border-border">
               <table className="w-full min-w-[860px] text-sm">
-                <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.12em] text-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.12em] text-primary/80 group-data-[erp-theme=light]/dashboard:bg-muted/30 group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 text-left">Producto</th>
                     <th className="px-4 py-3 text-left">Categoría</th>
@@ -344,7 +344,7 @@ export default function InventarioPage() {
                 <tbody className="divide-y divide-cyan-400/10 group-data-[erp-theme=light]/dashboard:divide-slate-100">
                   {productosFiltrados.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-center text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500" colSpan={6}>Sin productos que cumplan los filtros.</td>
+                      <td className="px-4 py-8 text-center text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground" colSpan={6}>Sin productos que cumplan los filtros.</td>
                     </tr>
                   ) : (
                     productosFiltrados.map((producto) => {
@@ -353,19 +353,19 @@ export default function InventarioPage() {
                         <tr key={producto.id}>
                           <td className="px-4 py-3">
                             <div>
-                              <strong className="block text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-900">{producto.nombre}</strong>
-                              {producto.codigo && <small className="text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Código: {producto.codigo}</small>}
+                              <strong className="block text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">{producto.nombre}</strong>
+                              {producto.codigo && <small className="text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">Código: {producto.codigo}</small>}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{producto.categoria ?? '—'}</td>
+                          <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{producto.categoria ?? '—'}</td>
                           <td className="px-4 py-3">
-                            <Badge className={producto.activo ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700' : 'border-slate-300/25 bg-slate-300/10 text-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700'}>
+                            <Badge className={producto.activo ? 'border-cyan-300/30 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700' : 'border-border/25 bg-slate-300/10 text-foreground/90 group-data-[erp-theme=light]/dashboard:bg-muted group-data-[erp-theme=light]/dashboard:text-foreground/85'}>
                               {producto.activo ? 'Activo' : 'Inactivo'}
                             </Badge>
                           </td>
-                          <td className={critico ? 'px-4 py-3 text-right font-bold text-amber-200 group-data-[erp-theme=light]/dashboard:text-amber-700' : 'px-4 py-3 text-right'}>{formatNumber(producto.stockActual)}</td>
+                          <td className={critico ? 'px-4 py-3 text-right font-bold text-amber-700 dark:text-amber-200 group-data-[erp-theme=light]/dashboard:text-amber-700' : 'px-4 py-3 text-right'}>{formatNumber(producto.stockActual)}</td>
                           <td className="px-4 py-3 text-right">{producto.stockMinimo > 0 ? formatNumber(producto.stockMinimo) : '—'}</td>
-                          <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{formatDateTime(producto.updatedAt)}</td>
+                          <td className="px-4 py-3 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{formatDateTime(producto.updatedAt)}</td>
                         </tr>
                       )
                     })
@@ -375,7 +375,7 @@ export default function InventarioPage() {
               </div>
 
               {criticos.length > 0 && (
-                <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
+                <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-700 dark:text-amber-200 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
                   <strong>Productos críticos:</strong>{' '}
                   {criticos.map((producto) => producto.nombre).join(', ')}
                 </div>
@@ -391,24 +391,24 @@ export default function InventarioPage() {
             accion="read"
             fallback={<MovementsFallback />}
           >
-            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+            <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Movimientos recientes</CardTitle>
+                <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">Movimientos recientes</CardTitle>
                 <Button asChild size="sm"><Link href="/dashboard/inventario/kardex">Ver kardex</Link></Button>
               </CardHeader>
               <CardContent>
 
               {movimientos.length === 0 ? (
-                <p className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Sin movimientos recientes.</p>
+                <p className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">Sin movimientos recientes.</p>
               ) : (
                 <div className="grid gap-3">
                   {movimientos.map((movimiento) => {
                     const producto = movimiento.productoId ? productoPorId.get(movimiento.productoId) : null
                     return (
-                      <div key={movimiento.id} className="flex flex-col gap-2 rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-4 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50 md:flex-row md:items-center md:justify-between">
+                      <div key={movimiento.id} className="flex flex-col gap-2 rounded-2xl border border-cyan-400/15 bg-card/50 p-4 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30 md:flex-row md:items-center md:justify-between">
                         <div className="min-w-0">
                           <strong className="block truncate">{producto?.nombre ?? 'Movimiento de inventario'}</strong>
-                          <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                          <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                             <span>
                               Tipo:{' '}
                               <strong>{movimiento.tipo === 'ENTRADA' ? 'Entrada' : movimiento.tipo === 'SALIDA' ? 'Salida' : 'Ajuste'}</strong>
@@ -420,7 +420,7 @@ export default function InventarioPage() {
                             {movimiento.referencia && <span>Ref: {movimiento.referencia}</span>}
                           </div>
                         </div>
-                        <div className="text-xs font-semibold text-cyan-200 group-data-[erp-theme=light]/dashboard:text-blue-700">{formatDateTime(movimiento.creadoEn)}</div>
+                        <div className="text-xs font-semibold text-primary group-data-[erp-theme=light]/dashboard:text-blue-700">{formatDateTime(movimiento.creadoEn)}</div>
                       </div>
                     )
                   })}

@@ -1,14 +1,20 @@
 export interface CreateGuiaRemisionDto {
   destinatario: string;
   direccionDestino: string;
+  ubigeoDestino?: string;
   fechaTraslado: string;
   modalidad: 'TRANSPORTE_PUBLICO' | 'TRANSPORTE_PRIVADO';
   motivo: string;
   pesoTotal: number;
   observaciones?: string;
   transportista?: string;
+  transportistaDocumento?: string;
   placaVehiculo?: string;
   licenciaConducir?: string;
+  conductorDocumentoTipo?: string;
+  conductorDocumentoNumero?: string;
+  conductorNombres?: string;
+  conductorApellidos?: string;
   cpeRelacionado?: string; // ID del CPE relacionado si aplica
   pedidoId?: string;
   pedidoNumero?: string;
@@ -24,6 +30,7 @@ export interface GuiaRemisionResponseDto {
   estado: string;
   destinatario: string;
   direccionDestino: string;
+  ubigeoDestino?: string;
   fechaTraslado: string;
   fechaCreacion: string;
   modalidad: string;
@@ -31,8 +38,13 @@ export interface GuiaRemisionResponseDto {
   pesoTotal: number;
   observaciones?: string;
   transportista?: string;
+  transportistaDocumento?: string;
   placaVehiculo?: string;
   licenciaConducir?: string;
+  conductorDocumentoTipo?: string;
+  conductorDocumentoNumero?: string;
+  conductorNombres?: string;
+  conductorApellidos?: string;
   cpeRelacionado?: string; // ID del CPE relacionado
   numeroSunat?: string; // Número asignado por SUNAT
   hashGre?: string; // Hash del XML firmado

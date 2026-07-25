@@ -1,0 +1,28 @@
+{
+  "runId": "2026-06-17T07-56-41-259Z-1286",
+  "executedAt": "2026-06-17T07:56:41.448Z",
+  "operation": "getStatus-readonly",
+  "environment": "homologacion",
+  "endpoints": "SUNAT beta defaults from OseService",
+  "ruc": "20100066603",
+  "username": "20100066603MODDATOS",
+  "productionUsed": false,
+  "sentDocuments": false,
+  "sourceArtifact": "docs/audits/artifacts/sunat-beta-ra-rc-gre/2026-06-17T07-04-03-049Z-1489/manifest.json",
+  "artifactDirectory": "C:\\Users\\PC\\Desktop\\erp\\docs\\audits\\artifacts\\sunat-beta-ticket-readonly\\2026-06-17T07-56-41-259Z-1286",
+  "tickets": [
+    {
+      "type": "RC",
+      "label": "RC-1781679882872",
+      "ticket": "1781679882872",
+      "response": {
+        "success": true,
+        "codigoRespuesta": "0",
+        "descripcionRespuesta": "El Resumen diario RC-20260617-34514, ha sido aceptado",
+        "observaciones": [],
+        "cdrSha256": "0D1710B6437FA850CD3F2E30F47F795C1373ED45AE4B9F12DDB5D584E297FE76",
+        "cdrLength": 1768
+      }
+    }
+  ]
+}

@@ -88,13 +88,13 @@ export function NotificationBell({ className }: NotificationBellProps) {
           size="icon"
           aria-label="Abrir notificaciones"
           className={cn(
-            'relative h-11 w-11 rounded-xl border border-cyan-300/25 bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-950/20 hover:from-blue-500 hover:to-cyan-400',
+            'relative h-11 w-11 rounded-xl border border-border/80 bg-card text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground',
             className,
           )}
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full border border-slate-950 bg-cyan-300 px-1 text-[10px] font-black text-slate-950">
+            <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full border-2 border-background bg-primary px-1 text-[10px] font-black text-primary-foreground">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -103,7 +103,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
       <PopoverContent
         align="end"
         sideOffset={12}
-        className="w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-2xl border-cyan-300/20 bg-slate-950 p-0 text-slate-100 shadow-2xl shadow-blue-950/40 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950 group-data-[erp-theme=light]/dashboard:shadow-slate-200/80"
+        className="w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-2xl border-cyan-300/20 bg-background p-0 text-foreground shadow-2xl shadow-blue-950/40 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground group-data-[erp-theme=light]/dashboard:shadow-slate-200/80"
       >
         <NotificationPanel
           onNotificationRead={fetchUnreadCount}

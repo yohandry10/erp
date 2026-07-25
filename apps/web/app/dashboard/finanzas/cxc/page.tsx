@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CheckCircle, Clock, DollarSign, Download, Eye, FileText, History, RefreshCw, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { parseDateLocal } from '@/lib/date-utils'
+import { usePermission } from '@/hooks/use-permission'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { CobroModal, HistorialDrawer, NotaCreditoModal, ReprogramarModal } from '@/components/finanzas'
 import { Button } from '@/components/ui/button'
@@ -39,22 +41,22 @@ type ClienteLigero = {
 const ESTADO_META: Record<EstadoCxc, { label: string; className: string; icon: typeof Clock }> = {
   PENDIENTE: {
     label: 'Pendiente',
-    className: 'border-amber-300/25 bg-amber-300/10 text-amber-100',
+    className: 'border-amber-300/25 bg-amber-300/10 text-amber-400 dark:text-amber-200',
     icon: Clock,
   },
   PARCIAL: {
     label: 'Parcial',
-    className: 'border-blue-300/25 bg-blue-300/10 text-blue-100',
+    className: 'border-blue-300/25 bg-blue-300/10 text-primary dark:text-blue-200',
     icon: AlertCircle,
   },
   CANCELADO: {
     label: 'Cancelado',
-    className: 'border-cyan-300/25 bg-cyan-300/10 text-cyan-100',
+    className: 'border-cyan-300/25 bg-cyan-300/10 text-primary',
     icon: CheckCircle,
   },
   VENCIDO: {
     label: 'Vencido',
-    className: 'border-slate-300/25 bg-slate-300/10 text-slate-100',
+    className: 'border-border/25 bg-slate-300/10 text-foreground',
     icon: XCircle,
   },
 }
@@ -73,13 +75,14 @@ const initialFilters = {
 }
 
 const inputClass =
-  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+  'w-full rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
-const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function CuentasPorCobrarPage() {
   const router = useRouter()
-  const { get } = useApi()
+  const { get } = useApi({ showErrorToast: false })
+  const { hasPermission: canReadClientes, loading: clientesPermissionLoading } = usePermission('ventas', 'ver', 'clientes')
 
   const [cuentas, setCuentas] = useState<CuentaPorCobrar[]>([])
   const [clientes, setClientes] = useState<ClienteLigero[]>([])
@@ -115,6 +118,13 @@ export default function CuentasPorCobrarPage() {
   }, [filters, get])
 
   const fetchClientes = useCallback(async () => {
+    if (clientesPermissionLoading) return
+
+    if (!canReadClientes) {
+      setClientes([])
+      return
+    }
+
     try {
       const response = await get('/ventas/clientes?limit=1000')
       const data = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : []
@@ -123,7 +133,7 @@ export default function CuentasPorCobrarPage() {
       console.error('Error cargando clientes', error)
       setClientes([])
     }
-  }, [get])
+  }, [canReadClientes, clientesPermissionLoading, get])
 
   const fetchHistorial = useCallback(
     async (cxcId: string) => {
@@ -167,6 +177,26 @@ export default function CuentasPorCobrarPage() {
     [filters],
   )
 
+  const clientesFiltro = useMemo(() => {
+    if (clientes.length > 0) return clientes
+
+    const byId = new Map<string, ClienteLigero>()
+    cuentas.forEach((cuenta) => {
+      if (!cuenta.cliente_id || byId.has(cuenta.cliente_id)) return
+      byId.set(cuenta.cliente_id, {
+        id: cuenta.cliente_id,
+        razon_social: cuenta.clientes?.razon_social ?? 'Cliente sin nombre',
+      })
+    })
+
+    return Array.from(byId.values()).sort((a, b) =>
+      (a.razon_social || a.nombre_comercial || '').localeCompare(
+        b.razon_social || b.nombre_comercial || '',
+        'es',
+      ),
+    )
+  }, [clientes, cuentas])
+
   const formatCurrency = (value: number | null | undefined, currency: string = 'PEN') => {
     if (value === null || value === undefined) return '-'
     return new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(value)
@@ -174,8 +204,7 @@ export default function CuentasPorCobrarPage() {
 
   const formatDate = (value: string | null | undefined) => {
     if (!value) return '-'
-    const candidate = value.includes('T') ? value : `${value}T00:00:00Z`
-    const parsed = new Date(candidate)
+    const parsed = parseDateLocal(value)
     return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleDateString('es-PE')
   }
 
@@ -194,7 +223,7 @@ export default function CuentasPorCobrarPage() {
       ? ESTADO_META[normalizedEstado]
       : {
           label: estado ? String(estado) : 'Sin estado',
-          className: 'border-slate-300/25 bg-slate-300/10 text-slate-100',
+          className: 'border-border/25 bg-slate-300/10 text-foreground',
           icon: AlertCircle,
         }
     const Icon = meta.icon
@@ -234,28 +263,28 @@ export default function CuentasPorCobrarPage() {
     setSelectedCuenta(null)
   }
 
-  const actionButtonClass = 'h-9 gap-1 border-cyan-400/20 bg-white/10 px-3 text-xs text-cyan-50 hover:bg-white/15 hover:text-white'
+  const actionButtonClass = 'h-9 gap-1 border-cyan-400/20 bg-muted/30 px-3 text-xs text-primary hover:bg-muted/50 hover:text-foreground'
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+        <section className="rounded-3xl border border-cyan-400/20 bg-card/80 p-5 shadow-2xl shadow-blue-950/30">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 ERP Receivables
               </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Cuentas por Cobrar</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-300">
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">Cuentas por Cobrar</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 CxC generadas desde ventas con cobros, notas de credito, reprogramaciones e historial.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={fetchCuentas} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+              <Button type="button" onClick={fetchCuentas} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
-              <Button type="button" onClick={() => alert('Exportacion en desarrollo')} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+              <Button type="button" onClick={() => alert('Exportacion en desarrollo')} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                 <Download className="h-4 w-4" />
                 Exportar
               </Button>
@@ -270,14 +299,14 @@ export default function CuentasPorCobrarPage() {
             { label: 'Vencidas', value: stats.vencidas.toLocaleString('es-PE'), description: 'Atrasadas', icon: XCircle },
             { label: 'Saldo total', value: formatCurrency(stats.saldoPendiente), description: 'Pendiente por cobrar', icon: DollarSign },
           ].map(({ label, value, description, icon: Icon }) => (
-            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
                 <div>
                   <div className={labelClass}>{label}</div>
-                  <div className="mt-3 text-2xl font-bold text-white">{value}</div>
-                  <div className="mt-1 text-xs text-cyan-100/55">{description}</div>
+                  <div className="mt-3 text-2xl font-bold text-foreground">{value}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{description}</div>
                 </div>
-                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
                   <Icon className="h-5 w-5" />
                 </span>
               </CardContent>
@@ -285,11 +314,11 @@ export default function CuentasPorCobrarPage() {
           ))}
         </section>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-            <CardTitle className="text-base text-white">Filtros operativos</CardTitle>
+            <CardTitle className="text-base text-foreground">Filtros operativos</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_180px_minmax(220px,1fr)_170px_170px_auto] xl:items-end">
+          <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3 xl:items-end">
             <label className="space-y-2">
               <span className={labelClass}>Buscar</span>
               <input className={inputClass} type="text" value={filters.search} onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))} placeholder="Serie, numero, cliente, moneda" />
@@ -308,7 +337,7 @@ export default function CuentasPorCobrarPage() {
               <span className={labelClass}>Cliente</span>
               <select className={inputClass} value={filters.clienteId} onChange={(event) => setFilters((prev) => ({ ...prev, clienteId: event.target.value }))}>
                 <option value="">Todos</option>
-                {clientes.map((cliente) => (
+                {clientesFiltro.map((cliente) => (
                   <option key={cliente.id} value={cliente.id}>
                     {cliente.razon_social || cliente.nombre_comercial || 'Sin nombre'}
                   </option>
@@ -324,7 +353,7 @@ export default function CuentasPorCobrarPage() {
               <input className={inputClass} type="date" value={filters.vencimientoHasta} onChange={(event) => setFilters((prev) => ({ ...prev, vencimientoHasta: event.target.value }))} />
             </label>
             {isFiltersActive && (
-              <Button type="button" onClick={resetFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+              <Button type="button" onClick={resetFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                 <XCircle className="h-4 w-4" />
                 Limpiar
               </Button>
@@ -332,25 +361,25 @@ export default function CuentasPorCobrarPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardContent className="p-0">
             {loading ? (
-              <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-slate-300">
-                <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
+              <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-muted-foreground">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
                 <p>Cargando cuentas por cobrar...</p>
               </div>
             ) : cuentas.length === 0 ? (
               <div className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
                 <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
-                <h3 className="text-lg font-bold text-white">{isFiltersActive ? 'Sin resultados con los filtros aplicados' : 'No hay cuentas por cobrar'}</h3>
-                <p className="mt-2 max-w-xl text-sm text-slate-400">
+                <h3 className="text-lg font-bold text-foreground">{isFiltersActive ? 'Sin resultados con los filtros aplicados' : 'No hay cuentas por cobrar'}</h3>
+                <p className="mt-2 max-w-xl text-sm text-muted-foreground">
                   Las CxC se generan automaticamente cuando emites comprobantes de ventas.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1100px] border-collapse text-sm">
-                  <thead className="bg-slate-950/80 text-xs uppercase tracking-[0.12em] text-cyan-200/70">
+                  <thead className="bg-card/80 text-xs uppercase tracking-[0.12em] text-primary/80">
                     <tr>
                       <th className="px-4 py-3 text-left">Documento</th>
                       <th className="px-4 py-3 text-left">Cliente</th>
@@ -371,20 +400,20 @@ export default function CuentasPorCobrarPage() {
                       const estadoNormalizado = normalizeEstadoCxc(cuenta.estado)
                       const puedeGestionar = saldo > 0 && estadoNormalizado !== 'CANCELADO'
                       return (
-                        <tr key={cuenta.id} className="bg-slate-950/35 text-slate-200 transition hover:bg-slate-900/70">
+                        <tr key={cuenta.id} className="bg-card/35 text-foreground/90 transition hover:bg-card/70">
                           <td className="px-4 py-3">
-                            <div className="font-mono font-semibold text-white">{numeroCompleto}</div>
-                            <div className="text-xs text-cyan-100/55">{cuenta.tipo_documento ?? '-'}</div>
+                            <div className="font-mono font-semibold text-foreground">{numeroCompleto}</div>
+                            <div className="text-xs text-muted-foreground">{cuenta.tipo_documento ?? '-'}</div>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="font-semibold text-slate-100">{cuenta.clientes?.razon_social ?? 'Cliente sin nombre'}</div>
-                            <div className="text-xs text-cyan-100/55">{cuenta.clientes?.documento_numero ?? '-'}</div>
+                            <div className="font-semibold text-foreground">{cuenta.clientes?.razon_social ?? 'Cliente sin nombre'}</div>
+                            <div className="text-xs text-muted-foreground">{cuenta.clientes?.documento_numero ?? '-'}</div>
                           </td>
-                          <td className="px-4 py-3 text-slate-300">{formatDate(cuenta.fecha_emision)}</td>
-                          <td className="px-4 py-3 text-slate-300">{formatDate(cuenta.fecha_vencimiento)}</td>
-                          <td className="px-4 py-3 text-center font-bold text-slate-100">{diasAtraso}</td>
-                          <td className="px-4 py-3 text-right font-bold text-cyan-50">{formatCurrency(cuenta.total, cuenta.moneda)}</td>
-                          <td className="px-4 py-3 text-right font-bold text-cyan-50">{formatCurrency(saldo, cuenta.moneda)}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{formatDate(cuenta.fecha_emision)}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{formatDate(cuenta.fecha_vencimiento)}</td>
+                          <td className="px-4 py-3 text-center font-bold text-foreground">{diasAtraso}</td>
+                          <td className="px-4 py-3 text-right font-bold text-primary">{formatCurrency(cuenta.total, cuenta.moneda)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-primary">{formatCurrency(saldo, cuenta.moneda)}</td>
                           <td className="px-4 py-3 text-center">{renderEstadoBadge(cuenta.estado)}</td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap justify-end gap-2">

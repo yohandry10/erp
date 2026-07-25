@@ -83,7 +83,7 @@ interface FlujoCajaData {
 }
 
 const fieldClass =
-  'border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-inner shadow-cyan-950/20 focus:ring-cyan-400/40 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950'
+  'border-cyan-400/20 bg-card/60 text-foreground shadow-inner shadow-cyan-950/20 focus:ring-cyan-400/40 group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground'
 
 const toNumber = (value: unknown) => {
   const numeric = Number(value)
@@ -197,11 +197,11 @@ export default function FlujoCajaPage() {
 
   if (loading) {
     return (
-      <div className="min-h-full bg-slate-950 p-6 text-slate-100">
-        <Card className="border-cyan-400/20 bg-slate-950/70">
+      <div className="min-h-full bg-background p-6 text-foreground">
+        <Card className="border-cyan-400/20 bg-card/70">
           <CardContent className="flex min-h-80 flex-col items-center justify-center gap-4">
-            <RefreshCw className="h-8 w-8 animate-spin text-cyan-300" />
-            <p className="text-sm text-slate-300">Generando proyección de flujo de caja...</p>
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Generando proyección de flujo de caja...</p>
           </CardContent>
         </Card>
       </div>
@@ -209,34 +209,34 @@ export default function FlujoCajaPage() {
   }
 
   return (
-    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.22),transparent_34%),linear-gradient(135deg,#020617_0%,#061a2f_58%,#020617_100%)] p-4 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:p-6">
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.22),transparent_34%),linear-gradient(135deg,#020617_0%,#061a2f_58%,#020617_100%)] p-4 text-foreground group-data-[erp-theme=light]/dashboard:bg-muted/30 group-data-[erp-theme=light]/dashboard:text-foreground lg:p-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-        <Card className="border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-cyan-950/20 group-data-[erp-theme=light]/dashboard:bg-white">
+        <Card className="border-cyan-400/20 bg-card/75 shadow-2xl shadow-cyan-950/20 group-data-[erp-theme=light]/dashboard:bg-card">
           <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
               <Button
                 variant="outline"
                 size="icon"
-                className="mt-1 border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10"
+                className="mt-1 border-cyan-400/30 bg-card/50 text-primary hover:bg-cyan-400/10"
                 aria-label="Volver a tesorería"
                 onClick={() => router.push('/dashboard/finanzas/tesoreria')}
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
-                <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-cyan-100">
+                <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-primary">
                   ERP Cash Flow
                 </Badge>
-                <h1 className="text-2xl font-semibold tracking-normal text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:text-3xl">
+                <h1 className="text-2xl font-semibold tracking-normal text-foreground group-data-[erp-theme=light]/dashboard:text-foreground lg:text-3xl">
                   Proyección de Flujo de Caja
                 </h1>
-                <p className="mt-1 text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                   Ingresos y egresos proyectados para los próximos {diasProyeccion} días.
                 </p>
               </div>
             </div>
 
-            <Button variant="outline" className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10" onClick={loadFlujoCaja}>
+            <Button variant="outline" className="border-cyan-400/30 bg-card/50 text-primary hover:bg-cyan-400/10" onClick={loadFlujoCaja}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Actualizar
             </Button>
@@ -244,14 +244,14 @@ export default function FlujoCajaPage() {
         </Card>
 
         {!flujoCajaData ? (
-          <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+          <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
             <CardContent className="flex min-h-80 flex-col items-center justify-center gap-4 p-8 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-amber-300/30 bg-amber-300/10 text-amber-100">
+              <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200">
                 <AlertCircle className="h-7 w-7" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">Error al cargar datos</h2>
-                <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                <h2 className="text-lg font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">Error al cargar datos</h2>
+                <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                   No se pudo cargar la proyección de flujo de caja.
                 </p>
               </div>
@@ -259,10 +259,10 @@ export default function FlujoCajaPage() {
           </Card>
         ) : (
           <>
-            <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+            <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
               <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
-                  <Filter className="h-4 w-4 text-cyan-300" />
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
+                  <Filter className="h-4 w-4 text-primary" />
                   Filtros
                 </div>
 
@@ -270,7 +270,7 @@ export default function FlujoCajaPage() {
                   <SelectTrigger className={cn(fieldClass, 'w-full md:w-44')}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-cyan-400/20 bg-slate-950 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                  <SelectContent className="border-cyan-400/20 bg-background text-foreground group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
                     <SelectItem value="30">30 días</SelectItem>
                     <SelectItem value="60">60 días</SelectItem>
                     <SelectItem value="90">90 días</SelectItem>
@@ -283,7 +283,7 @@ export default function FlujoCajaPage() {
                     <SelectTrigger className={cn(fieldClass, 'w-full md:w-52')}>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="border-cyan-400/20 bg-slate-950 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                    <SelectContent className="border-cyan-400/20 bg-background text-foreground group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
                       <SelectItem value="TODAS">Todas las monedas</SelectItem>
                       {monedasDisponibles.map((moneda) => (
                         <SelectItem key={moneda} value={moneda}>
@@ -296,9 +296,9 @@ export default function FlujoCajaPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+            <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
               <CardHeader className="border-b border-cyan-400/10 p-4">
-                <CardTitle className="text-base text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">Resumen por moneda</CardTitle>
+                <CardTitle className="text-base text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">Resumen por moneda</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
                 {flujoCajaData.resumen.map((resumen) => (
@@ -314,19 +314,19 @@ export default function FlujoCajaPage() {
               <MetricCard icon={Calendar} label="Días con movimientos" value={proyeccionFiltrada.length.toString()} detail={`De ${flujoCajaData.periodo.dias} días totales`} />
             </div>
 
-            <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+            <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
               <CardHeader className="border-b border-cyan-400/10 p-4">
-                <CardTitle className="text-base text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">Proyección día por día</CardTitle>
+                <CardTitle className="text-base text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">Proyección día por día</CardTitle>
               </CardHeader>
               <CardContent className="p-4">
                 {proyeccionFiltrada.length === 0 ? (
                   <div className="flex min-h-72 flex-col items-center justify-center gap-4 p-8 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-primary">
                       <Calendar className="h-7 w-7" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">No hay movimientos proyectados</h2>
-                      <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                      <h2 className="text-lg font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">No hay movimientos proyectados</h2>
+                      <p className="mt-1 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                         No se encontraron ingresos o egresos para el periodo seleccionado.
                       </p>
                     </div>
@@ -342,7 +342,7 @@ export default function FlujoCajaPage() {
                         <Card
                           key={`${dia.fecha}-${dia.moneda}`}
                           className={cn(
-                            'overflow-hidden border-cyan-400/20 bg-slate-950/55',
+                            'overflow-hidden border-cyan-400/20 bg-card/55',
                             isNegative && 'border-amber-300/35 bg-amber-300/5',
                           )}
                         >
@@ -352,8 +352,8 @@ export default function FlujoCajaPage() {
                             className="grid w-full gap-4 p-4 text-left transition hover:bg-cyan-400/5 lg:grid-cols-[minmax(150px,1fr)_2fr_minmax(180px,auto)] lg:items-center"
                           >
                             <div>
-                              <div className="text-sm font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">{formatDate(dia.fecha)}</div>
-                              <div className="mt-1 text-xs text-slate-400">{dia.moneda}</div>
+                              <div className="text-sm font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">{formatDate(dia.fecha)}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">{dia.moneda}</div>
                             </div>
 
                             <div className="grid gap-3 sm:grid-cols-3">
@@ -368,35 +368,35 @@ export default function FlujoCajaPage() {
 
                             <div className="flex items-center justify-between gap-4 lg:justify-end">
                               <div className="text-right">
-                                <div className="text-xs text-slate-400">Saldo final</div>
-                                <div className={cn('mt-1 text-base font-semibold', isNegative ? 'text-amber-100' : 'text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950')}>
+                                <div className="text-xs text-muted-foreground">Saldo final</div>
+                                <div className={cn('mt-1 text-base font-semibold', isNegative ? 'text-amber-700 dark:text-amber-200' : 'text-foreground group-data-[erp-theme=light]/dashboard:text-foreground')}>
                                   {formatCurrency(dia.saldo_final, dia.moneda)}
                                 </div>
                               </div>
-                              {(isNegative || isLow) && <AlertCircle className="h-5 w-5 text-amber-200" />}
-                              <ChevronDown className={cn('h-5 w-5 text-slate-400 transition-transform', isExpanded && 'rotate-180')} />
+                              {(isNegative || isLow) && <AlertCircle className="h-5 w-5 text-amber-400 dark:text-amber-200" />}
+                              <ChevronDown className={cn('h-5 w-5 text-muted-foreground transition-transform', isExpanded && 'rotate-180')} />
                             </div>
                           </button>
 
                           {isExpanded && dia.items.length > 0 && (
-                            <div className="border-t border-cyan-400/10 bg-slate-950/45 p-4">
-                              <div className="mb-3 text-sm font-semibold text-slate-200">Detalle de movimientos ({dia.items.length})</div>
+                            <div className="border-t border-cyan-400/10 bg-card/45 p-4">
+                              <div className="mb-3 text-sm font-semibold text-foreground/90">Detalle de movimientos ({dia.items.length})</div>
                               <div className="space-y-2">
                                 {dia.items.map((item, itemIndex) => (
                                   <div
                                     key={`${item.referencia_id}-${itemIndex}`}
-                                    className="flex flex-col gap-3 rounded-md border border-cyan-400/15 bg-slate-950/70 p-3 sm:flex-row sm:items-center sm:justify-between"
+                                    className="flex flex-col gap-3 rounded-md border border-cyan-400/15 bg-card/70 p-3 sm:flex-row sm:items-center sm:justify-between"
                                   >
                                     <div className="flex items-center gap-3">
-                                      <div className="flex h-9 w-9 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+                                      <div className="flex h-9 w-9 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/10 text-primary">
                                         {item.tipo === 'INGRESO' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                                       </div>
                                       <div>
-                                        <div className="text-sm font-semibold text-slate-100">{item.concepto}</div>
-                                        <div className="text-xs text-slate-400">{item.descripcion}</div>
+                                        <div className="text-sm font-semibold text-foreground">{item.concepto}</div>
+                                        <div className="text-xs text-muted-foreground">{item.descripcion}</div>
                                       </div>
                                     </div>
-                                    <div className={cn('text-sm font-semibold', item.tipo === 'INGRESO' ? 'text-cyan-200' : 'text-amber-100')}>
+                                    <div className={cn('text-sm font-semibold', item.tipo === 'INGRESO' ? 'text-primary' : 'text-amber-400 dark:text-amber-200')}>
                                       {item.tipo === 'INGRESO' ? '+' : '-'}{formatCurrency(item.monto, dia.moneda)}
                                     </div>
                                   </div>
@@ -426,12 +426,12 @@ function SummaryCard({
   formatCurrency: (amount: number, moneda?: string) => string
 }) {
   return (
-    <Card className="border-cyan-400/20 bg-slate-950/55">
+    <Card className="border-cyan-400/20 bg-card/55">
       <CardContent className="space-y-4 p-4">
         <div>
           <p className="text-xs font-semibold uppercase text-cyan-200/75">{resumen.moneda}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-50">{formatCurrency(resumen.saldo_proyectado, resumen.moneda)}</p>
-          <p className="text-xs text-slate-400">Saldo proyectado al final del periodo</p>
+          <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(resumen.saldo_proyectado, resumen.moneda)}</p>
+          <p className="text-xs text-muted-foreground">Saldo proyectado al final del periodo</p>
         </div>
 
         <div className="space-y-2 border-t border-cyan-400/10 pt-3 text-sm">
@@ -449,7 +449,7 @@ function SummaryCard({
         </div>
 
         {resumen.alerta && (
-          <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-100">
+          <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               {resumen.alerta === 'SALDO_NEGATIVO' ? 'Saldo negativo proyectado' : 'Saldo bajo proyectado'}
@@ -473,14 +473,14 @@ function MetricCard({
   detail: string
 }) {
   return (
-    <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+    <Card className="border-cyan-400/20 bg-card/70 group-data-[erp-theme=light]/dashboard:bg-card">
       <CardContent className="flex items-start justify-between gap-4 p-4">
         <div>
-          <p className="text-xs font-semibold uppercase text-cyan-200/75 group-data-[erp-theme=light]/dashboard:text-slate-500">{label}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">{value}</p>
-          <p className="mt-1 text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">{detail}</p>
+          <p className="text-xs font-semibold uppercase text-cyan-200/75 group-data-[erp-theme=light]/dashboard:text-muted-foreground">{label}</p>
+          <p className="mt-2 text-2xl font-semibold text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">{value}</p>
+          <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">{detail}</p>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-primary">
           <Icon className="h-5 w-5" />
         </div>
       </CardContent>
@@ -503,16 +503,16 @@ function FlowLine({
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className={cn('flex items-center gap-2 text-slate-400', strong && 'font-semibold text-slate-200')}>
-        {Icon && <Icon className={cn('h-4 w-4', tone === 'positive' ? 'text-cyan-200' : 'text-amber-100')} />}
+      <span className={cn('flex items-center gap-2 text-muted-foreground', strong && 'font-semibold text-foreground/90')}>
+        {Icon && <Icon className={cn('h-4 w-4', tone === 'positive' ? 'text-primary' : 'text-amber-400 dark:text-amber-200')} />}
         {label}:
       </span>
       <span
         className={cn(
           'font-semibold',
-          tone === 'positive' && 'text-cyan-200',
-          tone === 'negative' && 'text-amber-100',
-          tone === 'neutral' && 'text-slate-200',
+          tone === 'positive' && 'text-primary',
+          tone === 'negative' && 'text-amber-400 dark:text-amber-200',
+          tone === 'neutral' && 'text-foreground/90',
           strong && 'font-bold',
         )}
       >
@@ -525,8 +525,8 @@ function FlowLine({
 function CompactAmount({ label, value, tone }: { label: string; value: string; tone: 'positive' | 'negative' }) {
   return (
     <div>
-      <div className="text-xs text-slate-400">{label}</div>
-      <div className={cn('mt-1 text-sm font-semibold', tone === 'positive' ? 'text-cyan-200' : 'text-amber-100')}>{value}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={cn('mt-1 text-sm font-semibold', tone === 'positive' ? 'text-primary' : 'text-amber-400 dark:text-amber-200')}>{value}</div>
     </div>
   )
 }

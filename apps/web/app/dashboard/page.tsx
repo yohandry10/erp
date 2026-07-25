@@ -127,7 +127,7 @@ function getActivityIcon(type: RecentActivity['type']) {
     GRE: { Icon: Truck, color: 'text-amber-400 group-data-[erp-theme=light]/dashboard:text-amber-600' },
     COTIZACION: { Icon: FileSpreadsheet, color: 'text-indigo-400 group-data-[erp-theme=light]/dashboard:text-indigo-600' },
   }
-  return map[type] || { Icon: Activity, color: 'text-slate-400' }
+  return map[type] || { Icon: Activity, color: 'text-muted-foreground' }
 }
 
 function getStatusTone(status: RecentActivity['status']) {
@@ -153,20 +153,20 @@ function getStatusLabel(status: RecentActivity['status']) {
 // ============================================================================
 
 const surface =
-  'rounded-2xl border border-cyan-400/15 bg-gradient-to-br from-[#040c1c] via-[#020817] to-[#050d1f] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:from-white group-data-[erp-theme=light]/dashboard:via-white group-data-[erp-theme=light]/dashboard:to-slate-50 group-data-[erp-theme=light]/dashboard:shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
+  'rounded-2xl border border-cyan-400/15 bg-gradient-to-br from-[#040c1c] via-[#020817] to-[#050d1f] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:from-white group-data-[erp-theme=light]/dashboard:via-white group-data-[erp-theme=light]/dashboard:to-slate-50 group-data-[erp-theme=light]/dashboard:shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
 
 const eyebrow =
-  'text-[0.65rem] font-medium uppercase tracking-[0.18em] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500'
+  'text-[0.65rem] font-medium uppercase tracking-[0.18em] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground'
 
 const cardTitle =
-  'text-base font-semibold tracking-tight text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-900'
+  'text-base font-semibold tracking-tight text-foreground group-data-[erp-theme=light]/dashboard:text-foreground'
 
 const tabularNum = 'font-bold tabular-nums tracking-tight'
 
 const tonePalette = {
   cyan: {
-    text: 'text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700',
-    chip: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50 group-data-[erp-theme=light]/dashboard:text-cyan-700',
+    text: 'text-primary group-data-[erp-theme=light]/dashboard:text-cyan-700',
+    chip: 'border-cyan-400/30 bg-cyan-400/10 text-primary group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50 group-data-[erp-theme=light]/dashboard:text-cyan-700',
     accent: '#22d3ee',
   },
   violet: {
@@ -213,7 +213,7 @@ function ChartEmptyState({
 }) {
   return (
     <div
-      className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-cyan-400/15 bg-slate-950/30 px-6 text-center group-data-[erp-theme=light]/dashboard:border-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-cyan-50/30"
+      className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-cyan-400/15 bg-card/30 px-6 text-center group-data-[erp-theme=light]/dashboard:border-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-cyan-50/30"
       style={{ height }}
     >
       <Icon
@@ -221,11 +221,11 @@ function ChartEmptyState({
         strokeWidth={1.6}
         className="text-cyan-400/55 group-data-[erp-theme=light]/dashboard:text-cyan-600/70"
       />
-      <p className="text-sm font-medium text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+      <p className="text-sm font-medium text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85">
         {title}
       </p>
       {subtitle && (
-        <p className="max-w-[36ch] text-xs leading-5 text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+        <p className="max-w-[36ch] text-xs leading-5 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
           {subtitle}
         </p>
       )}
@@ -264,14 +264,14 @@ function MetricTile({
           <Icon size={15} strokeWidth={2.4} />
         </span>
       </div>
-      <div className={`${tabularNum} text-2xl text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 md:text-3xl`}>
+      <div className={`${tabularNum} text-2xl text-foreground group-data-[erp-theme=light]/dashboard:text-foreground md:text-3xl`}>
         {value}
       </div>
       {delta && (
         <div className="flex items-center gap-1.5 text-xs">
           {delta.direction === 'up' && <TrendingUp size={13} className="text-emerald-400" />}
           {delta.direction === 'down' && <TrendingDown size={13} className="text-rose-400" />}
-          {delta.direction === 'neutral' && <Activity size={13} className="text-slate-400" />}
+          {delta.direction === 'neutral' && <Activity size={13} className="text-muted-foreground" />}
           {delta.value && (
             <span
               className={
@@ -279,13 +279,13 @@ function MetricTile({
                   ? 'font-semibold tabular-nums text-emerald-300 group-data-[erp-theme=light]/dashboard:text-emerald-700'
                   : delta.direction === 'down'
                     ? 'font-semibold tabular-nums text-rose-300 group-data-[erp-theme=light]/dashboard:text-rose-700'
-                    : 'font-semibold tabular-nums text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700'
+                    : 'font-semibold tabular-nums text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/85'
               }
             >
               {delta.value}
             </span>
           )}
-          <span className="text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <span className="text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             {delta.description}
           </span>
         </div>
@@ -293,8 +293,8 @@ function MetricTile({
       {/* Sparkline: solo se renderiza con serie temporal real. Sin datos no
           dibujamos curva (evitamos sugerir actividad que no existe). */}
       {hasSpark ? (
-        <div className="-mx-1 mt-auto h-10">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="-mx-1 mt-auto h-10 min-w-0">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={40}>
             <AreaChart data={sparkPoints} margin={{ top: 2, right: 2, left: 2, bottom: 0 }}>
               <defs>
                 <linearGradient id={`spark-${tone}`} x1="0" y1="0" x2="0" y2="1">
@@ -330,24 +330,25 @@ function FinancialFlowChart({
   data,
   currencySymbol,
 }: {
-  data: Array<{ label: string; value: number; tone: Tone }>
+  data: Array<{ label: string; value: number; tone: Tone; chart?: boolean }>
   currencySymbol: string
 }) {
-  const total = data.reduce((s, d) => s + d.value, 0)
+  // El inventario es un valor de STOCK (no flujo) y su magnitud eclipsa a
+  // ventas/compras en un eje compartido, dejando las barras de flujo invisibles.
+  // Se muestra en la tira de stats de arriba, pero se excluye de las barras para
+  // que las magnitudes comparables (ventas/compras) sean legibles.
+  const chartData = data
+    .filter((d) => d.chart !== false)
+    .map((d) => ({ label: d.label, value: d.value, tone: d.tone }))
+  const total = chartData.reduce((s, d) => s + d.value, 0)
   const hasReal = total > 0
-
-  const chartData = data.map((d) => ({
-    label: d.label,
-    value: d.value,
-    tone: d.tone,
-  }))
 
   return (
     <div className={`${surface} flex h-full flex-col gap-4 p-6`}>
       <header className="flex items-start justify-between gap-3">
         <div>
           <h3 className={cardTitle}>Flujo financiero y operacional</h3>
-          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             Ventas, compras e inventario valorizado del periodo
           </p>
         </div>
@@ -361,7 +362,7 @@ function FinancialFlowChart({
         {data.map((d) => (
           <div
             key={d.label}
-            className="rounded-xl border border-cyan-400/15 bg-slate-950/60 px-3 py-2 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+            className="rounded-xl border border-cyan-400/15 bg-card/60 px-3 py-2 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30"
           >
             <div className={eyebrow}>{d.label}</div>
             <div className={`${tabularNum} mt-0.5 text-sm ${tonePalette[d.tone].text}`}>
@@ -372,8 +373,8 @@ function FinancialFlowChart({
       </div>
 
       {hasReal ? (
-        <div className="-mx-2 h-[260px]">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="-mx-2 h-[260px] min-w-0">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={260}>
             <RBarChart data={chartData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }} barCategoryGap="28%">
               <defs>
                 {(['cyan', 'emerald', 'violet', 'amber', 'rose'] as Tone[]).map((t) => (
@@ -405,7 +406,7 @@ function FinancialFlowChart({
                 }}
                 formatter={(value: any) => [formatCurrency(Number(value), currencySymbol), 'Valor']}
               />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+              <Bar dataKey="value" radius={[8, 8, 0, 0]} isAnimationActive={false}>
                 {chartData.map((entry, i) => (
                   <Cell key={i} fill={`url(#flow-${entry.tone})`} />
                 ))}
@@ -453,7 +454,7 @@ function FiscalDonut({
       <header className="flex items-start justify-between gap-3">
         <div>
           <h3 className={cardTitle}>Mix fiscal</h3>
-          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             Documentos tributarios del periodo
           </p>
         </div>
@@ -463,8 +464,8 @@ function FiscalDonut({
       </header>
 
       {hasReal ? (
-        <div className="relative mx-auto h-[180px] w-[180px]">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="relative mx-auto h-[180px] w-[180px] min-w-0">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
             <RPieChart>
               <Pie
                 data={segments}
@@ -475,6 +476,7 @@ function FiscalDonut({
                 paddingAngle={3}
                 dataKey="value"
                 stroke="none"
+                isAnimationActive={false}
               >
                 {segments.map((entry, i) => (
                   <Cell key={i} fill={entry.color} />
@@ -495,7 +497,7 @@ function FiscalDonut({
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <span className={eyebrow}>Total</span>
             <span
-              className={`${tabularNum} mt-0.5 text-2xl text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}
+              className={`${tabularNum} mt-0.5 text-2xl text-foreground group-data-[erp-theme=light]/dashboard:text-foreground`}
             >
               {formatNumber(total)}
             </span>
@@ -515,9 +517,9 @@ function FiscalDonut({
         {segments.map((seg) => (
           <li
             key={seg.name}
-            className="flex items-center justify-between rounded-lg border border-cyan-400/10 bg-slate-950/40 px-3 py-2 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+            className="flex items-center justify-between rounded-lg border border-cyan-400/10 bg-card/40 px-3 py-2 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30"
           >
-            <span className="flex items-center gap-2 text-sm text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-800">
+            <span className="flex items-center gap-2 text-sm text-foreground/90 group-data-[erp-theme=light]/dashboard:text-foreground">
               <span
                 className="inline-block h-2.5 w-2.5 rounded-full"
                 style={{ background: seg.color, boxShadow: hasReal ? `0 0 10px ${seg.color}88` : 'none' }}
@@ -525,7 +527,7 @@ function FiscalDonut({
               <span className="font-medium">{seg.name}</span>
             </span>
             <span
-              className={`${tabularNum} text-sm text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}
+              className={`${tabularNum} text-sm text-foreground group-data-[erp-theme=light]/dashboard:text-foreground`}
             >
               {formatNumber(seg.value)}
             </span>
@@ -552,7 +554,7 @@ function ActivityTimeline({
       <header className="flex items-start justify-between gap-3">
         <div>
           <h3 className={cardTitle}>Actividad reciente</h3>
-          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             Últimos eventos trazables del tenant
           </p>
         </div>
@@ -569,21 +571,21 @@ function ActivityTimeline({
             return (
               <li
                 key={activity.id}
-                className="flex items-start gap-3 rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+                className="flex items-start gap-3 rounded-xl border border-cyan-400/10 bg-card/40 p-3 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30"
               >
-                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-400/15 bg-slate-950/60 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white`}>
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-400/15 bg-card/60 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card`}>
                   <Icon size={15} strokeWidth={2.3} className={color} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="line-clamp-2 text-sm font-medium text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-800">
+                    <p className="line-clamp-2 text-sm font-medium text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">
                       {activity.description}
                     </p>
                     <StatusBadge tone={getStatusTone(activity.status)} className="shrink-0 text-[0.65rem]">
                       {getStatusLabel(activity.status)}
                     </StatusBadge>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-3 text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                     <span className="tabular-nums">
                       {new Date(activity.date).toLocaleDateString('es-PE', {
                         day: '2-digit',
@@ -604,12 +606,12 @@ function ActivityTimeline({
           })}
         </ul>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-cyan-400/20 bg-slate-950/40 p-8 text-center group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50/30">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-cyan-400/20 bg-card/40 p-8 text-center group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50/30">
           <Activity size={28} className="text-cyan-400/70 group-data-[erp-theme=light]/dashboard:text-cyan-600" />
-          <p className="text-sm font-medium text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">
+          <p className="text-sm font-medium text-foreground/90 group-data-[erp-theme=light]/dashboard:text-foreground/85">
             Sin actividad reciente
           </p>
-          <p className="text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <p className="text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             Los eventos del tenant aparecerán aquí en tiempo real
           </p>
         </div>
@@ -664,7 +666,7 @@ function ExecutiveRadar({
       <header className="flex items-start justify-between gap-3">
         <div>
           <h3 className={cardTitle}>Radar ejecutivo</h3>
-          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             Prioridades operativas del día
           </p>
         </div>
@@ -677,17 +679,17 @@ function ExecutiveRadar({
         {radarItems.map((item) => (
           <div
             key={item.label}
-            className="rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+            className="rounded-xl border border-cyan-400/10 bg-card/40 p-3 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-800">
+              <span className="text-sm font-medium text-foreground/90 group-data-[erp-theme=light]/dashboard:text-foreground">
                 {item.label}
               </span>
               <span className={`${tabularNum} text-sm ${tonePalette[item.tone].text}`}>
                 {item.value}
               </span>
             </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800/80 group-data-[erp-theme=light]/dashboard:bg-slate-200">
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/80 group-data-[erp-theme=light]/dashboard:bg-muted">
               <span
                 className="block h-full rounded-full transition-all duration-700 ease-out"
                 style={{
@@ -697,7 +699,7 @@ function ExecutiveRadar({
                 }}
               />
             </div>
-            <p className="mt-1.5 text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            <p className="mt-1.5 text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
               {item.sub}
             </p>
           </div>
@@ -705,7 +707,7 @@ function ExecutiveRadar({
       </div>
 
       {/* Próxima revisión strip */}
-      <div className="mt-auto rounded-xl border border-cyan-400/15 bg-slate-950/30 p-3 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50/40">
+      <div className="mt-auto rounded-xl border border-cyan-400/15 bg-card/30 p-3 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50/40">
         <h4 className={`${eyebrow} mb-2`}>Siguiente revisión</h4>
         <div className="grid gap-1.5">
           {proximaRevision.map((item) => {
@@ -717,7 +719,7 @@ function ExecutiveRadar({
                   : tonePalette.emerald
             return (
               <div key={item.label} className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                <span className="text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                   {item.label}
                 </span>
                 <span className={`font-semibold ${toneCls.text}`}>{item.value}</span>
@@ -756,17 +758,17 @@ function ModuleTile({
       <div className="min-w-0 flex-1">
         <div className={eyebrow}>{label}</div>
         <div
-          className={`${tabularNum} mt-0.5 text-2xl text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}
+          className={`${tabularNum} mt-0.5 text-2xl text-foreground group-data-[erp-theme=light]/dashboard:text-foreground`}
         >
           {value}
         </div>
         {hint && (
-          <div className="mt-0.5 text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <div className="mt-0.5 text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
             {hint}
           </div>
         )}
       </div>
-      <ArrowUpRight size={14} className="shrink-0 text-slate-600 group-data-[erp-theme=light]/dashboard:text-slate-400" />
+      <ArrowUpRight size={14} className="shrink-0 text-foreground/80 group-data-[erp-theme=light]/dashboard:text-muted-foreground" />
     </div>
   )
 }
@@ -890,7 +892,7 @@ export default function Dashboard() {
     { label: 'Ventas mes', value: Number(stats?.ventasMes ?? 0), tone: 'cyan' as Tone },
     { label: 'Ventas hoy', value: Number(stats?.ventasHoy ?? 0), tone: 'emerald' as Tone },
     { label: 'Compras', value: Number(stats?.comprasMes ?? 0), tone: 'violet' as Tone },
-    { label: 'Inventario', value: Number(stats?.valorInventario ?? 0), tone: 'amber' as Tone },
+    { label: 'Inventario', value: Number(stats?.valorInventario ?? 0), tone: 'amber' as Tone, chart: false },
   ]
   const proximaRevision: Array<{ label: string; value: string; status: 'ok' | 'warn' | 'alert' }> = [
     {
@@ -917,7 +919,7 @@ export default function Dashboard() {
   ]
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020817] p-4 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950 md:p-6">
+    <main className="relative min-h-screen overflow-hidden bg-[#020817] p-4 text-foreground group-data-[erp-theme=light]/dashboard:bg-muted group-data-[erp-theme=light]/dashboard:text-foreground md:p-6">
       {/* Atmospheric layers — sutiles, no distraen */}
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.04)_1px,transparent_1px)] bg-[size:48px_48px] group-data-[erp-theme=light]/dashboard:bg-[linear-gradient(rgba(15,23,42,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.035)_1px,transparent_1px)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_at_top,rgba(14,165,233,0.12),transparent_70%)] group-data-[erp-theme=light]/dashboard:bg-[radial-gradient(ellipse_at_top,rgba(14,165,233,0.08),transparent_70%)]" />
@@ -940,7 +942,7 @@ export default function Dashboard() {
         <DashboardNotificationBanners />
 
         {error ? (
-          <Alert variant="destructive" className="border-rose-400/30 bg-rose-950/50 text-rose-50">
+          <Alert variant="destructive" className="border-rose-400/30 bg-rose-950/50 text-destructive dark:text-rose-200">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Dashboard sin sincronización completa</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
@@ -959,20 +961,20 @@ export default function Dashboard() {
                 Datos reales del tenant
               </span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white group-data-[erp-theme=light]/dashboard:text-slate-950 md:text-4xl">
+            <h1 className="text-3xl font-bold tracking-tight text-white group-data-[erp-theme=light]/dashboard:text-foreground md:text-4xl">
               Dashboard ejecutivo
             </h1>
-            <p className="mt-1.5 max-w-3xl text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+            <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
               Visión operativa de ventas, compras, fiscal, logística e inventario.
               {lastUpdate ? (
-                <span className="ml-1 tabular-nums text-slate-500">· Sync {lastUpdate}</span>
+                <span className="ml-1 tabular-nums text-muted-foreground">· Sync {lastUpdate}</span>
               ) : null}
             </p>
           </div>
           <Button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="shrink-0 border border-cyan-400/30 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-600 group-data-[erp-theme=light]/dashboard:text-white group-data-[erp-theme=light]/dashboard:hover:bg-cyan-700"
+            className="shrink-0 border border-cyan-400/30 bg-cyan-400/10 text-primary hover:bg-cyan-400/20 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-600 group-data-[erp-theme=light]/dashboard:text-white group-data-[erp-theme=light]/dashboard:hover:bg-cyan-700"
           >
             <RefreshCw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             {isRefreshing ? 'Sincronizando…' : 'Actualizar'}

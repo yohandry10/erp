@@ -30,17 +30,17 @@ interface NotificationItemProps {
 const severityConfig = {
   info: {
     icon: Info,
-    iconClassName: 'border-cyan-300/20 bg-cyan-400/10 text-cyan-200 group-data-[erp-theme=light]/dashboard:text-cyan-700',
+    iconClassName: 'border-cyan-300/20 bg-cyan-400/10 text-primary group-data-[erp-theme=light]/dashboard:text-cyan-700',
     label: 'Info',
   },
   warning: {
     icon: AlertTriangle,
-    iconClassName: 'border-blue-300/25 bg-blue-400/10 text-blue-100 group-data-[erp-theme=light]/dashboard:text-blue-700',
+    iconClassName: 'border-blue-300/25 bg-blue-400/10 text-blue-700 dark:text-blue-200 group-data-[erp-theme=light]/dashboard:text-blue-700',
     label: 'Revisar',
   },
   error: {
     icon: AlertCircle,
-    iconClassName: 'border-cyan-200/30 bg-cyan-200/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:text-cyan-800',
+    iconClassName: 'border-cyan-200/30 bg-cyan-200/10 text-primary group-data-[erp-theme=light]/dashboard:text-cyan-800',
     label: 'Crítico',
   },
 }
@@ -104,7 +104,7 @@ export function NotificationItem({
         if (event.key === 'Enter' || event.key === ' ') handleOpen()
       }}
       className={cn(
-        'relative flex cursor-pointer gap-3 px-5 py-4 outline-none transition-colors hover:bg-cyan-400/5 focus-visible:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:hover:bg-slate-50 group-data-[erp-theme=light]/dashboard:focus-visible:bg-slate-50',
+        'relative flex cursor-pointer gap-3 px-5 py-4 outline-none transition-colors hover:bg-cyan-400/5 focus-visible:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:hover:bg-muted/30 group-data-[erp-theme=light]/dashboard:focus-visible:bg-muted/30',
         !notification.leida && 'bg-cyan-400/5 group-data-[erp-theme=light]/dashboard:bg-cyan-50/70',
       )}
     >
@@ -115,8 +115,8 @@ export function NotificationItem({
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h4 className="truncate text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{title}</h4>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            <h4 className="truncate text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-foreground">{title}</h4>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
               <span>{config.label}</span>
               <span className="h-1 w-1 rounded-full bg-cyan-300/40" />
               <span>{formatDate(notification.created_at)}</span>
@@ -128,14 +128,14 @@ export function NotificationItem({
             variant="ghost"
             aria-label="Eliminar notificación"
             onClick={handleDelete}
-            className="h-8 w-8 shrink-0 text-slate-500 hover:bg-cyan-400/10 hover:text-cyan-100 group-data-[erp-theme=light]/dashboard:hover:text-cyan-800"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-cyan-400/10 hover:text-primary group-data-[erp-theme=light]/dashboard:hover:text-cyan-800"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
 
         {message && (
-          <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+          <p className="mt-2 line-clamp-2 text-sm leading-5 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
             {message}
           </p>
         )}
@@ -146,7 +146,7 @@ export function NotificationItem({
             size="sm"
             variant="ghost"
             onClick={handleActionClick}
-            className="mt-3 h-8 px-0 text-cyan-200 hover:bg-transparent hover:text-white group-data-[erp-theme=light]/dashboard:text-cyan-700 group-data-[erp-theme=light]/dashboard:hover:text-cyan-900"
+            className="mt-3 h-8 px-0 text-primary hover:bg-transparent hover:text-white group-data-[erp-theme=light]/dashboard:text-cyan-700 group-data-[erp-theme=light]/dashboard:hover:text-cyan-900"
           >
             {notification.action_label}
           </Button>

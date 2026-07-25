@@ -97,8 +97,13 @@ export class SecurityService {
         'X-HTTP-Method-Override',
         'X-Forwarded-For',
         'X-Real-IP',
-        // 👇 imprescindibles para tu caso
+        // Headers funcionales del cliente web/desktop: tenant y pais via contexto.
+        'x-tenant-id',
+        'X-Tenant-Id',
+        'x-user-id',
+        'X-User-Id',
         'x-country-id',
+        'X-Country-Id',
       ],
       exposedHeaders: ['Content-Disposition'],
       credentials: true,

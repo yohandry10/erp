@@ -28,7 +28,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     const productData = {
       codigo: formData.codigo,
       nombre: formData.nombre,
@@ -44,7 +44,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
     }
 
     const result = await api.post('/api/inventario/productos', productData)
-    
+
     if (result) {
       onSuccess()
       onClose()
@@ -74,12 +74,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
   if (!isOpen) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]">
-      <div className="bg-white rounded-3 p-8 w-[90%] max-w-[600px] overflow-auto">
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1100]">
+      <div className="bg-card rounded-xl p-8 w-[90%] max-w-[600px] overflow-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-6 font-semibold text-gray-800">Nuevo Producto</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Nuevo Producto</h2>
           <button
-            onClick={onClose} className="border-0 text-6 cursor-pointer text-gray-500"
+            onClick={onClose} className="border-0 text-2xl cursor-pointer text-muted-foreground"
           >
             ×
           </button>
@@ -88,7 +88,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Código *
               </label>
               <input
@@ -96,12 +96,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 name="codigo"
                 value={formData.codigo}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Nombre *
               </label>
               <input
@@ -109,31 +109,31 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 name="nombre"
                 value={formData.nombre}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Descripción
               </label>
               <textarea
                 name="descripcion"
                 value={formData.descripcion}
                 onChange={handleChange}
-                rows={3} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                rows={3} className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Categoría *
               </label>
               <select
                 name="categoria"
                 value={formData.categoria}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               >
                 <option value="">Seleccionar categoría</option>
                 <option value="Tecnología">Tecnología</option>
@@ -145,13 +145,13 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Unidad de Medida
               </label>
               <select
                 name="unidadMedida"
                 value={formData.unidadMedida}
-                onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
               >
                 <option value="UND">Unidad</option>
                 <option value="KG">Kilogramo</option>
@@ -163,7 +163,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Precio Compra *
               </label>
               <input
@@ -173,12 +173,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 onChange={handleChange}
                 step="0.01"
                 min="0"
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Precio Venta *
               </label>
               <input
@@ -188,12 +188,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 onChange={handleChange}
                 step="0.01"
                 min="0"
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Stock Inicial *
               </label>
               <input
@@ -202,12 +202,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 value={formData.stock}
                 onChange={handleChange}
                 min="0"
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Stock Mínimo *
               </label>
               <input
@@ -216,12 +216,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 value={formData.stockMinimo}
                 onChange={handleChange}
                 min="0"
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Stock Máximo
               </label>
               <input
@@ -229,19 +229,19 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 name="stockMaximo"
                 value={formData.stockMaximo}
                 onChange={handleChange}
-                min="0" className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                min="0" className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Proveedor
               </label>
               <input
                 type="text"
                 name="proveedor"
                 value={formData.proveedor}
-                onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
           </div>
@@ -249,7 +249,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
           <div className="flex gap-4 justify-end">
             <button
               type="button"
-              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-semibold"
+              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-card text-foreground/85 cursor-pointer font-semibold"
             >
               Cancelar
             </button>
@@ -264,4 +264,4 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
       </div>
     </div>
   )
-} 
+}

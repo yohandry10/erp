@@ -45,11 +45,11 @@ export function OnboardingSpotlight({
   return (
     <>
       {/* Spotlight hole */}
-      <div className="fixed z-[9999] rounded-2 shadow transition"
+      <div className="fixed z-[9999] rounded-lg shadow transition"
       />
 
       {/* Pulse animation */}
-      <div className="fixed z-[9998] rounded-2"
+      <div className="fixed z-[9998] rounded-lg"
       />
     </>
   )

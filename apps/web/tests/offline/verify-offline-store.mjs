@@ -132,17 +132,24 @@ const assert = (condition, message) => {
   assert(queue.length === 1, 'debe existir un item en cola')
   assert(queue[0].body === JSON.stringify({ total: 10 }), 'la cola debe guardar body JSON')
   assert(queue[0].tenant_id === 'tenant-1' && queue[0].user_id === 'user-1', 'la cola debe guardar tenant/user')
+  assert(
+    !queue[0].headers.some((header) => header.name.toLowerCase() === 'authorization'),
+    'la cola no debe persistir Authorization',
+  )
 
   let syncCall = 0
-  globalThis.fetch = async () => {
+  let synchronizedAuthorization = null
+  globalThis.fetch = async (_url, init) => {
     syncCall += 1
+    synchronizedAuthorization = new Headers(init?.headers).get('Authorization')
     return new Response(JSON.stringify({ success: true, id: 'remote-1' }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     })
   }
-  const syncResult = await mod.syncOfflineQueue()
+  const syncResult = await mod.syncOfflineQueue('fresh-token')
   assert(syncResult.length === 1 && syncResult[0].ok === true, 'sync exitosa debe marcar ok')
+  assert(synchronizedAuthorization === 'Bearer fresh-token', 'sync debe inyectar el token vigente solo al enviar')
   queue = await mod.listOfflineRequests()
   assert(queue[0].status === 'synced' && queue[0].response_status === 201, 'item debe quedar synced')
 
@@ -247,6 +254,52 @@ const assert = (condition, message) => {
   assert(status.total === 5 && status.synced === 1 && status.failed === 2 && status.pending === 2, 'status debe contar synced/failed/pending')
 
   window.__TAURI__ = {}
+  let rewrittenSyncUrl = null
+  let rewrittenSyncBody = null
+  invokeCalls = []
+  invokeHandler = async (command, args) => {
+    if (command === 'list_offline_requests') {
+      return [{
+        id: 'queued-dependent-1',
+        endpoint: '/api/ventas/pedidos/local-order-1',
+        method: 'PUT',
+        url: 'http://api.test/api/ventas/pedidos/local-order-1',
+        headers: [{ name: 'Content-Type', value: 'application/json' }],
+        body: JSON.stringify({ cliente_id: 'local-client-1', items: [{ producto_id: 'local-product-1' }] }),
+        tenant_id: 'tenant-1',
+        user_id: 'user-1',
+        status: 'pending',
+        attempts: 0,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+        last_error: null,
+        response_status: null,
+        response_body: null,
+      }]
+    }
+    if (command === 'list_local_id_mappings') {
+      return [
+        { local_id: 'local-client-1', remote_id: 'remote-client-1', entity_type: 'customer', endpoint: '/api/ventas/clientes', synced_at: Date.now(), response_json: null },
+        { local_id: 'local-product-1', remote_id: 'remote-product-1', entity_type: 'product', endpoint: '/api/inventario/productos', synced_at: Date.now(), response_json: null },
+        { local_id: 'local-order-1', remote_id: 'remote-order-1', entity_type: 'order', endpoint: '/api/ventas/pedidos', synced_at: Date.now(), response_json: null },
+      ]
+    }
+    if (command === 'mark_offline_request_synced') return null
+    throw new Error('invoke inesperado en sync con mappings: ' + command)
+  }
+  globalThis.fetch = async (url, init) => {
+    rewrittenSyncUrl = String(url)
+    rewrittenSyncBody = String(init.body)
+    return new Response(JSON.stringify({ success: true, data: { id: 'remote-order-1' } }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+  const mappedSync = await mod.syncOfflineQueue()
+  assert(mappedSync.length === 1 && mappedSync[0].ok === true, 'sync Tauri con mappings debe completar')
+  assert(rewrittenSyncUrl.includes('/api/ventas/pedidos/remote-order-1'), 'sync debe reescribir IDs locales en endpoint')
+  assert(rewrittenSyncBody.includes('remote-client-1') && rewrittenSyncBody.includes('remote-product-1'), 'sync debe reescribir IDs locales en body')
+
   online = false
   mod.invalidateOfflineModeCache()
   invokeCalls = []
@@ -255,6 +308,9 @@ const assert = (condition, message) => {
       return { offline_mode: true, total: 0, pending: 0, failed: 0, synced: 0 }
     }
     if (command === 'get_local_first_response') {
+      if (args.endpoint === '/api/pos/productos') {
+        assert(args.tenantId === 'tenant-1', 'GET local-first debe pasar tenantId a Tauri')
+      }
       assert(
         [
           '/api/pos/productos',
@@ -277,6 +333,9 @@ const assert = (condition, message) => {
       }
     }
     if (command === 'process_local_first_write') {
+      if (args.request.endpoint === '/api/pos/venta') {
+        assert(args.request.tenant_id === 'tenant-1', 'write local-first debe persistir tenant_id')
+      }
       assert(
         [
           '/api/pos/venta',
@@ -308,6 +367,7 @@ const assert = (condition, message) => {
     }
     if (command === 'get_binary_response') {
       assert(args.endpoint === '/api/reportes/pdf', 'binario offline debe pedir endpoint normalizado')
+      assert(args.tenantId === 'tenant-1', 'binario offline debe pasar tenantId a Tauri')
       return {
         status: 200,
         body_base64: Buffer.from('%PDF-local').toString('base64'),
@@ -331,7 +391,7 @@ const assert = (condition, message) => {
   const localProducts = await mod.fetchWithOfflineSupport(
     'http://api.test/api/pos/productos',
     { method: 'GET' },
-    { endpoint: '/api/pos/productos' },
+    { endpoint: '/api/pos/productos', tenantId: 'tenant-1' },
   )
   assert(localProducts.headers.get('x-erp-local-first') === 'true', 'GET POS offline debe salir de SQLite local-first')
   assert((await localProducts.json()).data[0].id === 'p1', 'GET POS local-first debe preservar data')
@@ -476,7 +536,7 @@ const assert = (condition, message) => {
   const localPdf = await mod.fetchWithOfflineSupport(
     'http://api.test/api/reportes/pdf',
     { method: 'GET' },
-    { endpoint: '/api/reportes/pdf' },
+    { endpoint: '/api/reportes/pdf', tenantId: 'tenant-1' },
   )
   assert(localPdf.headers.get('x-erp-offline-cache') === 'true', 'binario offline debe salir del cache SQLite')
   assert((await localPdf.text()).includes('%PDF-local'), 'binario offline debe preservar bytes')

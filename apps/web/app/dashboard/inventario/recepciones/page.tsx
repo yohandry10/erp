@@ -86,9 +86,9 @@ const formatDate = (value?: string | null) => {
 
 function NoPermission() {
   return (
-    <div className="rounded-xl border border-cyan-400/25 bg-slate-950/70 p-6 font-semibold text-cyan-50 shadow-lg shadow-cyan-950/20">
+    <div className="rounded-xl border border-cyan-400/25 bg-card/70 p-6 font-semibold text-primary shadow-lg shadow-cyan-950/20">
       No cuentas con el permiso{' '}
-      <code className="rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-cyan-100">
+      <code className="rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-primary">
         inventario.ingresos.write
       </code>
       . Solicítalo para administrar recepciones.
@@ -191,28 +191,28 @@ function RecepcionesContent() {
   )
 
   return (
-    <div className="grid gap-5 text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
-      <header className="rounded-3xl border border-cyan-300/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:shadow-slate-300/30 md:p-6">
+    <div className="grid gap-5 text-foreground group-data-[erp-theme=light]/dashboard:text-foreground">
+      <header className="rounded-3xl border border-cyan-300/20 bg-card/80 p-5 shadow-2xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:shadow-slate-300/30 md:p-6">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-black tracking-tight text-white group-data-[erp-theme=light]/dashboard:text-slate-950 md:text-3xl">
+          <h1 className="text-2xl font-black tracking-tight text-white group-data-[erp-theme=light]/dashboard:text-foreground md:text-3xl">
             Recepciones de compra
           </h1>
-          <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100 group-data-[erp-theme=light]/dashboard:text-blue-700">
+          <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary group-data-[erp-theme=light]/dashboard:text-blue-700">
             Compras → Inventario
           </span>
         </div>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
           Gestiona recepciones totales o parciales, asigna ubicaciones y emite el evento{' '}
-          <code className="rounded-md border border-cyan-300/20 bg-cyan-300/10 px-1.5 py-0.5 text-cyan-100 group-data-[erp-theme=light]/dashboard:text-blue-700">
+          <code className="rounded-md border border-cyan-300/20 bg-cyan-300/10 px-1.5 py-0.5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-700">
             RecepcionRegistradaEvent
           </code>{' '}
           para Kardex y Contabilidad. Se aplican controles multitenant y permisos endurecidos.
         </p>
         <div className="mt-4 flex flex-wrap gap-3 text-sm font-semibold">
-          <Link className="text-cyan-200 hover:text-white group-data-[erp-theme=light]/dashboard:text-blue-700" href="/dashboard/compras/ordenes">
+          <Link className="text-primary hover:text-white group-data-[erp-theme=light]/dashboard:text-blue-700" href="/dashboard/compras/ordenes">
             Volver a Órdenes de Compra →
           </Link>
-          <Link className="text-cyan-200 hover:text-white group-data-[erp-theme=light]/dashboard:text-blue-700" href="/dashboard/inventario/kardex">
+          <Link className="text-primary hover:text-white group-data-[erp-theme=light]/dashboard:text-blue-700" href="/dashboard/inventario/kardex">
             Revisar Kardex →
           </Link>
         </div>
@@ -225,20 +225,20 @@ function RecepcionesContent() {
         fallback={<NoPermission />}
       >
         <div className="grid gap-4">
-          <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-300/20 bg-slate-950/70 p-4 shadow-xl shadow-blue-950/15 group-data-[erp-theme=light]/dashboard:bg-white">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
-              <Package size={20} className="text-cyan-200 group-data-[erp-theme=light]/dashboard:text-blue-700" />
+          <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-300/20 bg-card/70 p-4 shadow-xl shadow-blue-950/15 group-data-[erp-theme=light]/dashboard:bg-card">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-foreground">
+              <Package size={20} className="text-primary group-data-[erp-theme=light]/dashboard:text-blue-700" />
               <span>
                 Recepciones cargadas: {recepciones.length.toLocaleString('es-PE')}
               </span>
             </div>
-            <div className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
-              Valor total filtrado: <strong className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{formatCurrency(totalValorizado)}</strong>
+            <div className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
+              Valor total filtrado: <strong className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">{formatCurrency(totalValorizado)}</strong>
             </div>
             <button
               type="button"
               onClick={loadRecepciones}
-              className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-50 hover:bg-cyan-400/20 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700"
+              className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-primary hover:bg-cyan-400/20 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700"
             >
               <RefreshCcw size={16} />
               Refrescar
@@ -246,7 +246,7 @@ function RecepcionesContent() {
           </section>
 
           <form
-            className="flex flex-wrap items-end gap-4 rounded-2xl border border-cyan-300/20 bg-slate-950/70 p-4 shadow-xl shadow-blue-950/15 group-data-[erp-theme=light]/dashboard:bg-white"
+            className="flex flex-wrap items-end gap-4 rounded-2xl border border-cyan-300/20 bg-card/70 p-4 shadow-xl shadow-blue-950/15 group-data-[erp-theme=light]/dashboard:bg-card"
             onSubmit={(event) => {
               event.preventDefault()
               setPagination((prev) => ({ ...prev, page: 1 }))
@@ -254,7 +254,7 @@ function RecepcionesContent() {
             }}
           >
             <div className="flex min-w-[280px] flex-1 items-center gap-2">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-200 group-data-[erp-theme=light]/dashboard:text-blue-700">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:text-blue-700">
                 <Search size={18} />
               </span>
               <input
@@ -265,23 +265,23 @@ function RecepcionesContent() {
                   setFilters((prev) => ({ ...prev, search: event.target.value }))
                   setPagination((prev) => ({ ...prev, page: 1 }))
                 }}
-                className="h-10 flex-1 rounded-xl border border-cyan-300/20 bg-slate-950/60 px-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-400/30 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
+                className="h-10 flex-1 rounded-xl border border-cyan-300/20 bg-card/60 px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-cyan-400/30 group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground"
               />
             </div>
 
             <div className="min-w-[200px] flex-1">
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                 Estado
               </label>
               <div className="relative">
-                <Filter size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Filter size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <select
                   value={filters.estado}
                 onChange={(event) => {
                   setFilters((prev) => ({ ...prev, estado: event.target.value as RecepcionFilters['estado'] }))
                   setPagination((prev) => ({ ...prev, page: 1 }))
                 }}
-                  className="h-10 w-full rounded-xl border border-cyan-300/20 bg-slate-950/60 py-2 pl-9 pr-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-cyan-400/30 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
+                  className="h-10 w-full rounded-xl border border-cyan-300/20 bg-card/60 py-2 pl-9 pr-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-cyan-400/30 group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground"
                 >
                   {ESTADOS.map((estado) => (
                     <option key={estado.value || 'all'} value={estado.value}>
@@ -295,14 +295,14 @@ function RecepcionesContent() {
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:bg-cyan-300"
+                className="rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-bold text-foreground shadow-lg shadow-cyan-950/20 hover:bg-cyan-300"
               >
                 Filtrar
               </button>
               <button
                 type="button"
                 onClick={resetFilters}
-                className="rounded-xl border border-cyan-300/25 bg-transparent px-4 py-2.5 text-sm font-bold text-cyan-100 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:text-blue-700"
+                className="rounded-xl border border-cyan-300/25 bg-transparent px-4 py-2.5 text-sm font-bold text-primary hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:text-blue-700"
               >
                 Limpiar
               </button>
@@ -310,15 +310,15 @@ function RecepcionesContent() {
           </form>
 
           {loading ? (
-            <div className="rounded-2xl border border-cyan-300/20 bg-slate-950/70 p-8 text-center font-semibold text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-blue-700">
+            <div className="rounded-2xl border border-cyan-300/20 bg-card/70 p-8 text-center font-semibold text-primary group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-blue-700">
               Cargando recepciones…
             </div>
           ) : error ? (
-            <div className="rounded-2xl border border-cyan-300/25 bg-slate-950/80 p-4 font-semibold text-cyan-50 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-blue-700">
+            <div className="rounded-2xl border border-cyan-300/25 bg-card/80 p-4 font-semibold text-primary group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-blue-700">
               {error}
             </div>
           ) : recepciones.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-cyan-300/25 bg-slate-950/60 p-8 text-center text-slate-400 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-500">
+            <div className="rounded-2xl border border-dashed border-cyan-300/25 bg-card/60 p-8 text-center text-muted-foreground group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-muted-foreground">
               No encontramos recepciones con los filtros seleccionados.
             </div>
           ) : (
@@ -326,32 +326,32 @@ function RecepcionesContent() {
               {recepciones.map((recepcion) => (
                 <article
                   key={recepcion.id}
-                  className="grid gap-4 rounded-2xl border border-cyan-300/15 bg-slate-950/70 p-4 shadow-xl shadow-blue-950/10 group-data-[erp-theme=light]/dashboard:bg-white"
+                  className="grid gap-4 rounded-2xl border border-cyan-300/15 bg-card/70 p-4 shadow-xl shadow-blue-950/10 group-data-[erp-theme=light]/dashboard:bg-card"
                 >
                   <div className="flex flex-wrap justify-between gap-4">
                     <div className="grid gap-1">
-                      <span className="text-base font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                      <span className="text-base font-bold text-white group-data-[erp-theme=light]/dashboard:text-foreground">
                         Recepción #{recepcion.numero}
                       </span>
-                      <span className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                      <span className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                         Fecha: {formatDate(recepcion.fechaRecepcion)} · Ítems: {recepcion.totalItems}
                       </span>
                       {recepcion.orden && (
-                        <span className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                        <span className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                           Orden: {recepcion.orden.numero} ·{' '}
                           {formatCurrency(recepcion.orden.total, recepcion.orden.moneda)}
                         </span>
                       )}
                     </div>
-                    <span className="self-start rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-cyan-100 group-data-[erp-theme=light]/dashboard:text-blue-700">
+                    <span className="self-start rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-primary group-data-[erp-theme=light]/dashboard:text-blue-700">
                       {recepcion.estado}
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                  <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                     <span>
                       Cantidad recibida:{' '}
-                      <strong className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                      <strong className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">
                         {toNumber(recepcion.totalCantidad).toLocaleString('es-PE', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
@@ -360,7 +360,7 @@ function RecepcionesContent() {
                     </span>
                     <span>
                       Valor NI:{' '}
-                      <strong className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                      <strong className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">
                         {formatCurrency(recepcion.totalValorizado, recepcion.orden?.moneda ?? 'PEN')}
                       </strong>
                     </span>
@@ -376,17 +376,17 @@ function RecepcionesContent() {
                   </div>
 
                   {recepcion.observaciones && (
-                    <div className="border-l-2 border-cyan-300/40 pl-3 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                    <div className="border-l-2 border-cyan-300/40 pl-3 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                       {recepcion.observaciones}
                     </div>
                   )}
 
-                  <div className="grid gap-2 rounded-xl border border-cyan-300/15 bg-slate-900/70 p-3 group-data-[erp-theme=light]/dashboard:bg-slate-50">
-                    <strong className="text-sm text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                  <div className="grid gap-2 rounded-xl border border-cyan-300/15 bg-card/70 p-3 group-data-[erp-theme=light]/dashboard:bg-muted/30">
+                    <strong className="text-sm text-white group-data-[erp-theme=light]/dashboard:text-foreground">
                       Detalle ({recepcion.items.length})
                     </strong>
                     {recepcion.items.length === 0 ? (
-                      <span className="text-sm text-slate-500">
+                      <span className="text-sm text-muted-foreground">
                         Esta recepción aún no tiene ítems valorizados.
                       </span>
                     ) : (
@@ -394,10 +394,10 @@ function RecepcionesContent() {
                         {recepcion.items.map((item) => (
                           <li
                             key={item.id}
-                            className="flex flex-wrap justify-between gap-3 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600"
+                            className="flex flex-wrap justify-between gap-3 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80"
                           >
                             <div className="grid">
-                              <span className="font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                              <span className="font-semibold text-white group-data-[erp-theme=light]/dashboard:text-foreground">
                                 {item.producto?.nombre ?? 'Producto'}
                               </span>
                               <span>
@@ -409,9 +409,9 @@ function RecepcionesContent() {
                                 {formatCurrency(item.costoUnitario, recepcion.orden?.moneda ?? 'PEN')}
                               </span>
                             </div>
-                            <div className="text-right font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                            <div className="text-right font-semibold text-white group-data-[erp-theme=light]/dashboard:text-foreground">
                               {formatCurrency(item.valorTotal, recepcion.orden?.moneda ?? 'PEN')}
-                              <div className="text-xs text-slate-500">
+                              <div className="text-xs text-muted-foreground">
                                 {item.almacen?.nombre ?? 'Sin almacén'}
                               </div>
                             </div>
@@ -424,7 +424,7 @@ function RecepcionesContent() {
               ))}
 
               {pagination.totalPages > 1 && (
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                   <span>
                     Página {pagination.page} de {pagination.totalPages} · {pagination.total.toLocaleString('es-PE')} registros
                   </span>
@@ -433,7 +433,7 @@ function RecepcionesContent() {
                       type="button"
                       onClick={() => setPagination((prev) => ({ ...prev, page: Math.max(prev.page - 1, 1) }))}
                       disabled={pagination.page <= 1}
-                      className="rounded-xl border border-cyan-300/25 px-3 py-2 font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45 group-data-[erp-theme=light]/dashboard:text-blue-700"
+                      className="rounded-xl border border-cyan-300/25 px-3 py-2 font-semibold text-primary disabled:cursor-not-allowed disabled:opacity-45 group-data-[erp-theme=light]/dashboard:text-blue-700"
                     >
                       Anterior
                     </button>
@@ -446,7 +446,7 @@ function RecepcionesContent() {
                         }))
                       }
                       disabled={pagination.page >= pagination.totalPages}
-                      className="rounded-xl bg-cyan-400 px-3 py-2 font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
+                      className="rounded-xl bg-cyan-400 px-3 py-2 font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       Siguiente
                     </button>

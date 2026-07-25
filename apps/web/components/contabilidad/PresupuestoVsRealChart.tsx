@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  TrendingUp,
+  TrendingDown,
   AlertTriangle,
   CheckCircle,
   Loader2,
@@ -341,16 +341,16 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12 bg-white rounded-3 shadow">
+      <div className="flex items-center justify-center p-12 bg-card rounded-xl shadow">
         <Loader2 size={24} className="text-blue-500" />
-        <span className="ml-3 text-gray-500">Cargando comparación...</span>
+        <span className="ml-3 text-muted-foreground">Cargando comparación...</span>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="p-8 bg-[#fef2f2] border rounded-3 text-red-800">
+      <div className="p-8 bg-[#fef2f2] border rounded-xl text-destructive">
         <p className="m-0 font-semibold">Error al cargar la comparación</p>
         <p className="mt-2 mr-0 mb-0 ml-0 text-[0.875rem]">{error}</p>
       </div>
@@ -359,7 +359,7 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
 
   if (!data) {
     return (
-      <div className="p-8 bg-[#f9fafb] border rounded-3 text-center text-gray-500">
+      <div className="p-8 bg-muted border rounded-xl text-center text-muted-foreground">
         <p className="m-0">No hay datos disponibles para este período</p>
       </div>
     )
@@ -368,18 +368,18 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
   return (
     <div className="flex flex-col gap-6">
       {/* Header con información del período */}
-      <div className="bg-white p-6 rounded-3 shadow">
+      <div className="bg-card p-6 rounded-xl shadow">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="m-0 text-6 font-bold text-gray-900">
+            <h2 className="m-0 text-2xl font-bold text-foreground">
               Comparación Presupuesto vs Real
             </h2>
-            <p className="mt-2 mr-0 mb-0 ml-0 text-gray-500">
+            <p className="mt-2 mr-0 mb-0 ml-0 text-muted-foreground">
               Período: {data.periodo.descripcion} ({data.periodo.estado})
             </p>
           </div>
           <button
-            onClick={handleExportToExcel} className="py-3 px-6 rounded-2 border bg-[#10b981] text-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold transition"
+            onClick={handleExportToExcel} className="py-3 px-6 rounded-lg border bg-[#10b981] text-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = '#059669'
               e.currentTarget.style.borderColor = '#059669'
@@ -397,20 +397,20 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
 
       {/* Resumen Global */}
       <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
-        <div className="bg-white p-6 rounded-3 shadow">
-          <p className="m-0 text-[0.875rem] text-gray-500 font-semibold">
+        <div className="bg-card p-6 rounded-xl shadow">
+          <p className="m-0 text-[0.875rem] text-muted-foreground font-semibold">
             Total Presupuestado
           </p>
-          <p className="mt-2 mr-0 mb-0 ml-0 text-6 font-bold text-gray-900">
+          <p className="mt-2 mr-0 mb-0 ml-0 text-2xl font-bold text-foreground">
             {formatCurrency(data.resumen_global.total_presupuestado)}
           </p>
         </div>
 
-        <div className="bg-white p-6 rounded-3 shadow">
-          <p className="m-0 text-[0.875rem] text-gray-500 font-semibold">
+        <div className="bg-card p-6 rounded-xl shadow">
+          <p className="m-0 text-[0.875rem] text-muted-foreground font-semibold">
             Total Ejecutado
           </p>
-          <p className="mt-2 mr-0 mb-0 ml-0 text-6 font-bold text-gray-900">
+          <p className="mt-2 mr-0 mb-0 ml-0 text-2xl font-bold text-foreground">
             {formatCurrency(data.resumen_global.total_ejecutado)}
           </p>
           <div className="mt-2 flex items-center gap-1 text-[0.875rem]">
@@ -423,17 +423,17 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3 shadow">
-          <p className="m-0 text-[0.875rem] text-gray-500 font-semibold">
+        <div className="bg-card p-6 rounded-xl shadow">
+          <p className="m-0 text-[0.875rem] text-muted-foreground font-semibold">
             Total Disponible
           </p>
-          <p className="mt-2 mr-0 mb-0 ml-0 text-6 font-bold">
+          <p className="mt-2 mr-0 mb-0 ml-0 text-2xl font-bold">
             {formatCurrency(data.resumen_global.total_disponible)}
           </p>
         </div>
 
-        <div className="bg-white p-6 rounded-3 shadow">
-          <p className="m-0 text-[0.875rem] text-gray-500 font-semibold">
+        <div className="bg-card p-6 rounded-xl shadow">
+          <p className="m-0 text-[0.875rem] text-muted-foreground font-semibold">
             Alertas
           </p>
           <div className="mt-2 flex gap-4 text-[0.875rem]">
@@ -455,8 +455,8 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
 
       {/* Gráfico de Ejecución por Centro */}
       {data.centros_costo.length > 0 && (
-        <div className="bg-white p-6 rounded-3 shadow">
-          <h3 className="mt-0 mr-0 mb-6 ml-0 text-[1.125rem] font-semibold text-gray-900">
+        <div className="bg-card p-6 rounded-xl shadow">
+          <h3 className="mt-0 mr-0 mb-6 ml-0 text-[1.125rem] font-semibold text-foreground">
             Ejecución Presupuestal por Centro de Costo
           </h3>
           <PresupuestoEjecucionPorCentroChart centros={data.centros_costo} />
@@ -467,18 +467,18 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
       <div className="flex flex-col gap-4">
         {data.centros_costo.map((centro) => {
           const isExpanded = expandedCentros.has(centro.centro_costo.id)
-          
+
           return (
             <div
-              key={centro.centro_costo.id} className="bg-white rounded-3 shadow overflow-hidden"
+              key={centro.centro_costo.id} className="bg-card rounded-xl shadow overflow-hidden"
             >
               {/* Header del Centro de Costo */}
               <button
-                onClick={() => toggleCentro(centro.centro_costo.id)} className="w-[100%] p-6 bg-white border-0 cursor-pointer flex justify-between items-center text-left"
+                onClick={() => toggleCentro(centro.centro_costo.id)} className="w-[100%] p-6 bg-card border-0 cursor-pointer flex justify-between items-center text-left"
               >
                 <div className="flex-[1]">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="m-0 text-[1.125rem] font-semibold text-gray-900">
+                    <h3 className="m-0 text-[1.125rem] font-semibold text-foreground">
                       {centro.centro_costo.codigo} - {centro.centro_costo.nombre}
                     </h3>
                     <PresupuestoEjecucionIndicator
@@ -489,7 +489,7 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
                       showProgressBar={false}
                     />
                   </div>
-                  <div className="flex gap-8 text-[0.875rem] text-gray-500">
+                  <div className="flex gap-8 text-[0.875rem] text-muted-foreground">
                     <span>Presupuestado: {formatCurrency(centro.totales.presupuestado)}</span>
                     <span>Ejecutado: {formatCurrency(centro.totales.ejecutado)}</span>
                     <span>Disponible: {formatCurrency(centro.totales.disponible)}</span>
@@ -498,7 +498,7 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
                     </span>
                   </div>
                 </div>
-                <div className="p-2 rounded-[4px] bg-[#f3f4f6] transition">
+                <div className="p-2 rounded-[4px] bg-muted transition">
                   ▼
                 </div>
               </button>
@@ -508,44 +508,44 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
                 <div className="border-t">
                   <table className="w-[100%]">
                     <thead>
-                      <tr className="bg-[#f9fafb]">
-                        <th className="py-3 px-6 text-left text-3 font-semibold text-gray-500">
+                      <tr className="bg-muted">
+                        <th className="py-3 px-6 text-left text-xs font-semibold text-muted-foreground">
                           Cuenta
                         </th>
-                        <th className="py-3 px-6 text-right text-3 font-semibold text-gray-500">
+                        <th className="py-3 px-6 text-right text-xs font-semibold text-muted-foreground">
                           Presupuestado
                         </th>
-                        <th className="py-3 px-6 text-right text-3 font-semibold text-gray-500">
+                        <th className="py-3 px-6 text-right text-xs font-semibold text-muted-foreground">
                           Ejecutado
                         </th>
-                        <th className="py-3 px-6 text-right text-3 font-semibold text-gray-500">
+                        <th className="py-3 px-6 text-right text-xs font-semibold text-muted-foreground">
                           Disponible
                         </th>
-                        <th className="py-3 px-6 text-right text-3 font-semibold text-gray-500">
+                        <th className="py-3 px-6 text-right text-xs font-semibold text-muted-foreground">
                           % Ejecución
                         </th>
-                        <th className="py-3 px-6 text-center text-3 font-semibold text-gray-500">
+                        <th className="py-3 px-6 text-center text-xs font-semibold text-muted-foreground">
                           Estado
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {centro.cuentas.map((cuenta, idx) => (
-                        <tr 
+                        <tr
                           key={idx} className="border-t"
                         >
                           <td className="py-4 px-6">
-                            <div className="text-[0.875rem] font-semibold text-gray-900">
+                            <div className="text-[0.875rem] font-semibold text-foreground">
                               {cuenta.cuenta.codigo}
                             </div>
-                            <div className="text-3 text-gray-500 mt-1">
+                            <div className="text-xs text-muted-foreground mt-1">
                               {cuenta.cuenta.nombre}
                             </div>
                           </td>
-                          <td className="py-4 px-6 text-right text-[0.875rem] text-gray-900">
+                          <td className="py-4 px-6 text-right text-[0.875rem] text-foreground">
                             {formatCurrency(cuenta.monto_presupuestado)}
                           </td>
-                          <td className="py-4 px-6 text-right text-[0.875rem] text-gray-900">
+                          <td className="py-4 px-6 text-right text-[0.875rem] text-foreground">
                             {formatCurrency(cuenta.monto_ejecutado)}
                           </td>
                           <td className="py-4 px-6 text-right text-[0.875rem]">
@@ -583,8 +583,8 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
 
       {/* Mensaje si no hay centros */}
       {data.centros_costo.length === 0 && (
-        <div className="p-12 bg-white rounded-3 text-center text-gray-500">
-          <p className="m-0 text-4">
+        <div className="p-12 bg-card rounded-xl text-center text-muted-foreground">
+          <p className="m-0 text-base">
             No hay presupuestos configurados para este período
           </p>
           <p className="mt-2 mr-0 mb-0 ml-0 text-[0.875rem]">

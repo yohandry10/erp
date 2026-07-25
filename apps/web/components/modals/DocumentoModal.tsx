@@ -31,9 +31,9 @@ interface DetalleTipo {
 }
 
 const fieldClass =
-  'border-cyan-400/20 bg-slate-950/60 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-400/40'
+  'border-cyan-400/20 bg-card/60 text-foreground placeholder:text-muted-foreground focus-visible:ring-cyan-400/40'
 
-const readOnlyClass = 'border-cyan-400/10 bg-slate-900/80 text-slate-400'
+const readOnlyClass = 'border-cyan-400/10 bg-card/80 text-muted-foreground'
 
 export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }: DocumentoModalProps) {
   const { tasaIgv } = useTaxConfig()
@@ -148,13 +148,18 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
       setValidandoRUC(true)
       try {
         const response = await api.post('/api/documentos/validar-ruc', { ruc })
-        if (response && response.success && response.data) {
-          setFormData(prev => ({
-            ...prev,
-            receptor_razon_social: response.data.razon_social,
-            receptor_direccion: response.data.direccion
-          }))
-          showSuccessToast('RUC validado correctamente')
+        const responseData: any = api.unwrap(response)
+        if (responseData) {
+          if (responseData.consulta_sunat) {
+            setFormData(prev => ({
+              ...prev,
+              receptor_razon_social: responseData.razon_social || prev.receptor_razon_social,
+              receptor_direccion: responseData.direccion || prev.receptor_direccion
+            }))
+            showSuccessToast('RUC validado con SUNAT')
+          } else {
+            showSuccessToast('Formato y dígito verificador del RUC válidos; complete los datos registrales')
+          }
         } else {
           showErrorToast('RUC no encontrado o inválido')
         }
@@ -187,7 +192,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validar documento antes de enviar
     const datosParaValidar = {
       ...formData,
@@ -195,7 +200,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
     }
 
     const validationResponse = await api.post('/api/documentos/validar-documento', datosParaValidar)
-    
+
     if (validationResponse && !validationResponse.data.valido) {
       setErroresValidacion(validationResponse.data.errores)
       showErrorToast(`Errores de validación: ${validationResponse.data.errores.join(', ')}`)
@@ -206,7 +211,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
 
     // Crear o actualizar documento
     console.log('📊 Enviando datos del documento:', { ...formData, detalles })
-    
+
     let response
     if (documento) {
       // Actualizar documento existente
@@ -215,12 +220,12 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
       // Crear nuevo documento
       response = await api.post('/api/documentos/crear', { ...formData, detalles })
     }
-    
+
     if (response && response.success) {
       console.log('✅ Documento guardado exitosamente:', response.data)
-      
+
       showSuccessToast(response.message || `Documento ${documento ? 'actualizado' : 'creado'} exitosamente`)
-      
+
       onSuccess()
       onClose()
     } else {
@@ -241,7 +246,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
       impuesto_igv: 0,
       total_item: 0
     }])
-    
+
     // Calcular totales después de agregar
     setTimeout(() => {
       calcularTotales()
@@ -251,7 +256,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
   const eliminarDetalle = (index: number) => {
     if (detalles.length > 1) {
       setDetalles(detalles.filter((_, i) => i !== index))
-      
+
       // Calcular totales después de eliminar
       setTimeout(() => {
         calcularTotales()
@@ -263,7 +268,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
     const nuevosDetalles = [...detalles]
     nuevosDetalles[index] = { ...nuevosDetalles[index], [campo]: valor }
     setDetalles(nuevosDetalles)
-    
+
     // Calcular totales automáticamente cuando cambien valores relevantes
     if (campo === 'cantidad' || campo === 'precio_unitario' || campo === 'descuento_unitario') {
       // Usar setTimeout para asegurar que el estado se actualice primero
@@ -276,7 +281,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
   const showSuccessToast = (message: string) => {
     if (typeof window !== 'undefined') {
       const toast = document.createElement('div')
-      toast.className = 'fixed right-5 top-5 z-[9999] rounded-lg border border-cyan-400/30 bg-slate-950 px-5 py-4 font-semibold text-cyan-100 shadow-2xl shadow-cyan-950/40'
+      toast.className = 'fixed right-5 top-5 z-[9999] rounded-lg border border-cyan-400/30 bg-background px-5 py-4 font-semibold text-primary shadow-2xl shadow-cyan-950/40'
       toast.textContent = `✓ ${message}`
       document.body.appendChild(toast)
       setTimeout(() => {
@@ -288,7 +293,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
   const showErrorToast = (message: string) => {
     if (typeof window !== 'undefined') {
       const toast = document.createElement('div')
-      toast.className = 'fixed right-5 top-5 z-[9999] rounded-lg border border-amber-300/30 bg-slate-950 px-5 py-4 font-semibold text-amber-100 shadow-2xl shadow-cyan-950/40'
+      toast.className = 'fixed right-5 top-5 z-[9999] rounded-lg border border-amber-300/30 bg-background px-5 py-4 font-semibold text-amber-400 dark:text-amber-200 shadow-2xl shadow-cyan-950/40'
       toast.textContent = `! ${message}`
       document.body.appendChild(toast)
       setTimeout(() => {
@@ -300,12 +305,12 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg border border-cyan-400/20 bg-slate-950 text-slate-100 shadow-2xl shadow-cyan-950/40">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-cyan-400/10 bg-slate-950/95 px-6 py-4 backdrop-blur">
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg border border-cyan-400/20 bg-background text-foreground shadow-2xl shadow-cyan-950/40">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-cyan-400/10 bg-card/95 px-6 py-4 backdrop-blur">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-cyan-200/75">Documento fiscal</p>
-            <h2 className="mt-1 text-xl font-semibold tracking-normal text-slate-50">
+            <h2 className="mt-1 text-xl font-semibold tracking-normal text-foreground">
             {documento ? 'Editar Documento' : 'Crear Nuevo Documento'}
           </h2>
           </div>
@@ -314,7 +319,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
             variant="outline"
             size="icon"
             onClick={onClose}
-            className="border-cyan-400/20 bg-slate-900/80 text-slate-200 hover:bg-cyan-400/10"
+            className="border-cyan-400/20 bg-card/80 text-foreground/90 hover:bg-cyan-400/10"
             aria-label="Cerrar"
           >
             <X className="h-4 w-4" />
@@ -323,7 +328,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
 
         <form onSubmit={handleSubmit} className="space-y-6 p-6">
           {erroresValidacion.length > 0 && (
-            <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-100">
+            <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 <span className="font-semibold">Errores de validación:</span>
@@ -336,8 +341,8 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
             </Alert>
           )}
 
-          <section className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
-            <h3 className="mb-4 text-base font-semibold text-slate-50">Información del documento</h3>
+          <section className="rounded-lg border border-cyan-400/15 bg-card/50 p-4">
+            <h3 className="mb-4 text-base font-semibold text-foreground">Información del documento</h3>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <Field label="Tipo de documento *">
                 <select
@@ -397,8 +402,8 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
             </div>
           </section>
 
-          <section className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
-            <h3 className="mb-4 text-base font-semibold text-slate-50">Información del cliente</h3>
+          <section className="rounded-lg border border-cyan-400/15 bg-card/50 p-4">
+            <h3 className="mb-4 text-base font-semibold text-foreground">Información del cliente</h3>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <Field label="Tipo de documento">
                 <select
@@ -428,7 +433,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                     className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
                   />
                   {validandoRUC && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-cyan-200">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary">
                       Validando...
                     </div>
                   )}
@@ -468,9 +473,9 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
             </div>
           </section>
 
-          <section className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
+          <section className="rounded-lg border border-cyan-400/15 bg-card/50 p-4">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-base font-semibold text-slate-50">Detalles del documento</h3>
+              <h3 className="text-base font-semibold text-foreground">Detalles del documento</h3>
               <Button
                 type="button"
                 onClick={agregarDetalle}
@@ -482,16 +487,16 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
             </div>
 
             {detalles.map((detalle, index) => (
-              <div key={index} className="mb-3 rounded-lg border border-cyan-400/15 bg-slate-950/55 p-4">
+              <div key={index} className="mb-3 rounded-lg border border-cyan-400/15 bg-card/55 p-4">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <h4 className="text-sm font-semibold text-slate-200">Línea {index + 1}</h4>
+                  <h4 className="text-sm font-semibold text-foreground/90">Línea {index + 1}</h4>
                   {detalles.length > 1 && (
                     <Button
                       type="button"
                       onClick={() => eliminarDetalle(index)}
                       variant="outline"
                       size="sm"
-                      className="border-amber-300/30 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20"
+                      className="border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200 hover:bg-amber-300/20"
                     >
                       <Trash2 className="mr-2 h-3 w-3" />
                       Eliminar
@@ -583,8 +588,8 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
             ))}
           </section>
 
-          <section className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
-            <h3 className="mb-4 text-base font-semibold text-slate-50">Totales</h3>
+          <section className="rounded-lg border border-cyan-400/15 bg-card/50 p-4">
+            <h3 className="mb-4 text-base font-semibold text-foreground">Totales</h3>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <Field label="Subtotal">
                 <input
@@ -620,7 +625,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                   type="number"
                   value={(formData.total - formData.descuentos).toFixed(2)}
                   readOnly
-                  className="h-10 w-full rounded-md border border-cyan-300/40 bg-cyan-400/10 px-3 text-sm font-semibold text-cyan-100"
+                  className="h-10 w-full rounded-md border border-cyan-300/40 bg-cyan-400/10 px-3 text-sm font-semibold text-primary"
                 />
               </Field>
             </div>
@@ -641,7 +646,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
               type="button"
               onClick={onClose}
               variant="outline"
-              className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10"
+              className="border-cyan-400/30 bg-card/50 text-primary hover:bg-cyan-400/10"
             >
               Cancelar
             </Button>
@@ -657,7 +662,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
       </div>
     </div>
   )
-} 
+}
 
 function Field({
   label,
@@ -670,7 +675,7 @@ function Field({
 }) {
   return (
     <div className={cn('space-y-2', className)}>
-      <Label className="text-xs font-semibold uppercase text-slate-400">{label}</Label>
+      <Label className="text-xs font-semibold uppercase text-muted-foreground">{label}</Label>
       {children}
     </div>
   )

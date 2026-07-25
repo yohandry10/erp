@@ -84,15 +84,15 @@ export function TenantSwitcher() {
   }
 
   return (
-    <div className="bg-white border rounded-3 p-4 shadow">
+    <div className="bg-card border rounded-xl p-4 shadow">
       {/* Label */}
-      <div className="flex items-center gap-2 text-3 font-semibold text-slate-500 mb-2">
+      <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-2">
         <Building2 className="w-3.5 h-3.5" />
         <span>Empresa Actual</span>
       </div>
-      
+
       {switchError && (
-        <div className="text-red-600 text-xs mb-2 px-1">{switchError}</div>
+        <div className="text-destructive text-xs mb-2 px-1">{switchError}</div>
       )}
 
       {/* Tenant Selector */}
@@ -101,7 +101,7 @@ export function TenantSwitcher() {
         onValueChange={handleTenantSwitch}
         disabled={loading || switching}
       >
-        <SelectTrigger className="w-[100%] bg-slate-50 border rounded-2 py-2.5 px-3 text-[0.875rem] font-medium text-slate-800 cursor-pointer transition flex items-center justify-between">
+        <SelectTrigger className="w-[100%] bg-muted/30 border rounded-lg py-2.5 px-3 text-[0.875rem] font-medium text-foreground cursor-pointer transition flex items-center justify-between">
           {switching ? (
             <div className="flex items-center gap-2">
               <RefreshCw className="w-3.5 h-3.5" />
@@ -115,25 +115,25 @@ export function TenantSwitcher() {
             </SelectValue>
           )}
         </SelectTrigger>
-        <SelectContent 
+        <SelectContent
           position="popper"
           side="bottom"
           align="start"
-          sideOffset={8} className="max-h-[300px] bg-white border rounded-2 shadow z-[9999] overflow-auto"
+          sideOffset={8} className="max-h-[300px] bg-card border rounded-lg shadow z-[9999] overflow-auto"
         >
           {loading ? (
-            <div className="py-3 px-4 flex items-center gap-2 text-slate-500 text-[0.875rem]">
+            <div className="py-3 px-4 flex items-center gap-2 text-muted-foreground text-[0.875rem]">
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Cargando empresas...</span>
             </div>
           ) : tenants.length === 0 ? (
-            <div className="py-3 px-4 text-slate-500 text-[0.875rem] text-center">
+            <div className="py-3 px-4 text-muted-foreground text-[0.875rem] text-center">
               No hay empresas disponibles
             </div>
           ) : (
             tenants.map((t) => (
-              <SelectItem 
-                key={t.id} 
+              <SelectItem
+                key={t.id}
                 value={t.id} className="py-2.5 px-4 cursor-pointer text-[0.875rem] flex items-center justify-between transition"
               >
                 <div className="flex items-center justify-between w-[100%] gap-2">

@@ -196,7 +196,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
   const actualizarExperiencia = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      experiencia_laboral: prev.experiencia_laboral.map((exp, i) => 
+      experiencia_laboral: prev.experiencia_laboral.map((exp, i) =>
         i === index ? { ...exp, [field]: value } : exp
       )
     }))
@@ -227,7 +227,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
   const actualizarFormacion = (index: number, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      formacion_academica: prev.formacion_academica.map((form, i) => 
+      formacion_academica: prev.formacion_academica.map((form, i) =>
         i === index ? { ...form, [field]: value } : form
       )
     }))
@@ -303,7 +303,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
         puntuacion_cv: Math.min(puntuacion, 100)
       }
 
-      const response = candidato?.id 
+      const response = candidato?.id
         ? await put(`/api/rrhh/candidatos/${candidato.id}`, candidatoData)
         : await post('/api/rrhh/candidatos', candidatoData)
 
@@ -356,25 +356,25 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.75)] flex items-center justify-center z-[99999] p-4"
       onClick={handleClose}
     >
-      <div className="bg-white rounded-3 shadow w-[100%] max-w-[900px] overflow-hidden"
+      <div className="bg-card rounded-xl shadow w-[100%] max-w-[900px] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        
+
         {/* Header */}
         <div className="flex justify-between items-center pt-8 pr-8 pb-4 pl-8">
           <div>
-            <h2 className="text-7 font-bold m-0 text-gray-800 flex items-center gap-3">
+            <h2 className="text-[1.75rem] font-bold m-0 text-foreground flex items-center gap-3">
               👤 {candidato?.id ? 'Editar Candidato' : 'Nuevo Candidato'}
             </h2>
-            <p className="text-[0.875rem] text-gray-500 mt-2 mr-0 mb-0 ml-0">
+            <p className="text-[0.875rem] text-muted-foreground mt-2 mr-0 mb-0 ml-0">
               {candidato?.id ? 'Actualizar información del candidato' : 'Registrar nueva postulación'}
             </p>
           </div>
-          
+
           {/* Indicador de pasos */}
           <div className="flex items-center gap-2">
             {[1, 2, 3, 4].map((step) => (
-              <div 
+              <div
                 key={step} className="w-8 h-8 rounded-full flex items-center justify-center text-[0.875rem] font-bold"
               >
                 {step}
@@ -383,17 +383,17 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
           </div>
 
           <button
-            onClick={handleClose} className="w-8 h-8 rounded-full bg-red-500 text-white border-0 cursor-pointer flex items-center justify-center font-bold text-4"
+            onClick={handleClose} className="w-8 h-8 rounded-full bg-red-500 text-white border-0 cursor-pointer flex items-center justify-center font-bold text-base"
           >
             ✕
           </button>
         </div>
-        
+
         {/* Información de vacante seleccionada */}
         {vacanteSeleccionada && (
-          <div className="my-4 mx-8 p-4 bg-[#d1fae5] rounded-2 border">
+          <div className="my-4 mx-8 p-4 bg-[#d1fae5] rounded-lg border">
             <div className="text-[0.875rem] text-[#065f46]">
-              <strong>📋 Vacante:</strong> {vacanteSeleccionada.titulo} • 
+              <strong>📋 Vacante:</strong> {vacanteSeleccionada.titulo} •
               <strong> 🏢 Depto:</strong> {vacanteSeleccionada.departamento} •
               <strong> 💰 Salario:</strong> S/ {vacanteSeleccionada.salario_min} - S/ {vacanteSeleccionada.salario_max}
             </div>
@@ -402,23 +402,23 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
 
         {/* Contenido */}
         <div className="p-8 overflow-y-auto">
-          
+
           {/* PASO 1: Información personal */}
           {currentStep === 1 && (
             <div className="flex flex-col gap-6">
-              <div className="bg-[#dbeafe] border rounded-2 p-6">
+              <div className="bg-[#dbeafe] border rounded-lg p-6">
                 <h3 className="text-[1.125rem] font-semibold text-[#1e40af] mt-0 mr-0 mb-4 ml-0">
                   👤 Información Personal
                 </h3>
-                
+
                 <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-4">
                   <div>
-                    <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
+                    <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                       📋 Vacante *
                     </label>
                     <select
                       value={formData.id_vacante}
-                      onChange={(e) => handleInputChange('id_vacante', e.target.value)} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-white"
+                      onChange={(e) => handleInputChange('id_vacante', e.target.value)} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-card"
                       required
                     >
                       <option value="">Seleccionar vacante...</option>
@@ -431,11 +431,11 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Estado del proceso</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Estado del proceso</label>
                     <select
                       value={formData.estado_proceso}
                       onChange={(e) => handleInputChange('estado_proceso', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="postulante">📝 Postulante</option>
                       <option value="revision_cv">👀 Revisión CV</option>
@@ -449,58 +449,58 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombres *</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Nombres *</label>
                     <input
                       type="text"
                       value={formData.nombres}
                       onChange={(e) => handleInputChange('nombres', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Nombres del candidato"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Apellidos *</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Apellidos *</label>
                     <input
                       type="text"
                       value={formData.apellidos}
                       onChange={(e) => handleInputChange('apellidos', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Apellidos del candidato"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Email *</label>
                     <input
                       type="email"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="candidato@email.com"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Teléfono</label>
                     <input
                       type="tel"
                       value={formData.telefono}
                       onChange={(e) => handleInputChange('telefono', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="+51 999 999 999"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipo documento</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Tipo documento</label>
                     <select
                       value={formData.tipo_documento}
                       onChange={(e) => handleInputChange('tipo_documento', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="DNI">DNI</option>
                       <option value="CE">Carnet de Extranjería</option>
@@ -509,32 +509,32 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Número de documento</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Número de documento</label>
                     <input
                       type="text"
                       value={formData.numero_documento}
                       onChange={(e) => handleInputChange('numero_documento', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="12345678"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Fecha de nacimiento</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Fecha de nacimiento</label>
                     <input
                       type="date"
                       value={formData.fecha_nacimiento}
                       onChange={(e) => handleInputChange('fecha_nacimiento', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Estado civil</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Estado civil</label>
                     <select
                       value={formData.estado_civil}
                       onChange={(e) => handleInputChange('estado_civil', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="soltero">Soltero(a)</option>
                       <option value="casado">Casado(a)</option>
@@ -546,11 +546,11 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                 </div>
 
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Dirección</label>
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">Dirección</label>
                   <textarea
                     value={formData.direccion}
                     onChange={(e) => handleInputChange('direccion', e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     rows={2}
                     placeholder="Dirección completa del candidato"
                   />
@@ -562,16 +562,16 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
           {/* PASO 2: Información profesional */}
           {currentStep === 2 && (
             <div className="space-y-6">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-green-800 mb-4">💼 Información Profesional</h3>
-                
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-emerald-400 mb-4">💼 Información Profesional</h3>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nivel de educación</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Nivel de educación</label>
                     <select
                       value={formData.nivel_educacion}
                       onChange={(e) => handleInputChange('nivel_educacion', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     >
                       <option value="secundaria">Secundaria</option>
                       <option value="tecnico">Técnico</option>
@@ -583,24 +583,24 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Años de experiencia</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Años de experiencia</label>
                     <input
                       type="number"
                       value={formData.experiencia_años}
                       onChange={(e) => handleInputChange('experiencia_años', parseInt(e.target.value) || 0)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       min="0"
                       max="50"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Pretensión salarial (S/)</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Pretensión salarial (S/)</label>
                     <input
                       type="number"
                       value={formData.pretension_salarial}
                       onChange={(e) => handleInputChange('pretension_salarial', parseFloat(e.target.value) || 0)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       min="0"
                       step="100"
                       placeholder="3000"
@@ -610,11 +610,11 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Modalidad de trabajo preferida</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">Modalidad de trabajo preferida</label>
                     <select
                       value={formData.modalidad_trabajo_preferida}
                       onChange={(e) => handleInputChange('modalidad_trabajo_preferida', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     >
                       <option value="presencial">🏢 Presencial</option>
                       <option value="remoto">🏠 Remoto</option>
@@ -629,9 +629,9 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                         id="disponibilidad"
                         checked={formData.disponibilidad_inmediata}
                         onChange={(e) => handleInputChange('disponibilidad_inmediata', e.target.checked)}
-                        className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                        className="w-4 h-4 text-emerald-400 focus:ring-green-500 border-border rounded"
                       />
-                      <label htmlFor="disponibilidad" className="text-sm text-gray-700">
+                      <label htmlFor="disponibilidad" className="text-sm text-foreground/85">
                         ⚡ Disponibilidad inmediata
                       </label>
                     </div>
@@ -641,34 +641,34 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                 {/* URLs profesionales */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">📄 URL del CV</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">📄 URL del CV</label>
                     <input
                       type="url"
                       value={formData.cv_url || ''}
                       onChange={(e) => handleInputChange('cv_url', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       placeholder="https://..."
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">💼 LinkedIn</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">💼 LinkedIn</label>
                     <input
                       type="url"
                       value={formData.linkedin_url || ''}
                       onChange={(e) => handleInputChange('linkedin_url', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       placeholder="https://linkedin.com/in/..."
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">🎨 Portfolio</label>
+                    <label className="block text-sm font-medium text-foreground/85 mb-2">🎨 Portfolio</label>
                     <input
                       type="url"
                       value={formData.portfolio_url || ''}
                       onChange={(e) => handleInputChange('portfolio_url', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       placeholder="https://portfolio.com"
                     />
                   </div>
@@ -681,9 +681,9 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
           {currentStep === 3 && (
             <div className="space-y-6">
               {/* Experiencia laboral */}
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <div className="bg-violet-500/10 border border-purple-200 rounded-lg p-4">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-purple-800">💼 Experiencia Laboral</h3>
+                  <h3 className="text-lg font-semibold text-violet-400">💼 Experiencia Laboral</h3>
                   <button
                     onClick={agregarExperiencia}
                     className="bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600 transition-colors text-sm"
@@ -691,49 +691,49 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                     + Agregar
                   </button>
                 </div>
-                
+
                 {formData.experiencia_laboral.map((exp, index) => (
-                  <div key={index} className="border border-purple-300 rounded-lg p-4 mb-4 bg-white">
+                  <div key={index} className="border border-purple-300 rounded-lg p-4 mb-4 bg-card">
                     <div className="flex justify-between items-start mb-3">
-                      <h4 className="font-medium text-purple-800">Experiencia #{index + 1}</h4>
+                      <h4 className="font-medium text-violet-400">Experiencia #{index + 1}</h4>
                       <button
                         onClick={() => eliminarExperiencia(index)}
-                        className="text-red-500 hover:text-red-700 font-bold"
+                        className="text-red-500 hover:text-destructive font-bold"
                       >
                         ✕
                       </button>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <input
                         type="text"
                         value={exp.empresa}
                         onChange={(e) => actualizarExperiencia(index, 'empresa', e.target.value)}
-                        className="p-2 border border-gray-300 rounded-lg"
+                        className="p-2 border border-border rounded-lg"
                         placeholder="Empresa"
                       />
                       <input
                         type="text"
                         value={exp.puesto}
                         onChange={(e) => actualizarExperiencia(index, 'puesto', e.target.value)}
-                        className="p-2 border border-gray-300 rounded-lg"
+                        className="p-2 border border-border rounded-lg"
                         placeholder="Puesto"
                       />
                       <input
                         type="date"
                         value={exp.fecha_inicio}
                         onChange={(e) => actualizarExperiencia(index, 'fecha_inicio', e.target.value)}
-                        className="p-2 border border-gray-300 rounded-lg"
+                        className="p-2 border border-border rounded-lg"
                       />
                       <input
                         type="date"
                         value={exp.fecha_fin}
                         onChange={(e) => actualizarExperiencia(index, 'fecha_fin', e.target.value)}
-                        className="p-2 border border-gray-300 rounded-lg"
+                        className="p-2 border border-border rounded-lg"
                         disabled={exp.actualmente_trabaja}
                       />
                     </div>
-                    
+
                     <div className="mt-3">
                       <label className="flex items-center gap-2">
                         <input
@@ -745,11 +745,11 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                         <span className="text-sm">Actualmente trabajo aquí</span>
                       </label>
                     </div>
-                    
+
                     <textarea
                       value={exp.descripcion}
                       onChange={(e) => actualizarExperiencia(index, 'descripcion', e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-lg mt-3"
+                      className="w-full p-2 border border-border rounded-lg mt-3"
                       rows={2}
                       placeholder="Descripción de responsabilidades y logros..."
                     />
@@ -758,9 +758,9 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
               </div>
 
               {/* Formación académica */}
-              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+              <div className="bg-primary/10 border border-indigo-200 rounded-lg p-4">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-indigo-800">🎓 Formación Académica</h3>
+                  <h3 className="text-lg font-semibold text-primary">🎓 Formación Académica</h3>
                   <button
                     onClick={agregarFormacion}
                     className="bg-indigo-500 text-white px-3 py-1 rounded-lg hover:bg-indigo-600 transition-colors text-sm"
@@ -768,38 +768,38 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                     + Agregar
                   </button>
                 </div>
-                
+
                 {formData.formacion_academica.map((form, index) => (
-                  <div key={index} className="border border-indigo-300 rounded-lg p-4 mb-4 bg-white">
+                  <div key={index} className="border border-indigo-300 rounded-lg p-4 mb-4 bg-card">
                     <div className="flex justify-between items-start mb-3">
-                      <h4 className="font-medium text-indigo-800">Formación #{index + 1}</h4>
+                      <h4 className="font-medium text-primary">Formación #{index + 1}</h4>
                       <button
                         onClick={() => eliminarFormacion(index)}
-                        className="text-red-500 hover:text-red-700 font-bold"
+                        className="text-red-500 hover:text-destructive font-bold"
                       >
                         ✕
                       </button>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <input
                         type="text"
                         value={form.institucion}
                         onChange={(e) => actualizarFormacion(index, 'institucion', e.target.value)}
-                        className="p-2 border border-gray-300 rounded-lg"
+                        className="p-2 border border-border rounded-lg"
                         placeholder="Institución"
                       />
                       <input
                         type="text"
                         value={form.titulo}
                         onChange={(e) => actualizarFormacion(index, 'titulo', e.target.value)}
-                        className="p-2 border border-gray-300 rounded-lg"
+                        className="p-2 border border-border rounded-lg"
                         placeholder="Título obtenido"
                       />
                       <select
                         value={form.nivel}
                         onChange={(e) => actualizarFormacion(index, 'nivel', e.target.value)}
-                        className="p-2 border border-gray-300 rounded-lg"
+                        className="p-2 border border-border rounded-lg"
                       >
                         <option value="secundaria">Secundaria</option>
                         <option value="tecnico">Técnico</option>
@@ -819,14 +819,14 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
           {currentStep === 4 && (
             <div className="space-y-6">
               {/* Habilidades técnicas */}
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-orange-800 mb-4">🔧 Habilidades Técnicas</h3>
-                
+              <div className="bg-amber-500/10 border border-orange-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-amber-400 mb-4">🔧 Habilidades Técnicas</h3>
+
                 <div className="mb-4">
                   <input
                     type="text"
                     placeholder="Escriba una habilidad y presione Enter"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         agregarHabilidad(e.currentTarget.value)
@@ -835,17 +835,17 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                     }}
                   />
                 </div>
-                
+
                 <div className="flex flex-wrap gap-2">
                   {formData.habilidades_tecnicas.map((habilidad, index) => (
                     <span
                       key={index}
-                      className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm flex items-center gap-2"
+                      className="bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full text-sm flex items-center gap-2"
                     >
                       {habilidad}
                       <button
                         onClick={() => eliminarHabilidad(habilidad)}
-                        className="text-orange-600 hover:text-orange-800 font-bold"
+                        className="text-amber-400 hover:text-amber-400 font-bold"
                       >
                         ✕
                       </button>
@@ -855,9 +855,9 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
               </div>
 
               {/* Idiomas */}
-              <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-teal-800 mb-4">🌍 Idiomas</h3>
-                
+              <div className="bg-emerald-500/10 border border-teal-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-emerald-400 mb-4">🌍 Idiomas</h3>
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {['español', 'inglés', 'portugués', 'francés', 'alemán', 'italiano', 'japonés', 'chino'].map(idioma => (
                     <label key={idioma} className="flex items-center gap-2">
@@ -877,7 +877,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                             }))
                           }
                         }}
-                        className="w-4 h-4 text-teal-600 focus:ring-teal-500 border-gray-300 rounded"
+                        className="w-4 h-4 text-emerald-400 focus:ring-teal-500 border-border rounded"
                       />
                       <span className="text-sm capitalize">{idioma}</span>
                     </label>
@@ -886,21 +886,21 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
               </div>
 
               {/* Observaciones */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">📝 Observaciones del proceso</h3>
+              <div className="bg-muted/30 border border-border rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-foreground mb-4">📝 Observaciones del proceso</h3>
                 <textarea
                   value={formData.observaciones}
                   onChange={(e) => handleInputChange('observaciones', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   rows={4}
                   placeholder="Observaciones sobre el candidato, entrevistas realizadas, fortalezas, áreas de mejora, etc."
                 />
               </div>
 
               {/* Puntuación calculada */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-blue-800 mb-2">🎯 Puntuación del candidato</h3>
-                <div className="text-sm text-blue-700">
+              <div className="bg-primary/10 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-primary mb-2">🎯 Puntuación del candidato</h3>
+                <div className="text-sm text-primary">
                   <p>La puntuación se calcula automáticamente basada en:</p>
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li>Experiencia laboral ({formData.experiencia_años > 0 ? '✅' : '❌'} {formData.experiencia_años >= 3 ? '+' : ''})</li>
@@ -917,26 +917,26 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+        <div className="px-6 py-4 border-t border-border bg-muted/30 flex justify-between items-center">
           <div>
             {currentStep > 1 && (
               <button
                 onClick={prevStep}
-                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                className="px-4 py-2 text-foreground/80 border border-border rounded-lg hover:bg-muted transition-colors"
               >
                 ← Anterior
               </button>
             )}
           </div>
-          
+
           <div className="flex gap-3">
             <button
               onClick={handleClose}
-              className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+              className="px-6 py-2 text-foreground/80 border border-border rounded-lg hover:bg-muted transition-colors"
             >
               Cancelar
             </button>
-            
+
             {currentStep < 4 ? (
               <button
                 onClick={nextStep}
@@ -963,7 +963,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     </div>
   )
 
-  return typeof window !== 'undefined' 
+  return typeof window !== 'undefined'
     ? createPortal(modalContent, document.body)
     : null
-} 
+}

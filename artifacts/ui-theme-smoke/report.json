@@ -1,0 +1,297 @@
+{
+  "routes": [
+    {
+      "name": "dashboard",
+      "theme": "dark",
+      "status": 200,
+      "layout": "dark",
+      "html": "dark",
+      "heading": "Dashboard ejecutivo",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "analytics",
+      "theme": "dark",
+      "status": 200,
+      "layout": "dark",
+      "html": "dark",
+      "heading": "Analytics Financiero",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "documentos",
+      "theme": "dark",
+      "status": 200,
+      "layout": "dark",
+      "html": "dark",
+      "heading": "Gestion Documental y Facturacion Electronica",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "cpe",
+      "theme": "dark",
+      "status": 200,
+      "layout": "dark",
+      "html": "dark",
+      "heading": "Comprobantes de Pago Electronicos",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "reportes-ventas",
+      "theme": "dark",
+      "status": 200,
+      "layout": "dark",
+      "html": "dark",
+      "heading": "Reportes y Estadísticas",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "cotizaciones-nueva",
+      "theme": "dark",
+      "status": 200,
+      "layout": "dark",
+      "html": "dark",
+      "heading": "Nueva Cotización",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "pedidos",
+      "theme": "dark",
+      "status": 200,
+      "layout": "dark",
+      "html": "dark",
+      "heading": "Pedidos de Venta",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "recepciones",
+      "theme": "dark",
+      "status": 200,
+      "layout": "dark",
+      "html": "dark",
+      "heading": "Recepciones de Mercancía",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "cxp",
+      "theme": "dark",
+      "status": 200,
+      "layout": "dark",
+      "html": "dark",
+      "heading": "Cuentas por Pagar",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "dashboard",
+      "theme": "light",
+      "status": 200,
+      "layout": "light",
+      "html": "light",
+      "heading": "Dashboard ejecutivo",
+      "whiteLargeSurfaces": [
+        {
+          "tag": "LI",
+          "className": "flex items-start gap-3 rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-sl",
+          "area": 45489
+        },
+        {
+          "tag": "LI",
+          "className": "flex items-start gap-3 rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-sl",
+          "area": 45489
+        },
+        {
+          "tag": "LI",
+          "className": "flex items-start gap-3 rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-sl",
+          "area": 45489
+        },
+        {
+          "tag": "LI",
+          "className": "flex items-start gap-3 rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-sl",
+          "area": 45489
+        },
+        {
+          "tag": "DIV",
+          "className": "rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50",
+          "area": 24450
+        },
+        {
+          "tag": "DIV",
+          "className": "rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50",
+          "area": 24450
+        },
+        {
+          "tag": "DIV",
+          "className": "rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50",
+          "area": 24450
+        }
+      ]
+    },
+    {
+      "name": "analytics",
+      "theme": "light",
+      "status": 200,
+      "layout": "light",
+      "html": "light",
+      "heading": "Analytics Financiero",
+      "whiteLargeSurfaces": [
+        {
+          "tag": "HEADER",
+          "className": "rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboa",
+          "area": 173968
+        },
+        {
+          "tag": "DIV",
+          "className": "rounded-xl border border-cyan-400/20 bg-slate-950/60 px-4 py-3 group-data-[erp-theme=light]/dashboard:bg-slate-50",
+          "area": 31350
+        },
+        {
+          "tag": "DIV",
+          "className": "rounded-xl border border-rose-400/20 bg-slate-950/60 px-4 py-3 group-data-[erp-theme=light]/dashboard:bg-slate-50",
+          "area": 31351
+        },
+        {
+          "tag": "DIV",
+          "className": "rounded-xl border border-emerald-400/20 bg-slate-950/60 px-4 py-3 group-data-[erp-theme=light]/dashboard:bg-slate-50",
+          "area": 31350
+        }
+      ]
+    },
+    {
+      "name": "documentos",
+      "theme": "light",
+      "status": 200,
+      "layout": "light",
+      "html": "light",
+      "heading": "Gestion Documental y Facturacion Electronica",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "cpe",
+      "theme": "light",
+      "status": 200,
+      "layout": "light",
+      "html": "light",
+      "heading": "Comprobantes de Pago Electronicos",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "reportes-ventas",
+      "theme": "light",
+      "status": 200,
+      "layout": "light",
+      "html": "light",
+      "heading": "Reportes y Estadísticas",
+      "whiteLargeSurfaces": [
+        {
+          "tag": "DIV",
+          "className": "rounded-lg border border-border/70 bg-card text-card-foreground shadow-sm supports-[backdrop-filter]:backdrop-blur",
+          "area": 56523
+        },
+        {
+          "tag": "DIV",
+          "className": "rounded-lg border border-border/70 bg-card text-card-foreground shadow-sm supports-[backdrop-filter]:backdrop-blur",
+          "area": 56526
+        },
+        {
+          "tag": "DIV",
+          "className": "rounded-lg border border-border/70 bg-card text-card-foreground shadow-sm supports-[backdrop-filter]:backdrop-blur",
+          "area": 56523
+        },
+        {
+          "tag": "DIV",
+          "className": "overflow-auto rounded-lg border border-border/70 bg-card text-card-foreground shadow-sm",
+          "area": 127958
+        },
+        {
+          "tag": "TABLE",
+          "className": "min-w-full divide-y divide-border",
+          "area": 95996
+        },
+        {
+          "tag": "TBODY",
+          "className": "divide-y divide-border bg-card",
+          "area": 49343
+        }
+      ]
+    },
+    {
+      "name": "cotizaciones-nueva",
+      "theme": "light",
+      "status": 200,
+      "layout": "light",
+      "html": "light",
+      "heading": "Nueva Cotización",
+      "whiteLargeSurfaces": [
+        {
+          "tag": "NAV",
+          "className": "breadcrumbs-nav",
+          "area": 20720
+        },
+        {
+          "tag": "INPUT",
+          "className": "w-[100%] pt-4 pr-12 pb-4 pl-12 text-4 transition bg-[rgba(255,_255,_255,_0.9)] text-[var(--primary-800)]",
+          "area": 57479
+        },
+        {
+          "tag": "INPUT",
+          "className": "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:t",
+          "area": 39920
+        },
+        {
+          "tag": "TEXTAREA",
+          "className": "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-vi",
+          "area": 97804
+        }
+      ]
+    },
+    {
+      "name": "pedidos",
+      "theme": "light",
+      "status": 200,
+      "layout": "light",
+      "html": "light",
+      "heading": "Pedidos de Venta",
+      "whiteLargeSurfaces": [
+        {
+          "tag": "INPUT",
+          "className": "w-[100%] pt-3 pr-4 pb-3 pl-12 rounded-2 border text-[0.875rem]",
+          "area": 37080
+        }
+      ]
+    },
+    {
+      "name": "recepciones",
+      "theme": "light",
+      "status": 200,
+      "layout": "light",
+      "html": "light",
+      "heading": "Recepciones de Mercancía",
+      "whiteLargeSurfaces": []
+    },
+    {
+      "name": "cxp",
+      "theme": "light",
+      "status": 200,
+      "layout": "light",
+      "html": "light",
+      "heading": "Cuentas por Pagar",
+      "whiteLargeSurfaces": []
+    }
+  ],
+  "console_errors": [],
+  "page_errors": [],
+  "storage_keys": {
+    "local": [
+      "erp-analytics-dashboard-snapshot",
+      "erp-dashboard-theme",
+      "erp.auth.session.snapshot",
+      "erp.desktop.offline.cache",
+      "erp.permissions.snapshot",
+      "erp_onboarding_completed"
+    ],
+    "session": [
+      "erp.auth.session.snapshot"
+    ]
+  },
+  "storage_findings": []
+}

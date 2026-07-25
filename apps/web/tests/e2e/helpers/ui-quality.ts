@@ -22,7 +22,7 @@ const fatalTextPatterns = [
 ] as const;
 
 const permanentLoaderPattern =
-  /Verificando autenticaci[oó]n|Redirigiendo|Cargando pa[ií]s configurado|Cargando datos del dashboard|Cargando\.\.\.|Loading\.\.\./i;
+  /Verificando autenticaci[oó]n|Redirigiendo|Cargando pa[ií]s configurado|Cargando datos del dashboard|Cargando gu[ií]as de remisi[oó]n|Cargando\.\.\.|Loading\.\.\./i;
 
 export function installUiQualityMonitor(page: Page): UiQualityMonitor {
   const monitor: UiQualityMonitor = {
@@ -50,9 +50,10 @@ export function installUiQualityMonitor(page: Page): UiQualityMonitor {
 
 export async function expectHealthyUi(page: Page, monitor: UiQualityMonitor, label: string) {
   await expect(page.locator('body'), `${label}: body visible`).toBeVisible();
-  await expect(page.locator('main'), `${label}: main visible`).toBeVisible({ timeout: 15000 });
+  const main = page.locator('main').first();
+  await expect(main, `${label}: main visible`).toBeVisible({ timeout: 15000 });
   const bodyText = await page.locator('body').innerText({ timeout: 15000 });
-  const mainText = await page.locator('main').innerText({ timeout: 15000 });
+  const mainText = await main.innerText({ timeout: 15000 });
 
   expect(mainText.trim().length, `${label}: main debe tener contenido útil`).toBeGreaterThan(40);
   expect(bodyText, `${label}: no debe quedar en loader permanente`).not.toMatch(permanentLoaderPattern);

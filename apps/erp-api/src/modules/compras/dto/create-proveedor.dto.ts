@@ -12,9 +12,9 @@ export enum CondicionesPago {
 }
 
 export class CreateProveedorDto {
-  @ApiProperty({ description: 'RUC del proveedor (11 dígitos para Perú, 9 para Colombia)', example: '20123456789' })
+  @ApiProperty({ description: 'RUC del proveedor peruano (11 dígitos)', example: '20123456789' })
   @IsString()
-  @IsValidRuc({ message: 'El RUC debe tener 11 dígitos (Perú) o 9 dígitos (Colombia) y contener solo números' })
+  @IsValidRuc({ message: 'El RUC debe tener 11 dígitos y contener solo números' })
   ruc: string;
 
   @ApiProperty({ description: 'Razón social del proveedor', example: 'DISTRIBUIDORA ABC S.A.C.' })

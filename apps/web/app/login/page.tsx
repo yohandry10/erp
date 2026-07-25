@@ -6,48 +6,18 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { Building2, Loader2, Globe, Lock, Mail } from 'lucide-react'
-import { usePaises } from '@/hooks/use-paises'
-
-type Pais = {
-  id: string | number
-  nombre: string
-  codigo_fiscal?: string
-  codigo_iso?: string
-}
+import { INITIAL_ACTIVE_COUNTRY, INITIAL_ACTIVE_COUNTRY_ID } from '@/lib/initial-country'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [selectedCountry, setSelectedCountry] = useState<string>('')
   const [loading, setLoading] = useState(false)
-  const [countryLoadExpired, setCountryLoadExpired] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
   const { signIn, session, loading: authLoading } = useAuth()
-
-  const {
-    paises,
-    loading: paisesLoading,
-    getUserConfiguration,
-    updateUserConfiguration,
-    // Remover estas líneas que no existen:
-    // saveUserCountryPreference,
-    // createUserConfiguration,
-  } = usePaises()
-
-  useEffect(() => {
-    if (!paisesLoading) {
-      setCountryLoadExpired(false)
-      return
-    }
-
-    const timeoutId = window.setTimeout(() => setCountryLoadExpired(true), 10000)
-    return () => window.clearTimeout(timeoutId)
-  }, [paisesLoading])
 
   useEffect(() => {
     if (!authLoading && session) {
@@ -56,16 +26,10 @@ export default function LoginPage() {
   }, [authLoading, session, router])
 
   useEffect(() => {
-    const list = (paises as Pais[]) || []
-    if (list.length > 0 && !selectedCountry) {
-      if (typeof window !== 'undefined') {
-        const storedCountry = window.localStorage.getItem('selectedCountry')
-        if (storedCountry && list.some((p) => String(p.id) === storedCountry)) {
-          setSelectedCountry(storedCountry)
-        }
-      }
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('selectedCountry', INITIAL_ACTIVE_COUNTRY_ID)
     }
-  }, [paises, selectedCountry])
+  }, [])
 
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -80,27 +44,20 @@ export default function LoginPage() {
 
       // Persistir país seleccionado en localStorage
       if (typeof window !== 'undefined') {
-        if (selectedCountry) {
-          localStorage.setItem('selectedCountry', selectedCountry)
-        } else {
-          localStorage.removeItem('selectedCountry')
-        }
+        localStorage.setItem('selectedCountry', INITIAL_ACTIVE_COUNTRY_ID)
       }
-
-      const list = (paises as Pais[]) || []
-      const selectedPais = list.find((p) => String(p.id) === selectedCountry)
 
       toast({
         title: 'Bienvenido',
-        description: selectedPais
-          ? `Has iniciado sesión correctamente - ${selectedPais.nombre}`
-          : 'Has iniciado sesión correctamente',
+        description: `Has iniciado sesión correctamente - ${INITIAL_ACTIVE_COUNTRY.nombre}`,
       })
 
       console.log('🚀 [LoginPage] Redirigiendo a dashboard...')
       router.push('/dashboard')
     } catch (error) {
-      console.error('🚨 Auth Error:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.info('[LoginPage] Login rechazado:', error instanceof Error ? error.message : error)
+      }
       toast({
         variant: 'destructive',
         title: 'Error de autenticación',
@@ -115,11 +72,7 @@ export default function LoginPage() {
     setLoading(true)
 
     if (typeof window !== 'undefined') {
-      if (selectedCountry) {
-        localStorage.setItem('selectedCountry', selectedCountry)
-      } else {
-        localStorage.removeItem('selectedCountry')
-      }
+      localStorage.setItem('selectedCountry', INITIAL_ACTIVE_COUNTRY_ID)
     }
 
     // /demo crea un tenant demo (POST /api/demo/create), autentica con signIn() y
@@ -128,67 +81,52 @@ export default function LoginPage() {
     router.push('/demo')
   }
 
-  const paisesList = (paises as Pais[]) || []
-  const showCountryLoading = paisesLoading && !countryLoadExpired
-
   return (
-    <div className="login-container">
-      <div className="login-background">
-        <div className="login-gradient-1"></div>
-        <div className="login-gradient-2"></div>
-        <div className="login-gradient-3"></div>
+    <div className="theme-light-scope relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 px-4 py-8">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-blue-400/15 blur-3xl" />
+        <div className="absolute -right-32 top-1/4 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="absolute -bottom-40 left-1/3 h-96 w-96 rounded-full bg-amber-300/10 blur-3xl" />
       </div>
 
-      <div className="login-card-wrapper">
-        <Card className="login-card">
-          <CardHeader className="login-header">
-            <div className="login-logo">
-              <div className="logo-icon">
-                <Building2 size={32} />
+      <div className="relative z-10 w-full max-w-md">
+        <Card className="relative overflow-hidden border-border/80 bg-white/95 shadow-2xl shadow-slate-900/15 backdrop-blur-xl before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-blue-700 before:via-blue-500 before:to-cyan-400">
+          <CardHeader className="px-6 pb-6 pt-10 text-center sm:px-10 sm:pt-12">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-800 via-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-900/25">
+                <Building2 className="h-8 w-8" aria-hidden="true" />
               </div>
-              <div className="logo-text">
-                <CardTitle className="login-title">ERP Suite</CardTitle>
-                <CardDescription className="login-subtitle">
+              <div className="text-center">
+                <CardTitle className="bg-gradient-to-r from-blue-900 via-blue-700 to-cyan-600 bg-clip-text text-4xl font-black tracking-tight text-transparent">
+                  ERP Suite
+                </CardTitle>
+                <CardDescription className="mt-2 font-medium text-foreground/80">
                   Sistema Empresarial Integrado
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
 
-          <CardContent className="login-content">
-            <form onSubmit={handleLogin} className="login-form">
+          <CardContent className="px-6 pb-6 sm:px-10">
+            <form onSubmit={handleLogin} className="space-y-5">
               {/* Selector de País */}
-              <div className="form-group">
-                <Label htmlFor="country" className="form-label">
-                  <Globe size={16} />
-                  País (preferencia de interfaz)
+              <div className="space-y-2">
+                <Label htmlFor="country" className="flex items-center gap-2 font-semibold text-foreground/85">
+                  <Globe className="h-4 w-4" aria-hidden="true" />
+                  País operativo
                 </Label>
-                <Select
-                  value={selectedCountry}
-                  onValueChange={(v) => setSelectedCountry(v)}
-                  disabled={showCountryLoading}
-                >
-                  <SelectTrigger id="country" className="select-trigger">
-                    <SelectValue placeholder={showCountryLoading ? 'Cargando países...' : 'Selecciona un país'} />
-                  </SelectTrigger>
-                  <SelectContent className="select-content">
-                    {paisesList.map((pais) => (
-                      <SelectItem key={String(pais.id)} value={String(pais.id)} className="select-item">
-                        <div className="country-option">
-                          <span className="country-name">{pais.nombre}</span>
-                          {pais.codigo_fiscal && (
-                            <span className="country-code">({pais.codigo_fiscal})</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="country"
+                  value={`${INITIAL_ACTIVE_COUNTRY.nombre} (${INITIAL_ACTIVE_COUNTRY.nombre_fiscal})`}
+                  readOnly
+                  className="h-12 border-border bg-muted/30 px-4 text-foreground/85"
+                  aria-readonly="true"
+                />
               </div>
 
-              <div className="form-group">
-                <Label htmlFor="email" className="form-label">
-                  <Mail size={16} />
+              <div className="space-y-2">
+                <Label htmlFor="email" className="flex items-center gap-2 font-semibold text-foreground/85">
+                  <Mail className="h-4 w-4" aria-hidden="true" />
                   Correo Electrónico
                 </Label>
                 <Input
@@ -200,13 +138,13 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="username"
-                  className="form-input"
+                  className="h-12 border-border bg-card px-4 text-base text-foreground focus-visible:border-blue-500 focus-visible:ring-blue-500/20"
                 />
               </div>
 
-              <div className="form-group">
-                <Label htmlFor="password" className="form-label">
-                  <Lock size={16} />
+              <div className="space-y-2">
+                <Label htmlFor="password" className="flex items-center gap-2 font-semibold text-foreground/85">
+                  <Lock className="h-4 w-4" aria-hidden="true" />
                   Contraseña
                 </Label>
                 <Input
@@ -217,7 +155,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="form-input"
+                  className="h-12 border-border bg-card px-4 text-base text-foreground focus-visible:border-blue-500 focus-visible:ring-blue-500/20"
                 />
               </div>
 
@@ -225,28 +163,30 @@ export default function LoginPage() {
             </form>
           </CardContent>
 
-          <CardFooter className="login-footer">
+          <CardFooter className="flex flex-col gap-5 px-6 pb-10 sm:px-10">
             <Button
               type="submit"
               onClick={handleLogin}
               disabled={loading}
-              className="login-button primary"
+              className="h-12 w-full bg-gradient-to-r from-blue-800 via-blue-600 to-cyan-500 text-base text-white shadow-lg shadow-blue-900/20 hover:from-blue-900 hover:via-blue-700 hover:to-cyan-600"
             >
-              {loading && <Loader2 className="button-spinner" />}
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               Iniciar Sesión
             </Button>
 
-            <div className="divider">
-              <span className="divider-text">O continúa con</span>
+            <div className="flex w-full items-center gap-3" aria-hidden="true">
+              <span className="h-px flex-1 bg-muted" />
+              <span className="text-sm font-medium text-muted-foreground">O continúa con</span>
+              <span className="h-px flex-1 bg-muted" />
             </div>
 
             <Button
               variant="outline"
               onClick={handleDemoLogin}
               disabled={loading}
-              className="login-button demo"
+              className="h-12 w-full border-2 border-border bg-card text-base text-foreground/85 hover:border-border hover:bg-muted/30 hover:text-foreground"
             >
-              {loading && <Loader2 className="button-spinner" />}
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               Acceso Demo
             </Button>
           </CardFooter>

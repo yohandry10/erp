@@ -9,7 +9,7 @@ services:
     ports:
       - "${WEB_HOST_PORT:-13001}:3001"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3001
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:13002}
       - SERVER_API_URL=http://erp-api:3002
@@ -38,7 +38,10 @@ services:
     ports:
       - "${API_HOST_PORT:-13002}:3002"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-development}
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV:-DEV}
+      - EXPECTED_SUPABASE_PROJECT_REF=${EXPECTED_SUPABASE_PROJECT_REF:-hbueraexcbowpfnjlppi}
+      - DEMO_API_ENABLED=${DEMO_API_ENABLED:-false}
       - PORT=3002
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
@@ -61,6 +64,7 @@ services:
       - REDIS_REQUIRED=${REDIS_REQUIRED:-true}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:13001}
       - FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED:-true}
@@ -110,11 +114,12 @@ services:
     ports:
       - "${WORKER_HOST_PORT:-3050}:3050"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-development}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
       - FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED:-true}
       - FEATURE_INVENTARIO_ENABLED=${FEATURE_INVENTARIO_ENABLED:-true}

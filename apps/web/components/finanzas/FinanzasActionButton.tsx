@@ -71,7 +71,7 @@ export default function FinanzasActionButton({
   return (
     <button
       onClick={onClick}
-      disabled={disabled} className="rounded-2 font-semibold inline-flex items-center gap-2 transition whitespace-nowrap"
+      disabled={disabled} className="rounded-lg font-semibold inline-flex items-center gap-2 transition whitespace-nowrap"
       onMouseEnter={(e) => {
         if (!disabled) {
           e.currentTarget.style.background = variantStyle.hoverBackground

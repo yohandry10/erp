@@ -11,6 +11,11 @@ import { XmlSigner } from '@erp-suite/crypto';
         const pfxPath = configService.get<string>('PFX_PATH');
         const pfxPassword = configService.get<string>('PFX_PASS');
         const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+        const sunatEnvironment = configService.get<string>('SUNAT_ENVIRONMENT', 'homologacion');
+        const expectedRuc = configService.get<string>('SUNAT_CERT_EXPECTED_RUC') || configService.get<string>('EMPRESA_RUC');
+        const mismatchConfirmed =
+          configService.get<string | boolean>('SUNAT_CERT_RUC_MISMATCH_CONFIRMED') === true ||
+          configService.get<string | boolean>('SUNAT_CERT_RUC_MISMATCH_CONFIRMED') === 'true';
 
         if (!pfxPath || !pfxPassword) {
           if (nodeEnv !== 'production') {
@@ -22,6 +27,9 @@ import { XmlSigner } from '@erp-suite/crypto';
         return new XmlSigner({
           pfxPath,
           pfxPassword,
+          expectedRuc,
+          enforceRucInCertificate: sunatEnvironment === 'produccion',
+          allowRucMismatchWithConfirmation: mismatchConfirmed,
         });
       },
       inject: [ConfigService],

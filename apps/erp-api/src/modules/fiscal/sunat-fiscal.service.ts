@@ -12,24 +12,57 @@ import {
 import { XmlSigner } from '@erp-suite/crypto';
 import * as https from 'https';
 
+const SUNAT_CPE_ENDPOINTS = {
+  homologacion: 'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService',
+  produccion: 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService',
+} as const;
+
+const SUNAT_QUERY_ENDPOINTS = {
+  homologacion: 'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService',
+  produccion: 'https://e-factura.sunat.gob.pe/ol-it-wsconscpegem/billConsultService',
+} as const;
+
+const getConfigValue = (configService: ConfigService, ...keys: string[]): string | undefined => {
+  for (const key of keys) {
+    const value = configService.get<string>(key);
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+};
+
 @Injectable()
 export class SunatFiscalService extends FiscalServiceAbstract {
   private xmlSigner: XmlSigner;
 
   constructor(private readonly configService: ConfigService) {
+    const environment = configService.get('SUNAT_ENVIRONMENT') === 'produccion' ? 'produccion' : 'homologacion';
     const config: FiscalConfig = {
-      url: configService.get('OSE_URL') || 'https://api-cpe-beta.sunat.gob.pe',
-      usuario: configService.get('OSE_USUARIO') || '',
-      password: configService.get('OSE_PASSWORD') || '',
+      url: configService.get('SUNAT_CPE_URL') || configService.get('OSE_URL') || SUNAT_CPE_ENDPOINTS[environment],
+      usuario: getConfigValue(configService, 'SUNAT_USERNAME', 'OSE_USUARIO', 'OSE_USERNAME') || '',
+      password: getConfigValue(configService, 'SUNAT_PASSWORD', 'OSE_PASSWORD') || '',
       empresaId: configService.get('EMPRESA_RUC') || '',
-      certificatePath: configService.get('CERTIFICATE_PATH') || '/certificates/certificado.pfx',
-      certificatePassword: configService.get('CERTIFICATE_PASSWORD') || '',
-      environment: configService.get('SUNAT_ENVIRONMENT') === 'produccion' ? 'produccion' : 'homologacion',
+      certificatePath: getConfigValue(configService, 'CERTIFICATE_PATH', 'PFX_PATH') || '/certificates/certificado.pfx',
+      certificatePassword: getConfigValue(configService, 'CERTIFICATE_PASSWORD', 'PFX_PASS') || '',
+      environment,
       pais: 'PE'
     };
     
     super(config);
     this.initializeXmlSigner();
+  }
+
+  private getConfigValue(...keys: string[]): string | undefined {
+    for (const key of keys) {
+      const value = this.configService.get<string>(key);
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    return undefined;
   }
 
   private initializeXmlSigner(): void {
@@ -41,7 +74,15 @@ export class SunatFiscalService extends FiscalServiceAbstract {
       pfxPath: this.config.certificatePath,
       pfxPassword: this.config.certificatePassword,
       allowDemoFallback: !requireRealCertificate,
+      expectedRuc: this.getConfigValue('SUNAT_CERT_EXPECTED_RUC') || this.config.empresaId,
+      enforceRucInCertificate: this.config.environment === 'produccion',
+      allowRucMismatchWithConfirmation: this.isCertificateRucMismatchConfirmed(),
     });
+  }
+
+  private isCertificateRucMismatchConfirmed(): boolean {
+    return this.configService.get<string | boolean>('SUNAT_CERT_RUC_MISMATCH_CONFIRMED') === true
+      || this.configService.get<string | boolean>('SUNAT_CERT_RUC_MISMATCH_CONFIRMED') === 'true';
   }
 
   async enviarDocumento(documento: DocumentoElectronico): Promise<FiscalResponse> {
@@ -107,8 +148,16 @@ export class SunatFiscalService extends FiscalServiceAbstract {
       errores.push('RUC del emisor debe tener 11 dígitos');
     }
 
-    if (documento.tipoDocumento === '01' && documento.importeTotal < 700) {
-      advertencias.push('Factura con monto menor a S/ 700.00');
+    if (documento.tipoDocumento === '01' && documento.receptor.numeroDocumento?.length !== 11) {
+      errores.push('Factura requiere RUC del receptor de 11 dígitos');
+    }
+
+    if (documento.tipoDocumento === '03' && documento.importeTotal > 700) {
+      if (!documento.receptor.razonSocial?.trim() || !documento.receptor.numeroDocumento?.trim()) {
+        errores.push(
+          'Boleta mayor a S/ 700 requiere apellidos y nombres o razón social, y número de documento del adquirente o usuario',
+        );
+      }
     }
 
     if (documento.moneda !== 'PEN' && documento.moneda !== 'USD') {
@@ -146,12 +195,11 @@ export class SunatFiscalService extends FiscalServiceAbstract {
         tipo: libro.tipoLibro 
       });
 
-      // Implementación específica para libros contables SUNAT
-      // Por ahora retornamos éxito simulado
       return {
-        success: true,
-        codigoRespuesta: '0',
-        descripcionRespuesta: 'Libro contable enviado exitosamente'
+        success: false,
+        codigoRespuesta: 'NOT_IMPLEMENTED',
+        descripcionRespuesta:
+          'El envío directo de libros contables no está implementado. Genere y valide el archivo PLE/SIRE mediante el módulo correspondiente.',
       };
     } catch (error) {
       this.logError('enviarLibroContable', error);
@@ -177,19 +225,24 @@ export class SunatFiscalService extends FiscalServiceAbstract {
         this.assertSunatDirectConfigured();
         const postData = this.buildSunatRequest(zipBuffer, fileName, 'sendBill');
         const endpoint = this.resolveSunatEndpoint();
-        const req = https.request(
-          {
-            hostname: endpoint.hostname,
-            port: endpoint.port,
-            path: endpoint.path,
-            method: 'POST',
-            headers: {
-              'Content-Type': 'text/xml; charset=utf-8',
-              'Content-Length': Buffer.byteLength(postData),
-              SOAPAction: 'urn:sendBill',
-            },
-            auth: `${this.config.usuario}:${this.config.password}`,
+        const requestOptions: https.RequestOptions = {
+          hostname: endpoint.hostname,
+          port: endpoint.port,
+          path: endpoint.path,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/xml; charset=utf-8',
+            'Content-Length': Buffer.byteLength(postData),
+            SOAPAction: 'urn:sendBill',
           },
+        };
+
+        if (this.shouldUseHttpBasicAuth(endpoint.hostname)) {
+          requestOptions.auth = `${this.config.usuario}:${this.config.password}`;
+        }
+
+        const req = https.request(
+          requestOptions,
           (res) => {
             let data = '';
             res.on('data', (chunk) => {
@@ -217,21 +270,26 @@ export class SunatFiscalService extends FiscalServiceAbstract {
           throw new Error('RUC emisor requerido para consultar estado SUNAT');
         }
 
-        const postData = this.buildStatusRequest(rucConsulta, tipoDocumento, serie, numero);
-        const endpoint = this.resolveSunatEndpoint();
-        const req = https.request(
-          {
-            hostname: endpoint.hostname,
-            port: endpoint.port,
-            path: endpoint.path,
-            method: 'POST',
-            headers: {
-              'Content-Type': 'text/xml; charset=utf-8',
-              'Content-Length': Buffer.byteLength(postData),
-              SOAPAction: 'urn:getStatus',
-            },
-            auth: `${this.config.usuario}:${this.config.password}`,
+        const postData = this.buildStatusCdrRequest(rucConsulta, tipoDocumento, serie, numero);
+        const endpoint = this.resolveSunatEndpoint('query');
+        const requestOptions: https.RequestOptions = {
+          hostname: endpoint.hostname,
+          port: endpoint.port,
+          path: endpoint.path,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/xml; charset=utf-8',
+            'Content-Length': Buffer.byteLength(postData),
+            SOAPAction: 'urn:getStatusCdr',
           },
+        };
+
+        if (this.shouldUseHttpBasicAuth(endpoint.hostname)) {
+          requestOptions.auth = `${this.config.usuario}:${this.config.password}`;
+        }
+
+        const req = https.request(
+          requestOptions,
           (res) => {
             let data = '';
             res.on('data', (chunk) => {
@@ -256,25 +314,26 @@ export class SunatFiscalService extends FiscalServiceAbstract {
     if (!this.config.password) throw new Error('Password SUNAT/OSE no configurado');
   }
 
-  private resolveSunatEndpoint(): { hostname: string; port: number; path: string } {
-    const url = new URL(this.config.url);
+  private resolveSunatEndpoint(kind: 'cpe' | 'query' = 'cpe'): { hostname: string; port: number; path: string } {
+    const endpointUrl =
+      kind === 'query'
+        ? this.getConfigValue('SUNAT_QUERY_URL') || SUNAT_QUERY_ENDPOINTS[this.config.environment]
+        : this.config.url || SUNAT_CPE_ENDPOINTS[this.config.environment];
+    const defaultUrl = kind === 'query' ? SUNAT_QUERY_ENDPOINTS[this.config.environment] : SUNAT_CPE_ENDPOINTS[this.config.environment];
+    const url = new URL(endpointUrl);
     const configuredPath = url.pathname && url.pathname !== '/' ? url.pathname : '';
-    const path =
-      configuredPath ||
-      (this.config.environment === 'homologacion' ? '/ol-ti-itcpfegem-beta/billService' : '');
-
-    if (!path) {
-      throw new Error(
-        'SUNAT_ENVIRONMENT=produccion requiere OSE_URL/SUNAT URL con path SOAP explicito. ' +
-        'No se usara un endpoint productivo inferido.',
-      );
-    }
+    const path = configuredPath || new URL(defaultUrl).pathname;
 
     return {
       hostname: url.hostname,
       port: Number(url.port || 443),
       path,
     };
+  }
+
+  private shouldUseHttpBasicAuth(hostname: string): boolean {
+    const normalizedHost = hostname.toLowerCase();
+    return normalizedHost !== 'sunat.gob.pe' && !normalizedHost.endsWith('.sunat.gob.pe');
   }
 
   private buildSunatRequest(zipBuffer: Buffer, fileName: string, operation: 'sendBill'): string {
@@ -300,18 +359,26 @@ export class SunatFiscalService extends FiscalServiceAbstract {
 </soap:Envelope>`;
   }
 
-  private buildStatusRequest(ruc: string, tipoDocumento: string, serie: string, numero: string): string {
+  private buildStatusCdrRequest(ruc: string, tipoDocumento: string, serie: string, numero: string): string {
     return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
-               xmlns:ser="http://service.sunat.gob.pe">
-  <soap:Header/>
+               xmlns:ser="http://service.sunat.gob.pe"
+               xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+  <soap:Header>
+    <wsse:Security>
+      <wsse:UsernameToken>
+        <wsse:Username>${this.config.usuario}</wsse:Username>
+        <wsse:Password>${this.config.password}</wsse:Password>
+      </wsse:UsernameToken>
+    </wsse:Security>
+  </soap:Header>
   <soap:Body>
-    <ser:getStatus>
+    <ser:getStatusCdr>
       <rucComprobante>${ruc}</rucComprobante>
       <tipoComprobante>${tipoDocumento}</tipoComprobante>
       <serieComprobante>${serie}</serieComprobante>
       <numeroComprobante>${numero}</numeroComprobante>
-    </ser:getStatus>
+    </ser:getStatusCdr>
   </soap:Body>
 </soap:Envelope>`;
   }
@@ -326,18 +393,20 @@ export class SunatFiscalService extends FiscalServiceAbstract {
       };
     }
 
-    const cdrMatch = soapResponse.match(/<applicationResponse>(.*?)<\/applicationResponse>/);
+    const cdrMatch =
+      soapResponse.match(/<(?:\w+:)?applicationResponse\b[^>]*>([\s\S]*?)<\/(?:\w+:)?applicationResponse>/i) ||
+      soapResponse.match(/<(?:\w+:)?content\b[^>]*>([\s\S]*?)<\/(?:\w+:)?content>/i);
     if (cdrMatch) {
       return {
         success: true,
         codigoRespuesta: '0',
         descripcionRespuesta: 'Aceptado por SUNAT',
-        cdr: cdrMatch[1],
+        cdr: cdrMatch[1].trim(),
       };
     }
 
-    const statusCodeMatch = soapResponse.match(/<statusCode>(.*?)<\/statusCode>/);
-    const statusMessageMatch = soapResponse.match(/<statusMessage>(.*?)<\/statusMessage>/);
+    const statusCodeMatch = soapResponse.match(/<(?:\w+:)?statusCode\b[^>]*>([\s\S]*?)<\/(?:\w+:)?statusCode>/i);
+    const statusMessageMatch = soapResponse.match(/<(?:\w+:)?statusMessage\b[^>]*>([\s\S]*?)<\/(?:\w+:)?statusMessage>/i);
     if (statusCodeMatch || statusMessageMatch) {
       const codigo = statusCodeMatch?.[1] || '0';
       return {

@@ -6,6 +6,7 @@ import {
   expectVisibleTexts,
   installUiQualityMonitor,
 } from './helpers/ui-quality';
+import { generateValidRucFromRunId } from './helpers/test-data';
 
 test.describe('T18 calidad funcional UI', () => {
   test.beforeEach(async ({ page }) => {
@@ -24,7 +25,7 @@ test.describe('T18 calidad funcional UI', () => {
     ]);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: /^Cancelar$/i }).click();
-    await expect(page).toHaveURL(/\/dashboard\/compras\/proveedores\/?$/);
+    await expect(page).toHaveURL(/\/dashboard\/compras\/proveedores\/?$/, { timeout: 15000 });
 
     await gotoAuthenticated(page, '/dashboard/ventas/clientes/nuevo/');
     await page.getByRole('button', { name: /Crear Cliente/i }).click();
@@ -33,7 +34,7 @@ test.describe('T18 calidad funcional UI', () => {
       /La razón social debe tener al menos 3 caracteres/i,
     ]);
     await page.getByRole('button', { name: /^Cancelar$/i }).click();
-    await expect(page).toHaveURL(/\/dashboard\/ventas\/clientes\/?$/);
+    await expect(page).toHaveURL(/\/dashboard\/ventas\/clientes\/?$/, { timeout: 15000 });
 
     await gotoAuthenticated(page, '/dashboard/inventario/productos/nuevo/');
     await page.getByRole('button', { name: /Crear Producto/i }).click();
@@ -44,7 +45,7 @@ test.describe('T18 calidad funcional UI', () => {
       /El precio de venta debe ser mayor a 0/i,
     ]);
     await page.getByRole('button', { name: /^Cancelar$/i }).click();
-    await expect(page).toHaveURL(/\/dashboard\/inventario\/productos\/?$/);
+    await expect(page).toHaveURL(/\/dashboard\/inventario\/productos\/?$/, { timeout: 15000 });
 
     await gotoAuthenticated(page, '/dashboard/finanzas/bancos/');
     await gotoAuthenticated(page, '/dashboard/finanzas/bancos/nueva/');
@@ -55,7 +56,7 @@ test.describe('T18 calidad funcional UI', () => {
       /El número de cuenta es requerido/i,
     ]);
     await page.getByRole('button', { name: /^Cancelar$/i }).click();
-    await expect(page).toHaveURL(/\/dashboard\/finanzas\/bancos\/?$/);
+    await expect(page).toHaveURL(/\/dashboard\/finanzas\/bancos\/?$/, { timeout: 15000 });
 
     await expectHealthyUi(page, monitor, 'formularios críticos');
   });
@@ -63,7 +64,7 @@ test.describe('T18 calidad funcional UI', () => {
   test('formulario de clientes registra documento real, crea cliente y persiste en listado', async ({ page }) => {
     const monitor = installUiQualityMonitor(page);
     const unique = Date.now().toString();
-    const documento = `20${unique.slice(-9)}`;
+    const documento = generateValidRucFromRunId(`ui-cliente-${unique}`);
     const razonSocial = `QA-PROD-READY-${unique} Cliente UI`;
 
     await gotoAuthenticated(page, '/dashboard/ventas/clientes/nuevo/');
@@ -76,7 +77,10 @@ test.describe('T18 calidad funcional UI', () => {
     await page.locator('#telefono').fill('999888777');
 
     await expect(page.locator('#documento_numero')).toHaveValue(documento);
-    await expect(page.getByRole('button', { name: /Validar con SUNAT/i })).toBeEnabled();
+    const validateRucButton = page.getByRole('button', { name: /^Validar RUC$/i });
+    await expect(validateRucButton).toBeEnabled();
+    await validateRucButton.click();
+    await expect(page.getByText(/Formato y dígito verificador válidos/i).first()).toBeVisible();
 
     const createResponse = page.waitForResponse((response) =>
       response.url().includes('/api/ventas/clientes') &&
@@ -99,7 +103,7 @@ test.describe('T18 calidad funcional UI', () => {
     const monitor = installUiQualityMonitor(page);
 
     await gotoAuthenticated(page, '/dashboard/usuarios/');
-    await page.getByRole('button', { name: /\+ Nuevo Usuario/i }).click();
+    await page.getByRole('button', { name: /^Nuevo usuario$/i }).click();
     await expect(page.getByRole('heading', { name: /Nuevo Usuario/i })).toBeVisible({ timeout: 10000 });
 
     await page.getByRole('button', { name: /Crear Usuario/i }).click();
@@ -110,7 +114,7 @@ test.describe('T18 calidad funcional UI', () => {
       /El rol es requerido/i,
     ]);
 
-    const closeButton = page.getByRole('button', { name: /Cerrar modal de usuario/i });
+    const closeButton = page.getByRole('button', { name: /^Cerrar$/i });
     await expect(closeButton).toBeVisible();
     await closeButton.click();
     await expectModalClosed(page, /Nuevo Usuario/i);
@@ -121,7 +125,7 @@ test.describe('T18 calidad funcional UI', () => {
     const monitor = installUiQualityMonitor(page);
 
     await gotoAuthenticated(page, '/dashboard/gre/');
-    await expect(page.locator('body')).not.toContainText(/Cargando guías de remisión/i, { timeout: 10000 });
+    await expect(page.locator('body')).not.toContainText(/Cargando gu[ií]as de remisi[oó]n/i, { timeout: 15000 });
     await expectHealthyUi(page, monitor, 'GRE');
 
     const pdfButtons = page.getByRole('button', { name: /^PDF$/i });

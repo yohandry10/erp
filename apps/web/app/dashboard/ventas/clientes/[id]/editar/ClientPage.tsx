@@ -60,9 +60,9 @@ export default function EditarClientePage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando cliente...</p>
         </div>
       </div>
@@ -78,14 +78,14 @@ export default function EditarClientePage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={handleCancel} className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
+          onClick={handleCancel} className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-card/80 border cursor-pointer transition"
         >
           <ArrowLeft className="w-4 h-4" />
           Volver
         </button>
         <div>
-          <h1 className="text-8 font-bold text-[var(--primary-900)] m-0">Editar Cliente</h1>
-          <p className="text-4 text-[var(--primary-600)] mt-1 mr-0 mb-0 ml-0">{cliente.razon_social}</p>
+          <h1 className="text-[2rem] font-bold text-[var(--primary-900)] m-0">Editar Cliente</h1>
+          <p className="text-base text-[var(--primary-600)] mt-1 mr-0 mb-0 ml-0">{cliente.razon_social}</p>
         </div>
       </div>
 

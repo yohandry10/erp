@@ -28,22 +28,22 @@ export default function FinanzasTable({
 }: FinanzasTableProps) {
   if (loading) {
     return (
-      <div className="loading">
-        <div className="loading-spinner"></div>
+      <div className="flex min-h-48 items-center justify-center">
+        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
         <p>Cargando datos...</p>
       </div>
     )
   }
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       <div className="overflow-auto">
         <table className="w-[100%]">
           <thead>
             <tr>
               {columns.map((column) => (
                 <th
-                  key={column.key} className="p-4 font-semibold text-3 text-gray-500"
+                  key={column.key} className="p-4 font-semibold text-xs text-muted-foreground"
                 >
                   {column.label}
                 </th>

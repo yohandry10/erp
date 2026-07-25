@@ -21,6 +21,7 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { User } from '../auth/user.interface';
 
 @ApiTags('cpe')
@@ -33,6 +34,7 @@ export class CpeController {
   ) { }
 
   @Post('worker/create')
+  @Public()
   @UseGuards(WorkerAuthGuard)
   @ApiOperation({ summary: 'Crear CPE desde Worker' })
   async createFromWorker(
@@ -43,6 +45,7 @@ export class CpeController {
   }
 
   @Post('worker/:id/enviar-sunat')
+  @Public()
   @UseGuards(WorkerAuthGuard)
   @ApiOperation({ summary: 'Enviar CPE a SUNAT/OSE (worker)' })
   async enviarSunatWorker(
@@ -54,6 +57,7 @@ export class CpeController {
   }
 
   @Get('worker/:id/status')
+  @Public()
   @UseGuards(WorkerAuthGuard)
   @ApiOperation({ summary: 'Consultar estado CPE en OSE (worker)' })
   async checkStatusWorker(
@@ -64,6 +68,7 @@ export class CpeController {
   }
 
   @Get('worker/comprobantes/:id/pdf')
+  @Public()
   @UseGuards(WorkerAuthGuard)
   @ApiOperation({ summary: 'Descargar PDF del CPE (worker)' })
   async downloadPdfWorker(

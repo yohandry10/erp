@@ -422,9 +422,14 @@ export class CxpService {
           ? 'PARCIAL'
           : 'PENDIENTE';
 
-    // Calcular fecha de vencimiento según condiciones de pago
+    // Calcular fecha de vencimiento según condiciones de pago.
+    // Ojo: un proveedor puede tener condiciones_pago='CREDITO_30' pero dias_credito=0
+    // (el modal no deriva los días). Con `??`, ese 0 ganaba y la CxP vencía el mismo
+    // día. Se usa dias_credito solo si es positivo; si no, se deriva de la condición.
     const condicionesPago = dto.condiciones_pago ?? 'CONTADO';
-    const diasCredito = dto.dias_credito ?? this.obtenerDiasCreditoPorCondicion(condicionesPago);
+    const diasCredito = dto.dias_credito && dto.dias_credito > 0
+      ? dto.dias_credito
+      : this.obtenerDiasCreditoPorCondicion(condicionesPago);
     const fechaVencimiento = dto.fecha_vencimiento ?? this.calcularFechaVencimiento(dto.fecha_emision, diasCredito);
 
     // Crear la cuenta por pagar

@@ -1,0 +1,35 @@
+{
+  "runId": "2026-06-17T07-57-15-425Z-3044",
+  "executedAt": "2026-06-17T07:57:17.661Z",
+  "operation": "getStatus-readonly",
+  "environment": "homologacion",
+  "endpoints": "SUNAT beta defaults from OseService",
+  "ruc": "20100066603",
+  "username": "20100066603MODDATOS",
+  "productionUsed": false,
+  "sentDocuments": false,
+  "sourceArtifact": "docs/audits/artifacts/sunat-beta-ra-rc-gre/2026-06-17T07-04-03-049Z-1489/manifest.json",
+  "artifactDirectory": "C:\\Users\\PC\\Desktop\\erp\\docs\\audits\\artifacts\\sunat-beta-ticket-readonly\\2026-06-17T07-57-15-425Z-3044",
+  "tickets": [
+    {
+      "type": "RA",
+      "label": "RA-20260617-34513",
+      "ticket": "1781679870729",
+      "response": {
+        "success": false,
+        "codigoRespuesta": "0127",
+        "descripcionRespuesta": "El ticket no existe"
+      }
+    },
+    {
+      "type": "RC",
+      "label": "RC-20260617-34514",
+      "ticket": "1781679882872",
+      "response": {
+        "success": false,
+        "codigoRespuesta": "0127",
+        "descripcionRespuesta": "El ticket no existe"
+      }
+    }
+  ]
+}

@@ -441,38 +441,30 @@ export class LogisticaService {
             throw new BadRequestException('Debe especificar el lote o serie para completar el despacho.');
           }
 
-          // Libera reserva si existía y luego registra la salida
-          if (reservadoAntes > 0) {
-            const liberar = Math.min(cantidadSolicitada, reservadoAntes);
-            const { error: liberarError } = await client.rpc('registrar_movimiento_almacen', {
-              p_producto_id: item.producto_id,
-              p_almacen_id: itemAlmacenId,
-              p_tipo: 'LIBERACION',
-              p_cantidad: liberar,
-              p_referencia_tipo: 'PEDIDO',
-              p_referencia_id: pedidoId,
-              p_notas: `Liberación reserva despacho pedido ${pedido.numero}`,
-              p_ubicacion_id: itemUbicacionId,
-              p_lote: itemLote,
-              p_fecha_expiracion: null,
-            });
-            if (liberarError) {
-              console.error('Error liberando reserva en despacho:', liberarError);
-              throw new BadRequestException('No se pudo liberar la reserva de inventario');
-            }
+          const { data: existenciaAlmacen, error: existenciaError } = await client
+            .from('producto_existencias')
+            .select('stock_reservado')
+            .eq('tenant_id', tenantId)
+            .eq('producto_id', item.producto_id)
+            .eq('almacen_id', itemAlmacenId)
+            .single();
+          if (existenciaError || !existenciaAlmacen) {
+            throw new BadRequestException('No existe saldo físico del producto en el almacén seleccionado');
           }
 
-          const { error: movimientoError } = await client.rpc('registrar_movimiento_almacen', {
+          const reservadoEnAlmacen = Number(existenciaAlmacen.stock_reservado ?? 0);
+          const { error: movimientoError } = await client.rpc('despachar_stock_en_almacen_tx', {
+            p_tenant_id: tenantId,
             p_producto_id: item.producto_id,
             p_almacen_id: itemAlmacenId,
-            p_tipo: 'SALIDA',
             p_cantidad: cantidadSolicitada,
+            p_cantidad_reservada: Math.min(cantidadSolicitada, reservadoEnAlmacen),
             p_referencia_tipo: 'PEDIDO',
             p_referencia_id: pedidoId,
             p_notas: `Salida por despacho de pedido ${pedido.numero}`,
             p_ubicacion_id: itemUbicacionId,
             p_lote: itemLote,
-            p_fecha_expiracion: null,
+            p_metadata: { pedido_id: pedidoId, source: 'logistica' },
           });
 
           if (movimientoError) {

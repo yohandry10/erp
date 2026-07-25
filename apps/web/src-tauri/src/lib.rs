@@ -1,10 +1,11 @@
 use base64::{engine::general_purpose, Engine as _};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
+use std::ptr;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
@@ -168,6 +169,16 @@ fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(config_dir.join("config.json"))
 }
 
+fn auth_token_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("No se pudo resolver el directorio de configuracion: {e}"))?;
+    fs::create_dir_all(&config_dir)
+        .map_err(|e| format!("No se pudo crear el directorio de configuracion: {e}"))?;
+    Ok(config_dir.join("auth_token.dat"))
+}
+
 fn offline_outbox_path(app: &AppHandle) -> Result<PathBuf, String> {
     let config_dir = app
         .path()
@@ -237,6 +248,7 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
             cache_key TEXT PRIMARY KEY,
             endpoint TEXT NOT NULL,
             url TEXT NOT NULL,
+            tenant_id TEXT,
             status INTEGER NOT NULL,
             headers_json TEXT NOT NULL DEFAULT '[]',
             body TEXT NOT NULL,
@@ -250,6 +262,7 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
             cache_key TEXT PRIMARY KEY,
             endpoint TEXT NOT NULL,
             url TEXT NOT NULL,
+            tenant_id TEXT,
             status INTEGER NOT NULL,
             headers_json TEXT NOT NULL DEFAULT '[]',
             body_base64 TEXT NOT NULL,
@@ -272,15 +285,17 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
             ON local_id_map(remote_id, entity_type);
 
         CREATE TABLE IF NOT EXISTS local_fiscal_series (
+            tenant_id TEXT NOT NULL DEFAULT '__global__',
             document_type TEXT NOT NULL,
             serie TEXT NOT NULL,
             ultimo_numero INTEGER NOT NULL DEFAULT 0,
             updated_at INTEGER NOT NULL,
-            PRIMARY KEY (document_type, serie)
+            PRIMARY KEY (tenant_id, document_type, serie)
         );
 
         CREATE TABLE IF NOT EXISTS local_fiscal_documents (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL DEFAULT '__global__',
             document_type TEXT NOT NULL,
             serie TEXT NOT NULL,
             numero INTEGER NOT NULL,
@@ -300,16 +315,17 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
             response_json TEXT,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
-            UNIQUE(document_type, serie, numero)
+            UNIQUE(tenant_id, document_type, serie, numero)
         );
 
         CREATE INDEX IF NOT EXISTS idx_local_fiscal_documents_estado
-            ON local_fiscal_documents(estado, updated_at);
+            ON local_fiscal_documents(tenant_id, estado, updated_at);
         CREATE INDEX IF NOT EXISTS idx_local_fiscal_documents_source
-            ON local_fiscal_documents(source_type, source_id);
+            ON local_fiscal_documents(tenant_id, source_type, source_id);
 
         CREATE TABLE IF NOT EXISTS pos_products (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT,
             codigo TEXT,
             nombre TEXT NOT NULL,
             stock_actual REAL NOT NULL DEFAULT 0,
@@ -320,6 +336,7 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
 
         CREATE TABLE IF NOT EXISTS pos_cash_sessions (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT,
             caja_id TEXT NOT NULL,
             estado TEXT NOT NULL CHECK (estado IN ('ABIERTA', 'CERRADA')),
             monto_inicio REAL NOT NULL DEFAULT 0,
@@ -335,6 +352,7 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
 
         CREATE TABLE IF NOT EXISTS pos_sales (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT,
             idempotency_key TEXT NOT NULL UNIQUE,
             sesion_caja_id TEXT NOT NULL,
             numero_ticket TEXT NOT NULL,
@@ -353,6 +371,7 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
 
         CREATE TABLE IF NOT EXISTS local_customers (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT,
             documento TEXT,
             razon_social TEXT NOT NULL,
             data_json TEXT NOT NULL,
@@ -367,6 +386,7 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
 
         CREATE TABLE IF NOT EXISTS local_sales_documents (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT,
             kind TEXT NOT NULL CHECK (kind IN ('quote', 'order')),
             numero TEXT NOT NULL,
             cliente_id TEXT,
@@ -386,6 +406,7 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
 
         CREATE TABLE IF NOT EXISTS local_generic_records (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT,
             endpoint TEXT NOT NULL,
             collection_endpoint TEXT NOT NULL,
             method TEXT NOT NULL,
@@ -404,12 +425,185 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
     )
     .map_err(|e| format!("No se pudo inicializar SQLite local: {e}"))?;
 
+    ensure_text_column(&conn, "local_api_snapshots", "tenant_id")?;
+    ensure_text_column(&conn, "local_binary_cache", "tenant_id")?;
+    ensure_text_column(&conn, "pos_products", "tenant_id")?;
+    ensure_text_column(&conn, "pos_cash_sessions", "tenant_id")?;
+    ensure_text_column(&conn, "pos_sales", "tenant_id")?;
+    ensure_text_column(&conn, "local_customers", "tenant_id")?;
+    ensure_text_column(&conn, "local_sales_documents", "tenant_id")?;
+    ensure_text_column(&conn, "local_generic_records", "tenant_id")?;
+    ensure_text_column(&conn, "local_fiscal_series", "tenant_id")?;
+    ensure_text_column(&conn, "local_fiscal_documents", "tenant_id")?;
+    migrate_fiscal_tables_tenant_scope(&conn)?;
+
     migrate_legacy_json_outbox(app, &conn)?;
     Ok(conn)
 }
 
+fn ensure_text_column(conn: &Connection, table: &str, column: &str) -> Result<(), String> {
+    let pragma = format!("PRAGMA table_info({table})");
+    let mut stmt = conn
+        .prepare(&pragma)
+        .map_err(|e| format!("No se pudo inspeccionar tabla local {table}: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| format!("No se pudo leer columnas de tabla local {table}: {e}"))?;
+    for row in rows {
+        if row.map_err(|e| format!("Columna invalida en tabla local {table}: {e}"))? == column {
+            return Ok(());
+        }
+    }
+    let sql = format!("ALTER TABLE {table} ADD COLUMN {column} TEXT");
+    conn.execute(&sql, [])
+        .map_err(|e| format!("No se pudo agregar columna local {table}.{column}: {e}"))?;
+    Ok(())
+}
+
+fn table_sql(conn: &Connection, table: &str) -> Result<Option<String>, String> {
+    conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+        params![table],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|e| format!("No se pudo leer schema local de {table}: {e}"))
+}
+
+fn fiscal_tables_need_tenant_migration(conn: &Connection) -> Result<bool, String> {
+    let Some(series_sql) = table_sql(conn, "local_fiscal_series")? else {
+        return Ok(false);
+    };
+    let Some(documents_sql) = table_sql(conn, "local_fiscal_documents")? else {
+        return Ok(false);
+    };
+    Ok(!series_sql.contains("PRIMARY KEY (tenant_id, document_type, serie)")
+        || !documents_sql.contains("UNIQUE(tenant_id, document_type, serie, numero)"))
+}
+
+fn migrate_fiscal_tables_tenant_scope(conn: &Connection) -> Result<(), String> {
+    if !fiscal_tables_need_tenant_migration(conn)? {
+        return Ok(());
+    }
+
+    conn.execute_batch(
+        r#"
+        PRAGMA foreign_keys = OFF;
+
+        CREATE TABLE IF NOT EXISTS local_fiscal_series_v2 (
+            tenant_id TEXT NOT NULL DEFAULT '__global__',
+            document_type TEXT NOT NULL,
+            serie TEXT NOT NULL,
+            ultimo_numero INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (tenant_id, document_type, serie)
+        );
+
+        INSERT OR REPLACE INTO local_fiscal_series_v2
+            (tenant_id, document_type, serie, ultimo_numero, updated_at)
+        SELECT
+            COALESCE(NULLIF(tenant_id, ''), '__global__'),
+            document_type,
+            serie,
+            ultimo_numero,
+            updated_at
+        FROM local_fiscal_series;
+
+        DROP TABLE local_fiscal_series;
+        ALTER TABLE local_fiscal_series_v2 RENAME TO local_fiscal_series;
+
+        CREATE TABLE IF NOT EXISTS local_fiscal_documents_v2 (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL DEFAULT '__global__',
+            document_type TEXT NOT NULL,
+            serie TEXT NOT NULL,
+            numero INTEGER NOT NULL,
+            estado TEXT NOT NULL CHECK (estado IN ('GENERADO_LOCAL', 'FIRMADO_LOCAL', 'PENDIENTE_ENVIO', 'ENVIADO', 'ACEPTADO', 'RECHAZADO', 'FALLIDO')),
+            cliente_ruc TEXT,
+            cliente_nombre TEXT,
+            moneda TEXT NOT NULL DEFAULT 'PEN',
+            subtotal REAL NOT NULL DEFAULT 0,
+            igv REAL NOT NULL DEFAULT 0,
+            total REAL NOT NULL DEFAULT 0,
+            source_type TEXT,
+            source_id TEXT,
+            xml_content TEXT NOT NULL,
+            signed_xml TEXT,
+            pdf_base64 TEXT,
+            hash TEXT NOT NULL,
+            response_json TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            UNIQUE(tenant_id, document_type, serie, numero)
+        );
+
+        INSERT OR REPLACE INTO local_fiscal_documents_v2
+            (id, tenant_id, document_type, serie, numero, estado, cliente_ruc, cliente_nombre,
+             moneda, subtotal, igv, total, source_type, source_id, xml_content, signed_xml,
+             pdf_base64, hash, response_json, created_at, updated_at)
+        SELECT
+            id,
+            COALESCE(NULLIF(tenant_id, ''), '__global__'),
+            document_type,
+            serie,
+            numero,
+            estado,
+            cliente_ruc,
+            cliente_nombre,
+            moneda,
+            subtotal,
+            igv,
+            total,
+            source_type,
+            source_id,
+            xml_content,
+            signed_xml,
+            pdf_base64,
+            hash,
+            response_json,
+            created_at,
+            updated_at
+        FROM local_fiscal_documents;
+
+        DROP TABLE local_fiscal_documents;
+        ALTER TABLE local_fiscal_documents_v2 RENAME TO local_fiscal_documents;
+
+        CREATE INDEX IF NOT EXISTS idx_local_fiscal_documents_estado
+            ON local_fiscal_documents(tenant_id, estado, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_local_fiscal_documents_source
+            ON local_fiscal_documents(tenant_id, source_type, source_id);
+
+        PRAGMA foreign_keys = ON;
+        "#,
+    )
+    .map_err(|e| format!("No se pudo migrar tablas fiscales locales por tenant: {e}"))?;
+    Ok(())
+}
+
 fn local_cache_key(endpoint: &str, url: &str) -> String {
     format!("{endpoint}|{url}")
+}
+
+fn scoped_cache_key(tenant_id: Option<&str>, endpoint: &str, url: &str) -> String {
+    format!(
+        "{}|{}",
+        tenant_id.filter(|value| !value.trim().is_empty()).unwrap_or("__global__"),
+        local_cache_key(endpoint, url)
+    )
+}
+
+fn tenant_scope(tenant_id: Option<&str>) -> &str {
+    tenant_id
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("__global__")
+}
+
+fn scoped_metadata_key(key: &str, tenant_id: Option<&str>) -> String {
+    if tenant_id.filter(|value| !value.trim().is_empty()).is_some() {
+        format!("{}:{key}", tenant_scope(tenant_id))
+    } else {
+        key.to_string()
+    }
 }
 
 fn collection_endpoint(endpoint: &str) -> String {
@@ -510,8 +704,42 @@ fn with_json_body_fields(
     Ok(next)
 }
 
+fn with_local_sync_contract(
+    input: &LocalFirstWriteInput,
+    local_id: &str,
+    entity_type: &str,
+) -> Result<LocalFirstWriteInput, String> {
+    let with_headers = with_local_entity_headers(input, local_id, entity_type);
+    if with_headers.body.is_none() {
+        return Ok(with_headers);
+    }
+
+    let mut body = parse_json_body(&with_headers.body)?;
+    if let Some(object) = body.as_object_mut() {
+        object
+            .entry("local_id".to_string())
+            .or_insert_with(|| serde_json::json!(local_id));
+        object
+            .entry("external_id".to_string())
+            .or_insert_with(|| serde_json::json!(local_id));
+        object
+            .entry("idempotency_key".to_string())
+            .or_insert_with(|| serde_json::json!(local_id));
+        object
+            .entry("offline_entity_type".to_string())
+            .or_insert_with(|| serde_json::json!(entity_type));
+    }
+
+    let mut next = with_headers;
+    next.body = Some(
+        serde_json::to_string(&body)
+            .map_err(|e| format!("No se pudo serializar contrato de sync local: {e}"))?,
+    );
+    Ok(next)
+}
+
 fn offline_sync_headers(
-    access_token: Option<&str>,
+    _access_token: Option<&str>,
     tenant_id: Option<&str>,
     local_id: &str,
     entity_type: &str,
@@ -530,13 +758,11 @@ fn offline_sync_headers(
             value: entity_type.to_string(),
         },
     ];
-    if let Some(token) = access_token.filter(|value| !value.trim().is_empty()) {
-        headers.push(HeaderPair {
-            name: "Authorization".to_string(),
-            value: format!("Bearer {}", token.trim()),
-        });
-    }
     if let Some(tenant) = tenant_id.filter(|value| !value.trim().is_empty()) {
+        headers.push(HeaderPair {
+            name: "x-tenant-id".to_string(),
+            value: tenant.trim().to_string(),
+        });
         headers.push(HeaderPair {
             name: "x-erp-tenant-id".to_string(),
             value: tenant.trim().to_string(),
@@ -683,14 +909,16 @@ fn reserve_local_fiscal_number(
     conn: &Connection,
     document_type: &str,
     serie: &str,
+    tenant_id: Option<&str>,
 ) -> Result<i64, String> {
+    let tenant = tenant_scope(tenant_id);
     conn.execute(
         r#"
         INSERT OR IGNORE INTO local_fiscal_series
-            (document_type, serie, ultimo_numero, updated_at)
-        VALUES (?1, ?2, 0, ?3)
+            (tenant_id, document_type, serie, ultimo_numero, updated_at)
+        VALUES (?1, ?2, ?3, 0, ?4)
         "#,
-        params![document_type_code(document_type), serie, now_ms()],
+        params![tenant, document_type_code(document_type), serie, now_ms()],
     )
     .map_err(|e| format!("No se pudo inicializar serie fiscal local: {e}"))?;
 
@@ -698,16 +926,19 @@ fn reserve_local_fiscal_number(
         r#"
         UPDATE local_fiscal_series
         SET ultimo_numero = ultimo_numero + 1,
-            updated_at = ?3
-        WHERE document_type = ?1 AND serie = ?2
+            updated_at = ?4
+        WHERE tenant_id = ?1 AND document_type = ?2 AND serie = ?3
         "#,
-        params![document_type_code(document_type), serie, now_ms()],
+        params![tenant, document_type_code(document_type), serie, now_ms()],
     )
     .map_err(|e| format!("No se pudo reservar correlativo fiscal local: {e}"))?;
 
     conn.query_row(
-        "SELECT ultimo_numero FROM local_fiscal_series WHERE document_type = ?1 AND serie = ?2",
-        params![document_type_code(document_type), serie],
+        r#"
+        SELECT ultimo_numero FROM local_fiscal_series
+        WHERE tenant_id = ?1 AND document_type = ?2 AND serie = ?3
+        "#,
+        params![tenant, document_type_code(document_type), serie],
         |row| row.get(0),
     )
     .map_err(|e| format!("No se pudo leer correlativo fiscal local: {e}"))
@@ -867,6 +1098,7 @@ fn upsert_snapshot(
     conn: &Connection,
     endpoint: &str,
     url: &str,
+    tenant_id: Option<&str>,
     status: u16,
     headers: &[HeaderPair],
     body: &str,
@@ -874,13 +1106,14 @@ fn upsert_snapshot(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO local_api_snapshots
-            (cache_key, endpoint, url, status, headers_json, body, cached_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            (cache_key, endpoint, url, tenant_id, status, headers_json, body, cached_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
         "#,
         params![
-            local_cache_key(endpoint, url),
+            scoped_cache_key(tenant_id, endpoint, url),
             endpoint,
             url,
+            tenant_id,
             status as i64,
             response_headers_json(headers)?,
             body,
@@ -928,7 +1161,7 @@ fn extract_response_data(body: &str) -> Option<Value> {
     Some(parsed.get("data").cloned().unwrap_or(parsed))
 }
 
-fn hydrate_pos_products(conn: &Connection, body: &str) -> Result<(), String> {
+fn hydrate_pos_products(conn: &Connection, body: &str, tenant_id: Option<&str>) -> Result<(), String> {
     let Some(Value::Array(products)) = extract_response_data(body) else {
         return Ok(());
     };
@@ -954,11 +1187,12 @@ fn hydrate_pos_products(conn: &Connection, body: &str) -> Result<(), String> {
         tx.execute(
             r#"
             INSERT OR REPLACE INTO pos_products
-                (id, codigo, nombre, stock_actual, stock_disponible, data_json, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                (id, tenant_id, codigo, nombre, stock_actual, stock_disponible, data_json, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             "#,
             params![
                 id,
+                tenant_id,
                 codigo,
                 nombre,
                 stock_actual,
@@ -975,7 +1209,7 @@ fn hydrate_pos_products(conn: &Connection, body: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn hydrate_local_customers(conn: &Connection, body: &str) -> Result<(), String> {
+fn hydrate_local_customers(conn: &Connection, body: &str, tenant_id: Option<&str>) -> Result<(), String> {
     let Some(data) = extract_response_data(body) else {
         return Ok(());
     };
@@ -1006,11 +1240,12 @@ fn hydrate_local_customers(conn: &Connection, body: &str) -> Result<(), String> 
         tx.execute(
             r#"
             INSERT OR REPLACE INTO local_customers
-                (id, documento, razon_social, data_json, deleted, updated_at)
-            VALUES (?1, ?2, ?3, ?4, 0, ?5)
+                (id, tenant_id, documento, razon_social, data_json, deleted, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)
             "#,
             params![
                 id,
+                tenant_id,
                 documento,
                 razon_social,
                 serde_json::to_string(&customer)
@@ -1025,7 +1260,12 @@ fn hydrate_local_customers(conn: &Connection, body: &str) -> Result<(), String> 
     Ok(())
 }
 
-fn hydrate_sales_documents(conn: &Connection, body: &str, kind: &str) -> Result<(), String> {
+fn hydrate_sales_documents(
+    conn: &Connection,
+    body: &str,
+    kind: &str,
+    tenant_id: Option<&str>,
+) -> Result<(), String> {
     let Some(data) = extract_response_data(body) else {
         return Ok(());
     };
@@ -1059,11 +1299,12 @@ fn hydrate_sales_documents(conn: &Connection, body: &str, kind: &str) -> Result<
         tx.execute(
             r#"
             INSERT OR REPLACE INTO local_sales_documents
-                (id, kind, numero, cliente_id, estado, total, data_json, deleted, sync_status, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 'synced', ?8, ?8)
+                (id, tenant_id, kind, numero, cliente_id, estado, total, data_json, deleted, sync_status, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, 'synced', ?9, ?9)
             "#,
             params![
                 id,
+                tenant_id,
                 kind,
                 numero,
                 cliente_id,
@@ -1081,7 +1322,7 @@ fn hydrate_sales_documents(conn: &Connection, body: &str, kind: &str) -> Result<
     Ok(())
 }
 
-fn hydrate_cash_session(conn: &Connection, body: &str) -> Result<(), String> {
+fn hydrate_cash_session(conn: &Connection, body: &str, tenant_id: Option<&str>) -> Result<(), String> {
     let Some(session) = extract_response_data(body) else {
         return Ok(());
     };
@@ -1102,11 +1343,12 @@ fn hydrate_cash_session(conn: &Connection, body: &str) -> Result<(), String> {
     conn.execute(
         r#"
         INSERT OR REPLACE INTO pos_cash_sessions
-            (id, caja_id, estado, monto_inicio, monto_cierre, opened_at, closed_at, data_json, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            (id, tenant_id, caja_id, estado, monto_inicio, monto_cierre, opened_at, closed_at, data_json, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         "#,
         params![
             id,
+            tenant_id,
             caja_id,
             if estado == "CERRADA" { "CERRADA" } else { "ABIERTA" },
             monto_inicio,
@@ -1122,13 +1364,19 @@ fn hydrate_cash_session(conn: &Connection, body: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn read_local_snapshot(conn: &Connection, endpoint: &str, url: &str) -> Result<Option<LocalFirstResponse>, String> {
+fn read_local_snapshot(
+    conn: &Connection,
+    endpoint: &str,
+    url: &str,
+    tenant_id: Option<&str>,
+) -> Result<Option<LocalFirstResponse>, String> {
     let mut stmt = conn
         .prepare(
             r#"
             SELECT status, headers_json, body
             FROM local_api_snapshots
-            WHERE cache_key = ?1 OR endpoint = ?2
+            WHERE cache_key = ?1
+               OR (endpoint = ?2 AND ((?3 IS NULL AND tenant_id IS NULL) OR tenant_id = ?3))
             ORDER BY CASE WHEN cache_key = ?1 THEN 0 ELSE 1 END, cached_at DESC
             LIMIT 1
             "#,
@@ -1136,7 +1384,7 @@ fn read_local_snapshot(conn: &Connection, endpoint: &str, url: &str) -> Result<O
         .map_err(|e| format!("No se pudo preparar snapshot local: {e}"))?;
 
     let mut rows = stmt
-        .query(params![local_cache_key(endpoint, url), endpoint])
+        .query(params![scoped_cache_key(tenant_id, endpoint, url), endpoint, tenant_id])
         .map_err(|e| format!("No se pudo consultar snapshot local: {e}"))?;
 
     let Some(row) = rows
@@ -1476,12 +1724,18 @@ fn is_known_empty_object_endpoint(endpoint: &str) -> bool {
     detail_prefixes.iter().any(|prefix| endpoint.starts_with(prefix))
 }
 
-fn build_products_snapshot(conn: &Connection) -> Result<LocalFirstResponse, String> {
+fn build_products_snapshot(conn: &Connection, tenant_id: Option<&str>) -> Result<LocalFirstResponse, String> {
     let mut stmt = conn
-        .prepare("SELECT data_json FROM pos_products ORDER BY nombre ASC")
+        .prepare(
+            r#"
+            SELECT data_json FROM pos_products
+            WHERE ((?1 IS NULL AND tenant_id IS NULL) OR tenant_id = ?1)
+            ORDER BY nombre ASC
+            "#,
+        )
         .map_err(|e| format!("No se pudo preparar productos POS locales: {e}"))?;
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(params![tenant_id], |row| {
             let raw: String = row.get(0)?;
             Ok(serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null))
         })
@@ -1499,12 +1753,17 @@ fn build_products_snapshot(conn: &Connection) -> Result<LocalFirstResponse, Stri
 fn build_product_detail_snapshot(
     conn: &Connection,
     endpoint: &str,
+    tenant_id: Option<&str>,
 ) -> Result<Option<LocalFirstResponse>, String> {
     let id = endpoint.trim_start_matches("/api/inventario/productos/");
     let raw: Option<String> = conn
         .query_row(
-            "SELECT data_json FROM pos_products WHERE id = ?1",
-            params![id],
+            r#"
+            SELECT data_json FROM pos_products
+            WHERE id = ?1
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+            params![id, tenant_id],
             |row| row.get(0),
         )
         .ok();
@@ -1515,12 +1774,19 @@ fn build_product_detail_snapshot(
     Ok(Some(json_success_response(product, "Producto local")?))
 }
 
-fn build_customers_snapshot(conn: &Connection) -> Result<LocalFirstResponse, String> {
+fn build_customers_snapshot(conn: &Connection, tenant_id: Option<&str>) -> Result<LocalFirstResponse, String> {
     let mut stmt = conn
-        .prepare("SELECT data_json FROM local_customers WHERE deleted = 0 ORDER BY razon_social ASC")
+        .prepare(
+            r#"
+            SELECT data_json FROM local_customers
+            WHERE deleted = 0
+              AND ((?1 IS NULL AND tenant_id IS NULL) OR tenant_id = ?1)
+            ORDER BY razon_social ASC
+            "#,
+        )
         .map_err(|e| format!("No se pudo preparar clientes locales: {e}"))?;
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(params![tenant_id], |row| {
             let raw: String = row.get(0)?;
             Ok(serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null))
         })
@@ -1566,14 +1832,19 @@ fn build_customers_snapshot(conn: &Connection) -> Result<LocalFirstResponse, Str
 fn build_customer_detail_snapshot(
     conn: &Connection,
     endpoint: &str,
+    tenant_id: Option<&str>,
 ) -> Result<Option<LocalFirstResponse>, String> {
     let id = endpoint
         .trim_start_matches("/api/ventas/clientes/")
         .trim_start_matches("/api/pos/clientes/");
     let raw: Option<String> = conn
         .query_row(
-            "SELECT data_json FROM local_customers WHERE id = ?1 AND deleted = 0",
-            params![id],
+            r#"
+            SELECT data_json FROM local_customers
+            WHERE id = ?1 AND deleted = 0
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+            params![id, tenant_id],
             |row| row.get(0),
         )
         .ok();
@@ -1584,14 +1855,18 @@ fn build_customer_detail_snapshot(
     Ok(Some(json_success_response(customer, "Cliente local")?))
 }
 
-fn attach_customer(conn: &Connection, mut document: Value) -> Value {
+fn attach_customer(conn: &Connection, mut document: Value, tenant_id: Option<&str>) -> Value {
     let Some(cliente_id) = value_string(&document, "cliente_id") else {
         return document;
     };
     let customer_raw: Option<String> = conn
         .query_row(
-            "SELECT data_json FROM local_customers WHERE id = ?1 AND deleted = 0",
-            params![cliente_id],
+            r#"
+            SELECT data_json FROM local_customers
+            WHERE id = ?1 AND deleted = 0
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+            params![cliente_id, tenant_id],
             |row| row.get(0),
         )
         .ok();
@@ -1606,18 +1881,23 @@ fn attach_customer(conn: &Connection, mut document: Value) -> Value {
     document
 }
 
-fn build_sales_documents_snapshot(conn: &Connection, kind: &str) -> Result<LocalFirstResponse, String> {
+fn build_sales_documents_snapshot(
+    conn: &Connection,
+    kind: &str,
+    tenant_id: Option<&str>,
+) -> Result<LocalFirstResponse, String> {
     let mut stmt = conn
         .prepare(
             r#"
             SELECT data_json FROM local_sales_documents
             WHERE kind = ?1 AND deleted = 0
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
             ORDER BY updated_at DESC
             "#,
         )
         .map_err(|e| format!("No se pudo preparar documentos venta locales: {e}"))?;
     let rows = stmt
-        .query_map(params![kind], |row| {
+        .query_map(params![kind, tenant_id], |row| {
             let raw: String = row.get(0)?;
             Ok(serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null))
         })
@@ -1626,7 +1906,7 @@ fn build_sales_documents_snapshot(conn: &Connection, kind: &str) -> Result<Local
     for row in rows {
         let value = row.map_err(|e| format!("Documento venta local invalido: {e}"))?;
         if !value.is_null() {
-            documents.push(attach_customer(conn, value));
+            documents.push(attach_customer(conn, value, tenant_id));
         }
     }
     let total = documents.len();
@@ -1665,6 +1945,7 @@ fn build_sales_document_detail_snapshot(
     conn: &Connection,
     endpoint: &str,
     kind: &str,
+    tenant_id: Option<&str>,
 ) -> Result<Option<LocalFirstResponse>, String> {
     let prefix = if kind == "quote" {
         "/api/ventas/cotizaciones/"
@@ -1674,8 +1955,12 @@ fn build_sales_document_detail_snapshot(
     let id = endpoint.trim_start_matches(prefix);
     let raw: Option<String> = conn
         .query_row(
-            "SELECT data_json FROM local_sales_documents WHERE id = ?1 AND kind = ?2 AND deleted = 0",
-            params![id, kind],
+            r#"
+            SELECT data_json FROM local_sales_documents
+            WHERE id = ?1 AND kind = ?2 AND deleted = 0
+              AND ((?3 IS NULL AND tenant_id IS NULL) OR tenant_id = ?3)
+            "#,
+            params![id, kind, tenant_id],
             |row| row.get(0),
         )
         .ok();
@@ -1684,7 +1969,7 @@ fn build_sales_document_detail_snapshot(
     };
     let document: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
     Ok(Some(json_success_response(
-        attach_customer(conn, document),
+        attach_customer(conn, document, tenant_id),
         if kind == "quote" { "Cotizacion local" } else { "Pedido local" },
     )?))
 }
@@ -1693,6 +1978,7 @@ fn merge_local_records_into_response(
     conn: &Connection,
     endpoint: &str,
     snapshot: Option<LocalFirstResponse>,
+    tenant_id: Option<&str>,
 ) -> Result<Option<LocalFirstResponse>, String> {
     let collection = collection_endpoint(endpoint);
     let mut stmt = conn
@@ -1700,12 +1986,13 @@ fn merge_local_records_into_response(
             r#"
             SELECT data_json FROM local_generic_records
             WHERE collection_endpoint = ?1 AND deleted = 0
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
             ORDER BY updated_at DESC
             "#,
         )
         .map_err(|e| format!("No se pudo preparar registros locales genericos: {e}"))?;
     let rows = stmt
-        .query_map(params![&collection], |row| {
+        .query_map(params![&collection, tenant_id], |row| {
             let raw: String = row.get(0)?;
             Ok(serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null))
         })
@@ -1783,11 +2070,16 @@ fn merge_local_records_into_response(
 fn build_generic_detail_snapshot(
     conn: &Connection,
     endpoint: &str,
+    tenant_id: Option<&str>,
 ) -> Result<Option<LocalFirstResponse>, String> {
     let raw: Option<String> = conn
         .query_row(
-            "SELECT data_json FROM local_generic_records WHERE endpoint = ?1 AND deleted = 0",
-            params![endpoint],
+            r#"
+            SELECT data_json FROM local_generic_records
+            WHERE endpoint = ?1 AND deleted = 0
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+            params![endpoint, tenant_id],
             |row| row.get(0),
         )
         .ok();
@@ -1798,19 +2090,20 @@ fn build_generic_detail_snapshot(
     Ok(Some(json_success_response(data, "Registro local pendiente")?))
 }
 
-fn build_open_session_snapshot(conn: &Connection) -> Result<Option<LocalFirstResponse>, String> {
+fn build_open_session_snapshot(conn: &Connection, tenant_id: Option<&str>) -> Result<Option<LocalFirstResponse>, String> {
     let mut stmt = conn
         .prepare(
             r#"
             SELECT data_json FROM pos_cash_sessions
             WHERE estado = 'ABIERTA'
+              AND ((?1 IS NULL AND tenant_id IS NULL) OR tenant_id = ?1)
             ORDER BY opened_at DESC
             LIMIT 1
             "#,
         )
         .map_err(|e| format!("No se pudo preparar sesion POS local: {e}"))?;
     let mut rows = stmt
-        .query([])
+        .query(params![tenant_id])
         .map_err(|e| format!("No se pudo leer sesion POS local: {e}"))?;
     let Some(row) = rows
         .next()
@@ -1823,12 +2116,18 @@ fn build_open_session_snapshot(conn: &Connection) -> Result<Option<LocalFirstRes
     Ok(Some(json_success_response(session, "Sesion POS local")?))
 }
 
-fn build_recent_sales_snapshot(conn: &Connection) -> Result<LocalFirstResponse, String> {
+fn build_recent_sales_snapshot(conn: &Connection, tenant_id: Option<&str>) -> Result<LocalFirstResponse, String> {
     let mut stmt = conn
-        .prepare("SELECT response_json FROM pos_sales ORDER BY created_at DESC LIMIT 50")
+        .prepare(
+            r#"
+            SELECT response_json FROM pos_sales
+            WHERE ((?1 IS NULL AND tenant_id IS NULL) OR tenant_id = ?1)
+            ORDER BY created_at DESC LIMIT 50
+            "#,
+        )
         .map_err(|e| format!("No se pudo preparar ventas POS locales: {e}"))?;
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(params![tenant_id], |row| {
             let raw: String = row.get(0)?;
             Ok(serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null))
         })
@@ -1847,12 +2146,17 @@ fn build_recent_sales_snapshot(conn: &Connection) -> Result<LocalFirstResponse, 
 fn build_pos_sale_details_snapshot(
     conn: &Connection,
     endpoint: &str,
+    tenant_id: Option<&str>,
 ) -> Result<LocalFirstResponse, String> {
     let id = endpoint.trim_start_matches("/api/pos/detalles-venta/");
     let raw: Option<String> = conn
         .query_row(
-            "SELECT body_json, response_json FROM pos_sales WHERE id = ?1 OR idempotency_key = ?1",
-            params![id],
+            r#"
+            SELECT body_json, response_json FROM pos_sales
+            WHERE (id = ?1 OR idempotency_key = ?1)
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+            params![id, tenant_id],
             |row| Ok(format!("{}\n{}", row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
         )
         .ok();
@@ -1902,8 +2206,11 @@ fn build_pos_sale_details_snapshot(
     json_success_response(Value::Array(items), "Detalle de venta POS local")
 }
 
-fn build_user_country_config_snapshot(conn: &Connection) -> Result<LocalFirstResponse, String> {
-    if let Some(config) = read_metadata_json(conn, "usuario_configuracion")? {
+fn build_user_country_config_snapshot(
+    conn: &Connection,
+    tenant_id: Option<&str>,
+) -> Result<LocalFirstResponse, String> {
+    if let Some(config) = read_metadata_json(conn, &scoped_metadata_key("usuario_configuracion", tenant_id))? {
         return json_success_response(config, "Configuracion de usuario local");
     }
     json_success_response(
@@ -2028,6 +2335,7 @@ fn update_notification_snapshots(
     target_id: Option<&str>,
     mark_all: bool,
     delete: bool,
+    tenant_id: Option<&str>,
 ) -> Result<usize, String> {
     let timestamp = now_ms();
     let mut changed = 0usize;
@@ -2037,11 +2345,12 @@ fn update_notification_snapshots(
             SELECT cache_key, endpoint, body
             FROM local_api_snapshots
             WHERE endpoint IN ('/api/notifications', '/api/notifications/unread')
+              AND ((?1 IS NULL AND tenant_id IS NULL) OR tenant_id = ?1)
             "#,
         )
         .map_err(|e| format!("No se pudo preparar snapshots de notificaciones: {e}"))?;
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(params![tenant_id], |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
@@ -2081,11 +2390,12 @@ fn update_notification_snapshots(
             SELECT id, data_json
             FROM local_generic_records
             WHERE collection_endpoint = '/api/notifications' AND deleted = 0
+              AND ((?1 IS NULL AND tenant_id IS NULL) OR tenant_id = ?1)
             "#,
         )
         .map_err(|e| format!("No se pudo preparar notificaciones locales: {e}"))?;
     let rows = stmt
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .query_map(params![tenant_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
         .map_err(|e| format!("No se pudo leer notificaciones locales: {e}"))?;
     let mut local_updates = Vec::new();
     for row in rows {
@@ -2104,18 +2414,29 @@ fn update_notification_snapshots(
     for (id, value) in local_updates {
         if let Some(value) = value {
             conn.execute(
-                "UPDATE local_generic_records SET data_json = ?2, updated_at = ?3 WHERE id = ?1",
+                r#"
+                UPDATE local_generic_records
+                SET data_json = ?2, updated_at = ?3
+                WHERE id = ?1
+                  AND ((?4 IS NULL AND tenant_id IS NULL) OR tenant_id = ?4)
+                "#,
                 params![
                     id,
                     serde_json::to_string(&value)
                         .map_err(|e| format!("No se pudo serializar notificacion local: {e}"))?,
                     timestamp,
+                    tenant_id,
                 ],
             )
         } else {
             conn.execute(
-                "UPDATE local_generic_records SET deleted = 1, updated_at = ?2 WHERE id = ?1",
-                params![id, timestamp],
+                r#"
+                UPDATE local_generic_records
+                SET deleted = 1, updated_at = ?2
+                WHERE id = ?1
+                  AND ((?3 IS NULL AND tenant_id IS NULL) OR tenant_id = ?3)
+                "#,
+                params![id, timestamp, tenant_id],
             )
         }
         .map_err(|e| format!("No se pudo actualizar notificacion local: {e}"))?;
@@ -2150,11 +2471,17 @@ fn process_local_notifications_mutation(
         return process_generic_local_write(conn, input);
     };
 
-    let changed = update_notification_snapshots(conn, target_id.as_deref(), mark_all, delete)?;
+    let changed = update_notification_snapshots(
+        conn,
+        target_id.as_deref(),
+        mark_all,
+        delete,
+        input.tenant_id.as_deref(),
+    )?;
     let local_id = target_id
         .clone()
         .unwrap_or_else(|| format!("notifications-mark-all-{}", now_ms()));
-    let queued_input = with_local_entity_headers(input, &local_id, "notification");
+    let queued_input = with_local_sync_contract(input, &local_id, "notification")?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
 
     let data = serde_json::json!({
@@ -2174,7 +2501,9 @@ fn process_local_user_country_config(
 ) -> Result<LocalFirstResponse, String> {
     let timestamp = now_ms();
     let payload = parse_json_body(&input.body)?;
-    let mut config = read_metadata_json(conn, "usuario_configuracion")?.unwrap_or_else(|| {
+    let tenant = input.tenant_id.as_deref();
+    let key = scoped_metadata_key("usuario_configuracion", tenant);
+    let mut config = read_metadata_json(conn, &key)?.unwrap_or_else(|| {
         serde_json::json!({
             "id": "local-user-config",
             "idioma": "es",
@@ -2190,8 +2519,8 @@ fn process_local_user_country_config(
         obj.insert("sync_status".to_string(), serde_json::json!("pending"));
         obj.insert("updated_at".to_string(), serde_json::json!(timestamp));
     }
-    write_metadata_json(conn, "usuario_configuracion", &config)?;
-    let queued_input = with_local_entity_headers(input, "local-user-config", "user_country_config");
+    write_metadata_json(conn, &key, &config)?;
+    let queued_input = with_local_sync_contract(input, "local-user-config", "user_country_config")?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(config, "Configuracion de usuario guardada localmente")
 }
@@ -2353,11 +2682,12 @@ fn process_local_treasury_batch(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO local_generic_records
-            (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
-        VALUES (?1, ?2, '/api/finanzas/tesoreria/pagos', 'POST', ?3, 0, 'pending', ?4, ?4)
+            (id, tenant_id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, ?3, '/api/finanzas/tesoreria/pagos', 'POST', ?4, 0, 'pending', ?5, ?5)
         "#,
         params![
             batch_id,
+            input.tenant_id.as_deref(),
             format!("/api/finanzas/tesoreria/pagos/{batch_id}"),
             serde_json::to_string(&result)
                 .map_err(|e| format!("No se pudo serializar lote local de pagos: {e}"))?,
@@ -2387,19 +2717,24 @@ fn session_id_from_endpoint(endpoint: &str, prefix: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-fn local_cash_movements(conn: &Connection, session_id: &str) -> Result<Vec<Value>, String> {
+fn local_cash_movements(
+    conn: &Connection,
+    session_id: &str,
+    tenant_id: Option<&str>,
+) -> Result<Vec<Value>, String> {
     let mut stmt = conn
         .prepare(
             r#"
             SELECT data_json FROM local_generic_records
             WHERE collection_endpoint = '/api/cajas/movimientos'
               AND deleted = 0
+              AND ((?1 IS NULL AND tenant_id IS NULL) OR tenant_id = ?1)
             ORDER BY created_at ASC
             "#,
         )
         .map_err(|e| format!("No se pudo preparar movimientos de caja locales: {e}"))?;
     let rows = stmt
-        .query_map([], |row| row.get::<_, String>(0))
+        .query_map(params![tenant_id], |row| row.get::<_, String>(0))
         .map_err(|e| format!("No se pudo leer movimientos de caja locales: {e}"))?;
     let mut movements = Vec::new();
     for row in rows {
@@ -2416,11 +2751,19 @@ fn local_cash_movements(conn: &Connection, session_id: &str) -> Result<Vec<Value
     Ok(movements)
 }
 
-fn local_session_start_amount(conn: &Connection, session_id: &str) -> Result<f64, String> {
+fn local_session_start_amount(
+    conn: &Connection,
+    session_id: &str,
+    tenant_id: Option<&str>,
+) -> Result<f64, String> {
     let raw: Option<String> = conn
         .query_row(
-            "SELECT data_json FROM pos_cash_sessions WHERE id = ?1",
-            params![session_id],
+            r#"
+            SELECT data_json FROM pos_cash_sessions
+            WHERE id = ?1
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+            params![session_id, tenant_id],
             |row| row.get(0),
         )
         .ok();
@@ -2435,12 +2778,22 @@ fn local_session_start_amount(conn: &Connection, session_id: &str) -> Result<f64
         .unwrap_or(0.0))
 }
 
-fn local_session_sales_total(conn: &Connection, session_id: &str) -> Result<f64, String> {
+fn local_session_sales_total(
+    conn: &Connection,
+    session_id: &str,
+    tenant_id: Option<&str>,
+) -> Result<f64, String> {
     let mut stmt = conn
-        .prepare("SELECT total FROM pos_sales WHERE sesion_caja_id = ?1")
+        .prepare(
+            r#"
+            SELECT total FROM pos_sales
+            WHERE sesion_caja_id = ?1
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+        )
         .map_err(|e| format!("No se pudo preparar ventas de sesion local: {e}"))?;
     let rows = stmt
-        .query_map(params![session_id], |row| row.get::<_, f64>(0))
+        .query_map(params![session_id, tenant_id], |row| row.get::<_, f64>(0))
         .map_err(|e| format!("No se pudo leer ventas de sesion local: {e}"))?;
     let mut total = 0.0;
     for row in rows {
@@ -2449,20 +2802,28 @@ fn local_session_sales_total(conn: &Connection, session_id: &str) -> Result<f64,
     Ok(total)
 }
 
-fn local_cash_expected_balance(conn: &Connection, session_id: &str) -> Result<f64, String> {
-    let start = local_session_start_amount(conn, session_id)?;
-    let sales = local_session_sales_total(conn, session_id)?;
-    let movements = local_cash_movements(conn, session_id)?
+fn local_cash_expected_balance(
+    conn: &Connection,
+    session_id: &str,
+    tenant_id: Option<&str>,
+) -> Result<f64, String> {
+    let start = local_session_start_amount(conn, session_id, tenant_id)?;
+    let sales = local_session_sales_total(conn, session_id, tenant_id)?;
+    let movements = local_cash_movements(conn, session_id, tenant_id)?
         .iter()
         .map(|movement| movement.get("monto").and_then(Value::as_f64).unwrap_or(0.0))
         .sum::<f64>();
     Ok(start + sales + movements)
 }
 
-fn build_cash_movements_snapshot(conn: &Connection, endpoint: &str) -> Result<LocalFirstResponse, String> {
+fn build_cash_movements_snapshot(
+    conn: &Connection,
+    endpoint: &str,
+    tenant_id: Option<&str>,
+) -> Result<LocalFirstResponse, String> {
     let session_id = session_id_from_endpoint(endpoint, "/api/cajas/movimientos/").unwrap_or_default();
-    let mut movements = local_cash_movements(conn, &session_id)?;
-    let mut saldo = local_session_start_amount(conn, &session_id)?;
+    let mut movements = local_cash_movements(conn, &session_id, tenant_id)?;
+    let mut saldo = local_session_start_amount(conn, &session_id, tenant_id)?;
     for (index, movement) in movements.iter_mut().enumerate() {
         let amount = movement.get("monto").and_then(Value::as_f64).unwrap_or(0.0);
         let saldo_anterior = saldo;
@@ -2476,11 +2837,15 @@ fn build_cash_movements_snapshot(conn: &Connection, endpoint: &str) -> Result<Lo
     json_success_response(Value::Array(movements), "Movimientos de caja locales")
 }
 
-fn build_cash_expected_balance_snapshot(conn: &Connection, endpoint: &str) -> Result<LocalFirstResponse, String> {
+fn build_cash_expected_balance_snapshot(
+    conn: &Connection,
+    endpoint: &str,
+    tenant_id: Option<&str>,
+) -> Result<LocalFirstResponse, String> {
     let session_id = session_id_from_endpoint(endpoint, "/api/cajas/saldo-esperado/").unwrap_or_default();
-    let monto_inicial = local_session_start_amount(conn, &session_id)?;
-    let ventas = local_session_sales_total(conn, &session_id)?;
-    let movimientos = local_cash_movements(conn, &session_id)?
+    let monto_inicial = local_session_start_amount(conn, &session_id, tenant_id)?;
+    let ventas = local_session_sales_total(conn, &session_id, tenant_id)?;
+    let movimientos = local_cash_movements(conn, &session_id, tenant_id)?
         .iter()
         .map(|movement| movement.get("monto").and_then(Value::as_f64).unwrap_or(0.0))
         .sum::<f64>();
@@ -2524,7 +2889,8 @@ fn process_local_cash_movement(
     } else {
         raw_amount
     };
-    let saldo_anterior = local_cash_expected_balance(conn, &session_id)?;
+    let tenant = input.tenant_id.as_deref();
+    let saldo_anterior = local_cash_expected_balance(conn, &session_id, tenant)?;
     let saldo_nuevo = saldo_anterior + signed_amount;
     let movement = serde_json::json!({
         "id": movement_id,
@@ -2548,11 +2914,12 @@ fn process_local_cash_movement(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO local_generic_records
-            (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
-        VALUES (?1, ?2, '/api/cajas/movimientos', 'POST', ?3, 0, 'pending', ?4, ?4)
+            (id, tenant_id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, ?3, '/api/cajas/movimientos', 'POST', ?4, 0, 'pending', ?5, ?5)
         "#,
         params![
             &movement_id,
+            tenant,
             format!("/api/cajas/movimientos/{session_id}/{movement_id}"),
             serde_json::to_string(&movement)
                 .map_err(|e| format!("No se pudo serializar movimiento de caja local: {e}"))?,
@@ -2577,12 +2944,14 @@ fn process_local_shift_change(
 ) -> Result<LocalFirstResponse, String> {
     let payload = parse_json_body(&input.body)?;
     let timestamp = now_ms();
+    let tenant = input.tenant_id.as_deref();
     if input.endpoint.starts_with("/api/cajas/cambio-turno/iniciar/") {
         let session_id = session_id_from_endpoint(&input.endpoint, "/api/cajas/cambio-turno/iniciar/")
             .ok_or_else(|| "El cambio de turno local requiere sesion".to_string())?;
         let change_id = value_string(&payload, "idempotency_key")
             .unwrap_or_else(|| format!("local-shift-change-{}", Uuid::new_v4()));
-        let saldo_sistema = local_cash_expected_balance(conn, &session_id)?;
+        let tenant = input.tenant_id.as_deref();
+        let saldo_sistema = local_cash_expected_balance(conn, &session_id, tenant)?;
         let data = serde_json::json!({
             "id": change_id,
             "sesion_caja_id": session_id,
@@ -2598,11 +2967,12 @@ fn process_local_shift_change(
         conn.execute(
             r#"
             INSERT OR REPLACE INTO local_generic_records
-                (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
-            VALUES (?1, ?2, '/api/cajas/cambios-turno', 'POST', ?3, 0, 'pending', ?4, ?4)
+                (id, tenant_id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+            VALUES (?1, ?2, ?3, '/api/cajas/cambios-turno', 'POST', ?4, 0, 'pending', ?5, ?5)
             "#,
             params![
                 &change_id,
+                tenant,
                 format!("/api/cajas/cambios-turno/{change_id}"),
                 serde_json::to_string(&data)
                     .map_err(|e| format!("No se pudo serializar cambio de turno local: {e}"))?,
@@ -2622,8 +2992,12 @@ fn process_local_shift_change(
         .ok_or_else(|| "El cierre de cambio local requiere cambio_id".to_string())?;
     let mut data = conn
         .query_row(
-            "SELECT data_json FROM local_generic_records WHERE id = ?1",
-            params![&change_id],
+            r#"
+            SELECT data_json FROM local_generic_records
+            WHERE id = ?1
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+            params![&change_id, tenant],
             |row| row.get::<_, String>(0),
         )
         .ok()
@@ -2650,12 +3024,18 @@ fn process_local_shift_change(
         obj.insert("updated_at".to_string(), serde_json::json!(timestamp));
     }
     conn.execute(
-        "UPDATE local_generic_records SET data_json = ?2, updated_at = ?3 WHERE id = ?1",
+        r#"
+        UPDATE local_generic_records
+        SET data_json = ?2, updated_at = ?3
+        WHERE id = ?1
+          AND ((?4 IS NULL AND tenant_id IS NULL) OR tenant_id = ?4)
+        "#,
         params![
             &change_id,
             serde_json::to_string(&data)
                 .map_err(|e| format!("No se pudo serializar cierre de cambio local: {e}"))?,
             timestamp,
+            tenant,
         ],
     )
     .map_err(|e| format!("No se pudo actualizar cambio de turno local: {e}"))?;
@@ -2708,8 +3088,10 @@ fn process_local_cash_open(conn: &Connection, input: &LocalFirstWriteInput) -> R
         .unwrap_or_else(|| format!("local-session-{}", Uuid::new_v4()));
     let monto_inicio = value_number(&payload, "monto_inicio");
     let timestamp = now_ms();
+    let tenant = input.tenant_id.as_deref();
     let session = serde_json::json!({
         "id": session_id,
+        "tenant_id": input.tenant_id.clone(),
         "caja_id": caja_id,
         "estado": "ABIERTA",
         "monto_inicio": monto_inicio,
@@ -2721,16 +3103,25 @@ fn process_local_cash_open(conn: &Connection, input: &LocalFirstWriteInput) -> R
         "sync_status": "pending"
     });
 
-    conn.execute("UPDATE pos_cash_sessions SET estado = 'CERRADA', closed_at = ?1, updated_at = ?1 WHERE estado = 'ABIERTA'", params![timestamp])
+    conn.execute(
+        r#"
+        UPDATE pos_cash_sessions
+        SET estado = 'CERRADA', closed_at = ?1, updated_at = ?1
+        WHERE estado = 'ABIERTA'
+          AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+        "#,
+        params![timestamp, tenant],
+    )
         .map_err(|e| format!("No se pudo cerrar sesion local anterior: {e}"))?;
     conn.execute(
         r#"
         INSERT INTO pos_cash_sessions
-            (id, caja_id, estado, monto_inicio, opened_at, data_json, updated_at)
-        VALUES (?1, ?2, 'ABIERTA', ?3, ?4, ?5, ?4)
+            (id, tenant_id, caja_id, estado, monto_inicio, opened_at, data_json, updated_at)
+        VALUES (?1, ?2, ?3, 'ABIERTA', ?4, ?5, ?6, ?5)
         "#,
         params![
             session_id,
+            tenant,
             caja_id,
             monto_inicio,
             timestamp,
@@ -2762,8 +3153,10 @@ fn process_local_cash_close(conn: &Connection, input: &LocalFirstWriteInput) -> 
         .and_then(Value::as_f64)
         .unwrap_or(0.0);
     let timestamp = now_ms();
+    let tenant = input.tenant_id.as_deref();
     let mut session = serde_json::json!({
         "id": session_id,
+        "tenant_id": input.tenant_id.clone(),
         "estado": "CERRADA",
         "monto_cierre": monto_cierre,
         "monto_contado": monto_cierre,
@@ -2775,8 +3168,12 @@ fn process_local_cash_close(conn: &Connection, input: &LocalFirstWriteInput) -> 
 
     let existing: Option<String> = conn
         .query_row(
-            "SELECT data_json FROM pos_cash_sessions WHERE id = ?1",
-            params![&session_id],
+            r#"
+            SELECT data_json FROM pos_cash_sessions
+            WHERE id = ?1
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+            params![&session_id, tenant],
             |row| row.get(0),
         )
         .ok();
@@ -2796,6 +3193,7 @@ fn process_local_cash_close(conn: &Connection, input: &LocalFirstWriteInput) -> 
         UPDATE pos_cash_sessions
         SET estado = 'CERRADA', monto_cierre = ?2, closed_at = ?3, data_json = ?4, updated_at = ?3
         WHERE id = ?1
+          AND ((?5 IS NULL AND tenant_id IS NULL) OR tenant_id = ?5)
         "#,
         params![
             session_id,
@@ -2803,6 +3201,7 @@ fn process_local_cash_close(conn: &Connection, input: &LocalFirstWriteInput) -> 
             timestamp,
             serde_json::to_string(&session)
                 .map_err(|e| format!("No se pudo serializar cierre local: {e}"))?,
+            tenant,
         ],
     )
     .map_err(|e| format!("No se pudo cerrar caja local: {e}"))?;
@@ -2820,12 +3219,17 @@ fn process_local_pos_sale(
     config: &AppConfig,
 ) -> Result<LocalFirstResponse, String> {
     let payload = parse_json_body(&input.body)?;
+    let tenant = input.tenant_id.as_deref();
     let idempotency_key = value_string(&payload, "idempotency_key")
         .unwrap_or_else(|| format!("local-{}", Uuid::new_v4()));
     let existing: Option<String> = conn
         .query_row(
-            "SELECT response_json FROM pos_sales WHERE idempotency_key = ?1",
-            params![&idempotency_key],
+            r#"
+            SELECT response_json FROM pos_sales
+            WHERE idempotency_key = ?1
+              AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+            "#,
+            params![&idempotency_key, tenant],
             |row| row.get(0),
         )
         .ok();
@@ -2859,8 +3263,12 @@ fn process_local_pos_sale(
         let cantidad = value_number(item, "cantidad");
         let mut product_raw: String = conn
             .query_row(
-                "SELECT data_json FROM pos_products WHERE id = ?1",
-                params![&producto_id],
+                r#"
+                SELECT data_json FROM pos_products
+                WHERE id = ?1
+                  AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+                "#,
+                params![&producto_id, tenant],
                 |row| row.get(0),
             )
             .map_err(|_| format!("Producto {producto_id} no existe en SQLite local"))?;
@@ -2886,8 +3294,13 @@ fn process_local_pos_sale(
         product_raw = serde_json::to_string(&product_json)
             .map_err(|e| format!("No se pudo serializar stock local: {e}"))?;
         conn.execute(
-            "UPDATE pos_products SET stock_actual = ?2, stock_disponible = ?2, data_json = ?3, updated_at = ?4 WHERE id = ?1",
-            params![producto_id, next_stock, product_raw, now_ms()],
+            r#"
+            UPDATE pos_products
+            SET stock_actual = ?2, stock_disponible = ?2, data_json = ?3, updated_at = ?4
+            WHERE id = ?1
+              AND ((?5 IS NULL AND tenant_id IS NULL) OR tenant_id = ?5)
+            "#,
+            params![producto_id, next_stock, product_raw, now_ms(), tenant],
         )
         .map_err(|e| format!("No se pudo descontar stock local POS: {e}"))?;
         items_actualizados.push(serde_json::json!({
@@ -2899,13 +3312,14 @@ fn process_local_pos_sale(
 
     let timestamp = now_ms();
     let mut response = serde_json::json!({
-        "success": true,
-        "offline": true,
-        "local_first": true,
-        "data": {
-            "venta_id": sale_id,
-            "id": sale_id,
-            "numero_ticket": numero_ticket,
+            "success": true,
+            "offline": true,
+            "local_first": true,
+            "data": {
+                "venta_id": sale_id,
+                "id": sale_id,
+                "tenant_id": input.tenant_id.clone(),
+                "numero_ticket": numero_ticket,
             "total": total,
             "subtotal": value_number(&payload, "subtotal"),
             "impuestos": value_number(&payload, "impuestos"),
@@ -2927,11 +3341,12 @@ fn process_local_pos_sale(
     conn.execute(
         r#"
         INSERT INTO pos_sales
-            (id, idempotency_key, sesion_caja_id, numero_ticket, total, body_json, response_json, sync_status, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?8)
+            (id, tenant_id, idempotency_key, sesion_caja_id, numero_ticket, total, body_json, response_json, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', ?9, ?9)
         "#,
         params![
             sale_id,
+            tenant,
             idempotency_key,
             sesion_caja_id,
             numero_ticket,
@@ -2943,7 +3358,7 @@ fn process_local_pos_sale(
     )
     .map_err(|e| format!("No se pudo guardar venta POS local: {e}"))?;
 
-    let queued_input = with_local_entity_headers(input, &sale_id, "pos_sale");
+    let queued_input = with_local_sync_contract(input, &sale_id, "pos_sale")?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
 
     if !config.ruc.trim().is_empty() && !config.razon_social.trim().is_empty() {
@@ -2984,8 +3399,13 @@ fn process_local_pos_sale(
             let response_raw = serde_json::to_string(&response)
                 .map_err(|e| format!("No se pudo serializar venta local con CPE: {e}"))?;
             conn.execute(
-                "UPDATE pos_sales SET response_json = ?2, updated_at = ?3 WHERE id = ?1",
-                params![sale_id, response_raw, now_ms()],
+                r#"
+                UPDATE pos_sales
+                SET response_json = ?2, updated_at = ?3
+                WHERE id = ?1
+                  AND ((?4 IS NULL AND tenant_id IS NULL) OR tenant_id = ?4)
+                "#,
+                params![sale_id, response_raw, now_ms(), tenant],
             )
             .map_err(|e| format!("No se pudo actualizar venta POS local con CPE: {e}"))?;
         }
@@ -3061,6 +3481,7 @@ fn process_local_inventory_product(
 ) -> Result<LocalFirstResponse, String> {
     let method = input.method.to_uppercase();
     let timestamp = now_ms();
+    let tenant = input.tenant_id.as_deref();
     let id = if method == "POST" {
         format!("local-product-{}", Uuid::new_v4())
     } else {
@@ -3073,8 +3494,12 @@ fn process_local_inventory_product(
     let payload = if method == "DELETE" {
         let existing: Option<String> = conn
             .query_row(
-                "SELECT data_json FROM pos_products WHERE id = ?1",
-                params![&id],
+                r#"
+                SELECT data_json FROM pos_products
+                WHERE id = ?1
+                  AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+                "#,
+                params![&id, tenant],
                 |row| row.get(0),
             )
             .ok();
@@ -3095,11 +3520,12 @@ fn process_local_inventory_product(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO pos_products
-            (id, codigo, nombre, stock_actual, stock_disponible, data_json, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6)
+            (id, tenant_id, codigo, nombre, stock_actual, stock_disponible, data_json, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6, ?7)
         "#,
         params![
             id,
+            tenant,
             codigo,
             nombre,
             stock,
@@ -3109,7 +3535,7 @@ fn process_local_inventory_product(
         ],
     )
     .map_err(|e| format!("No se pudo guardar producto local: {e}"))?;
-    let queued_input = with_local_entity_headers(input, &id, "inventory_product");
+    let queued_input = with_local_sync_contract(input, &id, "inventory_product")?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(product, "Producto guardado localmente; pendiente de sincronizacion")
 }
@@ -3139,6 +3565,7 @@ fn process_local_customer(
 ) -> Result<LocalFirstResponse, String> {
     let method = input.method.to_uppercase();
     let timestamp = now_ms();
+    let tenant = input.tenant_id.as_deref();
     let id = if method == "POST" {
         format!("local-customer-{}", Uuid::new_v4())
     } else {
@@ -3152,8 +3579,12 @@ fn process_local_customer(
     let payload = if method == "DELETE" {
         let existing: Option<String> = conn
             .query_row(
-                "SELECT data_json FROM local_customers WHERE id = ?1",
-                params![&id],
+                r#"
+                SELECT data_json FROM local_customers
+                WHERE id = ?1
+                  AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+                "#,
+                params![&id, tenant],
                 |row| row.get(0),
             )
             .ok();
@@ -3173,11 +3604,12 @@ fn process_local_customer(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO local_customers
-            (id, documento, razon_social, data_json, deleted, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            (id, tenant_id, documento, razon_social, data_json, deleted, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
         "#,
         params![
             id,
+            tenant,
             documento,
             razon_social,
             serde_json::to_string(&customer)
@@ -3187,7 +3619,7 @@ fn process_local_customer(
         ],
     )
     .map_err(|e| format!("No se pudo guardar cliente local: {e}"))?;
-    let queued_input = with_local_entity_headers(input, &id, "customer");
+    let queued_input = with_local_sync_contract(input, &id, "customer")?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(customer, "Cliente guardado localmente; pendiente de sincronizacion")
 }
@@ -3264,7 +3696,11 @@ fn normalize_sales_document_payload(
     document
 }
 
-fn reserve_order_stock(conn: &Connection, payload: &Value) -> Result<(), String> {
+fn reserve_order_stock(
+    conn: &Connection,
+    payload: &Value,
+    tenant_id: Option<&str>,
+) -> Result<(), String> {
     let detalle = payload
         .get("detalle")
         .or_else(|| payload.get("items"))
@@ -3277,8 +3713,12 @@ fn reserve_order_stock(conn: &Connection, payload: &Value) -> Result<(), String>
         let cantidad = value_number(item, "cantidad");
         let raw: String = conn
             .query_row(
-                "SELECT data_json FROM pos_products WHERE id = ?1",
-                params![&producto_id],
+                r#"
+                SELECT data_json FROM pos_products
+                WHERE id = ?1
+                  AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+                "#,
+                params![&producto_id, tenant_id],
                 |row| row.get(0),
             )
             .map_err(|_| format!("Producto {producto_id} no existe en SQLite local"))?;
@@ -3306,12 +3746,18 @@ fn reserve_order_stock(conn: &Connection, payload: &Value) -> Result<(), String>
             obj.insert("offline_dirty".to_string(), serde_json::json!(true));
         }
         conn.execute(
-            "UPDATE pos_products SET data_json = ?2, updated_at = ?3 WHERE id = ?1",
+            r#"
+            UPDATE pos_products
+            SET data_json = ?2, updated_at = ?3
+            WHERE id = ?1
+              AND ((?4 IS NULL AND tenant_id IS NULL) OR tenant_id = ?4)
+            "#,
             params![
                 producto_id,
                 serde_json::to_string(&product_json)
                     .map_err(|e| format!("No se pudo serializar reserva local: {e}"))?,
                 now_ms(),
+                tenant_id,
             ],
         )
         .map_err(|e| format!("No se pudo reservar stock local: {e}"))?;
@@ -3326,6 +3772,7 @@ fn process_local_sales_document(
 ) -> Result<LocalFirstResponse, String> {
     let method = input.method.to_uppercase();
     let timestamp = now_ms();
+    let tenant = input.tenant_id.as_deref();
     let base = if kind == "quote" {
         "/api/ventas/cotizaciones/"
     } else {
@@ -3344,8 +3791,12 @@ fn process_local_sales_document(
     let payload = if method == "DELETE" {
         let existing: Option<String> = conn
             .query_row(
-                "SELECT data_json FROM local_sales_documents WHERE id = ?1 AND kind = ?2",
-                params![&id, kind],
+                r#"
+                SELECT data_json FROM local_sales_documents
+                WHERE id = ?1 AND kind = ?2
+                  AND ((?3 IS NULL AND tenant_id IS NULL) OR tenant_id = ?3)
+                "#,
+                params![&id, kind, tenant],
                 |row| row.get(0),
             )
             .ok();
@@ -3358,7 +3809,7 @@ fn process_local_sales_document(
 
     let document = normalize_sales_document_payload(&payload, id.clone(), kind, method == "DELETE");
     if kind == "order" && method == "POST" {
-        reserve_order_stock(conn, &document)?;
+        reserve_order_stock(conn, &document, tenant)?;
     }
     let numero = value_string(&document, "numero").unwrap_or_else(|| id.clone());
     let cliente_id = value_string(&document, "cliente_id");
@@ -3373,11 +3824,12 @@ fn process_local_sales_document(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO local_sales_documents
-            (id, kind, numero, cliente_id, estado, total, data_json, deleted, sync_status, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', ?9, ?9)
+            (id, tenant_id, kind, numero, cliente_id, estado, total, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10, ?10)
         "#,
         params![
             id,
+            tenant,
             kind,
             numero,
             cliente_id,
@@ -3391,10 +3843,10 @@ fn process_local_sales_document(
     )
     .map_err(|e| format!("No se pudo guardar documento venta local: {e}"))?;
     let entity_type = if kind == "quote" { "sales_quote" } else { "sales_order" };
-    let queued_input = with_local_entity_headers(input, &id, entity_type);
+    let queued_input = with_local_sync_contract(input, &id, entity_type)?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(
-        attach_customer(conn, document),
+        attach_customer(conn, document, tenant),
         if kind == "quote" {
             "Cotizacion guardada localmente; pendiente de sincronizacion"
         } else {
@@ -3409,6 +3861,7 @@ fn process_local_attendance_mark(
 ) -> Result<LocalFirstResponse, String> {
     let payload = parse_json_body(&input.body)?;
     let timestamp = now_ms();
+    let tenant = input.tenant_id.as_deref();
     let empleado_id = value_string(&payload, "empleado_id")
         .or_else(|| {
             input
@@ -3438,11 +3891,15 @@ fn process_local_attendance_mark(
     let mut existing_data: Option<Value> = None;
     let mut stmt = conn
         .prepare(
-            "SELECT id, data_json FROM local_generic_records WHERE collection_endpoint = '/api/rrhh/asistencias' AND deleted = 0",
+            r#"
+            SELECT id, data_json FROM local_generic_records
+            WHERE collection_endpoint = '/api/rrhh/asistencias' AND deleted = 0
+              AND ((?1 IS NULL AND tenant_id IS NULL) OR tenant_id = ?1)
+            "#,
         )
         .map_err(|e| format!("No se pudo preparar asistencia local: {e}"))?;
     let rows = stmt
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .query_map(params![tenant], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
         .map_err(|e| format!("No se pudo leer asistencia local: {e}"))?;
     for row in rows {
         let (id, raw) = row.map_err(|e| format!("Asistencia local invalida: {e}"))?;
@@ -3491,11 +3948,12 @@ fn process_local_attendance_mark(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO local_generic_records
-            (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
-        VALUES (?1, ?2, '/api/rrhh/asistencias', 'POST', ?3, 0, 'pending', ?4, ?4)
+            (id, tenant_id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, ?3, '/api/rrhh/asistencias', 'POST', ?4, 0, 'pending', ?5, ?5)
         "#,
         params![
             id,
+            tenant,
             format!("/api/rrhh/asistencias/{id}"),
             serde_json::to_string(&attendance)
                 .map_err(|e| format!("No se pudo serializar asistencia local: {e}"))?,
@@ -3503,7 +3961,7 @@ fn process_local_attendance_mark(
         ],
     )
     .map_err(|e| format!("No se pudo guardar asistencia local: {e}"))?;
-    let queued_input = with_local_entity_headers(input, &id, "rrhh_attendance");
+    let queued_input = with_local_sync_contract(input, &id, "rrhh_attendance")?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(attendance, "Asistencia guardada localmente; pendiente de sincronizacion")
 }
@@ -3514,6 +3972,7 @@ fn process_generic_local_write(
 ) -> Result<LocalFirstResponse, String> {
     let method = input.method.to_uppercase();
     let timestamp = now_ms();
+    let tenant = input.tenant_id.as_deref();
     let collection = local_collection_endpoint_for_write(&input.endpoint);
     let id = if method == "POST" {
         format!("local-generic-{}", Uuid::new_v4())
@@ -3531,8 +3990,12 @@ fn process_generic_local_write(
     let payload = if method == "DELETE" {
         let existing: Option<String> = conn
             .query_row(
-                "SELECT data_json FROM local_generic_records WHERE id = ?1",
-                params![&id],
+                r#"
+                SELECT data_json FROM local_generic_records
+                WHERE id = ?1
+                  AND ((?2 IS NULL AND tenant_id IS NULL) OR tenant_id = ?2)
+                "#,
+                params![&id, tenant],
                 |row| row.get(0),
             )
             .ok();
@@ -3565,11 +4028,12 @@ fn process_generic_local_write(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO local_generic_records
-            (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?7, ?7)
+            (id, tenant_id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?8)
         "#,
         params![
             id,
+            tenant,
             detail_endpoint,
             collection,
             method,
@@ -3580,7 +4044,7 @@ fn process_generic_local_write(
         ],
     )
     .map_err(|e| format!("No se pudo guardar registro local generico: {e}"))?;
-    let queued_input = with_local_entity_headers(input, &id, "generic_record");
+    let queued_input = with_local_sync_contract(input, &id, "generic_record")?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(data, "Operacion guardada localmente; pendiente de sincronizacion")
 }
@@ -3590,20 +4054,22 @@ fn hydrate_local_first_response(
     app: AppHandle,
     endpoint: String,
     url: String,
+    tenant_id: Option<String>,
     status: u16,
     headers: Vec<HeaderPair>,
     body: String,
 ) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
-    upsert_snapshot(&conn, &endpoint, &url, status, &headers, &body)?;
+    let tenant = tenant_id.as_deref();
+    upsert_snapshot(&conn, &endpoint, &url, tenant, status, &headers, &body)?;
 
     match endpoint.as_str() {
-        "/api/pos/productos" | "/api/inventario/productos" => hydrate_pos_products(&conn, &body)?,
-        "/api/pos/clientes" | "/api/ventas/clientes" => hydrate_local_customers(&conn, &body)?,
-        "/api/ventas/cotizaciones" => hydrate_sales_documents(&conn, &body, "quote")?,
-        "/api/ventas/pedidos" => hydrate_sales_documents(&conn, &body, "order")?,
-        "/api/pos/sesion-caja" => hydrate_cash_session(&conn, &body)?,
+        "/api/pos/productos" | "/api/inventario/productos" => hydrate_pos_products(&conn, &body, tenant)?,
+        "/api/pos/clientes" | "/api/ventas/clientes" => hydrate_local_customers(&conn, &body, tenant)?,
+        "/api/ventas/cotizaciones" => hydrate_sales_documents(&conn, &body, "quote", tenant)?,
+        "/api/ventas/pedidos" => hydrate_sales_documents(&conn, &body, "order", tenant)?,
+        "/api/pos/sesion-caja" => hydrate_cash_session(&conn, &body, tenant)?,
         _ => {}
     }
 
@@ -3615,107 +4081,109 @@ fn get_local_first_response(
     app: AppHandle,
     endpoint: String,
     url: String,
+    tenant_id: Option<String>,
 ) -> Result<Option<LocalFirstResponse>, String> {
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
     let config = load_config(app.clone()).unwrap_or_default();
+    let tenant = tenant_id.as_deref();
 
     match endpoint.as_str() {
         "/api/cajas" => {
-            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url, tenant)? {
                 return Ok(Some(snapshot));
             }
             return Ok(Some(build_default_cajas_snapshot()?));
         }
         "/api/pos/metodos-pago" => {
-            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url, tenant)? {
                 return Ok(Some(snapshot));
             }
             return Ok(Some(build_default_payment_methods_snapshot()?));
         }
         "/api/pos/empresa-config" => {
-            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url, tenant)? {
                 return Ok(Some(snapshot));
             }
             return Ok(Some(build_empresa_config_snapshot(&config)?));
         }
         "/api/pos/configuration-status" => {
-            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url, tenant)? {
                 return Ok(Some(snapshot));
             }
             return Ok(Some(build_pos_configuration_status_snapshot(&config)?))
         }
         "/api/configuration/gre-thresholds" => {
-            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url, tenant)? {
                 return Ok(Some(snapshot));
             }
             return Ok(Some(build_gre_thresholds_snapshot()?));
         }
         "/api/compras/next-number" => {
-            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url, tenant)? {
                 return Ok(Some(snapshot));
             }
             return Ok(Some(build_next_number_snapshot("OC")?));
         }
         "/api/paises/usuario/configuracion" => {
-            return Ok(Some(build_user_country_config_snapshot(&conn)?));
+            return Ok(Some(build_user_country_config_snapshot(&conn, tenant)?));
         }
         "/api/pos/productos" | "/api/inventario/productos" => {
-            return Ok(Some(build_products_snapshot(&conn)?))
+            return Ok(Some(build_products_snapshot(&conn, tenant)?))
         }
         "/api/pos/clientes" | "/api/ventas/clientes" => {
-            return Ok(Some(build_customers_snapshot(&conn)?))
+            return Ok(Some(build_customers_snapshot(&conn, tenant)?))
         }
         "/api/ventas/cotizaciones" => {
-            return Ok(Some(build_sales_documents_snapshot(&conn, "quote")?))
+            return Ok(Some(build_sales_documents_snapshot(&conn, "quote", tenant)?))
         }
         "/api/ventas/pedidos" => {
-            return Ok(Some(build_sales_documents_snapshot(&conn, "order")?))
+            return Ok(Some(build_sales_documents_snapshot(&conn, "order", tenant)?))
         }
-        "/api/pos/sesion-caja" => return build_open_session_snapshot(&conn),
-        "/api/pos/ventas-recientes" => return Ok(Some(build_recent_sales_snapshot(&conn)?)),
+        "/api/pos/sesion-caja" => return build_open_session_snapshot(&conn, tenant),
+        "/api/pos/ventas-recientes" => return Ok(Some(build_recent_sales_snapshot(&conn, tenant)?)),
         _ => {}
     }
 
     if endpoint.starts_with("/api/pos/detalles-venta/") {
-        return Ok(Some(build_pos_sale_details_snapshot(&conn, &endpoint)?));
+        return Ok(Some(build_pos_sale_details_snapshot(&conn, &endpoint, tenant)?));
     }
     if endpoint.starts_with("/api/cajas/movimientos/") {
-        return Ok(Some(build_cash_movements_snapshot(&conn, &endpoint)?));
+        return Ok(Some(build_cash_movements_snapshot(&conn, &endpoint, tenant)?));
     }
     if endpoint.starts_with("/api/cajas/saldo-esperado/") {
-        return Ok(Some(build_cash_expected_balance_snapshot(&conn, &endpoint)?));
+        return Ok(Some(build_cash_expected_balance_snapshot(&conn, &endpoint, tenant)?));
     }
     if endpoint.starts_with("/api/inventario/productos/") {
         return Ok(Some(
-            build_product_detail_snapshot(&conn, &endpoint)?
+            build_product_detail_snapshot(&conn, &endpoint, tenant)?
                 .unwrap_or(build_empty_object_snapshot(&endpoint)?),
         ));
     }
     if endpoint.starts_with("/api/ventas/clientes/") || endpoint.starts_with("/api/pos/clientes/") {
         return Ok(Some(
-            build_customer_detail_snapshot(&conn, &endpoint)?
+            build_customer_detail_snapshot(&conn, &endpoint, tenant)?
                 .unwrap_or(build_empty_object_snapshot(&endpoint)?),
         ));
     }
     if endpoint.starts_with("/api/ventas/cotizaciones/") {
         return Ok(Some(
-            build_sales_document_detail_snapshot(&conn, &endpoint, "quote")?
+            build_sales_document_detail_snapshot(&conn, &endpoint, "quote", tenant)?
                 .unwrap_or(build_empty_object_snapshot(&endpoint)?),
         ));
     }
     if endpoint.starts_with("/api/ventas/pedidos/") {
         return Ok(Some(
-            build_sales_document_detail_snapshot(&conn, &endpoint, "order")?
+            build_sales_document_detail_snapshot(&conn, &endpoint, "order", tenant)?
                 .unwrap_or(build_empty_object_snapshot(&endpoint)?),
         ));
     }
 
-    if let Some(detail) = build_generic_detail_snapshot(&conn, &endpoint)? {
+    if let Some(detail) = build_generic_detail_snapshot(&conn, &endpoint, tenant)? {
         return Ok(Some(detail));
     }
 
-    let snapshot = read_local_snapshot(&conn, &endpoint, &url)?.or_else(|| {
+    let snapshot = read_local_snapshot(&conn, &endpoint, &url, tenant)?.or_else(|| {
         if is_known_empty_collection_endpoint(&endpoint) {
             build_empty_collection_snapshot(&endpoint).ok()
         } else if is_known_empty_object_endpoint(&endpoint) {
@@ -3724,7 +4192,7 @@ fn get_local_first_response(
             None
         }
     });
-    merge_local_records_into_response(&conn, &endpoint, snapshot)
+    merge_local_records_into_response(&conn, &endpoint, snapshot, tenant)
 }
 
 #[tauri::command]
@@ -3839,7 +4307,8 @@ fn migrate_legacy_json_outbox(app: &AppHandle, conn: &Connection) -> Result<(), 
 }
 
 fn insert_offline_item(conn: &Connection, item: &OfflineQueueItem) -> Result<(), String> {
-    let headers_json = serde_json::to_string(&item.headers)
+    let safe_headers = strip_sensitive_request_headers(&item.headers);
+    let headers_json = serde_json::to_string(&safe_headers)
         .map_err(|e| format!("No se pudo serializar headers offline: {e}"))?;
     conn.execute(
         r#"
@@ -3965,16 +4434,17 @@ fn update_local_first_sync_status(
     sync_status: &str,
     response_body: Option<&String>,
 ) -> Result<(), String> {
-    let request: Option<(String, Option<String>, String)> = conn
+    let request: Option<(String, Option<String>, String, Option<String>)> = conn
         .query_row(
-            "SELECT endpoint, body, headers_json FROM offline_requests WHERE id = ?1",
+            "SELECT endpoint, body, headers_json, tenant_id FROM offline_requests WHERE id = ?1",
             params![offline_request_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .ok();
-    let Some((endpoint, body, headers_json)) = request else {
+    let Some((endpoint, body, headers_json, tenant_id)) = request else {
         return Ok(());
     };
+    let tenant = tenant_id.as_deref();
     let headers: Vec<HeaderPair> = serde_json::from_str(&headers_json).unwrap_or_default();
     let local_id = header_value(&headers, "x-erp-local-id");
     let entity_type = header_value(&headers, "x-erp-local-entity-type");
@@ -4003,8 +4473,12 @@ fn update_local_first_sync_status(
             let fiscal_status = response_fiscal_status(sync_status, response_body);
             let synced_json = response_data_json(response_body);
             conn.execute(
-                "UPDATE local_fiscal_documents SET estado = ?2, response_json = COALESCE(?3, response_json), updated_at = ?4 WHERE id = ?1",
-                params![id, fiscal_status, synced_json, now_ms()],
+                r#"
+                UPDATE local_fiscal_documents
+                SET estado = ?2, response_json = COALESCE(?3, response_json), updated_at = ?4
+                WHERE id = ?1 AND tenant_id = ?5
+                "#,
+                params![id, fiscal_status, synced_json, now_ms(), tenant_scope(tenant)],
             )
             .map_err(|e| format!("No se pudo actualizar sync de documento fiscal local: {e}"))?;
         }
@@ -4017,8 +4491,12 @@ fn update_local_first_sync_status(
             let fiscal_status = response_fiscal_status(sync_status, response_body);
             let synced_json = response_data_json(response_body);
             conn.execute(
-                "UPDATE local_fiscal_documents SET estado = ?2, response_json = COALESCE(?3, response_json), updated_at = ?4 WHERE hash = ?1",
-                params![hash, fiscal_status, synced_json, now_ms()],
+                r#"
+                UPDATE local_fiscal_documents
+                SET estado = ?2, response_json = COALESCE(?3, response_json), updated_at = ?4
+                WHERE hash = ?1 AND tenant_id = ?5
+                "#,
+                params![hash, fiscal_status, synced_json, now_ms(), tenant_scope(tenant)],
             )
             .map_err(|e| format!("No se pudo actualizar sync de envio fiscal local: {e}"))?;
         }
@@ -4033,8 +4511,13 @@ fn update_local_first_sync_status(
         let local_id = local_id.or_else(|| value_string(&payload, "id"));
         if let Some(id) = local_id {
             conn.execute(
-                "UPDATE local_sales_documents SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4 WHERE id = ?1 AND kind = 'quote'",
-                params![id, sync_status, synced_document_json, now_ms()],
+                r#"
+                UPDATE local_sales_documents
+                SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4
+                WHERE id = ?1 AND kind = 'quote'
+                  AND ((?5 IS NULL AND tenant_id IS NULL) OR tenant_id = ?5)
+                "#,
+                params![id, sync_status, synced_document_json, now_ms(), tenant],
             )
             .map_err(|e| format!("No se pudo actualizar sync de cotizacion local: {e}"))?;
         }
@@ -4046,8 +4529,13 @@ fn update_local_first_sync_status(
         let local_id = local_id.or_else(|| value_string(&payload, "id"));
         if let Some(id) = local_id {
             conn.execute(
-                "UPDATE local_sales_documents SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4 WHERE id = ?1 AND kind = 'order'",
-                params![id, sync_status, synced_document_json, now_ms()],
+                r#"
+                UPDATE local_sales_documents
+                SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4
+                WHERE id = ?1 AND kind = 'order'
+                  AND ((?5 IS NULL AND tenant_id IS NULL) OR tenant_id = ?5)
+                "#,
+                params![id, sync_status, synced_document_json, now_ms(), tenant],
             )
             .map_err(|e| format!("No se pudo actualizar sync de pedido local: {e}"))?;
         }
@@ -4059,8 +4547,13 @@ fn update_local_first_sync_status(
         let local_id = local_id.or_else(|| value_string(&payload, "id"));
         if let Some(id) = local_id {
             conn.execute(
-                "UPDATE pos_products SET data_json = COALESCE(?2, data_json), updated_at = ?3 WHERE id = ?1",
-                params![id, synced_json, now_ms()],
+                r#"
+                UPDATE pos_products
+                SET data_json = COALESCE(?2, data_json), updated_at = ?3
+                WHERE id = ?1
+                  AND ((?4 IS NULL AND tenant_id IS NULL) OR tenant_id = ?4)
+                "#,
+                params![id, synced_json, now_ms(), tenant],
             )
             .map_err(|e| format!("No se pudo actualizar sync de producto local: {e}"))?;
         }
@@ -4076,8 +4569,13 @@ fn update_local_first_sync_status(
         let local_id = local_id.or_else(|| value_string(&payload, "id"));
         if let Some(id) = local_id {
             conn.execute(
-                "UPDATE local_customers SET data_json = COALESCE(?2, data_json), updated_at = ?3 WHERE id = ?1",
-                params![id, synced_json, now_ms()],
+                r#"
+                UPDATE local_customers
+                SET data_json = COALESCE(?2, data_json), updated_at = ?3
+                WHERE id = ?1
+                  AND ((?4 IS NULL AND tenant_id IS NULL) OR tenant_id = ?4)
+                "#,
+                params![id, synced_json, now_ms(), tenant],
             )
             .map_err(|e| format!("No se pudo actualizar sync de cliente local: {e}"))?;
         }
@@ -4095,8 +4593,13 @@ fn update_local_first_sync_status(
             .or_else(|| value_string(&payload, "id"));
         if let Some(id) = session_id {
             conn.execute(
-                "UPDATE pos_cash_sessions SET data_json = COALESCE(?2, data_json), updated_at = ?3 WHERE id = ?1",
-                params![id, synced_json, now_ms()],
+                r#"
+                UPDATE pos_cash_sessions
+                SET data_json = COALESCE(?2, data_json), updated_at = ?3
+                WHERE id = ?1
+                  AND ((?4 IS NULL AND tenant_id IS NULL) OR tenant_id = ?4)
+                "#,
+                params![id, synced_json, now_ms(), tenant],
             )
             .map_err(|e| format!("No se pudo actualizar sync de caja local: {e}"))?;
         }
@@ -4114,7 +4617,11 @@ fn update_local_first_sync_status(
             obj.insert("local_first".to_string(), serde_json::json!(true));
             obj.insert("updated_at".to_string(), serde_json::json!(now_ms()));
         }
-        write_metadata_json(conn, "usuario_configuracion", &config)?;
+        write_metadata_json(
+            conn,
+            &scoped_metadata_key("usuario_configuracion", tenant),
+            &config,
+        )?;
         return Ok(());
     }
 
@@ -4123,8 +4630,13 @@ fn update_local_first_sync_status(
         if let Some(id) = generic_id {
             let synced_json = response_data_json(response_body);
             conn.execute(
-                "UPDATE local_generic_records SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4 WHERE id = ?1",
-                params![id, sync_status, synced_json, now_ms()],
+                r#"
+                UPDATE local_generic_records
+                SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4
+                WHERE id = ?1
+                  AND ((?5 IS NULL AND tenant_id IS NULL) OR tenant_id = ?5)
+                "#,
+                params![id, sync_status, synced_json, now_ms(), tenant],
             )
             .map_err(|e| format!("No se pudo actualizar sync de registro local generico: {e}"))?;
         }
@@ -4136,14 +4648,24 @@ fn update_local_first_sync_status(
     };
     if let Some(response) = response_body {
         conn.execute(
-            "UPDATE pos_sales SET sync_status = ?2, response_json = ?3, updated_at = ?4 WHERE idempotency_key = ?1",
-            params![idempotency_key, sync_status, response, now_ms()],
+            r#"
+            UPDATE pos_sales
+            SET sync_status = ?2, response_json = ?3, updated_at = ?4
+            WHERE idempotency_key = ?1
+              AND ((?5 IS NULL AND tenant_id IS NULL) OR tenant_id = ?5)
+            "#,
+            params![idempotency_key, sync_status, response, now_ms(), tenant],
         )
         .map_err(|e| format!("No se pudo actualizar estado sync POS local: {e}"))?;
     } else {
         conn.execute(
-            "UPDATE pos_sales SET sync_status = ?2, updated_at = ?3 WHERE idempotency_key = ?1",
-            params![idempotency_key, sync_status, now_ms()],
+            r#"
+            UPDATE pos_sales
+            SET sync_status = ?2, updated_at = ?3
+            WHERE idempotency_key = ?1
+              AND ((?4 IS NULL AND tenant_id IS NULL) OR tenant_id = ?4)
+            "#,
+            params![idempotency_key, sync_status, now_ms(), tenant],
         )
         .map_err(|e| format!("No se pudo actualizar estado sync POS local: {e}"))?;
     }
@@ -4172,7 +4694,7 @@ fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> 
                 endpoint: row.get(1)?,
                 method: row.get(2)?,
                 url: row.get(3)?,
-                headers,
+                headers: strip_sensitive_request_headers(&headers),
                 body: row.get(5)?,
                 tenant_id: row.get(6)?,
                 user_id: row.get(7)?,
@@ -4191,6 +4713,16 @@ fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> 
     for row in rows {
         items.push(row.map_err(|e| format!("Fila offline SQLite invalida: {e}"))?);
     }
+    drop(stmt);
+    for item in &items {
+        let headers_json = serde_json::to_string(&item.headers)
+            .map_err(|e| format!("No se pudo sanear headers offline: {e}"))?;
+        conn.execute(
+            "UPDATE offline_requests SET headers_json = ?1 WHERE id = ?2",
+            params![headers_json, &item.id],
+        )
+        .map_err(|e| format!("No se pudo limpiar header sensible legacy: {e}"))?;
+    }
     Ok(items)
 }
 
@@ -4203,6 +4735,224 @@ fn write_file_replace(path: &PathBuf, raw: String) -> std::io::Result<()> {
     fs::rename(temp_path, path)
 }
 
+const DPAPI_PREFIX: &str = "dpapi:";
+
+fn strip_sensitive_request_headers(headers: &[HeaderPair]) -> Vec<HeaderPair> {
+    headers
+        .iter()
+        .filter(|header| {
+            !matches!(
+                header.name.trim().to_ascii_lowercase().as_str(),
+                "authorization"
+                    | "cookie"
+                    | "proxy-authorization"
+                    | "set-cookie"
+                    | "x-api-key"
+                    | "x-access-token"
+                    | "x-auth-token"
+                    | "x-refresh-token"
+            )
+        })
+        .cloned()
+        .collect()
+}
+
+#[cfg(target_os = "windows")]
+fn protect_local_secret(value: &str) -> Result<String, String> {
+    use windows_sys::Win32::Security::Cryptography::{
+        CryptProtectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
+    };
+    use windows_sys::Win32::Foundation::LocalFree;
+
+    if value.starts_with(DPAPI_PREFIX) {
+        return Ok(value.to_string());
+    }
+    let mut bytes = value.as_bytes().to_vec();
+    let mut input = CRYPT_INTEGER_BLOB {
+        cbData: bytes.len() as u32,
+        pbData: bytes.as_mut_ptr(),
+    };
+    let mut output = CRYPT_INTEGER_BLOB {
+        cbData: 0,
+        pbData: ptr::null_mut(),
+    };
+    let ok = unsafe {
+        CryptProtectData(
+            &mut input,
+            ptr::null(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            CRYPTPROTECT_UI_FORBIDDEN,
+            &mut output,
+        )
+    };
+    if ok == 0 {
+        return Err("No se pudo cifrar el password del certificado con DPAPI".to_string());
+    }
+    let encrypted = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) };
+    let encoded = general_purpose::STANDARD.encode(encrypted);
+    unsafe {
+        LocalFree(output.pbData as _);
+    }
+    Ok(format!("{DPAPI_PREFIX}{encoded}"))
+}
+
+#[cfg(target_os = "windows")]
+fn unprotect_local_secret(value: &str) -> Result<String, String> {
+    use windows_sys::Win32::Security::Cryptography::{
+        CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
+    };
+    use windows_sys::Win32::Foundation::LocalFree;
+
+    let Some(encoded) = value.strip_prefix(DPAPI_PREFIX) else {
+        return Ok(value.to_string());
+    };
+    let mut bytes = general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|e| format!("Password de certificado cifrado invalido: {e}"))?;
+    let mut input = CRYPT_INTEGER_BLOB {
+        cbData: bytes.len() as u32,
+        pbData: bytes.as_mut_ptr(),
+    };
+    let mut output = CRYPT_INTEGER_BLOB {
+        cbData: 0,
+        pbData: ptr::null_mut(),
+    };
+    let ok = unsafe {
+        CryptUnprotectData(
+            &mut input,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            CRYPTPROTECT_UI_FORBIDDEN,
+            &mut output,
+        )
+    };
+    if ok == 0 {
+        return Err("No se pudo descifrar el password del certificado con DPAPI".to_string());
+    }
+    let decrypted = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) };
+    let result = String::from_utf8(decrypted.to_vec())
+        .map_err(|e| format!("Password de certificado descifrado no es UTF-8 valido: {e}"))?;
+    unsafe {
+        LocalFree(output.pbData as _);
+    }
+    Ok(result)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn protect_local_secret(value: &str) -> Result<String, String> {
+    Ok(value.to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn unprotect_local_secret(value: &str) -> Result<String, String> {
+    Ok(value.to_string())
+}
+
+#[tauri::command]
+fn save_secure_access_token(app: AppHandle, access_token: String) -> Result<(), String> {
+    if access_token.trim().is_empty() {
+        return clear_secure_access_token(app);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let protected = protect_local_secret(access_token.trim())?;
+        let path = auth_token_path(&app)?;
+        return write_file_replace(&path, protected)
+            .map_err(|e| format!("No se pudo guardar token protegido: {e}"));
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        Err("El almacenamiento persistente de token requiere un keyring seguro".to_string())
+    }
+}
+
+#[tauri::command]
+fn load_secure_access_token(app: AppHandle) -> Result<Option<String>, String> {
+    let path = auth_token_path(&app)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let raw = fs::read_to_string(&path)
+            .map_err(|e| format!("No se pudo leer token protegido: {e}"))?;
+        if !raw.trim().starts_with(DPAPI_PREFIX) {
+            return Err("El archivo de token no esta protegido con DPAPI".to_string());
+        }
+        return unprotect_local_secret(raw.trim()).map(Some);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("El almacenamiento persistente de token requiere un keyring seguro".to_string())
+    }
+}
+
+#[tauri::command]
+fn clear_secure_access_token(app: AppHandle) -> Result<(), String> {
+    let path = auth_token_path(&app)?;
+    if path.exists() {
+        fs::remove_file(path).map_err(|e| format!("No se pudo eliminar token protegido: {e}"))?;
+    }
+    Ok(())
+}
+
+fn decrypt_config_for_runtime(mut config: AppConfig) -> Result<AppConfig, String> {
+    if let Some(password) = config.certificado_password.as_deref() {
+        config.certificado_password = Some(unprotect_local_secret(password)?);
+    }
+    Ok(config)
+}
+
+fn encrypt_config_for_disk(mut config: AppConfig) -> Result<AppConfig, String> {
+    if let Some(password) = config
+        .certificado_password
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        config.certificado_password = Some(protect_local_secret(password)?);
+    }
+    Ok(config)
+}
+
+fn redact_config_for_backup(mut config: AppConfig) -> AppConfig {
+    if config.certificado_password.is_some() {
+        config.certificado_password = Some("[redacted]".to_string());
+    }
+    config
+}
+
+fn redact_headers_for_backup(headers: &[HeaderPair]) -> Vec<HeaderPair> {
+    headers
+        .iter()
+        .map(|header| {
+            let lower = header.name.to_ascii_lowercase();
+            if matches!(lower.as_str(), "authorization" | "cookie" | "x-api-key") {
+                HeaderPair {
+                    name: header.name.clone(),
+                    value: "[redacted]".to_string(),
+                }
+            } else {
+                header.clone()
+            }
+        })
+        .collect()
+}
+
+fn redact_queue_for_backup(queue: Vec<OfflineQueueItem>) -> Vec<OfflineQueueItem> {
+    queue
+        .into_iter()
+        .map(|mut item| {
+            item.headers = redact_headers_for_backup(&item.headers);
+            item
+        })
+        .collect()
+}
+
 #[tauri::command]
 fn load_config(app: AppHandle) -> Result<AppConfig, String> {
     let path = config_path(&app)?;
@@ -4212,13 +4962,16 @@ fn load_config(app: AppHandle) -> Result<AppConfig, String> {
 
     let raw = fs::read_to_string(path)
         .map_err(|e| format!("No se pudo leer la configuracion local: {e}"))?;
-    serde_json::from_str(&raw).map_err(|e| format!("Configuracion local invalida: {e}"))
+    let config: AppConfig =
+        serde_json::from_str(&raw).map_err(|e| format!("Configuracion local invalida: {e}"))?;
+    decrypt_config_for_runtime(config)
 }
 
 #[tauri::command]
 fn save_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
     let path = config_path(&app)?;
-    let raw = serde_json::to_string_pretty(&config)
+    let config_for_disk = encrypt_config_for_disk(config)?;
+    let raw = serde_json::to_string_pretty(&config_for_disk)
         .map_err(|e| format!("No se pudo serializar la configuracion local: {e}"))?;
     write_file_replace(&path, raw)
         .map_err(|e| format!("No se pudo guardar la configuracion local: {e}"))
@@ -4379,22 +5132,25 @@ fn cache_binary_response(
     app: AppHandle,
     endpoint: String,
     url: String,
+    tenant_id: Option<String>,
     status: u16,
     headers: Vec<HeaderPair>,
     body_base64: String,
 ) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
+    let tenant = tenant_id.as_deref();
     conn.execute(
         r#"
         INSERT OR REPLACE INTO local_binary_cache
-            (cache_key, endpoint, url, status, headers_json, body_base64, cached_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            (cache_key, endpoint, url, tenant_id, status, headers_json, body_base64, cached_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
         "#,
         params![
-            local_cache_key(&endpoint, &url),
+            scoped_cache_key(tenant, &endpoint, &url),
             endpoint,
             url,
+            tenant,
             status as i64,
             response_headers_json(&headers)?,
             body_base64,
@@ -4410,22 +5166,25 @@ fn get_binary_response(
     app: AppHandle,
     endpoint: String,
     url: String,
+    tenant_id: Option<String>,
 ) -> Result<Option<BinaryLocalResponse>, String> {
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
+    let tenant = tenant_id.as_deref();
     let mut stmt = conn
         .prepare(
             r#"
             SELECT status, headers_json, body_base64, cached_at
             FROM local_binary_cache
-            WHERE cache_key = ?1 OR endpoint = ?2
+            WHERE cache_key = ?1
+               OR (endpoint = ?2 AND ((?3 IS NULL AND tenant_id IS NULL) OR tenant_id = ?3))
             ORDER BY CASE WHEN cache_key = ?1 THEN 0 ELSE 1 END, cached_at DESC
             LIMIT 1
             "#,
         )
         .map_err(|e| format!("No se pudo preparar binario local: {e}"))?;
     let mut rows = stmt
-        .query(params![local_cache_key(&endpoint, &url), endpoint])
+        .query(params![scoped_cache_key(tenant, &endpoint, &url), endpoint, tenant])
         .map_err(|e| format!("No se pudo consultar binario local: {e}"))?;
     let Some(row) = rows
         .next()
@@ -4451,18 +5210,21 @@ fn save_local_fiscal_document(
     conn: &Connection,
     document: &OfflineFiscalDocument,
     input: &OfflineFiscalDocumentInput,
+    tenant_id: Option<&str>,
 ) -> Result<(), String> {
+    let tenant = tenant_scope(tenant_id);
     conn.execute(
         r#"
         INSERT OR REPLACE INTO local_fiscal_documents (
-            id, document_type, serie, numero, estado, cliente_ruc, cliente_nombre,
+            id, tenant_id, document_type, serie, numero, estado, cliente_ruc, cliente_nombre,
             moneda, subtotal, igv, total, source_type, source_id, xml_content,
             signed_xml, pdf_base64, hash, response_json, created_at, updated_at
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, NULL, ?18, ?18)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, NULL, ?19, ?19)
         "#,
         params![
             document.id,
+            tenant,
             document_type_code(&document.document_type),
             document.serie,
             document.numero,
@@ -4502,7 +5264,12 @@ fn create_local_fiscal_document_with_conn(
         .clone()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| default_series(&document.document_type).to_string());
-    let numero = reserve_local_fiscal_number(conn, &document.document_type, &serie)?;
+    let numero = reserve_local_fiscal_number(
+        conn,
+        &document.document_type,
+        &serie,
+        tenant_id.as_deref(),
+    )?;
     let xml = build_local_ubl_xml(config, &document, &serie, numero);
     let signed_xml = match (&config.certificado_path, &config.certificado_password) {
         (Some(path), Some(password)) if !path.trim().is_empty() && !password.is_empty() => {
@@ -4529,7 +5296,7 @@ fn create_local_fiscal_document_with_conn(
         hash,
         created_at: timestamp,
     };
-    save_local_fiscal_document(conn, &result, &document)?;
+    save_local_fiscal_document(conn, &result, &document, tenant_id.as_deref())?;
     let sync_items = normalize_fiscal_sync_items(&document.items);
 
     let queued_body = serde_json::to_string(&serde_json::json!({
@@ -4655,10 +5422,15 @@ async fn send_to_sunat(
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
     let hash = hash_base64(&signed_xml);
+    let tenant = tenant_id.as_deref();
     let local_fiscal_id: Option<String> = conn
         .query_row(
-            "SELECT id FROM local_fiscal_documents WHERE hash = ?1 LIMIT 1",
-            params![&hash],
+            r#"
+            SELECT id FROM local_fiscal_documents
+            WHERE hash = ?1 AND tenant_id = ?2
+            LIMIT 1
+            "#,
+            params![&hash, tenant_scope(tenant)],
             |row| row.get(0),
         )
         .ok();
@@ -4724,7 +5496,7 @@ async fn backup_database(app: AppHandle, backup_path: String) -> Result<(), Stri
         .prepare(
             r#"
             SELECT id, document_type, serie, numero, estado, cliente_ruc, cliente_nombre,
-                   moneda, subtotal, igv, total, source_type, source_id, hash, created_at
+                   tenant_id, moneda, subtotal, igv, total, source_type, source_id, hash, created_at
             FROM local_fiscal_documents
             ORDER BY created_at ASC
             "#,
@@ -4740,14 +5512,15 @@ async fn backup_database(app: AppHandle, backup_path: String) -> Result<(), Stri
                 "estado": row.get::<_, String>(4)?,
                 "cliente_ruc": row.get::<_, Option<String>>(5)?,
                 "cliente_nombre": row.get::<_, Option<String>>(6)?,
-                "moneda": row.get::<_, String>(7)?,
-                "subtotal": row.get::<_, f64>(8)?,
-                "igv": row.get::<_, f64>(9)?,
-                "total": row.get::<_, f64>(10)?,
-                "source_type": row.get::<_, Option<String>>(11)?,
-                "source_id": row.get::<_, Option<String>>(12)?,
-                "hash": row.get::<_, String>(13)?,
-                "created_at": row.get::<_, i64>(14)?,
+                "tenant_id": row.get::<_, String>(7)?,
+                "moneda": row.get::<_, String>(8)?,
+                "subtotal": row.get::<_, f64>(9)?,
+                "igv": row.get::<_, f64>(10)?,
+                "total": row.get::<_, f64>(11)?,
+                "source_type": row.get::<_, Option<String>>(12)?,
+                "source_id": row.get::<_, Option<String>>(13)?,
+                "hash": row.get::<_, String>(14)?,
+                "created_at": row.get::<_, i64>(15)?,
             }))
         })
         .map_err(|e| format!("No se pudo leer backup fiscal local: {e}"))?;
@@ -4761,8 +5534,8 @@ async fn backup_database(app: AppHandle, backup_path: String) -> Result<(), Stri
     let payload = serde_json::json!({
         "kind": "erp_desktop_offline_backup",
         "generated_at": now_ms(),
-        "config": config,
-        "offline_outbox": queue,
+        "config": redact_config_for_backup(config),
+        "offline_outbox": redact_queue_for_backup(queue),
         "local_fiscal_documents": fiscal_documents,
         "sqlite_path": sqlite_path,
         "note": "Backup local del cliente desktop. La base autoritativa sigue siendo backend/BD."
@@ -4773,22 +5546,31 @@ async fn backup_database(app: AppHandle, backup_path: String) -> Result<(), Stri
 }
 
 #[tauri::command]
-async fn export_sire_data(app: AppHandle, periodo: String) -> Result<String, String> {
+async fn export_sire_data(
+    app: AppHandle,
+    periodo: String,
+    tenant_id: Option<String>,
+) -> Result<String, String> {
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
     let period = periodo.trim();
+    let tenant = tenant_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .map(|_| tenant_scope(tenant_id.as_deref()));
     let mut stmt = conn
         .prepare(
             r#"
             SELECT document_type, serie, numero, cliente_ruc, cliente_nombre, moneda,
                    subtotal, igv, total, estado, hash, created_at
             FROM local_fiscal_documents
+            WHERE (?1 IS NULL OR tenant_id = ?1)
             ORDER BY created_at ASC
             "#,
         )
         .map_err(|e| format!("No se pudo preparar exportacion SIRE local: {e}"))?;
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(params![tenant], |row| {
             Ok(serde_json::json!({
                 "document_type": row.get::<_, String>(0)?,
                 "serie": row.get::<_, String>(1)?,
@@ -4845,10 +5627,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,
+            save_secure_access_token,
+            load_secure_access_token,
+            clear_secure_access_token,
             enqueue_offline_request,
             list_offline_requests,
             mark_offline_request_synced,

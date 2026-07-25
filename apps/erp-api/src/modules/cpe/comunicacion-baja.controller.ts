@@ -100,8 +100,7 @@ export class ComunicacionBajaController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
   ) {
-    // Reutilizar la misma lógica de envío
-    return this.comunicacionBajaService.enviarComunicacionBaja(id, tenantId, userId);
+    return this.comunicacionBajaService.enviarResumenDiario(id, tenantId, userId);
   }
 
   /**
@@ -118,6 +117,6 @@ export class ComunicacionBajaController {
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.comunicacionBajaService.consultarEstadoComunicacion(id, tenantId);
+    return this.comunicacionBajaService.consultarEstadoResumen(id, tenantId);
   }
 }

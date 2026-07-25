@@ -4,10 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { Download, Edit, FileText, Plus, RefreshCw, Send, XCircle, type LucideIcon } from 'lucide-react'
 import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { parseDateLocal } from '@/lib/date-utils'
 import DocumentoModal from '@/components/modals/DocumentoModal'
 import { apiSucceeded, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
 
 interface Documento {
@@ -51,17 +54,17 @@ const emptyStats: DocumentoStats = {
 }
 
 const inputClass =
-  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+  'w-full rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
-const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 const estadoClasses: Record<string, string> = {
-  BORRADOR: 'border-slate-400/30 bg-slate-400/10 text-slate-200',
-  EMITIDO: 'border-blue-300/30 bg-blue-300/10 text-blue-100',
-  ENVIADO_SUNAT: 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
-  ACEPTADO: 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
-  RECHAZADO: 'border-amber-300/30 bg-amber-300/10 text-amber-100',
-  ANULADO: 'border-slate-300/30 bg-slate-300/10 text-slate-100',
+  BORRADOR: 'border-border/30 bg-slate-400/10 text-foreground/90',
+  EMITIDO: 'border-blue-300/30 bg-blue-300/10 text-primary dark:text-blue-200',
+  ENVIADO_SUNAT: 'border-cyan-300/30 bg-cyan-300/10 text-primary',
+  ACEPTADO: 'border-cyan-300/30 bg-cyan-300/10 text-primary',
+  RECHAZADO: 'border-amber-300/30 bg-amber-300/10 text-amber-400 dark:text-amber-200',
+  ANULADO: 'border-border/30 bg-slate-300/10 text-foreground',
 }
 
 export default function DocumentosPage() {
@@ -71,6 +74,9 @@ export default function DocumentosPage() {
   const [stats, setStats] = useState<DocumentoStats | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDocumento, setSelectedDocumento] = useState<Documento | null>(null)
+  const [documentoAAnular, setDocumentoAAnular] = useState<Documento | null>(null)
+  const [motivoAnulacion, setMotivoAnulacion] = useState('')
+  const [anulando, setAnulando] = useState(false)
   const [filters, setFilters] = useState({
     tipo_documento: '',
     estado: '',
@@ -178,13 +184,25 @@ export default function DocumentosPage() {
     }
   }
 
-  const anularDocumento = async (documentoId: string, motivo: string) => {
-    const response = await postDocumentoAction(`/api/documentos/${documentoId}/anular`, { motivo })
-    if (apiSucceeded(response)) {
-      loadDocumentos()
-      showSuccessToast('Documento anulado correctamente')
-    } else {
-      showErrorToast(response?.message || 'Error al anular documento')
+  const anularDocumento = async () => {
+    if (!documentoAAnular || !motivoAnulacion.trim()) return
+
+    setAnulando(true)
+    try {
+      const response = await postDocumentoAction(
+        `/api/documentos/${documentoAAnular.id}/anular`,
+        { motivo: motivoAnulacion.trim() },
+      )
+      if (apiSucceeded(response)) {
+        setDocumentoAAnular(null)
+        setMotivoAnulacion('')
+        await loadData()
+        showSuccessToast('Documento y operaciones relacionadas anulados correctamente')
+      } else {
+        showErrorToast(response?.message || response?.error || 'Error al anular documento')
+      }
+    } finally {
+      setAnulando(false)
     }
   }
 
@@ -239,31 +257,31 @@ export default function DocumentosPage() {
 
   if (documentosLoading && documentos.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-950 p-5 text-slate-100">
-        <div className="mx-auto flex min-h-[420px] w-full max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-blue-950/30">
-          <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
-          <p className="text-sm text-slate-300">Cargando documentos...</p>
+      <div className="min-h-screen bg-background p-5 text-foreground">
+        <div className="mx-auto flex min-h-[420px] w-full max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-card/75 shadow-2xl shadow-blue-950/30">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Cargando documentos...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+        <section className="rounded-3xl border border-cyan-400/20 bg-card/80 p-5 shadow-2xl shadow-blue-950/30">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 ERP Document Center
               </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Gestion Documental y Facturacion Electronica</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-300">
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">Gestión Documental y Facturación Electrónica</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 Facturas, boletas, notas y contratos con validacion {country.servicioFiscal}.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={loadData} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+              <Button type="button" onClick={loadData} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
@@ -275,16 +293,16 @@ export default function DocumentosPage() {
           </div>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {statCards.map(({ label, value, description, icon: Icon }) => (
-            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex h-full items-start justify-between gap-3 p-4">
                 <div>
                   <div className={labelClass}>{label}</div>
-                  <div className="mt-3 text-2xl font-bold text-white">{value}</div>
-                  <div className="mt-1 text-xs text-cyan-100/55">{description}</div>
+                  <div className="mt-3 text-2xl font-bold text-foreground">{value}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{description}</div>
                 </div>
-                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-primary">
                   <Icon className="h-5 w-5" />
                 </span>
               </CardContent>
@@ -292,11 +310,11 @@ export default function DocumentosPage() {
           ))}
         </section>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
-            <CardTitle className="text-base text-white">Filtros de busqueda</CardTitle>
+            <CardTitle className="text-base text-foreground">Filtros de búsqueda</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[180px_180px_1fr_150px_150px_150px_auto] xl:items-end">
+          <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4 xl:items-end">
             <label className="space-y-2">
               <span className={labelClass}>Tipo</span>
               <select className={inputClass} value={filters.tipo_documento} onChange={(event) => setFilters((prev) => ({ ...prev, tipo_documento: event.target.value }))}>
@@ -336,18 +354,18 @@ export default function DocumentosPage() {
               <span className={labelClass}>Hasta</span>
               <input className={inputClass} type="date" value={filters.fecha_hasta} onChange={(event) => setFilters((prev) => ({ ...prev, fecha_hasta: event.target.value }))} />
             </label>
-            <Button type="button" onClick={clearFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+            <Button type="button" onClick={clearFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
               <XCircle className="h-4 w-4" />
               Limpiar
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="flex flex-col gap-3 border-b border-cyan-400/10 px-5 py-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle className="text-base text-white">Lista de documentos</CardTitle>
-              <p className="mt-1 text-sm text-slate-400">{documentos.length} registros cargados</p>
+              <CardTitle className="text-base text-foreground">Lista de documentos</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">{documentos.length} registros cargados</p>
             </div>
             <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <Plus className="h-4 w-4" />
@@ -358,8 +376,8 @@ export default function DocumentosPage() {
             {documentos.length === 0 && !documentosLoading ? (
               <div className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
                 <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
-                <h3 className="text-lg font-bold text-white">No hay documentos registrados</h3>
-                <p className="mt-2 text-sm text-slate-400">Comienza creando tu primer documento.</p>
+                <h3 className="text-lg font-bold text-foreground">No hay documentos registrados</h3>
+                <p className="mt-2 text-sm text-muted-foreground">Comienza creando tu primer documento.</p>
                 <Button type="button" onClick={() => setIsModalOpen(true)} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
                   <Plus className="h-4 w-4" />
                   Crear primer documento
@@ -368,7 +386,7 @@ export default function DocumentosPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1080px] border-collapse text-sm">
-                  <thead className="bg-slate-950/80 text-xs uppercase tracking-[0.12em] text-cyan-200/70">
+                  <thead className="bg-card/80 text-xs uppercase tracking-[0.12em] text-primary/80">
                     <tr>
                       <th className="px-4 py-3 text-left">Tipo</th>
                       <th className="px-4 py-3 text-left">Numero</th>
@@ -381,15 +399,15 @@ export default function DocumentosPage() {
                   </thead>
                   <tbody className="divide-y divide-cyan-400/10">
                     {documentos.map((documento) => (
-                      <tr key={documento.id} className="bg-slate-950/35 text-slate-200 transition hover:bg-slate-900/70">
-                        <td className="px-4 py-3 font-semibold text-slate-100">{getTipoDocumentoDisplay(documento.tipo_documento)}</td>
-                        <td className="px-4 py-3 font-mono font-semibold text-white">{documento.serie}-{documento.numero}</td>
-                        <td className="px-4 py-3 text-slate-300">{new Date(documento.fecha_emision).toLocaleDateString('es-PE')}</td>
+                      <tr key={documento.id} className="bg-card/35 text-foreground/90 transition hover:bg-card/70">
+                        <td className="px-4 py-3 font-semibold text-foreground">{getTipoDocumentoDisplay(documento.tipo_documento)}</td>
+                        <td className="px-4 py-3 font-mono font-semibold text-foreground">{documento.serie}-{documento.numero}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{parseDateLocal(documento.fecha_emision).toLocaleDateString('es-PE')}</td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-100">{documento.receptor_razon_social}</div>
-                          <div className="text-xs text-cyan-100/55">{documento.receptor_numero_doc}</div>
+                          <div className="font-semibold text-foreground">{documento.receptor_razon_social}</div>
+                          <div className="text-xs text-muted-foreground">{documento.receptor_numero_doc}</div>
                         </td>
-                        <td className="px-4 py-3 text-right font-bold text-cyan-50">{documento.moneda} {documento.total.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-bold text-primary">{documento.moneda} {documento.total.toFixed(2)}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${estadoClasses[documento.estado] || estadoClasses.BORRADOR}`}>
                             {getEstadoText(documento.estado)}
@@ -411,7 +429,7 @@ export default function DocumentosPage() {
                                     setIsModalOpen(true)
                                   }}
                                   variant="outline"
-                                  className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white"
+                                  className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground"
                                 >
                                   <Edit className="h-4 w-4" />
                                   Editar
@@ -426,11 +444,11 @@ export default function DocumentosPage() {
                             )}
                             {['ENVIADO_SUNAT', 'ACEPTADO'].includes(documento.estado) && (
                               <>
-                                <Button type="button" size="sm" onClick={() => descargarPDF(documento.id, `${documento.serie}-${documento.numero}.pdf`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+                                <Button type="button" size="sm" onClick={() => descargarPDF(documento.id, `${documento.serie}-${documento.numero}.pdf`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
                                   <Download className="h-4 w-4" />
                                   PDF
                                 </Button>
-                                <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+                                <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
                                   <Download className="h-4 w-4" />
                                   XML
                                 </Button>
@@ -441,11 +459,11 @@ export default function DocumentosPage() {
                                 type="button"
                                 size="sm"
                                 onClick={() => {
-                                  const motivo = prompt('Ingrese el motivo de anulacion:')
-                                  if (motivo) anularDocumento(documento.id, motivo)
+                                  setDocumentoAAnular(documento)
+                                  setMotivoAnulacion('')
                                 }}
                                 variant="outline"
-                                className="gap-1 border-slate-300/20 bg-slate-400/10 text-slate-100 hover:bg-slate-400/15 hover:text-white"
+                                className="gap-1 border-border/20 bg-slate-400/10 text-foreground hover:bg-slate-400/15 hover:text-foreground"
                               >
                                 <XCircle className="h-4 w-4" />
                                 Anular
@@ -462,6 +480,60 @@ export default function DocumentosPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={Boolean(documentoAAnular)}
+        onOpenChange={(open) => {
+          if (!open && !anulando) {
+            setDocumentoAAnular(null)
+            setMotivoAnulacion('')
+          }
+        }}
+      >
+        <DialogContent className="border-border bg-card text-card-foreground sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Anular documento fiscal</DialogTitle>
+            <DialogDescription>
+              {documentoAAnular
+                ? `Se generará la nota de crédito y se revertirán contabilidad, caja, inventario y cuentas relacionadas de ${documentoAAnular.serie}-${documentoAAnular.numero}.`
+                : 'Se ejecutará la anulación fiscal integral.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <label className="space-y-2">
+            <span className={labelClass}>Motivo de anulación</span>
+            <Textarea
+              aria-label="Motivo de anulación"
+              value={motivoAnulacion}
+              onChange={(event) => setMotivoAnulacion(event.target.value)}
+              placeholder="Ej. devolución total de la operación"
+              disabled={anulando}
+            />
+          </label>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={anulando}
+              onClick={() => {
+                setDocumentoAAnular(null)
+                setMotivoAnulacion('')
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={anulando || !motivoAnulacion.trim()}
+              onClick={anularDocumento}
+            >
+              {anulando ? 'Anulando...' : 'Confirmar anulación'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <DocumentoModal
         isOpen={isModalOpen}

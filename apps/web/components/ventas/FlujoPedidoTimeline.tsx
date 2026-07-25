@@ -90,16 +90,16 @@ export default function FlujoPedidoTimeline({
   usarFlujoLogistica
 }: FlujoPedidoTimelineProps) {
   const steps = usarFlujoLogistica ? FLUJO_COMPLETO : FLUJO_SIMPLE
-  
+
   // Handle canceled state
   if (estadoActual === EstadoPedido.CANCELADO) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex items-center gap-2 text-red-800">
+      <div className="bg-destructive/10 border border-red-200 rounded-lg p-4">
+        <div className="flex items-center gap-2 text-destructive">
           <Circle className="w-5 h-5" />
           <span className="font-semibold">Pedido Cancelado</span>
         </div>
-        <p className="text-sm text-red-600 mt-1">
+        <p className="text-sm text-destructive mt-1">
           Este pedido ha sido cancelado y el stock ha sido liberado.
         </p>
       </div>
@@ -118,22 +118,22 @@ export default function FlujoPedidoTimeline({
   const getStepIcon = (status: 'completed' | 'current' | 'upcoming') => {
     switch (status) {
       case 'completed':
-        return <CheckCircle className="w-5 h-5 text-green-600" />
+        return <CheckCircle className="w-5 h-5 text-emerald-400" />
       case 'current':
-        return <Clock className="w-5 h-5 text-blue-600" />
+        return <Clock className="w-5 h-5 text-primary" />
       case 'upcoming':
-        return <Circle className="w-5 h-5 text-gray-300" />
+        return <Circle className="w-5 h-5 text-muted-foreground" />
     }
   }
 
   const getStepColor = (status: 'completed' | 'current' | 'upcoming') => {
     switch (status) {
       case 'completed':
-        return 'text-green-600'
+        return 'text-emerald-400'
       case 'current':
-        return 'text-blue-600'
+        return 'text-primary'
       case 'upcoming':
-        return 'text-gray-400'
+        return 'text-muted-foreground'
     }
   }
 
@@ -149,11 +149,11 @@ export default function FlujoPedidoTimeline({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+    <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+      <h3 className="text-lg font-semibold text-foreground mb-4">
         Flujo del Pedido {usarFlujoLogistica ? '(Completo)' : '(Simplificado)'}
       </h3>
-      
+
       <div className="relative">
         {/* Timeline */}
         <div className="flex items-start justify-between">
@@ -166,9 +166,9 @@ export default function FlujoPedidoTimeline({
                 <div className="flex flex-col items-center">
                   {/* Icon */}
                   <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                    status === 'completed' ? 'border-green-600 bg-green-50' :
-                    status === 'current' ? 'border-blue-600 bg-blue-50' :
-                    'border-gray-300 bg-gray-50'
+                    status === 'completed' ? 'border-green-600 bg-emerald-500/10' :
+                    status === 'current' ? 'border-blue-600 bg-primary/10' :
+                    'border-border bg-muted/30'
                   }`}>
                     {getStepIcon(status)}
                   </div>
@@ -178,7 +178,7 @@ export default function FlujoPedidoTimeline({
                     <p className={`text-sm font-medium ${getStepColor(status)}`}>
                       {step.label}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {step.description}
                     </p>
                   </div>
@@ -199,18 +199,18 @@ export default function FlujoPedidoTimeline({
       </div>
 
       {/* Legend */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <div className="flex items-center justify-center gap-6 text-xs text-gray-600">
+      <div className="mt-6 pt-4 border-t border-border">
+        <div className="flex items-center justify-center gap-6 text-xs text-foreground/80">
           <div className="flex items-center gap-1">
-            <CheckCircle className="w-4 h-4 text-green-600" />
+            <CheckCircle className="w-4 h-4 text-emerald-400" />
             <span>Completado</span>
           </div>
           <div className="flex items-center gap-1">
-            <Clock className="w-4 h-4 text-blue-600" />
+            <Clock className="w-4 h-4 text-primary" />
             <span>Actual</span>
           </div>
           <div className="flex items-center gap-1">
-            <Circle className="w-4 h-4 text-gray-300" />
+            <Circle className="w-4 h-4 text-muted-foreground" />
             <span>Pendiente</span>
           </div>
         </div>

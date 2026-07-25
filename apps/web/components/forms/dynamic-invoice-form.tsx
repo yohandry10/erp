@@ -20,15 +20,15 @@ interface InvoiceData {
 }
 
 const DynamicInvoiceForm: React.FC = () => {
-  const { 
-    getLabel, 
-    formatCurrency, 
-    formatDate, 
+  const {
+    getLabel,
+    formatCurrency,
+    formatDate,
     country,
-    loading 
+    loading
   } = useCountryConfig();
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState<InvoiceData>({
     tipoDocumento: '',
     serie: '',
@@ -53,7 +53,7 @@ const DynamicInvoiceForm: React.FC = () => {
   const calculateTotals = () => {
     const impuestos = formData.totalGravadas * (country?.paisCodigo === 'PE' ? 0.18 : 0.19);
     const total = formData.totalGravadas + impuestos;
-    
+
     setFormData(prev => ({
       ...prev,
       totalImpuestos: impuestos,
@@ -63,7 +63,7 @@ const DynamicInvoiceForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       // Aquí iría la lógica de envío usando el servicio fiscal apropiado
       toast({
@@ -156,7 +156,7 @@ const DynamicInvoiceForm: React.FC = () => {
               <label className="text-sm font-medium">
                 {getLabel('total_impuestos', 'Total Impuestos')}
               </label>
-              <div className="p-2 bg-gray-50 rounded border">
+              <div className="p-2 bg-muted/30 rounded border">
                 {formatCurrency(formData.totalImpuestos)}
               </div>
             </div>
@@ -164,7 +164,7 @@ const DynamicInvoiceForm: React.FC = () => {
               <label className="text-sm font-medium">
                 {getLabel('importe_total', 'Importe Total')}
               </label>
-              <div className="p-2 bg-blue-50 rounded border font-semibold">
+              <div className="p-2 bg-primary/10 rounded border font-semibold">
                 {formatCurrency(formData.importeTotal)}
               </div>
             </div>

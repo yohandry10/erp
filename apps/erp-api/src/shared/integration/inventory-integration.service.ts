@@ -119,7 +119,8 @@ export class InventoryIntegrationService {
           valorTotal: item.total,
           usuarioId: 'system',
           referencia: venta.numeroTicket,
-          ventaId: venta.ventaId
+          ventaId: venta.ventaId,
+          almacenId: venta.almacenId ?? undefined,
         }, tenantId); // ✅ Pasar tenant_id
       }
 
@@ -159,7 +160,8 @@ export class InventoryIntegrationService {
           precioUnitario: item.precioUnitario,
           valorTotal: item.total,
           usuarioId: 'system',
-          referencia: compra.numeroOrden
+          referencia: compra.numeroOrden,
+          almacenId: compra.almacenId ?? undefined,
         }, tenantId); // ✅ Pasar tenant_id
       }
 
@@ -192,6 +194,9 @@ export class InventoryIntegrationService {
       }
       movimiento.cantidad = cantidadEntera;
       const almacenId = movimiento.almacenId ?? movimiento.almacen_id ?? null;
+      if (!almacenId) {
+        throw new BadRequestException('almacenId es obligatorio para todo movimiento físico de inventario');
+      }
       
       this.logger.log(`📦 [Inventario] [Tenant: ${currentTenantId}] Movimiento ${movimiento.tipoMovimiento} - ${movimiento.cantidad} unidades de ${movimiento.productoId}`); // HARDENING.
 
@@ -250,20 +255,18 @@ export class InventoryIntegrationService {
         return null;
       }
 
-      if (almacenId) {
-        const { data: almacen, error: almacenError } = await this.supabase.getClient()
-          .from('almacenes')
-          .select('id, activo')
-          .eq('tenant_id', currentTenantId)
-          .eq('id', almacenId)
-          .maybeSingle();
+      const { data: almacen, error: almacenError } = await this.supabase.getClient()
+        .from('almacenes')
+        .select('id, activo')
+        .eq('tenant_id', currentTenantId)
+        .eq('id', almacenId)
+        .maybeSingle();
 
-        if (almacenError) {
-          throw new BadRequestException(`No se pudo validar el almacén: ${almacenError.message}`);
-        }
-        if (!almacen || almacen.activo === false) {
-          throw new BadRequestException('Almacén inválido o inactivo para el movimiento de inventario');
-        }
+      if (almacenError) {
+        throw new BadRequestException(`No se pudo validar el almacén: ${almacenError.message}`);
+      }
+      if (!almacen || almacen.activo === false) {
+        throw new BadRequestException('Almacén inválido o inactivo para el movimiento de inventario');
       }
 
       if (movimiento.referencia) {
@@ -292,47 +295,44 @@ export class InventoryIntegrationService {
       const stockActual = parseFloat((producto as any).stock_actual || 0);
       movimiento.stockAnterior = stockActual;
 
-      // 2. Calcular nuevo stock según tipo de movimiento
-      let nuevoStock: number;
-      switch (movimiento.tipoMovimiento) {
-        case 'ENTRADA':
-          nuevoStock = stockActual + movimiento.cantidad;
-          break;
-        case 'SALIDA':
-          nuevoStock = stockActual - movimiento.cantidad;
-          if (nuevoStock < 0) {
-            throw new BadRequestException(
-              `Stock insuficiente para ${producto.nombre}. Disponible: ${stockActual}, solicitado: ${movimiento.cantidad}`,
-            );
+      const referenciaId = movimiento.ventaId && /^[0-9a-f-]{36}$/i.test(movimiento.ventaId)
+        ? movimiento.ventaId
+        : null;
+      const rpcName = movimiento.tipoMovimiento === 'AJUSTE'
+        ? 'ajustar_stock_en_almacen_tx'
+        : 'aplicar_movimiento_inventario_tx';
+      const rpcPayload = movimiento.tipoMovimiento === 'AJUSTE'
+        ? {
+            p_tenant_id: currentTenantId,
+            p_producto_id: producto.id,
+            p_almacen_id: almacenId,
+            p_delta: movimiento.cantidad,
+            p_referencia_tipo: 'INTEGRACION_AJUSTE',
+            p_referencia_id: referenciaId,
+            p_notas: movimiento.motivo,
+            p_metadata: { source: 'inventory_integration', external_reference: movimiento.referencia ?? null },
           }
-          break;
-        case 'AJUSTE':
-          nuevoStock = stockActual + movimiento.cantidad; // cantidad puede ser negativa
-          break;
-        default:
-          throw new Error(`Tipo de movimiento no válido: ${movimiento.tipoMovimiento}`);
+        : {
+            p_tenant_id: currentTenantId,
+            p_producto_id: producto.id,
+            p_almacen_id: almacenId,
+            p_tipo: movimiento.tipoMovimiento,
+            p_cantidad: movimiento.cantidad,
+            p_referencia_tipo: movimiento.ventaId ? 'VENTA' : 'INTEGRACION',
+            p_referencia_id: referenciaId,
+            p_notas: movimiento.motivo,
+            p_created_by: movimiento.usuarioId,
+            p_metadata: {
+              source: 'inventory_integration',
+              external_reference: movimiento.referencia ?? null,
+              costo_unitario: movimiento.precioUnitario,
+              valor_total: movimiento.valorTotal,
+            },
+          };
+      const { data: movimientoId, error: movimientoError } = await this.supabase.getClient().rpc(rpcName, rpcPayload);
+      if (movimientoError) {
+        throw new BadRequestException(`No se pudo aplicar el movimiento físico: ${movimientoError.message}`);
       }
-
-      movimiento.stockNuevo = nuevoStock;
-
-      // 3. Actualizar stock en tabla productos (usar ID del producto encontrado)
-      this.logger.debug(`📦 [Inventario] Actualizando stock producto ${producto.id}: actual=${stockActual}, nuevo=${nuevoStock}`);
-      
-      const { data: updateData, error: updateError } = await this.supabase.getClient()
-        .from('productos')
-        .update({
-          stock_actual: nuevoStock
-        })
-        .eq('id', producto.id)
-        .eq('tenant_id', currentTenantId)
-        .select();
-
-      if (updateError) {
-        this.logger.error('❌ [Inventario] Error actualizando stock del producto', this.formatError(updateError));
-        throw updateError;
-      }
-
-      this.logger.debug(`✅ [Inventario] Stock actualizado correctamente: ${JSON.stringify(updateData)}`);
       
       // VERIFICACIÓN ADICIONAL - Leer de nuevo el producto para confirmar
       const { data: verificacion } = await this.supabase.getClient()
@@ -343,27 +343,7 @@ export class InventoryIntegrationService {
         .single();
       
       this.logger.debug(`🔍 [Inventario] Verificación post actualización: ${JSON.stringify(verificacion)}`);
-
-      // 4. Registrar el movimiento en histórico usando las columnas correctas según Supabase
-      const { data: movimientoGuardado, error: movimientoError } = await this.supabase.getClient()
-        .from('stock_movimientos')
-        .insert({
-          tenant_id: currentTenantId, // ✅ MULTI-TENANT: Usar tenant actual
-          producto_id: producto.id, // Usar el ID del producto encontrado
-          tipo_movimiento: movimiento.tipoMovimiento,
-          cantidad: movimiento.cantidad,
-          motivo: movimiento.motivo,
-          referencia: movimiento.referencia || null,
-          usuario_id: null,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (movimientoError) {
-        this.logger.error('❌ [Inventario] Error registrando movimiento de stock', this.formatError(movimientoError));
-        throw movimientoError;
-      }
+      movimiento.stockNuevo = Number(verificacion?.stock_actual ?? stockActual);
 
       // 5. Emitir evento para otros módulos (contabilidad, finanzas)
       this.eventBus.emitMovimientoStock({
@@ -378,8 +358,8 @@ export class InventoryIntegrationService {
         tenantId: currentTenantId,
       }, currentTenantId);
 
-      this.logger.log(`✅ [Inventario] Movimiento registrado ${movimientoGuardado.id}`);
-      return movimientoGuardado.id;
+      this.logger.log(`✅ [Inventario] Movimiento canónico registrado ${movimientoId}`);
+      return String(movimientoId);
 
     } catch (error) {
       this.logger.error('❌ [Inventario] Error realizando movimiento de stock', this.formatError(error));

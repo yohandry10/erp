@@ -11,8 +11,8 @@ const proveedorSchema = z.object({
   ruc: z.string()
     .min(1, 'El RUC es requerido')
     .regex(/^\d+$/, 'El RUC debe contener solo números')
-    .refine((val) => val.length === 11 || val.length === 9, {
-      message: 'El RUC debe tener 11 dígitos (Perú) o 9 dígitos (Colombia)'
+    .refine((val) => val.length === 11, {
+      message: 'El RUC debe tener 11 dígitos'
     }),
   razon_social: z.string()
     .min(3, 'La razón social debe tener al menos 3 caracteres')
@@ -95,7 +95,7 @@ export function ProveedorForm({
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6" noValidate>
       {/* Información Básica */}
-      <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         <h3 className="text-[1.125rem] font-semibold mb-6 flex items-center gap-2">
           <Building2 size={20} />
           Información Básica
@@ -104,16 +104,16 @@ export function ProveedorForm({
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
           {/* RUC */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               RUC <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               {...register('ruc')}
-              placeholder="20123456789" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
+              placeholder="20123456789" className="w-[100%] p-3 rounded-lg text-[0.875rem]"
             />
             {errors.ruc && (
-              <p className="text-red-500 text-3 mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.ruc.message}
               </p>
             )}
@@ -121,16 +121,16 @@ export function ProveedorForm({
 
           {/* Razón Social */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Razón Social <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               {...register('razon_social')}
-              placeholder="DISTRIBUIDORA ABC S.A.C." className="w-[100%] p-3 rounded-2 text-[0.875rem]"
+              placeholder="DISTRIBUIDORA ABC S.A.C." className="w-[100%] p-3 rounded-lg text-[0.875rem]"
             />
             {errors.razon_social && (
-              <p className="text-red-500 text-3 mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.razon_social.message}
               </p>
             )}
@@ -138,16 +138,16 @@ export function ProveedorForm({
 
           {/* Nombre Comercial */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Nombre Comercial
             </label>
             <input
               type="text"
               {...register('nombre_comercial')}
-              placeholder="ABC Distribuidora" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
+              placeholder="ABC Distribuidora" className="w-[100%] p-3 rounded-lg text-[0.875rem]"
             />
             {errors.nombre_comercial && (
-              <p className="text-red-500 text-3 mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.nombre_comercial.message}
               </p>
             )}
@@ -155,21 +155,21 @@ export function ProveedorForm({
 
           {/* Email */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Email <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <Mail 
-                size={16} className="absolute left-3 top-[50%] -translate-y-1/2 text-gray-400" 
+              <Mail
+                size={16} className="absolute left-3 top-[50%] -translate-y-1/2 text-muted-foreground"
               />
               <input
                 type="email"
                 {...register('email')}
-                placeholder="contacto@abc.com" className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-2 text-[0.875rem]"
+                placeholder="contacto@abc.com" className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-lg text-[0.875rem]"
               />
             </div>
             {errors.email && (
-              <p className="text-red-500 text-3 mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.email.message}
               </p>
             )}
@@ -178,7 +178,7 @@ export function ProveedorForm({
       </div>
 
       {/* Información de Contacto */}
-      <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         <h3 className="text-[1.125rem] font-semibold mb-6 flex items-center gap-2">
           <User size={20} />
           Información de Contacto
@@ -187,16 +187,16 @@ export function ProveedorForm({
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
           {/* Contacto */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Nombre del Contacto
             </label>
             <input
               type="text"
               {...register('contacto')}
-              placeholder="Juan Pérez" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
+              placeholder="Juan Pérez" className="w-[100%] p-3 rounded-lg text-[0.875rem]"
             />
             {errors.contacto && (
-              <p className="text-red-500 text-3 mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.contacto.message}
               </p>
             )}
@@ -204,21 +204,21 @@ export function ProveedorForm({
 
           {/* Teléfono */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Teléfono
             </label>
             <div className="relative">
-              <Phone 
-                size={16} className="absolute left-3 top-[50%] -translate-y-1/2 text-gray-400" 
+              <Phone
+                size={16} className="absolute left-3 top-[50%] -translate-y-1/2 text-muted-foreground"
               />
               <input
                 type="text"
                 {...register('telefono')}
-                placeholder="+51 999 888 777" className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-2 text-[0.875rem]"
+                placeholder="+51 999 888 777" className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-lg text-[0.875rem]"
               />
             </div>
             {errors.telefono && (
-              <p className="text-red-500 text-3 mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.telefono.message}
               </p>
             )}
@@ -226,21 +226,21 @@ export function ProveedorForm({
 
           {/* Dirección */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Dirección
             </label>
             <div className="relative">
-              <MapPin 
-                size={16} className="absolute left-3 top-3 text-gray-400" 
+              <MapPin
+                size={16} className="absolute left-3 top-3 text-muted-foreground"
               />
               <textarea
                 {...register('direccion')}
                 placeholder="Av. Principal 123, Lima"
-                rows={2} className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-2 text-[0.875rem]"
+                rows={2} className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-lg text-[0.875rem]"
               />
             </div>
             {errors.direccion && (
-              <p className="text-red-500 text-3 mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.direccion.message}
               </p>
             )}
@@ -249,7 +249,7 @@ export function ProveedorForm({
       </div>
 
       {/* Condiciones Comerciales */}
-      <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         <h3 className="text-[1.125rem] font-semibold mb-6 flex items-center gap-2">
           <CreditCard size={20} />
           Condiciones Comerciales
@@ -258,11 +258,11 @@ export function ProveedorForm({
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
           {/* Condiciones de Pago */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Condiciones de Pago
             </label>
             <select
-              {...register('condiciones_pago')} className="w-[100%] p-3 rounded-2 text-[0.875rem] bg-white"
+              {...register('condiciones_pago')} className="w-[100%] p-3 rounded-lg text-[0.875rem] bg-card"
             >
               <option value="CONTADO">Contado</option>
               <option value="CREDITO_15">Crédito 15 días</option>
@@ -272,7 +272,7 @@ export function ProveedorForm({
               <option value="CREDITO_90">Crédito 90 días</option>
             </select>
             {errors.condiciones_pago && (
-              <p className="text-red-500 text-3 mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.condiciones_pago.message}
               </p>
             )}
@@ -280,23 +280,23 @@ export function ProveedorForm({
 
           {/* Límite de Crédito */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Límite de Crédito (PEN)
             </label>
             <input
               type="number"
               step="0.01"
               {...register('limite_credito', { valueAsNumber: true })}
-              placeholder="0.00" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
+              placeholder="0.00" className="w-[100%] p-3 rounded-lg text-[0.875rem]"
               disabled={condicionesPago === 'CONTADO'}
             />
             {errors.limite_credito && (
-              <p className="text-red-500 text-3 mt-1">
+              <p className="text-red-500 text-xs mt-1">
                 {errors.limite_credito.message}
               </p>
             )}
             {condicionesPago === 'CONTADO' && (
-              <p className="text-gray-500 text-3 mt-1">
+              <p className="text-muted-foreground text-xs mt-1">
                 No aplica para pagos al contado
               </p>
             )}
@@ -309,14 +309,14 @@ export function ProveedorForm({
         <button
           type="button"
           onClick={onCancel}
-          disabled={isLoading} className="py-3 px-6 rounded-2 border bg-white text-gray-700 text-[0.875rem] font-medium"
+          disabled={isLoading} className="py-3 px-6 rounded-lg border bg-card text-foreground/85 text-[0.875rem] font-medium"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={isLoading}
-          className="refresh-btn py-3 px-6"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 py-3 px-6"
         >
           {isLoading ? 'Guardando...' : submitLabel}
         </button>

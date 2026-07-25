@@ -1,0 +1,418 @@
+{
+  "createdAt": "2026-06-17T21:23:23.161Z",
+  "tenantId": "c0af84b5-5ea6-44a9-9e6e-a869f119b013",
+  "webBase": "http://localhost:3001",
+  "apiBase": "http://localhost:3002/api",
+  "total": 11,
+  "failed": 3,
+  "results": [
+    {
+      "role": "ADMIN_DEMO",
+      "route": "/dashboard/",
+      "finalPath": "/dashboard/",
+      "headings": [
+        "Dashboard ejecutivo",
+        "Flujo financiero y operacional",
+        "Mix fiscal",
+        "Actividad reciente",
+        "Radar ejecutivo",
+        "Configuración Incompleta"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "POS",
+        "Documentos",
+        "Contabilidad",
+        "Analytics",
+        "Inventario",
+        "CPE",
+        "GRE",
+        "Reportes SIRE",
+        "Compras",
+        "Ventas",
+        "Finanzas",
+        "Usuarios",
+        "RRHH",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 0,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [],
+      "consoleIssues": [],
+      "pageErrors": [],
+      "pass": true,
+      "sample": "N NEON ERP SUITE Dashboard POS Documentos Contabilidad Analytics Inventario CPE GRE Reportes SIRE Compras Ventas Finanzas Usuarios RRHH Configuración Offline Ayuda demo demo-c0af84b5@temp.local Cerrar Sesión Light Configuración Incompleta (67% completado) Faltan: Usuario SOL secundario, Clave SOL secundaria Completar Configuración Configuración Incompleta Tu configuración está 67% completa. Completa la configuración para usar todas las funcionalidades del sistema. Completar Configuración ERP COMMAND CENTER DATOS RE"
+    },
+    {
+      "role": "ADMIN",
+      "route": "/dashboard/usuarios/",
+      "finalPath": "/dashboard/usuarios/",
+      "headings": [
+        "Gestión de Usuarios",
+        "Usuarios totales",
+        "Usuarios activos",
+        "Roles definidos",
+        "Inactivos",
+        "Usuarios del Sistema",
+        "Roles y Permisos",
+        "ADMIN",
+        "ADMIN_DEMO",
+        "ALMACEN"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "POS",
+        "Documentos",
+        "Contabilidad",
+        "Analytics",
+        "Inventario",
+        "CPE",
+        "GRE",
+        "Reportes SIRE",
+        "Compras",
+        "Ventas",
+        "Finanzas",
+        "Usuarios",
+        "RRHH",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 0,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [],
+      "consoleIssues": [],
+      "pageErrors": [],
+      "pass": true,
+      "sample": "N NEON ERP SUITE Dashboard POS Documentos Contabilidad Analytics Inventario CPE GRE Reportes SIRE Compras Ventas Finanzas Usuarios RRHH Configuración Offline Ayuda aprobador aprobador-c0af84b5@temp.local Cerrar Sesión Light Gestión de Usuarios Administra usuarios, roles operativos y permisos del sistema con trazabilidad por tenant. Nuevo usuario USUARIOS TOTALES 11 Usuarios registrados USUARIOS ACTIVOS 11 Activos en el sistema ROLES DEFINIDOS 11 Roles configurados INACTIVOS 0 Usuarios inactivos Usuarios del Sistema"
+    },
+    {
+      "role": "GERENCIA",
+      "route": "/dashboard/analytics/",
+      "finalPath": "/dashboard/analytics/",
+      "headings": [
+        "Analytics Financiero",
+        "Evolución de ventas",
+        "Ventas por categoría",
+        "Maduración de cuentas (CxC vs CxP)"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "POS",
+        "Analytics",
+        "Inventario",
+        "Ventas",
+        "Finanzas",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 0,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [],
+      "consoleIssues": [],
+      "pageErrors": [],
+      "pass": true,
+      "sample": "N NEON ERP SUITE Dashboard Finanzas Offline Auditoría Ayuda QA GERENCIA qa-gerencia-c0af84b5@temp.local Cerrar Sesión Light Analytics Financiero Indicadores gerenciales, cuentas por cobrar, cuentas por pagar y tendencias del periodo. Semanal Mensual Trimestral Anual Aplicar Limpiar Exportar CSV LIQUIDEZ REVISAR 0.00 / 1.50 Avance al objetivo 0% RENTABILIDAD REVISAR 0.0% / 15.0% Avance al objetivo 0% CRECIMIENTO SIN DATOS 0.0% / 10.0% Avance al objetivo 0% EFICIENCIA OPERATIVA COMPOSITE 0.0x rotación / año Ciclo de "
+    },
+    {
+      "role": "COMPRAS",
+      "route": "/dashboard/compras/proveedores/",
+      "finalPath": "/dashboard/compras/proveedores/",
+      "headings": [
+        "Proveedores",
+        "TOTAL PROVEEDORES",
+        "ACTIVOS",
+        "INACTIVOS",
+        "No hay proveedores"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "Inventario",
+        "Compras",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 0,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [],
+      "consoleIssues": [],
+      "pageErrors": [],
+      "pass": true,
+      "sample": "N NEON ERP SUITE Dashboard Inventario Compras Offline Ayuda QA COMPRAS qa-compras-c0af84b5@temp.local Cerrar Sesión Light Proveedores Gestiona tu red de proveedores estratégicos Nuevo Proveedor TOTAL PROVEEDORES 0 Proveedores registrados ACTIVOS ✅ 0 Proveedores activos INACTIVOS ⏸️ 0 Proveedores inactivos Todos los estados Activos Inactivos Todas las condiciones Contado Crédito 7 días Crédito 15 días Crédito 30 días Crédito 45 días Crédito 60 días Crédito 90 días Importar Exportar Actualizar No hay proveedores Comi"
+    },
+    {
+      "role": "ALMACEN",
+      "route": "/dashboard/inventario/",
+      "finalPath": "/dashboard/inventario/",
+      "headings": [
+        "Inventario",
+        "Productos",
+        "Valor inventario",
+        "Stock crítico",
+        "Movimientos",
+        "Productos",
+        "Movimientos recientes"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "Inventario",
+        "Compras",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 0,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [],
+      "consoleIssues": [],
+      "pageErrors": [],
+      "pass": true,
+      "sample": "N NEON ERP SUITE Dashboard Inventario Compras Offline Ayuda QA ALMACEN qa-almacen-c0af84b5@temp.local Cerrar Sesión Light Inventario Control operativo de productos, stock crítico, recepciones y movimientos de kardex por tenant. ProductosRecepcionesKardex Actualizar PRODUCTOS 0 Activos registrados VALOR INVENTARIO S/ 0.00 Inventario valorizado STOCK CRÍTICO 0 Por debajo del mínimo MOVIMIENTOS 0 Registrados hoy Productos Filtros de operación sobre catálogo, stock crítico y última actualización. Todos Activos Inactivo"
+    },
+    {
+      "role": "VENDEDOR",
+      "route": "/dashboard/ventas/clientes/",
+      "finalPath": "/dashboard/ventas/clientes/",
+      "headings": [
+        "Clientes",
+        "TOTAL CLIENTES",
+        "No hay clientes"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "Documentos",
+        "CPE",
+        "Ventas",
+        "Finanzas",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 1,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [],
+      "consoleIssues": [],
+      "pageErrors": [],
+      "pass": true,
+      "sample": "N NEON ERP SUITE Dashboard Documentos CPE Ventas Finanzas Offline Ayuda QA VENDEDOR qa-vendedor-c0af84b5@temp.local Cerrar Sesión Light Dashboard Ventas Clientes Clientes Gestiona tu base de datos de clientes Nuevo Cliente TOTAL CLIENTES 0 Clientes registrados Todos los tipos Persona Empresa Importar Exportar Actualizar No hay clientes Usa el botón \"Nuevo Cliente\" en la parte superior para agregar tu primer cliente"
+    },
+    {
+      "role": "CAJERO",
+      "route": "/dashboard/pos/",
+      "finalPath": "/dashboard/pos/",
+      "headings": [
+        "CAJA CERRADA"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "POS",
+        "Documentos",
+        "CPE",
+        "Finanzas",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 0,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [
+        {
+          "status": 403,
+          "url": "/api/configuration/gre-thresholds/"
+        },
+        {
+          "status": 403,
+          "url": "/api/configuration/gre-thresholds/"
+        }
+      ],
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        },
+        {
+          "type": "warning",
+          "text": "⚠️ Configuración incompleta: [Usuario SOL secundario, Clave SOL secundaria]"
+        }
+      ],
+      "pageErrors": [],
+      "pass": false,
+      "sample": "N NEON ERP SUITE Dashboard POS Documentos CPE Finanzas Offline Ayuda QA CAJERO qa-cajero-c0af84b5@temp.local Cerrar Sesión Light CAJA CERRADA Para usar el sistema POS, primero debe abrir la caja registradora con el monto inicial Abrir Caja Registradora"
+    },
+    {
+      "role": "FINANZAS",
+      "route": "/dashboard/finanzas/",
+      "finalPath": "/dashboard/finanzas/cxc/",
+      "headings": [
+        "Cuentas por Cobrar",
+        "Filtros operativos",
+        "No hay cuentas por cobrar"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "Finanzas",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 0,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": true,
+      "stillLoading": false,
+      "apiErrors": [
+        {
+          "status": 403,
+          "url": "/api/ventas/clientes/?limit=1000"
+        },
+        {
+          "status": 403,
+          "url": "/api/ventas/clientes/?limit=1000"
+        }
+      ],
+      "consoleIssues": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        }
+      ],
+      "pageErrors": [],
+      "pass": false,
+      "sample": "N NEON ERP SUITE Dashboard Finanzas Offline Ayuda QA FINANZAS qa-finanzas-c0af84b5@temp.local Cerrar Sesión Light ERP RECEIVABLES Cuentas por Cobrar CxC generadas desde ventas con cobros, notas de credito, reprogramaciones e historial. Actualizar Exportar TOTAL 0 Cuentas registradas PENDIENTES 0 Por cobrar VENCIDAS 0 Atrasadas SALDO TOTAL S/ 0.00 Pendiente por cobrar Filtros operativos BUSCAR ESTADO Todos Pendiente Parcial Vencido Cancelado CLIENTE Todos DESDE HASTA No hay cuentas por cobrar Las CxC se generan auto"
+    },
+    {
+      "role": "CONTADOR",
+      "route": "/dashboard/contabilidad/",
+      "finalPath": "/dashboard/contabilidad/",
+      "headings": [
+        "Contabilidad",
+        "Vistas contables",
+        "Registro de Compras",
+        "Radar operativo contable",
+        "Control de consistencia",
+        "Flujos contables principales"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "Documentos",
+        "Contabilidad",
+        "Inventario",
+        "CPE",
+        "Compras",
+        "Finanzas",
+        "RRHH",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 0,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [],
+      "consoleIssues": [],
+      "pageErrors": [],
+      "pass": true,
+      "sample": "N NEON ERP SUITE Dashboard Documentos Contabilidad CPE Finanzas Offline Ayuda QA CONTADOR qa-contador-c0af84b5@temp.local Cerrar Sesión Light ERP LEDGER CENTER Contabilidad Libros, balances y registros contables conectados a operaciones reales del ERP. VISTAS CONTABLES Estado de Resultados Análisis financiero y rentabilidad operativa. Registro de Compras Detalle tributario y contable de adquisiciones. Balance de Comprobación Validación de saldos, debe y haber. Kardex Valorizado Control valorizado de inventario. Lib"
+    },
+    {
+      "role": "RRHH",
+      "route": "/dashboard/rrhh/",
+      "finalPath": "/dashboard/rrhh/",
+      "headings": [
+        "Recursos Humanos",
+        "Total empleados",
+        "Activos",
+        "Departamentos",
+        "Nuevos ingresos",
+        "Planillas",
+        "Asistencia",
+        "Contratos",
+        "Candidatos",
+        "Pagos"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "Contabilidad",
+        "GRE",
+        "RRHH",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 0,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [],
+      "consoleIssues": [],
+      "pageErrors": [],
+      "pass": true,
+      "sample": "N NEON ERP SUITE Dashboard Contabilidad Offline Ayuda QA RRHH qa-rrhh-c0af84b5@temp.local Cerrar Sesión Light Recursos Humanos Operación diaria de empleados, contratos, asistencia, pagos y planillas. Agregar empleado TOTAL EMPLEADOS 0 Personal registrado ACTIVOS 0 Personal en actividad DEPARTAMENTOS 0 Áreas organizacionales NUEVOS INGRESOS 0 Últimos 30 días Planillas Cálculo de sueldos y beneficios Asistencia Control de horarios y marcaciones Contratos Gestión de contratos laborales Candidatos Reclutamiento y selec"
+    },
+    {
+      "role": "AUDITOR",
+      "route": "/dashboard/audit-logs/",
+      "finalPath": "/dashboard/audit-logs/",
+      "headings": [
+        "Logs de Auditoría",
+        "Filtros",
+        "Registros (58)"
+      ],
+      "visibleMenu": [
+        "Dashboard",
+        "POS",
+        "Finanzas",
+        "Usuarios",
+        "Offline",
+        "Ayuda"
+      ],
+      "expectedRoleInToken": true,
+      "loginRateLimitWaits": 1,
+      "hasLogin": false,
+      "hasDenied": false,
+      "hasApiErrorText": false,
+      "stillLoading": false,
+      "apiErrors": [],
+      "consoleIssues": [],
+      "pageErrors": [],
+      "pass": false,
+      "sample": "N NEON ERP SUITE Dashboard Finanzas Offline Auditoría Ayuda QA AUDITOR qa-auditor-c0af84b5@temp.local Cerrar Sesión Light Logs de Auditoría Trazabilidad completa de cambios críticos, usuarios, documentos y operaciones. Actualizar Filtros BUSCAR TABLA Todas las tablas Logins Eventos POS Auditoría de Caja Integraciones Clientes Proveedores Órdenes de Compra Recepciones Pedidos de Venta Comprobantes Electrónicos Guías de Remisión Asientos Contables Movimientos Bancarios Cuentas por Cobrar Cuentas por Pagar Usuarios Ro"
+    }
+  ]
+}

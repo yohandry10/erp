@@ -94,7 +94,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
     const Icon = config.icon
 
     return (
-      <span className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-full text-3 font-semibold">
+      <span className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-full text-xs font-semibold">
         <Icon size={14} />
         {config.label}
       </span>
@@ -108,9 +108,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
 
   if (loading) {
     return (
-      <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="flex items-center gap-3 mb-6 pb-4">
-          <div className="w-10 h-10 rounded-2.5 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
+          <div className="w-10 h-10 rounded-[0.625rem] bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
             <CheckCircle size={20} />
           </div>
           <h2 className="text-[1.125rem] font-bold text-[var(--primary-800)] m-0">
@@ -118,7 +118,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
           </h2>
         </div>
         <div className="text-center p-8 text-[var(--primary-400)]">
-          <div className="loading-spinner"></div>
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p className="text-[0.875rem]">Cargando aprobaciones...</p>
         </div>
       </div>
@@ -127,9 +127,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
 
   if (error) {
     return (
-      <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="flex items-center gap-3 mb-6 pb-4">
-          <div className="w-10 h-10 rounded-2.5 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
+          <div className="w-10 h-10 rounded-[0.625rem] bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
             <CheckCircle size={20} />
           </div>
           <h2 className="text-[1.125rem] font-bold text-[var(--primary-800)] m-0">
@@ -149,16 +149,16 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
   const rechazadas = aprobaciones.filter(a => a.estado === 'RECHAZADA').length
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       <div className="flex items-center gap-3 mb-6 pb-4">
-        <div className="w-10 h-10 rounded-2.5 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
+        <div className="w-10 h-10 rounded-[0.625rem] bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
           <CheckCircle size={20} />
         </div>
         <div className="flex-[1]">
           <h2 className="text-[1.125rem] font-bold text-[var(--primary-800)] m-0">
             Aprobaciones
           </h2>
-          <p className="text-3 text-[var(--primary-500)] m-0">
+          <p className="text-xs text-[var(--primary-500)] m-0">
             {aprobadas} de {aprobaciones.length} aprobadas
           </p>
         </div>
@@ -166,29 +166,29 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
 
       {/* Summary Stats */}
       <div className="grid grid-cols-[repeat(3,_1fr)] gap-3 mb-6">
-        <div className="p-3 rounded-2 bg-[var(--amber-50)] border">
-          <div className="text-3 text-[var(--amber-600)] mb-1">
+        <div className="p-3 rounded-lg bg-[var(--amber-50)] border">
+          <div className="text-xs text-[var(--amber-600)] mb-1">
             Pendientes
           </div>
-          <div className="text-6 font-bold text-[var(--amber-600)]">
+          <div className="text-2xl font-bold text-[var(--amber-600)]">
             {pendientes}
           </div>
         </div>
 
-        <div className="p-3 rounded-2 bg-[var(--emerald-50)] border">
-          <div className="text-3 text-[var(--emerald-600)] mb-1">
+        <div className="p-3 rounded-lg bg-[var(--emerald-50)] border">
+          <div className="text-xs text-[var(--emerald-600)] mb-1">
             Aprobadas
           </div>
-          <div className="text-6 font-bold text-[var(--emerald-600)]">
+          <div className="text-2xl font-bold text-[var(--emerald-600)]">
             {aprobadas}
           </div>
         </div>
 
-        <div className="p-3 rounded-2 bg-[var(--red-500)10] border">
-          <div className="text-3 text-[var(--red-500)] mb-1">
+        <div className="p-3 rounded-lg bg-[var(--red-500)10] border">
+          <div className="text-xs text-[var(--red-500)] mb-1">
             Rechazadas
           </div>
-          <div className="text-6 font-bold text-[var(--red-500)]">
+          <div className="text-2xl font-bold text-[var(--red-500)]">
             {rechazadas}
           </div>
         </div>
@@ -198,10 +198,10 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
       {aprobaciones.length > 0 && (
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-3 font-semibold text-[var(--primary-600)]">
+            <span className="text-xs font-semibold text-[var(--primary-600)]">
               Progreso de Aprobación
             </span>
-            <span className="text-3 font-bold text-[var(--emerald-600)]">
+            <span className="text-xs font-bold text-[var(--emerald-600)]">
               {((aprobadas / aprobaciones.length) * 100).toFixed(0)}%
             </span>
           </div>
@@ -215,18 +215,18 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
       <div className="flex flex-col gap-3">
         {aprobaciones.map((aprobacion) => (
           <div
-            key={aprobacion.id} className="p-4 rounded-2 bg-[var(--primary-50)] border transition"
+            key={aprobacion.id} className="p-4 rounded-lg bg-[var(--primary-50)] border transition"
           >
             <div className="flex justify-between items-start mb-3">
               <div className="flex items-center gap-2 flex-[1]">
-                <div className="w-8 h-8 rounded-full bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)] text-3 font-semibold">
+                <div className="w-8 h-8 rounded-full bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)] text-xs font-semibold">
                   <User size={16} />
                 </div>
                 <div className="flex-[1]">
                   <div className="text-[0.875rem] font-semibold text-[var(--primary-800)]">
                     {aprobacion.aprobador_nombre}
                   </div>
-                  <div className="text-3 text-[var(--primary-500)]">
+                  <div className="text-xs text-[var(--primary-500)]">
                     Nivel {aprobacion.nivel}
                   </div>
                 </div>
@@ -235,19 +235,19 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
             </div>
 
             {aprobacion.fecha_aprobacion && (
-              <div className="flex items-center gap-1.5 mb-2 text-3 text-[var(--primary-600)]">
+              <div className="flex items-center gap-1.5 mb-2 text-xs text-[var(--primary-600)]">
                 <Calendar size={12} />
                 {formatDate(aprobacion.fecha_aprobacion)}
               </div>
             )}
 
             {aprobacion.comentarios && (
-              <div className="mt-3 p-3 rounded-[6px] bg-white border">
-                <div className="flex items-center gap-1.5 mb-1.5 text-3 font-semibold text-[var(--primary-600)]">
+              <div className="mt-3 p-3 rounded-[6px] bg-card border">
+                <div className="flex items-center gap-1.5 mb-1.5 text-xs font-semibold text-[var(--primary-600)]">
                   <MessageSquare size={12} />
                   Comentarios
                 </div>
-                <p className="text-3 text-[var(--primary-700)] m-0 leading-6">
+                <p className="text-xs text-[var(--primary-700)] m-0 leading-6">
                   {aprobacion.comentarios}
                 </p>
               </div>

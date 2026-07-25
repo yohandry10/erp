@@ -175,14 +175,15 @@ Esta guía establece los estándares de UX para todas las páginas del módulo F
 ## 📐 Estructura de Página Estándar
 
 ### 1. Header
-- Título principal (dashboard-title)
-- Subtítulo descriptivo (dashboard-subtitle)
+- Título principal con tipografía Tailwind semántica
+- Subtítulo descriptivo con `text-muted-foreground`
 - Botones de acción (Actualizar, Crear Nuevo, etc.)
 
 ### 2. Stats Section
 - 4 tarjetas de estadísticas clave
 - Grid responsive (auto-fit, minmax(250px, 1fr))
 - Iconos representativos con colores consistentes
+- Superficies con `bg-card`, `text-card-foreground` y `border-border`
 
 ### 3. Alerts Section (opcional)
 - Alertas de vencimientos

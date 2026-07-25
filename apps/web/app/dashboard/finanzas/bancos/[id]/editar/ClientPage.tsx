@@ -28,7 +28,7 @@ export default function EditarCuentaBancariaPage() {
   const router = useRouter()
   const params = useParams()
   const { get, put } = useApi()
-  
+
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -46,13 +46,13 @@ export default function EditarCuentaBancariaPage() {
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await get(`/api/finanzas/bancos/cuentas/${params.id}`)
-      
+
       if (response?.success && response.data) {
         const data = response.data
         setCuenta(data)
-        
+
         // Populate form fields
         setNombre(data.nombre || '')
         setBanco(data.banco || '')
@@ -134,9 +134,9 @@ export default function EditarCuentaBancariaPage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando cuenta bancaria...</p>
         </div>
       </div>
@@ -145,15 +145,15 @@ export default function EditarCuentaBancariaPage() {
 
   if (error && !cuenta) {
     return (
-      <div className="dashboard-container">
-        <div className="activity-section">
-          <div className="activity-card">
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
+          <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+            <div className="bg-destructive/10 border border-red-200 text-destructive px-4 py-3 rounded-lg text-sm">
               {error}
             </div>
             <button
               onClick={() => router.back()}
-              className="mt-4 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              className="mt-4 px-4 py-2 border border-border rounded-lg text-foreground/85 hover:bg-muted/30"
             >
               Volver
             </button>
@@ -164,43 +164,43 @@ export default function EditarCuentaBancariaPage() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-2"
+            className="flex items-center gap-2 text-foreground/80 hover:text-foreground mb-2"
           >
             <ArrowLeft size={20} />
             Volver
           </button>
-          <h1 className="dashboard-title">Editar Cuenta Bancaria</h1>
-          <p className="dashboard-subtitle">Actualiza la información de la cuenta bancaria</p>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Editar Cuenta Bancaria</h1>
+          <p className="mt-2 text-base text-muted-foreground">Actualiza la información de la cuenta bancaria</p>
         </div>
       </div>
 
       {/* Form */}
-      <div className="activity-section">
-        <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
+            <div className="bg-destructive/10 border border-red-200 text-destructive px-4 py-3 rounded-lg text-sm mb-6">
               {error}
             </div>
           )}
 
           {/* Info Alert */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="bg-primary/10 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
               <div className="flex-1">
-                <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                <h4 className="text-sm font-semibold text-primary mb-1">
                   Información de la Cuenta
                 </h4>
-                <div className="text-sm text-blue-800 space-y-1">
+                <div className="text-sm text-primary space-y-1">
                   <p><strong>Moneda:</strong> {cuenta?.moneda}</p>
                   <p><strong>Saldo Actual:</strong> {formatCurrency(cuenta?.saldo || 0, cuenta?.moneda)}</p>
-                  <p className="text-xs text-blue-700 mt-2">
+                  <p className="text-xs text-primary mt-2">
                     Nota: El saldo no se puede modificar directamente. Se actualiza automáticamente mediante movimientos bancarios.
                   </p>
                 </div>
@@ -211,15 +211,15 @@ export default function EditarCuentaBancariaPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Información Básica */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Building2 size={20} className="text-blue-600" />
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Building2 size={20} className="text-primary" />
                 Información Básica
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Nombre */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <FileText className="inline h-4 w-4 mr-1" />
                     Nombre de la Cuenta *
                   </label>
@@ -228,17 +228,17 @@ export default function EditarCuentaBancariaPage() {
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
                     placeholder="Ej: Cuenta Operaciones BCP"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Nombre descriptivo para identificar la cuenta
                   </p>
                 </div>
 
                 {/* Banco */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <Building2 className="inline h-4 w-4 mr-1" />
                     Banco *
                   </label>
@@ -247,14 +247,14 @@ export default function EditarCuentaBancariaPage() {
                     value={banco}
                     onChange={(e) => setBanco(e.target.value)}
                     placeholder="Ej: Banco de Crédito del Perú"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
 
                 {/* Número de Cuenta */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <Hash className="inline h-4 w-4 mr-1" />
                     Número de Cuenta *
                   </label>
@@ -263,21 +263,21 @@ export default function EditarCuentaBancariaPage() {
                     value={numeroCuenta}
                     onChange={(e) => setNumeroCuenta(e.target.value)}
                     placeholder="Ej: 191-1234567-0-89"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
 
                 {/* Tipo de Cuenta */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <CreditCard className="inline h-4 w-4 mr-1" />
                     Tipo de Cuenta *
                   </label>
                   <select
                     value={tipoCuenta}
                     onChange={(e) => setTipoCuenta(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
                     {TIPOS_CUENTA.map((tipo) => (
@@ -292,10 +292,10 @@ export default function EditarCuentaBancariaPage() {
 
             {/* Opciones */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-foreground mb-4">
                 Opciones
               </h3>
-              
+
               <div className="space-y-3">
                 {/* Permite Sobregiro */}
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -303,13 +303,13 @@ export default function EditarCuentaBancariaPage() {
                     type="checkbox"
                     checked={permiteSobregiro}
                     onChange={(e) => setPermiteSobregiro(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-primary border-border rounded focus:ring-blue-500"
                   />
                   <div>
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-foreground/85">
                       Permite Sobregiro
                     </span>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       Permite que el saldo de la cuenta sea negativo
                     </p>
                   </div>
@@ -321,13 +321,13 @@ export default function EditarCuentaBancariaPage() {
                     type="checkbox"
                     checked={activa}
                     onChange={(e) => setActiva(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-primary border-border rounded focus:ring-blue-500"
                   />
                   <div>
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-foreground/85">
                       Cuenta Activa
                     </span>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       Solo las cuentas activas pueden recibir movimientos
                     </p>
                   </div>
@@ -341,7 +341,7 @@ export default function EditarCuentaBancariaPage() {
                 type="button"
                 onClick={() => router.back()}
                 disabled={submitting}
-                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 border border-border rounded-lg text-foreground/85 hover:bg-muted/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>

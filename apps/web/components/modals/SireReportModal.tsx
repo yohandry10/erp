@@ -40,16 +40,16 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     console.log('📊 Enviando datos para generar reporte SIRE:', formData)
     const response = await api.post('/api/sire/generar-reporte', formData)
-    
+
     if (response && response.success) {
       console.log('✅ Reporte SIRE generado exitosamente:', response.data)
-      
+
       // Mostrar toast de éxito
       showToast(`✅ ${response.message || 'Reporte SIRE generado exitosamente'}`)
-      
+
       onSuccess()
       onClose()
       setFormData({
@@ -60,7 +60,7 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
         formato: 'TXT',
         incluirAnulados: false
       })
-      
+
       // Force reload after 1.5 seconds to show updated status
       setTimeout(() => {
         console.log('🔄 Recargando datos después de crear reporte...')
@@ -68,7 +68,7 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
       }, 1500)
     } else {
       console.log('❌ Error al generar reporte SIRE:', response)
-      
+
       // Mostrar error
       showToast(`❌ ${response?.message || 'Error al generar reporte SIRE'}`)
     }
@@ -85,12 +85,12 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
   if (!isOpen) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]">
-      <div className="bg-white rounded-3 p-8 w-[90%] max-w-[500px] overflow-auto">
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1100]">
+      <div className="bg-card rounded-xl p-8 w-[90%] max-w-[500px] overflow-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-6 font-semibold text-gray-800">Generar Reporte SIRE</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Generar Reporte SIRE</h2>
           <button
-            onClick={onClose} className="border-0 text-6 cursor-pointer text-gray-500"
+            onClick={onClose} className="border-0 text-2xl cursor-pointer text-muted-foreground"
           >
             ×
           </button>
@@ -99,14 +99,14 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col gap-4 mb-6">
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Tipo de Reporte *
               </label>
               <select
                 name="tipoReporte"
                 value={formData.tipoReporte}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               >
                 <option value="REGISTRO_VENTAS">Registro de Ventas</option>
                 <option value="REGISTRO_COMPRAS">Registro de Compras</option>
@@ -116,7 +116,7 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Período *
               </label>
               <input
@@ -124,45 +124,45 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
                 name="periodo"
                 value={formData.periodo}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
 
             <div className="grid grid-cols-[1fr_1fr] gap-4">
               <div>
-                <label className="block mb-2 font-semibold text-gray-700">
+                <label className="block mb-2 font-semibold text-foreground/85">
                   Fecha Inicio
                 </label>
                 <input
                   type="date"
                   name="fechaInicio"
                   value={formData.fechaInicio}
-                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-gray-700">
+                <label className="block mb-2 font-semibold text-foreground/85">
                   Fecha Fin
                 </label>
                 <input
                   type="date"
                   name="fechaFin"
                   value={formData.fechaFin}
-                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-gray-700">
+              <label className="block mb-2 font-semibold text-foreground/85">
                 Formato *
               </label>
               <select
                 name="formato"
                 value={formData.formato}
                 onChange={handleChange}
-                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
+                required className="w-[100%] p-3 border rounded-[6px] text-sm"
               >
                 <option value="TXT">TXT</option>
                 <option value="XML">XML</option>
@@ -178,7 +178,7 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
                 onChange={handleChange}
                 id="incluirAnulados" className="w-auto"
               />
-              <label htmlFor="incluirAnulados" className="font-semibold text-gray-700 cursor-pointer">
+              <label htmlFor="incluirAnulados" className="font-semibold text-foreground/85 cursor-pointer">
                 Incluir documentos anulados
               </label>
             </div>
@@ -187,7 +187,7 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
           <div className="flex gap-4 justify-end">
             <button
               type="button"
-              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-semibold"
+              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-card text-foreground/85 cursor-pointer font-semibold"
             >
               Cancelar
             </button>

@@ -96,7 +96,7 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
   const isDueSoon = daysUntilDue >= 0 && daysUntilDue <= 7
 
   return (
-    <div className="rounded-3 p-5 shadow border transition relative overflow-hidden"
+    <div className="rounded-xl p-5 shadow border transition relative overflow-hidden"
       onMouseEnter={(e) => {
         if (onClick) {
           e.currentTarget.style.transform = 'translateY(-4px)'
@@ -120,7 +120,7 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
         <div className="text-[0.875rem] font-bold text-[var(--primary-800)] mb-1">
           {cuenta.numero_documento}
         </div>
-        <div className="text-3 text-[var(--primary-500)]">
+        <div className="text-xs text-[var(--primary-500)]">
           {cuenta.tipo_documento}
         </div>
       </div>
@@ -131,17 +131,17 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
           {cuenta.proveedores?.razon_social || 'Proveedor N/A'}
         </div>
         {cuenta.proveedores?.ruc && (
-          <div className="text-3 text-[var(--primary-500)]">
+          <div className="text-xs text-[var(--primary-500)]">
             RUC: {cuenta.proveedores.ruc}
           </div>
         )}
       </div>
 
       {/* Amounts */}
-      <div className="rounded-2 p-3 mb-3"
+      <div className="rounded-lg p-3 mb-3"
       >
         <div className="flex justify-between mb-2">
-          <div className="text-3 text-[var(--primary-600)]">
+          <div className="text-xs text-[var(--primary-600)]">
             Total
           </div>
           <div className="text-[0.875rem] font-bold text-[var(--primary-800)]">
@@ -149,17 +149,17 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
           </div>
         </div>
         <div className="flex justify-between">
-          <div className="text-3 text-[var(--primary-600)]">
+          <div className="text-xs text-[var(--primary-600)]">
             Saldo
           </div>
-          <div className="text-4 font-bold">
+          <div className="text-base font-bold">
             {formatCurrency(cuenta.saldo, cuenta.moneda)}
           </div>
         </div>
       </div>
 
       {/* Due Date */}
-      <div className="flex items-center gap-2 text-3 mb-3">
+      <div className="flex items-center gap-2 text-xs mb-3">
         <Clock size={14} className="text-[var(--primary-500)]" />
         <div>
           <span className="text-[var(--primary-500)]">Vence: </span>
@@ -171,7 +171,7 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
 
       {/* Overdue Warning */}
       {(isOverdue || isDueSoon) && cuenta.estado !== 'PAGADA' && cuenta.estado !== 'ANULADA' && (
-        <div className="p-2 rounded-[6px] text-3 font-semibold mb-3 flex items-center gap-2">
+        <div className="p-2 rounded-[6px] text-xs font-semibold mb-3 flex items-center gap-2">
           <AlertCircle size={14} />
           {isOverdue 
             ? `Vencido hace ${Math.abs(daysUntilDue)} días`
@@ -182,7 +182,7 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
 
       {/* Status Badge */}
       <div className="flex items-center justify-between pt-3 border-t">
-        <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-medium text-white">
+        <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-xs font-medium text-white">
           <Icon size={14} />
           {config?.label || cuenta.estado}
         </span>
@@ -192,7 +192,7 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
             onClick={(e) => {
               e.stopPropagation()
               onClick()
-            }} className="py-2 px-4 rounded-[6px] border-0 bg-[var(--blue-500)] text-white cursor-pointer text-3 font-semibold flex items-center gap-1 transition"
+            }} className="py-2 px-4 rounded-[6px] border-0 bg-[var(--blue-500)] text-white cursor-pointer text-xs font-semibold flex items-center gap-1 transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--blue-600)'
             }}

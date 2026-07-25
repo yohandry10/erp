@@ -181,8 +181,10 @@ describe('PedidosService (cancelación)', () => {
     await expect(service.cancelarPedido('pedido-1', 'tenant-1', 'motivo')).resolves.toEqual({ success: true });
 
     expect(updateEstadoSpy).toHaveBeenCalledTimes(2);
-    expect(mockSupabaseClient.__spies.insert).toHaveBeenCalledTimes(1); // 2do intento dedupe por movimiento existente
-    expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1); // no debe decrementar dos veces
+    expect(mockSupabaseClient.__spies.insert).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(2);
+    expect(mockSupabaseClient.rpc).toHaveBeenNthCalledWith(1, 'liberar_reservas_pedido_tx', expect.any(Object));
+    expect(mockSupabaseClient.rpc).toHaveBeenNthCalledWith(2, 'liberar_reservas_pedido_tx', expect.any(Object));
   });
 
   it('bloquea cancelar pedidos facturados', async () => {
@@ -196,4 +198,3 @@ describe('PedidosService (cancelación)', () => {
     await expect(service.cancelarPedido('pedido-1', 'tenant-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 });
-

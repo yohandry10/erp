@@ -39,9 +39,9 @@ export default function ClienteDetallePage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando cliente...</p>
         </div>
       </div>
@@ -53,35 +53,35 @@ export default function ClienteDetallePage() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div className="flex items-center gap-4 mb-4">
           <button
-            onClick={() => router.push('/dashboard/ventas/clientes')} className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
+            onClick={() => router.push('/dashboard/ventas/clientes')} className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-card/80 border cursor-pointer transition"
           >
             <ArrowLeft className="w-4 h-4" />
             Volver
           </button>
           <button
             onClick={() => router.push(`/dashboard/ventas/clientes/${clienteId}/editar`)}
-            className="refresh-btn"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
           >
             <Edit size={16} />
             Editar
           </button>
         </div>
         <div>
-          <h1 className="dashboard-title">{cliente.razon_social}</h1>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">{cliente.razon_social}</h1>
           {cliente.nombre_comercial && (
-            <p className="dashboard-subtitle">{cliente.nombre_comercial}</p>
+            <p className="mt-2 text-base text-muted-foreground">{cliente.nombre_comercial}</p>
           )}
         </div>
       </div>
 
       {/* Information Card */}
-      <div className="activity-card mb-8">
-        <h2 className="text-6 font-semibold mb-6 text-[var(--primary-900)]">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
+        <h2 className="text-2xl font-semibold mb-6 text-[var(--primary-900)]">
           Información General
         </h2>
 
@@ -99,14 +99,14 @@ export default function ClienteDetallePage() {
             <label className="text-[0.875rem] font-medium text-[var(--primary-600)] block mb-2">
               Tipo de Documento
             </label>
-            <p className="text-4 text-[var(--primary-900)]">{cliente.documento_tipo}</p>
+            <p className="text-base text-[var(--primary-900)]">{cliente.documento_tipo}</p>
           </div>
 
           <div>
             <label className="text-[0.875rem] font-medium text-[var(--primary-600)] block mb-2">
               Número de Documento
             </label>
-            <p className="text-4 font-semibold text-[var(--primary-900)]">
+            <p className="text-base font-semibold text-[var(--primary-900)]">
               {cliente.numero_documento}
             </p>
           </div>
@@ -117,7 +117,7 @@ export default function ClienteDetallePage() {
                 <MapPin size={16} />
                 Dirección
               </label>
-              <p className="text-4 text-[var(--primary-900)]">{cliente.direccion}</p>
+              <p className="text-base text-[var(--primary-900)]">{cliente.direccion}</p>
             </div>
           )}
 
@@ -127,7 +127,7 @@ export default function ClienteDetallePage() {
                 <Mail size={16} />
                 Email
               </label>
-              <p className="text-4 text-[var(--primary-900)]">{cliente.email}</p>
+              <p className="text-base text-[var(--primary-900)]">{cliente.email}</p>
             </div>
           )}
 
@@ -137,7 +137,7 @@ export default function ClienteDetallePage() {
                 <Phone size={16} />
                 Teléfono
               </label>
-              <p className="text-4 text-[var(--primary-900)]">{cliente.telefono}</p>
+              <p className="text-base text-[var(--primary-900)]">{cliente.telefono}</p>
             </div>
           )}
         </div>

@@ -52,7 +52,7 @@ export default function PeriodoDetailPage() {
     try {
       setLoading(true)
       setError(null)
-      
+
       const result = await apiCall(`/contabilidad/periodos/${periodoId}`)
       setPeriodo(result?.data)
     } catch (err) {
@@ -121,11 +121,11 @@ export default function PeriodoDetailPage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="flex items-center justify-center p-12 bg-white rounded-3">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="flex items-center justify-center p-12 bg-card rounded-xl">
           <div className="text-center">
             <div className="w-12 h-12 rounded-full" />
-            <p className="text-gray-500">Cargando período...</p>
+            <p className="text-muted-foreground">Cargando período...</p>
           </div>
         </div>
       </div>
@@ -134,8 +134,8 @@ export default function PeriodoDetailPage() {
 
   if (error || !periodo) {
     return (
-      <div className="dashboard-container">
-        <div className="p-8 bg-[#fee2e2] border rounded-3 text-red-800">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="p-8 bg-[#fee2e2] border rounded-xl text-destructive">
           <p className="m-0 font-semibold">⚠️ {error || 'Período no encontrado'}</p>
           <button
             onClick={() => router.push('/dashboard/contabilidad/periodos')} className="mt-4 py-2 px-4 bg-red-600 text-white border-0 rounded-[6px] cursor-pointer font-semibold"
@@ -150,12 +150,12 @@ export default function PeriodoDetailPage() {
   const estadoColor = getEstadoColor(periodo.estado)
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
           <button
-            onClick={() => router.push('/dashboard/contabilidad/periodos')} className="inline-flex items-center gap-2 py-2 px-4 bg-transparent text-slate-500 border-0 rounded-2 cursor-pointer font-semibold text-[0.875rem] mb-4 transition"
+            onClick={() => router.push('/dashboard/contabilidad/periodos')} className="inline-flex items-center gap-2 py-2 px-4 bg-transparent text-muted-foreground border-0 rounded-lg cursor-pointer font-semibold text-[0.875rem] mb-4 transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(100, 116, 139, 0.1)'
               e.currentTarget.style.color = '#334155'
@@ -168,15 +168,15 @@ export default function PeriodoDetailPage() {
             <ArrowLeft size={16} />
             Volver a Períodos
           </button>
-          <h1 className="dashboard-title">Período Contable</h1>
-          <p className="dashboard-subtitle">
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Período Contable</h1>
+          <p className="mt-2 text-base text-muted-foreground">
             {formatPeriodo(periodo.anio, periodo.mes)}
           </p>
         </div>
         <div className="flex gap-4">
           {periodo.estado === 'ABIERTO' && (
             <button
-              onClick={() => setShowWizard(true)} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-2 cursor-pointer font-semibold text-[0.875rem] transition shadow"
+              onClick={() => setShowWizard(true)} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-lg cursor-pointer font-semibold text-[0.875rem] transition shadow"
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-2px)'
                 e.currentTarget.style.boxShadow = '0 10px 15px -3px rgb(0 0 0 / 0.1)'
@@ -201,7 +201,7 @@ export default function PeriodoDetailPage() {
                   onConfirm: handleReabrirPeriodo
                 })
               }}
-              disabled={reopening} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-2 font-semibold text-[0.875rem] transition shadow"
+              disabled={reopening} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-lg font-semibold text-[0.875rem] transition shadow"
               onMouseEnter={(e) => {
                 if (!reopening) {
                   e.currentTarget.style.transform = 'translateY(-2px)'
@@ -221,15 +221,15 @@ export default function PeriodoDetailPage() {
       </div>
 
       {/* Period Info Card */}
-      <div className="bg-white rounded-3 shadow overflow-hidden mb-8">
+      <div className="bg-card rounded-xl shadow overflow-hidden mb-8">
         <div className="p-8 border-b">
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-8">
             {/* Estado */}
             <div>
-              <p className="mt-0 mr-0 mb-2 ml-0 text-3 font-bold text-gray-500">
+              <p className="mt-0 mr-0 mb-2 ml-0 text-xs font-bold text-muted-foreground">
                 Estado
               </p>
-              <div className="inline-flex items-center gap-2 py-2 px-4 rounded-2 text-[0.875rem] font-semibold">
+              <div className="inline-flex items-center gap-2 py-2 px-4 rounded-lg text-[0.875rem] font-semibold">
                 {getEstadoIcon(periodo.estado)}
                 {periodo.estado}
               </div>
@@ -237,20 +237,20 @@ export default function PeriodoDetailPage() {
 
             {/* Año */}
             <div>
-              <p className="mt-0 mr-0 mb-2 ml-0 text-3 font-bold text-gray-500">
+              <p className="mt-0 mr-0 mb-2 ml-0 text-xs font-bold text-muted-foreground">
                 Año
               </p>
-              <p className="m-0 text-6 font-bold text-gray-800">
+              <p className="m-0 text-2xl font-bold text-foreground">
                 {periodo.anio}
               </p>
             </div>
 
             {/* Mes */}
             <div>
-              <p className="mt-0 mr-0 mb-2 ml-0 text-3 font-bold text-gray-500">
+              <p className="mt-0 mr-0 mb-2 ml-0 text-xs font-bold text-muted-foreground">
                 Mes
               </p>
-              <p className="m-0 text-6 font-bold text-gray-800">
+              <p className="m-0 text-2xl font-bold text-foreground">
                 {String(periodo.mes).padStart(2, '0')}
               </p>
             </div>
@@ -258,10 +258,10 @@ export default function PeriodoDetailPage() {
             {/* Fecha de Cierre */}
             {periodo.fecha_cierre && (
               <div>
-                <p className="mt-0 mr-0 mb-2 ml-0 text-3 font-bold text-gray-500">
+                <p className="mt-0 mr-0 mb-2 ml-0 text-xs font-bold text-muted-foreground">
                   Fecha de Cierre
                 </p>
-                <p className="m-0 text-4 font-semibold text-gray-800">
+                <p className="m-0 text-base font-semibold text-foreground">
                   {new Date(periodo.fecha_cierre).toLocaleDateString('es-PE', {
                     year: 'numeric',
                     month: 'long',
@@ -274,22 +274,22 @@ export default function PeriodoDetailPage() {
         </div>
 
         {/* Additional Info */}
-        <div className="py-6 px-8 bg-[#f9fafb]">
+        <div className="py-6 px-8 bg-muted">
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-6">
             <div>
-              <p className="mt-0 mr-0 mb-1 ml-0 text-3 font-semibold text-gray-500">
+              <p className="mt-0 mr-0 mb-1 ml-0 text-xs font-semibold text-muted-foreground">
                 ID del Período
               </p>
-              <p className="m-0 text-[0.875rem] font-medium text-gray-800">
+              <p className="m-0 text-[0.875rem] font-medium text-foreground">
                 {periodo.id}
               </p>
             </div>
 
             <div>
-              <p className="mt-0 mr-0 mb-1 ml-0 text-3 font-semibold text-gray-500">
+              <p className="mt-0 mr-0 mb-1 ml-0 text-xs font-semibold text-muted-foreground">
                 Fecha de Creación
               </p>
-              <p className="m-0 text-[0.875rem] font-medium text-gray-800">
+              <p className="m-0 text-[0.875rem] font-medium text-foreground">
                 {new Date(periodo.created_at).toLocaleDateString('es-PE', {
                   year: 'numeric',
                   month: 'short',
@@ -300,10 +300,10 @@ export default function PeriodoDetailPage() {
 
             {periodo.cerrado_por && (
               <div>
-                <p className="mt-0 mr-0 mb-1 ml-0 text-3 font-semibold text-gray-500">
+                <p className="mt-0 mr-0 mb-1 ml-0 text-xs font-semibold text-muted-foreground">
                   Cerrado Por
                 </p>
-                <p className="m-0 text-[0.875rem] font-medium text-gray-800">
+                <p className="m-0 text-[0.875rem] font-medium text-foreground">
                   {periodo.cerrado_por}
                 </p>
               </div>
@@ -313,24 +313,24 @@ export default function PeriodoDetailPage() {
       </div>
 
       {/* Info Box */}
-      <div className="p-6 rounded-3">
+      <div className="p-6 rounded-xl">
         <div className="flex items-start gap-3">
           {periodo.estado === 'ABIERTO' ? (
-            <CheckCircle size={24} className="text-emerald-600 shrink-0 mt-0.5" />
+            <CheckCircle size={24} className="text-emerald-400 shrink-0 mt-0.5" />
           ) : (
-            <Lock size={24} className="text-blue-600 shrink-0 mt-0.5" />
+            <Lock size={24} className="text-primary shrink-0 mt-0.5" />
           )}
           <div>
-            <h4 className="mt-0 mr-0 mb-2 ml-0 text-4 font-semibold">
-              {periodo.estado === 'ABIERTO' 
-                ? 'Período Abierto' 
+            <h4 className="mt-0 mr-0 mb-2 ml-0 text-base font-semibold">
+              {periodo.estado === 'ABIERTO'
+                ? 'Período Abierto'
                 : periodo.estado === 'CERRADO'
                 ? 'Período Cerrado'
                 : 'Período Bloqueado'
               }
             </h4>
             <p className="m-0 text-[0.875rem] leading-7">
-              {periodo.estado === 'ABIERTO' 
+              {periodo.estado === 'ABIERTO'
                 ? 'Este período está abierto y permite el registro de nuevos asientos contables. Puedes cerrarlo cuando hayas terminado todas las operaciones del mes.'
                 : periodo.estado === 'CERRADO'
                 ? 'Este período está cerrado y no permite el registro de nuevos asientos contables. Solo un superadministrador puede reabrirlo.'

@@ -1,7 +1,7 @@
 /**
  * Item Limit Warning Component
  * Requirements: 15.3, 19.5
- * 
+ *
  * Displays a warning when approaching or reaching the 999 item limit
  */
 
@@ -67,13 +67,13 @@ export function ItemCountBadge({ itemCount, className }: ItemCountBadgeProps) {
   const { validation, remainingCount } = useItemLimit(itemCount)
 
   // Determine color based on remaining items
-  let colorClass = 'bg-gray-100 text-gray-700'
+  let colorClass = 'bg-muted text-foreground/85'
   if (!validation.isValid) {
-    colorClass = 'bg-red-100 text-red-700'
+    colorClass = 'bg-destructive/10 text-destructive'
   } else if (remainingCount <= 10) {
-    colorClass = 'bg-yellow-100 text-yellow-700'
+    colorClass = 'bg-amber-500/10 text-amber-400'
   } else if (remainingCount <= 50) {
-    colorClass = 'bg-blue-100 text-blue-700'
+    colorClass = 'bg-primary/10 text-primary'
   }
 
   return (

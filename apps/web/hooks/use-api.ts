@@ -7,6 +7,7 @@ import { customAuth } from '@/lib/auth-service'
 import { apiSucceeded, getApiErrorMessage, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
 import { buildApiUrl, normalizeApiEndpoint, withTrailingSlash } from '@/lib/api-url'
 import { fetchWithOfflineSupport, isOfflineCachedResponse, isOfflineQueuedResponse } from '@/lib/offline-store'
+import { INITIAL_ACTIVE_COUNTRY_ID, isInitialActiveCountryId } from '@/lib/initial-country'
 
 interface ApiResponse<T> {
   data?: T
@@ -32,6 +33,23 @@ interface ApiRequestOptions extends RequestInit {
 
 const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
+// Evita que decenas de requests paralelas repitan la redirección cuando la
+// demo expira: solo la primera navega a /demo/convert.
+let demoExpiredRedirectInFlight = false
+
+async function handleDemoExpired() {
+  if (demoExpiredRedirectInFlight) return
+  demoExpiredRedirectInFlight = true
+  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/demo')) {
+    try {
+      await customAuth.signOut()
+    } catch {
+      /* la sesión demo ya no es utilizable; continuamos igual */
+    }
+    window.location.href = '/demo?expired=1'
+  }
+}
+
 function resolveMethod(options: ApiRequestOptions): string {
   return String(options.method || 'GET').toUpperCase()
 }
@@ -48,7 +66,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     data: undefined,
   })
   const [loading, setLoading] = useState(false)
-  
+
   const { toast } = useToast()
   const { loading: authLoading, session } = useAuth()
   const {
@@ -83,7 +101,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         const { data } = await customAuth.getSession()
         resolvedSession = data.session || resolvedSession
       }
-      
+
       // Agregar prefijo /api si el endpoint no lo tiene
       const normalizedEndpoint = normalizeApiEndpoint(endpoint)
 
@@ -101,7 +119,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
 
       const baseUrl = buildApiUrl(normalizedEndpoint)
       const url = buildUrl(baseUrl, options.params)
-      
+
       // Headers base - convertir options.headers a objeto plano si es necesario
       const optionsHeaders: Record<string, string> = {}
       const rawHeaders = options.headers
@@ -114,24 +132,29 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       } else if (rawHeaders) {
         Object.assign(optionsHeaders, rawHeaders as Record<string, string>)
       }
-      
+
       const headers: Record<string, string> = {
         ...(resolvedSession?.access_token ? { Authorization: `Bearer ${resolvedSession.access_token}` } : {}),
         ...optionsHeaders,
+      }
+      if (resolvedSession?.user?.tenant_id && !headers['x-tenant-id'] && !headers['X-Tenant-Id']) {
+        headers['x-tenant-id'] = resolvedSession.user.tenant_id
       }
       if (!isFormDataBody && !headers['Content-Type'] && !headers['content-type']) {
         headers['Content-Type'] = 'application/json'
       }
 
-      // Inyección automática del país (si existe en localStorage)
+      // Inyección automática del país inicial activo (Peru/SUNAT).
       try {
         if (typeof window !== 'undefined') {
           const storedCountryId = window.localStorage.getItem('selectedCountry')
-          if (storedCountryId && /^\d+$/.test(storedCountryId)) {
-            // Solo lo añadimos si el caller no lo envió ya
-            if (!headers['x-country-id']) {
-              headers['x-country-id'] = storedCountryId
-            }
+          const countryId = isInitialActiveCountryId(storedCountryId)
+            ? storedCountryId || INITIAL_ACTIVE_COUNTRY_ID
+            : INITIAL_ACTIVE_COUNTRY_ID
+
+          // Solo lo añadimos si el caller no lo envió ya
+          if (!headers['x-country-id']) {
+            headers['x-country-id'] = countryId
           }
         }
       } catch {
@@ -140,7 +163,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
 
       // Excluir headers/params de options para evitar conflictos
       const { headers: _, params: __, ...restOptions } = options
-      
+
       const method = resolveMethod(options)
       const maxAttempts = resolveAttempts(method, retries)
       let attempt = 0
@@ -186,6 +209,12 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
           // Handle 403 Forbidden - show permission error
           if (response.status === 403) {
             const errorData = await response.json().catch(() => ({}))
+            // Demo vencida: cortar aquí y llevar al usuario al flujo de
+            // renovación/conversión en vez de dejar el dashboard en bucle de 403s.
+            if (errorData.error === 'DEMO_EXPIRED') {
+              await handleDemoExpired()
+              throw new Error('Tu demo ha expirado. Crea una nueva demo o convierte tu cuenta.')
+            }
             const errorMessage = errorData.message || 'You do not have permission to perform this action'
             throw new Error(errorMessage)
           }
@@ -224,20 +253,20 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
           }
 
           const result: any = await response.json()
-          
+
           // Contrato de lectura:
           // - endpoints nuevos: { success, data, message }
           // - endpoints legacy: array/objeto crudo
           // `success: "false"` nunca se trata como truthy.
           const success = apiSucceeded(result)
-          
+
           if (!success) {
             throw new Error(getApiErrorMessage(result, 'API call failed'))
           }
 
           const responseData = unwrapApiData<T>(result)
           setState({ success: true, data: responseData })
-          
+
           if (showSuccessToast) {
             toast({
               title: 'Éxito',
@@ -266,7 +295,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
       setState({ success: false, data: undefined })
-      
+
       if (showErrorToast) {
         toast({
           variant: 'destructive',
@@ -283,7 +312,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     } finally {
       setLoading(false)
     }
-  }, [toast, authLoading, session?.access_token, showErrorToast, showSuccessToast, retries, timeoutMs, throwOnError])
+  }, [toast, authLoading, session?.access_token, session?.user?.tenant_id, showErrorToast, showSuccessToast, retries, timeoutMs, throwOnError])
 
   // Métodos helper
   const get = useCallback((endpoint: string, reqOptions?: ApiRequestOptions) => {

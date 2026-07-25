@@ -379,7 +379,7 @@ export function UserList() {
                             ) : (
                               <DropdownMenuItem
                                 onClick={() => handleActivate(user.id)}
-                                className="text-green-600"
+                                className="text-emerald-400"
                               >
                                 <CheckCircle className="h-4 w-4 mr-2" />
                                 Activate

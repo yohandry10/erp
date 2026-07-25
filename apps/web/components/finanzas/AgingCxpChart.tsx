@@ -110,9 +110,9 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
 
   if (loading) {
     return (
-      <div className="activity-card p-8 text-center">
-        <div className="loading-spinner"></div>
-        <p className="text-gray-500">Cargando reporte de aging...</p>
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8 text-center">
+        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
+        <p className="text-muted-foreground">Cargando reporte de aging...</p>
       </div>
     )
   }
@@ -128,12 +128,12 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
 
   if (!agingData || resumen.total.cantidad === 0) {
     return (
-      <div className="activity-card p-8 text-center">
-        <BarChart3 size={48} className="text-gray-400" />
-        <h3 className="text-[1.125rem] font-semibold mb-2 text-gray-700">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8 text-center">
+        <BarChart3 size={48} className="text-muted-foreground" />
+        <h3 className="text-[1.125rem] font-semibold mb-2 text-foreground/85">
           No hay cuentas vencidas
         </h3>
-        <p className="text-gray-500">
+        <p className="text-muted-foreground">
           Todas las cuentas por pagar están al día
         </p>
       </div>
@@ -184,22 +184,22 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
   ]
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       {/* Header */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b">
         <div className="flex items-center gap-3">
           <BarChart3 size={24} className="text-blue-500" />
           <div>
-            <h3 className="text-[1.125rem] font-semibold text-gray-900">
+            <h3 className="text-[1.125rem] font-semibold text-foreground">
               Aging de Cuentas por Pagar
             </h3>
-            <p className="text-[0.875rem] text-gray-500 mt-1">
+            <p className="text-[0.875rem] text-muted-foreground mt-1">
               Antigüedad de deudas vencidas
             </p>
           </div>
         </div>
         <button
-          onClick={loadAgingData} className="py-2 px-4 rounded-[6px] border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
+          onClick={loadAgingData} className="py-2 px-4 rounded-[6px] border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
         >
           <RefreshCw size={16} />
           Actualizar
@@ -208,11 +208,11 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-8">
-        <div className="p-4 rounded-2 text-white">
-          <div className="text-3 font-semibold opacity-[0.9]">
+        <div className="p-4 rounded-lg text-white">
+          <div className="text-xs font-semibold opacity-[0.9]">
             Total Vencido
           </div>
-          <div className="text-7 font-bold mt-2">
+          <div className="text-[1.75rem] font-bold mt-2">
             {formatCurrency(resumen.total.monto)}
           </div>
           <div className="text-[0.875rem] mt-1 opacity-[0.9]">
@@ -220,14 +220,14 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
           </div>
         </div>
 
-        <div className="p-4 rounded-2 bg-[rgba(239,_68,_68,_0.1)] border">
-          <div className="text-3 font-semibold text-red-800">
+        <div className="p-4 rounded-lg bg-destructive/10 border">
+          <div className="text-xs font-semibold text-destructive">
             Más Crítico (+90 días)
           </div>
-          <div className="text-6 font-bold mt-2 text-red-600">
+          <div className="text-2xl font-bold mt-2 text-destructive">
             {formatCurrency(resumen.rango_mas_90.monto)}
           </div>
-          <div className="text-[0.875rem] mt-1 text-red-800">
+          <div className="text-[0.875rem] mt-1 text-destructive">
             {resumen.rango_mas_90.cantidad} cuenta{resumen.rango_mas_90.cantidad !== 1 ? 's' : ''}
           </div>
         </div>
@@ -235,18 +235,18 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
 
       {/* Aging Bars */}
       <div className="mb-8">
-        <h4 className="text-[0.875rem] font-semibold text-gray-700 mb-4">
+        <h4 className="text-[0.875rem] font-semibold text-foreground/85 mb-4">
           Distribución por Antigüedad
         </h4>
         <div className="flex flex-col gap-4">
           {ranges.map((range, index) => (
             <div key={index}>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-[0.875rem] font-medium text-gray-700">
+                <span className="text-[0.875rem] font-medium text-foreground/85">
                   {range.label}
                 </span>
                 <div className="flex items-center gap-4">
-                  <span className="text-3 text-gray-500">
+                  <span className="text-xs text-muted-foreground">
                     {range.cantidad} cuenta{range.cantidad !== 1 ? 's' : ''}
                   </span>
                   <span className="text-[0.875rem] font-semibold">
@@ -257,7 +257,7 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
               <div className="w-[100%] h-8 rounded-[6px] overflow-hidden relative">
                 <div className="h-[100%] transition flex items-center justify-end pr-3">
                   {range.percentage > 15 && (
-                    <span className="text-3 font-semibold text-white">
+                    <span className="text-xs font-semibold text-white">
                       {range.percentage.toFixed(0)}%
                     </span>
                   )}
@@ -273,7 +273,7 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={18} className="text-red-500" />
-            <h4 className="text-[0.875rem] font-semibold text-gray-700">
+            <h4 className="text-[0.875rem] font-semibold text-foreground/85">
               Proveedores con Mayor Deuda Vencida
             </h4>
           </div>
@@ -281,22 +281,22 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
             <table className="w-[100%]">
               <thead>
                 <tr>
-                  <th className="text-left p-3 font-semibold text-3 text-gray-500">
+                  <th className="text-left p-3 font-semibold text-xs text-muted-foreground">
                     Proveedor
                   </th>
-                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
+                  <th className="text-right p-3 font-semibold text-xs text-muted-foreground">
                     0-30
                   </th>
-                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
+                  <th className="text-right p-3 font-semibold text-xs text-muted-foreground">
                     31-60
                   </th>
-                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
+                  <th className="text-right p-3 font-semibold text-xs text-muted-foreground">
                     61-90
                   </th>
-                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
+                  <th className="text-right p-3 font-semibold text-xs text-muted-foreground">
                     +90
                   </th>
-                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
+                  <th className="text-right p-3 font-semibold text-xs text-muted-foreground">
                     Total
                   </th>
                 </tr>
@@ -308,7 +308,7 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
                       <div className="text-[0.875rem] font-medium">
                         {proveedor.proveedor_razon_social}
                       </div>
-                      <div className="text-3 text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         RUC: {proveedor.proveedor_ruc} • {proveedor.cantidad_cxp} cuenta{proveedor.cantidad_cxp !== 1 ? 's' : ''}
                       </div>
                     </td>
@@ -324,7 +324,7 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
                     <td className="p-3 text-right text-[0.875rem] font-semibold">
                       {proveedor.rango_mas_90 > 0 ? formatCurrency(proveedor.rango_mas_90) : '-'}
                     </td>
-                    <td className="p-3 text-right text-[0.875rem] font-bold text-gray-900">
+                    <td className="p-3 text-right text-[0.875rem] font-bold text-foreground">
                       {formatCurrency(proveedor.total)}
                     </td>
                   </tr>

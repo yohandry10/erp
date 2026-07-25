@@ -8,6 +8,31 @@ export interface ParsedCertificateInfo {
   validTo: Date;
 }
 
+function unwrapSerializedNodeBuffer(buffer: Buffer): Buffer {
+  // Versiones anteriores enviaban un Buffer directamente a postgrest-js. Al
+  // serializar JSON terminaba persistido como {"type":"Buffer","data":[...]}
+  // dentro de bytea. Lo reconocemos para no invalidar certificados existentes.
+  if (buffer[0] !== 0x7b) {
+    return buffer;
+  }
+
+  try {
+    const parsed = JSON.parse(buffer.toString('utf8'));
+    if (parsed?.type === 'Buffer' && Array.isArray(parsed.data)) {
+      return Buffer.from(parsed.data);
+    }
+  } catch {
+    // No era JSON: devolver los bytes originales.
+  }
+
+  return buffer;
+}
+
+/** Serialización explícita aceptada por PostgreSQL/PostgREST para columnas bytea. */
+export function toPostgresBytea(buffer: Buffer): string {
+  return `\\x${buffer.toString('hex')}`;
+}
+
 /**
  * Normalizes the value retrieved from Supabase (or any source) to a Buffer.
  * Handles Buffer, base64 strings, hex strings, ArrayBuffers and JSON buffers.
@@ -18,7 +43,7 @@ export function normalizeCertificateInput(input: any): Buffer | null {
   }
 
   if (Buffer.isBuffer(input)) {
-    return input;
+    return unwrapSerializedNodeBuffer(input);
   }
 
   if (typeof input === 'string') {
@@ -28,9 +53,9 @@ export function normalizeCertificateInput(input: any): Buffer | null {
 
     try {
       if (input.startsWith('\\x')) {
-        return Buffer.from(input.slice(2), 'hex');
+        return unwrapSerializedNodeBuffer(Buffer.from(input.slice(2), 'hex'));
       }
-      return Buffer.from(input, 'base64');
+      return unwrapSerializedNodeBuffer(Buffer.from(input, 'base64'));
     } catch {
       return null;
     }

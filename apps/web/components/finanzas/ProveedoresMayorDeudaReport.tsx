@@ -32,7 +32,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
     try {
       setLoading(true)
       const response = await get(`/api/finanzas/cxp/proveedores-mayor-deuda?limite=${limite}`)
-      
+
       if (response?.success) {
         setProveedores(response.data || [])
       }
@@ -64,21 +64,21 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
 
   if (loading) {
     return (
-      <div className="activity-card p-8 text-center">
-        <div className="loading-spinner"></div>
-        <p className="text-gray-500">Cargando proveedores con mayor deuda...</p>
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8 text-center">
+        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
+        <p className="text-muted-foreground">Cargando proveedores con mayor deuda...</p>
       </div>
     )
   }
 
   if (proveedores.length === 0) {
     return (
-      <div className="activity-card p-12 text-center">
-        <TrendingDown size={48} className="text-gray-400" />
-        <h3 className="text-[1.125rem] font-semibold mb-2 text-gray-700">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-12 text-center">
+        <TrendingDown size={48} className="text-muted-foreground" />
+        <h3 className="text-[1.125rem] font-semibold mb-2 text-foreground/85">
           No hay deudas pendientes
         </h3>
-        <p className="text-gray-500">
+        <p className="text-muted-foreground">
           No hay proveedores con deuda pendiente
         </p>
       </div>
@@ -88,22 +88,22 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
   const maxDeuda = Math.max(...proveedores.map(p => p.deuda_total))
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       {/* Header */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b">
         <div className="flex items-center gap-3">
           <TrendingDown size={24} className="text-red-500" />
           <div>
-            <h3 className="text-[1.125rem] font-semibold text-gray-900">
+            <h3 className="text-[1.125rem] font-semibold text-foreground">
               Proveedores con Mayor Deuda
             </h3>
-            <p className="text-[0.875rem] text-gray-500 mt-1">
+            <p className="text-[0.875rem] text-muted-foreground mt-1">
               Top {proveedores.length} proveedores por deuda pendiente
             </p>
           </div>
         </div>
         <button
-          onClick={loadProveedores} className="py-2 px-4 rounded-[6px] border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
+          onClick={loadProveedores} className="py-2 px-4 rounded-[6px] border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
         >
           <RefreshCw size={16} />
           Actualizar
@@ -112,11 +112,11 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
 
       {/* Summary Stats */}
       <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-8">
-        <div className="p-4 rounded-2 text-white">
-          <div className="text-3 font-semibold opacity-[0.9]">
+        <div className="p-4 rounded-lg text-white">
+          <div className="text-xs font-semibold opacity-[0.9]">
             Deuda Total
           </div>
-          <div className="text-7 font-bold mt-2">
+          <div className="text-[1.75rem] font-bold mt-2">
             {formatCurrency(getTotalDeuda())}
           </div>
           <div className="text-[0.875rem] mt-1 opacity-[0.9]">
@@ -124,14 +124,14 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
           </div>
         </div>
 
-        <div className="p-4 rounded-2 bg-[rgba(239,_68,_68,_0.1)] border">
-          <div className="text-3 font-semibold text-red-800">
+        <div className="p-4 rounded-lg bg-destructive/10 border">
+          <div className="text-xs font-semibold text-destructive">
             Deuda Vencida
           </div>
-          <div className="text-6 font-bold mt-2 text-red-600">
+          <div className="text-2xl font-bold mt-2 text-destructive">
             {formatCurrency(getTotalVencida())}
           </div>
-          <div className="text-[0.875rem] mt-1 text-red-800">
+          <div className="text-[0.875rem] mt-1 text-destructive">
             {((getTotalVencida() / getTotalDeuda()) * 100).toFixed(1)}% del total
           </div>
         </div>
@@ -142,10 +142,10 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
         {proveedores.map((proveedor, index) => {
           const porcentajeVencida = (proveedor.deuda_vencida / proveedor.deuda_total) * 100
           const barWidth = (proveedor.deuda_total / maxDeuda) * 100
-          
+
           return (
             <div
-              key={proveedor.proveedor_id} className="p-6 rounded-3 border bg-white transition"
+              key={proveedor.proveedor_id} className="p-6 rounded-xl border bg-card transition"
               onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
               }}
@@ -160,21 +160,21 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
                       {index + 1}
                     </span>
                     <div>
-                      <h4 className="text-4 font-semibold text-gray-900">
+                      <h4 className="text-base font-semibold text-foreground">
                         {proveedor.razon_social}
                       </h4>
-                      <p className="text-3 text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         RUC: {proveedor.ruc} • {proveedor.cantidad_cxp} cuenta{proveedor.cantidad_cxp !== 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-5 font-bold text-gray-900">
+                  <div className="text-xl font-bold text-foreground">
                     {formatCurrency(proveedor.deuda_total)}
                   </div>
                   {proveedor.monedas.length > 1 && (
-                    <div className="text-3 text-gray-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       Multi-moneda
                     </div>
                   )}
@@ -186,7 +186,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
                 <div className="w-[100%] h-8 bg-[rgba(0,0,0,0.05)] rounded-[6px] overflow-hidden relative">
                   <div className="h-[100%] transition flex items-center justify-end pr-3">
                     {barWidth > 20 && (
-                      <span className="text-3 font-semibold text-white">
+                      <span className="text-xs font-semibold text-white">
                         {barWidth.toFixed(0)}%
                       </span>
                     )}
@@ -197,18 +197,18 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
               {/* Details Grid */}
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4">
                 <div>
-                  <div className="text-3 text-gray-500 mb-1">
+                  <div className="text-xs text-muted-foreground mb-1">
                     Deuda Vencida
                   </div>
-                  <div className="text-[0.875rem] font-semibold text-red-600">
+                  <div className="text-[0.875rem] font-semibold text-destructive">
                     {formatCurrency(proveedor.deuda_vencida)}
                   </div>
-                  <div className="text-3 text-red-800">
+                  <div className="text-xs text-destructive">
                     {porcentajeVencida.toFixed(1)}% del total
                   </div>
                 </div>
                 <div>
-                  <div className="text-3 text-gray-500 mb-1">
+                  <div className="text-xs text-muted-foreground mb-1">
                     Por Vencer
                   </div>
                   <div className="text-[0.875rem] font-semibold text-amber-500">
@@ -216,11 +216,11 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
                   </div>
                 </div>
                 <div>
-                  <div className="text-3 text-gray-500 mb-1">
+                  <div className="text-xs text-muted-foreground mb-1">
                     Días Prom. Vencimiento
                   </div>
-                  <div className="text-[0.875rem] font-semibold text-gray-700">
-                    {proveedor.dias_promedio_vencimiento > 0 
+                  <div className="text-[0.875rem] font-semibold text-foreground/85">
+                    {proveedor.dias_promedio_vencimiento > 0
                       ? `${proveedor.dias_promedio_vencimiento} días`
                       : 'Al día'
                     }
@@ -230,9 +230,9 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
 
               {/* Alert for high overdue */}
               {porcentajeVencida > 50 && (
-                <div className="mt-4 p-3 rounded-[6px] bg-[rgba(239,_68,_68,_0.1)] flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-red-600" />
-                  <span className="text-3 text-red-800 font-medium">
+                <div className="mt-4 p-3 rounded-[6px] bg-destructive/10 flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-destructive" />
+                  <span className="text-xs text-destructive font-medium">
                     Más del 50% de la deuda está vencida - Requiere atención prioritaria
                   </span>
                 </div>

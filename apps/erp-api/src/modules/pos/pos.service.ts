@@ -16,6 +16,7 @@ import * as crypto from 'crypto';
 import Decimal from 'decimal.js';
 import { PosAuditService, TipoEventoPOS } from './services/pos-audit.service';
 import { ConfigService } from '@nestjs/config';
+import { toPostgresBytea } from '../../shared/utils/certificate.utils';
 
 @Injectable()
 export class PosService {
@@ -346,200 +347,6 @@ export class PosService {
     return productosMap;
   }
 
-  private async persistirImpactosVentaPOS(params: {
-    ventaId: string;
-    tenantId: string;
-    userId: string;
-    items: any[];
-    productos: Map<string, any>;
-    pagos: Array<{
-      codigo: string;
-      tipo: string;
-      monto: number;
-      referencia?: string | null;
-      metodo_pago_id?: string | null;
-    }> | null;
-    ventaData: any;
-    tasaIgv?: number;
-  }): Promise<void> {
-    const client = this.supabase.getClient();
-    const { ventaId, tenantId, userId, items, productos, pagos, ventaData } = params;
-    const tasaIgvEfectiva = params.tasaIgv ?? 0.18;
-
-    const { data: detallesExistentes, error: detalleLookupError } = await client
-      .from('detalle_ventas_pos')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('venta_pos_id', ventaId)
-      .limit(1);
-
-    if (detalleLookupError) {
-      throw detalleLookupError;
-    }
-
-    if (!detallesExistentes || detallesExistentes.length === 0) {
-      const detalleRows = items.map((item: any, index: number) => {
-        const producto = productos.get(item.producto_id) || {};
-        const subtotal = Number(item.subtotal ?? 0);
-        const impuesto = new Decimal(subtotal).times(tasaIgvEfectiva).toDecimalPlaces(2).toNumber();
-        return {
-          tenant_id: tenantId,
-          venta_id: ventaId,
-          venta_pos_id: ventaId,
-          producto_id: item.producto_id,
-          item_index: index + 1,
-          cantidad: Number(item.cantidad ?? 0),
-          precio_unitario: Number(item.precio_unitario ?? 0),
-          descuento: Number(item.descuento_monto ?? 0),
-          impuesto,
-          subtotal,
-          total: new Decimal(subtotal).plus(impuesto).toDecimalPlaces(2).toNumber(),
-          nombre_producto: item.producto?.nombre || producto.nombre || item.nombre || item.descripcion || 'Producto',
-          codigo_producto: item.producto?.codigo || producto.codigo || item.codigo || 'PROD',
-          unidad_medida: item.producto?.unidad_medida_sunat || item.producto?.unidad_medida || producto.unidad_medida || 'NIU',
-          estado: 'CONFIRMADO',
-          metadata: {
-            source: 'pos',
-            idempotency_key: ventaData.idempotency_key,
-          },
-        };
-      });
-
-      const { error: detalleError } = await client.from('detalle_ventas_pos').insert(detalleRows);
-      if (detalleError) {
-        throw detalleError;
-      }
-    }
-
-    const metodoPagoDefault = await this.getMetodoPagoInfo(ventaData.metodo_pago_id || 'efectivo', tenantId);
-    const pagosRows = pagos && pagos.length > 0
-      ? pagos
-      : [{
-        codigo: metodoPagoDefault.codigo,
-        tipo: metodoPagoDefault.tipo,
-        monto: Number(ventaData.total ?? 0),
-        referencia: ventaData.referencia_pago || null,
-        metodo_pago_id: metodoPagoDefault.id,
-      }];
-
-    const { data: pagosExistentes, error: pagosLookupError } = await client
-      .from('ventas_pos_pagos')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('venta_pos_id', ventaId)
-      .limit(1);
-
-    if (pagosLookupError) {
-      throw pagosLookupError;
-    }
-
-    if (!pagosExistentes || pagosExistentes.length === 0) {
-      const { error: pagosError } = await client.from('ventas_pos_pagos').insert(
-        pagosRows.map((pago: any) => ({
-          tenant_id: tenantId,
-          venta_pos_id: ventaId,
-          metodo_pago_id: pago.metodo_pago_id || null,
-          metodo_pago_codigo: pago.codigo,
-          metodo_pago_tipo: pago.tipo,
-          monto: pago.monto,
-          moneda: ventaData.moneda || 'PEN',
-          referencia: pago.referencia || null,
-          estado: 'ACTIVO',
-          metadata: {
-            source: 'pos',
-            idempotency_key: ventaData.idempotency_key,
-          },
-        })),
-      );
-      if (pagosError) {
-        throw pagosError;
-      }
-    }
-
-    for (const item of items) {
-      const producto = productos.get(item.producto_id);
-      if (!producto) continue;
-      const controlaStock = producto.es_servicio === true ? false : producto.controla_stock !== false;
-      if (!controlaStock) continue;
-
-      const cantidad = Number(item.cantidad ?? 0);
-      const { data: movimientoExistente, error: movimientoLookupError } = await client
-        .from('movimientos_inventario')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('producto_id', item.producto_id)
-        .eq('referencia_id', ventaId)
-        .eq('referencia_tipo', 'VENTA_POS')
-        .eq('tipo', 'SALIDA')
-        .maybeSingle();
-
-      if (movimientoLookupError && movimientoLookupError.code !== 'PGRST116') {
-        throw movimientoLookupError;
-      }
-      if (movimientoExistente) {
-        continue;
-      }
-
-      const stockActual = Number(producto.stock_actual ?? producto.stock ?? 0);
-      const stockReservado = Number(producto.stock_reservado ?? 0);
-      const nuevoStock = new Decimal(stockActual).minus(cantidad).toDecimalPlaces(2).toNumber();
-      if (nuevoStock < 0 && ventaData.permite_venta_sin_stock !== true) {
-        throw new Error(`Stock insuficiente para ${producto.nombre || producto.codigo || item.producto_id}`);
-      }
-
-      const { data: movimientoId, error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
-        p_producto_id: item.producto_id,
-        p_cantidad: cantidad,
-        p_referencia_tipo: 'VENTA_POS',
-        p_referencia_id: ventaId,
-        p_notas: `Salida POS por venta ${ventaId}`,
-      });
-      if (salidaError) {
-        throw salidaError;
-      }
-
-      const { data: productoActualizado, error: productoActualizadoError } = await client
-        .from('productos')
-        .select('stock_actual, stock, stock_reservado')
-        .eq('tenant_id', tenantId)
-        .eq('id', item.producto_id)
-        .maybeSingle();
-      if (productoActualizadoError) {
-        throw productoActualizadoError;
-      }
-
-      const stockFinal = Number(productoActualizado?.stock_actual ?? nuevoStock);
-      const stockReservadoFinal = Number(productoActualizado?.stock_reservado ?? stockReservado);
-      const costoUnitario = Number(producto.precio_compra ?? producto.costo ?? 0);
-      producto.stock_actual = stockFinal;
-      producto.stock = String(productoActualizado?.stock ?? stockFinal);
-
-      const { error: movimientoUpdateError } = await client
-        .from('movimientos_inventario')
-        .update({
-          created_by: userId,
-          motivo: `Venta POS ${ventaId}`,
-          stock_actual: String(stockFinal),
-          stock_reservado: String(stockReservadoFinal),
-          activo: true,
-          estado: 'ACTIVO',
-          metadata: {
-            source: 'pos',
-            idempotency_key: ventaData.idempotency_key,
-            numero_ticket: ventaData.numero_ticket,
-            metodo_costeo: 'ULTIMO_COSTO',
-            costo_unitario: costoUnitario,
-            valor_total: new Decimal(costoUnitario).times(cantidad).toDecimalPlaces(2).toNumber(),
-          },
-        })
-        .eq('tenant_id', tenantId)
-        .eq('id', movimientoId);
-      if (movimientoUpdateError) {
-        throw movimientoUpdateError;
-      }
-    }
-  }
-
   async getProductos(user: any) {
     return this.runWithTenantContext(user, async () => {
       try {
@@ -765,8 +572,6 @@ export class PosService {
   }
 
   private async procesarVentaInternal(ventaData: any, user: any) {
-    const productLocks: string[] = [];
-    let ventaLockAcquired = false;
     const items = Array.isArray(ventaData?.items) ? ventaData.items : [];
     try {
       this.logger.log(
@@ -787,30 +592,6 @@ export class PosService {
       // Normalizar idempotency_key para que sea estable (trim) en todos los sub-flujos (CPE/CxC/outbox).
       ventaData.idempotency_key = String(ventaData.idempotency_key).trim();
       const ventaIdempotencyKey = ventaData.idempotency_key;
-
-      // Lock por tenant + idempotency y, si existe, sesión de caja para evitar colisiones concurrentes
-      const lockKey = this.buildVentaLockKey(ventaData, user);
-
-      const acquireLegacyLocks = async () => {
-        if (ventaLockAcquired) return;
-
-        await this.supabase.getClient().rpc('acquire_pos_lock', {
-          p_tenant_id: user.tenant_id,
-          p_lock_key: lockKey,
-        });
-
-        const productIds = Array.from(new Set(items.map((i: any) => i.producto_id).filter(Boolean))).sort();
-        for (const pid of productIds) {
-          const key = `product:${pid}`;
-          await this.supabase.getClient().rpc('acquire_pos_lock', {
-            p_tenant_id: user.tenant_id,
-            p_lock_key: key,
-          });
-          productLocks.push(key);
-        }
-
-        ventaLockAcquired = true;
-      };
 
       // Validaciones mínimas de entrada antes de tocar la BD
       if (!items.length) {
@@ -1107,39 +888,16 @@ export class PosService {
 
       let txData: any;
       let txError: any;
-      let legacyRpc = false;
-
       ({ data: txData, error: txError } = await this.supabase.getClient()
         .rpc('pos_registrar_venta_full_tx', rpcPayload));
-
-      let fullTransactionRpc = !txError;
 
       if (
         txError?.code === 'PGRST202' &&
         String(txError?.details || txError?.message || '').includes('pos_registrar_venta_full_tx')
       ) {
-        this.logger.warn('⚠️ RPC POS full_tx no disponible. Usando contrato transaccional anterior.');
-        fullTransactionRpc = false;
-        await acquireLegacyLocks();
-        ({ data: txData, error: txError } = await this.supabase.getClient()
-          .rpc('pos_registrar_venta_tx', rpcPayload));
-      }
-
-      if (
-        !fullTransactionRpc &&
-        txError?.code === 'PGRST202' &&
-        ['p_idempotency_key', 'p_pagos'].some((p) =>
-          String(txError?.details || txError?.message || '').includes(p),
-        )
-      ) {
-        this.logger.warn('⚠️ RPC POS legacy detectado (firma antigua). Reintentando con payload reducido.');
-        await acquireLegacyLocks();
-        const legacyPayload = { ...rpcPayload };
-        delete legacyPayload.p_idempotency_key;
-        delete legacyPayload.p_pagos;
-        legacyRpc = true;
-        ({ data: txData, error: txError } = await this.supabase.getClient()
-          .rpc('pos_registrar_venta_tx', legacyPayload));
+        throw new Error(
+          'POS_INVENTORY_CONTRACT_UNAVAILABLE: falta pos_registrar_venta_full_tx; venta bloqueada para evitar saldos divergentes',
+        );
       }
 
       if (txError || !txData || !Array.isArray(txData) || txData.length === 0) {
@@ -1171,43 +929,12 @@ export class PosService {
         },
       }));
 
-      if (legacyRpc && ventaIdempotencyKey) {
-        try {
-          await this.supabase.getClient()
-            .from('outbox_events')
-            .update({ idempotency_key: ventaIdempotencyKey })
-            .eq('tenant_id', user.tenant_id)
-            .eq('aggregate_type', 'venta_pos')
-            .eq('aggregate_id', String(ventaResult.id))
-            .is('idempotency_key', null);
-        } catch (outboxErr) {
-          this.logger.warn('⚠️ No se pudo ajustar idempotency_key en outbox_events:', outboxErr);
-        }
-      }
-
       this.logger.log('✅ Venta procesada exitosamente:', ventaResult.id);
 
       if (!impactosAplicadosPorRpc) {
-        try {
-          await this.persistirImpactosVentaPOS({
-            ventaId: ventaResult.id,
-            tenantId: user.tenant_id,
-            userId: user.id,
-            items: recomputed,
-            productos: productosMap,
-            pagos: pagosNormalizados,
-            ventaData: {
-              ...ventaData,
-              total: totalCalculado,
-              numero_ticket: ventaResult.numero_ticket,
-            },
-            tasaIgv,
-          });
-        } catch (impactoError) {
-          this.logger.error('❌ Error persistiendo impactos POS; revirtiendo venta:', impactoError);
-          await this.rollbackVenta(ventaResult.id, user.tenant_id);
-          throw impactoError;
-        }
+        throw new Error(
+          'POS_INVENTORY_IMPACTS_NOT_ATOMIC: full_tx no confirmó impactos; venta bloqueada',
+        );
       }
 
       // Registrar movimiento de caja (solo efectivo) para calcular saldo esperado correctamente
@@ -1621,26 +1348,6 @@ export class PosService {
           codigo: error.code,
         }
       };
-    } finally {
-      try {
-        if (ventaLockAcquired) {
-          const lockKey = this.buildVentaLockKey(ventaData, user);
-          await this.supabase.getClient().rpc('release_pos_lock', {
-            p_tenant_id: user.tenant_id,
-            p_lock_key: lockKey,
-          });
-          // Liberar locks por producto (solo los adquiridos)
-          const productIds = productLocks.map((key) => key.replace(/^product:/, ''));
-          for (const pid of productIds) {
-            await this.supabase.getClient().rpc('release_pos_lock', {
-              p_tenant_id: user.tenant_id,
-              p_lock_key: `product:${pid}`,
-            });
-          }
-        }
-      } catch (unlockErr) {
-        this.logger.warn('⚠️ No se pudo liberar el advisory lock POS:', unlockErr);
-      }
     }
   }
 
@@ -1849,7 +1556,7 @@ export class PosService {
       const { data, error } = await this.supabase.getClient()
         .from('empresa_config')
         .update({
-          certificado_pfx: certEncrypted,            // bytes: iv|tag|ciphertext
+          certificado_pfx: toPostgresBytea(certEncrypted), // bytea: iv|tag|ciphertext
           certificado_password: passEncrypted,       // base64: iv|tag|ciphertext
           updated_at: new Date().toISOString()
         })

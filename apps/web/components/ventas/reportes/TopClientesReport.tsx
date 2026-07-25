@@ -110,10 +110,10 @@ export default function TopClientesReport({ filters }: Props) {
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Cargando reporte...</p>
+            <p className="mt-2 text-foreground/80">Cargando reporte...</p>
           </div>
         ) : data.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-muted-foreground">
             <p className="text-lg font-medium">No hay datos disponibles</p>
             <p className="text-sm">Ajusta los filtros para ver resultados</p>
           </div>
@@ -121,16 +121,16 @@ export default function TopClientesReport({ filters }: Props) {
           <>
             {/* Summary Card */}
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-6">
-              <p className="text-sm text-gray-600 font-medium">Facturación Total (Top {topN})</p>
-              <p className="text-3xl font-bold text-gray-900">S/ {totalFacturacion.toFixed(2)}</p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-sm text-foreground/80 font-medium">Facturación Total (Top {topN})</p>
+              <p className="text-3xl font-bold text-foreground">S/ {totalFacturacion.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground mt-1">
                 Promedio por cliente: S/ {(totalFacturacion / data.length).toFixed(2)}
               </p>
             </div>
 
             {/* Visual Chart */}
             <div className="space-y-3 mb-6">
-              <h3 className="text-sm font-medium text-gray-700">Distribución de Facturación</h3>
+              <h3 className="text-sm font-medium text-foreground/85">Distribución de Facturación</h3>
               {data.slice(0, 10).map((cliente, index) => (
                 <div key={cliente.cliente_id} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
@@ -138,15 +138,15 @@ export default function TopClientesReport({ filters }: Props) {
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
                         {index + 1}
                       </span>
-                      <span className="font-medium text-gray-700 truncate">
+                      <span className="font-medium text-foreground/85 truncate">
                         {cliente.cliente_nombre}
                       </span>
                     </div>
-                    <span className="text-gray-600 font-medium ml-2 flex-shrink-0">
+                    <span className="text-foreground/80 font-medium ml-2 flex-shrink-0">
                       S/ {cliente.total_facturacion.toFixed(2)}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden ml-8">
+                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden ml-8">
                     <div
                       className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
                     />
@@ -158,77 +158,77 @@ export default function TopClientesReport({ filters }: Props) {
             {/* Detailed Table */}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-muted/30">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Ranking
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Cliente
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Documento
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Facturación
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       % Total
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Pedidos
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Facturas
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Ticket Promedio
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Acciones
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-gray-200">
                   {data.map((cliente, index) => (
-                    <tr key={cliente.cliente_id} className="hover:bg-gray-50">
+                    <tr key={cliente.cliente_id} className="hover:bg-muted/30">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold text-sm">
                           {index + 1}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           {cliente.cliente_nombre}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           {cliente.cliente_documento}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm font-bold text-gray-900">
+                        <div className="text-sm font-bold text-foreground">
                           S/ {cliente.total_facturacion.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           {cliente.porcentaje_total.toFixed(1)}%
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           {cliente.cantidad_pedidos}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           {cliente.cantidad_facturas}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           S/ {cliente.ticket_promedio.toFixed(2)}
                         </div>
                       </td>
@@ -237,7 +237,7 @@ export default function TopClientesReport({ filters }: Props) {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleVerCliente(cliente.cliente_id)}
-                          className="text-blue-600 hover:text-blue-700"
+                          className="text-primary hover:text-primary"
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           Ver

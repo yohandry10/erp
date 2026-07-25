@@ -11,7 +11,7 @@ Write-Host "====================================`n" -ForegroundColor Cyan
 Write-Host "1️⃣ Obteniendo token de autenticación..." -ForegroundColor Yellow
 $loginBody = @{
     email = "admin@vierdes.com"
-    password = "Admin123!"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json
 
 try {

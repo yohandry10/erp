@@ -186,7 +186,7 @@ export default function ClienteSelector({
     <div className="relative" ref={dropdownRef}>
       {/* Selected Cliente Display */}
       {selectedCliente ? (
-        <div className="flex items-center justify-between p-4 bg-[rgba(255,_255,_255,_0.9)] transition">
+        <div className="flex items-center justify-between p-4 bg-card/90 transition">
           <div className="flex-[1]">
             <p className="text-[0.95rem] font-semibold text-[var(--primary-800)] mt-0 mr-0 mb-1 ml-0">
               {selectedCliente.razon_social}
@@ -222,7 +222,7 @@ export default function ClienteSelector({
               placeholder="Buscar por RUC, DNI o nombre..."
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
-              disabled={disabled} className="w-[100%] pt-4 pr-12 pb-4 pl-12 text-4 transition bg-[rgba(255,_255,_255,_0.9)] text-[var(--primary-800)]"
+              disabled={disabled} className="w-[100%] pt-4 pr-12 pb-4 pl-12 text-base transition bg-card/90 text-[var(--primary-800)]"
               onFocus={(e) => {
                 if (!error) {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
@@ -241,7 +241,7 @@ export default function ClienteSelector({
             />
             {loading && (
               <div className="absolute right-4 top-[50%] -translate-y-1/2">
-                <div className="loading-spinner w-5 h-5 rounded-full"></div>
+                <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary w-5 h-5 rounded-full"></div>
               </div>
             )}
             {!loading && searchTerm && (
@@ -251,7 +251,7 @@ export default function ClienteSelector({
 
           {/* Dropdown */}
           {isOpen && clientes.length > 0 && (
-            <div className="absolute z-[50] w-[100%] mt-2 bg-white border shadow max-h-[20rem] overflow-y-auto">
+            <div className="absolute z-[50] w-[100%] mt-2 bg-card border shadow max-h-[20rem] overflow-y-auto">
               {clientes.map((cliente) => (
                 <button
                   key={cliente.id}
@@ -278,7 +278,7 @@ export default function ClienteSelector({
 
           {/* No Results */}
           {isOpen && !loading && searchTerm.length >= 2 && clientes.length === 0 && (
-            <div className="absolute z-[50] w-[100%] mt-2 bg-white border shadow p-6 text-center">
+            <div className="absolute z-[50] w-[100%] mt-2 bg-card border shadow p-6 text-center">
               <p className="text-[0.875rem] text-[var(--primary-600)] m-0">
                 No se encontraron clientes
               </p>
@@ -292,7 +292,7 @@ export default function ClienteSelector({
         <button
           type="button"
           onClick={handleCreateNew}
-          disabled={disabled} className="mt-3 w-[100%] py-3 px-4 bg-white text-[var(--primary-700)] text-[0.875rem] font-semibold transition flex items-center justify-center gap-2"
+          disabled={disabled} className="mt-3 w-[100%] py-3 px-4 bg-card text-[var(--primary-700)] text-[0.875rem] font-semibold transition flex items-center justify-center gap-2"
           onMouseEnter={(e) => {
             if (!disabled) {
               e.currentTarget.style.background = 'var(--primary-50)'

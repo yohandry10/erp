@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 interface ConfigurationStatus {
@@ -95,7 +96,7 @@ function StatusPill({ ok }: { ok: boolean }) {
     <span
       className={cn(
         'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold',
-        ok ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-100 text-slate-700',
+        ok ? 'bg-primary/10 text-primary' : 'bg-muted text-foreground/85',
       )}
     >
       {ok ? <CheckCircle className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
@@ -107,9 +108,9 @@ function StatusPill({ ok }: { ok: boolean }) {
 function FieldRow({ label, value, ok = true }: { label: string; value?: string | number | boolean | null; ok?: boolean }) {
   const displayValue = typeof value === 'boolean' ? (value ? 'Sí' : 'No') : value
   return (
-    <div className="flex justify-between gap-4 border-b border-slate-100 py-2">
-      <span className="text-sm text-slate-500">{label}</span>
-      <span className={cn('text-right text-sm font-semibold', ok ? 'text-slate-950' : 'text-blue-800')}>
+    <div className="flex justify-between gap-4 border-b border-border py-2">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={cn('text-right text-sm font-semibold', ok ? 'text-foreground' : 'text-primary')}>
         {displayValue === undefined || displayValue === null || displayValue === '' ? 'No configurado' : String(displayValue)}
       </span>
     </div>
@@ -128,9 +129,9 @@ function SectionCard({
   ok: boolean
 }) {
   return (
-    <section className="activity-card p-5">
+    <section className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-5">
       <div className="mb-3 flex items-center justify-between gap-4">
-        <h2 className="m-0 flex items-center gap-2 text-base font-semibold text-slate-950">
+        <h2 className="m-0 flex items-center gap-2 text-base font-semibold text-foreground">
           <Icon className="h-[18px] w-[18px]" />
           {title}
         </h2>
@@ -197,6 +198,10 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
     const status = data.status
     const empresa = data.empresa
     const ose = data.ose
+    const logisticsEnabled =
+      empresa?.usar_flujo_logistica === true ||
+      empresa?.gre_obligatorio === true ||
+      empresa?.gre_automatico_habilitado === true
 
     return {
       complete: status?.isComplete === true,
@@ -205,16 +210,41 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
       ose: ose?.verificacion?.valid === true && ose?.configuracion?.certificateExists === true,
       fiscal: !!empresa?.regimen && empresa?.emisionCpeModo !== '',
       sales: !!empresa?.serieFactura && !!empresa?.serieBoleta,
-      logistics: empresa?.usar_flujo_logistica === true || empresa?.gre_obligatorio === true || empresa?.gre_automatico_habilitado === true,
+      logistics: !logisticsEnabled || !!empresa?.serieGuiaRemision,
     }
   }, [data])
 
+  const operationalChecks = [
+    checks.ruc,
+    checks.certificate,
+    checks.ose,
+    checks.fiscal,
+    checks.sales,
+    checks.logistics,
+  ]
+  const operationalReadiness = Math.round(
+    (operationalChecks.filter(Boolean).length / operationalChecks.length) * 100,
+  )
+  const isOperationallyReady = operationalChecks.every(Boolean)
+
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="activity-card p-12 text-center">
-          <div className="loading-spinner mx-auto mb-4" />
-          <p className="m-0 text-slate-600">Cargando configuración operativa...</p>
+      <div className="mx-auto w-full max-w-[1600px] space-y-5 p-4 text-foreground md:p-6" aria-busy="true">
+        <span className="sr-only" aria-live="polite">Cargando configuración operativa</span>
+        <div className="rounded-2xl border border-border bg-card/95 p-6 shadow-lg md:p-8">
+          <Skeleton className="h-9 w-72 max-w-full" />
+          <Skeleton className="mt-3 h-5 w-[34rem] max-w-full" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-24" />
+        </div>
+        <div className="grid gap-5 md:grid-cols-3">
+          {[0, 1, 2].map(item => <Skeleton key={item} className="h-36 rounded-2xl" />)}
+        </div>
+        <div className="grid gap-4 xl:grid-cols-3">
+          {[0, 1, 2].map(item => <Skeleton key={item} className="h-72 rounded-2xl" />)}
         </div>
       </div>
     )
@@ -222,14 +252,14 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
 
   if (error) {
     return (
-      <div className="dashboard-container">
-        <div className="activity-card border-slate-300 p-8">
-          <div className="mb-3 flex items-center gap-3 text-slate-700">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl border-border p-8">
+          <div className="mb-3 flex items-center gap-3 text-foreground/85">
             <AlertTriangle className="h-6 w-6" />
-            <h1 className="dashboard-title m-0">Configuración no disponible</h1>
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground m-0">Configuración no disponible</h1>
           </div>
-          <p className="dashboard-subtitle">{error}</p>
-          <button className="refresh-btn" onClick={() => loadConfiguration(true)} disabled={refreshing}>
+          <p className="mt-2 text-base text-muted-foreground">{error}</p>
+          <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50" onClick={() => loadConfiguration(true)} disabled={refreshing}>
             <RefreshCw size={16} />
             Reintentar
           </button>
@@ -242,39 +272,58 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
   const hidden = (name: Section) => section !== 'resumen' && section !== name
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">Configuración operativa</h1>
-          <p className="dashboard-subtitle">
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Configuración operativa</h1>
+          <p className="mt-2 text-base text-muted-foreground">
             Estado real de empresa, certificado, emisión fiscal, ventas y logística.
           </p>
         </div>
-        <button className="refresh-btn" onClick={() => loadConfiguration(true)} disabled={refreshing}>
+        <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50" onClick={() => loadConfiguration(true)} disabled={refreshing}>
           <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
           Actualizar
         </button>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Link className="refresh-btn" href="/dashboard/configuracion">Resumen</Link>
-        <Link className="refresh-btn" href="/dashboard/configuracion/empresa">Empresa</Link>
-        <Link className="refresh-btn" href="/dashboard/configuracion/ventas">Ventas</Link>
-        <Link className="refresh-btn" href="/dashboard/wizard">Editar en asistente</Link>
-      </div>
+      <nav className="mb-4 flex flex-wrap gap-2" aria-label="Secciones de configuración">
+        {([
+          ['resumen', '/dashboard/configuracion', 'Resumen'],
+          ['empresa', '/dashboard/configuracion/empresa', 'Empresa'],
+          ['ventas', '/dashboard/configuracion/ventas', 'Ventas'],
+        ] as const).map(([name, href, label]) => {
+          const active = section === name
+          return (
+            <Link
+              key={name}
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'inline-flex min-h-10 items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors',
+                active
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-card text-foreground hover:bg-accent',
+              )}
+            >
+              {label}
+            </Link>
+          )
+        })}
+        <Link className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent" href="/dashboard/wizard">Editar en asistente</Link>
+      </nav>
 
-      <div className="stats-grid mb-5">
-        <div className="stat-card">
-          <div className={cn('stat-icon', checks.complete ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-100 text-slate-700')}>
-            {checks.complete ? <CheckCircle className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 mb-5">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className={cn('inline-flex size-11 items-center justify-center rounded-xl', isOperationallyReady ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+            {isOperationallyReady ? <CheckCircle className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
           </div>
           <div className="stat-content">
-            <h3>{status?.completionPercentage ?? 0}%</h3>
-            <p>Configuración total</p>
+            <h3>{operationalReadiness}%</h3>
+            <p>Preparación operativa</p>
           </div>
         </div>
-        <div className="stat-card">
-          <div className={cn('stat-icon', checks.certificate ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-100 text-slate-700')}>
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className={cn('inline-flex size-11 items-center justify-center rounded-xl', checks.certificate ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
             <ShieldCheck className="h-6 w-6" />
           </div>
           <div className="stat-content">
@@ -282,8 +331,8 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             <p>Certificado digital</p>
           </div>
         </div>
-        <div className="stat-card">
-          <div className={cn('stat-icon', checks.ose ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-100 text-slate-700')}>
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+          <div className={cn('inline-flex size-11 items-center justify-center rounded-xl', checks.ose ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
             <Settings className="h-6 w-6" />
           </div>
           <div className="stat-content">
@@ -338,9 +387,9 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
       </div>
 
       {!!status?.missingItems?.length && (
-        <div className="activity-card mt-4 border-blue-200 bg-blue-50 p-4">
-          <h2 className="m-0 mb-2 text-base text-blue-900">Pendientes detectados por backend</h2>
-          <ul className="m-0 list-disc pl-5 text-blue-900">
+        <div className="relative mt-4 rounded-2xl border border-primary/30 bg-primary/10 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+          <h2 className="m-0 mb-2 text-base font-semibold text-primary">Pendientes detectados por backend</h2>
+          <ul className="m-0 list-disc pl-5 text-foreground/85">
             {status.missingItems.map(item => <li key={item}>{item}</li>)}
           </ul>
         </div>

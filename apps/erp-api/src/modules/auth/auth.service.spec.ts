@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { UnauthorizedException, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService, LoginDto } from './auth.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
@@ -248,6 +248,14 @@ describe('AuthService', () => {
             const result = await service.validateUser('nonexistent@example.com', 'password');
 
             expect(result).toBeNull();
+        });
+
+        it('should throw ServiceUnavailableException when Supabase is unreachable', async () => {
+            const mockClient = supabaseService.getPublicClient() as any;
+            mockClient.single.mockResolvedValueOnce({ data: null, error: { message: 'fetch failed' } });
+
+            await expect(service.validateUser('test@example.com', 'password'))
+                .rejects.toThrow(ServiceUnavailableException);
         });
 
         it('should return null when password is incorrect', async () => {
@@ -520,6 +528,12 @@ describe('AuthService', () => {
             mockClient.single
                 .mockResolvedValueOnce({ data: userWithToken, error: null })  // validatePasswordResetToken->findUserByEmail
                 .mockResolvedValueOnce({ data: userWithToken, error: null }); // resetPassword->findUserByEmail
+            mockClient.select.mockImplementation((columns: string) => {
+                if (columns === 'id') {
+                    return Promise.resolve({ data: [{ id: mockUser.id }], error: null });
+                }
+                return mockClient;
+            });
 
             await expect(service.resetPassword('test@example.com', token, 'newPassword123!'))
                 .resolves.not.toThrow();
@@ -533,6 +547,53 @@ describe('AuthService', () => {
 
             await expect(service.resetPassword('test@example.com', 'invalid-token', 'newPassword'))
                 .rejects.toThrow(UnauthorizedException);
+        });
+
+        it('should reject a concurrently consumed reset token', async () => {
+            const token = 'valid-reset-token';
+            const hashedToken = await bcrypt.hash(token, 10);
+            const expiresAt = new Date(Date.now() + 3600000).toISOString();
+
+            const userWithToken = {
+                ...mockUser,
+                password_reset_token: hashedToken,
+                password_reset_expires: expiresAt,
+            };
+
+            const mockClient = supabaseService.getPublicClient() as any;
+            mockClient.single
+                .mockResolvedValueOnce({ data: userWithToken, error: null })
+                .mockResolvedValueOnce({ data: userWithToken, error: null });
+            mockClient.select.mockImplementation((columns: string) => {
+                if (columns === 'id') {
+                    return Promise.resolve({ data: [], error: null });
+                }
+                return mockClient;
+            });
+
+            await expect(service.resetPassword('test@example.com', token, 'newPassword123!'))
+                .rejects.toThrow(UnauthorizedException);
+        });
+
+        it('should reject when the reset token was consumed before the second user read', async () => {
+            const token = 'valid-reset-token';
+            const hashedToken = await bcrypt.hash(token, 10);
+            const expiresAt = new Date(Date.now() + 3600000).toISOString();
+
+            const userWithToken = {
+                ...mockUser,
+                password_reset_token: hashedToken,
+                password_reset_expires: expiresAt,
+            };
+
+            const mockClient = supabaseService.getPublicClient() as any;
+            mockClient.single
+                .mockResolvedValueOnce({ data: userWithToken, error: null })
+                .mockResolvedValueOnce({ data: mockUser, error: null });
+
+            await expect(service.resetPassword('test@example.com', token, 'newPassword123!'))
+                .rejects.toThrow(UnauthorizedException);
+            expect(mockClient.update).not.toHaveBeenCalled();
         });
     });
 
@@ -649,6 +710,38 @@ describe('AuthService', () => {
             it('should revoke all user sessions without throwing', async () => {
                 await expect(service.revokeUserSessions('user-123'))
                     .resolves.not.toThrow();
+            });
+
+            it('should invalidate cached positive sessions before deleting them', async () => {
+                const mockClient = supabaseService.getAdminClient() as any;
+                const cacheService = testingModule.get<CacheService>(CacheService) as any;
+                const originalEq = mockClient.eq.getMockImplementation();
+
+                mockClient.select.mockImplementation((columns: string) => {
+                    if (columns === 'session_token') {
+                        return mockClient;
+                    }
+                    return mockClient;
+                });
+
+                mockClient.eq.mockImplementation((column: string) => {
+                    if (column === 'usuario_sistema_id' && mockClient.delete.mock.calls.length === 0) {
+                        return Promise.resolve({
+                            data: [
+                                { session_token: 'session-a' },
+                                { session_token: 'session-b' },
+                            ],
+                            error: null,
+                        });
+                    }
+                    return originalEq ? originalEq() : mockClient;
+                });
+
+                await service.revokeUserSessions('user-123');
+
+                expect(cacheService.del).toHaveBeenCalledWith('auth:session:session-a');
+                expect(cacheService.del).toHaveBeenCalledWith('auth:session:session-b');
+                expect(mockClient.delete).toHaveBeenCalled();
             });
         });
 

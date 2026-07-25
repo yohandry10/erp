@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useApi } from '@/hooks/use-api'
+import { useToast } from '@/components/ui/use-toast'
 
 interface OrdenCompraModalProps {
   isOpen: boolean
@@ -21,20 +22,21 @@ interface OrdenItem {
   esNuevoProducto?: boolean
 }
 
-export default function OrdenCompraModal({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
-  orden 
+export default function OrdenCompraModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  orden
 }: OrdenCompraModalProps) {
   const { tasaIgv } = useTaxConfig()
   const { get, post, put } = useApi()
-  
+  const { toast } = useToast()
+
   // DEBUG: Log de props recibidas
   console.log('🔍 OrdenCompraModal recibido props:', { isOpen, orden })
   console.log('🔍 Modal renderizando con isOpen:', isOpen)
   console.log('🔍 Elemento Dialog debe estar visible:', isOpen ? 'SÍ' : 'NO')
-  
+
   const [formData, setFormData] = useState({
     numero: '',
     proveedor_id: '',
@@ -107,7 +109,7 @@ export default function OrdenCompraModal({
   const loadOrdenData = useCallback(() => {
     if (orden) {
       console.log('🔍 Cargando datos de orden:', JSON.stringify(orden, null, 2))
-      
+
       setFormData({
         numero: orden.numero,
         proveedor_id: orden.proveedor_id,
@@ -120,11 +122,11 @@ export default function OrdenCompraModal({
         estado: orden.estado,
         observaciones: orden.observaciones || ''
       })
-      
+
       // Procesar los items correctamente
       const itemsArray = Array.isArray(orden.items) ? orden.items : []
       console.log('📋 Items raw de orden:', JSON.stringify(orden.items, null, 2))
-      
+
       const itemsToLoad: OrdenItem[] = itemsArray.map((item: any, index: number) => {
         const processedItem: OrdenItem = {
           id: item.id || `item-${Date.now()}-${index}`,
@@ -137,7 +139,7 @@ export default function OrdenCompraModal({
         console.log(`📋 Item ${index} procesado:`, JSON.stringify(processedItem, null, 2))
         return processedItem
       })
-      
+
       console.log('📋 Items procesados para cargar:', JSON.stringify(itemsToLoad, null, 2))
       setItems(itemsToLoad)
     }
@@ -191,7 +193,7 @@ export default function OrdenCompraModal({
 
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...items]
-    
+
     // Convertir valores numéricos y validar
     if (field === 'cantidad' || field === 'precio_unitario') {
       const numValue = Number(value) || 0
@@ -229,18 +231,25 @@ export default function OrdenCompraModal({
 
     try {
       console.log('🚀 Enviando orden con items:', JSON.stringify(items, null, 2))
-      
-      const ordenData = {
-        ...formData,
-        items: items.map(item => ({
+
+      // El backend (CreateOrdenCompraDto) usa whitelist estricta: espera `detalles[]`
+      // con { producto_id, descripcion, cantidad, precio_unitario } y calcula él mismo
+      // subtotal/igv/total. Enviar items/moneda/subtotal/igv/total o un estado fuera
+      // del enum (BORRADOR/APROBADA/…) provoca 400. El estado inicial lo pone el backend.
+      const ordenData: Record<string, unknown> = {
+        numero: formData.numero,
+        proveedor_id: formData.proveedor_id,
+        fecha_orden: formData.fecha_orden || undefined,
+        fecha_entrega_esperada: formData.fecha_entrega || undefined,
+        observaciones: formData.observaciones || undefined,
+        detalles: items.map(item => ({
           producto_id: item.producto_id,
-          producto_nombre: item.producto_nombre,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio_unitario,
-          subtotal: item.subtotal
-        }))
+          descripcion: item.producto_nombre || 'Producto',
+          cantidad: Number(item.cantidad),
+          precio_unitario: Number(item.precio_unitario),
+        })),
       }
-      
+
       console.log('📤 Datos completos a enviar:', JSON.stringify(ordenData, null, 2))
 
       const result = orden
@@ -252,11 +261,11 @@ export default function OrdenCompraModal({
         onClose()
         resetForm()
       } else {
-        alert('Error: ' + (result.message || 'Error al procesar la orden'))
+        toast({ variant: 'destructive', title: 'Error', description: result.message || 'Error al procesar la orden' })
       }
     } catch (error) {
       console.error('Error submitting order:', error)
-      alert('Error al procesar la orden')
+      toast({ variant: 'destructive', title: 'Error', description: 'Error al procesar la orden' })
     } finally {
       setIsLoading(false)
     }
@@ -281,14 +290,14 @@ export default function OrdenCompraModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]">
-      <div className="bg-white rounded-3 p-8 w-[95%] max-w-[1200px] overflow-auto shadow">
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1100]">
+      <div className="bg-card rounded-xl p-8 w-[95%] max-w-[1200px] overflow-auto shadow">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-6 font-semibold text-gray-800">
+          <h2 className="text-2xl font-semibold text-foreground">
             {orden ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
           </h2>
-          <button 
-            onClick={onClose} className="border-0 text-6 cursor-pointer text-gray-500 w-[30px] h-[30px] rounded-full flex items-center justify-center"
+          <button
+            onClick={onClose} className="border-0 text-2xl cursor-pointer text-muted-foreground w-[30px] h-[30px] rounded-full flex items-center justify-center"
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#f3f4f6'
             }}
@@ -304,25 +313,25 @@ export default function OrdenCompraModal({
           {/* Información básica */}
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Número de Orden
               </label>
               <input
                 type="text"
                 value={formData.numero}
-                disabled className="w-[100%] p-2 border rounded-1.5 bg-[#f9fafb] text-gray-500"
+                disabled className="w-[100%] p-2 border rounded-md bg-muted text-muted-foreground"
               />
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Proveedor *
               </label>
               <div className="flex gap-2">
                 <select
                   value={formData.proveedor_id}
                   onChange={(e) => setFormData({...formData, proveedor_id: e.target.value})}
-                  required className="flex-[1] p-2 border rounded-1.5 bg-white"
+                  required className="flex-[1] p-2 border rounded-md bg-card"
                 >
                   <option value="">Seleccionar proveedor</option>
                   {proveedores.map((proveedor: any) => (
@@ -334,9 +343,9 @@ export default function OrdenCompraModal({
                 <button
                   type="button"
                   onClick={() => {
-                    alert('Función de agregar proveedor - Se abrirá en nueva ventana');
+                    toast({ title: 'Agregar proveedor', description: 'Créalo desde el módulo de Proveedores.' });
                     // Aquí abrirías el modal de proveedores o irías a su página
-                  }} className="py-2 px-4 border rounded-1.5 bg-[#10b981] text-white cursor-pointer whitespace-nowrap"
+                  }} className="py-2 px-4 border rounded-md bg-[#10b981] text-white cursor-pointer whitespace-nowrap"
                   title="Agregar nuevo proveedor"
                 >
                   + Nuevo
@@ -345,12 +354,12 @@ export default function OrdenCompraModal({
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Moneda
               </label>
               <select
                 value={formData.moneda}
-                onChange={(e) => setFormData({...formData, moneda: e.target.value})} className="w-[100%] p-2 border rounded-1.5 bg-white"
+                onChange={(e) => setFormData({...formData, moneda: e.target.value})} className="w-[100%] p-2 border rounded-md bg-card"
               >
                 <option value="PEN">PEN - Soles</option>
                 <option value="USD">USD - Dólares</option>
@@ -360,26 +369,26 @@ export default function OrdenCompraModal({
 
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha de Orden *
               </label>
               <input
                 type="date"
                 value={formData.fecha_orden}
                 onChange={(e) => setFormData({...formData, fecha_orden: e.target.value})}
-                required className="w-[100%] p-2 border rounded-1.5"
+                required className="w-[100%] p-2 border rounded-md"
               />
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha de Entrega *
               </label>
               <input
                 type="date"
                 value={formData.fecha_entrega}
                 onChange={(e) => setFormData({...formData, fecha_entrega: e.target.value})}
-                required className="w-[100%] p-2 border rounded-1.5"
+                required className="w-[100%] p-2 border rounded-md"
               />
             </div>
           </div>
@@ -387,24 +396,24 @@ export default function OrdenCompraModal({
           {/* Items */}
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[1.125rem] font-semibold text-gray-700">Items de la Orden</h3>
+              <h3 className="text-[1.125rem] font-semibold text-foreground/85">Items de la Orden</h3>
               <button
                 type="button"
-                onClick={addItem} className="bg-blue-500 text-white py-2 px-4 rounded-1.5 border-0 cursor-pointer text-[0.875rem] font-medium"
+                onClick={addItem} className="bg-blue-500 text-white py-2 px-4 rounded-md border-0 cursor-pointer text-[0.875rem] font-medium"
               >
                 + Agregar Item
               </button>
             </div>
 
-            <div className="border rounded-2 overflow-hidden">
+            <div className="border rounded-lg overflow-hidden">
               <table className="w-[100%]">
-                <thead className="bg-[#f9fafb]">
+                <thead className="bg-muted">
                   <tr>
-                    <th className="p-3 text-left text-[0.875rem] font-medium text-gray-700">Producto</th>
-                    <th className="p-3 text-center text-[0.875rem] font-medium text-gray-700">Cantidad</th>
-                    <th className="p-3 text-right text-[0.875rem] font-medium text-gray-700">Precio Unit.</th>
-                    <th className="p-3 text-right text-[0.875rem] font-medium text-gray-700">Subtotal</th>
-                    <th className="p-3 text-center text-[0.875rem] font-medium text-gray-700">Acciones</th>
+                    <th className="p-3 text-left text-[0.875rem] font-medium text-foreground/85">Producto</th>
+                    <th className="p-3 text-center text-[0.875rem] font-medium text-foreground/85">Cantidad</th>
+                    <th className="p-3 text-right text-[0.875rem] font-medium text-foreground/85">Precio Unit.</th>
+                    <th className="p-3 text-right text-[0.875rem] font-medium text-foreground/85">Subtotal</th>
+                    <th className="p-3 text-center text-[0.875rem] font-medium text-foreground/85">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -418,11 +427,11 @@ export default function OrdenCompraModal({
                               placeholder="Nombre del nuevo producto"
                               value={item.producto_nombre || ''}
                               onChange={(e) => updateItem(index, 'producto_nombre', e.target.value)}
-                              required className="flex-[1] py-1 px-2 border rounded-1 text-[0.875rem] bg-[#eff6ff]"
+                              required className="flex-[1] py-1 px-2 border rounded text-[0.875rem] bg-card"
                             />
                             <button
                               type="button"
-                              onClick={() => updateItem(index, 'esNuevoProducto', false)} className="bg-gray-500 text-white py-1 px-2 rounded-1 border-0 cursor-pointer text-3"
+                              onClick={() => updateItem(index, 'esNuevoProducto', false)} className="bg-gray-500 text-white py-1 px-2 rounded border-0 cursor-pointer text-xs"
                               title="Cancelar producto nuevo"
                             >
                               ✕
@@ -433,7 +442,7 @@ export default function OrdenCompraModal({
                             <select
                               value={item.producto_id}
                               onChange={(e) => updateItem(index, 'producto_id', e.target.value)}
-                              required className="flex-[1] py-1 px-2 border rounded-1 text-[0.875rem]"
+                              required className="flex-[1] py-1 px-2 border rounded text-[0.875rem]"
                             >
                               <option value="">Seleccionar producto</option>
                               {productos.map((producto: any) => (
@@ -444,7 +453,7 @@ export default function OrdenCompraModal({
                             </select>
                             <button
                               type="button"
-                              onClick={() => updateItem(index, 'esNuevoProducto', true)} className="bg-[#10b981] text-white py-1 px-2 rounded-1 border-0 cursor-pointer text-3"
+                              onClick={() => updateItem(index, 'esNuevoProducto', true)} className="bg-[#10b981] text-white py-1 px-2 rounded border-0 cursor-pointer text-xs"
                               title="Crear producto nuevo"
                             >
                               + Nuevo
@@ -457,7 +466,7 @@ export default function OrdenCompraModal({
                           type="number"
                           min="1"
                           value={item.cantidad || ''}
-                          onChange={(e) => updateItem(index, 'cantidad', e.target.value)} className="w-[80px] p-1 border rounded-1 text-center text-[0.875rem]"
+                          onChange={(e) => updateItem(index, 'cantidad', e.target.value)} className="w-[80px] p-1 border rounded text-center text-[0.875rem]"
                         />
                       </td>
                       <td className="p-3 text-right">
@@ -466,7 +475,7 @@ export default function OrdenCompraModal({
                           step="0.01"
                           min="0"
                           value={item.precio_unitario || ''}
-                          onChange={(e) => updateItem(index, 'precio_unitario', e.target.value)} className="w-[100px] p-1 border rounded-1 text-right text-[0.875rem]"
+                          onChange={(e) => updateItem(index, 'precio_unitario', e.target.value)} className="w-[100px] p-1 border rounded text-right text-[0.875rem]"
                         />
                       </td>
                       <td className="p-3 text-right font-medium">
@@ -475,7 +484,7 @@ export default function OrdenCompraModal({
                       <td className="p-3 text-center">
                         <button
                           type="button"
-                          onClick={() => removeItem(index)} className="bg-red-600 text-white py-1 px-2 rounded-1 border-0 cursor-pointer text-3"
+                          onClick={() => removeItem(index)} className="bg-red-600 text-white py-1 px-2 rounded border-0 cursor-pointer text-xs"
                         >
                           Eliminar
                         </button>
@@ -487,7 +496,7 @@ export default function OrdenCompraModal({
             </div>
 
             {/* Totales */}
-            <div className="mt-4 bg-[#f9fafb] p-4 rounded-2">
+            <div className="mt-4 bg-muted p-4 rounded-lg">
               <div className="flex justify-end">
                 <div className="text-right">
                   <div className="mb-2 text-[0.875rem]">
@@ -508,14 +517,14 @@ export default function OrdenCompraModal({
 
           {/* Observaciones */}
           <div className="mb-6">
-            <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+            <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
               Observaciones
             </label>
             <textarea
               value={formData.observaciones}
               onChange={(e) => setFormData({...formData, observaciones: e.target.value})}
               rows={3}
-              placeholder="Observaciones adicionales..." className="w-[100%] p-2 border rounded-1.5"
+              placeholder="Observaciones adicionales..." className="w-[100%] p-2 border rounded-md"
             />
           </div>
 
@@ -523,13 +532,13 @@ export default function OrdenCompraModal({
           <div className="flex justify-end gap-3 pt-6 border-t">
             <button
               type="button"
-              onClick={onClose} className="py-2 px-4 border rounded-1.5 bg-white text-gray-700 cursor-pointer text-[0.875rem] font-medium"
+              onClick={onClose} className="py-2 px-4 border rounded-md bg-card text-foreground/85 cursor-pointer text-[0.875rem] font-medium"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={isLoading} className="py-2 px-4 text-white border-0 rounded-1.5 text-[0.875rem] font-medium"
+              disabled={isLoading} className="py-2 px-4 text-white border-0 rounded-md text-[0.875rem] font-medium"
             >
               {isLoading ? 'Procesando...' : (orden ? 'Actualizar' : 'Crear')} Orden
             </button>

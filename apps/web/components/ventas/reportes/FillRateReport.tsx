@@ -121,7 +121,7 @@ export default function FillRateReport({ filters }: Props) {
           <CardTitle>Fill-rate &amp; OTIF</CardTitle>
           <CardDescription>Evaluando entregas en el periodo seleccionado…</CardDescription>
         </CardHeader>
-        <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-slate-600">
+        <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-foreground/80">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span>Calculando métricas logísticas</span>
         </CardContent>
@@ -136,7 +136,7 @@ export default function FillRateReport({ filters }: Props) {
           <CardTitle>Fill-rate &amp; OTIF</CardTitle>
           <CardDescription>No se hallaron pedidos en el intervalo indicado</CardDescription>
         </CardHeader>
-        <CardContent className="py-12 text-center text-slate-500">
+        <CardContent className="py-12 text-center text-muted-foreground">
           Ajusta los filtros o confirma que existan registros confirmados en el periodo.
         </CardContent>
       </Card>
@@ -154,13 +154,13 @@ export default function FillRateReport({ filters }: Props) {
               <CheckCircle2 className="h-5 w-5" />
               Fill-rate global
             </CardTitle>
-            <CardDescription className="text-emerald-100">
+            <CardDescription className="text-emerald-400 dark:text-emerald-200">
               Porcentaje de unidades entregadas sobre lo solicitado
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-4xl font-semibold">{resumen.fillRate.toFixed(1)}%</p>
-            <p className="text-sm text-emerald-100 mt-1">
+            <p className="text-sm text-emerald-400 dark:text-emerald-200 mt-1">
               {numberFormatter.format(resumen.totalEntregado)} unidades entregadas de{' '}
               {numberFormatter.format(resumen.totalSolicitado)}
             </p>
@@ -192,13 +192,13 @@ export default function FillRateReport({ filters }: Props) {
               <CalendarClock className="h-5 w-5" />
               Backorders pendientes
             </CardTitle>
-            <CardDescription className="text-sky-100">
+            <CardDescription className="text-primary dark:text-sky-200">
               Líneas reagendadas a seguimiento
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-4xl font-semibold">{resumen.pedidosConBackorder}</p>
-            <p className="text-sm text-sky-100 mt-1">
+            <p className="text-sm text-primary dark:text-sky-200 mt-1">
               {numberFormatter.format(resumen.unidadesPendientesBackorder)} uds pendientes
             </p>
           </CardContent>
@@ -210,13 +210,13 @@ export default function FillRateReport({ filters }: Props) {
               <PackageMinus className="h-5 w-5" />
               Pedidos sin entrega
             </CardTitle>
-            <CardDescription className="text-amber-100">
+            <CardDescription className="text-amber-400 dark:text-amber-200">
               Pedidos confirmados sin salidas registradas
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-4xl font-semibold">{incidencias.pedidosSinEntrega}</p>
-            <p className="text-sm text-amber-100 mt-1">
+            <p className="text-sm text-amber-400 dark:text-amber-200 mt-1">
               de {resumen.pedidosAnalizados} pedidos analizados
             </p>
           </CardContent>
@@ -228,13 +228,13 @@ export default function FillRateReport({ filters }: Props) {
               <Clock3 className="h-5 w-5" />
               Fuera de SLA
             </CardTitle>
-            <CardDescription className="text-rose-100">
+            <CardDescription className="text-destructive dark:text-rose-200">
               Entregas completas con retraso
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-4xl font-semibold">{incidencias.pedidosFueraSla}</p>
-            <p className="text-sm text-rose-100 mt-1">
+            <p className="text-sm text-destructive dark:text-rose-200 mt-1">
               SLA estándar considerado: 5 días calendario
             </p>
           </CardContent>
@@ -250,50 +250,50 @@ export default function FillRateReport({ filters }: Props) {
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-muted/30">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-slate-600">Pedido</th>
-                <th className="px-3 py-2 text-left font-medium text-slate-600">Estado</th>
-                <th className="px-3 py-2 text-right font-medium text-slate-600">Solicitado</th>
-                <th className="px-3 py-2 text-right font-medium text-slate-600">Entregado</th>
-                <th className="px-3 py-2 text-right font-medium text-slate-600">Fill-rate</th>
-                <th className="px-3 py-2 text-right font-medium text-slate-600">Pendiente BO</th>
-                <th className="px-3 py-2 text-left font-medium text-slate-600">Compromisos</th>
-                <th className="px-3 py-2 text-left font-medium text-slate-600">Tracking</th>
-                <th className="px-3 py-2 text-right font-medium text-slate-600">Días entrega</th>
-                <th className="px-3 py-2 text-center font-medium text-slate-600">SLA</th>
+                <th className="px-3 py-2 text-left font-medium text-foreground/80">Pedido</th>
+                <th className="px-3 py-2 text-left font-medium text-foreground/80">Estado</th>
+                <th className="px-3 py-2 text-right font-medium text-foreground/80">Solicitado</th>
+                <th className="px-3 py-2 text-right font-medium text-foreground/80">Entregado</th>
+                <th className="px-3 py-2 text-right font-medium text-foreground/80">Fill-rate</th>
+                <th className="px-3 py-2 text-right font-medium text-foreground/80">Pendiente BO</th>
+                <th className="px-3 py-2 text-left font-medium text-foreground/80">Compromisos</th>
+                <th className="px-3 py-2 text-left font-medium text-foreground/80">Tracking</th>
+                <th className="px-3 py-2 text-right font-medium text-foreground/80">Días entrega</th>
+                <th className="px-3 py-2 text-center font-medium text-foreground/80">SLA</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {topIncidencias.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-3 py-6 text-center text-slate-500">
+                  <td colSpan={10} className="px-3 py-6 text-center text-muted-foreground">
                     No hay incidentes registrados en el periodo. ¡Buen trabajo del equipo logístico!
                   </td>
                 </tr>
               ) : (
                 topIncidencias.map((item) => (
-                  <tr key={item.pedido_id} className="bg-white">
-                    <td className="px-3 py-2 font-medium text-slate-700">{item.numero}</td>
-                    <td className="px-3 py-2 text-slate-600">{item.estado}</td>
-                    <td className="px-3 py-2 text-right text-slate-600">
+                  <tr key={item.pedido_id} className="bg-card">
+                    <td className="px-3 py-2 font-medium text-foreground/85">{item.numero}</td>
+                    <td className="px-3 py-2 text-foreground/80">{item.estado}</td>
+                    <td className="px-3 py-2 text-right text-foreground/80">
                       {numberFormatter.format(item.solicitado)}
                     </td>
-                    <td className="px-3 py-2 text-right text-slate-600">
+                    <td className="px-3 py-2 text-right text-foreground/80">
                       {numberFormatter.format(item.entregado)}
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold text-rose-600">
+                    <td className="px-3 py-2 text-right font-semibold text-destructive">
                       {item.fillRate.toFixed(1)}%
                     </td>
-                    <td className="px-3 py-2 text-right text-slate-600">
+                    <td className="px-3 py-2 text-right text-foreground/80">
                       {numberFormatter.format(item.pendiente_backorder_total ?? 0)}
                     </td>
-                    <td className="px-3 py-2 text-slate-500">
+                    <td className="px-3 py-2 text-muted-foreground">
                       {item.pendientes_backorder && item.pendientes_backorder.length > 0 ? (
                         <div className="space-y-1">
                           {item.pendientes_backorder.map((pendiente) => (
-                            <div key={`${pendiente.detalle_id}-${pendiente.proxima_fecha_compromiso}`} className="flex items-center justify-between text-xs text-slate-500">
-                              <span className="font-medium text-slate-600">
+                            <div key={`${pendiente.detalle_id}-${pendiente.proxima_fecha_compromiso}`} className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="font-medium text-foreground/80">
                                 {numberFormatter.format(pendiente.cantidad_pendiente)} uds
                               </span>
                               <span>
@@ -301,7 +301,7 @@ export default function FillRateReport({ filters }: Props) {
                                   ? new Date(pendiente.proxima_fecha_compromiso).toLocaleDateString('es-PE')
                                   : 'Sin fecha'}
                               </span>
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                              <span className="px-2 py-0.5 rounded-full bg-muted text-foreground/80">
                                 P{pendiente.prioridad}
                               </span>
                             </div>
@@ -311,23 +311,23 @@ export default function FillRateReport({ filters }: Props) {
                         <span>—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-slate-500">
+                    <td className="px-3 py-2 text-muted-foreground">
                       {item.tracking_estado ?? 'Sin tracking'}
                     </td>
-                    <td className="px-3 py-2 text-right text-slate-500">
+                    <td className="px-3 py-2 text-right text-muted-foreground">
                       {item.diasHastaEntrega != null ? `${item.diasHastaEntrega} días` : '—'}
                     </td>
                     <td className="px-3 py-2 text-center">
                       {item.dentroDeSla == null ? (
-                        <span className="px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-600">
+                        <span className="px-2 py-1 text-xs rounded-full bg-muted text-foreground/80">
                           N/D
                         </span>
                       ) : item.dentroDeSla ? (
-                        <span className="px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-700">
+                        <span className="px-2 py-1 text-xs rounded-full bg-emerald-500/10 text-emerald-400">
                           Dentro
                         </span>
                       ) : (
-                        <span className="px-2 py-1 text-xs rounded-full bg-rose-100 text-rose-700">
+                        <span className="px-2 py-1 text-xs rounded-full bg-destructive/10 text-destructive">
                           Fuera
                         </span>
                       )}
@@ -349,40 +349,40 @@ export default function FillRateReport({ filters }: Props) {
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {topBackorders.length === 0 ? (
-            <div className="py-6 text-center text-slate-500 text-sm">
+            <div className="py-6 text-center text-muted-foreground text-sm">
               No hay backorders reprogramados en el periodo seleccionado.
             </div>
           ) : (
             <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50">
+              <thead className="bg-muted/30">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-slate-600">Pedido</th>
-                  <th className="px-3 py-2 text-left font-medium text-slate-600">Detalle</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">Pendiente</th>
-                  <th className="px-3 py-2 text-center font-medium text-slate-600">Prioridad</th>
-                  <th className="px-3 py-2 text-left font-medium text-slate-600">Compromiso</th>
-                  <th className="px-3 py-2 text-left font-medium text-slate-600">Estado</th>
+                  <th className="px-3 py-2 text-left font-medium text-foreground/80">Pedido</th>
+                  <th className="px-3 py-2 text-left font-medium text-foreground/80">Detalle</th>
+                  <th className="px-3 py-2 text-right font-medium text-foreground/80">Pendiente</th>
+                  <th className="px-3 py-2 text-center font-medium text-foreground/80">Prioridad</th>
+                  <th className="px-3 py-2 text-left font-medium text-foreground/80">Compromiso</th>
+                  <th className="px-3 py-2 text-left font-medium text-foreground/80">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {topBackorders.map((item) => (
-                  <tr key={`${item.pedido_id}-${item.detalle_id}-${item.proxima_fecha_compromiso}`} className="bg-white">
-                    <td className="px-3 py-2 font-medium text-slate-700">{item.pedido_numero}</td>
-                    <td className="px-3 py-2 text-slate-500 text-xs">{item.detalle_id}</td>
-                    <td className="px-3 py-2 text-right text-slate-600">
+                  <tr key={`${item.pedido_id}-${item.detalle_id}-${item.proxima_fecha_compromiso}`} className="bg-card">
+                    <td className="px-3 py-2 font-medium text-foreground/85">{item.pedido_numero}</td>
+                    <td className="px-3 py-2 text-muted-foreground text-xs">{item.detalle_id}</td>
+                    <td className="px-3 py-2 text-right text-foreground/80">
                       {numberFormatter.format(item.cantidad_pendiente)}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                      <span className="px-2 py-0.5 rounded-full bg-muted text-foreground/80">
                         P{item.prioridad}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-slate-600">
+                    <td className="px-3 py-2 text-foreground/80">
                       {item.proxima_fecha_compromiso
                         ? new Date(item.proxima_fecha_compromiso).toLocaleDateString('es-PE')
                         : 'Sin fecha'}
                     </td>
-                    <td className="px-3 py-2 text-slate-500">{item.estado}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{item.estado}</td>
                   </tr>
                 ))}
               </tbody>

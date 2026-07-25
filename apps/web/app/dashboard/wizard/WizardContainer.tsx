@@ -37,8 +37,6 @@ export function WizardContainer({ children }: WizardContainerProps) {
       nextStep()
     } catch (error) {
       console.error('Error saving step progress:', error)
-      // Still move to next step even if save fails
-      nextStep()
     }
   }
 
@@ -63,7 +61,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
   const progress = ((state.currentStep + 1) / state.steps.length) * 100
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       <div className="max-w-[1000px] my-0 mx-auto">
         {/* Progress Section */}
         <div className="p-8 mb-8 shadow border">
@@ -71,7 +69,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
             <span className="text-[0.875rem] font-bold text-[var(--primary-700)]">
               Paso {state.currentStep + 1} de {state.steps.length}
             </span>
-            <span className="text-5 font-bold text-[var(--amber-600)]">
+            <span className="text-xl font-bold text-[var(--amber-600)]">
               {Math.round(progress)}%
             </span>
           </div>
@@ -87,10 +85,10 @@ export function WizardContainer({ children }: WizardContainerProps) {
               <div
                 key={step.id} className="flex-[1] text-center"
               >
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-4 font-bold transition">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold transition">
                   {step.isComplete ? '✓' : index + 1}
                 </div>
-                <div className="text-3 font-semibold">
+                <div className="text-xs font-semibold">
                   {step.title}
                 </div>
               </div>
@@ -107,24 +105,24 @@ export function WizardContainer({ children }: WizardContainerProps) {
         )}
 
         {/* Main Content Card */}
-        <div className="stat-card p-10">
+        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg p-10">
           {/* Step Title */}
           <div className="mb-8">
-            <h2 className="text-8 font-extrabold text-[var(--primary-800)] mb-3">
+            <h2 className="text-[2rem] font-extrabold text-[var(--primary-800)] mb-3">
               {state.hasPersistedConfiguration ? 'Resumen de Configuración' : currentStepData.title}
             </h2>
-            <p className="text-4 text-[var(--primary-600)] font-medium leading-7">
-              {state.hasPersistedConfiguration 
-                ? 'Tu sistema está configurado. Aquí puedes ver y editar algunos ajustes.' 
+            <p className="text-base text-[var(--primary-600)] font-medium leading-7">
+              {state.hasPersistedConfiguration
+                ? 'Tu sistema está configurado. Aquí puedes ver y editar algunos ajustes.'
                 : currentStepData.description}
             </p>
           </div>
 
           {/* Step Content */}
           {state.isLoading ? (
-            <div className="loading">
-              <div className="loading-spinner"></div>
-              <p className="text-[var(--primary-600)] text-4 font-medium">
+            <div className="flex min-h-48 items-center justify-center">
+              <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
+              <p className="text-[var(--primary-600)] text-base font-medium">
                 Cargando configuración inicial del sistema
               </p>
             </div>
@@ -137,7 +135,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
             <div className="flex mt-10 pt-8 border-t gap-4">
               {state.currentStep > 0 && !isFinalStep && (
                 <button
-                  className="btn btn-secondary flex items-center gap-2"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-semibold leading-5 text-secondary-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 flex items-center gap-2"
                   onClick={previousStep}
                 >
                   <ChevronLeft size={20} />
@@ -147,7 +145,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
 
               {state.currentStep < state.steps.length - 1 && (
                 <button
-                  className="btn btn-primary flex items-center gap-2"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 flex items-center gap-2"
                   onClick={handleNextStep}
                   disabled={!canGoNext()}
                 >

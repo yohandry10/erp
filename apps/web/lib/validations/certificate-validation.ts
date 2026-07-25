@@ -1,7 +1,7 @@
 /**
  * Certificate Digital Validation
  * Requirements: 15.5, 19.6, 19.7
- * 
+ *
  * Validates digital certificate before generating invoices (CPE)
  */
 
@@ -73,9 +73,9 @@ export function getCertificateStatus(
   )
 
   const isExpired = validation.errors.some(e => e.includes('vencido'))
-  
-  const isExpiringSoon = validation.daysUntilExpiration !== undefined && 
-    validation.daysUntilExpiration <= 30 && 
+
+  const isExpiringSoon = validation.daysUntilExpiration !== undefined &&
+    validation.daysUntilExpiration <= 30 &&
     validation.daysUntilExpiration > 0
 
   return {
@@ -98,9 +98,9 @@ export function getCertificateErrorMessage(errors: string[]): string {
   const hasNoCertificate = errors.some(
     e => e.includes('No se ha cargado') || e.includes('No se encontró')
   )
-  
+
   const isExpired = errors.some(e => e.includes('vencido'))
-  
+
   const hasInvalidFormat = errors.some(e => e.includes('formato'))
 
   if (hasNoCertificate) {
@@ -142,7 +142,7 @@ export function getCertificateActionMessage(
   const hasNoCertificate = validation.errors.some(
     e => e.includes('No se ha cargado') || e.includes('No se encontró')
   )
-  
+
   const isExpired = validation.errors.some(e => e.includes('vencido'))
 
   if (hasNoCertificate) {
@@ -165,7 +165,7 @@ export function formatExpirationDate(date: Date | string | undefined): string {
   }
 
   const expirationDate = typeof date === 'string' ? new Date(date) : date
-  
+
   return expirationDate.toLocaleDateString('es-PE', {
     year: 'numeric',
     month: 'long',
@@ -178,7 +178,7 @@ export function formatExpirationDate(date: Date | string | undefined): string {
  */
 export function getCertificateStatusColor(status: CertificateStatus): string {
   if (!status.exists) {
-    return 'bg-gray-100 text-gray-700'
+    return 'bg-muted text-foreground/85'
   }
 
   if (status.isExpired) {

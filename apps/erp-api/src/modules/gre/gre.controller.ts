@@ -230,8 +230,11 @@ export class GreController {
       `Peso total: ${gre.pesoTotal} Kg`,
       `Estado: ${gre.estado}`,
       gre.transportista ? `Transportista: ${gre.transportista}` : null,
+      gre.transportistaDocumento ? `RUC transportista: ${gre.transportistaDocumento}` : null,
       gre.placaVehiculo ? `Placa: ${gre.placaVehiculo}` : null,
       gre.licenciaConducir ? `Licencia: ${gre.licenciaConducir}` : null,
+      gre.conductorDocumentoNumero ? `Conductor: ${[gre.conductorNombres, gre.conductorApellidos].filter(Boolean).join(' ')}` : null,
+      gre.conductorDocumentoNumero ? `Documento conductor: ${gre.conductorDocumentoNumero}` : null,
       gre.hashGre ? `Hash: ${gre.hashGre}` : null,
     ].filter(Boolean).join('\n');
 

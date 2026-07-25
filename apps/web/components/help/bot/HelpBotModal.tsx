@@ -55,7 +55,7 @@ export function HelpBotModal({
 
   return (
     <div
-      className="fixed bottom-20 right-4 z-50 flex w-96 max-w-[calc(100vw-32px)] animate-in slide-in-from-bottom-2 flex-col rounded-xl bg-white shadow-2xl"
+      className="fixed bottom-20 right-4 z-50 flex w-96 max-w-[calc(100vw-32px)] animate-in slide-in-from-bottom-2 flex-col rounded-xl bg-card shadow-2xl"
       role="dialog"
       aria-label="Asistente de ayuda"
     >
@@ -80,7 +80,7 @@ export function HelpBotModal({
       <div className="flex max-h-80 min-h-52 flex-1 flex-col gap-3 overflow-y-auto p-4">
         {messages.length === 0 ? (
           <div className="flex flex-col gap-4">
-            <p className="m-0 text-sm text-slate-600">
+            <p className="m-0 text-sm text-foreground/80">
               ¡Hola! Soy tu asistente. ¿En qué puedo ayudarte?
             </p>
             <HelpBotSuggestions
@@ -96,8 +96,8 @@ export function HelpBotModal({
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="rounded-lg bg-slate-100 px-3 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                <div className="rounded-lg bg-muted px-3 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
               </div>
             )}
@@ -107,7 +107,7 @@ export function HelpBotModal({
       </div>
 
       {/* Input area */}
-      <div className="border-t border-slate-200 p-3">
+      <div className="border-t border-border p-3">
         <div className="flex gap-2">
           <input
             ref={inputRef}
@@ -117,7 +117,7 @@ export function HelpBotModal({
             onKeyDown={handleKeyDown}
             placeholder="Escribe tu pregunta..."
             disabled={isLoading}
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex-1 rounded-lg border border-border px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <button
             onClick={onSubmit}

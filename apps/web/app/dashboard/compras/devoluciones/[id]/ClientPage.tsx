@@ -69,21 +69,21 @@ interface Devolucion {
 }
 
 const ESTADO_CONFIG = {
-  PENDIENTE: { icon: Clock, className: 'bg-blue-500/20 text-blue-100 ring-blue-400/40' },
-  EMITIDA: { icon: CheckCircle, className: 'bg-cyan-500/20 text-cyan-100 ring-cyan-300/40' },
-  ANULADA: { icon: XCircle, className: 'bg-slate-800 text-slate-100 ring-slate-500/40' }
+  PENDIENTE: { icon: Clock, className: 'bg-blue-500/20 text-primary dark:text-blue-200 ring-blue-400/40' },
+  EMITIDA: { icon: CheckCircle, className: 'bg-cyan-500/20 text-primary ring-cyan-300/40' },
+  ANULADA: { icon: XCircle, className: 'bg-muted text-foreground ring-slate-500/40' }
 }
 
-const pageClass = 'min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 text-slate-100'
-const panelClass = 'rounded-2xl border border-blue-400/20 bg-slate-950/70 p-5 shadow-xl shadow-blue-950/20 backdrop-blur'
+const pageClass = 'min-h-full bg-gradient-to-br from-background via-muted/50 to-background p-6 text-foreground'
+const panelClass = 'rounded-2xl border border-blue-400/20 bg-card/70 p-5 shadow-xl shadow-blue-950/20 backdrop-blur'
 const panelHeaderClass = 'mb-5 flex items-center gap-3 border-b border-blue-400/20 pb-4'
-const iconBoxClass = 'flex size-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-200'
-const labelClass = 'mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-const valueClass = 'm-0 text-sm font-semibold text-slate-100'
+const iconBoxClass = 'flex size-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-primary dark:text-blue-200'
+const labelClass = 'mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground'
+const valueClass = 'm-0 text-sm font-semibold text-foreground'
 const primaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60'
-const secondaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-500/40 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-slate-800'
-const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
-const tableCellClass = 'px-4 py-3 text-sm text-slate-200'
+const secondaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-500/40 bg-card/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted'
+const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground'
+const tableCellClass = 'px-4 py-3 text-sm text-foreground/90'
 
 export default function DevolucionDetallePage() {
   const router = useRouter()
@@ -198,8 +198,8 @@ export default function DevolucionDetallePage() {
       <div className={pageClass}>
         <div className="flex min-h-[40vh] items-center justify-center">
           <div className={`${panelClass} max-w-xl text-center`}>
-            <PackageX className="mx-auto mb-4 size-12 text-slate-300" />
-            <p className="m-0 text-sm text-slate-300">Devolución no encontrada</p>
+            <PackageX className="mx-auto mb-4 size-12 text-muted-foreground" />
+            <p className="m-0 text-sm text-muted-foreground">Devolución no encontrada</p>
           </div>
         </div>
       </div>
@@ -208,8 +208,8 @@ export default function DevolucionDetallePage() {
 
   return (
     <div className={pageClass}>
-      <div className="mb-6 rounded-3xl border border-blue-400/20 bg-slate-950/80 p-6 shadow-2xl shadow-blue-950/30">
-        <button onClick={() => router.back()} className="mb-4 inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20">
+      <div className="mb-6 rounded-3xl border border-blue-400/20 bg-card/80 p-6 shadow-2xl shadow-blue-950/30">
+        <button onClick={() => router.back()} className="mb-4 inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-primary dark:text-blue-200 transition hover:bg-blue-500/20">
           <ArrowLeft size={18} />
           Volver
         </button>
@@ -217,10 +217,10 @@ export default function DevolucionDetallePage() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-4">
-              <h1 className="m-0 text-3xl font-bold text-white">Devolución {devolucion.numero}</h1>
+              <h1 className="m-0 text-3xl font-bold text-foreground">Devolución {devolucion.numero}</h1>
               {getEstadoBadge(devolucion.estado)}
             </div>
-            <p className="m-0 text-sm text-slate-300">Creada el {formatDateTime(devolucion.created_at)}</p>
+            <p className="m-0 text-sm text-muted-foreground">Creada el {formatDateTime(devolucion.created_at)}</p>
           </div>
 
           {devolucion.estado === 'PENDIENTE' && (
@@ -233,7 +233,7 @@ export default function DevolucionDetallePage() {
       </div>
 
       {pageMessage && (
-        <div className={`mb-6 rounded-xl border p-4 text-sm font-semibold ${pageMessage.type === 'error' ? 'border-slate-500/40 bg-slate-900/80 text-slate-100' : 'border-blue-400/30 bg-blue-500/10 text-blue-100'}`}>
+        <div className={`mb-6 rounded-xl border p-4 text-sm font-semibold ${pageMessage.type === 'error' ? 'border-slate-500/40 bg-card/80 text-foreground' : 'border-blue-400/30 bg-blue-500/10 text-primary dark:text-blue-200'}`}>
           <div className="flex items-center gap-3">
             {pageMessage.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
             {pageMessage.text}
@@ -246,7 +246,7 @@ export default function DevolucionDetallePage() {
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><FileText size={20} /></div>
-              <h2 className="m-0 text-lg font-bold text-white">Información de la Devolución</h2>
+              <h2 className="m-0 text-lg font-bold text-foreground">Información de la Devolución</h2>
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
@@ -266,18 +266,18 @@ export default function DevolucionDetallePage() {
                 <div>
                   <label className={labelClass}>Recepción</label>
                   <p className={valueClass}>{devolucion.recepcion.numero}</p>
-                  <p className="mt-1 text-xs text-slate-400">Recibida: {formatDate(devolucion.recepcion.fecha_recepcion)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Recibida: {formatDate(devolucion.recepcion.fecha_recepcion)}</p>
                 </div>
               )}
             </div>
 
             <div className="mt-5 border-t border-blue-400/20 pt-5">
               <label className={labelClass}>Motivo</label>
-              <p className="mb-4 text-sm font-semibold text-slate-100">{devolucion.motivo}</p>
+              <p className="mb-4 text-sm font-semibold text-foreground">{devolucion.motivo}</p>
               {devolucion.observaciones && (
                 <>
                   <label className={labelClass}>Observaciones</label>
-                  <p className="m-0 text-sm leading-6 text-slate-300">{devolucion.observaciones}</p>
+                  <p className="m-0 text-sm leading-6 text-muted-foreground">{devolucion.observaciones}</p>
                 </>
               )}
             </div>
@@ -285,10 +285,10 @@ export default function DevolucionDetallePage() {
             {devolucion.estado === 'EMITIDA' && (
               <div className="mt-5 rounded-xl border border-blue-400/20 bg-blue-500/10 p-4">
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="mt-0.5 size-5 shrink-0 text-blue-200" />
+                  <CheckCircle className="mt-0.5 size-5 shrink-0 text-primary dark:text-blue-200" />
                   <div>
-                    <p className="mb-1 font-semibold text-blue-100">Devolución emitida</p>
-                    <p className="m-0 text-sm text-slate-300">
+                    <p className="mb-1 font-semibold text-primary dark:text-blue-200">Devolución emitida</p>
+                    <p className="m-0 text-sm text-muted-foreground">
                       Emitida el {devolucion.emitido_at ? formatDateTime(devolucion.emitido_at) : 'N/A'}
                       {devolucion.emitido_por && ` por ${devolucion.emitido_por}`}
                     </p>
@@ -301,7 +301,7 @@ export default function DevolucionDetallePage() {
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><PackageX size={20} /></div>
-              <h2 className="m-0 text-lg font-bold text-white">Items Devueltos</h2>
+              <h2 className="m-0 text-lg font-bold text-foreground">Items Devueltos</h2>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-blue-400/10">
@@ -319,19 +319,19 @@ export default function DevolucionDetallePage() {
                   {devolucion.items?.map((item) => (
                     <tr key={item.id} className="border-b border-blue-400/10 last:border-b-0 hover:bg-blue-500/5">
                       <td className={tableCellClass}>
-                        <div className="font-semibold text-white">{item.producto?.nombre || 'N/A'}</div>
-                        <div className="text-xs text-slate-400">{item.producto?.codigo || 'N/A'}</div>
+                        <div className="font-semibold text-foreground">{item.producto?.nombre || 'N/A'}</div>
+                        <div className="text-xs text-muted-foreground">{item.producto?.codigo || 'N/A'}</div>
                       </td>
-                      <td className={`${tableCellClass} text-center font-semibold text-white`}>
+                      <td className={`${tableCellClass} text-center font-semibold text-foreground`}>
                         {item.cantidad} {item.producto?.unidad_medida || ''}
                       </td>
                       <td className={`${tableCellClass} text-right`}>{formatCurrency(item.precio_unitario)}</td>
-                      <td className={`${tableCellClass} text-right font-semibold text-white`}>{formatCurrency(item.subtotal)}</td>
+                      <td className={`${tableCellClass} text-right font-semibold text-foreground`}>{formatCurrency(item.subtotal)}</td>
                       <td className={tableCellClass}>
-                        <span className="inline-flex rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-100 ring-1 ring-slate-500/40">
+                        <span className="inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold text-foreground ring-1 ring-slate-500/40">
                           {item.motivo || devolucion.motivo}
                         </span>
-                        {item.motivo_detalle && <div className="mt-2 text-xs text-slate-400">{item.motivo_detalle}</div>}
+                        {item.motivo_detalle && <div className="mt-2 text-xs text-muted-foreground">{item.motivo_detalle}</div>}
                       </td>
                     </tr>
                   ))}
@@ -341,16 +341,16 @@ export default function DevolucionDetallePage() {
 
             <div className="ml-auto mt-6 grid max-w-sm gap-2 rounded-xl border border-blue-400/20 bg-blue-500/10 p-4">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Subtotal:</span>
-                <span className="font-semibold text-slate-100">{formatCurrency(devolucion.subtotal)}</span>
+                <span className="text-muted-foreground">Subtotal:</span>
+                <span className="font-semibold text-foreground">{formatCurrency(devolucion.subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-400">IGV (18%):</span>
-                <span className="font-semibold text-slate-100">{formatCurrency(devolucion.igv)}</span>
+                <span className="text-muted-foreground">IGV (18%):</span>
+                <span className="font-semibold text-foreground">{formatCurrency(devolucion.igv)}</span>
               </div>
               <div className="flex justify-between border-t border-blue-400/20 pt-2 text-lg">
-                <span className="font-semibold text-white">Total:</span>
-                <span className="font-bold text-blue-100">{formatCurrency(devolucion.total)}</span>
+                <span className="font-semibold text-foreground">Total:</span>
+                <span className="font-bold text-primary dark:text-blue-200">{formatCurrency(devolucion.total)}</span>
               </div>
             </div>
           </div>
@@ -360,29 +360,29 @@ export default function DevolucionDetallePage() {
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><User size={20} /></div>
-              <h2 className="m-0 text-lg font-bold text-white">Proveedor</h2>
+              <h2 className="m-0 text-lg font-bold text-foreground">Proveedor</h2>
             </div>
             <div className="grid gap-4">
               <div>
                 <p className={valueClass}>{devolucion.proveedor?.razon_social || 'N/A'}</p>
-                <p className="mt-1 text-xs text-slate-400">RUC: {devolucion.proveedor?.ruc || 'N/A'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">RUC: {devolucion.proveedor?.ruc || 'N/A'}</p>
               </div>
               {devolucion.proveedor?.direccion && (
                 <div>
                   <label className={labelClass}>Dirección</label>
-                  <p className="m-0 text-sm text-slate-300">{devolucion.proveedor.direccion}</p>
+                  <p className="m-0 text-sm text-muted-foreground">{devolucion.proveedor.direccion}</p>
                 </div>
               )}
               {devolucion.proveedor?.telefono && (
                 <div>
                   <label className={labelClass}>Teléfono</label>
-                  <p className="m-0 text-sm text-slate-300">{devolucion.proveedor.telefono}</p>
+                  <p className="m-0 text-sm text-muted-foreground">{devolucion.proveedor.telefono}</p>
                 </div>
               )}
               {devolucion.proveedor?.email && (
                 <div>
                   <label className={labelClass}>Email</label>
-                  <p className="m-0 text-sm text-slate-300">{devolucion.proveedor.email}</p>
+                  <p className="m-0 text-sm text-muted-foreground">{devolucion.proveedor.email}</p>
                 </div>
               )}
             </div>
@@ -391,31 +391,31 @@ export default function DevolucionDetallePage() {
           <div className={panelClass}>
             <div className={panelHeaderClass}>
               <div className={iconBoxClass}><Calendar size={20} /></div>
-              <h2 className="m-0 text-lg font-bold text-white">Auditoría</h2>
+              <h2 className="m-0 text-lg font-bold text-foreground">Auditoría</h2>
             </div>
             <div className="grid gap-4">
               <div className="flex items-start gap-3">
-                <Calendar className="mt-0.5 size-5 shrink-0 text-blue-200" />
+                <Calendar className="mt-0.5 size-5 shrink-0 text-primary dark:text-blue-200" />
                 <div>
-                  <p className="mb-1 text-xs text-slate-400">Creada</p>
+                  <p className="mb-1 text-xs text-muted-foreground">Creada</p>
                   <p className={valueClass}>{formatDateTime(devolucion.created_at)}</p>
                 </div>
               </div>
 
               {devolucion.created_by && (
                 <div className="flex items-start gap-3">
-                  <User className="mt-0.5 size-5 shrink-0 text-blue-200" />
+                  <User className="mt-0.5 size-5 shrink-0 text-primary dark:text-blue-200" />
                   <div>
-                    <p className="mb-1 text-xs text-slate-400">Creada por</p>
+                    <p className="mb-1 text-xs text-muted-foreground">Creada por</p>
                     <p className={valueClass}>{devolucion.created_by}</p>
                   </div>
                 </div>
               )}
 
               <div className="flex items-start gap-3">
-                <FileText className="mt-0.5 size-5 shrink-0 text-blue-200" />
+                <FileText className="mt-0.5 size-5 shrink-0 text-primary dark:text-blue-200" />
                 <div>
-                  <p className="mb-1 text-xs text-slate-400">Estado actual</p>
+                  <p className="mb-1 text-xs text-muted-foreground">Estado actual</p>
                   <p className={valueClass}>{devolucion.estado}</p>
                 </div>
               </div>

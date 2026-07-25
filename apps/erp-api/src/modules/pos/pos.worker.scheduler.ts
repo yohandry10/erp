@@ -16,10 +16,12 @@ export class PosWorkerScheduler {
 
   private async fetchTenants(): Promise<string[]> {
     try {
+      // Los tenants demo se crean con estado PRUEBA; sin incluirlos, sus ventas
+      // POS quedaban con cpe_pendiente=true para siempre (0 intentos).
       const { data, error } = await this.supabase.getPublicClient()
         .from('tenants')
         .select('id')
-        .eq('estado', 'ACTIVO');
+        .in('estado', ['ACTIVO', 'PRUEBA']);
 
       if (error) {
         this.logger.error(`❌ [POS Worker] Error obteniendo tenants: ${error.message}`);
@@ -91,14 +93,33 @@ export class PosWorkerScheduler {
 
       if (error) {
         this.logger.warn(`⚠️ [POS Worker] No se pudo adquirir lock distribuido: ${error.message}`);
-        return false;
+        return this.shouldContinueWithoutDistributedLock(error);
       }
 
       return data === true || data === 'true';
     } catch (err: any) {
       this.logger.warn(`⚠️ [POS Worker] Error adquiriendo lock distribuido: ${err?.message || err}`);
-      return false;
+      return this.shouldContinueWithoutDistributedLock(err);
     }
+  }
+
+  private shouldContinueWithoutDistributedLock(error: any): boolean {
+    const message = String(error?.message || error || '').toLowerCase();
+    const lockUnavailable =
+      message.includes('permission denied') ||
+      message.includes('does not exist') ||
+      message.includes('could not find') ||
+      message.includes('schema cache') ||
+      message.includes('blocked for rpc');
+
+    if (lockUnavailable) {
+      this.logger.warn(
+        '⚠️ [POS Worker] Lock distribuido no disponible; se continua con procesamiento idempotente.',
+      );
+      return true;
+    }
+
+    return false;
   }
 
   private async releaseJobLock(): Promise<void> {

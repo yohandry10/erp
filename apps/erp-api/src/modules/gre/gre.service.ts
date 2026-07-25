@@ -770,16 +770,56 @@ export class GreService {
       throw new BadRequestException('No se puede generar GRE: peso total debe ser mayor a cero');
     }
 
-    if (dto.modalidad === 'TRANSPORTE_PUBLICO' && !dto.transportista?.trim()) {
-      throw new BadRequestException('No se puede generar GRE: transporte público requiere transportista');
+    const extras = dto.datosAdicionales || {};
+    const ubigeoDestino = this.normalizeDigits(
+      dto.ubigeoDestino ||
+      extras.destinoUbigeo ||
+      extras.ubigeoDestino,
+    );
+    if (!/^\d{6}$/.test(ubigeoDestino)) {
+      throw new BadRequestException(
+        'No se puede generar GRE: el ubigeo de destino debe tener 6 dígitos',
+      );
+    }
+
+    if (dto.modalidad === 'TRANSPORTE_PUBLICO') {
+      if (!dto.transportista?.trim()) {
+        throw new BadRequestException('No se puede generar GRE: transporte público requiere transportista');
+      }
+
+      const transportistaDocumento = this.normalizeDigits(
+        dto.transportistaDocumento ||
+        extras.transportistaDocumento ||
+        extras.transportistaRuc,
+      );
+      if (!/^\d{11}$/.test(transportistaDocumento)) {
+        throw new BadRequestException('No se puede generar GRE: transporte público requiere RUC válido del transportista');
+      }
     }
 
     if (dto.modalidad === 'TRANSPORTE_PRIVADO') {
-      if (!dto.placaVehiculo?.trim()) {
+      const placa = this.normalizeGrePlate(dto.placaVehiculo || extras.placaVehiculo || extras.placa);
+      if (!placa) {
         throw new BadRequestException('No se puede generar GRE: transporte privado requiere placa del vehículo');
       }
-      if (!dto.licenciaConducir?.trim()) {
+      const licenciaConducir = String(dto.licenciaConducir || extras.licenciaConducir || '').trim();
+      if (!licenciaConducir) {
         throw new BadRequestException('No se puede generar GRE: transporte privado requiere licencia de conducir');
+      }
+
+      const conductorDocumentoTipo = String(dto.conductorDocumentoTipo || extras.conductorDocumentoTipo || '1').trim();
+      const conductorDocumentoNumero = this.normalizeDigits(dto.conductorDocumentoNumero || extras.conductorDocumentoNumero);
+      const conductorNombres = String(dto.conductorNombres || extras.conductorNombres || '').trim();
+      const conductorApellidos = String(dto.conductorApellidos || extras.conductorApellidos || '').trim();
+
+      if (!/^[0147A]$/.test(conductorDocumentoTipo) || conductorDocumentoTipo === '6') {
+        throw new BadRequestException('No se puede generar GRE: tipo de documento del conductor inválido');
+      }
+      if (!conductorDocumentoNumero || conductorDocumentoNumero.length > 15) {
+        throw new BadRequestException('No se puede generar GRE: transporte privado requiere número de documento del conductor');
+      }
+      if (!conductorNombres || !conductorApellidos) {
+        throw new BadRequestException('No se puede generar GRE: transporte privado requiere nombres y apellidos del conductor');
       }
     }
   }
@@ -844,28 +884,82 @@ export class GreService {
     detalles: Array<{ id: number; descripcion: string; cantidad: number; unidad: string; peso?: number }>;
   }): string {
     const greData = payload.gre;
-    const fechaEmision = new Date().toISOString().split('T')[0];
-    const horaEmision = new Date().toTimeString().split(' ')[0];
-
-    const receptorDocTipo = payload.receptor.docTipo || '1';
-    const receptorDocNumero = payload.receptor.docNumero || '00000000';
+    const now = new Date();
+    const fechaEmision = this.formatGreDate(now);
+    const horaEmision = this.formatGreTime(now);
+    const trasladoFecha = this.formatGreDate(greData.fecha_traslado);
+    const motivoCode = this.getMotivoCode(greData.motivo);
+    const modalidadCode = this.getModalidadCode(greData.modalidad);
+    const isPublicTransport = modalidadCode === '01';
+    const isPrivateTransport = modalidadCode === '02';
+    const receptorDocTipo = this.escapeXmlText(payload.receptor.docTipo || '1');
+    const receptorDocNumero = this.escapeXmlText(payload.receptor.docNumero || '00000000');
     const receptorNombre = payload.receptor.razonSocial || 'DESTINATARIO';
     const receptorDireccion = payload.receptor.direccion || '';
-
-    const transportistaId = greData.transportista_documento || payload.emisor.ruc;
+    const emisorUbigeo = this.resolveGreUbigeo(payload.emisor.ubigeo);
+    const destinoUbigeo = this.resolveGreUbigeo(
+      greData.datos_adicionales?.destinoUbigeo ||
+      greData.datos_adicionales?.ubigeoDestino ||
+      greData.ubigeo_destino,
+    );
+    const transportistaDocumento = this.normalizeDigits(
+      greData.transportista_documento ||
+      greData.datos_adicionales?.transportistaDocumento ||
+      greData.datos_adicionales?.transportistaRuc,
+    );
     const transportistaNombre = greData.transportista || payload.emisor.razonSocial;
+    if (isPublicTransport && !/^\d{11}$/.test(transportistaDocumento)) {
+      throw new BadRequestException('No se puede generar GRE: transporte público requiere RUC válido del transportista en XML SUNAT');
+    }
+
+    const placaVehiculo = this.normalizeGrePlate(
+      greData.placa_vehiculo ||
+      greData.datos_adicionales?.placaVehiculo ||
+      greData.datos_adicionales?.placa,
+    );
+    if (isPrivateTransport && !this.isValidGrePlate(placaVehiculo)) {
+      throw new BadRequestException('No se puede generar GRE: placa del vehículo inválida para SUNAT');
+    }
+
+    const driver = isPrivateTransport ? this.resolveGreDriverData(greData) : null;
+    const noteXml = this.buildGreNoteXml(greData.observaciones);
+    const carrierXml = isPublicTransport ? `
+      <cac:CarrierParty>
+        <cac:PartyIdentification>
+          <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${this.escapeXmlText(transportistaDocumento)}</cbc:ID>
+        </cac:PartyIdentification>
+        <cac:PartyLegalEntity>
+          <cbc:RegistrationName>${this.wrapCdata(transportistaNombre)}</cbc:RegistrationName>
+        </cac:PartyLegalEntity>
+      </cac:CarrierParty>` : '';
+    const driverXml = driver ? `
+      <cac:DriverPerson>
+        <cbc:ID schemeID="${this.escapeXmlAttribute(driver.documentoTipo)}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${this.escapeXmlText(driver.documentoNumero)}</cbc:ID>
+        <cbc:FirstName>${this.wrapCdata(driver.nombres)}</cbc:FirstName>
+        <cbc:FamilyName>${this.wrapCdata(driver.apellidos)}</cbc:FamilyName>
+        <cbc:JobTitle>Principal</cbc:JobTitle>
+        <cac:IdentityDocumentReference>
+          <cbc:ID>${this.escapeXmlText(driver.licencia)}</cbc:ID>
+        </cac:IdentityDocumentReference>
+      </cac:DriverPerson>` : '';
+    const transportHandlingUnitXml = placaVehiculo ? `
+    <cac:TransportHandlingUnit>
+      <cac:TransportEquipment>
+        <cbc:ID>${this.escapeXmlText(placaVehiculo)}</cbc:ID>
+      </cac:TransportEquipment>
+    </cac:TransportHandlingUnit>` : '';
 
     const lines = payload.detalles
       .map(
         (item) => `
   <cac:DespatchLine>
     <cbc:ID>${item.id}</cbc:ID>
-    <cbc:DeliveredQuantity unitCode="${item.unidad}">${item.cantidad}</cbc:DeliveredQuantity>
+    <cbc:DeliveredQuantity unitCode="${this.escapeXmlAttribute(item.unidad || 'NIU')}" unitCodeListID="UN/ECE rec 20" unitCodeListAgencyName="United Nations Economic Commission for Europe">${this.formatGreNumber(item.cantidad)}</cbc:DeliveredQuantity>
     <cac:OrderLineReference>
       <cbc:LineID>${item.id}</cbc:LineID>
     </cac:OrderLineReference>
     <cac:Item>
-      <cbc:Description><![CDATA[${item.descripcion}]]></cbc:Description>
+      <cbc:Description>${this.wrapCdata(item.descripcion)}</cbc:Description>
     </cac:Item>
   </cac:DespatchLine>`
       )
@@ -876,96 +970,221 @@ export class GreService {
                 xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
                 xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
                 xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
-
   <ext:UBLExtensions>
     <ext:UBLExtension>
       <ext:ExtensionContent></ext:ExtensionContent>
     </ext:UBLExtension>
   </ext:UBLExtensions>
-
   <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
-  <cbc:CustomizationID schemeAgencyName="PE:SUNAT">2.0</cbc:CustomizationID>
-  <cbc:ID>${greData.numero}</cbc:ID>
+  <cbc:CustomizationID>2.0</cbc:CustomizationID>
+  <cbc:ID>${this.escapeXmlText(greData.numero)}</cbc:ID>
   <cbc:IssueDate>${fechaEmision}</cbc:IssueDate>
   <cbc:IssueTime>${horaEmision}</cbc:IssueTime>
-  <cbc:DespatchAdviceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">09</cbc:DespatchAdviceTypeCode>
-
-  <!-- Motivo de traslado -->
-  <cac:AdditionalDocumentReference>
-    <cbc:ID>${greData.motivo}</cbc:ID>
-    <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Motivo de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo20">${this.getMotivoCode(greData.motivo)}</cbc:DocumentTypeCode>
-  </cac:AdditionalDocumentReference>
-
-  <!-- Modalidad de transporte -->
-  <cac:AdditionalDocumentReference>
-    <cbc:ID>${greData.modalidad}</cbc:ID>
-    <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Modalidad de transporte" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo18">${this.getModalidadCode(greData.modalidad)}</cbc:DocumentTypeCode>
-  </cac:AdditionalDocumentReference>
-
-  <!-- Fecha de inicio de traslado -->
+  <cbc:DespatchAdviceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">09</cbc:DespatchAdviceTypeCode>${noteXml}
+  <cac:Signature>
+    <cbc:ID>IDSignSP</cbc:ID>
+    <cac:SignatoryParty>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${this.escapeXmlText(payload.emisor.ruc)}</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name>${this.wrapCdata(payload.emisor.razonSocial)}</cbc:Name>
+      </cac:PartyName>
+    </cac:SignatoryParty>
+    <cac:DigitalSignatureAttachment>
+      <cac:ExternalReference>
+        <cbc:URI>#SignatureSP</cbc:URI>
+      </cac:ExternalReference>
+    </cac:DigitalSignatureAttachment>
+  </cac:Signature>
+  <cac:DespatchSupplierParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${this.escapeXmlText(payload.emisor.ruc)}</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name>${this.wrapCdata(payload.emisor.nombreComercial || payload.emisor.razonSocial)}</cbc:Name>
+      </cac:PartyName>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>${this.wrapCdata(payload.emisor.razonSocial)}</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:DespatchSupplierParty>
+  <cac:DeliveryCustomerParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="${receptorDocTipo}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${receptorDocNumero}</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>${this.wrapCdata(receptorNombre)}</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:DeliveryCustomerParty>
   <cac:Shipment>
-    <cbc:ID>1</cbc:ID>
-    <cbc:HandlingCode listAgencyName="PE:SUNAT" listName="Motivo de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo20">${this.getMotivoCode(greData.motivo)}</cbc:HandlingCode>
-    <cbc:GrossWeightMeasure unitCode="KGM">${greData.peso_total}</cbc:GrossWeightMeasure>
-    
-    <!-- Punto de partida -->
-    <cac:Consignment>
-      <cac:ConsignorParty>
-        <cac:PartyIdentification>
-          <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT">${payload.emisor.ruc}</cbc:ID>
-        </cac:PartyIdentification>
-        <cac:PartyName>
-          <cbc:Name><![CDATA[${payload.emisor.razonSocial}]]></cbc:Name>
-        </cac:PartyName>
-      </cac:ConsignorParty>
-      
-      <!-- Punto de llegada -->
-      <cac:ConsigneeParty>
-        <cac:PartyIdentification>
-          <cbc:ID schemeID="${receptorDocTipo}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT">${receptorDocNumero}</cbc:ID>
-        </cac:PartyIdentification>
-        <cac:PartyName>
-          <cbc:Name><![CDATA[${receptorNombre}]]></cbc:Name>
-        </cac:PartyName>
-      </cac:ConsigneeParty>
-      
-      <!-- Transportista -->
-      <cac:CarrierParty>
-        <cac:PartyIdentification>
-          <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT">${transportistaId}</cbc:ID>
-        </cac:PartyIdentification>
-        <cac:PartyName>
-          <cbc:Name><![CDATA[${transportistaNombre}]]></cbc:Name>
-        </cac:PartyName>
-      </cac:CarrierParty>
-    </cac:Consignment>
-    
-    <!-- Dirección de entrega -->
+    <cbc:ID>SUNAT_Envio</cbc:ID>
+    <cbc:HandlingCode listAgencyName="PE:SUNAT" listName="Motivo de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo20">${motivoCode}</cbc:HandlingCode>
+    <cbc:GrossWeightMeasure unitCode="KGM">${this.formatGreWeight(greData.peso_total)}</cbc:GrossWeightMeasure>
+    <cac:ShipmentStage>
+      <cbc:TransportModeCode listAgencyName="PE:SUNAT" listName="Modalidad de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo18">${modalidadCode}</cbc:TransportModeCode>
+      <cac:TransitPeriod>
+        <cbc:StartDate>${trasladoFecha}</cbc:StartDate>
+      </cac:TransitPeriod>${carrierXml}${driverXml}
+    </cac:ShipmentStage>
+${transportHandlingUnitXml}
     <cac:Delivery>
       <cac:DeliveryAddress>
-        <cbc:AddressLine><![CDATA[${receptorDireccion}]]></cbc:AddressLine>
+        <cbc:ID schemeAgencyName="PE:INEI">${destinoUbigeo}</cbc:ID>
+        <cac:AddressLine>
+          <cbc:Line>${this.wrapCdata(receptorDireccion)}</cbc:Line>
+        </cac:AddressLine>
         <cac:Country>
           <cbc:IdentificationCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 3166-1">PE</cbc:IdentificationCode>
         </cac:Country>
       </cac:DeliveryAddress>
       <cac:Despatch>
-        <cbc:ActualDespatchDate>${greData.fecha_traslado.split('T')[0]}</cbc:ActualDespatchDate>
+        <cac:DespatchAddress>
+          <cbc:ID schemeAgencyName="PE:INEI">${emisorUbigeo}</cbc:ID>
+          <cac:AddressLine>
+            <cbc:Line>${this.wrapCdata(payload.emisor.direccion)}</cbc:Line>
+          </cac:AddressLine>
+          <cac:Country>
+            <cbc:IdentificationCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 3166-1">PE</cbc:IdentificationCode>
+          </cac:Country>
+        </cac:DespatchAddress>
       </cac:Despatch>
     </cac:Delivery>
-    
-    <!-- Vehículo y licencia (si aplica) -->
-    ${greData.placa_vehiculo ? `
-    <cac:TransportHandlingUnit>
-      <cac:TransportEquipment>
-        <cbc:ID>${greData.placa_vehiculo}</cbc:ID>
-      </cac:TransportEquipment>
-    </cac:TransportHandlingUnit>` : ''}
   </cac:Shipment>
-
-  <!-- Líneas de la guía (productos/bienes a trasladar) -->
-  ${lines}
-
+${lines}
 </DespatchAdvice>`;
+  }
+
+  private formatGreDate(value: any): string {
+    const raw = String(value ?? '').trim();
+    const dateMatch = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/.exec(raw);
+
+    if (dateMatch) {
+      const [, year, month, day] = dateMatch;
+      if (!this.isValidCalendarDate(Number(year), Number(month), Number(day))) {
+        throw new BadRequestException('No se puede generar GRE: fecha inválida para XML SUNAT');
+      }
+      return `${year}-${month}-${day}`;
+    }
+
+    const parsed = value instanceof Date ? value : new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('No se puede generar GRE: fecha de traslado inválida para XML SUNAT');
+    }
+
+    return [
+      parsed.getFullYear(),
+      String(parsed.getMonth() + 1).padStart(2, '0'),
+      String(parsed.getDate()).padStart(2, '0'),
+    ].join('-');
+  }
+
+  private formatGreTime(value: Date): string {
+    return [
+      String(value.getHours()).padStart(2, '0'),
+      String(value.getMinutes()).padStart(2, '0'),
+      String(value.getSeconds()).padStart(2, '0'),
+    ].join(':');
+  }
+
+  private isValidCalendarDate(year: number, month: number, day: number): boolean {
+    const candidate = new Date(Date.UTC(year, month - 1, day));
+    return candidate.getUTCFullYear() === year
+      && candidate.getUTCMonth() === month - 1
+      && candidate.getUTCDate() === day;
+  }
+
+  private resolveGreDriverData(greData: any): {
+    documentoTipo: string;
+    documentoNumero: string;
+    nombres: string;
+    apellidos: string;
+    licencia: string;
+  } {
+    const extras = greData.datos_adicionales || {};
+    const documentoTipo = String(extras.conductorDocumentoTipo || greData.conductor_documento_tipo || '1').trim();
+    const documentoNumero = this.normalizeDigits(extras.conductorDocumentoNumero || greData.conductor_documento_numero);
+    const nombres = String(extras.conductorNombres || greData.conductor_nombres || '').trim();
+    const apellidos = String(extras.conductorApellidos || greData.conductor_apellidos || '').trim();
+    const licencia = String(greData.licencia_conducir || extras.licenciaConducir || '').trim().toUpperCase();
+
+    if (!documentoTipo || documentoTipo === '6' || !documentoNumero || !nombres || !apellidos || !licencia) {
+      throw new BadRequestException('No se puede generar GRE: faltan datos SUNAT del conductor principal');
+    }
+
+    if (licencia.length > 10) {
+      throw new BadRequestException('No se puede generar GRE: licencia de conducir excede 10 caracteres');
+    }
+
+    return { documentoTipo, documentoNumero, nombres, apellidos, licencia };
+  }
+
+  private normalizeDigits(value: any): string {
+    return String(value ?? '').replace(/\D/g, '');
+  }
+
+  private normalizeGrePlate(value: any): string {
+    return String(value ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  private isValidGrePlate(value: string): boolean {
+    return /^[A-Z0-9]{6,8}$/.test(value) && !/^0+$/.test(value);
+  }
+
+  private buildGreNoteXml(value: any): string {
+    const note = String(value ?? '').replace(/\s+/g, ' ').trim();
+    if (!note) {
+      return '';
+    }
+
+    if (note.length > 250) {
+      throw new BadRequestException('No se puede generar GRE: observaciones SUNAT no deben superar 250 caracteres');
+    }
+
+    return `\n  <cbc:Note>${this.escapeXmlText(note)}</cbc:Note>`;
+  }
+
+  private resolveGreUbigeo(value: any, required = true): string {
+    const ubigeo = String(value ?? '').replace(/\D/g, '');
+    if (/^\d{6}$/.test(ubigeo)) {
+      return ubigeo;
+    }
+
+    if (required) {
+      throw new BadRequestException('No se puede generar GRE: falta ubigeo válido para SUNAT');
+    }
+
+    return '000000';
+  }
+
+  private formatGreNumber(value: any): string {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(2) : '0.00';
+  }
+
+  private formatGreWeight(value: any): string {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(3) : '0.000';
+  }
+
+  private escapeXmlText(value: any): string {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  private escapeXmlAttribute(value: any): string {
+    return this.escapeXmlText(value)
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  private wrapCdata(value: any): string {
+    return `<![CDATA[${String(value ?? '').replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
   }
 
   private async registrarRelacionPedidoGre(params: {
@@ -1047,7 +1266,7 @@ export class GreService {
     const motivoCodes = {
       'VENTA': '01',
       'COMPRA': '02',
-      'TRASLADO_ENTRE_ESTABLECIMIENTOS': '03',
+      'TRASLADO_ENTRE_ESTABLECIMIENTOS': '04',
       'CONSIGNACION': '04',
       'DEVOLUCION': '05',
       'TRANSFORMACION': '06',
@@ -1137,7 +1356,7 @@ export class GreService {
       const xmlContent = this.generateGreXmlUbl(xmlPayload);
 
       // Firmar el XML (sin enviar a SUNAT)
-      const xmlSigned = await this.firmarXmlGre(xmlContent);
+      const xmlSigned = await this.firmarXmlGre(xmlContent, tenantId);
       const hash = this.generarHashXml(xmlSigned);
 
       // Guardar XML firmado en BD
@@ -1181,23 +1400,19 @@ export class GreService {
   /**
    * Firmar XML usando el servicio OSE (sin enviar)
    */
-  private async firmarXmlGre(xmlContent: string): Promise<string> {
+  private async firmarXmlGre(xmlContent: string, tenantId: string): Promise<string> {
     try {
       console.log('🔐 [GRE] Firmando XML con certificado...');
 
       // Usar el XmlSigner del OSE service para firmar realmente
-      const xmlSigned = await this.oseService.signXmlOnly(xmlContent);
+      const xmlSigned = await this.oseService.signXmlOnly(xmlContent, { tenantId });
 
       console.log('✅ [GRE] XML firmado exitosamente');
       return xmlSigned;
     } catch (error) {
       console.error('❌ Error firmando XML GRE:', error);
 
-      // Fallback: XML sin firmar pero marcado
-      return `${xmlContent}
-<!-- GRE XML - Error en firma digital -->
-<!-- Error: ${error.message} -->
-<!-- Fecha: ${new Date().toISOString()} -->`;
+      throw new BadRequestException(`No se pudo firmar la GRE: ${error.message}`);
     }
   }
 
@@ -1218,7 +1433,11 @@ export class GreService {
     const technicalErrorCodes = ['99', '98', '97']; // Errores técnicos genéricos
 
     // Si el código indica error técnico
-    if (technicalErrorCodes.includes(codigoRespuesta)) {
+    const normalizedCode = String(codigoRespuesta || '').trim();
+    if (
+      technicalErrorCodes.includes(normalizedCode) ||
+      /^5\d{2}$/.test(normalizedCode)
+    ) {
       return true;
     }
 
@@ -1232,6 +1451,7 @@ export class GreService {
       'servicio no disponible',
       'temporalmente',
       'unavailable',
+      'http 5',
     ];
 
     return technicalKeywords.some(keyword => errorMessage.includes(keyword));
@@ -1271,6 +1491,9 @@ export class GreService {
       }
 
       const effectiveTenantId = tenantId ?? (greData as any).tenant_id;
+      if (!effectiveTenantId) {
+        throw new Error('Tenant requerido para enviar GRE a SUNAT');
+      }
       const effectiveIdempotencyKey =
         String(options?.idempotencyKey ?? '').trim() ||
         String((greData as any).idempotency_key ?? '').trim() ||
@@ -1304,9 +1527,26 @@ export class GreService {
       const fileName = `${xmlPayload.emisor.ruc}-09-${greData.numero}`;
 
       // Enviar a SUNAT mediante OSE
-      const response = await this.oseService.enviarGre(xmlContent, fileName);
+      const response = await this.oseService.enviarGre(xmlContent, fileName, { tenantId: effectiveTenantId });
 
       if (response.success) {
+        if (response.ticket && !response.cdr) {
+          console.log(`⏳ [GRE] GRE ${greId} recibida por SUNAT con ticket ${response.ticket}; pendiente de consulta CDR`);
+
+          await this.supabaseService.update(
+            'gre_guias',
+            {
+              estado: 'ENVIADO',
+              sunat_status: this.sunatStatuses.SENDING,
+              numero_sunat: response.ticket,
+              hash_gre: response.hashCPE,
+              updated_at: new Date().toISOString()
+            },
+            { id: greId }
+          );
+          return;
+        }
+
         console.log(`✅ [GRE] GRE ${greId} enviada exitosamente a SUNAT`);
 
         // Actualizar como ACEPTADO
@@ -1332,18 +1572,24 @@ export class GreService {
         await this.supabaseService.update(
           'gre_guias',
           {
-            estado: 'RECHAZADO',
+            estado: isTechnicalError ? 'ERROR' : 'RECHAZADO',
             sunat_status: isTechnicalError ? this.sunatStatuses.ERROR : this.sunatStatuses.REJECTED,
             error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
-            retry_count: isTechnicalError ? 0 : null, // Solo reintentar errores técnicos
+            retry_count: 0,
             next_retry_at: null,
             updated_at: new Date().toISOString()
           },
           { id: greId }
         );
+
+        throw new BadRequestException(`SUNAT rechazó la GRE: ${response.codigoRespuesta}: ${response.descripcionRespuesta}`);
       }
 
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
       console.error(`❌ [GRE] Error técnico enviando GRE ${greId}:`, error);
 
       // 🔴 CRÍTICO FIX: Marcar como RECHAZADO con información de reintento
@@ -1351,7 +1597,7 @@ export class GreService {
       await this.supabaseService.update(
         'gre_guias',
         {
-          estado: 'RECHAZADO',
+          estado: 'ERROR',
           sunat_status: this.sunatStatuses.ERROR,
           error_message: `Error técnico: ${error.message}`,
           retry_count: retryCount,
@@ -1426,13 +1672,38 @@ export class GreService {
         throw new Error('GRE no encontrada');
       }
 
-      // Consultar en SUNAT (usando CPE como base ya que GRE usa similar estructura)
-      const response = await this.oseService.consultarEstadoCpe(
-        '20000000001', // RUC emisor
-        '09', // Tipo documento GRE
-        'T001', // Serie fija para GRE
-        greData.numero
-      );
+      const { data: empresaConfig, error: empresaError } = await this.supabaseService.getClient()
+        .from('empresa_config')
+        .select('ruc, sunat_gre_transport')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      if (empresaError) {
+        throw new Error(`No se pudo obtener RUC emisor para GRE: ${empresaError.message}`);
+      }
+
+      const rucEmisor = (empresaConfig as any)?.ruc;
+      if (!rucEmisor) {
+        throw new Error('RUC emisor requerido para consultar GRE en SUNAT');
+      }
+
+      let response: Awaited<ReturnType<OseService['consultarEstadoCpe']>>;
+      if ((empresaConfig as any)?.sunat_gre_transport === 'rest' && greData.numero_sunat) {
+        response = await this.oseService.consultarTicketGre(greData.numero_sunat, { tenantId });
+      } else {
+        const [serie, numero] = String(greData.numero || '').split('-');
+        if (!serie || !numero) {
+          throw new Error(`Número GRE inválido para consulta SUNAT: ${greData.numero}`);
+        }
+
+        response = await this.oseService.consultarEstadoCpe(
+          rucEmisor,
+          '09',
+          serie,
+          numero,
+          { tenantId },
+        );
+      }
 
       // Actualizar estado en BD si es necesario
       if (response.success) {
@@ -1554,6 +1825,20 @@ export class GreService {
       ...(dto.datosAdicionales || {}),
     };
 
+    const addIfPresent = (key: string, value: unknown) => {
+      const normalized = String(value ?? '').trim();
+      if (normalized) {
+        extras[key] = normalized;
+      }
+    };
+
+    addIfPresent('transportistaDocumento', dto.transportistaDocumento);
+    addIfPresent('destinoUbigeo', dto.ubigeoDestino);
+    addIfPresent('conductorDocumentoTipo', dto.conductorDocumentoTipo);
+    addIfPresent('conductorDocumentoNumero', dto.conductorDocumentoNumero);
+    addIfPresent('conductorNombres', dto.conductorNombres);
+    addIfPresent('conductorApellidos', dto.conductorApellidos);
+
     if (dto.despachosAsociados?.length) {
       extras.notasSalida = Array.from(new Set(dto.despachosAsociados));
     }
@@ -1572,6 +1857,10 @@ export class GreService {
       estado: record.estado,
       destinatario: record.destinatario,
       direccionDestino: record.direccion_destino,
+      ubigeoDestino:
+        record.datos_adicionales?.destinoUbigeo ||
+        record.datos_adicionales?.ubigeoDestino ||
+        record.ubigeo_destino,
       fechaTraslado: record.fecha_traslado,
       fechaCreacion: record.created_at,
       modalidad: record.modalidad,
@@ -1579,8 +1868,13 @@ export class GreService {
       pesoTotal: record.peso_total,
       observaciones: record.observaciones,
       transportista: record.transportista,
+      transportistaDocumento: record.datos_adicionales?.transportistaDocumento,
       placaVehiculo: record.placa_vehiculo,
       licenciaConducir: record.licencia_conducir,
+      conductorDocumentoTipo: record.datos_adicionales?.conductorDocumentoTipo,
+      conductorDocumentoNumero: record.datos_adicionales?.conductorDocumentoNumero,
+      conductorNombres: record.datos_adicionales?.conductorNombres,
+      conductorApellidos: record.datos_adicionales?.conductorApellidos,
       cpeRelacionado: record.cpe_relacionado,
       numeroSunat: record.numero_sunat,
       hashGre: record.hash_gre,
@@ -1712,26 +2006,43 @@ export class GreService {
       clienteDireccion?: string;
       total: number;
       productos?: any[];
+      modalidad?: 'TRANSPORTE_PUBLICO' | 'TRANSPORTE_PRIVADO';
+      transportista?: string;
+      transportistaDocumento?: string;
+      placaVehiculo?: string;
+      licenciaConducir?: string;
+      conductorDocumentoTipo?: string;
+      conductorDocumentoNumero?: string;
+      conductorNombres?: string;
+      conductorApellidos?: string;
     }
   ): Promise<GuiaRemisionResponseDto> {
     try {
       console.log(`🚚 [GRE] Creating automatic GRE for sale ${saleId}`);
 
+      this.assertAutoGreSaleDataValida(saleData);
+
       // Calculate estimated weight
       const pesoEstimado = this.calcularPesoEstimado(saleData.productos || [], saleData.total);
+      const modalidad = saleData.modalidad || 'TRANSPORTE_PUBLICO';
 
       // Prepare GRE data
       const greData: CreateGuiaRemisionDto = {
         destinatario: saleData.clienteNombre || `Cliente ${saleData.clienteId}`,
-        direccionDestino: saleData.clienteDireccion || 'Lima, Perú - Dirección por configurar',
+        direccionDestino: saleData.clienteDireccion!,
         fechaTraslado: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
-        modalidad: 'TRANSPORTE_PUBLICO',
+        modalidad,
         motivo: 'VENTA',
         pesoTotal: pesoEstimado,
         observaciones: `GRE automática - Venta ${saleId} - Total: S/ ${saleData.total}`,
-        transportista: 'Transporte por definir',
-        placaVehiculo: null,
-        licenciaConducir: null,
+        transportista: saleData.transportista,
+        transportistaDocumento: saleData.transportistaDocumento,
+        placaVehiculo: saleData.placaVehiculo,
+        licenciaConducir: saleData.licenciaConducir,
+        conductorDocumentoTipo: saleData.conductorDocumentoTipo,
+        conductorDocumentoNumero: saleData.conductorDocumentoNumero,
+        conductorNombres: saleData.conductorNombres,
+        conductorApellidos: saleData.conductorApellidos,
         cpeRelacionado: saleData.cpeId,
         idempotencyKey: `sale:${saleData.tenantId}:${saleId}`,
         datosAdicionales: {
@@ -1765,6 +2076,46 @@ export class GreService {
     } catch (error) {
       console.error(`❌ [GRE] Error creating automatic GRE for sale ${saleId}:`, error);
       throw error;
+    }
+  }
+
+  private assertAutoGreSaleDataValida(saleData: {
+    clienteNombre?: string;
+    clienteDireccion?: string;
+    modalidad?: 'TRANSPORTE_PUBLICO' | 'TRANSPORTE_PRIVADO';
+    transportista?: string;
+    transportistaDocumento?: string;
+    placaVehiculo?: string;
+    licenciaConducir?: string;
+    conductorDocumentoNumero?: string;
+    conductorNombres?: string;
+    conductorApellidos?: string;
+  }): void {
+    const missing: string[] = [];
+    const modalidad = saleData.modalidad || 'TRANSPORTE_PUBLICO';
+
+    if (!saleData.clienteNombre?.trim()) missing.push('destinatario real');
+    if (!saleData.clienteDireccion?.trim()) missing.push('dirección de destino real');
+
+    if (modalidad === 'TRANSPORTE_PUBLICO') {
+      if (!saleData.transportista?.trim()) missing.push('transportista');
+      if (!/^\d{11}$/.test(this.normalizeDigits(saleData.transportistaDocumento))) {
+        missing.push('RUC válido del transportista');
+      }
+    }
+
+    if (modalidad === 'TRANSPORTE_PRIVADO') {
+      if (!this.normalizeGrePlate(saleData.placaVehiculo)) missing.push('placa del vehículo');
+      if (!saleData.licenciaConducir?.trim()) missing.push('licencia de conducir');
+      if (!this.normalizeDigits(saleData.conductorDocumentoNumero)) missing.push('documento del conductor');
+      if (!saleData.conductorNombres?.trim()) missing.push('nombres del conductor');
+      if (!saleData.conductorApellidos?.trim()) missing.push('apellidos del conductor');
+    }
+
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `No se puede generar GRE automática: faltan datos obligatorios de traslado (${missing.join(', ')}). Use el flujo asistido/manual antes de enviar a SUNAT.`,
+      );
     }
   }
 
@@ -1815,25 +2166,25 @@ export class GreService {
         .single();
 
       if (error) {
-        console.warn(`⚠️ [GRE] Error getting GRE config, using defaults:`, error);
+        console.warn(`⚠️ [GRE] Error getting GRE config, disabling automatic GRE:`, error);
         return {
           umbralGREAutomatico: 700.0,
-          greAutomaticoHabilitado: true,
+          greAutomaticoHabilitado: false,
           greObligatorio: false,
         };
       }
 
       return {
         umbralGREAutomatico: data?.umbral_gre_automatico || 700.0,
-        greAutomaticoHabilitado: data?.gre_automatico_habilitado !== false,
+        greAutomaticoHabilitado: data?.gre_automatico_habilitado === true,
         greObligatorio: data?.gre_obligatorio === true,
       };
     } catch (error) {
       console.error(`❌ [GRE] Error getting GRE threshold config:`, error);
-      // Return defaults on error
+      // Fail closed: GRE automática requiere opt-in del tenant y datos reales de traslado.
       return {
         umbralGREAutomatico: 700.0,
-        greAutomaticoHabilitado: true,
+        greAutomaticoHabilitado: false,
         greObligatorio: false,
       };
     }
@@ -1852,64 +2203,27 @@ export class GreService {
     }
   ): Promise<string | null> {
     try {
-      console.log(`🚚 [GRE] Finding or creating inventory movement for sale ${saleId}`);
+      console.log(`🚚 [GRE] Finding canonical inventory movement for sale ${saleId}`);
 
       // First, try to find existing inventory movement for this sale
       const { data: existingMovement, error: findError } = await this.supabaseService.getClient()
-        .from('stock_movimientos')
+        .from('movimientos_inventario')
         .select('id')
         .eq('tenant_id', tenantId)
-        .eq('referencia', `Venta ${saleId}`)
+        .eq('referencia_id', saleId)
+        .in('referencia_tipo', ['VENTA_POS', 'VENTA'])
+        .eq('tipo', 'SALIDA')
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (existingMovement && !findError) {
         console.log(`✅ [GRE] Found existing inventory movement: ${existingMovement.id}`);
         return existingMovement.id;
       }
 
-      // If no existing movement found, create one using the inventory service
-      if (saleData?.productos && saleData.productos.length > 0) {
-        console.log(`🚚 [GRE] Creating inventory movements for ${saleData.productos.length} products`);
-
-        // Create movements for each product in the sale
-        const movementIds: string[] = [];
-
-        for (const producto of saleData.productos) {
-          try {
-            const movementId = await this.inventoryService.realizarMovimientoStock(
-              {
-                productoId: producto.productoId || producto.id,
-                tipoMovimiento: 'SALIDA',
-                cantidad: producto.cantidad || 1,
-                stockAnterior: 0, // Will be calculated by the service
-                stockNuevo: 0, // Will be calculated by the service
-                motivo: `Venta ${saleId}`,
-                precioUnitario: producto.precio || 0,
-                valorTotal: producto.total || 0,
-                usuarioId: 'system',
-                referencia: `Venta ${saleId}`,
-                ventaId: saleId,
-              },
-              tenantId
-            );
-
-            if (movementId) {
-              movementIds.push(movementId);
-            }
-          } catch (error) {
-            console.error(`❌ [GRE] Error creating movement for product ${producto.productoId}:`, error);
-          }
-        }
-
-        if (movementIds.length > 0) {
-          console.log(`✅ [GRE] Created ${movementIds.length} inventory movements`);
-          // Return the first movement ID as reference
-          return movementIds[0];
-        }
-      }
-
-      console.warn(`⚠️ [GRE] No inventory movement found or created for sale ${saleId}`);
+      // GRE no crea stock: la venta física debe haberlo hecho atómicamente.
+      // Inventar aquí un almacén causaría un segundo descuento.
+      console.warn(`⚠️ [GRE] No canonical inventory movement found for sale ${saleId}`);
       return null;
     } catch (error) {
       console.error(`❌ [GRE] Error finding/creating inventory movement:`, error);

@@ -1,59 +1,74 @@
-'use client'
+"use client";
 
-import { useState, useCallback, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { useApi } from '@/hooks/use-api'
+import { useState, useCallback, useEffect } from "react";
+import { useApi } from "@/hooks/use-api";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface PlanillaPagarModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onSuccess: () => void
-  planilla: any
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  planilla: any;
 }
 
 interface EmpleadoPago {
-  id: string
-  empleado_id: string
-  empleado_nombre: string
-  empleado_documento: string
-  dias_trabajados: number
-  total_ingresos: number
-  total_descuentos: number
-  neto_pagar: number
-  estado_pago: string
-  fecha_pago?: string
-  metodo_pago?: string
-  numero_operacion?: string
+  id: string;
+  empleado_id: string;
+  empleado_nombre: string;
+  empleado_documento: string;
+  dias_trabajados: number;
+  total_ingresos: number;
+  total_descuentos: number;
+  neto_pagar: number;
+  estado_pago: string;
+  fecha_pago?: string;
+  metodo_pago?: string;
+  numero_operacion?: string;
 }
 
 interface HistorialPago {
-  id: string
-  fecha: string
-  metodo: string
-  monto: number
-  empleados_count: number
-  numero_operacion?: string
-  observaciones?: string
+  id: string;
+  fecha: string;
+  metodo: string;
+  monto: number;
+  empleados_count: number;
+  numero_operacion?: string;
+  observaciones?: string;
 }
 
-export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planilla }: PlanillaPagarModalProps) {
-  const { get, post } = useApi()
-  const [loading, setLoading] = useState(false)
-  const [empleados, setEmpleados] = useState<EmpleadoPago[]>([])
-  const [historialPagos, setHistorialPagos] = useState<HistorialPago[]>([])
-  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia'>('transferencia')
-  const [numeroOperacion, setNumeroOperacion] = useState('')
-  const [observaciones, setObservaciones] = useState('')
-  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([])
-  const [pagando, setPagando] = useState(false)
+export default function PlanillaPagarModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  planilla,
+}: PlanillaPagarModalProps) {
+  const { get, post } = useApi();
+  const [loading, setLoading] = useState(false);
+  const [empleados, setEmpleados] = useState<EmpleadoPago[]>([]);
+  const [historialPagos, setHistorialPagos] = useState<HistorialPago[]>([]);
+  const [metodoPago, setMetodoPago] = useState<"efectivo" | "transferencia">(
+    "transferencia",
+  );
+  const [numeroOperacion, setNumeroOperacion] = useState("");
+  const [observaciones, setObservaciones] = useState("");
+  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<
+    string[]
+  >([]);
+  const [pagando, setPagando] = useState(false);
 
   const loadDetallePlanilla = useCallback(async () => {
-    if (!planilla?.id) return
+    if (!planilla?.id) return;
 
     try {
-      setLoading(true)
-      const response = await get(`/api/rrhh/planillas/${planilla.id}/detalle`)
-      
+      setLoading(true);
+      const response = await get(`/api/rrhh/planillas/${planilla.id}/detalle`);
+
       if (response && Array.isArray(response)) {
         const empleadosConEstado = response.map((emp: any) => ({
           id: emp.id,
@@ -64,147 +79,162 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
           total_ingresos: parseFloat(emp.total_ingresos) || 0,
           total_descuentos: parseFloat(emp.total_descuentos) || 0,
           neto_pagar: parseFloat(emp.neto_pagar) || 0,
-          estado_pago: emp.estado_pago || 'pendiente',
+          estado_pago: emp.estado_pago || "pendiente",
           fecha_pago: emp.fecha_pago,
           metodo_pago: emp.metodo_pago,
-          numero_operacion: emp.numero_operacion
-        }))
-        
-        setEmpleados(empleadosConEstado)
-        
+          numero_operacion: emp.numero_operacion,
+        }));
+
+        setEmpleados(empleadosConEstado);
+
         // Seleccionar empleados pendientes por defecto
         const pendientes = empleadosConEstado
-          .filter(emp => emp.estado_pago === 'pendiente')
-          .map(emp => emp.id)
-        setEmpleadosSeleccionados(pendientes)
+          .filter((emp) => emp.estado_pago === "pendiente")
+          .map((emp) => emp.id);
+        setEmpleadosSeleccionados(pendientes);
       }
     } catch (error) {
-      console.error('Error cargando detalle planilla:', error)
+      console.error("Error cargando detalle planilla:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [get, planilla])
+  }, [get, planilla]);
 
   const loadHistorialPagos = useCallback(async () => {
-    if (!planilla?.id) return
+    if (!planilla?.id) return;
 
     try {
-      const response = await get(`/api/rrhh/planillas/${planilla.id}/historial-pagos`)
+      const response = await get(
+        `/api/rrhh/planillas/${planilla.id}/historial-pagos`,
+      );
       if (response?.success && response.data) {
-        setHistorialPagos(response.data)
+        setHistorialPagos(response.data);
       }
     } catch (error) {
-      console.error('Error cargando historial:', error)
+      console.error("Error cargando historial:", error);
     }
-  }, [get, planilla])
+  }, [get, planilla]);
 
   useEffect(() => {
     if (isOpen && planilla) {
-      loadDetallePlanilla()
-      loadHistorialPagos()
-      document.body.style.overflow = 'hidden'
+      loadDetallePlanilla();
+      loadHistorialPagos();
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = 'unset'
+      document.body.style.overflow = "unset";
     }
 
     return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen, loadDetallePlanilla, loadHistorialPagos, planilla])
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen, loadDetallePlanilla, loadHistorialPagos, planilla]);
 
   const toggleEmpleado = (empleadoId: string) => {
-    setEmpleadosSeleccionados(prev => {
+    setEmpleadosSeleccionados((prev) => {
       if (prev.includes(empleadoId)) {
-        return prev.filter(id => id !== empleadoId)
+        return prev.filter((id) => id !== empleadoId);
       } else {
-        return [...prev, empleadoId]
+        return [...prev, empleadoId];
       }
-    })
-  }
+    });
+  };
 
   const seleccionarTodos = () => {
     // Seleccionar TODOS los empleados (no solo pendientes)
-    const todosLosEmpleados = empleados.map(emp => emp.id)
-    setEmpleadosSeleccionados(todosLosEmpleados)
-  }
+    const todosLosEmpleados = empleados.map((emp) => emp.id);
+    setEmpleadosSeleccionados(todosLosEmpleados);
+  };
 
   const deseleccionarTodos = () => {
-    setEmpleadosSeleccionados([])
-  }
+    setEmpleadosSeleccionados([]);
+  };
 
   const procesarPago = async () => {
     if (empleadosSeleccionados.length === 0) {
-      alert('Debe seleccionar al menos un empleado para pagar')
-      return
+      alert("Debe seleccionar al menos un empleado para pagar");
+      return;
     }
 
-    if (metodoPago === 'transferencia' && !numeroOperacion.trim()) {
-      alert('Debe ingresar el número de operación para transferencias')
-      return
+    if (metodoPago === "transferencia" && !numeroOperacion.trim()) {
+      alert("Debe ingresar el número de operación para transferencias");
+      return;
     }
 
     try {
-      setPagando(true)
-      
+      setPagando(true);
+
       const datosPago = {
         empleados_ids: empleadosSeleccionados,
         metodo_pago: metodoPago,
         numero_operacion: numeroOperacion.trim() || null,
-        observaciones: observaciones.trim() || null
-      }
-      
-      const response = await post(`/api/rrhh/planillas/${planilla.id}/pagar-empleados`, datosPago)
-      
+        observaciones: observaciones.trim() || null,
+      };
+
+      const response = await post(
+        `/api/rrhh/planillas/${planilla.id}/pagar-empleados`,
+        datosPago,
+      );
+
       if (response?.success) {
-        alert(`✅ Pago procesado correctamente para ${empleadosSeleccionados.length} empleados`)
-        await loadDetallePlanilla()
-        await loadHistorialPagos()
-        setEmpleadosSeleccionados([])
-        setNumeroOperacion('')
-        setObservaciones('')
-        onSuccess()
+        alert(
+          `✅ Pago procesado correctamente para ${empleadosSeleccionados.length} empleados`,
+        );
+        await loadDetallePlanilla();
+        await loadHistorialPagos();
+        setEmpleadosSeleccionados([]);
+        setNumeroOperacion("");
+        setObservaciones("");
+        onSuccess();
       } else {
-        throw new Error(response?.message || 'Error procesando pago')
+        throw new Error(response?.message || "Error procesando pago");
       }
     } catch (error: any) {
-      console.error('Error procesando pago:', error)
-      alert('Error procesando pago: ' + (error?.message || String(error)))
+      console.error("Error procesando pago:", error);
+      alert("Error procesando pago: " + (error?.message || String(error)));
     } finally {
-      setPagando(false)
+      setPagando(false);
     }
-  }
+  };
 
   const generarComprobantePago = async () => {
     if (empleadosSeleccionados.length === 0) {
-      alert('Debe seleccionar empleados para generar comprobante')
-      return
+      alert("Debe seleccionar empleados para generar comprobante");
+      return;
     }
 
     try {
-      const empleadosParaComprobante = empleados.filter(emp => 
-        empleadosSeleccionados.includes(emp.id)
-      )
-      
-      const html = generarComprobanteHTML(empleadosParaComprobante)
-      
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-      const link = document.createElement("a")
-      const url = URL.createObjectURL(blob)
-      link.setAttribute("href", url)
-      link.setAttribute("download", `comprobante_pago_${planilla.periodo}_${new Date().toISOString().split('T')[0]}.html`)
-      link.style.visibility = 'hidden'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      const empleadosParaComprobante = empleados.filter((emp) =>
+        empleadosSeleccionados.includes(emp.id),
+      );
+
+      const html = generarComprobanteHTML(empleadosParaComprobante);
+
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `comprobante_pago_${planilla.periodo}_${new Date().toISOString().split("T")[0]}.html`,
+      );
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (error: any) {
-      console.error('Error generando comprobante:', error)
-      alert('Error generando comprobante: ' + (error?.message || String(error)))
+      console.error("Error generando comprobante:", error);
+      alert(
+        "Error generando comprobante: " + (error?.message || String(error)),
+      );
     }
-  }
+  };
 
   const generarComprobanteHTML = (empleadosPago: EmpleadoPago[]) => {
-    const totalPago = empleadosPago.reduce((sum, emp) => sum + emp.neto_pagar, 0)
-    
+    const totalPago = empleadosPago.reduce(
+      (sum, emp) => sum + emp.neto_pagar,
+      0,
+    );
+
     return `
     <!DOCTYPE html>
     <html>
@@ -217,16 +247,16 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
             <div class="company">NEON SYSTEM</div>
             <div class="title">Comprobante de Pago de Planilla</div>
             <div>Período: ${planilla.periodo}</div>
-            <div>Generado: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</div>
+            <div>Generado: ${new Date().toLocaleDateString("es-PE")} ${new Date().toLocaleTimeString("es-PE")}</div>
         </div>
 
         <div class="info-grid">
             <div class="info-box">
                 <h3>Información del Pago</h3>
-                <p><strong>Método:</strong> ${metodoPago === 'efectivo' ? 'Efectivo' : 'Transferencia Bancaria'}</p>
-                <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-PE')}</p>
-                ${numeroOperacion ? `<p><strong>N° Operación:</strong> ${numeroOperacion}</p>` : ''}
-                ${observaciones ? `<p><strong>Observaciones:</strong> ${observaciones}</p>` : ''}
+                <p><strong>Método:</strong> ${metodoPago === "efectivo" ? "Efectivo" : "Transferencia Bancaria"}</p>
+                <p><strong>Fecha:</strong> ${new Date().toLocaleDateString("es-PE")}</p>
+                ${numeroOperacion ? `<p><strong>N° Operación:</strong> ${numeroOperacion}</p>` : ""}
+                ${observaciones ? `<p><strong>Observaciones:</strong> ${observaciones}</p>` : ""}
             </div>
             <div class="info-box">
                 <h3>Resumen</h3>
@@ -248,7 +278,9 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
                 </tr>
             </thead>
             <tbody>
-                ${empleadosPago.map(emp => `
+                ${empleadosPago
+                  .map(
+                    (emp) => `
                     <tr>
                         <td>${emp.empleado_nombre}</td>
                         <td>${emp.empleado_documento}</td>
@@ -257,7 +289,9 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
                         <td class="number">S/ ${emp.total_descuentos.toFixed(2)}</td>
                         <td class="number">S/ ${emp.neto_pagar.toFixed(2)}</td>
                     </tr>
-                `).join('')}
+                `,
+                  )
+                  .join("")}
                 <tr class="total-row">
                     <td colspan="5">TOTAL PAGADO</td>
                     <td class="number">S/ ${totalPago.toFixed(2)}</td>
@@ -270,33 +304,45 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
             <p>Sistema ERP - Generado automáticamente</p>
         </div>
     </body>
-    </html>`
-  }
+    </html>`;
+  };
 
   // Cálculos
-  const empleadosPendientes = empleados.filter(emp => emp.estado_pago === 'pendiente')
-  const empleadosPagados = empleados.filter(emp => emp.estado_pago === 'pagado')
-  const empleadosASerarPagados = empleados.filter(emp => empleadosSeleccionados.includes(emp.id))
-  const totalASerPagado = empleadosASerarPagados.reduce((sum, emp) => sum + emp.neto_pagar, 0)
-  const totalYaPagado = empleadosPagados.reduce((sum, emp) => sum + emp.neto_pagar, 0)
+  const empleadosPendientes = empleados.filter(
+    (emp) => emp.estado_pago === "pendiente",
+  );
+  const empleadosPagados = empleados.filter(
+    (emp) => emp.estado_pago === "pagado",
+  );
+  const empleadosASerarPagados = empleados.filter((emp) =>
+    empleadosSeleccionados.includes(emp.id),
+  );
+  const totalASerPagado = empleadosASerarPagados.reduce(
+    (sum, emp) => sum + emp.neto_pagar,
+    0,
+  );
+  const totalYaPagado = empleadosPagados.reduce(
+    (sum, emp) => sum + emp.neto_pagar,
+    0,
+  );
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
-  return createPortal(
-    <div className="modal-overlay">
-      <div className="modal-content payment max-w-[1400px] overflow-hidden flex flex-col">
-        <div className="modal-header">
-          <h2 className="modal-title">
-            💰 Pagar Planilla {planilla?.periodo}
-          </h2>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => !open && !pagando && onClose()}
+    >
+      <DialogContent className="flex h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden border-border bg-card p-0 text-card-foreground xl:max-w-[1400px]">
+        <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
+          <DialogTitle>💰 Pagar Planilla {planilla?.periodo}</DialogTitle>
+        </DialogHeader>
 
-        <div className="modal-body flex-[1] overflow-hidden flex flex-col">
+        <div className="flex flex-1 flex-col overflow-hidden px-6">
           {/* Resumen superior */}
           <div className="grid grid-cols-[repeat(4,_1fr)] gap-4 mb-4 shrink-0">
             <div className="bg-[var(--blue-50)] p-4 text-center border">
-              <div className="text-6 font-bold text-[var(--blue-600)]">
+              <div className="text-2xl font-bold text-[var(--blue-600)]">
                 {empleados.length}
               </div>
               <div className="text-[0.875rem] text-[var(--blue-700)]">
@@ -304,7 +350,7 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
               </div>
             </div>
             <div className="bg-[var(--emerald-50)] p-4 text-center border">
-              <div className="text-6 font-bold text-[var(--emerald-600)]">
+              <div className="text-2xl font-bold text-[var(--emerald-600)]">
                 {empleadosSeleccionados.length}
               </div>
               <div className="text-[0.875rem] text-[var(--emerald-700)]">
@@ -312,7 +358,7 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
               </div>
             </div>
             <div className="bg-[var(--blue-50)] p-4 text-center border">
-              <div className="text-6 font-bold text-[var(--blue-600)]">
+              <div className="text-2xl font-bold text-[var(--blue-600)]">
                 S/ {totalASerPagado.toFixed(2)}
               </div>
               <div className="text-[0.875rem] text-[var(--blue-700)]">
@@ -320,12 +366,10 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
               </div>
             </div>
             <div className="bg-[#f0f9ff] p-4 text-center border">
-              <div className="text-6 font-bold text-[#0ea5e9]">
+              <div className="text-2xl font-bold text-[#0ea5e9]">
                 S/ {totalYaPagado.toFixed(2)}
               </div>
-              <div className="text-[0.875rem] text-[#0c4a6e]">
-                Ya Pagado
-              </div>
+              <div className="text-[0.875rem] text-[#0c4a6e]">Ya Pagado</div>
             </div>
           </div>
 
@@ -341,14 +385,19 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
                 </label>
                 <select
                   value={metodoPago}
-                  onChange={(e) => setMetodoPago(e.target.value as 'efectivo' | 'transferencia')} className="p-2 border rounded-[4px] ml-2"
+                  onChange={(e) =>
+                    setMetodoPago(
+                      e.target.value as "efectivo" | "transferencia",
+                    )
+                  }
+                  className="p-2 border rounded-[4px] ml-2"
                 >
                   <option value="transferencia">Transferencia</option>
                   <option value="efectivo">Efectivo</option>
                 </select>
               </div>
-              
-              {metodoPago === 'transferencia' && (
+
+              {metodoPago === "transferencia" && (
                 <div>
                   <label className="text-[0.875rem] font-semibold text-[var(--primary-700)]">
                     N° Operación:
@@ -357,68 +406,56 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
                     type="text"
                     value={numeroOperacion}
                     onChange={(e) => setNumeroOperacion(e.target.value)}
-                    placeholder="Ej: 123456789" className="p-2 border rounded-[4px] ml-2 w-[150px]"
+                    placeholder="Ej: 123456789"
+                    className="p-2 border rounded-[4px] ml-2 w-[150px]"
                   />
                 </div>
               )}
-              
+
               <div>
                 <input
                   type="text"
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
-                  placeholder="Observaciones adicionales..." className="p-2 border rounded-[4px] w-[100%]"
+                  placeholder="Observaciones adicionales..."
+                  className="p-2 border rounded-[4px] w-[100%]"
                 />
               </div>
-              
-              <button
-                className="btn btn-secondary text-[0.875rem] py-2 px-4"
+
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
                 onClick={seleccionarTodos}
               >
                 ✅ Seleccionar Todos
-              </button>
-              
-              <button
-                className="btn btn-secondary text-[0.875rem] py-2 px-4"
+              </Button>
+
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
                 onClick={deseleccionarTodos}
               >
                 ❌ Deseleccionar
-              </button>
+              </Button>
             </div>
           </div>
 
           {/* Lista de empleados */}
           <div className="flex-[1] overflow-auto border">
-            <table className="w-[100%] text-[0.875rem] bg-white">
+            <table className="w-[100%] text-[0.875rem] bg-card">
               <thead className="sticky top-0 bg-[var(--primary-100)] z-[10]">
                 <tr>
-                  <th className="p-3 border w-[50px]">
-                    ✓
-                  </th>
-                  <th className="p-3 border min-w-[200px]">
-                    👤 EMPLEADO
-                  </th>
-                  <th className="p-3 border min-w-[100px]">
-                    📄 DOCUMENTO
-                  </th>
-                  <th className="p-3 border min-w-[80px]">
-                    📅 DÍAS
-                  </th>
-                  <th className="p-3 border min-w-[120px]">
-                    💰 INGRESOS
-                  </th>
-                  <th className="p-3 border min-w-[120px]">
-                    💸 DESCUENTOS
-                  </th>
-                  <th className="p-3 border min-w-[120px]">
-                    💵 NETO A PAGAR
-                  </th>
-                  <th className="p-3 border min-w-[120px]">
-                    📊 ESTADO
-                  </th>
-                  <th className="p-3 border min-w-[100px]">
-                    📅 FECHA PAGO
-                  </th>
+                  <th className="p-3 border w-[50px]">✓</th>
+                  <th className="p-3 border min-w-[200px]">👤 EMPLEADO</th>
+                  <th className="p-3 border min-w-[100px]">📄 DOCUMENTO</th>
+                  <th className="p-3 border min-w-[80px]">📅 DÍAS</th>
+                  <th className="p-3 border min-w-[120px]">💰 INGRESOS</th>
+                  <th className="p-3 border min-w-[120px]">💸 DESCUENTOS</th>
+                  <th className="p-3 border min-w-[120px]">💵 NETO A PAGAR</th>
+                  <th className="p-3 border min-w-[120px]">📊 ESTADO</th>
+                  <th className="p-3 border min-w-[100px]">📅 FECHA PAGO</th>
                 </tr>
               </thead>
               <tbody>
@@ -429,7 +466,8 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
                       <input
                         type="checkbox"
                         checked={empleadosSeleccionados.includes(empleado.id)}
-                        onChange={() => toggleEmpleado(empleado.id)} className="w-4 h-4"
+                        onChange={() => toggleEmpleado(empleado.id)}
+                        className="w-4 h-4"
                       />
                     </td>
                     <td className="p-3 border font-semibold">
@@ -447,18 +485,28 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
                     <td className="p-3 border text-right text-[var(--red-600)] font-semibold">
                       S/ {empleado.total_descuentos.toFixed(2)}
                     </td>
-                    <td className="p-3 border text-right text-[var(--blue-700)] font-bold text-4">
+                    <td className="p-3 border text-right text-[var(--blue-700)] font-bold text-base">
                       S/ {empleado.neto_pagar.toFixed(2)}
                     </td>
                     <td className="p-3 border text-center">
-                      <span className={
-                        empleado.estado_pago === 'pagado' ? 'status-success' : 'status-warning'
-                      }>
-                        {empleado.estado_pago === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
+                      <span
+                        className={
+                          empleado.estado_pago === "pagado"
+                            ? "inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-400 dark:text-emerald-300"
+                            : "inline-flex items-center rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-400 dark:text-amber-300"
+                        }
+                      >
+                        {empleado.estado_pago === "pagado"
+                          ? "✅ Pagado"
+                          : "⏳ Pendiente"}
                       </span>
                     </td>
                     <td className="p-3 border text-center text-[0.8rem] text-[var(--primary-600)]">
-                      {empleado.fecha_pago ? new Date(empleado.fecha_pago).toLocaleDateString('es-PE') : '-'}
+                      {empleado.fecha_pago
+                        ? new Date(empleado.fecha_pago).toLocaleDateString(
+                            "es-PE",
+                          )
+                        : "-"}
                     </td>
                   </tr>
                 ))}
@@ -472,7 +520,7 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
               <h3 className="mt-0 mr-0 mb-2 ml-0 text-[var(--primary-700)]">
                 📊 Historial de Pagos de esta Planilla
               </h3>
-              <div className="max-h-[150px] overflow-auto border bg-white">
+              <div className="max-h-[150px] overflow-auto border bg-card">
                 <table className="w-[100%] text-[0.8rem]">
                   <thead className="bg-[var(--primary-50)]">
                     <tr>
@@ -487,10 +535,12 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
                     {historialPagos.map((pago, index) => (
                       <tr key={pago.id}>
                         <td className="p-2 border">
-                          {new Date(pago.fecha).toLocaleDateString('es-PE')}
+                          {new Date(pago.fecha).toLocaleDateString("es-PE")}
                         </td>
                         <td className="p-2 border">
-                          {pago.metodo === 'efectivo' ? '💵 Efectivo' : '🏦 Transferencia'}
+                          {pago.metodo === "efectivo"
+                            ? "💵 Efectivo"
+                            : "🏦 Transferencia"}
                         </td>
                         <td className="p-2 border text-center">
                           {pago.empleados_count}
@@ -499,7 +549,7 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
                           S/ {pago.monto.toFixed(2)}
                         </td>
                         <td className="p-2 border">
-                          {pago.numero_operacion || '-'}
+                          {pago.numero_operacion || "-"}
                         </td>
                       </tr>
                     ))}
@@ -510,34 +560,31 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
           )}
         </div>
 
-        <div className="modal-actions">
-          <button 
-            className="modal-btn modal-btn-warning"
+        <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-border p-6">
+          <Button
+            variant="warning"
             onClick={generarComprobantePago}
             disabled={empleadosSeleccionados.length === 0}
           >
             📄 Generar Comprobante
-          </button>
-          
+          </Button>
+
           {/* BOTÓN DE PAGO - SIEMPRE DISPONIBLE para múltiples pagos */}
-          <button 
-            className="modal-btn modal-btn-success"
+          <Button
+            variant="success"
             onClick={procesarPago}
             disabled={empleadosSeleccionados.length === 0 || pagando}
           >
-            {pagando ? '⏳ Procesando...' : `💰 Pagar ${empleadosSeleccionados.length} Empleados`}
-          </button>
-          
-          <button 
-            className="modal-btn modal-btn-secondary" 
-            onClick={onClose}
-            disabled={pagando}
-          >
+            {pagando
+              ? "⏳ Procesando..."
+              : `💰 Pagar ${empleadosSeleccionados.length} Empleados`}
+          </Button>
+
+          <Button variant="outline" onClick={onClose} disabled={pagando}>
             Cerrar
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>,
-    document.body
-  )
-} 
+      </DialogContent>
+    </Dialog>
+  );
+}

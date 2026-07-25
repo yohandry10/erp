@@ -28,6 +28,14 @@ Las siguientes variables son requeridas en entornos fuera de `NODE_ENV=test`:
 - `ENCRYPTION_KEY` o `CERT_ENCRYPTION_KEY` (al menos una de ellas)
 - `DB_ENCRYPTION_KEY`
 
+## Frontera DEV/PROD
+
+- `DEPLOYMENT_ENV`: `DEV` o `PROD`. En `NODE_ENV=production` debe ser `PROD`.
+- `EXPECTED_SUPABASE_PROJECT_REF`: ref de 20 caracteres esperado. Es obligatorio en produccion y debe coincidir con el host de `SUPABASE_URL`.
+- `DEMO_API_ENABLED`: puede ser `true` solo en DEV. PROD rechaza el arranque si esta habilitado.
+
+Refs canonicos: DEV `hbueraexcbowpfnjlppi`; PROD `wypnbcptofqdmoynlonq`. Ver `docs/architecture/ENVIRONMENT_DATABASE_BOUNDARIES.md` y ejecutar el preflight antes de operar una base.
+
 ## Variables recomendadas de seguridad
 
 - `CERT_ENCRYPTION_KEY_OLD` (rotación de claves opcional)
@@ -67,4 +75,4 @@ Las siguientes variables son requeridas en entornos fuera de `NODE_ENV=test`:
 ## Nota de compatibilidad
 
 - Use `apps/erp-api/.env.example` como plantilla sin secretos reales.
-- Para pruebas locales puede usar `apps/erp-api/.env.local` sin exponer claves.
+- Para pruebas locales use el proyecto DEV; PROD se configura mediante `.env.production` o secretos inyectados y nunca se reutiliza para demos.

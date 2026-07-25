@@ -133,8 +133,8 @@ Implemented a multi-step wizard for creating purchase quotations (cotizaciones d
 
 ## Styling
 - Consistent with existing ERP design system
-- Uses activity-card and refresh-btn classes
-- Inline styles for component-specific styling
+- Uses Tailwind utilities with semantic tokens (`bg-card`, `text-foreground`, `border-border`)
+- Uses shadcn/Radix primitives for shared interactive patterns
 - Color scheme matches the application theme
 
 ## Future Enhancements

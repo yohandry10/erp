@@ -103,16 +103,16 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
       />
       <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
       >
-        <div className="w-[100%] bg-white shadow p-6"
+        <div className="w-[100%] bg-card shadow p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4">
-            <h3 className="text-5 font-bold m-0">Activar demo</h3>
-            <p className="text-slate-500">
+            <h3 className="text-xl font-bold m-0">Activar demo</h3>
+            <p className="text-muted-foreground">
               {tenant.razon_social}
             </p>
             {tenant.is_demo && (
-              <p className="text-blue-600 font-semibold">
+              <p className="text-primary font-semibold">
                 Demo activa{tenant.demo_expires_at ? ` hasta ${new Date(tenant.demo_expires_at).toLocaleString('es-PE')}` : ''}
               </p>
             )}
@@ -120,36 +120,36 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
 
           <div className="grid gap-3">
             <div>
-              <label className="text-3 font-semibold text-slate-500">Email</label>
+              <label className="text-xs font-semibold text-muted-foreground">Email</label>
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="cliente@empresa.com" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-3.5"
+                placeholder="cliente@empresa.com" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
               />
             </div>
             <div>
-              <label className="text-3 font-semibold text-slate-500">Contraseña</label>
+              <label className="text-xs font-semibold text-muted-foreground">Contraseña</label>
               <input
                 type="text"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Contraseña temporal" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-3.5"
+                placeholder="Contraseña temporal" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
               />
             </div>
             <div>
-              <label className="text-3 font-semibold text-slate-500">Días de demo</label>
+              <label className="text-xs font-semibold text-muted-foreground">Días de demo</label>
               <input
                 type="number"
                 min={1}
                 max={90}
                 value={days}
-                onChange={(e) => setDays(Number(e.target.value))} className="w-[100%] border py-[0.65rem] px-[0.8rem] text-3.5"
+                onChange={(e) => setDays(Number(e.target.value))} className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
               />
             </div>
           </div>
 
           {(error || success) && (
-            <div className="mt-4 py-3 px-4 font-semibold text-3.5"
+            <div className="mt-4 py-3 px-4 font-semibold text-sm"
             >
               {error || success}
             </div>
@@ -166,13 +166,13 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
             <button
               type="button"
               onClick={handleDeactivate}
-              disabled={loading} className="flex-[1] py-3 px-4 border bg-white text-slate-950 font-bold cursor-pointer"
+              disabled={loading} className="flex-[1] py-3 px-4 border bg-card text-foreground font-bold cursor-pointer"
             >
               Quitar demo
             </button>
             <button
               type="button"
-              onClick={onClose} className="py-3 px-4 border bg-slate-50 text-slate-600 font-bold cursor-pointer"
+              onClick={onClose} className="py-3 px-4 border bg-muted/30 text-foreground/80 font-bold cursor-pointer"
             >
               Cerrar
             </button>

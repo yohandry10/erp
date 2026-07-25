@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query, Logger, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { RrhhService } from './rrhh.service';
 import { PlanillasService } from './planillas.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -210,10 +211,14 @@ export class RrhhController {
   @Get('pagos/:id/comprobante')
   async generarComprobante(
     @CurrentTenant() tenantId: string,
-    @Param('id') pagoId: string
+    @Param('id') pagoId: string,
+    @Res() res: Response,
   ) {
     this.logger.debug(`📄 [RRHH] Generando comprobante ${pagoId}, tenant: ${tenantId}`);
-    return this.rrhhService.generarComprobantePago(pagoId, tenantId);
+    const pdf = await this.rrhhService.generarComprobantePago(pagoId, tenantId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="comprobante-pago-${pagoId}.pdf"`);
+    return res.send(pdf);
   }
 
   @Get('empleados/:id/boleta-pago/:mes')
@@ -268,10 +273,14 @@ export class RrhhController {
   @Get('contratos/:id/generar')
   async generarContrato(
     @CurrentTenant() tenantId: string,
-    @Param('id') contratoId: string
+    @Param('id') contratoId: string,
+    @Res() res: Response,
   ) {
     this.logger.debug(`📄 [RRHH] Generando contrato PDF ${contratoId} para tenant: ${tenantId}`);
-    return this.rrhhService.generarContratoPDF(contratoId, tenantId);
+    const pdf = await this.rrhhService.generarContratoPDF(contratoId, tenantId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="contrato-${contratoId}.pdf"`);
+    return res.send(pdf);
   }
 
   // ===== ASISTENCIAS MEJORADAS =====

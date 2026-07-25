@@ -123,7 +123,7 @@ export function CortesList({ className = '', id }: Props) {
   const buttonGhostStyle: React.CSSProperties = {
     background: 'transparent',
     border: 'none',
-    color: 'var(--primary, #2563eb)',
+    color: 'hsl(var(--primary))',
     fontSize: '0.9rem',
     cursor: 'pointer',
   };
@@ -174,7 +174,7 @@ export function CortesList({ className = '', id }: Props) {
 
   if (error) {
     return (
-      <div className="p-3 text-center text-red-700 bg-[#fef2f2] rounded-2.5">
+      <div className="p-3 text-center text-destructive bg-[#fef2f2] rounded-[0.625rem]">
         {error}
         <button
           onClick={cargarCortes} className="block"
@@ -187,17 +187,17 @@ export function CortesList({ className = '', id }: Props) {
 
   if (cortes.length === 0) {
     return (
-      <div className="p-3 text-center text-[var(--text-secondary,_#6b7280)] bg-[var(--bg-card,_#fff)] rounded-2.5 shadow">
+      <div className="p-3 text-center text-[var(--text-secondary,_#6b7280)] bg-[var(--bg-card,_#fff)] rounded-[0.625rem] shadow">
         No hay cortes registrados aún.
       </div>
     );
   }
 
   return (
-    <div id={id} className={cn(className, "bg-[var(--bg-card,_#fff)] border rounded-3 shadow mt-4 max-w-[1100px] ml-auto mr-auto overflow-hidden")}>
+    <div id={id} className={cn(className, "bg-[var(--bg-card,_#fff)] border rounded-xl shadow mt-4 max-w-[1100px] ml-auto mr-auto overflow-hidden")}>
       <div className="py-4 px-5 border-b flex justify-between items-center bg-[var(--bg-subtle,_#f8fafc)]">
-        <h3 className="text-4 font-semibold text-[var(--text-primary,_#1f2937)] m-0">Cortes (cierre diario/turno)</h3>
-        <button onClick={cargarCortes} className="bg-transparent border-0 text-[var(--primary,_#2563eb)] text-3.5 cursor-pointer">
+        <h3 className="text-base font-semibold text-[var(--text-primary,_#1f2937)] m-0">Cortes (cierre diario/turno)</h3>
+        <button onClick={cargarCortes} className="bg-transparent border-0 text-[hsl(var(--primary))] text-sm cursor-pointer">
           Actualizar
         </button>
       </div>
@@ -205,12 +205,12 @@ export function CortesList({ className = '', id }: Props) {
         <table className="w-[100%]">
           <thead>
             <tr>
-              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Fecha</th>
-              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Caja</th>
-              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Ventas</th>
-              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">IGV</th>
-              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Docs</th>
-              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Acciones</th>
+              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Fecha</th>
+              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Caja</th>
+              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Ventas</th>
+              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">IGV</th>
+              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Docs</th>
+              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -218,17 +218,17 @@ export function CortesList({ className = '', id }: Props) {
               <tr key={corte.id} className="bg-[var(--bg-card,_#fff)]">
                 <td>{formatearFecha(corte.fecha_corte)}</td>
                 <td>{corte.caja_id ?? 'Caja'}</td>
-                <td className="py-3 px-4 text-3.5 text-[var(--text-primary,_#111827)] border-b">S/ {(corte.total_ventas ?? corte.resumen_fiscal?.total ?? 0).toFixed(2)}</td>
+                <td className="py-3 px-4 text-sm text-[var(--text-primary,_#111827)] border-b">S/ {(corte.total_ventas ?? corte.resumen_fiscal?.total ?? 0).toFixed(2)}</td>
                 <td>S/ {(corte.total_impuestos ?? corte.resumen_fiscal?.igv ?? 0).toFixed(2)}</td>
                 <td>{corte.total_documentos ?? corte.resumen_fiscal?.cantidad_boletas ?? 0}</td>
                 <td className="flex gap-2">
                   <button
-                    onClick={() => descargarArchivo(corte.id, 'pdf')} className="text-[var(--primary,_#2563eb)]"
+                    onClick={() => descargarArchivo(corte.id, 'pdf')} className="text-[hsl(var(--primary))]"
                   >
                     PDF
                   </button>
                   <button
-                    onClick={() => descargarArchivo(corte.id, 'csv')} className="py-[6px] px-3 rounded-2 border bg-[var(--bg-card,_#fff)] cursor-pointer text-[0.8rem]"
+                    onClick={() => descargarArchivo(corte.id, 'csv')} className="py-[6px] px-3 rounded-lg border bg-[var(--bg-card,_#fff)] cursor-pointer text-[0.8rem]"
                   >
                     CSV
                   </button>

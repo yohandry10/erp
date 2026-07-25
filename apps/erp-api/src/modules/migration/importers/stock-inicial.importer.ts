@@ -8,6 +8,7 @@ import { MigrationRunsService } from '../migration-runs.service';
 const REQUIRED = [
   'external_id_producto',
   'sucursal_id',
+  'almacen_id',
   'cantidad',
   'costo_unitario',
 ];
@@ -24,10 +25,10 @@ export class StockInicialImporter implements Importer {
   ) {}
 
   getTemplate() {
-    const headers = [...REQUIRED, 'almacen_id', 'descripcion'];
+    const headers = [...REQUIRED, 'descripcion'];
     const sample = [
-      ['PROD-00001', '00000000-0000-0000-0000-000000000000', '120', '8.50', '', 'Stock inicial laboratorio'],
-      ['PROD-00002', '00000000-0000-0000-0000-000000000000', '50', '120.00', '', 'Stock inicial farmacia'],
+      ['PROD-00001', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '120', '8.50', 'Stock inicial laboratorio'],
+      ['PROD-00002', '00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', '50', '120.00', 'Stock inicial farmacia'],
     ];
     return {
       filename: 'plantilla_migracion_stock_inicial.csv',
@@ -52,16 +53,16 @@ export class StockInicialImporter implements Importer {
         errs.push({ rowIndex, externalId: externalProd, field: 'sucursal_id', message: 'sucursal_id debe ser UUID válido' });
       }
       const cantidad = toNumber(row['cantidad']);
-      if (!Number.isFinite(cantidad) || cantidad < 0) {
-        errs.push({ rowIndex, externalId: externalProd, field: 'cantidad', message: 'cantidad inválida (>=0)' });
+      if (!Number.isFinite(cantidad) || cantidad <= 0) {
+        errs.push({ rowIndex, externalId: externalProd, field: 'cantidad', message: 'cantidad inválida (>0)' });
       }
       const costo = toNumber(row['costo_unitario']);
       if (!Number.isFinite(costo) || costo < 0) {
         errs.push({ rowIndex, externalId: externalProd, field: 'costo_unitario', message: 'costo_unitario inválido (>=0)' });
       }
       const almacenId = nonEmpty(row['almacen_id']);
-      if (almacenId && !/^[0-9a-f-]{36}$/i.test(almacenId)) {
-        errs.push({ rowIndex, externalId: externalProd, field: 'almacen_id', message: 'almacen_id debe ser UUID válido' });
+      if (!almacenId || !/^[0-9a-f-]{36}$/i.test(almacenId)) {
+        errs.push({ rowIndex, externalId: externalProd, field: 'almacen_id', message: 'almacen_id requerido y debe ser UUID válido' });
       }
     });
     return errs;
@@ -155,7 +156,8 @@ export class StockInicialImporter implements Importer {
       }
 
       const sucursalId = row['sucursal_id'].trim();
-      const almacenId = nonEmpty(row['almacen_id']);
+      // Las filas con almacen_id ausente o inválido se descartaron arriba.
+      const almacenId = nonEmpty(row['almacen_id'])!;
       const cantidad = toNumber(row['cantidad']);
       const costo = toNumber(row['costo_unitario']);
 
@@ -172,12 +174,13 @@ export class StockInicialImporter implements Importer {
           .select('id')
           .eq('tenant_id', ctx.tenantId)
           .eq('producto_id', productoId)
-          .eq('motivo', 'INGRESO_APERTURA')
+          .eq('tipo', 'ENTRADA')
           .eq('referencia_tipo', `MIGRACION_APERTURA_${ctx.fechaCorte}`)
+          .eq('almacen_id', almacenId)
           .contains('metadata', {
             fecha_corte: ctx.fechaCorte,
             sucursal_id: sucursalId,
-            almacen_id: almacenId ?? null,
+            almacen_id: almacenId,
           })
           .maybeSingle();
 
@@ -198,51 +201,28 @@ export class StockInicialImporter implements Importer {
           continue;
         }
 
-        // Upsert stock por sucursal/almacen
-        const { error: stockErr } = await client
-          .from('producto_stock_sucursal')
-          .upsert(
-            [
-              {
-                tenant_id: ctx.tenantId,
-                producto_id: productoId,
-                sucursal_id: sucursalId,
-                almacen_id: almacenId,
-                stock_actual: cantidad,
-                stock_reservado: 0,
-                estado: 'ACTIVO',
-              },
-            ],
-            { onConflict: 'producto_id,sucursal_id,almacen_id' },
-          );
-        if (stockErr) throw stockErr;
-
-        // Registrar movimiento INGRESO_APERTURA
-        const { data: mov, error: movErr } = await client
-          .from('movimientos_inventario')
-          .insert({
-            tenant_id: ctx.tenantId,
-            producto_id: productoId,
-            cantidad,
-            tipo: 'ENTRADA',
-            motivo: 'INGRESO_APERTURA',
-            referencia_tipo: `MIGRACION_APERTURA_${ctx.fechaCorte}`,
-            notas: nonEmpty(row['descripcion']) ?? `Apertura migración al ${ctx.fechaCorte}`,
-            estado: 'ACTIVO',
-            created_by: ctx.startedBy ?? null,
-            metadata: {
-              origen: 'migracion_apertura',
-              fecha_corte: ctx.fechaCorte,
-              costo_unitario: costo,
-              valor_total: cantidad * costo,
-              sucursal_id: sucursalId,
-              almacen_id: almacenId,
-              run_id: ctx.runCtx?.runId ?? null,
-              external_id_producto: externalProd,
-            },
-          })
-          .select('id')
-          .single();
+        // Registrar el saldo físico, el agregado y el kardex en una sola RPC.
+        const { data: mov, error: movErr } = await client.rpc('aplicar_movimiento_inventario_tx', {
+          p_tenant_id: ctx.tenantId,
+          p_producto_id: productoId,
+          p_almacen_id: almacenId,
+          p_tipo: 'ENTRADA',
+          p_cantidad: cantidad,
+          p_referencia_tipo: `MIGRACION_APERTURA_${ctx.fechaCorte}`,
+          p_referencia_id: productoId,
+          p_notas: nonEmpty(row['descripcion']) ?? `Apertura migración al ${ctx.fechaCorte}`,
+          p_created_by: ctx.startedBy ?? null,
+          p_metadata: {
+            origen: 'migracion_apertura',
+            fecha_corte: ctx.fechaCorte,
+            costo_unitario: costo,
+            valor_total: cantidad * costo,
+            sucursal_id: sucursalId,
+            almacen_id: almacenId,
+            run_id: ctx.runCtx?.runId ?? null,
+            external_id_producto: externalProd,
+          },
+        });
         if (movErr) throw movErr;
 
         result.created++;
@@ -255,7 +235,7 @@ export class StockInicialImporter implements Importer {
             externalId: externalProd,
             status: 'ok',
             targetTable: 'movimientos_inventario',
-            targetId: mov?.id ?? null,
+            targetId: mov ?? null,
           });
         }
       } catch (err: any) {

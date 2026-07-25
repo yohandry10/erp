@@ -447,7 +447,7 @@ export function ImportarExtractoCSV({
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <FileText className="h-8 w-8 text-blue-600" />
+                <FileText className="h-8 w-8 text-primary" />
                 <div>
                   <div className="font-semibold">{selectedFile.name}</div>
                   <div className="text-sm text-muted-foreground">
@@ -471,13 +471,13 @@ export function ImportarExtractoCSV({
 
       {/* Errores */}
       {error && (
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-red-200 bg-destructive/10">
           <CardContent className="p-4">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
               <div>
-                <div className="font-semibold text-red-900">Error</div>
-                <div className="text-sm text-red-700">{error}</div>
+                <div className="font-semibold text-destructive">Error</div>
+                <div className="text-sm text-destructive">{error}</div>
               </div>
             </div>
           </CardContent>
@@ -486,21 +486,21 @@ export function ImportarExtractoCSV({
 
       {/* Errores de parseo */}
       {parseErrors.length > 0 && (
-        <Card className="border-yellow-200 bg-yellow-50">
+        <Card className="border-yellow-200 bg-amber-500/10">
           <CardHeader>
-            <CardTitle className="text-yellow-900 text-base">
+            <CardTitle className="text-amber-400 text-base">
               Advertencias de Procesamiento ({parseErrors.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-1 max-h-32 overflow-y-auto">
               {parseErrors.slice(0, 10).map((err, idx) => (
-                <div key={idx} className="text-sm text-yellow-700">
+                <div key={idx} className="text-sm text-amber-400">
                   • {err}
                 </div>
               ))}
               {parseErrors.length > 10 && (
-                <div className="text-sm text-yellow-700 font-semibold">
+                <div className="text-sm text-amber-400 font-semibold">
                   ... y {parseErrors.length - 10} advertencias más
                 </div>
               )}
@@ -514,7 +514,7 @@ export function ImportarExtractoCSV({
         <Card>
           <CardContent className="p-8">
             <div className="flex flex-col items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-2" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
               <p className="text-sm text-muted-foreground">Procesando archivo...</p>
             </div>
           </CardContent>
@@ -531,18 +531,18 @@ export function ImportarExtractoCSV({
                 <div className="text-2xl font-bold">{previewData.length}</div>
               </CardContent>
             </Card>
-            <Card className="border-green-200 bg-green-50">
+            <Card className="border-emerald-500/30 bg-emerald-500/10">
               <CardContent className="p-4">
-                <div className="text-sm text-green-700">Total Abonos</div>
-                <div className="text-2xl font-bold text-green-900">
+                <div className="text-sm text-emerald-400">Total Abonos</div>
+                <div className="text-2xl font-bold text-emerald-400">
                   {formatCurrency(totalAbonos)}
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-red-200 bg-red-50">
+            <Card className="border-red-200 bg-destructive/10">
               <CardContent className="p-4">
-                <div className="text-sm text-red-700">Total Cargos</div>
-                <div className="text-2xl font-bold text-red-900">
+                <div className="text-sm text-destructive">Total Cargos</div>
+                <div className="text-2xl font-bold text-destructive">
                   {formatCurrency(totalCargos)}
                 </div>
               </CardContent>
@@ -559,29 +559,29 @@ export function ImportarExtractoCSV({
             <CardContent>
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0">
+                  <thead className="bg-muted/30 sticky top-0">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                         Fecha
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                         Tipo
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                         Descripción
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
                         Monto
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                         Referencia
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-card divide-y divide-gray-200">
                     {previewData.map((mov, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm text-gray-900">
+                      <tr key={idx} className="hover:bg-muted/30">
+                        <td className="px-4 py-3 text-sm text-foreground">
                           {formatDate(mov.fecha)}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -589,20 +589,20 @@ export function ImportarExtractoCSV({
                             variant={mov.tipo === 'ABONO' ? 'default' : 'destructive'}
                             className={
                               mov.tipo === 'ABONO'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-700'
+                                ? 'bg-emerald-500/10 text-emerald-400'
+                                : 'bg-destructive/10 text-destructive'
                             }
                           >
                             {mov.tipo}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate">
+                        <td className="px-4 py-3 text-sm text-foreground max-w-xs truncate">
                           {mov.descripcion}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right font-semibold">
+                        <td className="px-4 py-3 text-sm text-foreground text-right font-semibold">
                           {formatCurrency(mov.monto)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">{mov.referencia}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{mov.referencia}</td>
                       </tr>
                     ))}
                   </tbody>

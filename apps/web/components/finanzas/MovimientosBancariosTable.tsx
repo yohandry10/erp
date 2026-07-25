@@ -1,7 +1,7 @@
 import {
-  TrendingUp, 
-  TrendingDown, 
-  CheckCircle, 
+  TrendingUp,
+  TrendingDown,
+  CheckCircle,
   Clock,
   Building2,
   FileText,
@@ -61,9 +61,9 @@ export default function MovimientosBancariosTable({
 
   if (loading) {
     return (
-      <div className="activity-card">
-        <div className="loading">
-          <div className="loading-spinner"></div>
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando movimientos...</p>
         </div>
       </div>
@@ -72,9 +72,9 @@ export default function MovimientosBancariosTable({
 
   if (movimientos.length === 0) {
     return (
-      <div className="activity-card">
-        <div className="text-center p-12 text-gray-500">
-          <FileText size={48} className="text-gray-400" />
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+        <div className="text-center p-12 text-muted-foreground">
+          <FileText size={48} className="text-muted-foreground" />
           <h3 className="text-[1.125rem] font-semibold mb-2">
             No hay movimientos
           </h3>
@@ -87,38 +87,38 @@ export default function MovimientosBancariosTable({
   }
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-[100%] text-[0.875rem]">
           <thead>
-            <tr className="bg-[#f9fafb]">
-              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
+            <tr className="bg-muted">
+              <th className="py-3 px-4 text-left font-semibold text-foreground/85 text-xs">
                 Fecha
               </th>
-              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
+              <th className="py-3 px-4 text-left font-semibold text-foreground/85 text-xs">
                 Tipo
               </th>
-              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
+              <th className="py-3 px-4 text-left font-semibold text-foreground/85 text-xs">
                 Descripción
               </th>
-              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
+              <th className="py-3 px-4 text-left font-semibold text-foreground/85 text-xs">
                 Proveedor
               </th>
-              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
+              <th className="py-3 px-4 text-left font-semibold text-foreground/85 text-xs">
                 Referencia
               </th>
-              <th className="py-3 px-4 text-right font-semibold text-gray-700 text-3">
+              <th className="py-3 px-4 text-right font-semibold text-foreground/85 text-xs">
                 Monto
               </th>
-              <th className="py-3 px-4 text-center font-semibold text-gray-700 text-3">
+              <th className="py-3 px-4 text-center font-semibold text-foreground/85 text-xs">
                 Estado
               </th>
             </tr>
           </thead>
           <tbody>
             {movimientos.map((movimiento, index) => (
-              <tr 
+              <tr
                 key={movimiento.id} className="border-b transition"
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = '#f3f4f6'
@@ -129,17 +129,17 @@ export default function MovimientosBancariosTable({
               >
                 {/* Fecha */}
                 <td className="p-4">
-                  <div className="text-[0.875rem] font-medium text-gray-900 mb-0.5">
+                  <div className="text-[0.875rem] font-medium text-foreground mb-0.5">
                     {formatDate(movimiento.fecha)}
                   </div>
-                  <div className="text-3 text-gray-500">
+                  <div className="text-xs text-muted-foreground">
                     {formatDateTime(movimiento.created_at)}
                   </div>
                 </td>
 
                 {/* Tipo */}
                 <td className="p-4">
-                  <span className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-full text-3 font-semibold">
+                  <span className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-full text-xs font-semibold">
                     {movimiento.tipo === 'ABONO' ? (
                       <TrendingUp size={12} />
                     ) : (
@@ -151,7 +151,7 @@ export default function MovimientosBancariosTable({
 
                 {/* Descripción */}
                 <td className="p-4">
-                  <div className="text-[0.875rem] font-medium text-gray-900 max-w-[300px] overflow-hidden text-ellipsis whitespace-nowrap">
+                  <div className="text-[0.875rem] font-medium text-foreground max-w-[300px] overflow-hidden text-ellipsis whitespace-nowrap">
                     {movimiento.descripcion}
                   </div>
                 </td>
@@ -160,15 +160,15 @@ export default function MovimientosBancariosTable({
                 <td className="p-4">
                   {movimiento.proveedores ? (
                     <div>
-                      <div className="text-[0.875rem] font-medium text-gray-900 mb-0.5">
+                      <div className="text-[0.875rem] font-medium text-foreground mb-0.5">
                         {movimiento.proveedores.razon_social}
                       </div>
-                      <div className="text-3 text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         RUC: {movimiento.proveedores.ruc}
                       </div>
                     </div>
                   ) : (
-                    <span className="text-[0.875rem] text-gray-400">
+                    <span className="text-[0.875rem] text-muted-foreground">
                       -
                     </span>
                   )}
@@ -177,11 +177,11 @@ export default function MovimientosBancariosTable({
                 {/* Referencia */}
                 <td className="p-4">
                   {movimiento.referencia ? (
-                    <span className="text-[0.875rem] font-medium text-gray-500">
+                    <span className="text-[0.875rem] font-medium text-muted-foreground">
                       {movimiento.referencia}
                     </span>
                   ) : (
-                    <span className="text-[0.875rem] text-gray-400">
+                    <span className="text-[0.875rem] text-muted-foreground">
                       -
                     </span>
                   )}
@@ -197,12 +197,12 @@ export default function MovimientosBancariosTable({
                 {/* Estado Conciliación */}
                 <td className="p-4 text-center">
                   {movimiento.conciliado ? (
-                    <span className="inline-flex items-center gap-1 py-1 px-2.5 rounded-full text-3 font-semibold bg-[rgba(16,_185,_129,_0.1)] text-[#10b981]">
+                    <span className="inline-flex items-center gap-1 py-1 px-2.5 rounded-full text-xs font-semibold bg-[rgba(16,_185,_129,_0.1)] text-[#10b981]">
                       <CheckCircle size={12} />
                       Conciliado
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 py-1 px-2.5 rounded-full text-3 font-semibold bg-[rgba(245,_158,_11,_0.1)] text-amber-500">
+                    <span className="inline-flex items-center gap-1 py-1 px-2.5 rounded-full text-xs font-semibold bg-[rgba(245,_158,_11,_0.1)] text-amber-500">
                       <Clock size={12} />
                       Pendiente
                     </span>
@@ -217,10 +217,10 @@ export default function MovimientosBancariosTable({
       {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex justify-between items-center mt-6 pt-6 border-t">
-          <div className="text-[0.875rem] text-gray-500">
+          <div className="text-[0.875rem] text-muted-foreground">
             Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} movimientos
           </div>
-          
+
           <div className="flex gap-2">
             <button
               onClick={() => onPageChange(pagination.page - 1)}
@@ -231,7 +231,7 @@ export default function MovimientosBancariosTable({
             </button>
 
             <div className="flex items-center gap-2 py-0 px-2">
-              <span className="text-[0.875rem] text-gray-500">
+              <span className="text-[0.875rem] text-muted-foreground">
                 Página {pagination.page} de {pagination.totalPages}
               </span>
             </div>

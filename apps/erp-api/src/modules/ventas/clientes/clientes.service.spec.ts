@@ -188,10 +188,11 @@ describe('ClientesService', () => {
       expect(mockSupabaseClient.eq).not.toHaveBeenCalledWith('tenant_id', tenantB);
     });
 
-    it('update debe usar solo columnas runtime y no enviar telefono inexistente', async () => {
+    it('update debe persistir nombre comercial y no enviar telefono inexistente', async () => {
       const tenantA = 'tenant-a';
       const dto: UpdateClienteDto = {
         razon_social: 'Cliente editado',
+        nombre_comercial: 'Marca Cliente',
         direccion: 'Av. Runtime 123',
         telefono: '+51999990000',
       };
@@ -224,10 +225,25 @@ describe('ClientesService', () => {
       expect(updatePayload).toMatchObject({
         razon_social: 'Cliente editado',
         nombre: 'Cliente editado',
+        nombre_comercial: 'Marca Cliente',
         direccion: 'Av. Runtime 123',
       });
       expect(updatePayload).not.toHaveProperty('telefono');
-      expect(updatePayload).not.toHaveProperty('nombre_comercial');
+    });
+
+    it('validarRUC solo confirma el dígito verificador y no inventa datos SUNAT', async () => {
+      const result = await service.validarRUC({ ruc: '20100066603' });
+
+      expect(result).toEqual(expect.objectContaining({
+        ruc: '20100066603',
+        validado_formato: true,
+        consulta_sunat: false,
+        fuente: 'VALIDACION_LOCAL',
+      }));
+      expect(result).not.toHaveProperty('razon_social');
+      expect(result).not.toHaveProperty('estado');
+      expect(result).not.toHaveProperty('condicion');
+      expect(result).not.toHaveProperty('direccion');
     });
   });
 });

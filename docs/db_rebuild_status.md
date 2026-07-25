@@ -19,6 +19,12 @@
 > Nota 2026-05-26: linea canonica extendida a `336__client_data_migration_external_id_and_audit.sql` (soporte de migracion de data desde ERP externo: `external_id` UNIQUE(tenant_id, external_id) en 8 maestros/documentos, tablas `migration_runs`/`migration_run_rows`, funcion `validar_migracion_apertura`, permisos `migration.*` para rol ADMIN). Detalle del flujo y endpoints CSV en `docs/migration/CLIENT_MIGRATION_RUNBOOK.md`.
 >
 > Nota 2026-05-27: repo local extendido a `337__client_migration_rls_rpc_hardening.sql` para forzar RLS en auditoria de migracion, corregir politicas a `app.current_tenant_id()` y restringir `validar_migracion_apertura` a `service_role`. Pendiente aplicar y validar en entornos remotos.
+>
+> Nota 2026-06-18: repo local extendido a `345__supabase_advisor_security_hardening.sql`. `343__job_lock_rpc_security_definer_hardening.sql`, `344__cxc_total_alias_runtime_alignment.sql` y `345__supabase_advisor_security_hardening.sql` fueron aplicadas y verificadas en DEV (`hbueraexcbowpfnjlppi`) y PROD (`wypnbcptofqdmoynlonq`) por `psql --set=ON_ERROR_STOP=1`. Validacion `345`: 0 vistas `SECURITY DEFINER`, 0 tablas publicas sin RLS, 0 funciones propias sin `search_path`, 0 funciones propias `SECURITY DEFINER` ejecutables por `anon/authenticated`, y `financial_forensic_repair_log` backend-only. Ver `docs/audits/2026-06-18-supabase-advisor-security-hardening.md`.
+>
+> Nota 2026-07-14: linea canonica extendida a `346__deployment_environment_boundary.sql`, aplicada y verificada en DEV y PROD. Crea la marca fisica `app.deployment_environment` y prohibe datos demo/QA en PROD. PROD fue limpiada de todo tenant demo y quedo con validadores de entorno/contabilidad/inventario/tesoreria verdes. Ver `docs/architecture/ENVIRONMENT_DATABASE_BOUNDARIES.md`.
+>
+> Nota 2026-07-24: la línea local llega a `355__non_demo_admin_rbac_seed_integrity.sql`. `347..355` están aplicadas únicamente en DEV `hbueraexcbowpfnjlppi`; PROD no fue consultada ni modificada. `353` alinea cliente/CxC, `354` unifica secuencia fiscal B/F y `355` separa ADMIN operativo de ADMIN demo. Antes de promover: preflight, respaldo, auditoría de colisiones fiscales históricas y validación posterior. Ver `docs/audits/2026-07-24-production-closure-functional-qa.md`.
 
 Fecha de corte: 2026-05-08 (actualizado)
 
@@ -1607,3 +1613,18 @@ Interpretacion:
 - Backend reforzado: `stock.movimiento` persiste en outbox con `movimientoId`, `eventId` e `idempotencyKey` deterministico; `generarFactura` repara `cantidad_facturada` al reintentar un pedido que ya tiene `factura_id`.
 - Gate de codigo: tests focales backend 64/64 OK, `pnpm type-check` monorepo OK, `pnpm audit --prod --json` con 0 vulnerabilidades, `git diff --check` OK.
 - Docker: Redis ya no usa password default conocido; `REDIS_PASSWORD` es obligatorio al levantar el stack.
+
+## 15) Contrato SUNAT tenant y QA por roles 2026-06-17
+
+- Migracion `342__sunat_tenant_onboarding_credentials.sql` aplicada y verificada en DEV y PROD el 2026-06-18. Agrega a `empresa_config` el contrato persistente para `sunat_environment`, usuario/clave SOL secundaria, endpoints CPE/summary/query/GRE, transporte GRE SOAP/REST, credenciales OAuth GRE REST y guard documentado para mismatch RUC/certificado. Verificacion DEV/PROD: 15 columnas presentes, 3 constraints validadas, defaults correctos y 0 filas invalidas.
+- Revalidacion autenticada por roles contra tenant demo local `c0af84b5-5ea6-44a9-9e6e-a869f119b013`: matriz API por rol permite/deniega con `200/403`; matriz UI 11/11 sin respuestas API `>=400`, sin `console.warn/error` y sin `pageerror`. Evidencia: `docs/audits/artifacts/web-runtime-roles/role-ui-playwright-2026-06-17T21-41-38-834Z.json`.
+- Ajustes asociados: AUDITOR accede por `security.audit.read`; FINANZAS CxC no depende de `/ventas/clientes`; CAJERO POS lee `GET /configuration/gre-thresholds` con `pos.read`; sidebar evita sobreexponer padres de modulos por permisos.
+
+## 16) Inventario single-ledger DEV 2026-07-22
+
+- Migraciones `347..352` aplicadas con `ON_ERROR_STOP=1` y preflight contra DEV `hbueraexcbowpfnjlppi`; no aplicadas a PROD.
+- `producto_existencias` queda como ledger físico por almacén; `productos.stock_*` y `producto_stock_sucursal` quedan derivados/protegidos.
+- POS exige sesión abierta y `cajas.almacen_id`, llama al writer canónico y no usa fallback heredado desde API.
+- Contrato runtime no vacío 6/6; venta real, retry idempotente y carrera de dos ventas sobre una unidad verificados sin divergencia ni overselling.
+- DEV fue respaldada y purgada con autorización; estado final: 1 tenant demo fresco, 5 productos, 5 existencias, 1 caja con almacén y 0 ventas.
+- Evidencia completa: `docs/audits/2026-07-22-inventory-single-ledger-closure.md`.

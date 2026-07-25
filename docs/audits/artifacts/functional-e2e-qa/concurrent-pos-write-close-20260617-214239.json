@@ -1,0 +1,92 @@
+{
+  "startedAt": "2026-06-18T02:42:58.127Z",
+  "apiUrl": "http://localhost:3002",
+  "tenantId": "c0af84b5-5ea6-44a9-9e6e-a869f119b013",
+  "runId": "750560098",
+  "idempotencyKey": "pos-concurrent-750560098",
+  "sesionId": "0d367e81-1293-4e91-988a-1e3f81369883",
+  "reusedExistingSession": false,
+  "requests": 5,
+  "okResponses": 5,
+  "failedResponses": [],
+  "responseVentaIds": [
+    "551d5b62-fdb3-474a-b580-615028adafdd",
+    "551d5b62-fdb3-474a-b580-615028adafdd",
+    "551d5b62-fdb3-474a-b580-615028adafdd",
+    "551d5b62-fdb3-474a-b580-615028adafdd",
+    "551d5b62-fdb3-474a-b580-615028adafdd"
+  ],
+  "uniqueResponseVentaIds": [
+    "551d5b62-fdb3-474a-b580-615028adafdd"
+  ],
+  "dbVentasCount": 1,
+  "dbVentaIds": [
+    "551d5b62-fdb3-474a-b580-615028adafdd"
+  ],
+  "dbTicket": "B001-00000001",
+  "stockInicial": 5,
+  "stockFinal": 4,
+  "movimientosCount": 1,
+  "movimientosCantidades": [
+    1
+  ],
+  "closeStatus": 201,
+  "closeOk": true,
+  "closeWarning": null,
+  "montoCierre": 111.8,
+  "sesionCerrada": {
+    "id": "0d367e81-1293-4e91-988a-1e3f81369883",
+    "estado": "CERRADA",
+    "monto_esperado": 111.8,
+    "monto_contado": 111.8,
+    "diferencia": 0,
+    "fecha_cierre": "2026-06-18T02:42:53.72+00:00"
+  },
+  "cortesCount": 1,
+  "asientosCierreCount": 1,
+  "asientosCierre": [
+    {
+      "id": "b661e541-5189-474f-9ae5-68c97cfe7488",
+      "tipo_asiento": "POS_CIERRE",
+      "referencia": "SESION:0d367e81-1293-4e91-988a-1e3f81369883",
+      "total_debe": 11.8,
+      "total_haber": 11.8,
+      "estado": "BORRADOR"
+    }
+  ],
+  "assertions": [
+    {
+      "name": "todas_respuestas_ok",
+      "ok": true
+    },
+    {
+      "name": "un_solo_id_respuesta",
+      "ok": true
+    },
+    {
+      "name": "una_sola_venta_db",
+      "ok": true
+    },
+    {
+      "name": "stock_reducido_una_vez",
+      "ok": true
+    },
+    {
+      "name": "un_solo_movimiento_inventario",
+      "ok": true
+    },
+    {
+      "name": "cierre_caja_ok",
+      "ok": true
+    },
+    {
+      "name": "corte_caja_registrado",
+      "ok": true
+    },
+    {
+      "name": "asiento_cierre_registrado",
+      "ok": true
+    }
+  ],
+  "passed": true
+}

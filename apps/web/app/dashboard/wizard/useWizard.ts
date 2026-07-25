@@ -5,6 +5,8 @@ import { useWizardContext } from './WizardContext'
 import { WizardConfiguration } from './types'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { fetchApi } from '@/lib/api-fetch'
+import { isOfflineQueuedResponse } from '@/lib/offline-store'
+import { INITIAL_ACTIVE_COUNTRY_CODE, INITIAL_ACTIVE_COUNTRY_ID } from '@/lib/initial-country'
 
 export function useWizard() {
   const country = useCountryContext()
@@ -152,6 +154,10 @@ export function useWizard() {
         }),
       })
 
+      if (isOfflineQueuedResponse(response)) {
+        throw new Error('No se pudo confirmar el guardado en el servidor. Verifica la conexión antes de continuar.')
+      }
+
       if (!response.ok) {
         throw new Error('Error al guardar el progreso')
       }
@@ -280,9 +286,8 @@ export function useWizard() {
   }
 
   const validateRuc = useCallback(async () => {
-    const { ruc, razonSocial, direccion } = state.configuration
+    const { ruc, razonSocial, direccion, ubigeo } = state.configuration
     const documentoFiscal = country.documentoFiscal || 'RUC'
-    const paisCodigo = (country.paisCodigo || 'PE').toUpperCase()
 
     try {
 
@@ -296,18 +301,8 @@ export function useWizard() {
         isValid = false
       } else {
         const normalized = ruc.replace(/\D/g, '')
-        if (paisCodigo === 'PE') {
-          if (normalized.length !== 11) {
-            errors.push(`El ${documentoFiscal} debe tener 11 dígitos`)
-            isValid = false
-          }
-        } else if (paisCodigo === 'CO') {
-          if (normalized.length < 9 || normalized.length > 10) {
-            errors.push(`El ${documentoFiscal} debe tener 9 o 10 dígitos`)
-            isValid = false
-          }
-        } else if (normalized.length < 6 || normalized.length > 15) {
-          errors.push(`El ${documentoFiscal} debe tener entre 6 y 15 dígitos`)
+        if (normalized.length !== 11) {
+          errors.push(`El ${documentoFiscal} debe tener 11 dígitos`)
           isValid = false
         }
       }
@@ -319,6 +314,11 @@ export function useWizard() {
 
       if (!direccion) {
         missingFields.push('Dirección Fiscal')
+        isValid = false
+      }
+
+      if (country.paisCodigo === 'PE' && !/^\d{6}$/.test(ubigeo || '')) {
+        errors.push('El ubigeo del domicilio fiscal debe tener 6 dígitos')
         isValid = false
       }
 
@@ -344,14 +344,18 @@ export function useWizard() {
     }
 
     const showLoader = !options?.silent
-    const configuration = state.configuration
+    const configuration = {
+      ...state.configuration,
+      pais: INITIAL_ACTIVE_COUNTRY_CODE,
+      pais_id: Number(INITIAL_ACTIVE_COUNTRY_ID),
+    }
 
     try {
       if (showLoader) {
         setLoading(true)
       }
 
-      // Obtener token del localStorage (custom auth)
+      // fetchApi usa cookie HttpOnly en web o token protegido en memoria en Tauri.
       const response = await fetchApi('/api/configuration/complete', {
         method: 'POST',
         headers: {
@@ -431,7 +435,8 @@ export function useWizard() {
       return !!(
         state.configuration.ruc &&
         state.configuration.razonSocial &&
-        state.configuration.direccion
+        state.configuration.direccion &&
+        (country.paisCodigo !== 'PE' || /^\d{6}$/.test(state.configuration.ubigeo || ''))
       )
     }
 
@@ -445,58 +450,32 @@ export function useWizard() {
 
     // Fiscal step requires regimen_tributario and series
     if (currentStepData.id === 'fiscal') {
-      const paisCodigo = (country.paisCodigo || 'PE').toUpperCase()
-      const isPeru = paisCodigo === 'PE'
       if (!state.configuration.serie_factura) {
         return false
       }
-      if (isPeru && !state.configuration.serie_boleta) {
+      if (!state.configuration.serie_boleta) {
         return false
       }
-      if (isPeru && !state.configuration.regimen_tributario) {
+      if (!state.configuration.regimen_tributario) {
         return false
-      }
-      if (paisCodigo === 'CO') {
-        if (!state.configuration.dian_regimen_fiscal) {
-          return false
-        }
-        if (!state.configuration.dian_tipo_contribuyente) {
-          return false
-        }
       }
       return true
     }
 
     // SUNAT/OSE step
     if (currentStepData.id === 'sunat') {
-      const paisCodigo = (country.paisCodigo || 'PE').toUpperCase()
       const modo = state.configuration.emision_cpe_modo || 'SUNAT_DIRECTO'
-      const dianEnvironment = (state.configuration.dian_environment || 'HOMOLOGACION').toUpperCase()
 
-      if (paisCodigo === 'CO') {
-        if (!state.configuration.dian_activo) {
+      if (modo === 'SUNAT_DIRECTO') {
+        if (!state.configuration.sunat_username || !state.configuration.sunat_password) {
           return false
         }
-        if (!state.configuration.dian_url) {
-          return false
-        }
-        if (!state.configuration.dian_usuario || !state.configuration.dian_password) {
-          return false
-        }
-        if (!state.configuration.dian_software_id || !state.configuration.dian_software_pin) {
-          return false
-        }
-        if (dianEnvironment === 'HOMOLOGACION' && !state.configuration.dian_test_set_id) {
-          return false
-        }
-        if (!state.configuration.dian_resolucion_numero || !state.configuration.dian_resolucion_prefijo) {
-          return false
-        }
-        if (state.configuration.dian_resolucion_desde == null || state.configuration.dian_resolucion_hasta == null) {
-          return false
-        }
-        if (!state.configuration.dian_resolucion_fecha_inicio || !state.configuration.dian_resolucion_fecha_fin) {
-          return false
+
+        if (state.configuration.sunat_gre_transport === 'rest') {
+          return !!(
+            state.configuration.sunat_gre_client_id &&
+            state.configuration.sunat_gre_client_secret
+          )
         }
       }
 
@@ -536,7 +515,7 @@ export function useWizard() {
     }
 
     return currentStepData.isComplete
-  }, [state, country])
+  }, [state, country.paisCodigo])
 
   return {
     state,

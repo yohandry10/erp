@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DocumentosService } from './documentos.service';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { CacheInvalidationService } from '../shared/cache/cache-invalidation.service';
@@ -11,6 +11,7 @@ import { CxcService } from './finanzas/cxc/cxc.service';
 describe('DocumentosService', () => {
   let service: DocumentosService;
   let mockSupabaseClient: any;
+  let mockCpeService: { anularComprobante: jest.Mock };
 
   const createSupabaseQuery = () => {
     const queue: any[] = [];
@@ -39,11 +40,16 @@ describe('DocumentosService', () => {
     query.lte = jest.fn().mockReturnValue(query);
     query.ilike = jest.fn().mockReturnValue(query);
     query.in = jest.fn().mockReturnValue(query);
+    query.limit = jest.fn().mockReturnValue(query);
+    query.maybeSingle = jest.fn();
     return query;
   };
 
   beforeEach(async () => {
     mockSupabaseClient = createSupabaseQuery();
+    mockCpeService = {
+      anularComprobante: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,7 +74,7 @@ describe('DocumentosService', () => {
         },
         {
           provide: CpeService,
-          useValue: {},
+          useValue: mockCpeService,
         },
         {
           provide: CxcService,
@@ -166,6 +172,108 @@ describe('DocumentosService', () => {
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('documentos');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', 'tenant-a');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', 'doc-cross');
+    });
+  });
+
+  describe('anulación fiscal integral', () => {
+    it('delega un documento con CPE al flujo fiscal completo sin actualizarlo superficialmente', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'doc-pos',
+          tenant_id: 'tenant-a',
+          tipo_documento: 'BOLETA',
+          estado: 'EMITIDO',
+          serie: 'B001',
+          numero: '00000001',
+        },
+        error: null,
+      });
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: { id: 'cpe-pos' },
+        error: null,
+      });
+      mockCpeService.anularComprobante.mockResolvedValueOnce({
+        success: true,
+        cpe_anulado: { id: 'cpe-pos', estado: 'ANULADO' },
+        nota_credito: { id: 'nc-pos' },
+      });
+
+      const result = await service.anularDocumento(
+        'doc-pos',
+        'Devolución total',
+        'tenant-a',
+        'user-1',
+      );
+
+      expect(mockCpeService.anularComprobante).toHaveBeenCalledWith(
+        'cpe-pos',
+        'Devolución total',
+        'tenant-a',
+        'user-1',
+      );
+      expect(mockSupabaseClient.update).not.toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({
+        success: true,
+        nota_credito: { id: 'nc-pos' },
+      }));
+    });
+
+    it('falla cerrado si un documento fiscal emitido no tiene CPE vinculado', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'doc-sin-cpe',
+          tenant_id: 'tenant-a',
+          tipo_documento: 'BOLETA',
+          estado: 'EMITIDO',
+          serie: 'B001',
+          numero: '9',
+        },
+        error: null,
+      });
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: null,
+        error: null,
+      });
+      mockSupabaseClient.pushResult({ data: [], error: null });
+
+      await expect(
+        service.anularDocumento(
+          'doc-sin-cpe',
+          'QA sin trazabilidad',
+          'tenant-a',
+          'user-1',
+        ),
+      ).rejects.toThrow(ConflictException);
+
+      expect(mockCpeService.anularComprobante).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('validación honesta de RUC', () => {
+    it('no simula padrón SUNAT ni autocompleta datos registrales', async () => {
+      const result = await service.validarRUC('20100066603');
+
+      expect(result).toEqual(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          ruc: '20100066603',
+          validado_formato: true,
+          consulta_sunat: false,
+          fuente: 'VALIDACION_LOCAL',
+        }),
+      }));
+      expect(result.data).not.toHaveProperty('razon_social');
+      expect(result.data).not.toHaveProperty('estado');
+      expect(result.data).not.toHaveProperty('condicion');
+      expect(result.data).not.toHaveProperty('direccion');
+    });
+
+    it('rechaza RUC con dígito verificador inválido', async () => {
+      const result = await service.validarRUC('20100066604');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('dígito verificador');
     });
   });
 });

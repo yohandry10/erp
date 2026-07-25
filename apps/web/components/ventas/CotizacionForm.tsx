@@ -266,9 +266,9 @@ export default function CotizacionForm({
       {/* Cliente Section */}
       <div className="p-6 shadow border">
         {stockAlerts.length > 0 && (
-          <div className="bg-[rgba(239,_68,_68,_0.08)] border text-[var(--red-700)] py-3 px-4 mb-3">
+          <div className="bg-destructive/10 border text-[var(--red-700)] py-3 px-4 mb-3">
             <strong className="block mb-1">⚠️ Stock insuficiente</strong>
-            <ul className="m-0 pl-4 text-3.5">
+            <ul className="m-0 pl-4 text-sm">
               {stockAlerts.map((s, i) => (
                 <li key={i}>
                   {s.descripcion}: solicitado {s.solicitado}, disponible {s.disponible} (reservado {s.reservado})
@@ -293,7 +293,13 @@ export default function CotizacionForm({
           <button
             type="button"
             onClick={handleAddItem}
-            disabled={disabled || loadingProductos} className="inline-flex items-center gap-2 py-2.5 px-5 text-[0.875rem] font-semibold text-white bg-[var(--gradient-primary)] border-0 transition shadow"
+            disabled={disabled || loadingProductos}
+            title={loadingProductos
+              ? 'Cargando productos disponibles'
+              : disabled
+                ? 'El formulario está procesando otra operación'
+                : 'Agregar un producto a la cotización'}
+            className="inline-flex items-center gap-2 py-2.5 px-5 text-[0.875rem] font-semibold text-white bg-[var(--gradient-primary)] border-0 transition shadow"
             onMouseEnter={(e) => {
               if (!disabled && !loadingProductos) {
                 e.currentTarget.style.transform = 'translateY(-2px)'
@@ -323,17 +329,17 @@ export default function CotizacionForm({
         ) : (
           <div className="flex flex-col gap-4">
             {detalle.map((item, index) => (
-              <div key={index} className="border p-4 bg-[rgba(255,_255,_255,_0.5)]">
-                <div className="grid grid-cols-[repeat(12,_1fr)] gap-4">
+              <div key={index} className="border p-4 bg-card/50">
+                <div className="grid grid-cols-12 gap-4">
                   {/* Producto Selector */}
-                  <div>
+                  <div className="col-span-12 md:col-span-5">
                     <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Producto
                     </label>
                     <select
                       value={item.producto_id}
                       onChange={(e) => handleProductoChange(index, e.target.value)}
-                      disabled={disabled} className="w-[100%] py-3 px-4 text-4 bg-white text-[var(--primary-800)] cursor-pointer"
+                      disabled={disabled} className="w-[100%] py-3 px-4 text-base bg-card text-[var(--primary-800)] cursor-pointer"
                     >
                       <option value="">Seleccionar producto...</option>
                       {productos.map(producto => {
@@ -349,14 +355,14 @@ export default function CotizacionForm({
                       })}
                     </select>
                     {errors[`producto_${index}`] && (
-                      <p className="text-3 text-[var(--red-600)] mt-1">
+                      <p className="text-xs text-[var(--red-600)] mt-1">
                         {errors[`producto_${index}`]}
                       </p>
                     )}
                   </div>
 
                   {/* Cantidad */}
-                  <div>
+                  <div className="col-span-6 md:col-span-2">
                     <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Cantidad
                     </label>
@@ -371,7 +377,7 @@ export default function CotizacionForm({
                       disabled={disabled}
                     />
                     {errors[`cantidad_${index}`] && (
-                      <p className="text-3 text-[var(--red-600)] mt-1">
+                      <p className="text-xs text-[var(--red-600)] mt-1">
                         {errors[`cantidad_${index}`]}
                       </p>
                     )}
@@ -381,7 +387,7 @@ export default function CotizacionForm({
                       const disponible = (producto?.stock_actual ?? 0) - reservado
                       const warn = item.cantidad > disponible
                       return (
-                        <p className="text-3 mt-[0.15rem]">
+                        <p className="text-xs mt-[0.15rem]">
                           {warn ? '⚠️ ' : ''}
                           Stock: {producto?.stock_actual ?? 0} • Reservado: {reservado} • Disponible: {disponible}
                         </p>
@@ -390,7 +396,7 @@ export default function CotizacionForm({
                   </div>
 
                   {/* Precio Unitario */}
-                  <div>
+                  <div className="col-span-6 md:col-span-2">
                     <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Precio Unit.
                     </label>
@@ -403,14 +409,14 @@ export default function CotizacionForm({
                       disabled={disabled}
                     />
                     {errors[`precio_${index}`] && (
-                      <p className="text-3 text-[var(--red-600)] mt-1">
+                      <p className="text-xs text-[var(--red-600)] mt-1">
                         {errors[`precio_${index}`]}
                       </p>
                     )}
                   </div>
 
                   {/* Subtotal */}
-                  <div>
+                  <div className="col-span-6 md:col-span-2">
                     <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Subtotal
                     </label>
@@ -422,7 +428,7 @@ export default function CotizacionForm({
                   </div>
 
                   {/* Remove Button */}
-                  <div className="flex items-end">
+                  <div className="col-span-6 md:col-span-1 flex items-end">
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(index)}
@@ -502,7 +508,7 @@ export default function CotizacionForm({
         <button
           type="button"
           onClick={onCancel}
-          disabled={submitting} className="inline-flex items-center gap-2 py-3 px-6 text-4 font-semibold text-[var(--primary-700)] bg-white transition shadow"
+          disabled={submitting} className="inline-flex items-center gap-2 py-3 px-6 text-base font-semibold text-[var(--primary-700)] bg-card transition shadow"
           onMouseEnter={(e) => {
             if (!submitting) {
               e.currentTarget.style.background = 'var(--primary-50)'
@@ -520,7 +526,7 @@ export default function CotizacionForm({
         </button>
         <button
           type="submit"
-          disabled={disabled || submitting || stockAlerts.length > 0} className="inline-flex items-center gap-2 py-3 px-8 text-4 font-semibold text-white bg-[var(--gradient-primary)] border-0 transition shadow relative overflow-hidden"
+          disabled={disabled || submitting || stockAlerts.length > 0} className="inline-flex items-center gap-2 py-3 px-8 text-base font-semibold text-white bg-[var(--gradient-primary)] border-0 transition shadow relative overflow-hidden"
           onMouseEnter={(e) => {
             if (!disabled && !submitting) {
               e.currentTarget.style.transform = 'translateY(-2px)'

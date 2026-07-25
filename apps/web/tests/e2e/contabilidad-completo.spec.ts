@@ -184,6 +184,12 @@ async function createSaleWithCxc(apiContext: APIRequestContext) {
     'crear cliente T14',
   );
 
+  const almacenes = await parseOk<any[]>(
+    await apiContext.get(api('/inventario/almacenes')),
+    'listar almacenes venta T14',
+  );
+  expect(almacenes.length, 'T14 requiere almacén operativo').toBeGreaterThan(0);
+
   const producto = await parseOk<any>(
     await apiContext.post(api('/inventario/productos'), {
       data: {
@@ -193,6 +199,7 @@ async function createSaleWithCxc(apiContext: APIRequestContext) {
         precio_compra: 40,
         precio_venta: 118,
         stock: 4,
+        almacen_id: almacenes[0].id,
         stock_minimo: 0,
         controla_stock: true,
       },
@@ -363,9 +370,21 @@ async function createPosSale(apiContext: APIRequestContext, supabase: SupabaseCl
     updated_at: new Date().toISOString(),
   }, { onConflict: 'tenant_id' });
 
+  const { data: almacen, error: almacenError } = await supabase
+    .from('almacenes')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('activo', true)
+    .order('es_principal', { ascending: false })
+    .limit(1)
+    .single();
+  expect(almacenError?.message || '', 'consultar almacen POS Contabilidad T14').toBe('');
+  expect(almacen?.id, 'debe existir almacen POS Contabilidad T14').toBeTruthy();
+
   const { data: caja, error: cajaError } = await supabase.from('cajas').insert({
     id: crypto.randomUUID(),
     tenant_id: tenantId,
+    almacen_id: almacen!.id,
     codigo: `CAJA-CON-${runId}`,
     nombre: `${qaPrefix} Caja Contabilidad`,
     estado: 'ACTIVO',
@@ -385,9 +404,6 @@ async function createPosSale(apiContext: APIRequestContext, supabase: SupabaseCl
     precio_venta: 50,
     precio_unitario: 50,
     precio_compra: 30,
-    stock: '3',
-    stock_actual: '3',
-    stock_reservado: '0',
     stock_minimo: '0',
     unidad_medida: 'NIU',
     activo: true,
@@ -396,6 +412,20 @@ async function createPosSale(apiContext: APIRequestContext, supabase: SupabaseCl
     es_servicio: false,
   }).select('*').single();
   expect(productoError?.message || '', 'crear producto POS Contabilidad T14').toBe('');
+
+  const { error: stockError } = await supabase.rpc('aplicar_movimiento_inventario_tx', {
+    p_tenant_id: tenantId,
+    p_producto_id: producto!.id,
+    p_almacen_id: almacen!.id,
+    p_tipo: 'ENTRADA',
+    p_cantidad: 3,
+    p_referencia_tipo: 'QA_CONTABILIDAD_E2E',
+    p_referencia_id: crypto.randomUUID(),
+    p_notas: 'Stock controlado para flujo POS/Contabilidad E2E',
+    p_created_by: 'playwright',
+    p_metadata: { source: 'contabilidad-completo.spec.ts', run_id: runId },
+  });
+  expect(stockError?.message || '', 'cargar stock por ledger POS Contabilidad T14').toBe('');
 
   const sesionActual = await parseOk<any>(await apiContext.get(api('/pos/sesion-caja')), 'consultar sesion POS T14');
   let sesionId = sesionActual?.id;

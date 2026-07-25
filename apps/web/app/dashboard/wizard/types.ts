@@ -28,6 +28,10 @@ export interface WizardConfiguration {
   ruc: string
   razonSocial: string
   direccion: string
+  ubigeo: string
+  departamento?: string
+  provincia?: string
+  distrito?: string
   // Logo de la empresa (multi-tenant)
   logoFile?: File
   logoUrl?: string
@@ -51,6 +55,21 @@ export interface WizardConfiguration {
   serie_nota_credito?: string
   // Configuración SUNAT/OSE
   emision_cpe_modo?: 'SUNAT_DIRECTO' | 'OSE_API'
+  sunat_environment?: 'homologacion' | 'produccion'
+  sunat_username?: string
+  sunat_password?: string
+  sunat_cpe_url?: string
+  sunat_summary_url?: string
+  sunat_query_url?: string
+  sunat_gre_url?: string
+  sunat_gre_transport?: 'soap' | 'rest'
+  sunat_gre_rest_base_url?: string
+  sunat_gre_auth_url?: string
+  sunat_gre_client_id?: string
+  sunat_gre_client_secret?: string
+  sunat_cert_expected_ruc?: string
+  sunat_cert_ruc_mismatch_confirmed?: boolean
+  sunat_cert_ruc_mismatch_reason?: string
   ose_url?: string
   ose_status_url?: string
   ose_username?: string

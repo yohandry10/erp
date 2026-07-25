@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CxcService } from './cxc.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
@@ -68,6 +68,21 @@ describe('CxcService - CobroRegistrado Event', () => {
   });
 
   describe('registrarPago', () => {
+    it('mapea a 404 cuando la RPC no encuentra la cuenta por cobrar', async () => {
+      mockSupabaseClient.rpc = jest.fn().mockResolvedValue({
+        data: null,
+        error: { code: 'P0001', message: 'Cuenta por cobrar no encontrada' },
+      });
+
+      await expect(
+        service.registrarPago('tenant-123', 'cxc-inexistente', {
+          monto: 100,
+          fecha_pago: '2026-07-24',
+          metodo_pago: 'TRANSFERENCIA',
+        } as any),
+      ).rejects.toThrow(NotFoundException);
+    });
+
     it('rechaza fechas de cobro inválidas antes de persistir', async () => {
       await expect(
         service.registrarPago('tenant-123', 'cxc-456', {

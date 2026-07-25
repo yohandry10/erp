@@ -80,14 +80,14 @@ export default function ReportesPage() {
   ].filter((tab) => isPeru || tab.id !== 'sunat')
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">Reportes y Estadísticas</h1>
-          <p className="dashboard-subtitle">Analiza el desempeño de ventas y toma decisiones informadas</p>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Reportes y Estadísticas</h1>
+          <p className="mt-2 text-base text-muted-foreground">Analiza el desempeño de ventas y toma decisiones informadas</p>
         </div>
-        <button 
-          className="refresh-btn"
+        <button
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
           onClick={() => handleExportReport(activeTab)}
         >
           <Download size={20} />
@@ -96,17 +96,17 @@ export default function ReportesPage() {
       </div>
 
       {/* Global Filters */}
-      <div className="activity-section">
-        <div className="activity-header">
-          <h2 className="activity-title">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="m-0 text-lg font-bold text-foreground">
             <Calendar size={20} className="mr-2" />
             Filtros Globales
           </h2>
         </div>
-        <div className="activity-card">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha Desde
               </label>
               <input
@@ -117,7 +117,7 @@ export default function ReportesPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha Hasta
               </label>
               <input
@@ -128,7 +128,7 @@ export default function ReportesPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Cliente (opcional)
               </label>
               <input
@@ -140,7 +140,7 @@ export default function ReportesPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Estado (opcional)
               </label>
               <select
@@ -160,25 +160,39 @@ export default function ReportesPage() {
       </div>
 
       {/* Reports Tabs */}
-      <div className="activity-section">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
         {/* Tab Navigation */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+        <div
+          data-testid="sales-report-tabs"
+          className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6"
+          role="tablist"
+          aria-label="Secciones de reportes de ventas"
+        >
           {tabs.map(tab => {
             const Icon = tab.icon
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)} className="py-3 px-4 border-0 cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium whitespace-nowrap transition"
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls={`report-panel-${tab.id}`}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-center text-sm font-semibold transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                    : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                }`}
               >
-                <Icon size={16} />
-                {tab.label}
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 leading-tight">{tab.label}</span>
               </button>
             )
           })}
         </div>
 
         {/* Tab Content */}
-        <div>
+        <div id={`report-panel-${activeTab}`} role="tabpanel">
           {activeTab === 'ventas-cliente' && <VentasPorClienteReport filters={filters} />}
           {activeTab === 'resumen-ventas' && <ResumenVentasReport filters={filters} />}
           {activeTab === 'cotizaciones' && <CotizacionesPendientesReport filters={filters} />}

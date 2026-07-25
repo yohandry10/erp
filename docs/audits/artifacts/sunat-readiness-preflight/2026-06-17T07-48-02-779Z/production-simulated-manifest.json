@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-06-17T07:48:03.847Z",
+  "productionUsed": false,
+  "sunatEnvironment": "produccion",
+  "expectedRuc": "20616053575",
+  "greTransport": "soap",
+  "canAttemptProductionSend": false,
+  "checks": [
+    {
+      "id": "sunat.environment",
+      "severity": "PASS",
+      "message": "SUNAT_ENVIRONMENT esta en produccion; se aplican compuertas estrictas."
+    },
+    {
+      "id": "sunat.expected_ruc",
+      "severity": "PASS",
+      "message": "RUC esperado configurado: 20616053575."
+    },
+    {
+      "id": "certificate.config",
+      "severity": "PASS",
+      "message": "PFX_PATH y PFX_PASS estan configurados."
+    },
+    {
+      "id": "certificate.load",
+      "severity": "FAIL",
+      "message": "No se pudo cargar el certificado: El certificado fiscal no contiene el RUC esperado 20616053575. SUNAT producción para persona jurídica requiere un certificado asociado al contribuyente; use un PFX con el RUC de la empresa o configure una confirmación explícita documentada."
+    },
+    {
+      "id": "certificate.ruc_match",
+      "severity": "FAIL",
+      "message": "El certificado fiscal no contiene el RUC esperado o no se pudo verificar. No emitir en produccion."
+    },
+    {
+      "id": "gre.transport",
+      "severity": "WARN",
+      "message": "GRE usa SOAP; la evidencia beta actual deja SOAP no concluyente para GRE 2.0. Usar REST si el contribuyente emitira guias."
+    },
+    {
+      "id": "ra_rc.ticket_cdr",
+      "severity": "WARN",
+      "message": "RA/RC requieren CDR de ticket por getStatus en beta/homologacion o produccion controlada; este preflight no consulta SUNAT."
+    }
+  ],
+  "certificate": {
+    "loaded": false,
+    "error": "El certificado fiscal no contiene el RUC esperado 20616053575. SUNAT producción para persona jurídica requiere un certificado asociado al contribuyente; use un PFX con el RUC de la empresa o configure una confirmación explícita documentada."
+  }
+}

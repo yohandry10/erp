@@ -199,7 +199,7 @@ export default function PagoProveedorModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-green-600" />
+            <DollarSign className="h-5 w-5 text-emerald-400" />
             Aplicar Pago a Cuenta por Pagar
           </DialogTitle>
           <DialogDescription>
@@ -208,16 +208,16 @@ export default function PagoProveedorModal({
         </DialogHeader>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <div className="bg-destructive/10 border border-red-200 text-destructive px-4 py-3 rounded-lg text-sm">
             {error}
           </div>
         )}
 
         {/* Saldo Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-primary/10 border border-blue-200 rounded-lg p-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-blue-900">Saldo Pendiente:</span>
-            <span className="text-xl font-bold text-blue-700">
+            <span className="text-sm font-medium text-primary">Saldo Pendiente:</span>
+            <span className="text-xl font-bold text-primary">
               {formatCurrency(saldoPendiente)}
             </span>
           </div>
@@ -226,7 +226,7 @@ export default function PagoProveedorModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Monto */}
           <div>
-            <label htmlFor="cxp-pago-monto" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-monto" className="block text-sm font-medium text-foreground/85 mb-2">
               <DollarSign className="inline h-4 w-4 mr-1" />
               Monto del Pago *
             </label>
@@ -237,7 +237,7 @@ export default function PagoProveedorModal({
                 value={monto}
                 onChange={(e) => handleMontoChange(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <Button
@@ -249,14 +249,14 @@ export default function PagoProveedorModal({
                 Pago Completo
               </Button>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Máximo: {formatCurrency(saldoPendiente)}
             </p>
           </div>
 
           {/* Fecha Pago */}
           <div>
-            <label htmlFor="cxp-pago-fecha" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-fecha" className="block text-sm font-medium text-foreground/85 mb-2">
               <Calendar className="inline h-4 w-4 mr-1" />
               Fecha de Pago *
             </label>
@@ -266,14 +266,14 @@ export default function PagoProveedorModal({
               value={fechaPago}
               onChange={(e) => setFechaPago(e.target.value)}
               max={new Date().toISOString().split('T')[0]}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
           </div>
 
           {/* Método de Pago */}
           <div>
-            <label htmlFor="cxp-pago-metodo" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-metodo" className="block text-sm font-medium text-foreground/85 mb-2">
               <CreditCard className="inline h-4 w-4 mr-1" />
               Método de Pago *
             </label>
@@ -281,7 +281,7 @@ export default function PagoProveedorModal({
               id="cxp-pago-metodo"
               value={metodoPago}
               onChange={(e) => setMetodoPago(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
               <option value="TRANSFERENCIA">Transferencia Bancaria</option>
@@ -294,17 +294,17 @@ export default function PagoProveedorModal({
           {/* Cuenta Bancaria */}
           {requiresCuentaBancaria && (
             <div>
-              <label htmlFor="cxp-pago-cuenta" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="cxp-pago-cuenta" className="block text-sm font-medium text-foreground/85 mb-2">
                 <Building2 className="inline h-4 w-4 mr-1" />
                 Cuenta Bancaria {requiresCuentaBancaria && '*'}
               </label>
               {loading ? (
-                <div className="flex items-center justify-center py-4 text-gray-500">
+                <div className="flex items-center justify-center py-4 text-muted-foreground">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2"></div>
                   Cargando cuentas...
                 </div>
               ) : cuentasBancarias.length === 0 ? (
-                <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="text-sm text-amber-400 bg-amber-500/10 border border-amber-200 rounded-lg p-3">
                   No hay cuentas bancarias activas en {moneda}. Puede continuar sin seleccionar una cuenta.
                 </div>
               ) : (
@@ -312,7 +312,7 @@ export default function PagoProveedorModal({
                   id="cxp-pago-cuenta"
                   value={cuentaBancariaId}
                   onChange={(e) => setCuentaBancariaId(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required={requiresCuentaBancaria}
                 >
                   <option value="">Seleccione una cuenta</option>
@@ -328,7 +328,7 @@ export default function PagoProveedorModal({
 
           {/* Referencia */}
           <div>
-            <label htmlFor="cxp-pago-referencia" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-referencia" className="block text-sm font-medium text-foreground/85 mb-2">
               <FileText className="inline h-4 w-4 mr-1" />
               Número de Referencia
             </label>
@@ -338,16 +338,16 @@ export default function PagoProveedorModal({
               value={referencia}
               onChange={(e) => setReferencia(e.target.value)}
               placeholder="Ej: OP-2025-001234, Cheque #12345"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Número de operación, cheque, etc.
             </p>
           </div>
 
           {/* Observaciones */}
           <div>
-            <label htmlFor="cxp-pago-observaciones" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-observaciones" className="block text-sm font-medium text-foreground/85 mb-2">
               Observaciones
             </label>
             <textarea
@@ -356,7 +356,7 @@ export default function PagoProveedorModal({
               onChange={(e) => setObservaciones(e.target.value)}
               placeholder="Observaciones adicionales sobre el pago..."
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
           </div>
 

@@ -17,16 +17,16 @@ interface CompanyFormData {
 }
 
 export const DynamicCompanyForm: React.FC = () => {
-  const { 
-    config, 
-    loading, 
+  const {
+    config,
+    loading,
     country,
     getLabel,
     formatCurrency,
-    formatDate 
+    formatDate
   } = useCountryConfig();
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState<CompanyFormData>({
     documento_identidad: '',
     razon_social: '',
@@ -36,7 +36,7 @@ export const DynamicCompanyForm: React.FC = () => {
     tipo_documento: '',
     moneda_principal: ''
   });
-  
+
   const [saving, setSaving] = useState(false);
 
   const handleFieldChange = (field: keyof CompanyFormData, value: any) => {
@@ -49,11 +49,11 @@ export const DynamicCompanyForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    
+
     try {
       // Simular guardado
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       toast({
         title: "Empresa guardada",
         description: `Configuración guardada para ${country?.paisNombre}`,
@@ -84,7 +84,7 @@ export const DynamicCompanyForm: React.FC = () => {
     return (
       <Card>
         <CardContent className="p-6">
-          <p className="text-center text-gray-500">
+          <p className="text-center text-muted-foreground">
             No se pudo cargar la configuración del país
           </p>
         </CardContent>
@@ -99,12 +99,12 @@ export const DynamicCompanyForm: React.FC = () => {
           <Building2 className="h-5 w-5" />
           Configuración de Empresa - {country?.paisNombre}
         </CardTitle>
-        <p className="text-sm text-gray-600">
-          Formulario adaptado para {config.pais.codigo_fiscal} 
+        <p className="text-sm text-foreground/80">
+          Formulario adaptado para {config.pais.codigo_fiscal}
           ({config.configuracion_fiscal.moneda_principal})
         </p>
       </CardHeader>
-      
+
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -115,7 +115,7 @@ export const DynamicCompanyForm: React.FC = () => {
               value={formData.tipo_documento}
               onChange={(value) => handleFieldChange('tipo_documento', value)}
             />
-            
+
             {/* Número de Documento */}
             <DynamicField
               name="documento_identidad"
@@ -124,7 +124,7 @@ export const DynamicCompanyForm: React.FC = () => {
               onChange={(value) => handleFieldChange('documento_identidad', value)}
             />
           </div>
-          
+
           {/* Razón Social */}
           <DynamicField
             name="razon_social"
@@ -132,7 +132,7 @@ export const DynamicCompanyForm: React.FC = () => {
             value={formData.razon_social}
             onChange={(value) => handleFieldChange('razon_social', value)}
           />
-          
+
           {/* Dirección Fiscal */}
           <DynamicField
             name="direccion_fiscal"
@@ -140,7 +140,7 @@ export const DynamicCompanyForm: React.FC = () => {
             value={formData.direccion_fiscal}
             onChange={(value) => handleFieldChange('direccion_fiscal', value)}
           />
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Teléfono */}
             <DynamicField
@@ -149,7 +149,7 @@ export const DynamicCompanyForm: React.FC = () => {
               value={formData.telefono}
               onChange={(value) => handleFieldChange('telefono', value)}
             />
-            
+
             {/* Email */}
             <DynamicField
               name="email"
@@ -158,7 +158,7 @@ export const DynamicCompanyForm: React.FC = () => {
               onChange={(value) => handleFieldChange('email', value)}
             />
           </div>
-          
+
           {/* Moneda Principal */}
           <DynamicField
             name="moneda_principal"
@@ -166,9 +166,9 @@ export const DynamicCompanyForm: React.FC = () => {
             value={formData.moneda_principal}
             onChange={(value) => handleFieldChange('moneda_principal', value)}
           />
-          
+
           {/* Información de configuración */}
-          <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="bg-muted/30 p-4 rounded-lg">
             <h4 className="font-medium mb-2">Configuración Fiscal Aplicada:</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>Formato de fecha: {config.formato_config.formato_fecha}</div>
@@ -177,7 +177,7 @@ export const DynamicCompanyForm: React.FC = () => {
               <div>Moneda: {config.configuracion_fiscal.moneda_principal}</div>
             </div>
           </div>
-          
+
           <div className="flex justify-end space-x-2">
             <Button type="submit" disabled={saving}>
               {saving ? (

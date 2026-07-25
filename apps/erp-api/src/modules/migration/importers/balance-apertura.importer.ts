@@ -176,23 +176,12 @@ export class BalanceAperturaImporter implements Importer {
           .eq('id', existing.id);
       }
 
-      // numero_asiento secuencial por (tenant, fecha)
-      const { data: maxRow } = await client
-        .from('asientos_contables')
-        .select('numero_asiento')
-        .eq('tenant_id', ctx.tenantId)
-        .gte('fecha', `${ctx.fechaCorte}T00:00:00Z`)
-        .lte('fecha', `${ctx.fechaCorte}T23:59:59Z`)
-        .order('numero_asiento', { ascending: false })
-        .limit(1);
-      const siguienteNumero = ((maxRow?.[0] as any)?.numero_asiento ?? 0) + 1;
-
       const { data: asiento, error: asErr } = await client
         .from('asientos_contables')
         .insert({
           tenant_id: ctx.tenantId,
           external_id: externalIdAsiento,
-          numero_asiento: siguienteNumero,
+          source_event_id: externalIdAsiento,
           tipo_asiento: 'APERTURA',
           fecha: `${ctx.fechaCorte}T00:00:00Z`,
           referencia: externalIdAsiento,
@@ -210,7 +199,7 @@ export class BalanceAperturaImporter implements Importer {
             fecha_corte: ctx.fechaCorte,
           },
         })
-        .select('id')
+        .select('id, numero_asiento, codigo')
         .single();
       if (asErr || !asiento) throw asErr ?? new Error('No se pudo crear asiento de apertura');
 

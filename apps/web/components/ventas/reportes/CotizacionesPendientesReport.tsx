@@ -73,12 +73,12 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
 
   const getEstadoBadge = (estado: EstadoCotizacion) => {
     const colors = {
-      [EstadoCotizacion.BORRADOR]: 'bg-gray-100 text-gray-800',
-      [EstadoCotizacion.ENVIADA]: 'bg-blue-100 text-blue-800',
-      [EstadoCotizacion.APROBADA]: 'bg-green-100 text-green-800',
-      [EstadoCotizacion.RECHAZADA]: 'bg-red-100 text-red-800',
-      [EstadoCotizacion.CONVERTIDA]: 'bg-purple-100 text-purple-800',
-      [EstadoCotizacion.VENCIDA]: 'bg-orange-100 text-orange-800'
+      [EstadoCotizacion.BORRADOR]: 'bg-muted text-foreground',
+      [EstadoCotizacion.ENVIADA]: 'bg-primary/10 text-primary',
+      [EstadoCotizacion.APROBADA]: 'bg-emerald-500/10 text-emerald-400',
+      [EstadoCotizacion.RECHAZADA]: 'bg-destructive/10 text-destructive',
+      [EstadoCotizacion.CONVERTIDA]: 'bg-violet-500/10 text-violet-400',
+      [EstadoCotizacion.VENCIDA]: 'bg-amber-500/10 text-amber-400'
     }
 
     const labels = {
@@ -99,11 +99,11 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
 
   const getVigenciaStatus = (diasVigencia: number) => {
     if (diasVigencia < 0) {
-      return <span className="text-red-600 font-medium">Vencida</span>
+      return <span className="text-destructive font-medium">Vencida</span>
     } else if (diasVigencia <= 3) {
-      return <span className="text-orange-600 font-medium">Por vencer ({diasVigencia}d)</span>
+      return <span className="text-amber-400 font-medium">Por vencer ({diasVigencia}d)</span>
     } else {
-      return <span className="text-green-600">{diasVigencia} días</span>
+      return <span className="text-emerald-400">{diasVigencia} días</span>
     }
   }
 
@@ -131,10 +131,10 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Cargando reporte...</p>
+            <p className="mt-2 text-foreground/80">Cargando reporte...</p>
           </div>
         ) : data.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-muted-foreground">
             <p className="text-lg font-medium">No hay cotizaciones pendientes</p>
             <p className="text-sm">Todas las cotizaciones han sido procesadas</p>
           </div>
@@ -142,31 +142,31 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
           <>
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-sm text-blue-600 font-medium">Total Cotizaciones</p>
-                <p className="text-2xl font-bold text-blue-900">{totalCotizaciones}</p>
+              <div className="bg-primary/10 rounded-lg p-4">
+                <p className="text-sm text-primary font-medium">Total Cotizaciones</p>
+                <p className="text-2xl font-bold text-primary">{totalCotizaciones}</p>
               </div>
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-sm text-green-600 font-medium">Monto Total</p>
-                <p className="text-2xl font-bold text-green-900">S/ {totalMonto.toFixed(2)}</p>
+              <div className="bg-emerald-500/10 rounded-lg p-4">
+                <p className="text-sm text-emerald-400 font-medium">Monto Total</p>
+                <p className="text-2xl font-bold text-emerald-400">S/ {totalMonto.toFixed(2)}</p>
               </div>
-              <div className="bg-orange-50 rounded-lg p-4">
-                <p className="text-sm text-orange-600 font-medium">Por Vencer</p>
-                <p className="text-2xl font-bold text-orange-900">{porVencer}</p>
+              <div className="bg-amber-500/10 rounded-lg p-4">
+                <p className="text-sm text-amber-400 font-medium">Por Vencer</p>
+                <p className="text-2xl font-bold text-amber-400">{porVencer}</p>
               </div>
-              <div className="bg-red-50 rounded-lg p-4">
-                <p className="text-sm text-red-600 font-medium">Vencidas</p>
-                <p className="text-2xl font-bold text-red-900">{vencidas}</p>
+              <div className="bg-destructive/10 rounded-lg p-4">
+                <p className="text-sm text-destructive font-medium">Vencidas</p>
+                <p className="text-2xl font-bold text-destructive">{vencidas}</p>
               </div>
             </div>
 
             {/* Alert for urgent items */}
             {(porVencer > 0 || vencidas > 0) && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div className="bg-amber-500/10 border border-yellow-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5" />
                 <div>
-                  <p className="font-medium text-yellow-900">Atención requerida</p>
-                  <p className="text-sm text-yellow-700">
+                  <p className="font-medium text-amber-400">Atención requerida</p>
+                  <p className="text-sm text-amber-400">
                     Hay {porVencer + vencidas} cotizaciones que requieren seguimiento urgente
                   </p>
                 </div>
@@ -176,60 +176,60 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
             {/* Table */}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-muted/30">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Número
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Cliente
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Fecha
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Vencimiento
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Vigencia
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Estado
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Total
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Probabilidad
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Acciones
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-gray-200">
                   {data.map((cotizacion) => (
-                    <tr key={cotizacion.id} className="hover:bg-gray-50">
+                    <tr key={cotizacion.id} className="hover:bg-muted/30">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           {cotizacion.numero}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           {cotizacion.cliente_nombre}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           {cotizacion.cliente_documento}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           {format(new Date(cotizacion.fecha), 'dd/MM/yyyy', { locale: es })}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           {cotizacion.fecha_vencimiento
                             ? format(new Date(cotizacion.fecha_vencimiento), 'dd/MM/yyyy', { locale: es })
                             : 'Sin fecha'}
@@ -244,17 +244,17 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
                         {getEstadoBadge(cotizacion.estado)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           S/ {cotizacion.total.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         {cotizacion.probabilidad ? (
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-foreground">
                             {cotizacion.probabilidad}%
                           </div>
                         ) : (
-                          <div className="text-sm text-gray-400">-</div>
+                          <div className="text-sm text-muted-foreground">-</div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -262,7 +262,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleVerDetalle(cotizacion.id)}
-                          className="text-blue-600 hover:text-blue-700"
+                          className="text-primary hover:text-primary"
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           Ver

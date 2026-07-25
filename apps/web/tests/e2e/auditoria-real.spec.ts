@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
-import { apiContextAsAprobador } from './helpers/test-data';
+import { generateValidRucFromRunId } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 type AuditLog = {
@@ -77,12 +77,93 @@ async function authContext(page: Page): Promise<{ headers: Record<string, string
   };
 }
 
+async function apiContextAsDemoAdmin() {
+  const email = process.env.TEST_USER_EMAIL;
+  const password = process.env.TEST_USER_PASSWORD;
+  expect(email, 'TEST_USER_EMAIL requerido para aprobador alterno CASE19').toBeTruthy();
+  expect(password, 'TEST_USER_PASSWORD requerido para aprobador alterno CASE19').toBeTruthy();
+  const loginContext = await playwrightRequest.newContext({ baseURL: apiBaseURL });
+  let response = await loginContext.post(api('/auth/login'), { data: { email, password } });
+  if (response.status() === 429) {
+    await new Promise((resolve) => setTimeout(resolve, 61000));
+    response = await loginContext.post(api('/auth/login'), { data: { email, password } });
+  }
+  const text = await response.text();
+  expect(response.ok(), `login aprobador alterno CASE19 HTTP ${response.status()}: ${text}`).toBe(true);
+  const body = JSON.parse(text);
+  const token = body.access_token || body.token || body.data?.access_token || body.data?.token;
+  expect(token, 'login aprobador alterno CASE19 debe devolver token').toBeTruthy();
+  const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+  expect(payload.sub, 'JWT del aprobador alterno CASE19 debe contener sub').toBeTruthy();
+  await loginContext.dispose();
+  return {
+    context: await playwrightRequest.newContext({
+      baseURL: apiBaseURL,
+      extraHTTPHeaders: { Authorization: `Bearer ${token}` },
+    }),
+    userId: payload.sub as string,
+  };
+}
+
 function getSupabase(): SupabaseClient {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   expect(url, 'SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL requerido para E2E auditoria').toBeTruthy();
   expect(key, 'SUPABASE_SERVICE_ROLE_KEY requerido para E2E auditoria').toBeTruthy();
   return createClient(url!, key!, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+let ephemeralAuditRoleAssignment: { userId: string; roleId: string } | null = null;
+
+async function ensurePrimaryAuditPermission(): Promise<void> {
+  const email = process.env.TEST_APROBADOR_EMAIL;
+  expect(email, 'TEST_APROBADOR_EMAIL requerido para principal de auditoría').toBeTruthy();
+  const supabase = getSupabase();
+  const { data: user, error: userError } = await supabase
+    .from('usuarios_sistema')
+    .select('id, tenant_id')
+    .eq('email', email!)
+    .single();
+  expect(userError?.message || '', 'resolver principal de auditoría').toBe('');
+
+  const { data: role, error: roleError } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('tenant_id', user!.tenant_id)
+    .eq('nombre', 'AUDITOR')
+    .single();
+  expect(roleError?.message || '', 'resolver rol AUDITOR para CASE19').toBe('');
+
+  const { data: existing, error: existingError } = await supabase
+    .from('user_roles')
+    .select('id')
+    .eq('tenant_id', user!.tenant_id)
+    .eq('usuario_sistema_id', user!.id)
+    .eq('role_id', role!.id)
+    .maybeSingle();
+  expect(existingError?.message || '', 'consultar rol AUDITOR del principal CASE19').toBe('');
+  if (existing) return;
+
+  const { error: insertError } = await supabase.from('user_roles').insert({
+    id: crypto.randomUUID(),
+    tenant_id: user!.tenant_id,
+    usuario_sistema_id: user!.id,
+    role_id: role!.id,
+  });
+  expect(insertError?.message || '', 'asignar AUDITOR efímero al principal CASE19').toBe('');
+  ephemeralAuditRoleAssignment = { userId: user!.id, roleId: role!.id };
+}
+
+async function restorePrimaryAuditPermission(): Promise<void> {
+  if (!ephemeralAuditRoleAssignment) return;
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from('user_roles')
+    .delete()
+    .eq('usuario_sistema_id', ephemeralAuditRoleAssignment.userId)
+    .eq('role_id', ephemeralAuditRoleAssignment.roleId);
+  expect(error?.message || '', 'retirar AUDITOR efímero del principal CASE19').toBe('');
+  ephemeralAuditRoleAssignment = null;
 }
 
 async function insertRole(supabase: SupabaseClient, tenantId: string) {
@@ -135,10 +216,17 @@ async function expectAudit(
 
 test.describe('CASE-19 Auditoria real', () => {
   test.setTimeout(600000);
+  test.beforeAll(ensurePrimaryAuditPermission);
+  test.afterAll(restorePrimaryAuditPermission);
 
   test('acciones criticas quedan trazadas y usuario limitado no puede leer ni mutar auditoria', async ({ page, browser }: { page: Page; browser: Browser }) => {
     const startDate = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    await login(page, process.env.TEST_USER_EMAIL || 'admin@erp.local', process.env.TEST_USER_PASSWORD || 'AdminProd2026!', true);
+    await login(
+      page,
+      process.env.TEST_APROBADOR_EMAIL || 'admin@erp.local',
+      process.env.TEST_APROBADOR_PASSWORD || 'AdminProd2026!',
+      true,
+    );
     const browserFailures = await collectBrowserFailures(page);
     const { headers, tenantId, userId } = await authContext(page);
     const supabase = getSupabase();
@@ -193,7 +281,7 @@ test.describe('CASE-19 Auditoria real', () => {
     const proveedor = await parseOk<any>(
       await apiContext.post(api('/compras/proveedores'), {
         data: {
-          ruc: `20${runId.replace(/\D/g, '').slice(-9).padStart(9, '1')}`,
+          ruc: generateValidRucFromRunId(`auditoria-${runId}`),
           razon_social: `${prefix} Proveedor S.A.C.`,
           nombre_comercial: `${prefix} Proveedor`,
           email: `proveedor-case19-${runId}@example.com`,
@@ -251,17 +339,18 @@ test.describe('CASE-19 Auditoria real', () => {
     const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
     expect(detalleId, 'orden debe devolver detalle').toBeTruthy();
 
-    // SEC-001 fix: aprobador autentica con su propio JWT.
-    const aprobadorCtx = await apiContextAsAprobador();
+    // Segregación real: el demo admin aprueba la OC creada por el ADMIN usado
+    // para auditar. Son dos identidades distintas del mismo tenant.
+    const aprobador = await apiContextAsDemoAdmin();
     try {
       await parseOk<any>(
-        await aprobadorCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+        await aprobador.context.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
           data: { aprobador_nombre: 'Admin CASE19', comentarios: `${prefix} aprobacion` },
         }),
         'aprobar orden auditada',
       );
     } finally {
-      await aprobadorCtx.dispose();
+      await aprobador.context.dispose();
     }
 
     const recepcion = await parseOk<any>(
@@ -313,7 +402,7 @@ test.describe('CASE-19 Auditoria real', () => {
     await expectAudit(apiContext, `table_name=clientes&user_id=${userId}&start_date=${encodeURIComponent(startDate)}`, (log) => log.record_id === cliente.id && log.operation === 'UPDATE', 'auditoria edicion cliente');
     await expectAudit(apiContext, `table_name=proveedores&user_id=${userId}&start_date=${encodeURIComponent(startDate)}`, (log) => log.record_id === proveedor.id && log.operation === 'INSERT', 'auditoria creacion proveedor');
     await expectAudit(apiContext, `table_name=proveedores&user_id=${userId}&start_date=${encodeURIComponent(startDate)}`, (log) => log.record_id === proveedor.id && log.operation === 'UPDATE', 'auditoria edicion proveedor');
-    await expectAudit(apiContext, `table_name=ordenes_compra&user_id=${userId}&start_date=${encodeURIComponent(startDate)}`, (log) => log.record_id === orden.id && log.metadata?.accion === 'APROBAR', 'auditoria aprobacion compra');
+    await expectAudit(apiContext, `table_name=ordenes_compra&user_id=${aprobador.userId}&start_date=${encodeURIComponent(startDate)}`, (log) => log.record_id === orden.id && log.user_id === aprobador.userId && log.metadata?.accion === 'APROBAR', 'auditoria aprobacion compra');
     await expectAudit(apiContext, `table_name=recepciones&user_id=${userId}&start_date=${encodeURIComponent(startDate)}`, (log) => log.record_id === recepcion.id && log.metadata?.accion === 'CERRAR_RECEPCION', 'auditoria cierre recepcion');
     await expectAudit(apiContext, `table_name=devoluciones_proveedor&user_id=${userId}&start_date=${encodeURIComponent(startDate)}`, (log) => log.record_id === devolucion.id && log.metadata?.accion === 'CREAR_DEVOLUCION_PROVEEDOR', 'auditoria creacion devolucion');
     await expectAudit(apiContext, `table_name=devoluciones_proveedor&user_id=${userId}&start_date=${encodeURIComponent(startDate)}`, (log) => log.record_id === devolucion.id && log.metadata?.accion === 'EMITIR_DEVOLUCION_PROVEEDOR', 'auditoria emision devolucion');

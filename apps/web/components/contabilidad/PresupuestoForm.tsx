@@ -42,11 +42,11 @@ interface PresupuestoFormProps {
   onCancel?: () => void
 }
 
-export default function PresupuestoForm({ 
-  presupuestoId, 
-  initialData, 
-  onSuccess, 
-  onCancel 
+export default function PresupuestoForm({
+  presupuestoId,
+  initialData,
+  onSuccess,
+  onCancel
 }: PresupuestoFormProps) {
   const router = useRouter()
   const { get, post, put } = useApi()
@@ -101,7 +101,7 @@ export default function PresupuestoForm({
 
       if (cuentasRes?.success && cuentasRes.data) {
         // Filter only expense accounts (tipo_cuenta = 'GASTO')
-        const cuentasGasto = cuentasRes.data.filter((c: Cuenta) => 
+        const cuentasGasto = cuentasRes.data.filter((c: Cuenta) =>
           c.tipo_cuenta === 'GASTO' || c.codigo.startsWith('6') || c.codigo.startsWith('9')
         )
         setCuentas(cuentasGasto)
@@ -109,7 +109,7 @@ export default function PresupuestoForm({
 
       if (periodosRes?.success && periodosRes.data) {
         // Filter only open periods
-        const periodosAbiertos = periodosRes.data.filter((p: Periodo) => 
+        const periodosAbiertos = periodosRes.data.filter((p: Periodo) =>
           p.estado === 'ABIERTO'
         )
         setPeriodos(periodosAbiertos)
@@ -129,7 +129,7 @@ export default function PresupuestoForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validation
     if (!formData.centro_costo_id) {
       setError('Debe seleccionar un centro de costo')
@@ -192,27 +192,27 @@ export default function PresupuestoForm({
 
   if (loadingData) {
     return (
-      <div className="loading p-12 text-center">
-        <div className="loading-spinner"></div>
+      <div className="flex min-h-48 items-center justify-center p-12 text-center">
+        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
         <p>Cargando formulario...</p>
       </div>
     )
   }
 
   return (
-    <form onSubmit={handleSubmit} className="activity-card p-8">
-      <div className="dashboard-header mb-8">
+    <form onSubmit={handleSubmit} className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8 mb-8">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-3 flex items-center justify-center text-white">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white">
             <DollarSign size={24} />
           </div>
           <div>
-            <h2 className="dashboard-title mb-1">
+            <h2 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground mb-1">
               {presupuestoId ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
             </h2>
-            <p className="dashboard-subtitle">
-              {presupuestoId 
-                ? 'Actualice el monto presupuestado y las notas' 
+            <p className="mt-2 text-base text-muted-foreground">
+              {presupuestoId
+                ? 'Actualice el monto presupuestado y las notas'
                 : 'Complete los datos para crear un nuevo presupuesto'}
             </p>
           </div>
@@ -220,9 +220,9 @@ export default function PresupuestoForm({
       </div>
 
       {error && (
-        <div className="p-4 mb-6 rounded-2 bg-[#fef2f2] border flex items-center gap-3">
-          <AlertCircle size={20} className="text-red-600 shrink-0" />
-          <p className="m-0 text-red-800 text-[0.875rem]">{error}</p>
+        <div className="p-4 mb-6 rounded-lg bg-[#fef2f2] border flex items-center gap-3">
+          <AlertCircle size={20} className="text-destructive shrink-0" />
+          <p className="m-0 text-destructive text-[0.875rem]">{error}</p>
         </div>
       )}
 
@@ -230,13 +230,13 @@ export default function PresupuestoForm({
         {/* Centro de Costo */}
         <div>
           <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
-            Centro de Costo <span className="text-red-600">*</span>
+            Centro de Costo <span className="text-destructive">*</span>
           </label>
           <select
             value={formData.centro_costo_id}
             onChange={(e) => setFormData({ ...formData, centro_costo_id: e.target.value })}
             disabled={!!presupuestoId}
-            required className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
+            required className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
           >
             <option value="">Seleccione un centro de costo</option>
             {centrosCosto.map((centro) => (
@@ -246,7 +246,7 @@ export default function PresupuestoForm({
             ))}
           </select>
           {presupuestoId && (
-            <p className="mt-2 text-3 text-[var(--primary-500)]">
+            <p className="mt-2 text-xs text-[var(--primary-500)]">
               No se puede cambiar el centro de costo al editar
             </p>
           )}
@@ -255,13 +255,13 @@ export default function PresupuestoForm({
         {/* Cuenta Contable */}
         <div>
           <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
-            Cuenta Contable <span className="text-red-600">*</span>
+            Cuenta Contable <span className="text-destructive">*</span>
           </label>
           <select
             value={formData.cuenta_id}
             onChange={(e) => setFormData({ ...formData, cuenta_id: e.target.value })}
             disabled={!!presupuestoId}
-            required className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
+            required className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
           >
             <option value="">Seleccione una cuenta</option>
             {cuentas.map((cuenta) => (
@@ -271,7 +271,7 @@ export default function PresupuestoForm({
             ))}
           </select>
           {presupuestoId && (
-            <p className="mt-2 text-3 text-[var(--primary-500)]">
+            <p className="mt-2 text-xs text-[var(--primary-500)]">
               No se puede cambiar la cuenta al editar
             </p>
           )}
@@ -280,13 +280,13 @@ export default function PresupuestoForm({
         {/* Período Contable */}
         <div>
           <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
-            Período Contable <span className="text-red-600">*</span>
+            Período Contable <span className="text-destructive">*</span>
           </label>
           <select
             value={formData.periodo_contable_id}
             onChange={(e) => setFormData({ ...formData, periodo_contable_id: e.target.value })}
             disabled={!!presupuestoId}
-            required className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
+            required className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
           >
             <option value="">Seleccione un período</option>
             {periodos.map((periodo) => (
@@ -296,7 +296,7 @@ export default function PresupuestoForm({
             ))}
           </select>
           {presupuestoId && (
-            <p className="mt-2 text-3 text-[var(--primary-500)]">
+            <p className="mt-2 text-xs text-[var(--primary-500)]">
               No se puede cambiar el período al editar
             </p>
           )}
@@ -305,7 +305,7 @@ export default function PresupuestoForm({
         {/* Monto Presupuestado */}
         <div>
           <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
-            Monto Presupuestado (S/) <span className="text-red-600">*</span>
+            Monto Presupuestado (S/) <span className="text-destructive">*</span>
           </label>
           <input
             type="number"
@@ -313,7 +313,7 @@ export default function PresupuestoForm({
             min="0"
             value={formData.monto_presupuestado}
             onChange={(e) => setFormData({ ...formData, monto_presupuestado: parseFloat(e.target.value) || 0 })}
-            required className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
+            required className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
             placeholder="0.00"
           />
         </div>
@@ -326,7 +326,7 @@ export default function PresupuestoForm({
           <textarea
             value={formData.notas}
             onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-            rows={3} className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
+            rows={3} className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
             placeholder="Comentarios adicionales sobre el presupuesto..."
           />
         </div>
@@ -339,7 +339,7 @@ export default function PresupuestoForm({
             </label>
             <select
               value={formData.estado}
-              onChange={(e) => setFormData({ ...formData, estado: e.target.value })} className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
+              onChange={(e) => setFormData({ ...formData, estado: e.target.value })} className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
             >
               <option value="ACTIVO">ACTIVO</option>
               <option value="BLOQUEADO">BLOQUEADO</option>

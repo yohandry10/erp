@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { PostgrestQueryBuilder } from '@supabase/postgrest-js';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -312,7 +313,7 @@ export class SupabaseService {
     return this.adminSupabase;
   }
 
-  query(table: string) {
+  query(table: string): PostgrestQueryBuilder<any, any, any> {
     this.ensureContext();
     return this.supabase.from(table);
   }

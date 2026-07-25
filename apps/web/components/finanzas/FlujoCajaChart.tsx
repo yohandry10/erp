@@ -62,14 +62,14 @@ interface FlujoCajaChartProps {
   cuentaBancariaId?: string
 }
 
-const panelClass = 'rounded-2xl border border-cyan-400/20 bg-slate-950/65 p-5 text-slate-100 shadow-xl shadow-blue-950/20'
-const metricClass = 'rounded-xl border border-cyan-400/15 bg-slate-950/45 p-4'
-const labelClass = 'text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70'
+const panelClass = 'rounded-2xl border border-cyan-400/20 bg-card/65 p-5 text-foreground shadow-xl shadow-blue-950/20'
+const metricClass = 'rounded-xl border border-cyan-400/15 bg-card/45 p-4'
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.14em] text-primary/80'
 const valueClass = 'mt-2 text-2xl font-black text-white'
-const buttonClass = 'inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-400/15'
-const tableClass = '!m-0 w-full min-w-full table-fixed border-collapse !bg-slate-950/80 text-sm !shadow-none'
-const thClass = '!border-cyan-400/10 !bg-slate-900/90 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
-const tdClass = '!border-cyan-400/10 !bg-transparent px-3 py-3 text-slate-200'
+const buttonClass = 'inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-cyan-400/15'
+const tableClass = '!m-0 w-full min-w-full table-fixed border-collapse !bg-card/80 text-sm !shadow-none'
+const thClass = '!border-cyan-400/10 !bg-card/90 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
+const tdClass = '!border-cyan-400/10 !bg-transparent px-3 py-3 text-foreground/90'
 
 export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }: FlujoCajaChartProps) {
   const { get } = useApi()
@@ -119,8 +119,8 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
 
   if (loading) {
     return (
-      <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-cyan-400/20 bg-slate-950/65 p-8 text-center text-slate-300">
-        <div className="mb-4 size-10 animate-spin rounded-full border-4 border-slate-800 border-t-cyan-300" />
+      <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-cyan-400/20 bg-card/65 p-8 text-center text-muted-foreground">
+        <div className="mb-4 size-10 animate-spin rounded-full border-4 border-border border-t-cyan-300" />
         <p>Cargando proyeccion de flujo de caja...</p>
       </div>
     )
@@ -128,10 +128,10 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
 
   if (!flujoCaja || flujoCaja.resumen.length === 0) {
     return (
-      <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-cyan-400/20 bg-slate-950/65 p-8 text-center text-slate-300">
+      <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-cyan-400/20 bg-card/65 p-8 text-center text-muted-foreground">
         <TrendingUp className="mb-4 h-12 w-12 text-cyan-200/50" />
         <h3 className="text-lg font-bold text-white">No hay datos para proyectar</h3>
-        <p className="mt-2 text-sm text-slate-400">No se encontraron cuentas bancarias activas o movimientos pendientes.</p>
+        <p className="mt-2 text-sm text-muted-foreground">No se encontraron cuentas bancarias activas o movimientos pendientes.</p>
       </div>
     )
   }
@@ -165,10 +165,10 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
     <div className={panelClass}>
       <div className="mb-5 flex flex-col gap-3 border-b border-cyan-400/10 pb-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex items-start gap-3">
-          <TrendingUp className="mt-1 h-6 w-6 text-cyan-200" />
+          <TrendingUp className="mt-1 h-6 w-6 text-primary" />
           <div>
             <h3 className="text-lg font-black text-white">Flujo de Caja Proyectado</h3>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-muted-foreground">
               {formatDate(flujoCaja.periodo.fecha_desde)} - {formatDate(flujoCaja.periodo.fecha_hasta)} ({flujoCaja.periodo.dias} dias)
             </p>
           </div>
@@ -193,7 +193,7 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
                 key={resumen.moneda}
                 type="button"
                 onClick={() => setSelectedMoneda(resumen.moneda)}
-                className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${selectedMoneda === resumen.moneda ? 'border-cyan-300/40 bg-cyan-400/15 text-cyan-50' : 'border-cyan-400/15 bg-slate-950/45 text-slate-300 hover:bg-cyan-400/10'}`}
+                className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${selectedMoneda === resumen.moneda ? 'border-cyan-300/40 bg-cyan-400/15 text-primary' : 'border-cyan-400/15 bg-card/45 text-muted-foreground hover:bg-cyan-400/10'}`}
               >
                 {resumen.moneda}
               </button>
@@ -225,11 +225,11 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
       </div>
 
       {hasAlert ? (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-slate-400/30 bg-slate-400/10 p-4 text-slate-100">
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-border/30 bg-slate-400/10 p-4 text-foreground">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <div className="text-sm font-bold">{resumenSeleccionado.alerta === 'SALDO_NEGATIVO' ? 'Saldo negativo proyectado' : 'Saldo bajo proyectado'}</div>
-            <div className="mt-1 text-xs text-slate-300">
+            <div className="mt-1 text-xs text-muted-foreground">
               {resumenSeleccionado.alerta === 'SALDO_NEGATIVO'
                 ? 'El saldo proyectado sera negativo. Ajusta pagos o financiamiento.'
                 : 'El saldo proyectado sera menor al 20% del saldo actual. Monitorea de cerca.'}
@@ -239,7 +239,7 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
       ) : null}
 
       <div className="mb-5">
-        <h4 className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-cyan-200/70">
+        <h4 className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-primary/80">
           {vistaDetallada ? 'Proyeccion Diaria' : 'Proyeccion Semanal'}
         </h4>
 
@@ -250,20 +250,20 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
               const TrendIcon = isPositive ? TrendingUp : TrendingDown
 
               return (
-                <div key={index} className="rounded-xl border border-cyan-400/15 bg-slate-950/45 p-4">
+                <div key={index} className="rounded-xl border border-cyan-400/15 bg-card/45 p-4">
                   <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                     <div>
                       <div className="flex items-center gap-2 text-sm font-bold text-white">
-                        <Calendar className="h-4 w-4 text-cyan-200" />
+                        <Calendar className="h-4 w-4 text-primary" />
                         Semana {index + 1}
                       </div>
-                      <div className="mt-1 text-xs text-slate-400">{formatDate(semana.fecha_inicio)} - {formatDate(semana.fecha_fin)}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{formatDate(semana.fecha_inicio)} - {formatDate(semana.fecha_fin)}</div>
                     </div>
                     <div className="grid gap-3 text-sm sm:grid-cols-4 xl:min-w-[680px]">
-                      <span className="text-slate-300">Ingresos <strong className="block text-cyan-50">{formatCurrency(semana.ingresos, selectedMoneda)}</strong></span>
-                      <span className="text-slate-300">Egresos <strong className="block text-slate-100">{formatCurrency(semana.egresos, selectedMoneda)}</strong></span>
-                      <span className="text-slate-300">Flujo <strong className="flex items-center gap-1 text-cyan-50"><TrendIcon className="h-4 w-4" />{formatCurrency(semana.flujo_neto, selectedMoneda)}</strong></span>
-                      <span className="text-slate-300">Saldo final <strong className="block text-cyan-50">{formatCurrency(semana.saldo_final, selectedMoneda)}</strong></span>
+                      <span className="text-muted-foreground">Ingresos <strong className="block text-primary">{formatCurrency(semana.ingresos, selectedMoneda)}</strong></span>
+                      <span className="text-muted-foreground">Egresos <strong className="block text-foreground">{formatCurrency(semana.egresos, selectedMoneda)}</strong></span>
+                      <span className="text-muted-foreground">Flujo <strong className="flex items-center gap-1 text-primary"><TrendIcon className="h-4 w-4" />{formatCurrency(semana.flujo_neto, selectedMoneda)}</strong></span>
+                      <span className="text-muted-foreground">Saldo final <strong className="block text-primary">{formatCurrency(semana.saldo_final, selectedMoneda)}</strong></span>
                     </div>
                   </div>
                 </div>
@@ -282,26 +282,26 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
               </thead>
               <tbody className="divide-y divide-cyan-400/10">
                 {proyeccionFiltrada.slice(0, 30).map((dia, index) => (
-                  <tr key={index} className="!bg-slate-950/50 transition hover:!bg-slate-900/80">
+                  <tr key={index} className="!bg-card/50 transition hover:!bg-card/80">
                     <td className={tdClass}>{formatDate(dia.fecha)}</td>
                     <td className={`${tdClass} text-right`}>{formatCurrency(dia.saldo_inicial, selectedMoneda)}</td>
-                    <td className={`${tdClass} text-right font-semibold text-cyan-100`}>+{formatCurrency(dia.ingresos, selectedMoneda)}</td>
-                    <td className={`${tdClass} text-right font-semibold text-slate-200`}>-{formatCurrency(dia.egresos, selectedMoneda)}</td>
-                    <td className={`${tdClass} text-right font-semibold text-cyan-50`}>{dia.flujo_neto >= 0 ? '+' : ''}{formatCurrency(dia.flujo_neto, selectedMoneda)}</td>
-                    <td className={`${tdClass} text-right font-bold text-cyan-50`}>{formatCurrency(dia.saldo_final, selectedMoneda)}</td>
+                    <td className={`${tdClass} text-right font-semibold text-primary`}>+{formatCurrency(dia.ingresos, selectedMoneda)}</td>
+                    <td className={`${tdClass} text-right font-semibold text-foreground/90`}>-{formatCurrency(dia.egresos, selectedMoneda)}</td>
+                    <td className={`${tdClass} text-right font-semibold text-primary`}>{dia.flujo_neto >= 0 ? '+' : ''}{formatCurrency(dia.flujo_neto, selectedMoneda)}</td>
+                    <td className={`${tdClass} text-right font-bold text-primary`}>{formatCurrency(dia.saldo_final, selectedMoneda)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {proyeccionFiltrada.length > 30 ? (
-              <div className="p-4 text-center text-sm text-slate-400">Mostrando primeros 30 dias de {proyeccionFiltrada.length} dias proyectados.</div>
+              <div className="p-4 text-center text-sm text-muted-foreground">Mostrando primeros 30 dias de {proyeccionFiltrada.length} dias proyectados.</div>
             ) : null}
           </div>
         )}
       </div>
 
-      <div className="rounded-xl border border-cyan-400/15 bg-slate-950/45 p-4">
-        <h4 className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-cyan-200/70">Estadisticas de Proyeccion</h4>
+      <div className="rounded-xl border border-cyan-400/15 bg-card/45 p-4">
+        <h4 className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-primary/80">Estadisticas de Proyeccion</h4>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label="Total Movimientos" value={flujoCaja.estadisticas.total_movimientos} />
           <Stat label="CxC Pendientes" value={flujoCaja.estadisticas.total_cxc_pendientes} />
@@ -316,7 +316,7 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="text-xs text-slate-400">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-1 text-xl font-bold text-white">{value}</div>
     </div>
   )

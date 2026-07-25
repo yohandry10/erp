@@ -8,7 +8,7 @@ Write-Host "=== TEST: Listar Clientes ===" -ForegroundColor Cyan
 # Obtener token de autenticación (ajusta según tu configuración)
 $loginBody = @{
     email = "admin@example.com"
-    password = "admin123"
+    password = $env:TEST_USER_PASSWORD
 } | ConvertTo-Json
 
 try {

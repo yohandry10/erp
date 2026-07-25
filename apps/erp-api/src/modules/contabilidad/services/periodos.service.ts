@@ -390,34 +390,59 @@ export class PeriodosService {
       return;
     }
 
-    // Obtener cuenta de resultados acumulados (cuenta 59 en PCGE Perú)
-    const { data: cuentaResultados, error: cuentaError } = await this.supabaseService
+    // Obtener cuentas de cierre PCGE: 59 Resultados acumulados y 89 Determinacion del resultado.
+    const { data: cuentasCierre, error: cuentaError } = await this.supabaseService
       .getClient()
       .from('plan_cuentas')
-      .select('id')
+      .select('id, codigo')
       .eq('tenant_id', tenantId)
-      .eq('codigo', '59')
-      .maybeSingle();
+      .in('codigo', ['59', '89']);
 
-    if (cuentaError || !cuentaResultados) {
-      console.warn('⚠️ [Periodos] No se encontró cuenta 59 (Resultados Acumulados), omitiendo asientos de cierre');
+    if (cuentaError) {
+      console.warn('⚠️ [Periodos] Error obteniendo cuentas de cierre PCGE, omitiendo asientos de cierre:', cuentaError);
+      return;
+    }
+
+    const cuentaResultados = (cuentasCierre || []).find((cuenta: any) => cuenta.codigo === '59');
+    const cuentaDeterminacion = (cuentasCierre || []).find((cuenta: any) => cuenta.codigo === '89');
+    if (!cuentaResultados || !cuentaDeterminacion) {
+      console.warn('⚠️ [Periodos] Faltan cuentas 59/89 para cierre anual PCGE, omitiendo asientos de cierre');
       return;
     }
 
     // Crear asiento de cierre
     const fechaCierre = new Date(anio, 11, 31); // 31 de diciembre
-    const numeroAsiento = `CIERRE-${anio}`;
+    const sourceEventId = `cierre-anual:${anio}`;
+
+    const { data: asientoExistente, error: asientoExistenteError } = await this.supabaseService
+      .getClient()
+      .from('asientos_contables')
+      .select('id, numero_asiento, codigo')
+      .eq('tenant_id', tenantId)
+      .eq('source_event_id', sourceEventId)
+      .maybeSingle();
+
+    if (asientoExistenteError) {
+      throw new Error(`Error validando asiento de cierre existente: ${asientoExistenteError.message}`);
+    }
+
+    if (asientoExistente?.id) {
+      console.log(`ℹ️ [Periodos] Asiento de cierre anual ${anio} ya existe (${asientoExistente.codigo ?? asientoExistente.numero_asiento ?? asientoExistente.id})`);
+      return;
+    }
 
     const { data: asiento, error: asientoError } = await this.supabaseService
       .getClient()
       .from('asientos_contables')
       .insert({
         tenant_id: tenantId,
-        numero_asiento: numeroAsiento,
         fecha: fechaCierre.toISOString(),
+        concepto: `Asiento de cierre del ejercicio ${anio}`,
         descripcion: `Asiento de cierre del ejercicio ${anio}`,
         tipo_asiento: 'CIERRE',
         origen: 'CIERRE_ANUAL',
+        referencia: `CIERRE-${anio}`,
+        source_event_id: sourceEventId,
         total_debe: Math.abs(resultadoEjercicio),
         total_haber: Math.abs(resultadoEjercicio),
         estado: 'APROBADO',
@@ -436,21 +461,35 @@ export class PeriodosService {
       ? [
           // Utilidad: cerrar cuentas de ingresos y gastos, abonar a resultados acumulados
           {
-            asiento_contable_id: asiento.id,
+            asiento_id: asiento.id,
+            cuenta_id: cuentaDeterminacion.id,
+            debe: resultadoEjercicio,
+            haber: 0,
+            concepto: `Determinacion del resultado ${anio}`
+          },
+          {
+            asiento_id: asiento.id,
             cuenta_id: cuentaResultados.id,
             debe: 0,
             haber: resultadoEjercicio,
-            descripcion: `Utilidad del ejercicio ${anio}`
+            concepto: `Utilidad del ejercicio ${anio}`
           }
         ]
       : [
           // Pérdida: cerrar cuentas de ingresos y gastos, cargar a resultados acumulados
           {
-            asiento_contable_id: asiento.id,
+            asiento_id: asiento.id,
             cuenta_id: cuentaResultados.id,
             debe: Math.abs(resultadoEjercicio),
             haber: 0,
-            descripcion: `Pérdida del ejercicio ${anio}`
+            concepto: `Perdida del ejercicio ${anio}`
+          },
+          {
+            asiento_id: asiento.id,
+            cuenta_id: cuentaDeterminacion.id,
+            debe: 0,
+            haber: Math.abs(resultadoEjercicio),
+            concepto: `Determinacion del resultado ${anio}`
           }
         ];
 

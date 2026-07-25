@@ -94,11 +94,11 @@ export default function NuevoAsientoPage() {
 
   if (loadingData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
-        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-card/70 text-foreground">
           <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
-            <Loader2 className="h-7 w-7 animate-spin text-cyan-200" />
-            <span className="text-sm font-medium text-slate-300">Cargando datos contables...</span>
+            <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            <span className="text-sm font-medium text-muted-foreground">Cargando datos contables...</span>
           </CardContent>
         </Card>
       </div>
@@ -107,15 +107,15 @@ export default function NuevoAsientoPage() {
 
   if (error && cuentas.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
-        <Card className="mx-auto max-w-[1200px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
+        <Card className="mx-auto max-w-[1200px] border-cyan-400/20 bg-card/70 text-foreground">
           <CardContent className="flex min-h-[220px] flex-col items-center justify-center gap-4 p-6 text-center">
             <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3">
-              <FileText className="h-8 w-8 text-cyan-100" />
+              <FileText className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Error al cargar los datos</h3>
-              <p className="mt-2 text-sm text-slate-300">{error}</p>
+              <h3 className="text-lg font-semibold text-foreground">Error al cargar los datos</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{error}</p>
             </div>
             <Button onClick={loadInitialData} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <RefreshCw className="h-4 w-4" />
@@ -128,28 +128,28 @@ export default function NuevoAsientoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+        <section className="rounded-2xl border border-cyan-400/20 bg-card/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
           <Button
             type="button"
             onClick={() => router.push('/dashboard/contabilidad/asientos')}
             variant="outline"
-            className="mb-4 gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+            className="mb-4 gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Volver a asientos
           </Button>
           <div className="flex items-start gap-4">
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-primary">
               <FileText className="h-6 w-6" />
             </span>
             <div>
-              <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+              <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
                 ERP Journal Center
               </div>
-              <h1 className="text-3xl font-bold tracking-tight text-white">Nuevo asiento contable manual</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">Nuevo asiento contable manual</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                 Complete el asiento y confirme que debe y haber cuadren antes de guardar.
               </p>
             </div>

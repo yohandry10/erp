@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react'
 import { useApi } from './use-api'
 import { apiSucceeded, unwrapApiArray, unwrapApiData } from '@/lib/api-contract'
 import { fetchApi } from '@/lib/api-fetch'
+import {
+  INITIAL_ACTIVE_COUNTRY,
+  INITIAL_ACTIVE_COUNTRY_ID,
+  isInitialActiveCountryId,
+  keepInitialActiveCountry,
+} from '@/lib/initial-country'
 
 // Interfaces actualizadas para coincidir con la API
 export interface Pais {
@@ -52,18 +58,18 @@ export function usePaises() {
     try {
       setLoading(true)
       setError(null)
-      
+
       // Endpoint público del API: login debe cargar países antes de tener sesión.
       const response = await fetchApi('/api/paises/', {
         method: 'GET',
         signal: requestController.signal,
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         const paises = unwrapApiArray<Pais>(data)
         if (apiSucceeded(data) && paises.length > 0) {
-          setPaises(paises)
+          setPaises(keepInitialActiveCountry(paises))
         } else {
           throw new Error('Error al obtener países')
         }
@@ -75,29 +81,13 @@ export function usePaises() {
         return
       }
       setError('Error de conexión con el servidor')
-      console.warn('Error loading países:', err)
-      
-      // Fallback a datos básicos en caso de error
-      setPaises([
-        {
-          id: 1,
-          codigo_iso: 'PE',
-          nombre: 'Perú',
-          nombre_fiscal: 'SUNAT',
-          moneda_codigo: 'PEN',
-          moneda_simbolo: 'S/',
-          activo: true
-        },
-        {
-          id: 2,
-          codigo_iso: 'CO',
-          nombre: 'Colombia',
-          nombre_fiscal: 'DIAN',
-          moneda_codigo: 'COP',
-          moneda_simbolo: '$',
-          activo: true
-        }
-      ])
+      if (process.env.NODE_ENV !== 'production') {
+        const detail = err instanceof Error ? err.message : String(err)
+        console.info('[usePaises] Usando fallback local de países:', detail)
+      }
+
+      // Fallback local limitado al alcance inicial: Peru/SUNAT.
+      setPaises([INITIAL_ACTIVE_COUNTRY])
     } finally {
       window.clearTimeout(timeoutId)
       signal?.removeEventListener('abort', abortFromParent)
@@ -121,9 +111,10 @@ export function usePaises() {
   // Obtener configuración del usuario (ENVÍA x-country-id)
   const getUserConfiguration = async (): Promise<UsuarioConfiguracion | null> => {
     try {
-      let countryId: string | null = null
+      let countryId: string | null = INITIAL_ACTIVE_COUNTRY_ID
       if (typeof window !== 'undefined') {
-        countryId = window.localStorage.getItem('selectedCountry')
+        const storedCountryId = window.localStorage.getItem('selectedCountry')
+        countryId = isInitialActiveCountryId(storedCountryId) ? storedCountryId : INITIAL_ACTIVE_COUNTRY_ID
       }
 
       const headers: Record<string, string> = {}
@@ -146,7 +137,10 @@ export function usePaises() {
   // Actualizar configuración del usuario
   const updateUserConfiguration = async (configuracion: Partial<UsuarioConfiguracion>) => {
     try {
-      const response = await put('/api/paises/usuario/configuracion', configuracion)
+      const response = await put('/api/paises/usuario/configuracion', {
+        ...configuracion,
+        pais_preferido_id: Number(INITIAL_ACTIVE_COUNTRY_ID),
+      })
       return apiSucceeded(response)
     } catch (err) {
       console.error('Error updating user configuration:', err)

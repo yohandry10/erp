@@ -949,3 +949,19 @@ Dr 69 Costo de Ventas       [Costo Promedio × Cantidad]
 | `LIBERACION` | Sin cambio | -cantidad |
 | `AJUSTE` | ±cantidad | Sin cambio |
 | `TRANSFERENCIA` | -origen, +destino | Sin cambio |
+
+---
+
+## 6. Contrato single-ledger vigente
+
+Desde el cierre DEV del 2026-07-22, `producto_existencias` es la única fuente física de verdad por `(tenant_id, producto_id, almacen_id)`:
+
+- `productos.stock_actual`, `productos.stock` y `productos.stock_reservado` son agregados derivados; un trigger rechaza escrituras que no coincidan con las existencias.
+- `producto_stock_sucursal` es una proyección derivada. No se usa para decidir disponibilidad ni para escribir movimientos.
+- `aplicar_movimiento_inventario_tx` es el writer canónico de `ENTRADA`, `SALIDA`, `RESERVA` y `LIBERACION`.
+- `establecer_stock_en_almacen_tx` traduce un ajuste absoluto en movimientos canónicos; nunca sobrescribe el agregado directamente.
+- POS obtiene el almacén desde `sesiones_caja -> cajas.almacen_id`. El payload de venta no decide el almacén.
+- Reservas, despachos, cancelaciones de pedido, recepciones, importación inicial y reversos CPE deben conservar el `almacen_id` explícito o derivarlo de una referencia física previa; ante ambigüedad fallan cerrado.
+- La función interna `pos_registrar_venta_full_tx_legacy_327` no es invocable por roles de aplicación. El wrapper actual la encapsula sólo como puente atómico y completa el writer canónico antes del `COMMIT`.
+
+Estado de despliegue: migraciones `347..352` aplicadas/verificadas sólo en DEV. Consultar `docs/audits/2026-07-22-inventory-single-ledger-closure.md` antes de promoverlas a PROD.

@@ -140,7 +140,7 @@ export default function ResumenVentasReport({ filters }: Props) {
             <CardTitle>Total Ventas</CardTitle>
             <CardDescription>Suma de ventas en el rango seleccionado</CardDescription>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-emerald-600">
+          <CardContent className="text-2xl font-bold text-emerald-400">
             S/ {formatMoney(resumen.total)}
           </CardContent>
         </Card>
@@ -149,50 +149,50 @@ export default function ResumenVentasReport({ filters }: Props) {
             <CardTitle>Subtotal</CardTitle>
             <CardDescription>Base imponible (sin IGV)</CardDescription>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold text-slate-700">
+          <CardContent className="text-2xl font-semibold text-foreground">
             S/ {formatMoney(resumen.subtotal)}
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex-row justify-between items-center">
-            <div>
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
               <CardTitle>IGV</CardTitle>
               <CardDescription>Impuesto calculado</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExport}>
+            <Button variant="outline" size="sm" onClick={handleExport} className="shrink-0">
               <Download size={16} className="mr-2" /> Exportar CSV
             </Button>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold text-orange-600">
+          <CardContent className="text-2xl font-semibold text-amber-400">
             S/ {formatMoney(resumen.igv)}
           </CardContent>
         </Card>
       </div>
 
-      <div className="overflow-auto rounded-lg border border-slate-200 shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+      <div className="overflow-auto rounded-lg border border-border/70 bg-card text-card-foreground shadow-sm">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-muted/60">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-slate-600">Fecha</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-slate-600">Documento</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-slate-600">Cliente</th>
-              <th className="px-4 py-2 text-right text-xs font-semibold text-slate-600">Subtotal</th>
-              <th className="px-4 py-2 text-right text-xs font-semibold text-slate-600">IGV</th>
-              <th className="px-4 py-2 text-right text-xs font-semibold text-slate-600">Total</th>
-              <th className="px-4 py-2 text-left text-xs font-semibold text-slate-600">Estado</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Fecha</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Documento</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Cliente</th>
+              <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Subtotal</th>
+              <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">IGV</th>
+              <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
+              <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Estado</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
+          <tbody className="divide-y divide-border bg-card">
             {loading && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">
+                <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
                   Cargando ventas...
                 </td>
               </tr>
             )}
             {!loading && data.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">
+                <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
                   No hay ventas en el rango seleccionado
                 </td>
               </tr>
@@ -200,23 +200,23 @@ export default function ResumenVentasReport({ filters }: Props) {
             {!loading &&
               data.map((venta) => (
                 <tr key={venta.id}>
-                  <td className="px-4 py-2 text-sm text-slate-700">
+                  <td className="px-4 py-2 text-sm text-foreground">
                     {venta.fecha ? format(new Date(venta.fecha), 'dd MMM yyyy', { locale: es }) : '-'}
                   </td>
-                  <td className="px-4 py-2 text-sm text-slate-700">
+                  <td className="px-4 py-2 text-sm text-foreground">
                     <div className="font-medium">{venta.tipo_documento || '-'}</div>
-                    <div className="text-xs text-slate-500">{venta.numero_documento || ''}</div>
+                    <div className="text-xs text-muted-foreground">{venta.numero_documento || ''}</div>
                   </td>
-                  <td className="px-4 py-2 text-sm text-slate-700">
+                  <td className="px-4 py-2 text-sm text-foreground">
                     <div className="font-medium">{venta.clientes?.nombre || 'Sin cliente'}</div>
-                    <div className="text-xs text-slate-500">{venta.clientes?.numero_documento || ''}</div>
+                    <div className="text-xs text-muted-foreground">{venta.clientes?.numero_documento || ''}</div>
                   </td>
-                  <td className="px-4 py-2 text-sm text-right text-slate-700">S/ {formatMoney(venta.subtotal)}</td>
-                  <td className="px-4 py-2 text-sm text-right text-slate-700">S/ {formatMoney(venta.igv)}</td>
-                  <td className="px-4 py-2 text-sm text-right font-semibold text-emerald-700">
+                  <td className="px-4 py-2 text-right text-sm text-foreground">S/ {formatMoney(venta.subtotal)}</td>
+                  <td className="px-4 py-2 text-right text-sm text-foreground">S/ {formatMoney(venta.igv)}</td>
+                  <td className="px-4 py-2 text-sm text-right font-semibold text-emerald-400">
                     S/ {formatMoney(venta.total)}
                   </td>
-                  <td className="px-4 py-2 text-sm text-slate-700">{venta.estado || '-'}</td>
+                  <td className="px-4 py-2 text-sm text-foreground">{venta.estado || '-'}</td>
                 </tr>
               ))}
           </tbody>

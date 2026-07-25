@@ -35,6 +35,13 @@ Sin estos elementos no se puede arrancar. Detalle de cada uno mas abajo en `0.1`
 - Confirmar vigencia: el certificado debe tener al menos 1 mes de vigencia restante. Si vence en menos, renovar antes de cargarlo.
 - Definir variables: `CERT_ENCRYPTION_KEY` (min 32 chars), `PFX_PATH` y `PFX_PASS` (si se usa certificado global) o cargarlo via wizard del tenant.
 - Validacion previa: ejecutar el test `apps/erp-api/src/shared/crypto/xml-signer-runtime.spec.ts` apuntando al PFX productivo (NO al `certs/demo.pfx`).
+- Preflight obligatorio sin envio:
+
+```bash
+pnpm --filter @erp-suite/erp-api run sunat:readiness-preflight -- --out docs/audits/artifacts/sunat-readiness-preflight/<fecha>/manifest.json
+```
+
+El reporte debe tener `productionUsed=false`, cero checks `FAIL` y `canAttemptProductionSend=true` antes de cualquier piloto productivo. Si el certificado no contiene el RUC esperado y no existe confirmacion escrita configurada, el proceso se detiene.
 
 ### 0.2 Credenciales SUNAT directo o OSE API
 
@@ -42,8 +49,20 @@ Una de las dos rutas, no ambas:
 
 Ruta A `SUNAT_DIRECTO`:
 
-- `SUNAT_ENVIRONMENT=produccion` (no `homologacion`).
-- `SUNAT_USERNAME`, `SUNAT_PASSWORD`, `SUNAT_API_KEY`, `SUNAT_API_SECRET` segun lo que entregue SUNAT al contribuyente.
+- Para beta/homologacion: `SUNAT_ENVIRONMENT=homologacion`.
+- Para produccion real: `SUNAT_ENVIRONMENT=produccion`.
+- Credenciales SOAP: usar `SUNAT_USERNAME`/`SUNAT_PASSWORD` o aliases legacy `OSE_USUARIO`/`OSE_PASSWORD`. En produccion debe ser un usuario secundario SOL autorizado para envio de documentos electronicos; no pegar la Clave SOL en tickets, docs ni chat.
+- Endpoints por operacion:
+  - `SUNAT_CPE_URL`: factura/boleta/nota por `sendBill`.
+  - `SUNAT_GRE_URL`: guia de remision por `sendBill` SOAP legacy si se mantiene ese canal.
+  - `SUNAT_GRE_TRANSPORT`: `soap` por compatibilidad o `rest` para Plataforma Nueva GRE.
+  - `SUNAT_GRE_CLIENT_ID` / `SUNAT_GRE_CLIENT_SECRET`: credenciales API SUNAT requeridas si `SUNAT_GRE_TRANSPORT=rest`.
+  - `SUNAT_GRE_REST_BASE_URL`: default `https://api-cpe.sunat.gob.pe/v1`.
+  - `SUNAT_SUMMARY_URL`: comunicaciones de baja/resumenes diarios por `sendSummary`.
+  - `SUNAT_QUERY_URL`: consulta CDR por `getStatusCdr`.
+- Defaults beta cableados: `https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService` para CPE/summary/query y `https://e-beta.sunat.gob.pe/ol-ti-itemision-guia-gem-beta/billService` para GRE. En produccion se usan defaults oficiales separados, pero el operador puede sobreescribirlos con las variables anteriores si SUNAT/OSE publica un cambio.
+- SUNAT publica para Plataforma Nueva GRE un flujo REST con token OAuth (`api-seguridad.sunat.gob.pe`) y envio a `api-cpe.sunat.gob.pe/v1/contribuyente/gem/comprobantes/{ruc}-{tipo}-{serie}-{numero}`. Ese canal requiere registrar credenciales API SUNAT en SOL; el usuario SOL secundario por si solo no reemplaza `client_id/client_secret`.
+- `SUNAT_API_KEY`, `SUNAT_API_SECRET` solo si el proveedor externo los requiere. SUNAT SOAP directo usa WS-Security UsernameToken con usuario/clave SOL; no enviar HTTP Basic contra hosts `*.sunat.gob.pe`. HTTP Basic queda reservado para endpoints externos no SUNAT que lo exijan.
 
 Ruta B `OSE_API`:
 
@@ -62,7 +81,9 @@ Generar nuevos, no reusar los de dev:
 
 ### 0.4 Proyecto Supabase productivo
 
-- Crear proyecto Supabase NUEVO dedicado a produccion. No reusar el demo (`wypnbcptofqdmoynlonq`).
+- El destino productivo canonico es `.env.production` -> `wypnbcptofqdmoynlonq`; no usar `.env.local`, que pertenece a DEV/demos. Ejecutar `./scripts/db-environment-preflight.ps1 -Environment PROD` y detenerse si no devuelve `OK`.
+- PROD debe declarar `NODE_ENV=production`, `DEPLOYMENT_ENV=PROD`, `EXPECTED_SUPABASE_PROJECT_REF=wypnbcptofqdmoynlonq` y `DEMO_API_ENABLED=false`.
+- Si se crea un nuevo proyecto productivo, actualizar primero la decision `DB-003`, la marca `app.deployment_environment`, secretos, preflight y `docs/architecture/ENVIRONMENT_DATABASE_BOUNDARIES.md`; no cambiar solo la URL.
 - Capturar `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `POSTGRES_URL` (cadena de conexion del pooler).
 - En `apps/web` exponer tambien `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` con los valores del proyecto productivo.
 
@@ -78,7 +99,7 @@ Generar nuevos, no reusar los de dev:
 
 ## 1. Aplicar baseline de BD en el proyecto productivo
 
-Las migraciones `000..341` forman la linea canonica vigente. La linea `000..335` fue validada desde cero el 2026-05-24; `337..341` ya fueron aplicadas/verificadas en DEV y PROD remoto por `psql` segun `docs/00_coordination/CURRENT_STATE.md`.
+Las migraciones `000..346` forman la linea canonica vigente en repo. La linea `000..335` fue validada desde cero el 2026-05-24; `337..346` ya fueron aplicadas/verificadas en DEV y PROD remoto por `psql` segun `docs/00_coordination/CURRENT_STATE.md`. Si el go-live se hace en un proyecto Supabase nuevo distinto de `wypnbcptofqdmoynlonq`, aplicar toda la linea canonica completa, configurar su marca de entorno y actualizar el contrato antes del piloto fiscal.
 
 ### 1.1 Pre-requisitos no-Supabase (saltable en Supabase, requerido en Postgres puro)
 
@@ -175,15 +196,34 @@ curl -H "Authorization: Bearer <token>" https://<dominio-productivo>/api/configu
 # Debe reflejar RUC, series, modo de emision, OSE/SUNAT y fecha de vencimiento del certificado.
 ```
 
-## 4. Smoke fiscal con SUNAT/OSE real (homologacion -> produccion)
+## 4. Smoke fiscal con SUNAT/OSE real (beta/homologacion -> produccion)
 
 Antes de emitir contra produccion real:
 
-1. **Homologacion**: emitir CPE de prueba con `SUNAT_ENVIRONMENT=homologacion` o endpoint OSE de homologacion. Validar CDR/ticket/acuse real. Guardar evidencia.
-2. **Produccion**: solo si homologacion paso, cambiar a `SUNAT_ENVIRONMENT=produccion` y emitir un CPE de prueba autorizado (montos minimos, contraparte conocida) con un comprobante de baja preparado por si hay que anularlo.
-3. Generar SIRE RVIE/RCE del periodo y validar ticket/acuse real.
-4. Exportar PLE del periodo y validarlo con el software/servicio oficial antes de declararlo libro definitivo.
-5. Confirmar que `integration_logs`, asientos contables, CxC/CxP, SIRE/PLE y dashboard reflejan la misma operacion.
+1. **Preparacion sin envio**:
+   - Validar certificado con `POST /api/configuration/wizard/validate-certificate`.
+   - Generar/firma XML CPE sin envio y conservar hash.
+   - Verificar que `SUNAT_ENVIRONMENT` y las URLs por operacion son las esperadas.
+   - Ejecutar `sunat:readiness-preflight` y archivar el JSON. Si `canAttemptProductionSend=false`, no continuar a produccion.
+2. **Beta SUNAT CPE**:
+   - Usar `SUNAT_ENVIRONMENT=homologacion`.
+   - Para el servicio beta SUNAT usar usuario `[RUC]MODDATOS` y password `MODDATOS` cuando aplique a la prueba beta. No usar la clave SOL productiva en esta fase si no corresponde.
+   - Emitir factura `01`, boleta `03`, nota de credito `07` y nota de debito `08` con montos de prueba.
+   - Guardar evidencia: XML sin firma, XML firmado, ZIP, SOAP request/response, CDR si retorna, estado CPE y `integration_logs`.
+   - Evidencia interna ya disponible: factura `01`, boleta `03`, nota de credito `07` y nota de debito `08` fueron aceptadas por SUNAT beta el 2026-06-16 con CDR `responseCode=0`; ver `docs/audits/2026-06-16-sunat-beta-cpe-evidence.md`. Repetir la prueba con el tenant/certificado real antes de go-live.
+3. **Beta SUNAT RA/RC/GRE**:
+   - Enviar comunicacion de baja/resumen diario por `sendSummary`.
+   - Consultar ticket por `getStatus`.
+   - Enviar GRE por el endpoint de guia (`SUNAT_GRE_URL`) si el contribuyente requiere GRE.
+   - Guardar ticket/CDR/acuse y estado persistido. Al 2026-06-16, beta devolvio tickets RA/RC pero `getStatus` respondio fallos tecnicos `code=99` por XML incompleto; no tratar ese caso como rechazo fiscal definitivo.
+4. **Produccion controlada**:
+   - Solo si beta paso, cambiar a `SUNAT_ENVIRONMENT=produccion`.
+   - Usar certificado vigente registrado/valido y usuario secundario SOL productivo con permisos correctos. No usar la clave SOL principal como credencial de integracion.
+   - Antes del primer `sendBill` productivo, validar la credencial secundaria con una consulta read-only `getStatusCdr` contra un comprobante inexistente. Evidencia interna 2026-06-17: `ERPFE001` valido por UsernameToken; ver `docs/audits/2026-06-17-sunat-secondary-sol-evidence.md`.
+   - Emitir 1 CPE piloto de monto minimo con contraparte conocida, teniendo preparada nota de credito/comunicacion de baja.
+5. Generar SIRE RVIE/RCE del periodo y validar ticket/acuse real.
+6. Exportar PLE del periodo y validarlo con el software/servicio oficial antes de declararlo libro definitivo.
+7. Confirmar que `integration_logs`, asientos contables, CxC/CxP, SIRE/PLE y dashboard reflejan la misma operacion.
 
 ## 5. Verificar salud de la aplicacion productiva
 

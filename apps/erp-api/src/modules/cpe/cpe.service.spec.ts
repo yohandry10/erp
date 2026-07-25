@@ -313,14 +313,143 @@ describe('CpeService', () => {
         });
     });
 
+    describe('sincronización de estado con Documentos', () => {
+        it.each([
+            ['FIRMADO', 'EMITIDO'],
+            ['ENVIADO', 'ENVIADO_SUNAT'],
+            ['ACEPTADO', 'ACEPTADO'],
+            ['RECHAZADO', 'RECHAZADO'],
+            ['ANULADO', 'ANULADO'],
+        ])('mapea CPE %s a documento %s', (estadoCpe, estadoDocumento) => {
+            expect((service as any).mapCpeEstadoADocumento(estadoCpe)).toBe(estadoDocumento);
+        });
+    });
+
+    describe('generateXmlContent SUNAT UBL 2.1', () => {
+        it('genera factura con forma de pago, firma UBL y atributos SUNAT requeridos por beta', () => {
+            const xml = (service as any).generateXmlContent(mockCreateFacturaDto);
+
+            expect(xml).toContain('<cbc:ProfileID schemeName="Tipo de Operacion"');
+            expect(xml).toContain('schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo51">0101</cbc:ProfileID>');
+            expect(xml).toContain('<cbc:InvoiceTypeCode listID="0101"');
+            expect(xml).toContain('<cac:Signature>');
+            expect(xml).toContain('<cbc:URI>#SignatureSP</cbc:URI>');
+            expect(xml).toContain('<cac:PaymentTerms>');
+            expect(xml).toContain('<cbc:ID>FormaPago</cbc:ID>');
+            expect(xml).toContain('<cbc:PaymentMeansID>Contado</cbc:PaymentMeansID>');
+            expect(xml).toContain('<cbc:PriceTypeCode listName="Tipo de Precio"');
+            expect(xml).toContain('<cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV"');
+            expect(xml).toContain('<cbc:ID schemeID="UN/ECE 5153" schemeName="Codigo de tributos" schemeAgencyName="PE:SUNAT">1000</cbc:ID>');
+            expect(xml).toContain('<cbc:PriceAmount currencyID="PEN">100.000000</cbc:PriceAmount>');
+        });
+
+        it('genera forma de pago credito con cuota SUNAT cuando corresponde', () => {
+            const xml = (service as any).generateXmlContent({
+                ...mockCreateFacturaDto,
+                condicion_pago: 'CREDITO',
+                fecha_vencimiento: '2026-07-16T15:30:00.000Z',
+                cuotas: [{ monto: 118, fecha_vencimiento: '2026-07-16T15:30:00.000Z' }],
+            });
+
+            expect(xml).toContain('<cbc:PaymentMeansID>Credito</cbc:PaymentMeansID>');
+            expect(xml).toContain('<cbc:Amount currencyID="PEN">118.00</cbc:Amount>');
+            expect(xml).toContain('<cbc:PaymentMeansID>Cuota001</cbc:PaymentMeansID>');
+            expect(xml).toContain('<cbc:PaymentDueDate>2026-07-16</cbc:PaymentDueDate>');
+            expect(xml).not.toContain('<cbc:PaymentDueDate>2026-07-16T15:30:00.000Z</cbc:PaymentDueDate>');
+        });
+
+        it('preserva fecha y hora local SUNAT sin corrimiento UTC al generar XML', () => {
+            const xml = (service as any).generateXmlContent({
+                ...mockCreateFacturaDto,
+                fecha_emision: '2026-06-17T23:30:00-05:00',
+                hora_emision: undefined,
+                fecha_vencimiento: '2026-07-17T01:00:00-05:00',
+            });
+
+            expect(xml).toContain('<cbc:IssueDate>2026-06-17</cbc:IssueDate>');
+            expect(xml).toContain('<cbc:IssueTime>23:30:00</cbc:IssueTime>');
+            expect(xml).toContain('<cbc:DueDate>2026-07-17</cbc:DueDate>');
+            expect(xml).not.toContain('<cbc:IssueDate>2026-06-18</cbc:IssueDate>');
+            expect(xml).not.toContain('<cbc:DueDate>2026-07-18</cbc:DueDate>');
+        });
+
+        it('genera nota de credito SUNAT como CreditNote UBL con comprobante afectado', () => {
+            const xml = (service as any).generateXmlContent({
+                ...mockCreateFacturaDto,
+                tipo_documento: '07',
+                serie: 'FC01',
+                numero: 12,
+                total_gravadas: -100,
+                total_igv: -18,
+                total_venta: -118,
+                documento_referencia_tipo: '01',
+                documento_referencia_serie: 'F001',
+                documento_referencia_numero: '50507464',
+                tipo_nota_credito: '01',
+                motivo_nota: 'ANULACION DE LA OPERACION',
+                items: [{ ...mockCreateFacturaDto.items[0], valor_venta: -100, igv: -18, precio_venta: -118 }],
+            } as any);
+
+            expect(xml).toContain('<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"');
+            expect(xml).not.toContain('<Invoice xmlns=');
+            expect(xml).toContain('<cbc:ReferenceID>F001-50507464</cbc:ReferenceID>');
+            expect(xml).toContain('listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo09">01</cbc:ResponseCode>');
+            expect(xml).toContain('<cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">01</cbc:DocumentTypeCode>');
+            expect(xml).toContain('<cbc:AddressTypeCode>0000</cbc:AddressTypeCode>');
+            expect(xml).toContain('<cac:CreditNoteLine>');
+            expect(xml).toContain('<cbc:CreditedQuantity unitCode="NIU"');
+            expect(xml).toContain('<cbc:PayableAmount currencyID="PEN">118.00</cbc:PayableAmount>');
+            expect(xml).not.toContain('>-118.00<');
+        });
+
+        it('genera nota de debito SUNAT como DebitNote UBL con RequestedMonetaryTotal', () => {
+            const xml = (service as any).generateXmlContent({
+                ...mockCreateFacturaDto,
+                tipo_documento: '08',
+                serie: 'FD01',
+                numero: 7,
+                documento_referencia_tipo: '03',
+                documento_referencia_serie: 'B001',
+                documento_referencia_numero: '50578301',
+                tipo_nota_debito: '01',
+                motivo_nota: 'INTERESES POR MORA',
+            } as any);
+
+            expect(xml).toContain('<DebitNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2"');
+            expect(xml).not.toContain('<Invoice xmlns=');
+            expect(xml).toContain('<cbc:ReferenceID>B001-50578301</cbc:ReferenceID>');
+            expect(xml).toContain('listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo10">01</cbc:ResponseCode>');
+            expect(xml).toContain('<cac:RequestedMonetaryTotal>');
+            expect(xml).toContain('<cac:DebitNoteLine>');
+            expect(xml).toContain('<cbc:DebitedQuantity unitCode="NIU"');
+        });
+
+        it('rechaza notas SUNAT sin comprobante afectado', () => {
+            expect(() => (service as any).generateXmlContent({
+                ...mockCreateFacturaDto,
+                tipo_documento: '07',
+                serie: 'FC01',
+                numero: 13,
+            } as any)).toThrow(/comprobante afectado/i);
+        });
+    });
+
     describe('anulación CPE y contabilidad', () => {
         const createAccountingValidationClient = (responses: Record<string, any>) => ({
             from: jest.fn((table: string) => {
+                const response = () => {
+                    const configured = responses[table];
+                    if (Array.isArray(configured)) {
+                        return configured.shift() ?? { data: [], error: null };
+                    }
+                    return configured ?? { data: [], error: null };
+                };
                 const chain = {
                     select: jest.fn().mockReturnThis(),
                     eq: jest.fn().mockReturnThis(),
-                    limit: jest.fn().mockResolvedValue(responses[table] ?? { data: [], error: null }),
-                    maybeSingle: jest.fn().mockResolvedValue(responses[table] ?? { data: null, error: null }),
+                    in: jest.fn().mockReturnThis(),
+                    limit: jest.fn().mockImplementation(() => Promise.resolve(response())),
+                    maybeSingle: jest.fn().mockImplementation(() => Promise.resolve(response())),
                 };
                 return chain;
             }),
@@ -400,6 +529,107 @@ describe('CpeService', () => {
                     'QA anulación con asiento',
                 ),
             ).resolves.toBeUndefined();
+        });
+
+        it('permite anular POS cuando factura.emitida y venta.procesada convergen en un asiento único por referencia', async () => {
+            const cpe = {
+                id: 'cpe-pos',
+                estado: 'FIRMADO',
+                serie: 'B001',
+                numero: 3,
+                event_id: 'evento-factura-emitida',
+                nota_credito_id: null,
+            };
+            const client = createAccountingValidationClient({
+                asientos_contables: [
+                    { data: [], error: null },
+                    {
+                        data: [{
+                            id: 'asiento-pos',
+                            source_event_id: 'evento-venta-procesada',
+                            referencia: 'B001-00000003',
+                        }],
+                        error: null,
+                    },
+                ],
+                detalle_asientos: { data: [{ id: 'detalle-pos' }], error: null },
+            });
+
+            await expect(
+                (service as any).assertCpeOriginalAccountingReady(
+                    client,
+                    mockTenantId,
+                    cpe,
+                    'user-1',
+                    'QA anulación POS',
+                ),
+            ).resolves.toBeUndefined();
+
+            const fallbackQuery = (client.from as jest.Mock).mock.results[1].value;
+            expect(fallbackQuery.in).toHaveBeenCalledWith('referencia', [
+                'B001-00000003',
+                'B001-3',
+            ]);
+        });
+
+        it('bloquea el fallback POS si la referencia fiscal apunta a más de un asiento', async () => {
+            const cpe = {
+                id: 'cpe-pos-duplicado',
+                estado: 'FIRMADO',
+                serie: 'B001',
+                numero: 4,
+                event_id: 'evento-factura-duplicado',
+                nota_credito_id: null,
+            };
+            const client = createAccountingValidationClient({
+                asientos_contables: [
+                    { data: [], error: null },
+                    {
+                        data: [
+                            { id: 'asiento-1', referencia: 'B001-00000004' },
+                            { id: 'asiento-2', referencia: 'B001-4' },
+                        ],
+                        error: null,
+                    },
+                ],
+            });
+
+            await expect(
+                (service as any).assertCpeOriginalAccountingReady(
+                    client,
+                    mockTenantId,
+                    cpe,
+                    'user-1',
+                    'QA referencia duplicada',
+                ),
+            ).rejects.toThrow(/se encontraron 2/i);
+        });
+
+        it('numera notas de crédito considerando el código SUNAT 07', async () => {
+            const numberingQuery = {
+                from: jest.fn().mockReturnThis(),
+                select: jest.fn().mockReturnThis(),
+                eq: jest.fn().mockReturnThis(),
+                in: jest.fn().mockReturnThis(),
+                order: jest.fn().mockReturnThis(),
+                limit: jest.fn().mockResolvedValue({
+                    data: [{ numero: 7 }],
+                    error: null,
+                }),
+            };
+            supabaseService.getClient.mockReturnValue(numberingQuery as any);
+
+            await expect(
+                (service as any).cancellationService.obtenerSiguienteNumeroNotaCredito(
+                    mockTenantId,
+                    'BC001',
+                ),
+            ).resolves.toBe(8);
+
+            expect(numberingQuery.in).toHaveBeenCalledWith(
+                'tipo_documento',
+                ['07', 'NOTA_CREDITO'],
+            );
         });
     });
 

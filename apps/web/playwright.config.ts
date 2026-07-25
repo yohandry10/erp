@@ -2,13 +2,14 @@ import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.BASE_URL || 'http://localhost:3001';
 const webPort = new URL(baseURL).port || '3001';
+const skipGlobalAuth = process.env.PLAYWRIGHT_SKIP_GLOBAL_AUTH === '1';
 
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  globalSetup: './tests/e2e/global-setup.ts',
+  globalSetup: skipGlobalAuth ? undefined : './tests/e2e/global-setup.ts',
   timeout: 90 * 1000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
@@ -17,7 +18,9 @@ export default defineConfig({
   reporter: 'html',
   use: {
     baseURL,
-    storageState: './tests/e2e/.auth/admin.json',
+    storageState: skipGlobalAuth
+      ? { cookies: [], origins: [] }
+      : './tests/e2e/.auth/admin.json',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

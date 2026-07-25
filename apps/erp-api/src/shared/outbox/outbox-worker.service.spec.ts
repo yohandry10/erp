@@ -38,11 +38,15 @@ describe('OutboxWorker', () => {
     };
   }
 
-  it('deja los eventos contables al ContabilidadEventsListener para evitar doble asiento', async () => {
+  it.each([
+    'cxc.creada',
+    'cpe.anulado',
+    'factura.emitida',
+  ])('deja %s al ContabilidadEventsListener para evitar carreras contables', async (eventType) => {
     const pendingEvent = {
       id: 'outbox-row-1',
       event_id: 'event-1',
-      event_type: 'cxc.creada',
+      event_type: eventType,
       tenant_id: 'tenant-1',
       payload: { tenantId: 'tenant-1', eventId: 'source-event-1' },
       created_at: new Date().toISOString(),

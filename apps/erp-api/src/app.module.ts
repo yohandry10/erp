@@ -62,13 +62,14 @@ import { DemoModule } from './modules/demo/demo.module';
 import { DemoExpiredGuard } from './modules/demo/guards/demo-expired.guard';
 import { DemoRestrictionsInterceptor } from './modules/demo/interceptors/demo-restrictions.interceptor';
 import { envSchema } from './config/env.schema';
+import { apiEnvFilePath } from './config/env-files';
 
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', 'apps/erp-api/.env'],
+      envFilePath: apiEnvFilePath,
       validationSchema: envSchema,
       validationOptions: {
         allowUnknown: true,

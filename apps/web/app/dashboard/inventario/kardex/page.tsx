@@ -83,7 +83,7 @@ const formatDateTime = (value?: string | null) => {
 
 function NoPermissionBanner() {
   return (
-    <div className="p-7 rounded-4 border bg-[rgba(191,_219,_254,_0.45)] text-blue-700 font-semibold"
+    <div className="p-7 rounded-2xl border bg-blue-500/10 text-primary font-semibold"
     >
       Necesitas el permiso <code>inventario.kardex.read</code> para consultar el kardex valorizado.
     </div>
@@ -252,24 +252,24 @@ export default function KardexPage() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="m-0 text-7 font-bold text-slate-950">Kardex valorizado</h1>
-          <span className="bg-[rgba(96,_165,_250,_0.18)] text-blue-700 rounded-full py-1 px-3 text-3 font-semibold"
+          <h1 className="m-0 text-[1.75rem] font-bold text-foreground">Kardex valorizado</h1>
+          <span className="bg-[rgba(96,_165,_250,_0.18)] text-primary rounded-full py-1 px-3 text-xs font-semibold"
           >
             Inventario → Contabilidad
           </span>
         </div>
-        <p className="m-0 text-slate-600 max-w-[760px] leading-7">
+        <p className="m-0 text-foreground/80 max-w-[760px] leading-7">
           Consulta las entradas de inventario con costo valorizado, filtrando por producto, almacén y rango de
           fechas. Los datos respetan el tenant activo y exponen el total por moneda para conciliación contable.
         </p>
         <div className="flex gap-3 flex-wrap">
           <Link
-            href="/dashboard/inventario/recepciones" className="text-[#166534] font-semibold"
+            href="/dashboard/inventario/recepciones" className="text-primary font-semibold hover:text-primary/80"
           >
             Ir a Recepciones →
           </Link>
           <Link
-            href="/dashboard/inventario/almacenes" className="text-[#1e3a8a] font-semibold"
+            href="/dashboard/inventario/almacenes" className="text-primary font-semibold hover:text-primary/80"
           >
             Gestionar Almacenes →
           </Link>
@@ -279,16 +279,16 @@ export default function KardexPage() {
       <ProtectedComponent modulo="inventario" recurso="kardex" accion="read" fallback={<NoPermissionBanner />}>
         <div className="flex flex-col gap-6">
           <form
-            onSubmit={applyFilters} className="flex flex-wrap gap-4 items-end border rounded-3.5 p-5 bg-[rgba(248,_250,_252,_0.85)]"
+            onSubmit={applyFilters} className="flex flex-wrap gap-4 items-end border rounded-[0.875rem] p-5 bg-muted/40"
           >
             <div className="flex-[1_1_220px] min-w-[200px]">
-              <label className="block text-[0.8rem] font-semibold text-slate-700 mb-1.5">
+              <label className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
                 Producto
               </label>
               <select
                 value={pendingFilters.productoId}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, productoId: event.target.value }))}
-                disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-2.5 border text-[0.875rem] bg-white"
+                disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
               >
                 <option value="">Todos los productos</option>
                 {productos.map((producto) => (
@@ -300,13 +300,13 @@ export default function KardexPage() {
             </div>
 
             <div className="flex-[1_1_220px] min-w-[200px]">
-              <label className="block text-[0.8rem] font-semibold text-slate-700 mb-1.5">
+              <label className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
                 Almacén
               </label>
               <select
                 value={pendingFilters.almacenId}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, almacenId: event.target.value }))}
-                disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-2.5 border text-[0.875rem] bg-white"
+                disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
               >
                 <option value="">Todos los almacenes</option>
                 {almacenes.map((almacen) => (
@@ -318,36 +318,36 @@ export default function KardexPage() {
             </div>
 
             <div className="flex-[1_1_180px] min-w-[180px]">
-              <label className="block text-[0.8rem] font-semibold text-slate-700 mb-1.5">
+              <label className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
                 Desde
               </label>
               <input
                 type="date"
                 value={pendingFilters.desde}
-                onChange={(event) => setPendingFilters((prev) => ({ ...prev, desde: event.target.value }))} className="w-[100%] py-[0.7rem] px-4 rounded-2.5 border text-[0.875rem] bg-white"
+                onChange={(event) => setPendingFilters((prev) => ({ ...prev, desde: event.target.value }))} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
               />
             </div>
 
             <div className="flex-[1_1_180px] min-w-[180px]">
-              <label className="block text-[0.8rem] font-semibold text-slate-700 mb-1.5">
+              <label className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
                 Hasta
               </label>
               <input
                 type="date"
                 value={pendingFilters.hasta}
-                onChange={(event) => setPendingFilters((prev) => ({ ...prev, hasta: event.target.value }))} className="w-[100%] py-[0.7rem] px-4 rounded-2.5 border text-[0.875rem] bg-white"
+                onChange={(event) => setPendingFilters((prev) => ({ ...prev, hasta: event.target.value }))} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
               />
             </div>
 
             <div className="flex gap-3 items-center">
               <button
-                type='submit' className="py-[0.7rem] px-6 rounded-2.5 border-0 bg-blue-700 text-white font-semibold cursor-pointer"
+                type='submit' className="py-[0.7rem] px-6 rounded-[0.625rem] border-0 bg-blue-700 text-white font-semibold cursor-pointer"
               >
                 Aplicar filtros
               </button>
               <button
                 type='button'
-                onClick={resetFilters} className="py-[0.7rem] px-5 rounded-2.5 border bg-white text-blue-700 font-semibold cursor-pointer"
+                onClick={resetFilters} className="py-[0.7rem] px-5 rounded-[0.625rem] border bg-card text-primary font-semibold cursor-pointer"
               >
                 Limpiar
               </button>
@@ -355,14 +355,14 @@ export default function KardexPage() {
           </form>
 
           {loading ? (
-            <div className="flex justify-center items-center py-12 px-0 text-blue-700 font-semibold"
+            <div className="flex justify-center items-center py-12 px-0 text-primary font-semibold"
             >
               Cargando kardex…
             </div>
           ) : (
             <>
               {error && (
-                <div className="py-4 px-5 rounded-3 border bg-[rgba(254,_226,_226,_0.65)] text-red-700 font-semibold"
+                <div className="py-4 px-5 rounded-xl border bg-destructive/10 text-destructive font-semibold"
                 >
                   {error}
                 </div>
@@ -372,21 +372,21 @@ export default function KardexPage() {
               >
                 {resumenCards.map((card) => (
                   <div
-                    key={card.label} className="rounded-4 border bg-white p-4 flex flex-col gap-1.5"
+                    key={card.label} className="rounded-2xl border bg-card p-4 flex flex-col gap-1.5"
                   >
-                    <span className="text-3 text-slate-500 font-bold">
+                    <span className="text-xs text-muted-foreground font-bold">
                       {card.label}
                     </span>
-                    <span className="text-6 font-bold text-slate-950">
+                    <span className="text-2xl font-bold text-foreground">
                       {'formatted' in card ? card.formatted : formatNumber(card.value)}
                     </span>
-                    <span className="text-3.5 text-slate-600">{card.note}</span>
+                    <span className="text-sm text-foreground/80">{card.note}</span>
                   </div>
                 ))}
               </section>
 
               {Object.keys(resumen.valorPorMoneda ?? {}).length > 0 && (
-                <section className="rounded-3.5 border bg-[rgba(191,_219,_254,_0.35)] p-4 text-[#1e3a8a] text-3.5 flex flex-wrap gap-4"
+                <section className="rounded-[0.875rem] border bg-blue-500/10 p-4 text-[#1e3a8a] text-sm flex flex-wrap gap-4"
                 >
                   <strong>Valor por moneda:</strong>
                   {Object.entries(resumen.valorPorMoneda).map(([moneda, valor]) => (
@@ -397,16 +397,16 @@ export default function KardexPage() {
                 </section>
               )}
 
-              <section className="rounded-4 border bg-white p-5 flex flex-col gap-4"
+              <section className="rounded-2xl border bg-card p-5 flex flex-col gap-4"
               >
-                <h2 className="m-0 text-[1.15rem] font-bold text-slate-950">Detalle de entradas</h2>
+                <h2 className="m-0 text-[1.15rem] font-bold text-foreground">Detalle de entradas</h2>
                 {movimientos.length === 0 ? (
-                  <div className="text-slate-400 text-3.5">No se encontraron movimientos para los filtros seleccionados.</div>
+                  <div className="text-muted-foreground text-sm">No se encontraron movimientos para los filtros seleccionados.</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-[100%] min-w-[880px]">
                       <thead>
-                        <tr className="border-b text-left text-slate-600 text-3">
+                        <tr className="border-b text-left text-foreground/80 text-xs">
                           <th className="py-[0.65rem] px-2">Fecha</th>
                           <th className="py-[0.65rem] px-2">Documento</th>
                           <th className="py-[0.65rem] px-2">Producto</th>
@@ -420,34 +420,34 @@ export default function KardexPage() {
                       <tbody>
                         {movimientos.map((mov) => (
                           <tr key={mov.id} className="border-b">
-                            <td className="py-3 px-2 text-slate-950 font-semibold">{formatDateTime(mov.fecha)}</td>
-                            <td className="py-3 px-2 text-slate-600">{mov.documento ?? '—'}</td>
+                            <td className="py-3 px-2 text-foreground font-semibold">{formatDateTime(mov.fecha)}</td>
+                            <td className="py-3 px-2 text-foreground/80">{mov.documento ?? '—'}</td>
                             <td className="py-3 px-2">
                               <div className="flex flex-col">
-                                <span className="font-semibold text-slate-950">{mov.producto.nombre}</span>
-                                <span className="text-3 text-slate-400">
+                                <span className="font-semibold text-foreground">{mov.producto.nombre}</span>
+                                <span className="text-xs text-muted-foreground">
                                   {mov.producto.codigo ?? mov.producto.sku ?? '—'}
                                 </span>
                               </div>
                             </td>
-                            <td className="py-3 px-2 text-slate-600">
+                            <td className="py-3 px-2 text-foreground/80">
                               {mov.almacen?.nombre ?? '—'}
                               {mov.ubicacion?.codigo ? (
-                                <span className="block text-3 text-slate-400">
+                                <span className="block text-xs text-muted-foreground">
                                   Ubicación: {mov.ubicacion.codigo}
                                 </span>
                               ) : null}
                             </td>
-                            <td className="py-3 px-2 text-right text-slate-950 font-semibold">
+                            <td className="py-3 px-2 text-right text-foreground font-semibold">
                               {formatNumber(mov.cantidad)}
                             </td>
-                            <td className="py-3 px-2 text-right text-slate-600">
+                            <td className="py-3 px-2 text-right text-foreground/80">
                               {formatCurrency(mov.costoUnitario, mov.moneda)}
                             </td>
-                            <td className="py-3 px-2 text-right text-slate-950 font-semibold">
+                            <td className="py-3 px-2 text-right text-foreground font-semibold">
                               {formatCurrency(mov.valorTotal, mov.moneda)}
                             </td>
-                            <td className="py-3 px-2 text-slate-600">
+                            <td className="py-3 px-2 text-foreground/80">
                               {mov.lote ?? '—'} {mov.serie ? ` / ${mov.serie}` : ''}
                             </td>
                           </tr>

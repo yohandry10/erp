@@ -37,7 +37,7 @@ export default function ConciliacionesPendientesReport() {
     try {
       setLoading(true)
       const response = await get('/api/finanzas/conciliacion/pendientes')
-      
+
       if (response?.success) {
         setConciliaciones(response.data || [])
       }
@@ -80,21 +80,21 @@ export default function ConciliacionesPendientesReport() {
 
   if (loading) {
     return (
-      <div className="activity-card p-8 text-center">
-        <div className="loading-spinner"></div>
-        <p className="text-gray-500">Cargando conciliaciones pendientes...</p>
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-8 text-center">
+        <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
+        <p className="text-muted-foreground">Cargando conciliaciones pendientes...</p>
       </div>
     )
   }
 
   if (conciliaciones.length === 0) {
     return (
-      <div className="activity-card p-12 text-center">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-12 text-center">
         <CheckCircle2 size={48} className="text-[#10b981]" />
-        <h3 className="text-[1.125rem] font-semibold mb-2 text-gray-700">
+        <h3 className="text-[1.125rem] font-semibold mb-2 text-foreground/85">
           No hay conciliaciones pendientes
         </h3>
-        <p className="text-gray-500">
+        <p className="text-muted-foreground">
           Todas las conciliaciones están cerradas
         </p>
       </div>
@@ -102,22 +102,22 @@ export default function ConciliacionesPendientesReport() {
   }
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       {/* Header */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b">
         <div className="flex items-center gap-3">
           <Calendar size={24} className="text-[#8b5cf6]" />
           <div>
-            <h3 className="text-[1.125rem] font-semibold text-gray-900">
+            <h3 className="text-[1.125rem] font-semibold text-foreground">
               Conciliaciones Pendientes
             </h3>
-            <p className="text-[0.875rem] text-gray-500 mt-1">
+            <p className="text-[0.875rem] text-muted-foreground mt-1">
               {conciliaciones.length} conciliación{conciliaciones.length !== 1 ? 'es' : ''} en proceso
             </p>
           </div>
         </div>
         <button
-          onClick={loadConciliaciones} className="py-2 px-4 rounded-[6px] border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
+          onClick={loadConciliaciones} className="py-2 px-4 rounded-[6px] border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
         >
           <RefreshCw size={16} />
           Actualizar
@@ -126,11 +126,11 @@ export default function ConciliacionesPendientesReport() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-8">
-        <div className="p-4 rounded-2 text-white">
-          <div className="text-3 font-semibold opacity-[0.9]">
+        <div className="p-4 rounded-lg text-white">
+          <div className="text-xs font-semibold opacity-[0.9]">
             Total Pendientes
           </div>
-          <div className="text-7 font-bold mt-2">
+          <div className="text-[1.75rem] font-bold mt-2">
             {conciliaciones.length}
           </div>
           <div className="text-[0.875rem] mt-1 opacity-[0.9]">
@@ -138,11 +138,11 @@ export default function ConciliacionesPendientesReport() {
           </div>
         </div>
 
-        <div className="p-4 rounded-2 bg-[rgba(245,_158,_11,_0.1)] border">
-          <div className="text-3 font-semibold text-[#92400e]">
+        <div className="p-4 rounded-lg bg-[rgba(245,_158,_11,_0.1)] border">
+          <div className="text-xs font-semibold text-[#92400e]">
             Avance Promedio
           </div>
-          <div className="text-6 font-bold mt-2 text-[#d97706]">
+          <div className="text-2xl font-bold mt-2 text-[#d97706]">
             {Math.round(conciliaciones.reduce((sum, c) => sum + c.porcentaje_avance, 0) / conciliaciones.length)}%
           </div>
           <div className="text-[0.875rem] mt-1 text-[#92400e]">
@@ -156,11 +156,11 @@ export default function ConciliacionesPendientesReport() {
         {conciliaciones.map((conciliacion) => {
           const estadoStyle = getEstadoColor(conciliacion.estado)
           const avanceColor = getAvanceColor(conciliacion.porcentaje_avance)
-          
+
           return (
             <div
               key={conciliacion.id}
-              onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacion.id}`)} className="p-6 rounded-3 border bg-white cursor-pointer transition"
+              onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacion.id}`)} className="p-6 rounded-xl border bg-card cursor-pointer transition"
               onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
                 e.currentTarget.style.transform = 'translateY(-2px)'
@@ -172,21 +172,21 @@ export default function ConciliacionesPendientesReport() {
             >
               <div className="flex justify-between mb-4">
                 <div>
-                  <h4 className="text-4 font-semibold text-gray-900 mb-1">
+                  <h4 className="text-base font-semibold text-foreground mb-1">
                     {conciliacion.cuenta_nombre}
                   </h4>
-                  <p className="text-[0.875rem] text-gray-500">
+                  <p className="text-[0.875rem] text-muted-foreground">
                     {conciliacion.banco} • {conciliacion.numero_cuenta}
                   </p>
                 </div>
-                <span className="py-1 px-3 rounded-full text-3 font-semibold">
+                <span className="py-1 px-3 rounded-full text-xs font-semibold">
                   {conciliacion.estado}
                 </span>
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4 mb-4">
                 <div>
-                  <div className="text-3 text-gray-500 mb-1">
+                  <div className="text-xs text-muted-foreground mb-1">
                     Período
                   </div>
                   <div className="text-[0.875rem] font-medium">
@@ -194,7 +194,7 @@ export default function ConciliacionesPendientesReport() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-3 text-gray-500 mb-1">
+                  <div className="text-xs text-muted-foreground mb-1">
                     Diferencia
                   </div>
                   <div className="text-[0.875rem] font-semibold">
@@ -202,7 +202,7 @@ export default function ConciliacionesPendientesReport() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-3 text-gray-500 mb-1">
+                  <div className="text-xs text-muted-foreground mb-1">
                     Items Conciliados
                   </div>
                   <div className="text-[0.875rem] font-medium">
@@ -214,7 +214,7 @@ export default function ConciliacionesPendientesReport() {
               {/* Progress Bar */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-3 font-semibold text-gray-500">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     Avance de Conciliación
                   </span>
                   <span className="text-[0.875rem] font-bold">
@@ -227,9 +227,9 @@ export default function ConciliacionesPendientesReport() {
               </div>
 
               {Math.abs(conciliacion.diferencia) > 0.01 && (
-                <div className="mt-4 p-3 rounded-[6px] bg-[rgba(239,_68,_68,_0.1)] flex items-center gap-2">
-                  <AlertCircle size={16} className="text-red-600" />
-                  <span className="text-3 text-red-800">
+                <div className="mt-4 p-3 rounded-[6px] bg-destructive/10 flex items-center gap-2">
+                  <AlertCircle size={16} className="text-destructive" />
+                  <span className="text-xs text-destructive">
                     Hay diferencias sin resolver
                   </span>
                 </div>

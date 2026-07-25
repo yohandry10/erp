@@ -190,7 +190,8 @@ export class DashboardMetricsService {
       usuariosResult,
       cotizacionesResult,
       cotizacionesPendientesResult,
-      sireResult
+      sireResult,
+      ventasPosResult
     ] = await Promise.allSettled([
       client.from('cpe')
         .select('total_venta, total, created_at, tenant_id')
@@ -229,7 +230,16 @@ export class DashboardMetricsService {
       client.from('sire_files')
         .select('id')
         .eq('tenant_id', tenantId)
+        .gte('created_at', inicioMes.toISOString()),
+      // Ventas POS del periodo. Las que aún no tienen CPE emitido (cpe_id null)
+      // no aparecen en la tabla `cpe`, así que sin esto el dashboard muestra
+      // "Ventas: S/ 0" aunque el POS haya registrado ventas pagadas.
+      client.from('ventas_pos')
+        .select('total, cpe_id, created_at')
+        .eq('tenant_id', tenantId)
+        .neq('estado', 'ANULADA')
         .gte('created_at', inicioMes.toISOString())
+        .lte('created_at', finMes.toISOString())
     ]);
 
     // Procesar resultados de forma segura
@@ -242,10 +252,16 @@ export class DashboardMetricsService {
     const cotizacionesData = cotizacionesResult.status === 'fulfilled' ? cotizacionesResult.value.data : [];
     const cotizacionesPendientesData = cotizacionesPendientesResult.status === 'fulfilled' ? cotizacionesPendientesResult.value.data : [];
     const sireData = sireResult.status === 'fulfilled' ? sireResult.value.data : [];
+    const ventasPosData = ventasPosResult.status === 'fulfilled' ? ventasPosResult.value.data : [];
 
-    // Calcular métricas reales
-    const ingresosMes = this.sumarTotalesCpe(cpeData);
-    const ingresosHoy = this.sumarTotalesCpe(cpeHoyData);
+    // Calcular métricas reales. Las ventas POS con CPE emitido ya están
+    // contadas en `cpe`; solo se suman las que siguen pendientes de emisión.
+    const ventasPosSinCpe = (ventasPosData || []).filter((v) => !v.cpe_id);
+    const ventasPosSinCpeHoy = ventasPosSinCpe.filter(
+      (v) => new Date(v.created_at) >= inicioHoy,
+    );
+    const ingresosMes = this.sumarTotalesCpe(cpeData) + this.sumarTotales(ventasPosSinCpe);
+    const ingresosHoy = this.sumarTotalesCpe(cpeHoyData) + this.sumarTotales(ventasPosSinCpeHoy);
     const inversionCompras = this.sumarTotales(comprasData);
     const totalProductos = productosData?.length || 0;
     const valorInventario = this.calcularValorInventario(productosData);
@@ -312,7 +328,7 @@ export class DashboardMetricsService {
       cotizacionesResult
     ] = await Promise.allSettled([
       client.from('cpe')
-        .select('id, serie, numero, total_venta, estado, created_at')
+        .select('id, tipo_documento, serie, numero, total_venta, estado, created_at')
         .eq('tenant_id', tenantId)
         .gte('created_at', hace24h.toISOString())
         .order('created_at', { ascending: false })
@@ -345,7 +361,7 @@ export class DashboardMetricsService {
         actividades.push({
           id: `cpe-${cpe.id}`,
           type: 'CPE',
-          description: `Factura ${cpe.serie}-${cpe.numero.toString().padStart(8, '0')}`,
+          description: `${this.getCpeDocumentLabel(cpe.tipo_documento)} ${cpe.serie}-${cpe.numero.toString().padStart(8, '0')}`,
           amount: parseFloat(cpe.total_venta) || 0,
           date: cpe.created_at,
           status: this.mapearEstado(cpe.estado)
@@ -427,9 +443,13 @@ export class DashboardMetricsService {
   private calcularValorInventario(productos: any[]): number {
     if (!Array.isArray(productos)) return 0;
     return productos.reduce(
-      (sum, p) => sum.plus(
-        new Decimal(p.precio ?? p.precio_venta ?? 0).times(p.stock_actual ?? p.stock ?? 0)
-      ),
+      (sum, p) => {
+        // `precio` es columna legacy que suele venir en 0/null; con `??` ese 0
+        // anulaba el fallback a precio_venta y el dashboard mostraba S/ 0.00.
+        const precio = Number(p.precio) || Number(p.precio_venta) || 0;
+        const stock = Number(p.stock_actual ?? p.stock ?? 0);
+        return sum.plus(new Decimal(precio).times(stock));
+      },
       new Decimal(0)
     ).toDecimalPlaces(2).toNumber();
   }
@@ -473,5 +493,16 @@ export class DashboardMetricsService {
     };
 
     return estadosMap[estado.toUpperCase()] || 'pending';
+  }
+
+  private getCpeDocumentLabel(tipoDocumento: unknown): string {
+    const labels: Record<string, string> = {
+      '01': 'Factura',
+      '03': 'Boleta',
+      '07': 'Nota de crédito',
+      '08': 'Nota de débito',
+    };
+
+    return labels[String(tipoDocumento ?? '').trim()] ?? 'Comprobante';
   }
 }

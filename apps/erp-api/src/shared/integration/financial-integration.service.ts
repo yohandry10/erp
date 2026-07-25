@@ -203,13 +203,15 @@ export class FinancialIntegrationService {
   private async obtenerVentasMensuales(tenantId?: string) {
     // ✅ MULTI-TENANT: Filtrar por tenant
     const currentTenantId = this.resolveTenantId(tenantId);
+    // `ventas` es tabla muerta; las ventas reales viven en `documentos` (comprobantes emitidos).
     const { data } = await this.supabase.getClient()
-      .from('ventas')
-      .select('total, fecha')
+      .from('documentos')
+      .select('total, fecha:fecha_emision')
       .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
-      .gte('fecha', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
-      .in('estado', ['EMITIDA', 'PAGADA'])
-      .order('fecha', { ascending: true });
+      .gte('fecha_emision', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
+      .in('tipo_documento', ['FACTURA', 'BOLETA'])
+      .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")')
+      .order('fecha_emision', { ascending: true });
 
     const ventasPorMes = new Map();
     data?.forEach(venta => {
@@ -601,11 +603,12 @@ export class FinancialIntegrationService {
     // ✅ MULTI-TENANT: Filtrar por tenant
     const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
-      .from('ventas')
+      .from('documentos')
       .select('total')
       .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
-      .gte('fecha', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-      .in('estado', ['EMITIDA', 'PAGADA']);
+      .gte('fecha_emision', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .in('tipo_documento', ['FACTURA', 'BOLETA'])
+      .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")');
     return data?.reduce((sum, venta) => sum + parseFloat(venta.total || '0'), 0) || 0;
   }
 
@@ -710,12 +713,13 @@ export class FinancialIntegrationService {
     // ✅ MULTI-TENANT: Filtrar por tenant
     const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
-      .from('ventas')
+      .from('documentos')
       .select('total')
       .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
-      .gte('fecha', fechaInicio.toISOString())
-      .lte('fecha', fechaFin.toISOString())
-      .in('estado', ['EMITIDA', 'PAGADA']);
+      .gte('fecha_emision', fechaInicio.toISOString())
+      .lte('fecha_emision', fechaFin.toISOString())
+      .in('tipo_documento', ['FACTURA', 'BOLETA'])
+      .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")');
     return data?.reduce((sum, venta) => sum + parseFloat(venta.total || '0'), 0) || 0;
   }
 

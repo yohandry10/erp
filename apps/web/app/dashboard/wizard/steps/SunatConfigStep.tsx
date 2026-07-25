@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Building2, PlugZap } from 'lucide-react'
+import { AlertCircle, Building2, KeyRound, PlugZap, Truck } from 'lucide-react'
 
 import { useWizardContext } from '../WizardContext'
 import { useCountryContext } from '@/hooks/use-country-context'
@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const fieldGridClass = 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'
-const labelClass = 'mb-2 block text-sm font-semibold text-cyan-100'
-const requiredClass = 'text-cyan-200'
-const inputClass = 'border-cyan-400/20 bg-slate-950/70 text-slate-100 placeholder:text-slate-500 focus:border-cyan-300 focus:ring-cyan-400/10'
+const labelClass = 'mb-2 block text-sm font-semibold text-primary'
+const requiredClass = 'text-primary'
+const inputClass = 'border-cyan-400/20 bg-card/70 text-foreground placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-cyan-400/10'
 
 function InfoPanel({
   tone = 'cyan',
@@ -25,9 +25,9 @@ function InfoPanel({
   description: string
 }) {
   const toneClass = {
-    cyan: 'border-cyan-400/20 bg-cyan-400/10 text-cyan-100',
-    blue: 'border-blue-400/20 bg-blue-500/10 text-blue-100',
-    slate: 'border-slate-400/20 bg-slate-500/10 text-slate-100',
+    cyan: 'border-cyan-400/20 bg-cyan-400/10 text-primary',
+    blue: 'border-blue-400/20 bg-blue-500/10 text-primary dark:text-blue-200',
+    slate: 'border-border/20 bg-slate-500/10 text-foreground',
   }[tone]
 
   return (
@@ -49,9 +49,12 @@ export function SunatConfigStep() {
   const emisionModo = state.configuration.emision_cpe_modo || 'SUNAT_DIRECTO'
   const authTipo = state.configuration.ose_auth_tipo || 'BASIC'
   const isOseApi = emisionModo === 'OSE_API'
-  const isColombia = country.paisCodigo === 'CO'
-  const oseLabel = isColombia ? 'Proveedor' : 'OSE'
+  const isColombia: boolean = false
+  const isPeru = country.paisCodigo === 'PE'
+  const oseLabel = 'OSE'
   const dianEnvironment = state.configuration.dian_environment || 'HOMOLOGACION'
+  const sunatEnvironment = state.configuration.sunat_environment || 'homologacion'
+  const greTransport = state.configuration.sunat_gre_transport || 'soap'
 
   const handleEmisionModoChange = (value: 'SUNAT_DIRECTO' | 'OSE_API') => {
     updateConfiguration({
@@ -76,17 +79,23 @@ export function SunatConfigStep() {
     }
   }, [isColombia, state.configuration.dian_activo, updateConfiguration])
 
+  useEffect(() => {
+    if (isPeru && !state.configuration.sunat_gre_rest_base_url) {
+      updateConfiguration({ sunat_gre_rest_base_url: 'https://api-cpe.sunat.gob.pe/v1' })
+    }
+  }, [isPeru, state.configuration.sunat_gre_rest_base_url, updateConfiguration])
+
   return (
-    <div className="space-y-5 py-2 text-slate-100">
+    <div className="space-y-5 py-2 text-foreground">
       <InfoPanel
         title="Autoridad fiscal"
         description={`Define como se enviaran los comprobantes: ${country.servicioFiscal} directo (SOAP) o API externa (${oseLabel} o propia).`}
       />
 
-      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+      <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
         <CardHeader className="border-b border-cyan-400/10">
           <CardTitle className="flex items-center gap-2 text-lg text-white">
-            <Building2 className="h-5 w-5 text-cyan-200" />
+            <Building2 className="h-5 w-5 text-primary" />
             Modo de emision
           </CardTitle>
         </CardHeader>
@@ -109,14 +118,210 @@ export function SunatConfigStep() {
           {!isOseApi ? (
             <InfoPanel
               title={`${country.servicioFiscal} directo activo`}
-              description={`Puedes cambiar a ${oseLabel} API cuando tengas un endpoint de proveedor o API propia.`}
+              description={`Se usaran las credenciales propias del contribuyente y los endpoints oficiales configurados para ${country.servicioFiscal}.`}
             />
           ) : null}
         </CardContent>
       </Card>
 
+      {isPeru && !isOseApi ? (
+        <>
+          <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
+            <CardHeader className="border-b border-cyan-400/10">
+              <CardTitle className="flex items-center gap-2 text-lg text-white">
+                <KeyRound className="h-5 w-5 text-primary" />
+                Credenciales SUNAT
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 p-5">
+              <InfoPanel
+                tone="blue"
+                title="Clave SOL secundaria"
+                description="Usa un usuario secundario SOL con permisos CPE/GRE; evita usar la clave principal del representante."
+              />
+
+              <div>
+                <Label htmlFor="sunat_environment" className={labelClass}>
+                  Ambiente SUNAT
+                </Label>
+                <Select
+                  value={sunatEnvironment}
+                  onValueChange={(value) => updateConfiguration({ sunat_environment: value as 'homologacion' | 'produccion' })}
+                >
+                  <SelectTrigger id="sunat_environment" className={inputClass}>
+                    <SelectValue placeholder="Selecciona ambiente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="homologacion">Homologacion</SelectItem>
+                    <SelectItem value="produccion">Produccion</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className={fieldGridClass}>
+                <div>
+                  <Label htmlFor="sunat_username" className={labelClass}>
+                    Usuario SOL secundario <span className={requiredClass}>*</span>
+                  </Label>
+                  <Input
+                    id="sunat_username"
+                    value={state.configuration.sunat_username || ''}
+                    onChange={(e) => updateConfiguration({ sunat_username: e.target.value.toUpperCase() })}
+                    placeholder="20600000000USUARIO"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="sunat_password" className={labelClass}>
+                    Clave SOL secundaria <span className={requiredClass}>*</span>
+                  </Label>
+                  <Input
+                    id="sunat_password"
+                    type="password"
+                    value={state.configuration.sunat_password || ''}
+                    onChange={(e) => updateConfiguration({ sunat_password: e.target.value })}
+                    placeholder="••••••••"
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
+            <CardHeader className="border-b border-cyan-400/10">
+              <CardTitle className="flex items-center gap-2 text-lg text-white">
+                <Truck className="h-5 w-5 text-primary" />
+                GRE SUNAT
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 p-5">
+              <div>
+                <Label htmlFor="sunat_gre_transport" className={labelClass}>
+                  Transporte GRE
+                </Label>
+                <Select
+                  value={greTransport}
+                  onValueChange={(value) => updateConfiguration({ sunat_gre_transport: value as 'soap' | 'rest' })}
+                >
+                  <SelectTrigger id="sunat_gre_transport" className={inputClass}>
+                    <SelectValue placeholder="Selecciona transporte" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="soap">SOAP SUNAT</SelectItem>
+                    <SelectItem value="rest">GRE REST SUNAT</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {greTransport === 'rest' ? (
+                <>
+                  <InfoPanel
+                    tone="slate"
+                    title="Credenciales API SUNAT GRE REST"
+                    description="Estas credenciales se obtienen desde SUNAT para la Plataforma Nueva GRE."
+                  />
+                  <div className={fieldGridClass}>
+                    <div>
+                      <Label htmlFor="sunat_gre_client_id" className={labelClass}>
+                        Client ID <span className={requiredClass}>*</span>
+                      </Label>
+                      <Input
+                        id="sunat_gre_client_id"
+                        value={state.configuration.sunat_gre_client_id || ''}
+                        onChange={(e) => updateConfiguration({ sunat_gre_client_id: e.target.value.trim() })}
+                        placeholder="client_id"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="sunat_gre_client_secret" className={labelClass}>
+                        Client secret <span className={requiredClass}>*</span>
+                      </Label>
+                      <Input
+                        id="sunat_gre_client_secret"
+                        type="password"
+                        value={state.configuration.sunat_gre_client_secret || ''}
+                        onChange={(e) => updateConfiguration({ sunat_gre_client_secret: e.target.value })}
+                        placeholder="client_secret"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="sunat_gre_rest_base_url" className={labelClass}>
+                        Base URL GRE REST
+                      </Label>
+                      <Input
+                        id="sunat_gre_rest_base_url"
+                        type="url"
+                        value={state.configuration.sunat_gre_rest_base_url || ''}
+                        onChange={(e) => updateConfiguration({ sunat_gre_rest_base_url: e.target.value })}
+                        placeholder="https://api-cpe.sunat.gob.pe/v1"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="sunat_gre_auth_url" className={labelClass}>
+                        URL OAuth opcional
+                      </Label>
+                      <Input
+                        id="sunat_gre_auth_url"
+                        type="url"
+                        value={state.configuration.sunat_gre_auth_url || ''}
+                        onChange={(e) => updateConfiguration({ sunat_gre_auth_url: e.target.value })}
+                        placeholder="https://api-seguridad.sunat.gob.pe/v1/clientessol/{client_id}/oauth2/token/"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
+            <CardHeader className="border-b border-cyan-400/10">
+              <CardTitle className="text-lg text-white">Endpoints SUNAT opcionales</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 p-5">
+              <InfoPanel
+                tone="slate"
+                title="Defaults oficiales"
+                description="Si dejas estos campos vacios, el backend usa los endpoints oficiales del ambiente seleccionado."
+              />
+              <div className={fieldGridClass}>
+                <div>
+                  <Label htmlFor="sunat_cpe_url" className={labelClass}>
+                    URL CPE
+                  </Label>
+                  <Input id="sunat_cpe_url" type="url" value={state.configuration.sunat_cpe_url || ''} onChange={(e) => updateConfiguration({ sunat_cpe_url: e.target.value })} placeholder="https://e-beta.sunat.gob.pe/..." className={inputClass} />
+                </div>
+                <div>
+                  <Label htmlFor="sunat_summary_url" className={labelClass}>
+                    URL bajas/resumenes
+                  </Label>
+                  <Input id="sunat_summary_url" type="url" value={state.configuration.sunat_summary_url || ''} onChange={(e) => updateConfiguration({ sunat_summary_url: e.target.value })} placeholder="https://e-beta.sunat.gob.pe/..." className={inputClass} />
+                </div>
+                <div>
+                  <Label htmlFor="sunat_query_url" className={labelClass}>
+                    URL consulta CDR
+                  </Label>
+                  <Input id="sunat_query_url" type="url" value={state.configuration.sunat_query_url || ''} onChange={(e) => updateConfiguration({ sunat_query_url: e.target.value })} placeholder="https://e-factura.sunat.gob.pe/..." className={inputClass} />
+                </div>
+                <div>
+                  <Label htmlFor="sunat_gre_url" className={labelClass}>
+                    URL GRE SOAP
+                  </Label>
+                  <Input id="sunat_gre_url" type="url" value={state.configuration.sunat_gre_url || ''} onChange={(e) => updateConfiguration({ sunat_gre_url: e.target.value })} placeholder="https://e-beta.sunat.gob.pe/..." className={inputClass} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
+
       {isColombia ? (
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10">
             <CardTitle className="text-lg text-white">Configuracion DIAN</CardTitle>
           </CardHeader>
@@ -237,10 +442,10 @@ export function SunatConfigStep() {
       ) : null}
 
       {isOseApi ? (
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10">
             <CardTitle className="flex items-center gap-2 text-lg text-white">
-              <PlugZap className="h-5 w-5 text-cyan-200" />
+              <PlugZap className="h-5 w-5 text-primary" />
               Configuracion {oseLabel} API
             </CardTitle>
           </CardHeader>
@@ -266,7 +471,7 @@ export function SunatConfigStep() {
                 placeholder="https://ose.ejemplo.com/api/enviar"
                 className={inputClass}
               />
-              {errors.ose_url ? <p className="mt-1 text-xs text-cyan-200">{errors.ose_url}</p> : null}
+              {errors.ose_url ? <p className="mt-1 text-xs text-primary">{errors.ose_url}</p> : null}
             </div>
 
             <div>
@@ -274,7 +479,7 @@ export function SunatConfigStep() {
                 URL estado opcional
               </Label>
               <Input id="ose_status_url" type="url" value={state.configuration.ose_status_url || ''} onChange={(e) => updateConfiguration({ ose_status_url: e.target.value })} placeholder="https://ose.ejemplo.com/api/estado" className={inputClass} />
-              <p className="mt-1 text-xs text-slate-400">Si no se define, se reutiliza la URL principal.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Si no se define, se reutiliza la URL principal.</p>
             </div>
 
             <div>
@@ -310,7 +515,7 @@ export function SunatConfigStep() {
                     placeholder="usuario"
                     className={inputClass}
                   />
-                  {errors.ose_username ? <p className="mt-1 text-xs text-cyan-200">{errors.ose_username}</p> : null}
+                  {errors.ose_username ? <p className="mt-1 text-xs text-primary">{errors.ose_username}</p> : null}
                 </div>
                 <div>
                   <Label htmlFor="ose_password" className={labelClass}>
@@ -327,7 +532,7 @@ export function SunatConfigStep() {
                     placeholder="••••••••"
                     className={inputClass}
                   />
-                  {errors.ose_password ? <p className="mt-1 text-xs text-cyan-200">{errors.ose_password}</p> : null}
+                  {errors.ose_password ? <p className="mt-1 text-xs text-primary">{errors.ose_password}</p> : null}
                 </div>
               </div>
             ) : null}
@@ -358,7 +563,7 @@ export function SunatConfigStep() {
               </div>
             ) : null}
 
-            {authTipo === 'NONE' ? <p className="text-sm text-slate-400">El {oseLabel} no requiere autenticacion adicional.</p> : null}
+            {authTipo === 'NONE' ? <p className="text-sm text-muted-foreground">El {oseLabel} no requiere autenticacion adicional.</p> : null}
           </CardContent>
         </Card>
       ) : null}

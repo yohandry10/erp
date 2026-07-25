@@ -748,7 +748,22 @@ export class RecepcionesService {
         return;
       }
 
-      const proveedor = ordenData.proveedor ?? {};
+      let proveedor = ordenData.proveedor ?? {};
+
+      // El `orden` recibido del caller puede no traer el join del proveedor; sin sus
+      // condiciones de crédito, la CxP se generaría como CONTADO (vence el mismo día)
+      // aunque el proveedor sea CREDITO_30. Se completa consultando el proveedor.
+      const proveedorId = proveedor.id ?? ordenData.proveedor_id ?? null;
+      if (!proveedor.condiciones_pago && proveedorId) {
+        const { data: provDb } = await this.supabase
+          .getClient()
+          .from('proveedores')
+          .select('id, razon_social, ruc, condiciones_pago, dias_credito')
+          .eq('tenant_id', tenantId)
+          .eq('id', proveedorId)
+          .maybeSingle();
+        if (provDb) proveedor = { ...proveedor, ...provDb };
+      }
 
       // HARDENING: garantizamos que cada item tenga metadata de la orden para costeo y contabilidad.
       const fallbackDetalleIds = (recepcion.items || []).map((item: any) => item.detalle_id).filter(Boolean);
@@ -816,8 +831,11 @@ export class RecepcionesService {
         igvParcial,
         totalParcial,
         moneda: ordenData.moneda ?? 'PEN',
-        diasCredito: proveedor.dias_credito ?? null,
-        condicionesPago: proveedor.condiciones_pago ?? null,
+        // Las condiciones pactadas en la ORDEN mandan sobre las del proveedor:
+        // una OC CREDITO_30 no debe generar una CxP que vence el mismo día
+        // solo porque el proveedor tiene CONTADO por defecto.
+        diasCredito: ordenData.dias_credito ?? proveedor.dias_credito ?? null,
+        condicionesPago: ordenData.condiciones_pago ?? proveedor.condiciones_pago ?? null,
         greProveedor: recepcion.gre_proveedor ?? null,
         items,
         emittedAt: new Date().toISOString(),
@@ -907,8 +925,9 @@ export class RecepcionesService {
         igv: this.round2(Number(orden.igv ?? 0)),
         total: this.round2(Number(orden.total ?? 0)),
         moneda: orden.moneda ?? 'PEN',
-        diasCredito: proveedor.dias_credito ?? null,
-        condicionesPago: proveedor.condiciones_pago ?? null,
+        // Prevalecen las condiciones pactadas en la orden (ver evento recepcion.registrada).
+        diasCredito: orden.dias_credito ?? proveedor.dias_credito ?? null,
+        condicionesPago: orden.condiciones_pago ?? proveedor.condiciones_pago ?? null,
         almacenId: recepcion.items?.[0]?.almacen_id ?? null,
         observaciones: recepcion.observaciones ?? null,
         inventarioAplicado: true,

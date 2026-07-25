@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { PdfFormatHelperService } from './pdf-format-helper.service';
+import { buildSunatQrDataUrl } from './sunat-qr.util';
 
 /**
  * Servicio para generar PDFs de comprobantes electrónicos con formato oficial
@@ -44,7 +45,7 @@ export class PdfGeneratorService {
       // 4. Generar código QR si es requerido
       let qrCode: string | null = null;
       if (this.pdfFormatHelper.isQRCodeRequired(countryCode)) {
-        qrCode = await this.generateQRCode(cpeData, countryCode);
+        qrCode = await this.generateQRCode(cpeData);
       }
 
       // 5. Generar PDF con formato específico del país
@@ -135,31 +136,9 @@ export class PdfGeneratorService {
    * Formato QR SUNAT:
    * RUC_EMISOR|TIPO_DOC|SERIE|NUMERO|IGV|TOTAL|FECHA_EMISION|TIPO_DOC_RECEPTOR|NUM_DOC_RECEPTOR|HASH
    */
-  private async generateQRCode(cpeData: any, _countryCode?: string): Promise<string> {
+  private async generateQRCode(cpeData: any): Promise<string> {
     try {
-      const qrData = [
-        cpeData.ruc_emisor || '',
-        cpeData.tipo_documento || '',
-        cpeData.serie || '',
-        cpeData.numero || '',
-        (cpeData.total_igv || 0).toFixed(2),
-        (cpeData.total_venta || 0).toFixed(2),
-        cpeData.fecha_emision || new Date().toISOString().split('T')[0],
-        cpeData.tipo_documento_receptor || '',
-        cpeData.documento_receptor || '',
-        cpeData.hash_firma || cpeData.hash || ''
-      ].join('|');
-
-      // Generar QR usando librería qrcode
-      const QRCode = await import('qrcode');
-      const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
-        errorCorrectionLevel: 'M',
-        type: 'image/png',
-        width: 200,
-        margin: 1
-      });
-
-      return qrCodeDataUrl;
+      return await buildSunatQrDataUrl(cpeData);
     } catch (error) {
       this.logger.warn('⚠️ Error generando QR, usando placeholder:', error);
       return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';

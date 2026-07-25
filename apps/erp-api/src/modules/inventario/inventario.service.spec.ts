@@ -135,28 +135,17 @@ describe('InventarioService', () => {
                 error: null,
             });
 
-            // 2. Update Producto
-            mockSupabaseClient.update.mockReturnValueOnce(mockSupabaseClient); // For update chain
-
-            // 3. Crear Movimiento (insert -> select -> single)
-            mockSupabaseClient.single.mockResolvedValueOnce({
-                data: { id: 'mov-1' },
-                error: null
-            });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 'mov-1', error: null });
 
             const result = await service.reservarStock(productoId, cantidad, tenantId);
 
             expect(result).toBe('mov-1');
-            // Verifica update de stock_reservado
-            expect(mockSupabaseClient.update).toHaveBeenCalledWith({ stock_reservado: 10 });
-            // Verifica insert de movimiento
-            expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    tipo: TipoMovimiento.RESERVA,
-                    cantidad: 10,
-                    producto_id: productoId,
-                })
-            );
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('reservar_stock_atomico', expect.objectContaining({
+                p_producto_id: productoId,
+                p_cantidad: 10,
+            }));
+            expect(mockSupabaseClient.update).not.toHaveBeenCalled();
+            expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
         });
 
         it('debe lanzar BadRequestException si cantidad <= 0', async () => {
@@ -182,18 +171,16 @@ describe('InventarioService', () => {
                 error: null,
             });
 
-            // 2. Update Producto
-            mockSupabaseClient.update.mockReturnValueOnce(mockSupabaseClient);
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 'mov-lib-1', error: null });
 
-            // 3. Crear Movimiento
-            mockSupabaseClient.single.mockResolvedValueOnce({
-                data: { id: 'mov-lib-1' },
-                error: null
-            });
+            const movimiento = await service.liberarReserva(productoId, cantidad, tenantId);
 
-            await service.liberarReserva(productoId, cantidad, tenantId);
-
-            expect(mockSupabaseClient.update).toHaveBeenCalledWith({ stock_reservado: 15 }); // 20 - 5
+            expect(movimiento).toBe('mov-lib-1');
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('liberar_stock_atomico', expect.objectContaining({
+                p_producto_id: productoId,
+                p_cantidad: 5,
+            }));
+            expect(mockSupabaseClient.update).not.toHaveBeenCalled();
         });
 
         it('debe ajustar liberacion al maximo reservado si se intenta liberar mas', async () => {
@@ -205,12 +192,10 @@ describe('InventarioService', () => {
                 data: { id: productoId, stock_actual: '100', stock_reservado: reservado.toString() },
                 error: null,
             });
-            mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'mov-lib-2' } });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { message: 'reserva insuficiente' } });
 
-            await service.liberarReserva(productoId, cantidad, 't1');
-
-            // Should release only 'reservado' amount (20), so new reserved stock is 0
-            expect(mockSupabaseClient.update).toHaveBeenCalledWith({ stock_reservado: 0 });
+            await expect(service.liberarReserva(productoId, cantidad, 't1')).rejects.toThrow(BadRequestException);
+            expect(mockSupabaseClient.update).not.toHaveBeenCalled();
         });
     });
 
@@ -311,25 +296,22 @@ describe('InventarioService', () => {
             expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', productoId);
         });
 
-        it('crearMovimiento debe persistir tenant del contexto en insert', async () => {
+        it('crearMovimiento debe usar el writer canónico con tenant y almacén', async () => {
             const tenantA = 'tenant-a';
             const movimiento = {
                 tenant_id: tenantA,
                 producto_id: 'prod-mov',
+                almacen_id: '00000000-0000-4000-8000-000000000001',
                 tipo: TipoMovimiento.ENTRADA as TipoMovimiento.ENTRADA,
                 cantidad: 8,
                 referencia_tipo: 'AJUSTE',
-                referencia_id: 'ref-001',
+                referencia_id: '00000000-0000-4000-8000-000000000002',
                 notas: 'Ajuste inicial',
                 created_by: 'user-1',
             };
 
-            mockSupabaseClient.single
-                .mockResolvedValueOnce({
-                    data: { id: 'mov-1' },
-                    error: null,
-                })
-                .mockResolvedValueOnce({
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 'mov-1', error: null });
+            mockSupabaseClient.single.mockResolvedValueOnce({
                     data: {
                         stock_actual: '100',
                         precio_venta: 12.5,
@@ -340,13 +322,16 @@ describe('InventarioService', () => {
 
             await service.crearMovimiento(movimiento);
 
-            expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'aplicar_movimiento_inventario_tx',
                 expect.objectContaining({
-                    tenant_id: tenantA,
-                    producto_id: movimiento.producto_id,
-                    tipo: TipoMovimiento.ENTRADA,
+                    p_tenant_id: tenantA,
+                    p_producto_id: movimiento.producto_id,
+                    p_almacen_id: movimiento.almacen_id,
+                    p_tipo: TipoMovimiento.ENTRADA,
                 }),
             );
+            expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
 
             expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', tenantA);
             expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', movimiento.producto_id);

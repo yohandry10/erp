@@ -21,12 +21,12 @@ export default function EditarCentroCostoPage() {
   const params = useParams()
   const { get, put } = useApi()
   const centroId = params.id as string | undefined
-  
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [centro, setCentro] = useState<CentroCosto | null>(null)
-  
+
   const [formData, setFormData] = useState({
     codigo: '',
     nombre: '',
@@ -85,7 +85,7 @@ export default function EditarCentroCostoPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       return
     }
@@ -116,9 +116,9 @@ export default function EditarCentroCostoPage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando centro de costo...</p>
         </div>
       </div>
@@ -127,11 +127,11 @@ export default function EditarCentroCostoPage() {
 
   if (error && !centro) {
     return (
-      <div className="dashboard-container">
-        <div className="p-8 bg-[var(--red-50)] rounded-2 flex items-center gap-3">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="p-8 bg-[var(--red-50)] rounded-lg flex items-center gap-3">
           <AlertCircle size={24} className="text-[var(--red-600)]" />
           <div>
-            <p className="text-4 font-semibold text-[var(--red-700)] m-0">
+            <p className="text-base font-semibold text-[var(--red-700)] m-0">
               Error al cargar el centro de costo
             </p>
             <p className="text-[0.875rem] text-[var(--red-600)] mt-1">
@@ -144,32 +144,32 @@ export default function EditarCentroCostoPage() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
           <div className="flex items-center gap-4 mb-2">
             <button
-              onClick={() => router.push('/dashboard/contabilidad/centros-costo')} className="w-12 h-12 rounded-3 bg-[var(--primary-100)] flex items-center justify-center text-[var(--primary-600)] border-0 cursor-pointer"
+              onClick={() => router.push('/dashboard/contabilidad/centros-costo')} className="w-12 h-12 rounded-xl bg-[var(--primary-100)] flex items-center justify-center text-[var(--primary-600)] border-0 cursor-pointer"
             >
               <ArrowLeft size={24} />
             </button>
-            <div className="w-12 h-12 rounded-3 bg-[var(--primary-100)] flex items-center justify-center text-[var(--primary-600)]">
+            <div className="w-12 h-12 rounded-xl bg-[var(--primary-100)] flex items-center justify-center text-[var(--primary-600)]">
               <Building2 size={24} />
             </div>
-            <h1 className="dashboard-title">Editar Centro de Costo</h1>
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Editar Centro de Costo</h1>
           </div>
-          <p className="dashboard-subtitle">
+          <p className="mt-2 text-base text-muted-foreground">
             Modifique la información del centro de costo
           </p>
         </div>
       </div>
 
       {/* Formulario */}
-      <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         <form onSubmit={handleSubmit}>
           {error && (
-            <div className="p-4 bg-[var(--red-50)] rounded-2 mb-6 flex items-center gap-3">
+            <div className="p-4 bg-[var(--red-50)] rounded-lg mb-6 flex items-center gap-3">
               <AlertCircle size={20} className="text-[var(--red-600)]" />
               <p className="text-[0.875rem] text-[var(--red-700)] m-0">
                 {error}
@@ -192,15 +192,15 @@ export default function EditarCentroCostoPage() {
                     setErrors({ ...errors, codigo: '' })
                   }
                 }}
-                placeholder="Ej: CC-001" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
+                placeholder="Ej: CC-001" className="w-[100%] p-3 rounded-lg text-[0.875rem]"
                 disabled={saving}
               />
               {errors.codigo && (
-                <p className="text-3 text-[var(--red-600)] mt-1">
+                <p className="text-xs text-[var(--red-600)] mt-1">
                   {errors.codigo}
                 </p>
               )}
-              <p className="text-3 text-[var(--primary-500)] mt-1">
+              <p className="text-xs text-[var(--primary-500)] mt-1">
                 Código único para identificar el centro de costo
               </p>
             </div>
@@ -219,11 +219,11 @@ export default function EditarCentroCostoPage() {
                     setErrors({ ...errors, nombre: '' })
                   }
                 }}
-                placeholder="Ej: Administración" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
+                placeholder="Ej: Administración" className="w-[100%] p-3 rounded-lg text-[0.875rem]"
                 disabled={saving}
               />
               {errors.nombre && (
-                <p className="text-3 text-[var(--red-600)] mt-1">
+                <p className="text-xs text-[var(--red-600)] mt-1">
                   {errors.nombre}
                 </p>
               )}
@@ -238,7 +238,7 @@ export default function EditarCentroCostoPage() {
                 value={formData.descripcion}
                 onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
                 placeholder="Descripción del centro de costo (opcional)"
-                rows={4} className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
+                rows={4} className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
                 disabled={saving}
               />
             </div>
@@ -256,7 +256,7 @@ export default function EditarCentroCostoPage() {
                   Centro de costo activo
                 </span>
               </label>
-              <p className="text-3 text-[var(--primary-500)] mt-1 ml-[1.625rem]">
+              <p className="text-xs text-[var(--primary-500)] mt-1 ml-[1.625rem]">
                 Los centros de costo inactivos no se pueden asignar a nuevos asientos
               </p>
             </div>
@@ -266,7 +266,7 @@ export default function EditarCentroCostoPage() {
           <div className="flex gap-4 justify-end mt-8 pt-6 border-t">
             <button
               type="button"
-              onClick={() => router.push('/dashboard/contabilidad/centros-costo')} className="py-3 px-6 bg-white text-[var(--primary-700)] border rounded-2 text-[0.875rem] font-semibold cursor-pointer"
+              onClick={() => router.push('/dashboard/contabilidad/centros-costo')} className="py-3 px-6 bg-card text-[var(--primary-700)] border rounded-lg text-[0.875rem] font-semibold cursor-pointer"
               disabled={saving}
             >
               Cancelar
@@ -278,7 +278,7 @@ export default function EditarCentroCostoPage() {
             >
               {saving ? (
                 <>
-                  <div className="loading-spinner w-4 h-4"></div>
+                  <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary w-4 h-4"></div>
                   Guardando...
                 </>
               ) : (

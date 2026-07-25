@@ -122,7 +122,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
     const Icon = config.icon
 
     return (
-      <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-3 font-semibold">
+      <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-semibold">
         <Icon size={12} />
         {config.label}
       </span>
@@ -134,7 +134,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
     if (!config) return null
 
     return (
-      <span className="inline-block py-0.5 px-2 rounded-[4px] text-3 font-semibold">
+      <span className="inline-block py-0.5 px-2 rounded-[4px] text-xs font-semibold">
         {config.label}
       </span>
     )
@@ -146,9 +146,9 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
 
   if (loading) {
     return (
-      <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="flex items-center gap-3 mb-6 pb-4">
-          <div className="w-10 h-10 rounded-2.5 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
+          <div className="w-10 h-10 rounded-[0.625rem] bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
             <Package size={20} />
           </div>
           <h2 className="text-[1.125rem] font-bold text-[var(--primary-800)] m-0">
@@ -156,7 +156,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
           </h2>
         </div>
         <div className="text-center p-8 text-[var(--primary-400)]">
-          <div className="loading-spinner"></div>
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando recepciones...</p>
         </div>
       </div>
@@ -165,9 +165,9 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
 
   if (error) {
     return (
-      <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="flex items-center gap-3 mb-6 pb-4">
-          <div className="w-10 h-10 rounded-2.5 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
+          <div className="w-10 h-10 rounded-[0.625rem] bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
             <Package size={20} />
           </div>
           <h2 className="text-[1.125rem] font-bold text-[var(--primary-800)] m-0">
@@ -183,10 +183,10 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
   }
 
   return (
-    <div className="activity-card">
+    <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
       <div className="flex items-center justify-between mb-6 pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2.5 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
+          <div className="w-10 h-10 rounded-[0.625rem] bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
             <Package size={20} />
           </div>
           <h2 className="text-[1.125rem] font-bold text-[var(--primary-800)] m-0">
@@ -207,7 +207,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
         <div className="flex flex-col gap-4">
           {recepciones.map((recepcion) => (
             <div
-              key={recepcion.id} className="border rounded-2 overflow-hidden transition"
+              key={recepcion.id} className="border rounded-lg overflow-hidden transition"
             >
               {/* Recepcion Header */}
               <div
@@ -224,7 +224,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
                 }}
               >
                 <div className="flex items-center gap-4 flex-[1]">
-                  <div className="w-9 h-9 rounded-2 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
+                  <div className="w-9 h-9 rounded-lg bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
                     <Package size={18} />
                   </div>
                   <div className="flex-[1]">
@@ -234,7 +234,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
                       </span>
                       {getEstadoBadge(recepcion.estado)}
                     </div>
-                    <div className="flex items-center gap-4 text-3 text-[var(--primary-500)]">
+                    <div className="flex items-center gap-4 text-xs text-[var(--primary-500)]">
                       <span className="flex items-center gap-1">
                         <Calendar size={12} />
                         {formatDate(recepcion.fecha_recepcion)}
@@ -257,8 +257,8 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
               {expandedRecepcion === recepcion.id && (
                 <div className="p-4 bg-[var(--primary-25)] border-t">
                   {recepcion.observaciones && (
-                    <div className="mb-4 p-3 bg-white rounded-[6px]">
-                      <div className="text-3 font-semibold text-[var(--primary-500)] mb-1">
+                    <div className="mb-4 p-3 bg-card rounded-[6px]">
+                      <div className="text-xs font-semibold text-[var(--primary-500)] mb-1">
                         Observaciones
                       </div>
                       <div className="text-[0.875rem] text-[var(--primary-700)]">
@@ -269,20 +269,20 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
 
                   {recepcion.recepcion_items && recepcion.recepcion_items.length > 0 && (
                     <div>
-                      <div className="text-3 font-semibold text-[var(--primary-500)] mb-3">
+                      <div className="text-xs font-semibold text-[var(--primary-500)] mb-3">
                         Productos Recibidos ({recepcion.recepcion_items.length})
                       </div>
                       <div className="flex flex-col gap-2">
                         {recepcion.recepcion_items.map((item) => (
                           <div
-                            key={item.id} className="p-3 bg-white rounded-[6px] border"
+                            key={item.id} className="p-3 bg-card rounded-[6px] border"
                           >
                             <div className="flex justify-between mb-2">
                               <div className="flex-[1]">
                                 <div className="text-[0.875rem] font-semibold text-[var(--primary-800)] mb-1">
                                   Producto ID: {item.producto_id}
                                 </div>
-                                <div className="flex gap-4 text-3 text-[var(--primary-600)]">
+                                <div className="flex gap-4 text-xs text-[var(--primary-600)]">
                                   <span className="text-[var(--emerald-600)]">
                                     Cantidad Recibida: <strong>{item.cantidad_recibida}</strong>
                                   </span>
@@ -291,7 +291,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
                               {getCalidadBadge(item.calidad)}
                             </div>
                             {(item.lote || item.serie || item.observaciones) && (
-                              <div className="flex gap-4 text-3 text-[var(--primary-500)] pt-2 border-t">
+                              <div className="flex gap-4 text-xs text-[var(--primary-500)] pt-2 border-t">
                                 {item.lote && <span>Lote: <strong>{item.lote}</strong></span>}
                                 {item.serie && <span>Serie: <strong>{item.serie}</strong></span>}
                                 {item.observaciones && <span>Obs: {item.observaciones}</span>}

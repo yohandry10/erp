@@ -8,9 +8,9 @@ import { Badge } from '@/components/ui/badge'
 
 const shortcuts = [
   { label: 'Buscar producto POS', key: 'F2' },
-  { label: 'Nueva venta', key: 'F4' },
-  { label: 'Procesar pago', key: 'F12' },
-  { label: 'Abrir ayuda', key: 'F1' },
+  { label: 'Enfocar escáner POS', key: 'F4' },
+  { label: 'Abrir cobro POS', key: 'F8' },
+  { label: 'Salir de modo caja', key: 'Esc' },
 ]
 
 export default function AyudaPage() {
@@ -20,10 +20,10 @@ export default function AyudaPage() {
       description="Tours interactivos, asistente contextual y atajos operativos del ERP."
     >
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
-              <BookOpen className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+            <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-foreground">
+              <BookOpen className="h-5 w-5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" />
               Tours Interactivos
             </CardTitle>
           </CardHeader>
@@ -33,27 +33,27 @@ export default function AyudaPage() {
         </Card>
 
         <div className="grid gap-4">
-          <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+          <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
-                <MessageCircle className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+              <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-foreground">
+                <MessageCircle className="h-5 w-5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" />
                 Asistente de Ayuda
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+              <p className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                 Usa el botón de ayuda inferior para consultar funciones del sistema según tu rol y permisos.
               </p>
-              <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm text-cyan-100 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
+              <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm text-primary group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
                 El asistente debe responder con contexto del módulo activo y sin exponer datos fuera del tenant.
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+          <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
-                <Keyboard className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+              <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-foreground">
+                <Keyboard className="h-5 w-5 text-primary group-data-[erp-theme=light]/dashboard:text-blue-600" />
                 Atajos Útiles
               </CardTitle>
             </CardHeader>
@@ -61,10 +61,10 @@ export default function AyudaPage() {
               {shortcuts.map((shortcut) => (
                 <div
                   key={shortcut.key}
-                  className="flex items-center justify-between rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+                  className="flex items-center justify-between rounded-2xl border border-cyan-400/15 bg-card/50 p-3 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30"
                 >
-                  <span className="text-sm text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">{shortcut.label}</span>
-                  <Badge className="border-blue-300/25 bg-blue-300/10 font-mono text-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
+                  <span className="text-sm text-foreground/90 group-data-[erp-theme=light]/dashboard:text-foreground/85">{shortcut.label}</span>
+                  <Badge className="border-blue-300/25 bg-blue-300/10 font-mono text-blue-700 dark:text-blue-200 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
                     {shortcut.key}
                   </Badge>
                 </div>

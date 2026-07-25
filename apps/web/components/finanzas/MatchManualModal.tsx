@@ -207,7 +207,7 @@ export default function MatchManualModal({
         </DialogHeader>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <div className="bg-destructive/10 border border-red-200 text-destructive px-4 py-3 rounded">
             {error}
           </div>
         )}
@@ -215,18 +215,18 @@ export default function MatchManualModal({
         {loading ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Cargando movimientos...</span>
+            <span className="ml-3 text-foreground/80">Cargando movimientos...</span>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-6">
             {/* Movimientos del Sistema */}
             <div className="border rounded-lg p-4">
-              <h3 className="font-semibold text-lg mb-3 text-blue-700">
+              <h3 className="font-semibold text-lg mb-3 text-primary">
                 Movimientos del Sistema ({movimientosSistema.length})
               </h3>
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {movimientosSistema.length === 0 ? (
-                  <p className="text-gray-500 text-sm text-center py-8">
+                  <p className="text-muted-foreground text-sm text-center py-8">
                     No hay movimientos del sistema pendientes de conciliar
                   </p>
                 ) : (
@@ -240,28 +240,28 @@ export default function MatchManualModal({
                       onClick={() => setSelectedSistema(mov.id)}
                       className={`w-full text-left p-3 border rounded cursor-pointer transition-all ${
                         selectedSistema === mov.id
-                          ? 'border-blue-500 bg-blue-50 shadow-md'
-                          : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                          ? 'border-blue-500 bg-primary/10 shadow-md'
+                          : 'border-border hover:border-blue-300 hover:bg-muted/30'
                       }`}
                     >
                       <div className="flex justify-between items-start mb-1">
-                        <span className="text-xs text-gray-500">{formatDate(mov.fecha)}</span>
+                        <span className="text-xs text-muted-foreground">{formatDate(mov.fecha)}</span>
                         <span
                           className={`text-xs font-semibold px-2 py-1 rounded ${
                             mov.tipo === 'ABONO'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
+                              ? 'bg-emerald-500/10 text-emerald-400'
+                              : 'bg-destructive/10 text-destructive'
                           }`}
                         >
                           {mov.tipo}
                         </span>
                       </div>
-                      <p className="text-sm font-medium text-gray-900 mb-1">
+                      <p className="text-sm font-medium text-foreground mb-1">
                         {formatCurrency(mov.monto)}
                       </p>
-                      <p className="text-xs text-gray-600 truncate">{mov.descripcion}</p>
+                      <p className="text-xs text-foreground/80 truncate">{mov.descripcion}</p>
                       {mov.referencia && (
-                        <p className="text-xs text-gray-500 mt-1">Ref: {mov.referencia}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Ref: {mov.referencia}</p>
                       )}
                     </button>
                   ))
@@ -271,12 +271,12 @@ export default function MatchManualModal({
 
             {/* Movimientos del Extracto */}
             <div className="border rounded-lg p-4">
-              <h3 className="font-semibold text-lg mb-3 text-green-700">
+              <h3 className="font-semibold text-lg mb-3 text-emerald-400">
                 Movimientos del Extracto ({movimientosExtracto.length})
               </h3>
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {movimientosExtracto.length === 0 ? (
-                  <p className="text-gray-500 text-sm text-center py-8">
+                  <p className="text-muted-foreground text-sm text-center py-8">
                     No hay movimientos del extracto pendientes de conciliar
                   </p>
                 ) : (
@@ -290,28 +290,28 @@ export default function MatchManualModal({
                       onClick={() => setSelectedExtracto(mov.id)}
                       className={`w-full text-left p-3 border rounded cursor-pointer transition-all ${
                         selectedExtracto === mov.id
-                          ? 'border-green-500 bg-green-50 shadow-md'
-                          : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                          ? 'border-green-500 bg-emerald-500/10 shadow-md'
+                          : 'border-border hover:border-green-300 hover:bg-muted/30'
                       }`}
                     >
                       <div className="flex justify-between items-start mb-1">
-                        <span className="text-xs text-gray-500">{formatDate(mov.fecha)}</span>
+                        <span className="text-xs text-muted-foreground">{formatDate(mov.fecha)}</span>
                         <span
                           className={`text-xs font-semibold px-2 py-1 rounded ${
                             mov.tipo === 'ABONO'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
+                              ? 'bg-emerald-500/10 text-emerald-400'
+                              : 'bg-destructive/10 text-destructive'
                           }`}
                         >
                           {mov.tipo}
                         </span>
                       </div>
-                      <p className="text-sm font-medium text-gray-900 mb-1">
+                      <p className="text-sm font-medium text-foreground mb-1">
                         {formatCurrency(mov.monto)}
                       </p>
-                      <p className="text-xs text-gray-600 truncate">{mov.descripcion}</p>
+                      <p className="text-xs text-foreground/80 truncate">{mov.descripcion}</p>
                       {mov.referencia && (
-                        <p className="text-xs text-gray-500 mt-1">Ref: {mov.referencia}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Ref: {mov.referencia}</p>
                       )}
                     </button>
                   ))
@@ -323,26 +323,26 @@ export default function MatchManualModal({
 
         {/* Match Summary */}
         {selectedSistema && selectedExtracto && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
             <h4 className="font-semibold text-sm mb-3">Resumen del Match</h4>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
-                <p className="text-gray-600 mb-1">Monto Sistema:</p>
+                <p className="text-foreground/80 mb-1">Monto Sistema:</p>
                 <p className="font-semibold">
                   {formatCurrency(getSelectedSistemaMovimiento()?.monto || 0)}
                 </p>
               </div>
               <div>
-                <p className="text-gray-600 mb-1">Monto Extracto:</p>
+                <p className="text-foreground/80 mb-1">Monto Extracto:</p>
                 <p className="font-semibold">
                   {formatCurrency(getSelectedExtractoMovimiento()?.monto || 0)}
                 </p>
               </div>
               <div>
-                <p className="text-gray-600 mb-1">Diferencia:</p>
+                <p className="text-foreground/80 mb-1">Diferencia:</p>
                 <p
                   className={`font-semibold ${
-                    calculateDifference() === 0 ? 'text-green-600' : 'text-orange-600'
+                    calculateDifference() === 0 ? 'text-emerald-400' : 'text-amber-400'
                   }`}
                 >
                   {formatCurrency(calculateDifference())}
@@ -350,7 +350,7 @@ export default function MatchManualModal({
               </div>
             </div>
             {!canMatch() && (
-              <div className="mt-3 text-sm text-red-600">
+              <div className="mt-3 text-sm text-destructive">
                 ⚠️ Los tipos de movimiento no coinciden. No se puede realizar el match.
               </div>
             )}

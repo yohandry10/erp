@@ -29,43 +29,43 @@ export default function ProductoLineItem({
   return (
     <div
       className={`py-3 ${
-        showBorder ? 'border-b border-gray-100 last:border-b-0' : ''
+        showBorder ? 'border-b border-border last:border-b-0' : ''
       }`}
     >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-1">
-          <Package className="w-5 h-5 text-gray-400" />
+          <Package className="w-5 h-5 text-muted-foreground" />
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-gray-900 text-sm">
+              <h4 className="font-medium text-foreground text-sm">
                 {descripcion}
               </h4>
               {producto_codigo && (
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Código: {producto_codigo}
                 </p>
               )}
             </div>
-            
+
             <div className="text-right flex-shrink-0">
-              <p className="font-semibold text-gray-900 text-sm">
+              <p className="font-semibold text-foreground text-sm">
                 {formatCurrency(subtotal)}
               </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+
+          <div className="flex items-center gap-4 mt-2 text-sm text-foreground/80">
             <div className="flex items-center gap-1">
-              <span className="text-gray-500">Cantidad:</span>
-              <span className="font-medium text-gray-900">{cantidad}</span>
+              <span className="text-muted-foreground">Cantidad:</span>
+              <span className="font-medium text-foreground">{cantidad}</span>
             </div>
-            
+
             <div className="flex items-center gap-1">
-              <span className="text-gray-500">Precio Unit.:</span>
-              <span className="font-medium text-gray-900">
+              <span className="text-muted-foreground">Precio Unit.:</span>
+              <span className="font-medium text-foreground">
                 {formatCurrency(precio_unitario)}
               </span>
             </div>

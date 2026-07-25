@@ -10,7 +10,7 @@
 > Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
 <!-- DOC-NAV:END -->
 
-Fecha de actualizacion: 2026-06-04
+Fecha de actualizacion: 2026-07-24
 
 Este manifiesto organiza toda la documentacion narrativa del repo y cataloga artefactos de soporte. No sustituye a `START_HERE`; sirve para saber que leer despues, segun dominio.
 
@@ -98,7 +98,10 @@ rg -n "palabra_clave|endpoint|tabla|RPC|permiso" apps supabase
 | `apps/web/tests/QUICK_START.md` | `frontend_tests` | Quick Start - E2E Tests | `docs/START_HERE.md`, `docs/README.md` |
 | `apps/web/VALIDACIONES_VENTAS_IMPLEMENTATION.md` | `frontend_local` | Implementación de Validaciones y Reglas de Negocio - Módulo de Ventas | `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md` |
 | `docs/00_coordination/AGENT_SYNC.md` | `estado_vivo` | Coordinacion Codex / Opus | `docs/START_HERE.md`, `docs/DOC_NAVIGATION_MANIFEST.md` |
+| `docs/architecture/FRONTEND_STYLING_ARCHITECTURE.md` | `arquitectura_frontend` | Arquitectura Tailwind/shadcn, tokens y contrato dark/light | `docs/00_coordination/CURRENT_STATE.md`, `docs/00_coordination/FLOW_STATUS.md`, `docs/audits/2026-07-15-ui-accounting-security-closure.md` |
+| `docs/00_coordination/ANTI_DUPLICATION_PROTOCOL.md` | `protocolo_agente` | Protocolo anti-duplicacion para agentes | `docs/START_HERE.md`, `docs/00_coordination/DECISIONS.md`, `docs/DOC_NAVIGATION_MANIFEST.md` |
 | `docs/00_coordination/CURRENT_STATE.md` | `estado_vivo` | Estado Actual del ERP | `docs/START_HERE.md`, `docs/DOC_NAVIGATION_MANIFEST.md` |
+| `docs/00_coordination/DECISIONS.md` | `decisiones_canonicas` | Decisiones canonicas del ERP | `docs/START_HERE.md`, `docs/00_coordination/ANTI_DUPLICATION_PROTOCOL.md`, `docs/00_coordination/CURRENT_STATE.md` |
 | `docs/00_coordination/FLOW_STATUS.md` | `estado_vivo` | Estado de Flujos del ERP | `docs/START_HERE.md`, `docs/DOC_NAVIGATION_MANIFEST.md` |
 | `docs/archive/audit_reports_legacy/API_ENDPOINT_INVENTORY.md` | `historico_auditoria_archivado` | Inventario de endpoints (NestJS) — heurístico | `docs/START_HERE.md`, `docs/DOCUMENTATION_QUARANTINE.md` |
 | `docs/archive/audit_reports_legacy/API_GUARD_AUDIT.md` | `historico_auditoria_archivado` | Auditoría de guards en controllers (heurística) | `docs/START_HERE.md`, `docs/DOCUMENTATION_QUARANTINE.md` |
@@ -158,6 +161,25 @@ rg -n "palabra_clave|endpoint|tabla|RPC|permiso" apps supabase
 | `docs/audits/2026-05-26-forensic-audit-pre-prod.md` | `auditoria_forense` | Auditoría forense pre-producción 2026-05-26 | `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md` |
 | `docs/audits/2026-05-26-system-analytics-completed.md` | `auditoria_fullscope` | Estado Final Codex 2026-06-01 | `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md` |
 | `docs/audits/2026-06-01-desktop-offline-closure.md` | `auditoria_forense` | Cierre offline desktop pre-produccion | `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md` |
+| `docs/audits/2026-06-04-deepsec-security-verification.md` | `auditoria_seguridad` | Verificacion DeepSec de seguridad - 2026-06-04 | `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md`, `docs/security/session-auth.md` |
+| `docs/audits/2026-06-16-sunat-beta-cpe-evidence.md` | `auditoria_forense` | Evidencia SUNAT beta CPE - 2026-06-16 | `docs/auditoria_impresion_cpe_facturas_2026-05.md`, `docs/release/GO_LIVE_RUNBOOK.md`, `docs/00_coordination/CURRENT_STATE.md` |
+| `docs/audits/2026-06-17-sunat-secondary-sol-evidence.md` | `auditoria_forense` | Evidencia SUNAT SOL secundario - 2026-06-17 | `docs/audits/2026-06-16-sunat-beta-cpe-evidence.md`, `docs/release/GO_LIVE_RUNBOOK.md`, `docs/00_coordination/CURRENT_STATE.md` |
+| `docs/audits/2026-06-17-pos-sunat-print-readiness.md` | `auditoria_forense` | Readiness POS para impresion SUNAT - 2026-06-17 | `docs/auditoria_impresion_cpe_facturas_2026-05.md`, `docs/manuals/modules/VENTAS_POS_FISCAL.md`, `docs/audits/2026-06-17-sunat-secondary-sol-evidence.md` |
+| `docs/audits/2026-06-17-sunat-wizard-onboarding-readiness.md` | `auditoria_forense` | Readiness del wizard SUNAT por tenant - 2026-06-17 | `docs/audits/2026-06-17-sunat-secondary-sol-evidence.md`, `docs/release/GO_LIVE_RUNBOOK.md`, `docs/00_coordination/CURRENT_STATE.md` |
+| `docs/audits/2026-06-17-sunat-cpe-gre-xml-alignment.md` | `auditoria_forense` | Alineacion SUNAT CPE/GRE XML y transporte - 2026-06-17 | `docs/audits/2026-06-16-sunat-beta-cpe-evidence.md`, `docs/audits/2026-06-17-sunat-secondary-sol-evidence.md`, `docs/audits/2026-06-17-sunat-wizard-onboarding-readiness.md` |
+| `docs/audits/2026-06-17-sunat-accounting-entries-pos-rrhh-ple-alignment.md` | `auditoria_forense` | Alineacion SUNAT de asientos POS/RRHH/PLE - 2026-06-17 | `docs/auditoria_forense_contable_2026-05.md`, `docs/manuals/modules/FINANZAS_CONTABILIDAD.md`, `docs/manuals/modules/VENTAS_POS_FISCAL.md`, `docs/audits/2026-06-17-sunat-cpe-gre-xml-alignment.md` |
+| `docs/audits/2026-06-17-web-runtime-devtools-audit.md` | `auditoria_forense` | Auditoria runtime web y DevTools - 2026-06-17 | `apps/web/README-DESKTOP.md`, `docs/security/session-auth.md`, `docs/audits/2026-06-01-desktop-offline-closure.md` |
+| `docs/audits/2026-06-18-functional-e2e-qa-write-smoke.md` | `auditoria_forense` | QA funcional E2E con escrituras controladas - 2026-06-18 | `docs/manuals/modules/VENTAS_POS_FISCAL.md`, `docs/manuals/modules/COMPRAS_INVENTARIO.md`, `docs/manuals/modules/FINANZAS_CONTABILIDAD.md`, `docs/00_coordination/FLOW_STATUS.md` |
+| `docs/audits/2026-06-18-supabase-advisor-security-hardening.md` | `auditoria_seguridad` | Hardening Supabase Advisor DEV/PROD - 2026-06-18 | `docs/security/supabase-access-audit.md`, `docs/ops/supabase-connection.md`, `docs/00_coordination/CURRENT_STATE.md` |
+| `docs/audits/2026-07-14-prod-demo-data-cleanup.md` | `auditoria_operacional` | Separacion DEV/PROD y limpieza de datos demo - 2026-07-14 | `docs/architecture/ENVIRONMENT_DATABASE_BOUNDARIES.md`, `docs/ops/supabase-connection.md`, `docs/00_coordination/CURRENT_STATE.md` |
+| `docs/audits/2026-07-14-local-secret-storage-hardening.md` | `auditoria_seguridad` | Hardening de secretos y almacenamiento local - 2026-07-14 | `docs/security/session-auth.md`, `apps/web/lib/auth-service.ts`, `apps/web/lib/offline-store.ts` |
+| `docs/audits/2026-07-15-ui-accounting-security-closure.md` | `auditoria_forense` | Cierre UI, integraciones contables y seguridad local - 2026-07-15 | `docs/00_coordination/CURRENT_STATE.md`, `docs/00_coordination/FLOW_STATUS.md`, `docs/security/session-auth.md` |
+| `docs/audits/2026-07-15-dependency-and-large-file-cleanup.md` | `auditoria_arquitectura_deuda` | Limpieza de dependencias y mapa de archivos inmantenibles - 2026-07-15 | `docs/00_coordination/CURRENT_STATE.md`, `package.json`, `pnpm-lock.yaml` |
+| `docs/audits/2026-07-22-inventory-single-ledger-closure.md` | `auditoria_forense` | Cierre single-ledger de inventario en DEV - 2026-07-22 | `docs/00_coordination/CURRENT_STATE.md`, `docs/00_coordination/FLOW_STATUS.md`, `docs/manuals/modules/COMPRAS_INVENTARIO.md` |
+| `docs/audits/2026-07-24-production-closure-functional-qa.md` | `auditoria_forense` | Cierre QA funcional integral en DEV - 2026-07-24 | `docs/00_coordination/CURRENT_STATE.md`, `docs/00_coordination/FLOW_STATUS.md`, `docs/00_coordination/DECISIONS.md` |
+| `docs/architecture/ENVIRONMENT_DATABASE_BOUNDARIES.md` | `arquitectura_canonica` | Arquitectura canonica de bases DEV y PROD | `docs/00_coordination/DECISIONS.md`, `docs/ops/supabase-connection.md`, `docs/release/GO_LIVE_RUNBOOK.md` |
+| `docs/architecture/CPE_SERVICE_BOUNDARIES.md` | `arquitectura_canonica` | Límites internos del módulo CPE | `docs/manuals/modules/VENTAS_POS_FISCAL.md`, `docs/00_coordination/DECISIONS.md`, `docs/audits/2026-06-16-sunat-beta-cpe-evidence.md` |
+| `docs/architecture/CONTABILIDAD_CONTROLLER_BOUNDARIES.md` | `arquitectura_canonica` | Límites de los controladores de Contabilidad | `docs/manuals/modules/FINANZAS_CONTABILIDAD.md`, `docs/security/route-access-matrix.md`, `docs/00_coordination/DECISIONS.md` |
 | `docs/CODEX_HANDOFF_2026-05-24.md` | `documento_general` | Codex handoff - 2026-05-24 | `docs/README.md`, `docs/START_HERE.md` |
 | `docs/configuration.md` | `documento_general` | Configuración de entorno – apps/erp-api | `docs/README.md`, `docs/START_HERE.md` |
 | `docs/db_forensic_baseline.md` | `baseline_db` | Baseline Forense de Base de Datos (Pre-Reset) | `docs/START_HERE.md`, `AGENTS.md` |

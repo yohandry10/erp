@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/lib/api-fetch';
@@ -64,6 +64,12 @@ export default function DemoPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<DemoCredentials | null>(null);
+  // window.location tras montar (no useSearchParams) para no requerir un
+  // boundary de Suspense en el prerender ni causar mismatch de hidratación.
+  const [demoExpirada, setDemoExpirada] = useState(false);
+  useEffect(() => {
+    setDemoExpirada(new URLSearchParams(window.location.search).get('expired') === '1');
+  }, []);
 
   const handleStartDemo = async () => {
     setLoading(true);
@@ -82,12 +88,6 @@ export default function DemoPage() {
       }
 
       const data = await response.json();
-
-      localStorage.setItem('demo_credentials', JSON.stringify({
-        email: data.email,
-        password: data.password,
-        tenant_id: data.tenant_id,
-      }));
 
       await signIn(data.email, data.password);
       setCredentials({ email: data.email, password: data.password });
@@ -114,15 +114,15 @@ export default function DemoPage() {
 
   if (credentials) {
     return (
-      <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-950">
+      <main className="min-h-screen bg-muted/30 px-6 py-10 text-foreground">
         <section className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl flex-col justify-center">
-          <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
             <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
               <BadgeCheck className="h-7 w-7" />
             </div>
 
             <h1 className="text-3xl font-bold tracking-normal">Demo creada</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="mt-2 text-sm leading-6 text-foreground/80">
               La sesion demo ya esta iniciada. Conserva estas credenciales para volver a entrar.
             </p>
 
@@ -133,7 +133,7 @@ export default function DemoPage() {
 
             <button
               onClick={handleContinue}
-              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-background px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-muted"
             >
               Configurar mi empresa
               <ArrowRight className="h-4 w-4" />
@@ -145,18 +145,18 @@ export default function DemoPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className="min-h-screen bg-muted/30 text-foreground">
       <section className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 gap-10 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:px-10">
         <div>
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 shadow-sm">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-sm text-foreground/80 shadow-sm">
             <Building2 className="h-4 w-4 text-blue-700" />
             ERP Suite Demo
           </div>
 
-          <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-normal text-slate-950 md:text-5xl">
+          <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-normal text-foreground md:text-5xl">
             Prueba el ERP completo con una empresa demo operativa
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+          <p className="mt-4 max-w-2xl text-base leading-7 text-foreground/80">
             Se crea un tenant aislado por 14 dias con usuario, datos iniciales y acceso a los modulos principales.
           </p>
 
@@ -167,13 +167,18 @@ export default function DemoPage() {
           </div>
         </div>
 
-        <aside className="rounded-lg border border-slate-200 bg-white p-7 shadow-sm">
+        <aside className="rounded-lg border border-border bg-card p-7 shadow-sm">
           <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md bg-blue-100 text-blue-700">
             <Check className="h-6 w-6" />
           </div>
 
+          {demoExpirada && (
+            <div className="mb-5 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+              Tu demo anterior expiró. Puedes crear una nueva empresa demo aquí, o convertir tu cuenta en una definitiva.
+            </div>
+          )}
           <h2 className="text-2xl font-bold tracking-normal">Listo para explorar</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
+          <p className="mt-2 text-sm leading-6 text-foreground/80">
             Crearemos una empresa demo con credenciales temporales y dejaremos la sesion iniciada.
           </p>
 
@@ -201,13 +206,13 @@ export default function DemoPage() {
             )}
           </button>
 
-          <div className="mt-6 space-y-3 text-sm text-slate-600">
+          <div className="mt-6 space-y-3 text-sm text-foreground/80">
             <Benefit text="No requiere registro previo" />
             <Benefit text="Acceso inmediato al dashboard" />
             <Benefit text="Datos de ejemplo incluidos" />
           </div>
 
-          <p className="mt-8 text-center text-sm text-slate-500">
+          <p className="mt-8 text-center text-sm text-muted-foreground">
             Ya tienes una cuenta?{' '}
             <a href="/login" className="font-medium text-blue-700 hover:text-blue-800">
               Inicia sesion
@@ -229,12 +234,12 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-700">
+    <article className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-muted text-foreground/85">
         <Icon className="h-5 w-5" />
       </div>
-      <h3 className="text-base font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      <h3 className="text-base font-semibold text-foreground">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-foreground/80">{description}</p>
     </article>
   );
 }
@@ -259,9 +264,9 @@ function CredentialRow({
 }) {
   return (
     <div>
-      <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</label>
+      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
       <div className="mt-1 flex items-center gap-2">
-        <code className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+        <code className="min-w-0 flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground">
           {value}
         </code>
         <button

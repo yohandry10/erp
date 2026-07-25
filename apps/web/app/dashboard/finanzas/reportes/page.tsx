@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  BarChart3, 
-  TrendingUp, 
+import {
+  BarChart3,
+  TrendingUp,
   FileText,
   Download,
   Calendar,
@@ -69,15 +69,15 @@ export default function ReportesFinanzasPage() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
-          <h1 className="dashboard-title">Reportes Financieros</h1>
-          <p className="dashboard-subtitle">Análisis y reportes del módulo de finanzas</p>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Reportes Financieros</h1>
+          <p className="mt-2 text-base text-muted-foreground">Análisis y reportes del módulo de finanzas</p>
         </div>
         <button
-          onClick={handleExport} className="py-3 px-6 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold text-gray-700 transition"
+          onClick={handleExport} className="py-3 px-6 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold text-foreground/85 transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#f9fafb'
           }}
@@ -95,12 +95,12 @@ export default function ReportesFinanzasPage() {
         {reports.map((report) => {
           const Icon = report.icon
           const isSelected = selectedReport === report.id
-          
+
           return (
             <button
               key={report.id}
               onClick={() => report.available && setSelectedReport(report.id)}
-              disabled={!report.available} className="p-6 rounded-3 text-left transition relative"
+              disabled={!report.available} className="p-6 rounded-xl text-left transition relative"
               onMouseEnter={(e) => {
                 if (report.available && !isSelected) {
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
@@ -115,21 +115,21 @@ export default function ReportesFinanzasPage() {
               }}
             >
               {!report.available && (
-                <div className="absolute top-3 right-3 py-1 px-2 rounded-[4px] bg-gray-500 text-white text-2.5 font-semibold">
+                <div className="absolute top-3 right-3 py-1 px-2 rounded-[4px] bg-gray-500 text-white text-[0.625rem] font-semibold">
                   Próximamente
                 </div>
               )}
-              
+
               <div className="flex items-center gap-3 mb-3">
-                <div className="p-3 rounded-2 flex items-center justify-center">
+                <div className="p-3 rounded-lg flex items-center justify-center">
                   <Icon size={24} />
                 </div>
-                <h3 className="text-4 font-semibold text-gray-900 m-0">
+                <h3 className="text-base font-semibold text-foreground m-0">
                   {report.title}
                 </h3>
               </div>
-              
-              <p className="text-[0.875rem] text-gray-500 m-0 leading-6">
+
+              <p className="text-[0.875rem] text-muted-foreground m-0 leading-6">
                 {report.description}
               </p>
             </button>
@@ -142,19 +142,19 @@ export default function ReportesFinanzasPage() {
         {selectedReport === 'aging-cxp' && (
           <AgingCxpChart proveedorId={proveedorFilter || undefined} />
         )}
-        
+
         {selectedReport === 'proveedores-deuda' && (
           <ProveedoresMayorDeudaReport limite={20} />
         )}
-        
+
         {selectedReport === 'movimientos' && (
           <MovimientosBancariosReport />
         )}
-        
+
         {selectedReport === 'conciliaciones' && (
           <ConciliacionesPendientesReport />
         )}
-        
+
         {selectedReport === 'flujo-caja' && (
           <FlujoCajaChart diasProyeccion={90} />
         )}

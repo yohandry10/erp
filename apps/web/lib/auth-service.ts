@@ -1,5 +1,36 @@
 import { buildApiUrl } from './api-url';
 import { getOfflineStatus, isDesktopRuntime } from './offline-store';
+import {
+  clearDesktopAccessToken,
+  loadDesktopAccessToken,
+  saveDesktopAccessToken,
+} from './desktop-secure-session';
+
+const AUTH_SESSION_STORAGE_KEY = 'erp.auth.session.snapshot';
+const PERMISSION_STORAGE_KEY = 'erp.permissions.snapshot';
+let desktopTokenMutation: Promise<void> = Promise.resolve();
+
+function queueDesktopTokenMutation(operation: () => Promise<void>) {
+  desktopTokenMutation = desktopTokenMutation.catch(() => undefined).then(operation);
+  return desktopTokenMutation;
+}
+
+function readSafeSessionSnapshot(): Session | null {
+  if (typeof window === 'undefined') return null;
+  const raw =
+    window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY) ||
+    window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+  if (!raw) return null;
+  const parsed = JSON.parse(raw) as Session;
+  if (!parsed?.user?.id) return null;
+  const sanitized = { ...parsed, access_token: undefined };
+  if (parsed.access_token) {
+    const json = JSON.stringify(sanitized);
+    window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, json);
+    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, json);
+  }
+  return sanitized;
+}
 
 // Rutas públicas donde el middleware ya garantiza que NO hay sesión válida (si la
 // hubiera, redirigiría a /dashboard antes de renderizar). Cualquier llamada a
@@ -13,6 +44,30 @@ function isPublicAuthSkipPath(): boolean {
   // next.config.js usa trailingSlash: true → puede llegar como "/login/".
   const normalized = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
   return PUBLIC_AUTH_SKIP_PATHS.has(normalized);
+}
+
+function extractErrorMessage(payload: any): string | null {
+  const candidate = payload?.message ?? payload?.error ?? payload?.detail;
+  if (typeof candidate === 'string' && candidate.trim()) {
+    return candidate;
+  }
+  if (Array.isArray(candidate)) {
+    const message = candidate.filter((item) => typeof item === 'string' && item.trim()).join(', ');
+    return message || null;
+  }
+  return null;
+}
+
+function authErrorMessageForStatus(status: number, payload: any, fallback = 'Error de autenticación'): string {
+  const payloadMessage = extractErrorMessage(payload);
+  if (payloadMessage) return payloadMessage;
+
+  if (status === 401) return 'Credenciales inválidas';
+  if (status === 403) return 'No tienes permisos para esta operación';
+  if (status === 429) return 'Demasiados intentos. Espera un momento antes de volver a intentar';
+  if (status === 503) return 'Servicio de autenticación temporalmente no disponible';
+
+  return fallback;
 }
 
 export interface User {
@@ -115,7 +170,7 @@ class AuthService {
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
-      throw new Error(payload?.message || 'No fue posible validar la sesión');
+      throw new Error(authErrorMessageForStatus(response.status, payload, 'No fue posible validar la sesión'));
     }
 
     const user = await response.json();
@@ -136,12 +191,27 @@ class AuthService {
   private saveSession(session: Session) {
     this.session = session;
     this.accessToken = session.access_token || this.accessToken;
+    if (session.access_token) {
+      void queueDesktopTokenMutation(() => saveDesktopAccessToken(session.access_token!)).catch((error) => {
+        console.warn('[auth] No se pudo proteger la sesión de escritorio:', error);
+      });
+    }
     this.notifyListeners();
   }
 
   private clearSession() {
     this.session = null;
     this.accessToken = null;
+    void queueDesktopTokenMutation(clearDesktopAccessToken).catch(() => undefined);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+        window.sessionStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+        window.localStorage.removeItem(PERMISSION_STORAGE_KEY);
+      } catch {
+        /* limpiar cache local no debe bloquear logout */
+      }
+    }
     this.notifyListeners();
   }
 
@@ -164,10 +234,10 @@ class AuthService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Error de autenticación' }));
+        const errorData = await response.json().catch(() => ({}));
         return {
           data: null,
-          error: new Error(errorData.message || 'Credenciales inválidas'),
+          error: new Error(authErrorMessageForStatus(response.status, errorData)),
         };
       }
 
@@ -208,6 +278,9 @@ class AuthService {
         await fetch(buildApiUrl('/api/auth/logout/'), {
           method: 'POST',
           credentials: 'include',
+          headers: {
+            ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
+          },
         });
       }
       this.clearSession();
@@ -226,13 +299,7 @@ class AuthService {
   getCachedSession(): { session: Session | null; accessToken: string | null } {
     if (!this.session && typeof window !== 'undefined') {
       try {
-        const raw =
-          window.localStorage.getItem('erp.auth.session.snapshot') ||
-          window.sessionStorage.getItem('erp.auth.session.snapshot');
-        const stored = raw ? (JSON.parse(raw) as Session) : null;
-        if (stored?.access_token) {
-          this.accessToken = stored.access_token;
-        }
+        const stored = readSafeSessionSnapshot();
         if (stored?.user?.id) {
           // Hidratación silenciosa (sin notifyListeners): es una lectura, no un cambio de sesión.
           this.session = stored;
@@ -247,15 +314,18 @@ class AuthService {
   async getSession(): Promise<{ data: { session: Session | null }; error: Error | null }> {
     let storedSession: Session | null = null;
 
+    if (!this.accessToken && isDesktopRuntime()) {
+      try {
+        await desktopTokenMutation.catch(() => undefined);
+        this.accessToken = await loadDesktopAccessToken();
+      } catch (error) {
+        console.warn('[auth] No se pudo recuperar la sesión protegida de escritorio:', error);
+      }
+    }
+
     if (!this.session && typeof window !== 'undefined') {
       try {
-        const raw =
-          window.localStorage.getItem('erp.auth.session.snapshot') ||
-          window.sessionStorage.getItem('erp.auth.session.snapshot');
-        storedSession = raw ? JSON.parse(raw) as Session : null;
-        if (storedSession?.access_token) {
-          this.accessToken = storedSession.access_token;
-        }
+        storedSession = readSafeSessionSnapshot();
 
         if (storedSession?.user?.id) {
           this.saveSession(storedSession);

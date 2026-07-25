@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { 
+import {
   ArrowLeft,
   RefreshCw,
   CreditCard,
@@ -112,7 +112,7 @@ export default function CuentaBancariaDetallePage() {
     try {
       setLoading(true)
       const response = await get(`/api/finanzas/bancos/cuentas/${cuentaId}`)
-      
+
       if (response?.success) {
         setCuenta(normalizeCuenta(response.data))
       }
@@ -131,15 +131,15 @@ export default function CuentaBancariaDetallePage() {
 
     try {
       setLoadingMovimientos(true)
-      
+
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: pagination.limit.toString(),
         ...(filters.fecha_desde && { fecha_desde: filters.fecha_desde }),
         ...(filters.fecha_hasta && { fecha_hasta: filters.fecha_hasta }),
         ...(filters.tipo && { tipo: filters.tipo }),
-        ...(filters.conciliado !== '' && filters.conciliado !== undefined && { 
-          conciliado: filters.conciliado.toString() 
+        ...(filters.conciliado !== '' && filters.conciliado !== undefined && {
+          conciliado: filters.conciliado.toString()
         }),
       })
 
@@ -208,17 +208,17 @@ export default function CuentaBancariaDetallePage() {
         ...(filters.fecha_desde && { fecha_desde: filters.fecha_desde }),
         ...(filters.fecha_hasta && { fecha_hasta: filters.fecha_hasta }),
         ...(filters.tipo && { tipo: filters.tipo }),
-        ...(filters.conciliado !== '' && filters.conciliado !== undefined && { 
-          conciliado: filters.conciliado.toString() 
+        ...(filters.conciliado !== '' && filters.conciliado !== undefined && {
+          conciliado: filters.conciliado.toString()
         }),
       })
 
       const response = await get(`/api/finanzas/bancos/cuentas/${cuentaId}/movimientos/exportar?${queryParams}`)
-      
+
       if (response?.success && response.data) {
         // Crear un blob con el contenido CSV
         const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' })
-        
+
         // Crear un enlace temporal para descargar
         const link = document.createElement('a')
         const url = URL.createObjectURL(blob)
@@ -240,9 +240,9 @@ export default function CuentaBancariaDetallePage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="flex min-h-48 items-center justify-center">
+          <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
           <p>Cargando cuenta bancaria...</p>
         </div>
       </div>
@@ -251,9 +251,9 @@ export default function CuentaBancariaDetallePage() {
 
   if (!cuenta) {
     return (
-      <div className="dashboard-container">
-        <div className="activity-card">
-          <div className="text-center p-12 text-gray-500">
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+          <div className="text-center p-12 text-muted-foreground">
             <AlertCircle size={48} className="text-red-500" />
             <h3 className="text-[1.125rem] font-semibold mb-2">
               Cuenta bancaria no encontrada
@@ -262,7 +262,7 @@ export default function CuentaBancariaDetallePage() {
               La cuenta bancaria que buscas no existe o no tienes permisos para verla
             </p>
             <button
-              onClick={() => router.push('/dashboard/finanzas/bancos')} className="py-3 px-6 rounded-2 border-0 bg-blue-500 text-white cursor-pointer text-[0.875rem] font-semibold"
+              onClick={() => router.push('/dashboard/finanzas/bancos')} className="py-3 px-6 rounded-lg border-0 bg-blue-500 text-white cursor-pointer text-[0.875rem] font-semibold"
             >
               Volver a Cuentas Bancarias
             </button>
@@ -276,18 +276,18 @@ export default function CuentaBancariaDetallePage() {
   const activeFiltersCount = Object.values(filters).filter(v => v !== '' && v !== undefined).length
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.push('/dashboard/finanzas/bancos')} className="p-2 rounded-2 border bg-white cursor-pointer flex items-center"
+            onClick={() => router.push('/dashboard/finanzas/bancos')} className="p-2 rounded-lg border bg-card cursor-pointer flex items-center"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="dashboard-title">{cuenta.nombre}</h1>
-            <p className="dashboard-subtitle">
+            <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">{cuenta.nombre}</h1>
+            <p className="mt-2 text-base text-muted-foreground">
               {cuenta.banco} • {cuenta.numero_cuenta}
             </p>
           </div>
@@ -298,7 +298,7 @@ export default function CuentaBancariaDetallePage() {
               loadCuenta()
               loadMovimientos(pagination.page)
             }}
-            className="refresh-btn py-3 px-6"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 py-3 px-6"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -307,16 +307,16 @@ export default function CuentaBancariaDetallePage() {
       </div>
 
       {/* Cuenta Info Card */}
-      <div className="activity-card mb-8">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-8">
           {/* Tipo de Cuenta */}
           <div>
-            <div className="text-3 text-gray-500 mb-2 font-medium">
+            <div className="text-xs text-muted-foreground mb-2 font-medium">
               Tipo de Cuenta
             </div>
             <div className="flex items-center gap-2">
               <CreditCard size={20} className="text-blue-500" />
-              <span className="text-4 font-semibold text-gray-900">
+              <span className="text-base font-semibold text-foreground">
                 {TIPO_CUENTA_LABELS[cuenta.tipo_cuenta] || cuenta.tipo_cuenta}
               </span>
             </div>
@@ -324,12 +324,12 @@ export default function CuentaBancariaDetallePage() {
 
           {/* Moneda */}
           <div>
-            <div className="text-3 text-gray-500 mb-2 font-medium">
+            <div className="text-xs text-muted-foreground mb-2 font-medium">
               Moneda
             </div>
             <div className="flex items-center gap-2">
               <DollarSign size={20} className="text-[#10b981]" />
-              <span className="text-4 font-semibold text-gray-900">
+              <span className="text-base font-semibold text-foreground">
                 {cuenta.moneda}
               </span>
             </div>
@@ -337,33 +337,33 @@ export default function CuentaBancariaDetallePage() {
 
           {/* Saldo */}
           <div>
-            <div className="text-3 text-gray-500 mb-2 font-medium">
+            <div className="text-xs text-muted-foreground mb-2 font-medium">
               Saldo Disponible
             </div>
-            <div className="text-6 font-bold">
+            <div className="text-2xl font-bold">
               {formatCurrency(cuenta.saldo, cuenta.moneda)}
             </div>
           </div>
 
           {/* Estado */}
           <div>
-            <div className="text-3 text-gray-500 mb-2 font-medium">
+            <div className="text-xs text-muted-foreground mb-2 font-medium">
               Estado
             </div>
             <div className="flex flex-col gap-2">
               {cuenta.activa ? (
-                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-semibold bg-[rgba(16,_185,_129,_0.1)] text-[#10b981]">
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-xs font-semibold bg-[rgba(16,_185,_129,_0.1)] text-[#10b981]">
                   <CheckCircle size={14} />
                   ACTIVA
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-semibold bg-[rgba(107,_114,_128,_0.1)] text-gray-500">
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-xs font-semibold bg-[rgba(107,_114,_128,_0.1)] text-muted-foreground">
                   <XCircle size={14} />
                   INACTIVA
                 </span>
               )}
               {cuenta.permite_sobregiro && (
-                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-semibold bg-[rgba(245,_158,_11,_0.1)] text-amber-500">
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-xs font-semibold bg-[rgba(245,_158,_11,_0.1)] text-amber-500">
                   <AlertCircle size={14} />
                   PERMITE SOBREGIRO
                 </span>
@@ -374,25 +374,25 @@ export default function CuentaBancariaDetallePage() {
       </div>
 
       {/* Movimientos Section */}
-      <div className="activity-section">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <h2 className="text-5 font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-foreground">
             Movimientos Bancarios
           </h2>
           <div className="flex gap-3 items-center">
             <button
-              onClick={handleExportMovimientos} className="py-3 px-4 rounded-2 border bg-white text-gray-700 cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2"
+              onClick={handleExportMovimientos} className="py-3 px-4 rounded-lg border bg-card text-foreground/85 cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2"
             >
               <Download size={16} />
               Exportar
             </button>
             <button
-              onClick={() => setShowFilters(!showFilters)} className="py-3 px-4 rounded-2 border text-gray-700 cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2 relative"
+              onClick={() => setShowFilters(!showFilters)} className="py-3 px-4 rounded-lg border text-foreground/85 cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2 relative"
             >
               <Filter size={16} />
               Filtros
               {activeFiltersCount > 0 && (
-                <span className="absolute bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-2.5 font-bold">
+                <span className="absolute bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[0.625rem] font-bold">
                   {activeFiltersCount}
                 </span>
               )}
@@ -402,10 +402,10 @@ export default function CuentaBancariaDetallePage() {
 
         {/* Filters Panel */}
         {showFilters && (
-          <div className="activity-card mb-6">
+          <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-6">
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                   Fecha Desde
                 </label>
                 <input
@@ -416,7 +416,7 @@ export default function CuentaBancariaDetallePage() {
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                   Fecha Hasta
                 </label>
                 <input
@@ -427,7 +427,7 @@ export default function CuentaBancariaDetallePage() {
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                   Tipo
                 </label>
                 <select
@@ -441,7 +441,7 @@ export default function CuentaBancariaDetallePage() {
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
+                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                   Conciliado
                 </label>
                 <select
@@ -458,7 +458,7 @@ export default function CuentaBancariaDetallePage() {
             {activeFiltersCount > 0 && (
               <div className="mt-4 pt-4 border-t">
                 <button
-                  onClick={handleClearFilters} className="py-2 px-4 rounded-[6px] border bg-white text-gray-700 cursor-pointer text-[0.875rem] font-medium"
+                  onClick={handleClearFilters} className="py-2 px-4 rounded-[6px] border bg-card text-foreground/85 cursor-pointer text-[0.875rem] font-medium"
                 >
                   Limpiar Filtros
                 </button>

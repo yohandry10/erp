@@ -21,7 +21,7 @@ const MONEDAS = [
 export default function NuevaCuentaBancariaPage() {
   const router = useRouter()
   const { post } = useApi()
-  
+
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -110,27 +110,27 @@ export default function NuevaCuentaBancariaPage() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
         <div>
           <button
             onClick={() => router.push('/dashboard/finanzas/bancos')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-2"
+            className="flex items-center gap-2 text-foreground/80 hover:text-foreground mb-2"
           >
             <ArrowLeft size={20} />
             Volver
           </button>
-          <h1 className="dashboard-title">Nueva Cuenta Bancaria</h1>
-          <p className="dashboard-subtitle">Registra una nueva cuenta bancaria de la empresa</p>
+          <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Nueva Cuenta Bancaria</h1>
+          <p className="mt-2 text-base text-muted-foreground">Registra una nueva cuenta bancaria de la empresa</p>
         </div>
       </div>
 
       {/* Form */}
-      <div className="activity-section">
-        <div className="activity-card">
+      <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
+            <div className="bg-destructive/10 border border-red-200 text-destructive px-4 py-3 rounded-lg text-sm mb-6">
               {error}
             </div>
           )}
@@ -138,15 +138,15 @@ export default function NuevaCuentaBancariaPage() {
           <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             {/* Información Básica */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Building2 size={20} className="text-blue-600" />
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Building2 size={20} className="text-primary" />
                 Información Básica
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Nombre */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <FileText className="inline h-4 w-4 mr-1" />
                     Nombre de la Cuenta *
                   </label>
@@ -158,23 +158,23 @@ export default function NuevaCuentaBancariaPage() {
                       clearFieldError('nombre')
                     }}
                     placeholder="Ej: Cuenta Operaciones BCP"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     aria-invalid={Boolean(fieldErrors.nombre)}
                     aria-describedby={fieldErrors.nombre ? 'cuenta-nombre-error' : undefined}
                   />
                   {fieldErrors.nombre && (
-                    <p id="cuenta-nombre-error" className="text-xs text-red-600 mt-1">
+                    <p id="cuenta-nombre-error" className="text-xs text-destructive mt-1">
                       {fieldErrors.nombre}
                     </p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Nombre descriptivo para identificar la cuenta
                   </p>
                 </div>
 
                 {/* Banco */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <Building2 className="inline h-4 w-4 mr-1" />
                     Banco *
                   </label>
@@ -186,12 +186,12 @@ export default function NuevaCuentaBancariaPage() {
                       clearFieldError('banco')
                     }}
                     placeholder="Ej: Banco de Crédito del Perú"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     aria-invalid={Boolean(fieldErrors.banco)}
                     aria-describedby={fieldErrors.banco ? 'cuenta-banco-error' : undefined}
                   />
                   {fieldErrors.banco && (
-                    <p id="cuenta-banco-error" className="text-xs text-red-600 mt-1">
+                    <p id="cuenta-banco-error" className="text-xs text-destructive mt-1">
                       {fieldErrors.banco}
                     </p>
                   )}
@@ -199,7 +199,7 @@ export default function NuevaCuentaBancariaPage() {
 
                 {/* Número de Cuenta */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <Hash className="inline h-4 w-4 mr-1" />
                     Número de Cuenta *
                   </label>
@@ -211,12 +211,12 @@ export default function NuevaCuentaBancariaPage() {
                       clearFieldError('numeroCuenta')
                     }}
                     placeholder="Ej: 191-1234567-0-89"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     aria-invalid={Boolean(fieldErrors.numeroCuenta)}
                     aria-describedby={fieldErrors.numeroCuenta ? 'cuenta-numero-error' : undefined}
                   />
                   {fieldErrors.numeroCuenta && (
-                    <p id="cuenta-numero-error" className="text-xs text-red-600 mt-1">
+                    <p id="cuenta-numero-error" className="text-xs text-destructive mt-1">
                       {fieldErrors.numeroCuenta}
                     </p>
                   )}
@@ -224,14 +224,14 @@ export default function NuevaCuentaBancariaPage() {
 
                 {/* Tipo de Cuenta */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <CreditCard className="inline h-4 w-4 mr-1" />
                     Tipo de Cuenta *
                   </label>
                   <select
                     value={tipoCuenta}
                     onChange={(e) => setTipoCuenta(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
                     {TIPOS_CUENTA.map((tipo) => (
@@ -246,22 +246,22 @@ export default function NuevaCuentaBancariaPage() {
 
             {/* Configuración Financiera */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <DollarSign size={20} className="text-green-600" />
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <DollarSign size={20} className="text-emerald-400" />
                 Configuración Financiera
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Moneda */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <DollarSign className="inline h-4 w-4 mr-1" />
                     Moneda *
                   </label>
                   <select
                     value={moneda}
                     onChange={(e) => setMoneda(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
                     {MONEDAS.map((mon) => (
@@ -274,7 +274,7 @@ export default function NuevaCuentaBancariaPage() {
 
                 {/* Saldo Inicial */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
                     <DollarSign className="inline h-4 w-4 mr-1" />
                     Saldo Inicial
                   </label>
@@ -283,16 +283,16 @@ export default function NuevaCuentaBancariaPage() {
                     value={saldo}
                     onChange={(e) => handleSaldoChange(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     aria-invalid={Boolean(fieldErrors.saldo)}
                     aria-describedby={fieldErrors.saldo ? 'cuenta-saldo-error' : undefined}
                   />
                   {fieldErrors.saldo && (
-                    <p id="cuenta-saldo-error" className="text-xs text-red-600 mt-1">
+                    <p id="cuenta-saldo-error" className="text-xs text-destructive mt-1">
                       {fieldErrors.saldo}
                     </p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Saldo actual de la cuenta bancaria
                   </p>
                 </div>
@@ -301,10 +301,10 @@ export default function NuevaCuentaBancariaPage() {
 
             {/* Opciones */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-foreground mb-4">
                 Opciones
               </h3>
-              
+
               <div className="space-y-3">
                 {/* Permite Sobregiro */}
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -312,13 +312,13 @@ export default function NuevaCuentaBancariaPage() {
                     type="checkbox"
                     checked={permiteSobregiro}
                     onChange={(e) => setPermiteSobregiro(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-primary border-border rounded focus:ring-blue-500"
                   />
                   <div>
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-foreground/85">
                       Permite Sobregiro
                     </span>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       Permite que el saldo de la cuenta sea negativo
                     </p>
                   </div>
@@ -330,13 +330,13 @@ export default function NuevaCuentaBancariaPage() {
                     type="checkbox"
                     checked={activa}
                     onChange={(e) => setActiva(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-primary border-border rounded focus:ring-blue-500"
                   />
                   <div>
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-foreground/85">
                       Cuenta Activa
                     </span>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       Solo las cuentas activas pueden recibir movimientos
                     </p>
                   </div>
@@ -350,7 +350,7 @@ export default function NuevaCuentaBancariaPage() {
                 type="button"
                 onClick={() => router.push('/dashboard/finanzas/bancos')}
                 disabled={submitting}
-                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 border border-border rounded-lg text-foreground/85 hover:bg-muted/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>

@@ -1,40 +1,57 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../shared/supabase/supabase.service';
-import { TenantContextService } from '../../shared/tenant/tenant-context.service';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import { CreateDemoTenantDto, ConvertDemoToRealDto } from './dto/create-demo-tenant.dto';
-import { StripeService } from './stripe.service';
-import { parseCertificateBuffer } from '../../shared/utils/certificate.utils';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { SupabaseService } from "../../shared/supabase/supabase.service";
+import { TenantContextService } from "../../shared/tenant/tenant-context.service";
+import { AuthService } from "../auth/auth.service";
+import * as bcrypt from "bcrypt";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { randomUUID } from "node:crypto";
+import {
+  CreateDemoTenantDto,
+  ConvertDemoToRealDto,
+} from "./dto/create-demo-tenant.dto";
+import { StripeService } from "./stripe.service";
+import {
+  parseCertificateBuffer,
+  toPostgresBytea,
+} from "../../shared/utils/certificate.utils";
+import {
+  encryptBuffer,
+  encryptText,
+} from "../../shared/utils/secure-config.utils";
+import { CacheInvalidationService } from "../../shared/cache/cache-invalidation.service";
 
 const PLANES = {
   basico: {
-    id: 'basico',
-    nombre: 'Plan Básico',
+    id: "basico",
+    nombre: "Plan Básico",
     precio_mensual: 99.0,
     precio_anual: 990.0,
-    moneda: 'PEN',
+    moneda: "PEN",
     usuarios: 5,
     facturas_mes: 1000,
   },
   profesional: {
-    id: 'profesional',
-    nombre: 'Plan Profesional',
+    id: "profesional",
+    nombre: "Plan Profesional",
     precio_mensual: 199.0,
     precio_anual: 1990.0,
-    moneda: 'PEN',
+    moneda: "PEN",
     usuarios: 15,
     facturas_mes: -1,
   },
   enterprise: {
-    id: 'enterprise',
-    nombre: 'Plan Enterprise',
+    id: "enterprise",
+    nombre: "Plan Enterprise",
     precio_mensual: 499.0,
     precio_anual: 4990.0,
-    moneda: 'PEN',
+    moneda: "PEN",
     usuarios: -1,
     facturas_mes: -1,
   },
@@ -46,9 +63,11 @@ export class DemoService {
 
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly jwtService: JwtService,
+    private readonly authService: AuthService,
     private readonly stripeService: StripeService,
     private readonly tenantContext: TenantContextService,
+    private readonly configService: ConfigService,
+    private readonly cacheInvalidation: CacheInvalidationService,
   ) {}
 
   private get client() {
@@ -57,16 +76,17 @@ export class DemoService {
 
   async createDemoTenant(dto: CreateDemoTenantDto = {}) {
     const diasDuracion = dto.dias_duracion || 14;
-    const nombre = dto.nombre || 'DEMO COMERCIAL SAC';
+    const nombre = dto.nombre || "DEMO COMERCIAL SAC";
 
     try {
-      const { data, error } = await this.client.rpc('create_demo_tenant', {
+      const { data, error } = await this.client.rpc("create_demo_tenant", {
         p_nombre: nombre,
         p_dias_duracion: diasDuracion,
       });
 
       if (error) throw new Error(error.message);
-      if (!data || !data.success) throw new Error('No se pudo crear el tenant demo');
+      if (!data || !data.success)
+        throw new Error("No se pudo crear el tenant demo");
 
       // Seed operacional best-effort: el RPC crea tenant + empresa + admin pero
       // deja el tenant "esqueleto". Agregamos datos mínimos para que el demo sea
@@ -82,20 +102,34 @@ export class DemoService {
           isSuperAdmin: true, // seed system-level
         },
         () =>
-          this.seedDemoOperationalData(data.tenant_id, data.user_id).catch((err) => {
-            this.logger.warn(
-              `[demo seed] fallo parcial al hidratar tenant ${data.tenant_id}: ${err?.message || err}`,
-            );
-            return { aprobadorUserId: null, aprobadorEmail: null, aprobadorPassword: null };
-          }),
+          this.seedDemoOperationalData(data.tenant_id, data.user_id).catch(
+            (err) => {
+              this.logger.warn(
+                `[demo seed] fallo parcial al hidratar tenant ${data.tenant_id}: ${err?.message || err}`,
+              );
+              return {
+                aprobadorUserId: null,
+                aprobadorEmail: null,
+                aprobadorPassword: null,
+              };
+            },
+          ),
       );
 
-      const token = this.jwtService.sign({
-        sub: data.user_id,
-        tenant_id: data.tenant_id,
-        email: data.email,
-        is_demo: true,
-      });
+      // El dashboard puede consultar sus métricas apenas inicia la sesión. Si
+      // algún dato quedó cacheado durante la hidratación, lo descartamos antes
+      // de devolver las credenciales para que la primera vista refleje el seed.
+      await this.cacheInvalidation.invalidateAllTenantCache(data.tenant_id);
+
+      // Emitir siempre una sesión revocable. Los JWT firmados directamente sin
+      // `session_token` son rechazados por JwtStrategy y dejaban el token de la
+      // respuesta /demo/create inutilizable.
+      const authResult = await this.authService.login(
+        { email: data.email, password: data.password },
+        "demo-api",
+        "demo-create",
+      );
+      const token = authResult.access_token;
 
       return {
         success: true,
@@ -113,7 +147,9 @@ export class DemoService {
         aprobador_password: seedResult.aprobadorPassword,
       };
     } catch (error) {
-      throw new BadRequestException(`Error creando tenant demo: ${error.message}`);
+      throw new BadRequestException(
+        `Error creando tenant demo: ${error.message}`,
+      );
     }
   }
 
@@ -135,30 +171,60 @@ export class DemoService {
   private async seedDemoOperationalData(
     tenantId: string,
     primerUserId: string,
-  ): Promise<{ aprobadorUserId: string | null; aprobadorEmail: string | null; aprobadorPassword: string | null }> {
-    let aprobadorResult: { userId: string; email: string; password: string } | null = null;
-    const results = await Promise.allSettled([
+  ): Promise<{
+    aprobadorUserId: string | null;
+    aprobadorEmail: string | null;
+    aprobadorPassword: string | null;
+  }> {
+    let aprobadorResult: {
+      userId: string;
+      email: string;
+      password: string;
+    } | null = null;
+    // Productos/existencias dependen del almacén principal. Ejecutar ambos en
+    // paralelo hacía que el seed fallara de forma intermitente aun en tenants
+    // recién creados. El resto de pasos sí es independiente.
+    const [almacenResult] = await Promise.allSettled([
       this.seedAlmacenDefault(tenantId),
+    ]);
+    const independentResults = await Promise.allSettled([
       this.seedPlanContableMinimo(tenantId),
       this.seedMetodosPago(tenantId),
-      this.seedCajaDefault(tenantId),
+      this.seedCajaDefault(tenantId, primerUserId),
       this.seedCertificadoDemo(tenantId),
+      this.seedProductosDemo(tenantId),
+      this.seedClientesDemo(tenantId),
       this.seedSegundoUserAprobador(tenantId, primerUserId).then((r) => {
         aprobadorResult = r;
       }),
     ]);
-    const stepNames = ['almacen', 'plan_cuentas', 'metodos_pago', 'caja', 'certificado', 'aprobador'];
+    const results = [almacenResult, ...independentResults];
+    const stepNames = [
+      "almacen",
+      "plan_cuentas",
+      "metodos_pago",
+      "caja",
+      "certificado",
+      "productos",
+      "clientes",
+      "aprobador",
+    ];
     const failures = results
       .map((r, i) => ({ r, step: stepNames[i] }))
-      .filter((x) => x.r.status === 'rejected');
+      .filter((x) => x.r.status === "rejected");
     if (failures.length) {
       this.logger.warn(
         `[demo seed] ${failures.length}/${results.length} pasos fallaron para tenant ${tenantId}: ${failures
-          .map((f) => `${f.step}=${(f.r as PromiseRejectedResult).reason?.message || 'unknown'}`)
-          .join(', ')}`,
+          .map(
+            (f) =>
+              `${f.step}=${(f.r as PromiseRejectedResult).reason?.message || "unknown"}`,
+          )
+          .join(", ")}`,
       );
     } else {
-      this.logger.log(`[demo seed] tenant ${tenantId} hidratado con datos operativos completos`);
+      this.logger.log(
+        `[demo seed] tenant ${tenantId} hidratado con datos operativos completos`,
+      );
     }
     return {
       aprobadorUserId: aprobadorResult?.userId ?? null,
@@ -188,50 +254,58 @@ export class DemoService {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // 1. usuarios_sistema (auth)
-    const { error: usuarioError } = await this.adminClient.from('usuarios_sistema').insert({
-      id: aprobadorId,
-      tenant_id: tenantId,
-      nombre: 'Aprobador',
-      apellido: 'Demo',
-      email,
-      nombre_usuario: 'aprobador',
-      password_hash: passwordHash,
-      activo: true,
-      estado: 'ACTIVO',
-      is_super_admin: false,
-      is_demo_user: true,
-      demo_email_temp: email,
-    });
-    if (usuarioError) throw new Error(`aprobador usuarios_sistema: ${usuarioError.message}`);
+    const { error: usuarioError } = await this.adminClient
+      .from("usuarios_sistema")
+      .insert({
+        id: aprobadorId,
+        tenant_id: tenantId,
+        nombre: "Aprobador",
+        apellido: "Demo",
+        email,
+        nombre_usuario: "aprobador",
+        password_hash: passwordHash,
+        activo: true,
+        estado: "ACTIVO",
+        is_super_admin: false,
+        is_demo_user: true,
+        demo_email_temp: email,
+      });
+    if (usuarioError)
+      throw new Error(`aprobador usuarios_sistema: ${usuarioError.message}`);
 
     // 2. users (dominio, espejo del id)
-    const { error: usersError } = await this.adminClient.from('users').insert({
+    const { error: usersError } = await this.adminClient.from("users").insert({
       id: aprobadorId,
       tenant_id: tenantId,
       email,
-      nombre: 'Aprobador',
-      apellido: 'Demo',
+      nombre: "Aprobador",
+      apellido: "Demo",
       activo: true,
-      estado: 'ACTIVO',
+      estado: "ACTIVO",
     });
     if (usersError) throw new Error(`aprobador users: ${usersError.message}`);
 
     // 3. Linkar al rol ADMIN existente (RPC ya lo creó)
     const { data: adminRole, error: roleError } = await this.adminClient
-      .from('roles')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('nombre', 'ADMIN')
+      .from("roles")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("nombre", "ADMIN")
       .maybeSingle();
     if (roleError || !adminRole?.id) {
-      throw new Error(`aprobador rol ADMIN no encontrado: ${roleError?.message || 'sin data'}`);
+      throw new Error(
+        `aprobador rol ADMIN no encontrado: ${roleError?.message || "sin data"}`,
+      );
     }
-    const { error: linkError } = await this.adminClient.from('user_roles').insert({
-      usuario_sistema_id: aprobadorId,
-      role_id: adminRole.id,
-      tenant_id: tenantId,
-    });
-    if (linkError) throw new Error(`aprobador user_roles: ${linkError.message}`);
+    const { error: linkError } = await this.adminClient
+      .from("user_roles")
+      .insert({
+        usuario_sistema_id: aprobadorId,
+        role_id: adminRole.id,
+        tenant_id: tenantId,
+      });
+    if (linkError)
+      throw new Error(`aprobador user_roles: ${linkError.message}`);
 
     return { userId: aprobadorId, email, password };
   }
@@ -247,11 +321,11 @@ export class DemoService {
     // Importante: además de `estado` (text), las tablas multi-tenant tienen
     // `activo` (boolean) que es lo que filtran los services. Sin éste el endpoint
     // devuelve [] aunque el row exista en DB.
-    const { error } = await this.adminClient.from('almacenes').insert({
+    const { error } = await this.adminClient.from("almacenes").insert({
       tenant_id: tenantId,
-      codigo: 'ALM-PRINCIPAL',
-      nombre: 'Almacén Principal',
-      estado: 'ACTIVO',
+      codigo: "ALM-PRINCIPAL",
+      nombre: "Almacén Principal",
+      estado: "ACTIVO",
       activo: true,
       es_principal: true,
     });
@@ -267,112 +341,396 @@ export class DemoService {
     const cuentas = [
       // Elementos PCGE peruano + cuentas de detalle que los e2e contables/RRHH
       // consultan explícitamente (621/627 RRHH, 411/403 planillas).
-      { codigo: '10', nombre: 'Efectivo y Equivalentes de Efectivo', tipo: 'ACTIVO' },
-      { codigo: '12', nombre: 'Cuentas por Cobrar Comerciales - Terceros', tipo: 'ACTIVO' },
-      { codigo: '20', nombre: 'Mercaderías', tipo: 'ACTIVO' },
-      { codigo: '40', nombre: 'Tributos por Pagar', tipo: 'PASIVO' },
-      { codigo: '403', nombre: 'Instituciones Públicas (ESSALUD/ONP)', tipo: 'PASIVO' },
-      { codigo: '411', nombre: 'Remuneraciones por Pagar', tipo: 'PASIVO' },
-      { codigo: '42', nombre: 'Cuentas por Pagar Comerciales - Terceros', tipo: 'PASIVO' },
-      { codigo: '50', nombre: 'Capital', tipo: 'PATRIMONIO' },
-      { codigo: '60', nombre: 'Compras', tipo: 'GASTO' },
-      { codigo: '621', nombre: 'Remuneraciones - Sueldos y Salarios', tipo: 'GASTO' },
-      { codigo: '627', nombre: 'Servicios Prestados por Terceros', tipo: 'GASTO' },
-      { codigo: '70', nombre: 'Ventas', tipo: 'INGRESO' },
-      { codigo: '94', nombre: 'Gastos de Administración', tipo: 'GASTO' },
+      {
+        codigo: "10",
+        nombre: "Efectivo y Equivalentes de Efectivo",
+        tipo: "ACTIVO",
+      },
+      {
+        codigo: "12",
+        nombre: "Cuentas por Cobrar Comerciales - Terceros",
+        tipo: "ACTIVO",
+      },
+      { codigo: "20", nombre: "Mercaderías", tipo: "ACTIVO" },
+      { codigo: "40", nombre: "Tributos por Pagar", tipo: "PASIVO" },
+      {
+        codigo: "403",
+        nombre: "Instituciones Públicas (ESSALUD/ONP)",
+        tipo: "PASIVO",
+      },
+      { codigo: "411", nombre: "Remuneraciones por Pagar", tipo: "PASIVO" },
+      {
+        codigo: "42",
+        nombre: "Cuentas por Pagar Comerciales - Terceros",
+        tipo: "PASIVO",
+      },
+      { codigo: "50", nombre: "Capital", tipo: "PATRIMONIO" },
+      { codigo: "60", nombre: "Compras", tipo: "GASTO" },
+      {
+        codigo: "621",
+        nombre: "Remuneraciones - Sueldos y Salarios",
+        tipo: "GASTO",
+      },
+      {
+        codigo: "627",
+        nombre: "Servicios Prestados por Terceros",
+        tipo: "GASTO",
+      },
+      { codigo: "70", nombre: "Ventas", tipo: "INGRESO" },
+      { codigo: "94", nombre: "Gastos de Administración", tipo: "GASTO" },
     ];
     const rows = cuentas.map((c) => ({
       tenant_id: tenantId,
       codigo: c.codigo,
       nombre: c.nombre,
       tipo: c.tipo,
-      estado: 'ACTIVO',
+      estado: "ACTIVO",
       activo: true,
       acepta_movimiento: true,
       nivel: 2,
     }));
-    const { error } = await this.adminClient.from('plan_cuentas').insert(rows);
+    const { error } = await this.adminClient.from("plan_cuentas").insert(rows);
     if (error) throw new Error(`plan_cuentas insert: ${error.message}`);
   }
 
   private async seedMetodosPago(tenantId: string): Promise<void> {
     const metodos = [
-      { codigo: 'EFECTIVO', nombre: 'Efectivo' },
-      { codigo: 'TARJETA', nombre: 'Tarjeta' },
-      { codigo: 'TRANSFERENCIA', nombre: 'Transferencia bancaria' },
-      { codigo: 'YAPE', nombre: 'Yape / Plin' },
-    ].map((m) => ({ tenant_id: tenantId, ...m, estado: 'ACTIVO', activo: true }));
-    const { error } = await this.adminClient.from('metodos_pago').insert(metodos);
+      { codigo: "EFECTIVO", nombre: "Efectivo" },
+      { codigo: "TARJETA", nombre: "Tarjeta" },
+      { codigo: "TRANSFERENCIA", nombre: "Transferencia bancaria" },
+      { codigo: "YAPE", nombre: "Yape / Plin" },
+    ].map((m) => ({
+      tenant_id: tenantId,
+      ...m,
+      estado: "ACTIVO",
+      activo: true,
+    }));
+    const { error } = await this.adminClient
+      .from("metodos_pago")
+      .insert(metodos);
     if (error) throw new Error(`metodos_pago insert: ${error.message}`);
   }
 
-  private async seedCajaDefault(tenantId: string): Promise<void> {
-    const { error } = await this.adminClient.from('cajas').insert({
-      tenant_id: tenantId,
-      codigo: 'CAJA-001',
-      nombre: 'Caja Principal',
-      estado: 'ACTIVO',
-      activo: true,
-    });
+  private async seedCajaDefault(tenantId: string, primerUserId?: string): Promise<void> {
+    const { data: almacen, error: almacenError } = await this.adminClient
+      .from("almacenes")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("codigo", "ALM-PRINCIPAL")
+      .single();
+    if (almacenError || !almacen?.id) {
+      throw new Error(`caja: almacén principal no disponible: ${almacenError?.message || "sin id"}`);
+    }
+
+    const { data: caja, error } = await this.adminClient
+      .from("cajas")
+      .insert({
+        tenant_id: tenantId,
+        codigo: "CAJA-001",
+        nombre: "Caja Principal",
+        estado: "ACTIVO",
+        almacen_id: almacen.id,
+      })
+      .select("id")
+      .single();
     if (error) throw new Error(`cajas insert: ${error.message}`);
+
+    // El demo promete "datos de ejemplo listos": dejar la caja YA ABIERTA con un
+    // fondo inicial y atribuida al usuario demo. Sin esto, POS arranca bloqueado
+    // ("Caja cerrada") y Cajas exige abrir sesión a mano en un tenant demo.
+    if (caja?.id && primerUserId) {
+      const { error: sesionError } = await this.adminClient
+        .from("sesiones_caja")
+        .insert({
+          tenant_id: tenantId,
+          caja_id: caja.id,
+          cajero_id: primerUserId,
+          abierto_por: primerUserId,
+          monto_inicio: 100,
+          moneda: "PEN",
+          estado: "ABIERTA",
+        });
+      if (sesionError) {
+        this.logger.warn(`[demo seed] sesión de caja abierta: ${sesionError.message}`);
+      }
+    }
   }
 
   /**
-   * Carga certs/demo.pfx + PFX_PASS en empresa_config.certificado_pfx para que
+   * Carga certs/demo.pfx + DEMO_PFX_PASS en empresa_config.certificado_pfx para que
    * CPE/GRE puedan firmar comprobantes en modo demo. Sin esto, todo flujo
    * fiscal falla con "Certificado digital inválido".
-   * Solo aplica si PFX_PATH y PFX_PASS están configurados en .env.
+   * No usa PFX_PATH/PFX_PASS porque esos pueden apuntar al certificado fiscal
+   * real de un contribuyente.
    */
   private async seedCertificadoDemo(tenantId: string): Promise<void> {
-    const pfxPath = process.env.PFX_PATH;
-    const pfxPass = process.env.PFX_PASS;
-    if (!pfxPath || !pfxPass) {
-      throw new Error('PFX_PATH/PFX_PASS no configurados — skip cert seed');
-    }
-    // Resolver path absoluto: PFX_PATH puede ser relativo al repo root.
-    const repoRoot = path.resolve(__dirname, '../../../../../..');
-    const absPath = path.isAbsolute(pfxPath) ? pfxPath : path.join(repoRoot, pfxPath);
-    if (!fs.existsSync(absPath)) {
-      throw new Error(`PFX no encontrado en ${absPath}`);
-    }
-    const buffer = fs.readFileSync(absPath);
-    // Validamos el cert para obtener expiry; si está roto, abortamos el seed.
-    const metadata = parseCertificateBuffer(buffer, pfxPass);
-    const hexValue = `\\x${buffer.toString('hex')}`;
-    const { error } = await this.adminClient
-      .from('empresa_config')
+    // 1) Config fiscal base SIEMPRE, independiente del PFX. Antes vivía en el
+    //    mismo update que el certificado: si el PFX fallaba, el demo quedaba
+    //    sin dirección fiscal ni SOL secundario y el usuario veía el modal
+    //    "Configuración Incompleta" en un tenant que promete datos de ejemplo.
+    const { error: baseError } = await this.adminClient
+      .from("empresa_config")
       .update({
-        certificado_pfx: hexValue,
-        certificado_password: pfxPass,
-        certificado_expira_en: metadata.validTo.toISOString(),
         // RUC válido SUNAT (módulo 11): prefijo 20 + 8 dígitos + checksum.
         // El sistema valida correctamente en otros endpoints (proveedores,
         // clientes), por eso necesitamos un RUC que cumpla el algoritmo.
         // 20123456786 → suma 148, 11 - (148 mod 11) = 6 ✓
-        ruc: '20123456786',
-        direccion_fiscal: 'Av. Demo 123, Lima',
+        ruc: "20123456786",
+        direccion_fiscal: "Av. Demo 123, Lima",
+        ubigeo: "150101",
+        departamento: "LIMA",
+        provincia: "LIMA",
+        distrito: "LIMA",
         configuracion_completa: true,
+        // Credenciales SOL secundarias de homologación (usuario beta estándar
+        // de SUNAT). Sin esto getConfigurationStatus() reporta la configuración
+        // incompleta y el POS muestra el banner de advertencia permanente.
+        sunat_environment: "homologacion",
+        sunat_username: "20123456786MODDATOS",
+        sunat_password: "MODDATOS",
       })
-      .eq('tenant_id', tenantId);
-    if (error) throw new Error(`empresa_config update (certificado): ${error.message}`);
+      .eq("tenant_id", tenantId);
+    if (baseError)
+      throw new Error(`empresa_config update (config fiscal demo): ${baseError.message}`);
+
+    // 2) Certificado demo para firmar CPE/GRE en modo demo.
+    const pfxPath = process.env.DEMO_PFX_PATH || "certs/demo.pfx";
+    const pfxPass = process.env.DEMO_PFX_PASS || "12345678910";
+    const absPath = this.resolveDemoPfxPath(pfxPath);
+    if (!absPath) {
+      throw new Error(`PFX demo no encontrado: ${pfxPath} (cwd=${process.cwd()})`);
+    }
+    const buffer = fs.readFileSync(absPath);
+    // Validamos el cert para obtener expiry; si está roto, abortamos el seed.
+    const metadata = parseCertificateBuffer(buffer, pfxPass);
+    const encryptedCertificate = encryptBuffer(this.configService, buffer);
+    const encryptedPassword = encryptText(this.configService, pfxPass);
+    const { error } = await this.adminClient
+      .from("empresa_config")
+      .update({
+        certificado_pfx: toPostgresBytea(encryptedCertificate),
+        certificado_password: encryptedPassword,
+        certificado_expira_en: metadata.validTo.toISOString(),
+      })
+      .eq("tenant_id", tenantId);
+    if (error)
+      throw new Error(`empresa_config update (certificado): ${error.message}`);
+  }
+
+  /**
+   * Resuelve el fixture tanto en ts-jest/dev (`src/...`) como en el artefacto
+   * compilado (`dist/src/...`). Basarse en una cantidad fija de `..` rompía el
+   * seed al ejecutar `node dist/src/main.js`.
+   */
+  private resolveDemoPfxPath(configuredPath: string): string | null {
+    if (path.isAbsolute(configuredPath)) {
+      return fs.existsSync(configuredPath) ? configuredPath : null;
+    }
+
+    const candidates = [
+      path.resolve(process.cwd(), configuredPath),
+      path.resolve(process.cwd(), "..", "..", configuredPath),
+      path.resolve(__dirname, "..", "..", "..", "..", "..", configuredPath),
+      path.resolve(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "..",
+        "..",
+        "..",
+        configuredPath,
+      ),
+    ];
+
+    return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
+  }
+
+  /**
+   * Catálogo de ejemplo prometido por la landing de demo ("datos de ejemplo
+   * incluidos"). Sin esto el POS/Inventario arrancan vacíos y el usuario no
+   * puede probar una venta sin crear productos a mano.
+   */
+  private async seedProductosDemo(tenantId: string): Promise<void> {
+    const productos = [
+      {
+        codigo: "DEMO-001",
+        nombre: "Café Molido Premium 250g",
+        categoria: "ALIMENTOS",
+        precio_venta: 25.0,
+        precio_compra: 18.0,
+        stock_actual: 50,
+      },
+      {
+        codigo: "DEMO-002",
+        nombre: "Azúcar Rubia 1kg",
+        categoria: "ALIMENTOS",
+        precio_venta: 6.5,
+        precio_compra: 4.8,
+        stock_actual: 120,
+      },
+      {
+        codigo: "DEMO-003",
+        nombre: "Cuaderno A4 96 hojas",
+        categoria: "OFICINA",
+        precio_venta: 8.9,
+        precio_compra: 5.5,
+        stock_actual: 80,
+      },
+      {
+        codigo: "DEMO-004",
+        nombre: "Audífonos Bluetooth",
+        categoria: "ELECTRONICA",
+        precio_venta: 89.9,
+        precio_compra: 60.0,
+        stock_actual: 15,
+      },
+      {
+        codigo: "DEMO-005",
+        nombre: "Detergente Líquido 1L",
+        categoria: "HOGAR",
+        precio_venta: 14.5,
+        precio_compra: 10.0,
+        stock_actual: 40,
+      },
+    ];
+    const rows = productos.map((p) => ({
+      tenant_id: tenantId,
+      ...p,
+      // El saldo se inicializa después mediante aplicar_movimiento_inventario_tx.
+      stock_actual: 0,
+      stock: 0,
+      descripcion: "Producto de ejemplo (demo)",
+      activo: true,
+      codigo_barras: p.codigo,
+      stock_minimo: 5,
+      stock_reservado: 0,
+      impuesto: 18,
+      es_servicio: false,
+      controla_stock: true,
+      afectacion_igv: "10",
+      favorito: false,
+      imagen_url: "",
+    }));
+    const { data: inserted, error } = await this.adminClient
+      .from("productos")
+      .insert(rows)
+      .select("id, codigo, stock_actual");
+    if (error) throw new Error(`productos insert: ${error.message}`);
+
+    // producto_existencias es la fuente física de verdad. El stock inicial debe
+    // entrar por el mismo writer transaccional que POS, recepciones y ajustes;
+    // nunca se insertan saldos y kardex por caminos separados.
+    const { data: almacenDemo } = await this.adminClient
+      .from("almacenes")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("codigo", "ALM-PRINCIPAL")
+      .maybeSingle();
+
+    if (almacenDemo?.id && inserted?.length) {
+      const datosPorCodigo = new Map(productos.map((p) => [p.codigo, p]));
+      for (const producto of inserted) {
+        const datos = datosPorCodigo.get(producto.codigo);
+        const { error: movimientoError } = await this.adminClient.rpc(
+          "aplicar_movimiento_inventario_tx",
+          {
+            p_tenant_id: tenantId,
+            p_producto_id: producto.id,
+            p_almacen_id: almacenDemo.id,
+            p_tipo: "ENTRADA",
+            p_cantidad: datos?.stock_actual ?? producto.stock_actual,
+            p_referencia_tipo: "STOCK_INICIAL_DEMO",
+            p_referencia_id: randomUUID(),
+            p_notas: "Stock inicial demo",
+            p_metadata: {
+              source: "demo_seed",
+              costo_unitario: datos?.precio_compra ?? 0,
+            },
+          },
+        );
+        if (movimientoError) {
+          throw new Error(`stock inicial canónico: ${movimientoError.message}`);
+        }
+      }
+    } else if (!almacenDemo?.id) {
+      throw new Error(
+        "producto_existencias: almacén demo ALM-PRINCIPAL no encontrado",
+      );
+    }
+
+  }
+
+  /**
+   * Clientes de ejemplo: el POS exige seleccionar un cliente con documento
+   * válido (≥8 dígitos) para procesar la venta. Sin esto no se puede vender.
+   * RUC 20600000013 pasa la validación módulo 11 de SUNAT.
+   */
+  private async seedClientesDemo(tenantId: string): Promise<void> {
+    const clientes = [
+      // Sin ceros a la izquierda: numero_documento es integer y el POS valida
+      // la longitud del documento como string (≥8 dígitos).
+      {
+        tipo: "PERSONA",
+        documento_tipo: "DNI",
+        documento: "99999999",
+        razon_social: "Cliente General",
+      },
+      {
+        tipo: "PERSONA",
+        documento_tipo: "DNI",
+        documento: "12345678",
+        razon_social: "Juan Pérez Demo",
+      },
+      {
+        tipo: "EMPRESA",
+        documento_tipo: "RUC",
+        documento: "20600000013",
+        razon_social: "COMERCIAL ANDINA DEMO S.A.C.",
+      },
+    ];
+    const rows = clientes.map((c) => {
+      const docNum = Number(c.documento);
+      const docSeguro =
+        Number.isSafeInteger(docNum) && docNum <= 2147483647 ? docNum : null;
+      return {
+        tenant_id: tenantId,
+        tipo: c.tipo,
+        tipo_documento: c.documento_tipo,
+        documento_tipo: c.documento_tipo,
+        documento_numero: docSeguro,
+        numero_documento: docSeguro,
+        razon_social: c.razon_social,
+        nombre: c.razon_social,
+        codigo: c.documento,
+        ruc: c.documento_tipo === "RUC" ? c.documento : null,
+        activo: true,
+      };
+    });
+    const { error } = await this.adminClient.from("clientes").insert(rows);
+    if (error) throw new Error(`clientes insert: ${error.message}`);
   }
 
   async getDemoStatus(tenantId: string) {
     const { data, error } = await this.client
-      .from('empresa_config')
-      .select('is_demo, demo_expires_at, demo_created_at, demo_conversion_attempted, plan')
-      .eq('tenant_id', tenantId)
+      .from("empresa_config")
+      .select(
+        "is_demo, demo_expires_at, demo_created_at, demo_conversion_attempted, plan",
+      )
+      .eq("tenant_id", tenantId)
       .single();
 
-    if (error || !data) throw new NotFoundException('Tenant no encontrado');
+    if (error || !data) throw new NotFoundException("Tenant no encontrado");
 
     if (!data.is_demo) {
-      return { is_demo: false, message: 'Este no es un tenant demo' };
+      return { is_demo: false, message: "Este no es un tenant demo" };
     }
 
     const now = new Date();
     const expiresAt = new Date(data.demo_expires_at);
-    const diasRestantes = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diasRestantes = Math.ceil(
+      (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     return {
       is_demo: true,
@@ -390,8 +748,8 @@ export class DemoService {
     return {
       planes: Object.values(PLANES).map((p) => ({
         ...p,
-        facturas_mes: p.facturas_mes === -1 ? 'Ilimitado' : p.facturas_mes,
-        usuarios: p.usuarios === -1 ? 'Ilimitado' : p.usuarios,
+        facturas_mes: p.facturas_mes === -1 ? "Ilimitado" : p.facturas_mes,
+        usuarios: p.usuarios === -1 ? "Ilimitado" : p.usuarios,
       })),
       stripe_enabled: this.stripeService.isConfigured(),
     };
@@ -402,56 +760,61 @@ export class DemoService {
    */
   async convertToReal(tenantId: string, dto: ConvertDemoToRealDto) {
     const status = await this.getDemoStatus(tenantId);
-    if (!status.is_demo) throw new BadRequestException('Este no es un tenant demo');
+    if (!status.is_demo)
+      throw new BadRequestException("Este no es un tenant demo");
 
-    const plan = PLANES[dto.plan_id || 'basico'];
-    if (!plan) throw new BadRequestException('Plan no válido');
+    const plan = PLANES[dto.plan_id || "basico"];
+    if (!plan) throw new BadRequestException("Plan no válido");
 
     // Validar RUC único
     const { data: existingRuc } = await this.client
-      .from('empresa_config')
-      .select('tenant_id')
-      .eq('ruc', dto.ruc)
-      .neq('tenant_id', tenantId)
+      .from("empresa_config")
+      .select("tenant_id")
+      .eq("ruc", dto.ruc)
+      .neq("tenant_id", tenantId)
       .single();
-    if (existingRuc) throw new BadRequestException('El RUC ya está registrado');
+    if (existingRuc) throw new BadRequestException("El RUC ya está registrado");
 
     // Validar email único
     const { data: existingEmail } = await this.client
-      .from('usuarios_sistema')
-      .select('id')
-      .eq('email', dto.email)
-      .neq('tenant_id', tenantId)
+      .from("usuarios_sistema")
+      .select("id")
+      .eq("email", dto.email)
+      .neq("tenant_id", tenantId)
       .single();
-    if (existingEmail) throw new BadRequestException('El email ya está registrado');
+    if (existingEmail)
+      throw new BadRequestException("El email ya está registrado");
 
     // Guardar datos pendientes de conversión
     await this.client
-      .from('empresa_config')
+      .from("empresa_config")
       .update({
         demo_conversion_attempted: true,
         // Guardar datos pendientes en metadata
       })
-      .eq('tenant_id', tenantId);
+      .eq("tenant_id", tenantId);
 
-    const monto = dto.periodo === 'anual' ? plan.precio_anual : plan.precio_mensual;
+    const monto =
+      dto.periodo === "anual" ? plan.precio_anual : plan.precio_mensual;
 
     // Si Stripe está configurado, crear sesión de checkout
     if (this.stripeService.isConfigured()) {
-      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      const { url, sessionId } = await this.stripeService.createCheckoutSession({
-        tenantId,
-        planId: dto.plan_id || 'basico',
-        periodo: dto.periodo || 'mensual',
-        email: dto.email,
-        razonSocial: dto.razon_social,
-        ruc: dto.ruc,
-        successUrl: `${baseUrl}/demo/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: `${baseUrl}/demo/cancel`,
-      });
+      const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      const { url, sessionId } = await this.stripeService.createCheckoutSession(
+        {
+          tenantId,
+          planId: dto.plan_id || "basico",
+          periodo: dto.periodo || "mensual",
+          email: dto.email,
+          razonSocial: dto.razon_social,
+          ruc: dto.ruc,
+          successUrl: `${baseUrl}/demo/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${baseUrl}/demo/cancel`,
+        },
+      );
 
       // Guardar datos para completar después del pago
-      await this.client.from('demo_conversiones_pendientes').insert({
+      await this.client.from("demo_conversiones_pendientes").insert({
         tenant_id: tenantId,
         stripe_session_id: sessionId,
         razon_social: dto.razon_social,
@@ -459,10 +822,10 @@ export class DemoService {
         email: dto.email,
         password_hash: await bcrypt.hash(dto.password, 10),
         telefono: dto.telefono,
-        plan_id: dto.plan_id || 'basico',
-        periodo: dto.periodo || 'mensual',
+        plan_id: dto.plan_id || "basico",
+        periodo: dto.periodo || "mensual",
         monto,
-        estado: 'PENDIENTE',
+        estado: "PENDIENTE",
       });
 
       return {
@@ -476,7 +839,7 @@ export class DemoService {
     }
 
     // Sin Stripe - modo manual o testing
-    if (process.env.DEMO_SKIP_PAYMENT === 'true') {
+    if (process.env.DEMO_SKIP_PAYMENT === "true") {
       return this.completarConversion(tenantId, dto);
     }
 
@@ -485,7 +848,7 @@ export class DemoService {
       payment_pending: true,
       plan: plan.nombre,
       plan_id: plan.id,
-      periodo: dto.periodo || 'mensual',
+      periodo: dto.periodo || "mensual",
       monto,
       moneda: plan.moneda,
       datos_empresa: {
@@ -494,7 +857,7 @@ export class DemoService {
         email: dto.email,
         telefono: dto.telefono,
       },
-      instrucciones: 'Contacte a ventas@erp.pe para completar el pago',
+      instrucciones: "Contacte a ventas@erp.pe para completar el pago",
     };
   }
 
@@ -503,11 +866,12 @@ export class DemoService {
    */
   async completarConversion(tenantId: string, dto: ConvertDemoToRealDto) {
     const authClient = this.supabase.getClient();
-    const passwordHash = dto.password_hash || (await bcrypt.hash(dto.password, 10));
+    const passwordHash =
+      dto.password_hash || (await bcrypt.hash(dto.password, 10));
 
     try {
       const { error: empresaError } = await authClient
-        .from('empresa_config')
+        .from("empresa_config")
         .update({
           razon_social: dto.razon_social,
           ruc: dto.ruc,
@@ -515,16 +879,16 @@ export class DemoService {
           is_demo: false,
           demo_expires_at: null,
           demo_conversion_attempted: true,
-          estado: 'ACTIVO',
-          plan: (dto.plan_id || 'basico').toUpperCase(),
+          estado: "ACTIVO",
+          plan: (dto.plan_id || "basico").toUpperCase(),
           updated_at: new Date().toISOString(),
         })
-        .eq('tenant_id', tenantId);
+        .eq("tenant_id", tenantId);
 
       if (empresaError) throw empresaError;
 
       const { error: usuarioError } = await authClient
-        .from('usuarios_sistema')
+        .from("usuarios_sistema")
         .update({
           email: dto.email,
           password_hash: passwordHash,
@@ -532,32 +896,36 @@ export class DemoService {
           demo_email_temp: null,
           updated_at: new Date().toISOString(),
         })
-        .eq('tenant_id', tenantId)
-        .eq('is_demo_user', true);
+        .eq("tenant_id", tenantId)
+        .eq("is_demo_user", true);
 
       if (usuarioError) throw usuarioError;
 
       const { data: usuario } = await authClient
-        .from('usuarios_sistema')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('email', dto.email)
+        .from("usuarios_sistema")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("email", dto.email)
         .single();
 
-      const token = this.jwtService.sign({
-        sub: usuario.id,
-        tenant_id: tenantId,
-        email: dto.email,
-        is_demo: false,
-      });
+      if (!usuario?.id) {
+        throw new Error("Usuario convertido no encontrado");
+      }
+
+      const authResult = await this.authService.login(
+        { email: dto.email, password: dto.password },
+        "demo-webhook",
+        "demo-conversion",
+      );
+      const token = authResult.access_token;
 
       return {
         success: true,
-        message: 'Cuenta activada exitosamente',
+        message: "Cuenta activada exitosamente",
         token,
         tenant_id: tenantId,
         email: dto.email,
-        plan: dto.plan_id || 'basico',
+        plan: dto.plan_id || "basico",
       };
     } catch (error) {
       throw new BadRequestException(`Error activando cuenta: ${error.message}`);
@@ -570,14 +938,14 @@ export class DemoService {
   async procesarPagoExitoso(sessionId: string) {
     // Obtener datos de la conversión pendiente
     const { data: conversion } = await this.client
-      .from('demo_conversiones_pendientes')
-      .select('*')
-      .eq('stripe_session_id', sessionId)
-      .eq('estado', 'PENDIENTE')
+      .from("demo_conversiones_pendientes")
+      .select("*")
+      .eq("stripe_session_id", sessionId)
+      .eq("estado", "PENDIENTE")
       .single();
 
     if (!conversion) {
-      throw new BadRequestException('Conversión no encontrada o ya procesada');
+      throw new BadRequestException("Conversión no encontrada o ya procesada");
     }
 
     // Completar la conversión
@@ -585,7 +953,7 @@ export class DemoService {
       razon_social: conversion.razon_social,
       ruc: conversion.ruc,
       email: conversion.email,
-      password: '', // No se usa, usamos password_hash
+      password: "", // No se usa, usamos password_hash
       password_hash: conversion.password_hash,
       telefono: conversion.telefono,
       plan_id: conversion.plan_id,
@@ -594,9 +962,9 @@ export class DemoService {
 
     // Marcar como completada
     await this.client
-      .from('demo_conversiones_pendientes')
-      .update({ estado: 'COMPLETADA', completed_at: new Date().toISOString() })
-      .eq('stripe_session_id', sessionId);
+      .from("demo_conversiones_pendientes")
+      .update({ estado: "COMPLETADA", completed_at: new Date().toISOString() })
+      .eq("stripe_session_id", sessionId);
 
     return result;
   }

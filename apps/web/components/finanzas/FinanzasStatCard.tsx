@@ -29,18 +29,18 @@ export default function FinanzasStatCard({
   trend
 }: FinanzasStatCardProps) {
   return (
-    <div className="stat-card">
-      <div className="stat-header">
+    <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+      <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
         <h3>{title}</h3>
-        <Icon className="stat-icon" />
+        <Icon className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary" />
       </div>
-      <div 
-        className="stat-value"
+      <div
+        className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none"
       >
         {value}
       </div>
       {subtitle && (
-        <div className="stat-subtitle">
+        <div className="mt-2 text-[0.8125rem] text-muted-foreground">
           {subtitle}
         </div>
       )}
