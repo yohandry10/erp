@@ -3,6 +3,9 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import PDFDocument from 'pdfkit';
 
+// Respaldo si normativa_peru_periodos no tiene fila para el periodo consultado.
+const RMV_PERU_FALLBACK = 1130;
+
 @Injectable()
 export class RrhhService {
   private readonly logger = new Logger(RrhhService.name);
@@ -1559,6 +1562,70 @@ export class RrhhService {
     return data || [];
   }
 
+  // RMV vigente para el periodo del contrato. Prioriza la fila del tenant sobre la global.
+  private async obtenerRmvVigente(periodo: string, tenantId: string): Promise<number> {
+    const client = this.supabaseService.getClient();
+    const base = () =>
+      client
+        .from('normativa_peru_periodos')
+        .select('rmv')
+        .eq('pais_codigo', 'PE')
+        .eq('activo', true)
+        .lte('periodo', periodo)
+        .order('periodo', { ascending: false })
+        .limit(1);
+
+    const { data: propia } = await base().eq('tenant_id', tenantId).maybeSingle();
+    if (propia?.rmv) return Number(propia.rmv);
+
+    const { data: global } = await base().is('tenant_id', null).maybeSingle();
+    return Number(global?.rmv) || RMV_PERU_FALLBACK;
+  }
+
+  // Valida el contrato contra la normativa laboral peruana (D.S. 003-97-TR).
+  private async validarContratoPeru(contratoData: any, tenantId: string): Promise<void> {
+    const tipo = String(contratoData?.tipo_contrato ?? '').trim().toLowerCase();
+    const jornada = String(contratoData?.jornada_laboral ?? '').trim().toLowerCase();
+    const sueldo = Number(contratoData?.sueldo_bruto ?? contratoData?.salario ?? 0);
+    const fechaInicio = String(contratoData?.fecha_inicio ?? '').slice(0, 10);
+    const fechaFin = String(contratoData?.fecha_fin ?? '').slice(0, 10);
+
+    // Periodo de prueba: 3 meses de regla general, ampliable a 6 (calificados o de
+    // confianza) y 12 (personal de direccion). LPCL art. 10.
+    const periodoPrueba = Number(contratoData?.periodo_prueba_meses ?? 0);
+    if (Number.isFinite(periodoPrueba) && periodoPrueba > 12) {
+      throw new BadRequestException(
+        'El periodo de prueba no puede superar 12 meses (máximo legal para personal de dirección).',
+      );
+    }
+
+    // Contratos sujetos a modalidad: duracion maxima de 5 anios. LPCL art. 74.
+    if (tipo === 'temporal' && fechaInicio && fechaFin) {
+      const inicio = new Date(`${fechaInicio}T00:00:00`);
+      const topeLegal = new Date(inicio);
+      topeLegal.setFullYear(topeLegal.getFullYear() + 5);
+      if (new Date(`${fechaFin}T00:00:00`) > topeLegal) {
+        throw new BadRequestException(
+          'Un contrato sujeto a modalidad no puede exceder 5 años de duración (D.S. 003-97-TR art. 74).',
+        );
+      }
+    }
+
+    // RMV: exigible en contratos laborales dependientes a jornada completa. No aplica a
+    // part time ni a locacion de servicios (contrato civil, no laboral).
+    const esContratoLaboral = tipo === 'indefinido' || tipo === 'temporal';
+    const esJornadaCompleta = jornada === '' || jornada === 'tiempo_completo';
+    if (esContratoLaboral && esJornadaCompleta && sueldo > 0) {
+      const periodo = (fechaInicio || new Date().toISOString().slice(0, 10)).slice(0, 7);
+      const rmv = await this.obtenerRmvVigente(periodo, tenantId);
+      if (sueldo < rmv) {
+        throw new BadRequestException(
+          `La remuneración de un contrato a jornada completa no puede ser menor a la RMV vigente (S/ ${rmv.toFixed(2)}).`,
+        );
+      }
+    }
+  }
+
   async createContrato(contratoData: any, tenantId?: string) {
     // ✅ MULTI-TENANT: Agregar tenant_id
     if (!tenantId) {
@@ -1569,6 +1636,8 @@ export class RrhhService {
     if (!empleadoId) {
       throw new BadRequestException('Debe enviar empleado_id para crear contrato');
     }
+
+    await this.validarContratoPeru(contratoData, currentTenantId);
 
     const metadataBase =
       contratoData?.metadata && typeof contratoData.metadata === 'object' && !Array.isArray(contratoData.metadata)

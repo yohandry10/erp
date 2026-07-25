@@ -85,7 +85,7 @@ export default function PeriodoCierreWizard({
 
   return (
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(15,_23,_42,_0.8)] flex items-center justify-center p-4 z-[1100]">
-      <div className="rounded-3xl p-8 w-[90%] max-w-[600px] shadow border relative overflow-hidden">
+      <div className="bg-card text-card-foreground rounded-3xl p-8 w-[90%] max-w-[600px] max-h-[90vh] shadow border relative overflow-y-auto">
         {/* Header Bar */}
         <div className="absolute top-0 left-0 right-0 h-[4px]" />
 

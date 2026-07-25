@@ -71,7 +71,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
   return (
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(15,_23,_42,_0.8)] flex items-center justify-center p-4 z-[1100]">
-      <div className="p-10 w-[100%] max-w-[700px] overflow-y-auto shadow border relative">
+      <div className="bg-card rounded-xl p-10 w-[100%] max-w-[700px] max-h-[90vh] overflow-y-auto shadow border relative">
         {/* Header del Modal */}
         <div className="flex justify-between items-center mb-8 pb-4">
           <h2 className="text-[2rem] font-extrabold bg-[var(--gradient-primary)] m-0">

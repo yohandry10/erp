@@ -32,6 +32,9 @@ const initialForm = {
   salario: '',
   cargo: '',
   beneficios: '',
+  regimen_pensionario: 'AFP',
+  jornada_laboral: 'tiempo_completo',
+  periodo_prueba_meses: '3',
 };
 
 export function ContractFormDialog({ isOpen, onClose, onSuccess, empleados }: ContractFormDialogProps) {
@@ -55,6 +58,7 @@ export function ContractFormDialog({ isOpen, onClose, onSuccess, empleados }: Co
         fecha_fin: form.tipo_contrato === 'indefinido' ? null : form.fecha_fin || null,
         salario: Number(form.salario),
         sueldo_bruto: Number(form.salario),
+        periodo_prueba_meses: Number(form.periodo_prueba_meses) || 0,
         moneda: 'PEN',
         estado: 'activo',
         activo: true,
@@ -134,6 +138,36 @@ export function ContractFormDialog({ isOpen, onClose, onSuccess, empleados }: Co
             <div className="space-y-2">
               <Label htmlFor="contrato-beneficios" className="mb-0">Beneficios</Label>
               <Input id="contrato-beneficios" value={form.beneficios} onChange={(event) => setForm((current) => ({ ...current, beneficios: event.target.value }))} placeholder="Beneficios según ley" />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="contrato-regimen" className="mb-0">Régimen pensionario</Label>
+              <Select value={form.regimen_pensionario} onValueChange={(value) => setForm((current) => ({ ...current, regimen_pensionario: value }))}>
+                <SelectTrigger id="contrato-regimen"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AFP">AFP</SelectItem>
+                  <SelectItem value="ONP">ONP</SelectItem>
+                  <SelectItem value="SIN_REGIMEN">Sin régimen</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Define el descuento previsional en planilla.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contrato-jornada" className="mb-0">Jornada laboral</Label>
+              <Select value={form.jornada_laboral} onValueChange={(value) => setForm((current) => ({ ...current, jornada_laboral: value }))}>
+                <SelectTrigger id="contrato-jornada"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tiempo_completo">Tiempo completo (48h)</SelectItem>
+                  <SelectItem value="part_time">Part time (&lt;4h/día)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contrato-prueba" className="mb-0">Periodo de prueba (meses)</Label>
+              <Input id="contrato-prueba" type="number" min="0" max="12" step="1" value={form.periodo_prueba_meses} onChange={(event) => setForm((current) => ({ ...current, periodo_prueba_meses: event.target.value }))} />
+              <p className="text-xs text-muted-foreground">3 general · 6 calificados · 12 dirección.</p>
             </div>
           </div>
 
