@@ -443,13 +443,17 @@ export class PlanillasService {
 
     // 2. DESCUENTOS
 
+    // Base asegurable: la asignación familiar es remuneración computable (Ley 25129),
+    // por lo que integra la base de AFP/ONP y del aporte a ESSALUD.
+    const baseAsegurable = totalIngresos;
+
     const contratoActual = contratoVigenteDe(empleado);
     const regimenPensionario = contratoActual?.regimen_pensionario || 'AFP';
 
     if (regimenPensionario === 'AFP') {
       // AFP - Aporte obligatorio (10%)
       // ✅ FIX: Usar Decimal.js para cálculos de nómina
-      const aporteAFP = new Decimal(sueldoBasico).times(normativa.afpAporte).toDecimalPlaces(2).toNumber();
+      const aporteAFP = new Decimal(baseAsegurable).times(normativa.afpAporte).toDecimalPlaces(2).toNumber();
       const conceptoAporteAFP = conceptos.find(c => c.codigo === '101');
       if (conceptoAporteAFP) {
         conceptosDetalle.push({
@@ -464,7 +468,7 @@ export class PlanillasService {
       // TODO: Estas tasas deben ser configurables por tenant y AFP del empleado
       // Tasa por defecto: AFP Integra comisión flujo 1.55% (vigente 2024-2025)
       const tasaComisionAFP = contratoActual?.tasa_comision_afp ?? normativa.afpComisionFlujoDefault;
-      const comisionAFP = new Decimal(sueldoBasico).times(tasaComisionAFP).toDecimalPlaces(2).toNumber();
+      const comisionAFP = new Decimal(baseAsegurable).times(tasaComisionAFP).toDecimalPlaces(2).toNumber();
       const conceptoComisionAFP = conceptos.find(c => c.codigo === '102');
       if (conceptoComisionAFP) {
         conceptosDetalle.push({
@@ -477,7 +481,7 @@ export class PlanillasService {
 
       // AFP - Seguro de invalidez vigente SBS 2026: 1.37%.
       const tasaSeguroAFP = contratoActual?.tasa_seguro_afp ?? normativa.afpPrimaSeguro;
-      const seguroAFP = new Decimal(sueldoBasico).times(tasaSeguroAFP).toDecimalPlaces(2).toNumber();
+      const seguroAFP = new Decimal(baseAsegurable).times(tasaSeguroAFP).toDecimalPlaces(2).toNumber();
       const conceptoSeguroAFP = conceptos.find(c => c.codigo === '103');
       if (conceptoSeguroAFP) {
         conceptosDetalle.push({
@@ -489,7 +493,7 @@ export class PlanillasService {
       }
     } else if (regimenPensionario === 'ONP') {
       // ONP (13%)
-      const aporteONP = new Decimal(sueldoBasico).times(normativa.onpAporte).toDecimalPlaces(2).toNumber();
+      const aporteONP = new Decimal(baseAsegurable).times(normativa.onpAporte).toDecimalPlaces(2).toNumber();
       const conceptoONP = conceptos.find(c => c.codigo === '104');
       if (conceptoONP) {
         conceptosDetalle.push({
@@ -518,7 +522,7 @@ export class PlanillasService {
     // 3. APORTES DEL EMPLEADOR
 
     // ESSALUD (9%)
-    const aporteESSALUD = new Decimal(sueldoBasico).times(normativa.essaludAporte).toDecimalPlaces(2).toNumber();
+    const aporteESSALUD = new Decimal(baseAsegurable).times(normativa.essaludAporte).toDecimalPlaces(2).toNumber();
     const conceptoESSALUD = conceptos.find(c => c.codigo === '201');
     if (conceptoESSALUD) {
       conceptosDetalle.push({

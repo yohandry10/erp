@@ -22,7 +22,9 @@ const createEmptyForm = () => ({
   puesto: '',
   id_departamento: '',
   fecha_ingreso: '',
-  estado: 'activo'
+  estado: 'activo',
+  tiene_hijos: false,
+  cantidad_hijos: ''
 })
 
 const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
@@ -53,17 +55,25 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
       puesto: initialData.puesto || '',
       id_departamento: initialData.id_departamento || '',
       fecha_ingreso: initialData.fecha_ingreso || '',
-      estado: initialData.estado || 'activo'
+      estado: initialData.estado || 'activo',
+      tiene_hijos: initialData.tiene_hijos === true,
+      cantidad_hijos:
+        initialData.cantidad_hijos === null || initialData.cantidad_hijos === undefined
+          ? ''
+          : String(initialData.cantidad_hijos)
     })
   }, [isOpen, initialData])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(formData)
+    onSubmit({
+      ...formData,
+      cantidad_hijos: formData.tiene_hijos ? Number(formData.cantidad_hijos) || 0 : 0
+    })
     setFormData(createEmptyForm())
   }
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
@@ -339,6 +349,38 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
                 e.currentTarget.style.boxShadow = 'none'
               }}
             />
+          </div>
+
+          {/* Carga familiar: habilita la asignación familiar (10% de la RMV) en planilla */}
+          <div className="mb-8">
+            <label className="flex items-center gap-3 font-semibold text-[var(--primary-700)]">
+              <input
+                type="checkbox"
+                checked={formData.tiene_hijos}
+                onChange={(e) => handleChange('tiene_hijos', e.target.checked)}
+                className="size-4"
+              />
+              Tiene hijos menores de 18 años (o hasta 24 cursando estudios superiores)
+            </label>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Da derecho a la asignación familiar equivalente al 10% de la RMV vigente.
+            </p>
+            {formData.tiene_hijos ? (
+              <div className="mt-4">
+                <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+                  Cantidad de hijos
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={formData.cantidad_hijos}
+                  onChange={(e) => handleChange('cantidad_hijos', e.target.value)}
+                  placeholder="1"
+                  className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
+                />
+              </div>
+            ) : null}
           </div>
 
           {/* Botones */}
