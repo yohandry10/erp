@@ -4,6 +4,11 @@ import { EventBusService, PlanillaCalculadaEvent, PlanillaPagadaEvent } from '..
 import Decimal from 'decimal.js';
 import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  calcularGratificacionTrunca,
+  mesesGratificablesDelPeriodo,
+  parseFechaLocal,
+} from './liquidacion-peru.util';
 
 const CONCEPTOS_PLANILLA_BASE = [
   { codigo: '001', nombre: 'Sueldo basico', tipo: 'ingreso' },
@@ -11,6 +16,8 @@ const CONCEPTOS_PLANILLA_BASE = [
   { codigo: '003', nombre: 'Horas extras 25%', tipo: 'ingreso' },
   { codigo: '004', nombre: 'Horas extras 35%', tipo: 'ingreso' },
   { codigo: '005', nombre: 'Bono adicional', tipo: 'ingreso' },
+  { codigo: '006', nombre: 'Gratificacion legal', tipo: 'ingreso' },
+  { codigo: '007', nombre: 'Bonificacion extraordinaria 9%', tipo: 'ingreso' },
   { codigo: '101', nombre: 'Aporte AFP', tipo: 'descuento' },
   { codigo: '102', nombre: 'Comision AFP', tipo: 'descuento' },
   { codigo: '103', nombre: 'Seguro AFP', tipo: 'descuento' },
@@ -248,7 +255,7 @@ export class PlanillasService {
       const sueldoBasico = parseFloat(contratoActual.sueldo_bruto) || 0;
       this.logger.debug(`Procesando empleado ID=${empleado.id}`);
 
-      const calculoEmpleado = this.calcularEmpleado(empleado, sueldoBasico, conceptos, normativa);
+      const calculoEmpleado = this.calcularEmpleado(empleado, sueldoBasico, conceptos, normativa, planillaEstado.periodo);
 
       // Insertar empleado en planilla
       const { data: empleadoPlanilla, error: empError } = await client
@@ -428,6 +435,7 @@ export class PlanillasService {
     sueldoBasico: number,
     conceptos: any[],
     normativa: NormativaPeruPeriodo = NORMATIVA_PERU_2026_DEFAULT,
+    periodo?: string,
   ) {
     const conceptosDetalle = [];
     let totalIngresos = 0;
@@ -464,6 +472,40 @@ export class PlanillasService {
     // Base asegurable: la asignación familiar es remuneración computable (Ley 25129),
     // por lo que integra la base de AFP/ONP y del aporte a ESSALUD.
     const baseAsegurable = totalIngresos;
+
+    // Gratificaciones de julio y diciembre (Ley 27735) más la bonificación
+    // extraordinaria del 9 % que sustituye el aporte a EsSalud (Ley 30334).
+    // Se suman DESPUÉS de fijar la base asegurable porque están inafectas de
+    // aportes y contribuciones; sí son renta de quinta categoría, y el impuesto
+    // se calcula más abajo sobre el total de ingresos.
+    const mesesGratificables = mesesGratificablesDelPeriodo(
+      periodo ?? '',
+      parseFechaLocal(empleado?.fecha_ingreso),
+    );
+
+    if (mesesGratificables !== null && mesesGratificables > 0) {
+      const gratificacion = calcularGratificacionTrunca(baseAsegurable, mesesGratificables);
+
+      const conceptoGratificacion = conceptos.find(c => c.codigo === '006');
+      if (conceptoGratificacion) {
+        conceptosDetalle.push({
+          id: conceptoGratificacion.id,
+          monto: gratificacion.gratificacion,
+          observaciones: `Gratificación ${mesesGratificables}/6 del semestre`,
+        });
+        totalIngresos += gratificacion.gratificacion;
+      }
+
+      const conceptoBonificacion = conceptos.find(c => c.codigo === '007');
+      if (conceptoBonificacion) {
+        conceptosDetalle.push({
+          id: conceptoBonificacion.id,
+          monto: gratificacion.bonificacionExtraordinaria,
+          observaciones: 'Bonificación extraordinaria 9% (Ley 30334)',
+        });
+        totalIngresos += gratificacion.bonificacionExtraordinaria;
+      }
+    }
 
     const contratoActual = contratoVigenteDe(empleado);
     const regimenPensionario = contratoActual?.regimen_pensionario || 'AFP';
