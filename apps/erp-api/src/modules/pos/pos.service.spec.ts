@@ -57,7 +57,12 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any } = {}) => {
     }
   };
 
+  let correlativoFiscal = 40;
   const rpcMock = jest.fn(async (fn: string, _args?: any) => {
+    if (fn === 'obtener_siguiente_numero_documento') {
+      correlativoFiscal += 1;
+      return { data: String(correlativoFiscal).padStart(8, '0'), error: null };
+    }
     if (fn === 'pos_registrar_venta_full_tx') {
       return {
         data: [
@@ -298,6 +303,90 @@ describe('PosService full transaction contract', () => {
         }),
       }),
     );
+  });
+
+  it('reserva el correlativo fiscal en documento_series cuando el ticket usa serie interna', async () => {
+    const ctx = createService();
+    ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+
+    // El mock de full_tx devuelve el ticket interno T001-000001: ese correlativo
+    // pertenece a la secuencia por caja y no puede viajar al comprobante.
+    const result = await ctx.service.procesarVenta(ventaBase, user);
+
+    expect(result.success).toBe(true);
+    expect(ctx.rpcMock).toHaveBeenCalledWith('obtener_siguiente_numero_documento', {
+      p_tenant_id: 'tenant-1',
+      p_tipo_documento: '03',
+      p_serie: 'B001',
+    });
+    const colaCpe = ctx.updates.find(
+      (entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data,
+    );
+    expect(colaCpe?.rows.cpe_data.serie).toBe('B001');
+    expect(colaCpe?.rows.cpe_data.numero).toBe(41);
+    expect(colaCpe?.rows.cpe_data.numero).not.toBe(1);
+  });
+
+  it('conserva el correlativo del ticket cuando el POS ya lo reservo sobre la serie fiscal', async () => {
+    const ctx = createService();
+    ctx.rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === 'pos_registrar_venta_full_tx') {
+        return {
+          data: [
+            {
+              venta_id: 'venta-1',
+              numero_ticket: 'B001-00000199',
+              subtotal: 100,
+              impuestos: 18,
+              total: 118,
+              impactos_aplicados: true,
+              caja_movimiento_id: 'mov-caja-1',
+            },
+          ],
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+    ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+
+    const result = await ctx.service.procesarVenta(
+      { ...ventaBase, comprobante: { tipo: '03', serie: 'B001' } },
+      user,
+    );
+
+    expect(result.success).toBe(true);
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith(
+      'obtener_siguiente_numero_documento',
+      expect.any(Object),
+    );
+    const colaCpe = ctx.updates.find(
+      (entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data,
+    );
+    expect(colaCpe?.rows.cpe_data.numero).toBe(199);
+  });
+
+  it('reutiliza el correlativo fiscal ya reservado si la venta se reintenta', async () => {
+    const ctx = createService({ ventasPosResponse: { cpe_data: { serie: 'B001', numero: 77 } } });
+    ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+
+    const result = await ctx.service.procesarVenta(ventaBase, user);
+
+    expect(result.success).toBe(true);
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith(
+      'obtener_siguiente_numero_documento',
+      expect.any(Object),
+    );
+    const colaCpe = ctx.updates.find(
+      (entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data,
+    );
+    expect(colaCpe?.rows.cpe_data.numero).toBe(77);
   });
 
   it('no bloquea la venta POS emitiendo CPE sincrono y la deja pendiente para el worker', async () => {
