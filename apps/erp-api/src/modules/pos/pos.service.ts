@@ -181,6 +181,25 @@ export class PosService {
   }
 
   /**
+   * Tipos de método de pago que se liquidan en el acto. Sólo lo que no está aquí
+   * genera cuenta por cobrar: una transferencia o un Yape se cobran al momento
+   * de la venta aunque no entren a la gaveta, y tratarlos como crédito abría una
+   * CxC por una venta ya pagada. `DIGITAL` se conserva por compatibilidad con
+   * catálogos antiguos anteriores a `BILLETERA_DIGITAL`.
+   */
+  private static readonly TIPOS_PAGO_INMEDIATO = new Set([
+    'EFECTIVO',
+    'TARJETA',
+    'DIGITAL',
+    'BILLETERA_DIGITAL',
+    'TRANSFERENCIA',
+  ]);
+
+  private esPagoInmediato(tipo: string | null | undefined): boolean {
+    return PosService.TIPOS_PAGO_INMEDIATO.has(String(tipo ?? '').trim().toUpperCase());
+  }
+
+  /**
    * Descuenta el descuento global de la base imponible de cada ítem, prorrateado
    * por su peso en el subtotal. El prorrateo evita mover base entre afectaciones
    * distintas: si se restara todo de un ítem gravado, un descuento sobre una
@@ -1287,12 +1306,12 @@ export class PosService {
       let creditoMonto = 0;
       if (pagosNormalizados && pagosNormalizados.length > 0) {
         creditoMonto = pagosNormalizados
-          .filter((p) => p.tipo !== 'EFECTIVO' && p.tipo !== 'TARJETA' && p.tipo !== 'DIGITAL')
+          .filter((p) => !this.esPagoInmediato(p.tipo))
           .reduce((sum, p) => sum + p.monto, 0);
       } else {
         const metodoPago = ventaData.metodo_pago_id || 'efectivo';
         const metodoInfoCxC = await this.getMetodoPagoInfo(metodoPago, user.tenant_id);
-        if (metodoInfoCxC.tipo !== 'EFECTIVO' && metodoInfoCxC.tipo !== 'TARJETA' && metodoInfoCxC.tipo !== 'DIGITAL') {
+        if (!this.esPagoInmediato(metodoInfoCxC.tipo)) {
           creditoMonto = totalCalculado;
         }
       }

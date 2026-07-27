@@ -14,7 +14,7 @@ const productoBase = {
   unidad_medida: 'NIU',
 };
 
-const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any[] } = {}) => {
+const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any[]; metodoPago?: any } = {}) => {
   const inserts: Array<{ table: string; rows: any }> = [];
   const updates: Array<{ table: string; rows: any }> = [];
   const responseFor = (table: string) => {
@@ -39,7 +39,10 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any
       case 'ventas_pos':
         return { data: fixtures.ventasPosResponse ?? [], error: null };
       case 'metodos_pago':
-        return { data: { id: 'mp-efectivo', codigo: 'efectivo', tipo: 'EFECTIVO' }, error: null };
+        return {
+          data: fixtures.metodoPago ?? { id: 'mp-efectivo', codigo: 'efectivo', tipo: 'EFECTIVO' },
+          error: null,
+        };
       case 'productos':
         return { data: fixtures.productos ?? [productoBase], error: null };
       case 'detalle_ventas_pos':
@@ -118,7 +121,7 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any
   return { supabaseClient, rpcMock, inserts, updates };
 };
 
-const createService = (fixtures: { ventasPosResponse?: any; productos?: any[] } = {}) => {
+const createService = (fixtures: { ventasPosResponse?: any; productos?: any[]; metodoPago?: any } = {}) => {
   const { supabaseClient, rpcMock, inserts, updates } = createSupabaseMock(fixtures);
 
   const supabaseService: any = {
@@ -142,6 +145,7 @@ const createService = (fixtures: { ventasPosResponse?: any; productos?: any[] } 
   };
 
   const cpeService: any = { create: jest.fn(async () => ({ id: 'cpe-1' })) };
+  const cxcService: any = { crearCuentaPorCobrarDesdeFactura: jest.fn(async () => undefined) };
 
   const service = new PosService(
     supabaseService,
@@ -151,7 +155,7 @@ const createService = (fixtures: { ventasPosResponse?: any; productos?: any[] } 
     { getConfigurationStatus: jest.fn() } as any, // ConfigurationService
     { emitVentaProcessed: jest.fn(async () => undefined) } as any, // EventBusService
     {} as any, // InventoryIntegrationService
-    { crearCuentaPorCobrarDesdeFactura: jest.fn() } as any, // CxcService
+    cxcService,
     taxCalculator,
     { listarCajas: jest.fn(async () => []) } as any, // CajasService
     { registrarEvento: jest.fn(async () => null) } as any, // PosAuditService
@@ -165,6 +169,7 @@ const createService = (fixtures: { ventasPosResponse?: any; productos?: any[] } 
     tenantContext,
     validationService,
     cpeService,
+    cxcService,
     taxCalculator,
     rpcMock,
     inserts,
@@ -302,6 +307,36 @@ describe('PosService full transaction contract', () => {
         }),
       }),
     );
+  });
+
+  it('no abre cuenta por cobrar cuando el pago se liquida en el acto', async () => {
+    const ctx = createService({
+      metodoPago: { id: 'mp-yape', codigo: 'yape', tipo: 'BILLETERA_DIGITAL' },
+    });
+    ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+
+    const result = await ctx.service.procesarVenta({ ...ventaBase, metodo_pago_id: 'yape' }, user);
+
+    expect(result.success).toBe(true);
+    expect(ctx.cxcService.crearCuentaPorCobrarDesdeFactura).not.toHaveBeenCalled();
+  });
+
+  it('trata como crédito el medio de pago diferido', async () => {
+    const ctx = createService({
+      metodoPago: { id: 'mp-credito', codigo: 'credito', tipo: 'CREDITO' },
+    });
+    ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+
+    // Sin cliente registrado la venta a crédito se rechaza antes de crear la CxC:
+    // ese rechazo es la señal de que el medio se clasificó como diferido.
+    const result = await ctx.service.procesarVenta({ ...ventaBase, metodo_pago_id: 'credito' }, user);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.codigo).toBe('CLIENTE_REQUERIDO_CREDITO');
   });
 
   it('descuenta el descuento global de la base imponible, no del total con IGV', async () => {
