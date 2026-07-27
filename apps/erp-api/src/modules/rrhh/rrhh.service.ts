@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import PDFDocument from 'pdfkit';
+import { contratoVigenteDe } from './planillas.service';
 import {
   calcularCts,
   calcularGratificacionTrunca,
@@ -11,6 +12,8 @@ import {
   mesesDelSemestreGratificatorio,
   remuneracionComputableCts,
   parseFechaLocal,
+  semestreCts,
+  tiempoComputableCts,
   tiempoDeServicios,
 } from './liquidacion-peru.util';
 
@@ -1569,6 +1572,88 @@ export class RrhhService {
     if (error) throw error;
 
     return data || [];
+  }
+
+  /**
+   * Calcula el depósito semestral de CTS de todos los empleados activos
+   * (D.S. 001-97-TR, art. 21): mayo liquida noviembre-abril y noviembre liquida
+   * mayo-octubre.
+   *
+   * La CTS no es un concepto de planilla: no se paga con la remuneración del mes
+   * ni está afecta a aportes o a renta, por eso tiene su propio libro. Recalcular
+   * un semestre actualiza el importe en vez de duplicar el depósito.
+   */
+  async calcularDepositosCts(periodo: string, tenantId: string) {
+    if (!tenantId) {
+      throw new BadRequestException('Tenant requerido para RRHH');
+    }
+
+    const semestre = semestreCts(periodo);
+    if (!semestre) {
+      throw new BadRequestException(
+        `La CTS se deposita en mayo y noviembre. El periodo "${periodo}" no corresponde a un depósito.`,
+      );
+    }
+
+    const client = this.supabaseService.getClient();
+    const { data: empleados, error } = await client
+      .from('empleados')
+      .select('*, contratos(*)')
+      .eq('tenant_id', tenantId)
+      .eq('estado', 'activo');
+
+    if (error) throw error;
+
+    const rmv = await this.obtenerRmvVigente(periodo, tenantId);
+    const asignacionFamiliar = Number((rmv * 0.1).toFixed(2));
+    const depositos = [];
+
+    for (const empleado of empleados || []) {
+      const contrato = contratoVigenteDe(empleado);
+      if (!contrato) continue;
+
+      const tiempo = tiempoComputableCts(periodo, parseFechaLocal(empleado.fecha_ingreso));
+      if (!tiempo || (tiempo.meses === 0 && tiempo.dias === 0)) continue;
+
+      // La asignación familiar es remuneración computable (Ley 25129), así que
+      // integra la base de la CTS igual que la de los aportes.
+      const remuneracion =
+        (parseFloat(contrato.sueldo_bruto) || 0) + (this.tieneHijosEmpleado(empleado) ? asignacionFamiliar : 0);
+      const computable = remuneracionComputableCts(remuneracion);
+
+      depositos.push({
+        tenant_id: tenantId,
+        empleado_id: empleado.id,
+        periodo,
+        semestre_inicio: semestre.inicio.toISOString().slice(0, 10),
+        semestre_fin: new Date(semestre.fin.getTime() - 86400000).toISOString().slice(0, 10),
+        remuneracion_computable: computable,
+        meses_computables: tiempo.meses,
+        dias_computables: tiempo.dias,
+        monto: calcularCts(computable, tiempo),
+        estado: 'CALCULADO',
+        metadata: { remuneracion_mensual: remuneracion, asignacion_familiar_incluida: remuneracion > (parseFloat(contrato.sueldo_bruto) || 0) },
+      });
+    }
+
+    if (depositos.length === 0) {
+      return { success: true, periodo, depositos: [], total: 0 };
+    }
+
+    const { data, error: upsertError } = await client
+      .from('depositos_cts')
+      .upsert(depositos, { onConflict: 'tenant_id,empleado_id,periodo' })
+      .select();
+
+    if (upsertError) throw upsertError;
+
+    const total = (data || []).reduce((suma: number, d: any) => suma + Number(d.monto || 0), 0);
+    return { success: true, periodo, depositos: data || [], total: Number(total.toFixed(2)) };
+  }
+
+  /** Igual criterio que la planilla para decidir si corresponde asignación familiar. */
+  private tieneHijosEmpleado(empleado: any): boolean {
+    return Boolean(empleado?.tiene_hijos) || Number(empleado?.cantidad_hijos ?? 0) > 0;
   }
 
   // RMV vigente para el periodo del contrato. Prioriza la fila del tenant sobre la global.

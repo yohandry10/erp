@@ -508,6 +508,17 @@ export class RrhhController {
     return this.rrhhService.calcularLiquidacion(empleadoId, data.motivo_terminacion, data.fecha_terminacion, tenantId);
   }
 
+  // ===== CTS =====
+  // La CTS se deposita en mayo y noviembre; no es un concepto de planilla.
+  @Post('cts/depositos')
+  async calcularDepositosCts(
+    @CurrentTenant() tenantId: string,
+    @Body() data: { periodo: string },
+  ) {
+    this.logger.debug(`💰 [RRHH] Calculando depósitos de CTS del periodo ${data?.periodo}, tenant: ${tenantId}`);
+    return this.rrhhService.calcularDepositosCts(data?.periodo, tenantId);
+  }
+
   // ===== HORARIOS =====
   @Get('horarios')
   async getHorarios(@CurrentTenant() tenantId: string) {

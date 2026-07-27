@@ -133,10 +133,43 @@ manda la norma. Seis specs fijan estas reglas, incluida la inafectación.
 
 Los datos de prueba se borraron; el tenant demo queda en 0 empleados y 0 planillas.
 
+## Depósito semestral de CTS
+
+La CTS sólo se calculaba al cese. La norma obliga a depositarla dos veces al año
+(D.S. 001-97-TR, art. 21): en mayo por el semestre noviembre-abril y en noviembre por el
+semestre mayo-octubre.
+
+La CTS **no es un concepto de planilla**: no se paga con la remuneración del mes, se
+deposita en la cuenta CTS del trabajador y está inafecta de aportes y del impuesto a la
+renta. Por eso se le dio su propio libro y no una fila de planilla.
+
+- `361__depositos_cts_semestrales.sql` crea `depositos_cts` con RLS forzado y aislamiento
+  por tenant, igual que el resto de tablas de RRHH. La unicidad por
+  `(tenant, empleado, periodo)` hace idempotente el cálculo: recalcular un semestre
+  actualiza el importe en vez de duplicar el depósito.
+- `semestreCts` y `tiempoComputableCts` resuelven el semestre y los meses computables,
+  contando desde el ingreso si el trabajador entró con el semestre empezado.
+- `POST /api/rrhh/cts/depositos` calcula el semestre para todos los empleados activos.
+- La asignación familiar entra en la base, por ser remuneración computable (Ley 25129).
+
+### Verificación end-to-end
+
+Dos empleados con antigüedad distinta, periodo `2026-05`:
+
+| Empleado | Meses | Remuneración computable | Depósito |
+|---|---|---|---|
+| Ingreso 2020, S/ 1,200, sin hijos | 6 | 1,400.00 (1200 + 1200/6) | **700.00** |
+| Ingreso feb-2026, S/ 1,200, con hijos | 3 | 1,531.83 (incluye asignación familiar) | **382.96** |
+
+Un semestre completo deposita media remuneración computable, que es lo que corresponde a
+seis dozavos. El periodo `2026-07` se rechaza con **HTTP 400** y mensaje explícito, no con
+un 500. El recálculo del mismo semestre deja las mismas dos filas y el mismo total.
+
+Siete specs adicionales fijan los límites del semestre, el prorrateo por ingreso tardío y
+el rechazo de periodos que no son de depósito. Los datos de prueba se borraron.
+
 ## Lo que sigue sin implementar
 
-- Depósito semestral de CTS en mayo y noviembre (D.S. 001-97-TR). Hoy la CTS sólo se
-  liquida al cese.
 - Remuneración vacacional al momento del goce.
 
-Mientras no existan, el módulo no cubre el ciclo completo de una planilla peruana.
+El módulo ya cubre gratificaciones, CTS semestral y liquidación al cese.

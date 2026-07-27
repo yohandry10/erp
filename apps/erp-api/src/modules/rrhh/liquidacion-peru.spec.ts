@@ -6,6 +6,8 @@ import {
   diasVacacionesPendientes,
   mesesDelSemestreGratificatorio,
   remuneracionComputableCts,
+  semestreCts,
+  tiempoComputableCts,
   tiempoDeServicios,
   parseFechaLocal,
 } from './liquidacion-peru.util';
@@ -129,5 +131,47 @@ describe('gratificación trunca', () => {
 
   it('arranca en la fecha de ingreso si entró dentro del semestre', () => {
     expect(mesesDelSemestreGratificatorio(parseFechaLocal('2026-08-01'), parseFechaLocal('2026-10-01'))).toBe(2);
+  });
+});
+
+// D.S. 001-97-TR art. 21: mayo deposita el semestre noviembre-abril y noviembre
+// el semestre mayo-octubre. Antes la CTS solo se calculaba al cese.
+describe('deposito semestral de CTS', () => {
+  it('mayo liquida el semestre noviembre-abril', () => {
+    const s = semestreCts('2026-05');
+    expect(s?.inicio.getFullYear()).toBe(2025);
+    expect(s?.inicio.getMonth()).toBe(10); // noviembre
+    expect(s?.fin.getMonth()).toBe(4);     // corta el 1 de mayo
+  });
+
+  it('noviembre liquida el semestre mayo-octubre', () => {
+    const s = semestreCts('2026-11');
+    expect(s?.inicio.getMonth()).toBe(4);  // mayo
+    expect(s?.fin.getMonth()).toBe(10);    // corta el 1 de noviembre
+  });
+
+  it('rechaza periodos que no son de deposito', () => {
+    expect(semestreCts('2026-07')).toBeNull();
+    expect(semestreCts('2026-12')).toBeNull();
+    expect(semestreCts('basura')).toBeNull();
+  });
+
+  it('un semestre completo computa seis meses', () => {
+    expect(tiempoComputableCts('2026-05', parseFechaLocal('2020-01-01'))).toEqual({ meses: 6, dias: 0 });
+  });
+
+  it('cuenta desde el ingreso si entro con el semestre empezado', () => {
+    // Ingreso el 1 de febrero: febrero, marzo y abril -> 3 meses
+    expect(tiempoComputableCts('2026-05', parseFechaLocal('2026-02-01'))).toEqual({ meses: 3, dias: 0 });
+  });
+
+  it('no computa nada si ingreso despues de cerrado el semestre', () => {
+    expect(tiempoComputableCts('2026-05', parseFechaLocal('2026-06-01'))).toEqual({ meses: 0, dias: 0 });
+  });
+
+  it('un semestre completo deposita media remuneracion computable', () => {
+    const rc = remuneracionComputableCts(1200); // 1400
+    const t = tiempoComputableCts('2026-05', parseFechaLocal('2020-01-01'))!;
+    expect(calcularCts(rc, t)).toBe(700);
   });
 });
