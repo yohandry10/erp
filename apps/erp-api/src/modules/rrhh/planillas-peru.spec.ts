@@ -79,36 +79,37 @@ describe('contratoVigenteDe', () => {
   });
 });
 
+const normativa = {
+  uit: 5500,
+  rmv: 1130,
+  asignacionFamiliar: 113,
+  afpAporte: 0.1,
+  afpPrimaSeguro: 0.0137,
+  afpComisionFlujoDefault: 0.0155,
+  onpAporte: 0.13,
+  essaludAporte: 0.09,
+  quintaDeduccionUit: 7,
+};
+
+// Códigos usados por el servicio: 001 básico, 002 asignación familiar,
+// 104 ONP, 201 ESSALUD.
+const conceptos = ['001', '002', '006', '007', '101', '102', '103', '104', '105', '201'].map((codigo) => ({
+  id: `c-${codigo}`,
+  codigo,
+}));
+
+const service = new PlanillasService({ getClient: jest.fn() } as any, {} as any);
+
+const calcular = (empleado: any, sueldo: number, periodo?: string) =>
+  (service as any).calcularEmpleado(empleado, sueldo, conceptos, normativa, periodo);
+
+const montoDe = (r: any, codigo: string) =>
+  r.conceptosDetalle.find((d: any) => d.id === `c-${codigo}`)?.monto;
+
 // La asignación familiar es remuneración computable (Ley 25129): integra la base de
 // AFP/ONP y del aporte del empleador a ESSALUD. Calcularla solo sobre el sueldo básico
 // sub-declaraba el aporte a ESSALUD y sub-retenía el aporte previsional.
 describe('calcularEmpleado — base asegurable peruana', () => {
-  const normativa = {
-    uit: 5500,
-    rmv: 1130,
-    asignacionFamiliar: 113,
-    afpAporte: 0.1,
-    afpPrimaSeguro: 0.0137,
-    afpComisionFlujoDefault: 0.0155,
-    onpAporte: 0.13,
-    essaludAporte: 0.09,
-    quintaDeduccionUit: 7,
-  };
-
-  // Códigos usados por el servicio: 001 básico, 002 asignación familiar,
-  // 104 ONP, 201 ESSALUD.
-  const conceptos = ['001', '002', '101', '102', '103', '104', '105', '201'].map((codigo) => ({
-    id: `c-${codigo}`,
-    codigo,
-  }));
-
-  const service = new PlanillasService({ getClient: jest.fn() } as any, {} as any);
-
-  const calcular = (empleado: any, sueldo: number) =>
-    (service as any).calcularEmpleado(empleado, sueldo, conceptos, normativa);
-
-  const montoDe = (r: any, codigo: string) =>
-    r.conceptosDetalle.find((d: any) => d.id === `c-${codigo}`)?.monto;
 
   it('incluye la asignacion familiar en la base de ONP y ESSALUD', () => {
     const empleado = {
@@ -146,5 +147,54 @@ describe('calcularEmpleado — base asegurable peruana', () => {
 
     expect(montoDe(r, '101')).toBe(200); // aporte 10%
     expect(montoDe(r, '104')).toBeUndefined(); // no debe haber ONP
+  });
+});
+
+// Ley 27735: la gratificacion se paga en julio y diciembre. Ley 30334: esta
+// inafecta de aportes y contribuciones, y se agrega una bonificacion
+// extraordinaria del 9 % equivalente al aporte a EsSalud que no se paga.
+describe('calcularEmpleado — gratificaciones de ley', () => {
+  const empleadoDesde = (fechaIngreso: string) => ({
+    tiene_hijos: false,
+    fecha_ingreso: fechaIngreso,
+    contratos: [{ estado: 'vigente', regimen_pensionario: 'ONP' }],
+  });
+
+  it('no paga gratificacion en un mes que no es julio ni diciembre', () => {
+    const r = calcular(empleadoDesde('2020-01-01'), 2000, '2026-05');
+    expect(montoDe(r, '006')).toBeUndefined();
+    expect(r.totalIngresos).toBe(2000);
+  });
+
+  it('en julio paga un sueldo completo por el semestre trabajado', () => {
+    const r = calcular(empleadoDesde('2020-01-01'), 2000, '2026-07');
+    expect(montoDe(r, '006')).toBe(2000);
+    expect(montoDe(r, '007')).toBe(180); // 9 % de 2000
+    expect(r.totalIngresos).toBe(4180);
+  });
+
+  it('en diciembre paga por el semestre julio-diciembre', () => {
+    const r = calcular(empleadoDesde('2020-01-01'), 2000, '2026-12');
+    expect(montoDe(r, '006')).toBe(2000);
+  });
+
+  it('prorratea por los meses completos del semestre', () => {
+    // Ingreso en abril: abril, mayo y junio -> 3/6
+    const r = calcular(empleadoDesde('2026-04-01'), 2400, '2026-07');
+    expect(montoDe(r, '006')).toBe(1200);
+    expect(montoDe(r, '007')).toBe(108);
+  });
+
+  it('la gratificacion no entra en la base de ONP ni de EsSalud', () => {
+    const r = calcular(empleadoDesde('2020-01-01'), 2000, '2026-07');
+    // Aportes sobre 2000, no sobre 4180
+    expect(montoDe(r, '104')).toBe(260);
+    expect(montoDe(r, '201')).toBe(180);
+  });
+
+  it('la asignacion familiar si integra la base de la gratificacion', () => {
+    const empleado = { ...empleadoDesde('2020-01-01'), tiene_hijos: true };
+    const r = calcular(empleado, 2000, '2026-07');
+    expect(montoDe(r, '006')).toBe(2113);
   });
 });

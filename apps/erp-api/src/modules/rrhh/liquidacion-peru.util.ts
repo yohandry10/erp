@@ -150,6 +150,33 @@ export function calcularGratificacionTrunca(
   };
 }
 
+/**
+ * Meses computables para la gratificación de un periodo de planilla `YYYY-MM`.
+ * Devuelve `null` si el periodo no es julio ni diciembre, que son los únicos en
+ * los que se paga (Ley 27735, art. 1): julio liquida el semestre enero-junio y
+ * diciembre el semestre julio-diciembre.
+ *
+ * Sólo cuentan los meses calendario completos: quien ingresa a mitad de mes
+ * empieza a acumular desde el mes siguiente.
+ */
+export function mesesGratificablesDelPeriodo(periodo: string, fechaIngreso: Date): number | null {
+  const partes = /^(\d{4})-(\d{2})$/.exec(String(periodo ?? '').trim());
+  if (!partes) return null;
+
+  const anio = Number(partes[1]);
+  const mes = Number(partes[2]);
+  if (mes !== 7 && mes !== 12) return null;
+
+  const inicioSemestre = mes === 7 ? new Date(anio, 0, 1) : new Date(anio, 6, 1);
+  // Primer día del mes siguiente al semestre, para que un semestre completo mida seis meses.
+  const finSemestre = mes === 7 ? new Date(anio, 6, 1) : new Date(anio + 1, 0, 1);
+
+  const desde = fechaIngreso > inicioSemestre ? fechaIngreso : inicioSemestre;
+  if (desde >= finSemestre) return 0;
+
+  return Math.max(0, Math.min(6, tiempoDeServicios(desde, finSemestre).meses));
+}
+
 /** Meses completos transcurridos del semestre gratificatorio (ene-jun o jul-dic). */
 export function mesesDelSemestreGratificatorio(ingreso: Date, cese: Date): number {
   const inicioSemestre = new Date(cese.getFullYear(), cese.getMonth() < 6 ? 0 : 6, 1);

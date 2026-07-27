@@ -94,13 +94,49 @@ limpios. `git diff -w --numstat` coincide con `git diff --numstat`.
 El empleado y el contrato creados para la prueba se borraron; el tenant demo vuelve a
 quedar en 0 empleados.
 
+## Gratificaciones de julio y diciembre
+
+La planilla no pagaba las gratificaciones legales: no existían como concepto y ningún
+periodo las calculaba. Se implementaron en el mismo módulo legal.
+
+- `mesesGratificablesDelPeriodo` reconoce los periodos `YYYY-07` y `YYYY-12`, que son los
+  únicos en que se paga (Ley 27735, art. 1), y cuenta los meses calendario completos del
+  semestre correspondiente. Quien ingresa a mitad de mes empieza a acumular el mes
+  siguiente.
+- Se agregaron los conceptos `006 Gratificacion legal` y `007 Bonificacion extraordinaria 9%`.
+- El importe se calcula sobre la remuneración computable, que incluye la asignación
+  familiar.
+
+El punto crítico es dónde se suma: la gratificación y su bonificación se agregan **después**
+de fijar la base asegurable, porque están inafectas de aportes y contribuciones
+(Ley 30334). Sí son renta de quinta categoría, y el impuesto se calcula sobre el total de
+ingresos, de modo que quedan gravadas por renta pero no por AFP/ONP/EsSalud.
+
+### Verificación end-to-end
+
+Empleado con ingreso 2020-01-01 y sueldo S/ 2,000, régimen ONP. Se calcularon dos planillas
+consecutivas sobre el mismo trabajador:
+
+| Concepto | Junio 2026 | Julio 2026 |
+|---|---|---|
+| Sueldo básico | 2,000.00 | 2,000.00 |
+| Gratificación legal | — | **2,000.00** |
+| Bonificación extraordinaria 9 % | — | **180.00** |
+| ONP (13 %) | 260.00 | **260.00** |
+| EsSalud (9 %) | 180.00 | **180.00** |
+| Renta de quinta categoría | — | 77.73 |
+| **Total ingresos** | 2,000.00 | **4,180.00** |
+
+Los aportes son idénticos en ambos meses mientras el ingreso sube S/ 2,180: la
+gratificación no engordó la base de aportes y sí la de renta, que es exactamente lo que
+manda la norma. Seis specs fijan estas reglas, incluida la inafectación.
+
+Los datos de prueba se borraron; el tenant demo queda en 0 empleados y 0 planillas.
+
 ## Lo que sigue sin implementar
 
-Esto corrige la liquidación al cese. **No** implementa las obligaciones periódicas, que
-siguen ausentes del módulo:
-
-- Gratificaciones de julio y diciembre como concepto de planilla (Ley 27735).
-- Depósito semestral de CTS en mayo y noviembre (D.S. 001-97-TR).
+- Depósito semestral de CTS en mayo y noviembre (D.S. 001-97-TR). Hoy la CTS sólo se
+  liquida al cese.
 - Remuneración vacacional al momento del goce.
 
-Mientras no existan, el sistema no puede operar una planilla peruana completa.
+Mientras no existan, el módulo no cubre el ciclo completo de una planilla peruana.
