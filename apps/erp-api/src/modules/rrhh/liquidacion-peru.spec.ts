@@ -6,6 +6,8 @@ import {
   diasVacacionesPendientes,
   mesesDelSemestreGratificatorio,
   remuneracionComputableCts,
+  diasEnPeriodo,
+  dividirRemuneracionPorVacaciones,
   semestreCts,
   tiempoComputableCts,
   tiempoDeServicios,
@@ -173,5 +175,52 @@ describe('deposito semestral de CTS', () => {
     const rc = remuneracionComputableCts(1200); // 1400
     const t = tiempoComputableCts('2026-05', parseFechaLocal('2020-01-01'))!;
     expect(calcularCts(rc, t)).toBe(700);
+  });
+});
+
+// D. Leg. 713 art. 15: en vacaciones el trabajador percibe lo mismo que si
+// hubiera trabajado. El importe del mes no cambia; cambia el concepto.
+describe('remuneracion vacacional', () => {
+  it('no altera el importe total del mes', () => {
+    const r = dividirRemuneracionPorVacaciones(3000, 15);
+    expect(r.montoVacacional).toBe(1500);
+    expect(r.montoTrabajado).toBe(1500);
+    expect(r.montoTrabajado + r.montoVacacional).toBe(3000);
+  });
+
+  it('cierra exacto aunque el treintavo no sea redondo', () => {
+    const r = dividirRemuneracionPorVacaciones(1130, 7);
+    expect(Number((r.montoTrabajado + r.montoVacacional).toFixed(2))).toBe(1130);
+  });
+
+  it('sin vacaciones deja todo como sueldo trabajado', () => {
+    const r = dividirRemuneracionPorVacaciones(2000, 0);
+    expect(r.montoTrabajado).toBe(2000);
+    expect(r.montoVacacional).toBe(0);
+  });
+
+  it('el mes completo de vacaciones no deja sueldo trabajado', () => {
+    const r = dividirRemuneracionPorVacaciones(2000, 30);
+    expect(r.montoVacacional).toBe(2000);
+    expect(r.montoTrabajado).toBe(0);
+  });
+
+  it('tope de 30 dias', () => {
+    expect(dividirRemuneracionPorVacaciones(2000, 45).diasVacaciones).toBe(30);
+  });
+});
+
+describe('diasEnPeriodo', () => {
+  it('cuenta los dias del descanso dentro del mes', () => {
+    expect(diasEnPeriodo('2026-03', parseFechaLocal('2026-03-10'), parseFechaLocal('2026-03-19'))).toBe(10);
+  });
+
+  it('reparte el descanso que cruza el cambio de mes', () => {
+    expect(diasEnPeriodo('2026-03', parseFechaLocal('2026-03-28'), parseFechaLocal('2026-04-06'))).toBe(4);
+    expect(diasEnPeriodo('2026-04', parseFechaLocal('2026-03-28'), parseFechaLocal('2026-04-06'))).toBe(6);
+  });
+
+  it('ignora descansos de otros meses', () => {
+    expect(diasEnPeriodo('2026-05', parseFechaLocal('2026-03-10'), parseFechaLocal('2026-03-19'))).toBe(0);
   });
 });

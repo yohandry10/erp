@@ -93,15 +93,15 @@ const normativa = {
 
 // Códigos usados por el servicio: 001 básico, 002 asignación familiar,
 // 104 ONP, 201 ESSALUD.
-const conceptos = ['001', '002', '006', '007', '101', '102', '103', '104', '105', '201'].map((codigo) => ({
+const conceptos = ['001', '002', '006', '007', '008', '101', '102', '103', '104', '105', '201'].map((codigo) => ({
   id: `c-${codigo}`,
   codigo,
 }));
 
 const service = new PlanillasService({ getClient: jest.fn() } as any, {} as any);
 
-const calcular = (empleado: any, sueldo: number, periodo?: string) =>
-  (service as any).calcularEmpleado(empleado, sueldo, conceptos, normativa, periodo);
+const calcular = (empleado: any, sueldo: number, periodo?: string, diasVacaciones = 0) =>
+  (service as any).calcularEmpleado(empleado, sueldo, conceptos, normativa, periodo, diasVacaciones);
 
 const montoDe = (r: any, codigo: string) =>
   r.conceptosDetalle.find((d: any) => d.id === `c-${codigo}`)?.monto;
@@ -196,5 +196,35 @@ describe('calcularEmpleado — gratificaciones de ley', () => {
     const empleado = { ...empleadoDesde('2020-01-01'), tiene_hijos: true };
     const r = calcular(empleado, 2000, '2026-07');
     expect(montoDe(r, '006')).toBe(2113);
+  });
+});
+
+// D. Leg. 713 art. 15: la remuneracion vacacional sustituye al sueldo de esos
+// dias, no se suma. Y es remuneracion computable, asi que los aportes no varian.
+describe('calcularEmpleado — remuneracion vacacional', () => {
+  const empleado = {
+    tiene_hijos: false,
+    fecha_ingreso: '2020-01-01',
+    contratos: [{ estado: 'vigente', regimen_pensionario: 'ONP' }],
+  };
+
+  it('separa el tramo vacacional sin cambiar el total del mes', () => {
+    const r = calcular(empleado, 3000, '2026-03', 15);
+    expect(montoDe(r, '001')).toBe(1500);
+    expect(montoDe(r, '008')).toBe(1500);
+    expect(r.totalIngresos).toBe(3000);
+  });
+
+  it('no altera la base de ONP ni de EsSalud', () => {
+    const conVacaciones = calcular(empleado, 3000, '2026-03', 15);
+    const sinVacaciones = calcular(empleado, 3000, '2026-03', 0);
+    expect(montoDe(conVacaciones, '104')).toBe(montoDe(sinVacaciones, '104'));
+    expect(montoDe(conVacaciones, '201')).toBe(montoDe(sinVacaciones, '201'));
+  });
+
+  it('sin vacaciones no emite el concepto', () => {
+    const r = calcular(empleado, 3000, '2026-03', 0);
+    expect(montoDe(r, '008')).toBeUndefined();
+    expect(montoDe(r, '001')).toBe(3000);
   });
 });

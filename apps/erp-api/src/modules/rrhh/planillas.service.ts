@@ -6,6 +6,8 @@ import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import { v4 as uuidv4 } from 'uuid';
 import {
   calcularGratificacionTrunca,
+  diasEnPeriodo,
+  dividirRemuneracionPorVacaciones,
   mesesGratificablesDelPeriodo,
   parseFechaLocal,
 } from './liquidacion-peru.util';
@@ -18,6 +20,7 @@ const CONCEPTOS_PLANILLA_BASE = [
   { codigo: '005', nombre: 'Bono adicional', tipo: 'ingreso' },
   { codigo: '006', nombre: 'Gratificacion legal', tipo: 'ingreso' },
   { codigo: '007', nombre: 'Bonificacion extraordinaria 9%', tipo: 'ingreso' },
+  { codigo: '008', nombre: 'Remuneracion vacacional', tipo: 'ingreso' },
   { codigo: '101', nombre: 'Aporte AFP', tipo: 'descuento' },
   { codigo: '102', nombre: 'Comision AFP', tipo: 'descuento' },
   { codigo: '103', nombre: 'Seguro AFP', tipo: 'descuento' },
@@ -244,6 +247,12 @@ export class PlanillasService {
 
     const planillaInfo = planillaEstado;
 
+    const vacacionesPorEmpleado = await this.obtenerDiasVacacionesDelPeriodo(
+      (empleados || []).map((e: any) => e.id),
+      planillaEstado.periodo,
+      tenantId,
+    );
+
     // Procesar cada empleado
     for (const empleado of empleados) {
       const contratoActual = contratoVigenteDe(empleado);
@@ -255,7 +264,14 @@ export class PlanillasService {
       const sueldoBasico = parseFloat(contratoActual.sueldo_bruto) || 0;
       this.logger.debug(`Procesando empleado ID=${empleado.id}`);
 
-      const calculoEmpleado = this.calcularEmpleado(empleado, sueldoBasico, conceptos, normativa, planillaEstado.periodo);
+      const calculoEmpleado = this.calcularEmpleado(
+        empleado,
+        sueldoBasico,
+        conceptos,
+        normativa,
+        planillaEstado.periodo,
+        vacacionesPorEmpleado.get(empleado.id) ?? 0,
+      );
 
       // Insertar empleado en planilla
       const { data: empleadoPlanilla, error: empError } = await client
@@ -430,12 +446,58 @@ export class PlanillasService {
   }
 
   // Lógica de cálculo por empleado
+  /**
+   * Días de vacaciones aprobadas que caen dentro del mes de la planilla. Un
+   * descanso que cruza el cambio de mes se reparte entre las dos planillas, así
+   * que se cuenta el solape en vez del total de la solicitud.
+   */
+  private async obtenerDiasVacacionesDelPeriodo(
+    empleadoIds: string[],
+    periodo: string,
+    tenantId?: string,
+  ): Promise<Map<string, number>> {
+    const porEmpleado = new Map<string, number>();
+    if (!periodo || empleadoIds.length === 0) return porEmpleado;
+
+    let query = this.supabaseService.getClient()
+      .from('solicitudes')
+      .select('id_empleado, fecha_inicio, fecha_fin')
+      .in('id_empleado', empleadoIds)
+      .eq('tipo', 'vacaciones')
+      .eq('estado', 'aprobada');
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      this.logger.warn(`No se pudieron leer las vacaciones del periodo ${periodo}: ${error.message}`);
+      return porEmpleado;
+    }
+
+    for (const solicitud of data || []) {
+      const dias = diasEnPeriodo(
+        periodo,
+        parseFechaLocal((solicitud as any).fecha_inicio),
+        parseFechaLocal((solicitud as any).fecha_fin),
+      );
+      if (dias <= 0) continue;
+
+      const clave = (solicitud as any).id_empleado;
+      porEmpleado.set(clave, (porEmpleado.get(clave) ?? 0) + dias);
+    }
+
+    return porEmpleado;
+  }
+
   private calcularEmpleado(
     empleado: any,
     sueldoBasico: number,
     conceptos: any[],
     normativa: NormativaPeruPeriodo = NORMATIVA_PERU_2026_DEFAULT,
     periodo?: string,
+    diasVacaciones = 0,
   ) {
     const conceptosDetalle = [];
     let totalIngresos = 0;
@@ -444,15 +506,33 @@ export class PlanillasService {
 
     // 1. INGRESOS
 
-    // Sueldo básico
+    // Sueldo básico. En vacaciones el trabajador percibe lo mismo que si hubiera
+    // trabajado (D. Leg. 713, art. 15), así que el importe del mes no cambia:
+    // sólo se separa el tramo vacacional del trabajado, que es lo que hay que
+    // declarar por separado. Ambos son remuneración computable, de modo que la
+    // base de aportes no se altera.
+    const reparto = dividirRemuneracionPorVacaciones(sueldoBasico, diasVacaciones ?? 0);
+
     const conceptoBasico = conceptos.find(c => c.codigo === '001');
     if (conceptoBasico) {
       conceptosDetalle.push({
         id: conceptoBasico.id,
-        monto: sueldoBasico,
-        observaciones: 'Sueldo mensual'
+        monto: reparto.montoTrabajado,
+        observaciones: reparto.diasVacaciones > 0
+          ? `Sueldo por ${30 - reparto.diasVacaciones} días trabajados`
+          : 'Sueldo mensual',
       });
-      totalIngresos += sueldoBasico;
+      totalIngresos += reparto.montoTrabajado;
+    }
+
+    const conceptoVacacional = conceptos.find(c => c.codigo === '008');
+    if (conceptoVacacional && reparto.montoVacacional > 0) {
+      conceptosDetalle.push({
+        id: conceptoVacacional.id,
+        monto: reparto.montoVacacional,
+        observaciones: `Remuneración vacacional por ${reparto.diasVacaciones} días`,
+      });
+      totalIngresos += reparto.montoVacacional;
     }
 
     // Asignación familiar: 10% de la RMV vigente.
