@@ -1251,31 +1251,47 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     return carrito.reduce((sum, item) => sum + item.subtotal, 0)
   }
 
+  // SUNAT, Catalogo 07: solo la base gravada paga IGV. Los codigos 2x son
+  // exonerados, 3x inafectos y 40 exportacion; ante un codigo ausente o
+  // desconocido se asume gravado, que es el caso mayoritario.
+  const esBaseGravada = (item: ItemVenta) => {
+    const codigo = String(item.producto?.afectacion_igv ?? '').trim()
+    if (!codigo) return true
+    return codigo.charAt(0) === '1'
+  }
+
+  // El descuento global reduce la base imponible, no el total ya con impuesto.
+  const calcularDescuentoGlobalMonto = () => {
+    const subtotal = calcularSubtotal()
+    if (subtotal <= 0 || descuentoGlobal.valor <= 0) return 0
+
+    return descuentoGlobal.tipo === 'PORCENTAJE'
+      ? subtotal * Math.min(descuentoGlobal.valor, 100) / 100
+      : Math.min(descuentoGlobal.valor, subtotal)
+  }
+
   const calcularDescuentoTotal = () => {
     const descuentoItems = carrito.reduce((sum, item) => sum + item.descuento_monto, 0)
-
-    // Aplicar descuento global al subtotal antes de descuentos
-    const subtotalOriginal = carrito.reduce((sum, item) => sum + (item.precio_original * item.cantidad), 0)
-    const descuentoGlobalMonto = descuentoGlobal.tipo === 'PORCENTAJE'
-      ? (subtotalOriginal * descuentoGlobal.valor / 100)
-      : descuentoGlobal.valor
-
-    return descuentoItems + descuentoGlobalMonto
+    return descuentoItems + calcularDescuentoGlobalMonto()
   }
 
   const calcularImpuestos = () => {
-    const subtotalConDescuentos = calcularSubtotal()
-    return subtotalConDescuentos * taxRate
+    const subtotal = calcularSubtotal()
+    if (subtotal <= 0) return 0
+
+    // El descuento global se prorratea, asi que reduce la base gravada en la
+    // misma proporcion en la que reduce el subtotal.
+    const factor = 1 - calcularDescuentoGlobalMonto() / subtotal
+    const baseGravada = carrito
+      .filter(esBaseGravada)
+      .reduce((sum, item) => sum + item.subtotal, 0) * factor
+
+    return Number((Math.max(0, baseGravada) * taxRate).toFixed(2))
   }
 
   const calcularTotal = () => {
-    const subtotal = calcularSubtotal()
-    const impuestos = calcularImpuestos()
-    const descuentoGlobalMonto = descuentoGlobal.tipo === 'PORCENTAJE'
-      ? (subtotal * descuentoGlobal.valor / 100)
-      : descuentoGlobal.valor
-
-    return Math.max(0, subtotal + impuestos - descuentoGlobalMonto)
+    const base = calcularSubtotal() - calcularDescuentoGlobalMonto()
+    return Math.max(0, Number((base + calcularImpuestos()).toFixed(2)))
   }
 
   const totalPagosMixtos = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0)

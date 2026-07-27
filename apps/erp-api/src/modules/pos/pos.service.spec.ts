@@ -1,6 +1,20 @@
 import { PosService } from './pos.service';
 
-const createSupabaseMock = (fixtures: { ventasPosResponse?: any } = {}) => {
+const productoBase = {
+  id: 'prod-1',
+  codigo: 'P1',
+  nombre: 'Prod 1',
+  precio_venta: 100,
+  stock_actual: 5,
+  stock_reservado: 0,
+  activo: true,
+  estado: 'ACTIVO',
+  es_servicio: false,
+  controla_stock: true,
+  unidad_medida: 'NIU',
+};
+
+const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any[] } = {}) => {
   const inserts: Array<{ table: string; rows: any }> = [];
   const updates: Array<{ table: string; rows: any }> = [];
   const responseFor = (table: string) => {
@@ -27,22 +41,7 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any } = {}) => {
       case 'metodos_pago':
         return { data: { id: 'mp-efectivo', codigo: 'efectivo', tipo: 'EFECTIVO' }, error: null };
       case 'productos':
-        return {
-          data: [{
-            id: 'prod-1',
-            codigo: 'P1',
-            nombre: 'Prod 1',
-            precio_venta: 100,
-            stock_actual: 5,
-            stock_reservado: 0,
-            activo: true,
-            estado: 'ACTIVO',
-            es_servicio: false,
-            controla_stock: true,
-            unidad_medida: 'NIU',
-          }],
-          error: null,
-        };
+        return { data: fixtures.productos ?? [productoBase], error: null };
       case 'detalle_ventas_pos':
       case 'ventas_pos_pagos':
         return { data: [], error: null };
@@ -119,7 +118,7 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any } = {}) => {
   return { supabaseClient, rpcMock, inserts, updates };
 };
 
-const createService = (fixtures: { ventasPosResponse?: any } = {}) => {
+const createService = (fixtures: { ventasPosResponse?: any; productos?: any[] } = {}) => {
   const { supabaseClient, rpcMock, inserts, updates } = createSupabaseMock(fixtures);
 
   const supabaseService: any = {
@@ -303,6 +302,82 @@ describe('PosService full transaction contract', () => {
         }),
       }),
     );
+  });
+
+  it('descuenta el descuento global de la base imponible, no del total con IGV', async () => {
+    const ctx = createService();
+    ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+
+    await ctx.service.procesarVenta(
+      { ...ventaBase, descuento_global: { tipo: 'PORCENTAJE', valor: 10 } },
+      user,
+    );
+
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_full_tx');
+    // Base 100 - 10 % = 90; el IGV se calcula sobre 90, no sobre 100.
+    expect(rpc?.[1].p_items[0].subtotal).toBe(90);
+    expect(rpc?.[1].p_items[0].igv).toBe(16.2);
+
+    const colaCpe = ctx.updates.find((entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data);
+    expect(colaCpe?.rows.cpe_data.total_gravadas).toBe(90);
+    expect(colaCpe?.rows.cpe_data.total_igv).toBe(16.2);
+    expect(colaCpe?.rows.cpe_data.total_venta).toBe(106.2);
+  });
+
+  it('no cobra IGV sobre un producto exonerado', async () => {
+    const ctx = createService({
+      productos: [{ ...productoBase, afectacion_igv: '20' }],
+    });
+    ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+
+    await ctx.service.procesarVenta(ventaBase, user);
+
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_full_tx');
+    expect(rpc?.[1].p_items[0].igv).toBe(0);
+
+    const colaCpe = ctx.updates.find((entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data);
+    expect(colaCpe?.rows.cpe_data.total_exoneradas).toBe(100);
+    expect(colaCpe?.rows.cpe_data.total_gravadas).toBe(0);
+    expect(colaCpe?.rows.cpe_data.total_igv).toBe(0);
+    expect(colaCpe?.rows.cpe_data.total_venta).toBe(100);
+  });
+
+  it('prorratea el descuento global sin mover base entre afectaciones', async () => {
+    const ctx = createService({
+      productos: [
+        { ...productoBase, id: 'prod-1', afectacion_igv: '10' },
+        { ...productoBase, id: 'prod-exo', codigo: 'P2', nombre: 'Prod exonerado', afectacion_igv: '20' },
+      ],
+    });
+    ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+
+    await ctx.service.procesarVenta(
+      {
+        ...ventaBase,
+        items: [
+          { producto_id: 'prod-1', cantidad: 1, precio_unitario: 100 },
+          { producto_id: 'prod-exo', cantidad: 1, precio_unitario: 100 },
+        ],
+        descuento_global: { tipo: 'MONTO_FIJO', valor: 20 },
+      },
+      user,
+    );
+
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_full_tx');
+    // 20 repartidos por peso: 10 a cada ítem de 100.
+    expect(rpc?.[1].p_items.map((item: any) => item.subtotal)).toEqual([90, 90]);
+    expect(rpc?.[1].p_items.map((item: any) => item.igv)).toEqual([16.2, 0]);
+
+    const colaCpe = ctx.updates.find((entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data);
+    expect(colaCpe?.rows.cpe_data.total_gravadas).toBe(90);
+    expect(colaCpe?.rows.cpe_data.total_exoneradas).toBe(90);
+    expect(colaCpe?.rows.cpe_data.total_igv).toBe(16.2);
   });
 
   it('reserva el correlativo fiscal en documento_series cuando el ticket usa serie interna', async () => {
