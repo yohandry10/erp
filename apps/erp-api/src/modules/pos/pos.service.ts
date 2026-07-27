@@ -180,6 +180,53 @@ export class PosService {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
   }
 
+  /**
+   * Reserva el siguiente correlativo de la serie fiscal en documento_series, que
+   * es la secuencia compartida por POS, Documentos y facturación de pedidos.
+   * Un reintento de la misma venta reutiliza el correlativo ya reservado en vez
+   * de quemar uno nuevo.
+   */
+  private async reservarCorrelativoFiscal(
+    tenantId: string,
+    tipoComprobante: string,
+    serieFiscal: string,
+    ventaId: string,
+  ): Promise<number> {
+    const client = this.supabase.getClient();
+
+    const { data: ventaExistente } = await client
+      .from('ventas_pos')
+      .select('cpe_data')
+      .eq('id', ventaId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const cpeDataPrevio = (ventaExistente as any)?.cpe_data;
+    if (cpeDataPrevio && String(cpeDataPrevio.serie ?? '').trim().toUpperCase() === serieFiscal) {
+      const numeroPrevio = this.parseCorrelativo(cpeDataPrevio.numero);
+      if (numeroPrevio > 0) {
+        return numeroPrevio;
+      }
+    }
+
+    const { data, error } = await client.rpc('obtener_siguiente_numero_documento', {
+      p_tenant_id: tenantId,
+      p_tipo_documento: tipoComprobante,
+      p_serie: serieFiscal,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const numero = this.parseCorrelativo(Array.isArray(data) ? data[0] : data);
+    if (numero <= 0) {
+      throw new Error(`Correlativo fiscal inválido para ${serieFiscal}: ${JSON.stringify(data)}`);
+    }
+
+    return numero;
+  }
+
   private async resolveCajaIdForSesion(tenantId: string, sesionCajaId: string | null): Promise<string | null> {
     if (!sesionCajaId) return null;
     const { data, error } = await this.supabase.getClient()
@@ -1056,10 +1103,17 @@ export class PosService {
           throw new Error('Factura requiere RUC válido de 11 dígitos');
         }
 
-        // Numero CPE seguro
-        const correlativoStr = ventaResult.numero_ticket?.split('-')[1] || ventaData?.comprobante?.correlativo;
-        const numeroCpe = correlativoStr ? Number(correlativoStr) : NaN;
-        if (!Number.isFinite(numeroCpe)) {
+        // Numero CPE seguro. El correlativo fiscal pertenece a la serie fiscal y
+        // debe salir de la secuencia canónica (documento_series). El ticket del POS
+        // puede venir de una serie interna por caja (T###) con su propio contador:
+        // heredar ese número emitía comprobantes con correlativos ya usados o
+        // saltados en la serie fiscal. Solo se reutiliza el número del ticket cuando
+        // el POS ya lo reservó sobre la misma serie fiscal.
+        const serieTicket = String(ventaResult.numero_ticket ?? '').split('-')[0].trim().toUpperCase();
+        const numeroCpe = serieTicket === serieCpe
+          ? this.parseCorrelativo(ventaResult.numero_ticket)
+          : await this.reservarCorrelativoFiscal(user.tenant_id, tipoComprobante, serieCpe, ventaResult.id);
+        if (!Number.isFinite(numeroCpe) || numeroCpe <= 0) {
           throw new Error('No se pudo determinar correlativo numérico para el CPE');
         }
 
