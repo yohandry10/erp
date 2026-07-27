@@ -2,6 +2,17 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import PDFDocument from 'pdfkit';
+import {
+  calcularCts,
+  calcularGratificacionTrunca,
+  calcularIndemnizacionDespido,
+  calcularVacacionesTruncas,
+  diasVacacionesPendientes,
+  mesesDelSemestreGratificatorio,
+  remuneracionComputableCts,
+  parseFechaLocal,
+  tiempoDeServicios,
+} from './liquidacion-peru.util';
 
 // Respaldo si normativa_peru_periodos no tiene fila para el periodo consultado.
 const RMV_PERU_FALLBACK = 1130;
@@ -875,37 +886,41 @@ export class RrhhService {
     const contrato = empleado.contratos[0];
     const sueldoMensual = parseFloat(contrato.sueldo_bruto);
 
-    // Calcular días trabajados en el año
-    const fechaIngreso = new Date(empleado.fecha_ingreso);
-    const fechaTerminacionDate = new Date(fechaTerminacion);
-    const diasTrabajados = Math.floor(
-      (fechaTerminacionDate.getTime() - fechaIngreso.getTime()) /
-      (1000 * 60 * 60 * 24),
-    );
+    const fechaIngreso = parseFechaLocal(empleado.fecha_ingreso);
+    const fechaTerminacionDate = parseFechaLocal(fechaTerminacion);
 
-    // Calcular beneficios
+    // La ley liquida por dozavos y treintavos, no por años decimales.
+    const tiempoTotal = tiempoDeServicios(fechaIngreso, fechaTerminacionDate);
+
+    // Se adeudan tanto las vacaciones vencidas de periodos ya cumplidos como las
+    // truncas del periodo en curso, así que ambas salen del tiempo total de
+    // servicios menos los días efectivamente gozados.
     const vacacionesUsadas = await this.calcularVacacionesUsadas(
       empleadoId,
-      fechaTerminacionDate.getFullYear(),
+      fechaIngreso,
+      fechaTerminacionDate,
       currentTenantId,
     );
 
-    const vacacionesPendientes = Math.max(0, 30 - vacacionesUsadas);
-    const diasCts = this.calcularDiasCts(fechaIngreso, fechaTerminacionDate);
-    // CTS según D.S. 001-97-TR: base = sueldo + 1/6 de última gratificación
-    const gratificacion = sueldoMensual; // Gratificación = 1 sueldo
-    const remuneracionComputableCts = sueldoMensual + (gratificacion / 6);
-    const montoCts = (remuneracionComputableCts / 360) * diasCts;
+    const vacacionesPendientes = diasVacacionesPendientes(tiempoTotal, vacacionesUsadas);
+    const montoVacaciones = calcularVacacionesTruncas(sueldoMensual, tiempoTotal, vacacionesUsadas);
 
-    let indemnizacion = 0;
-    if (motivoTerminacion === 'despido') {
-      // 1.5 sueldos por año trabajado
-      const añosTrabajados = diasTrabajados / 365;
-      indemnizacion = sueldoMensual * 1.5 * añosTrabajados;
-    }
+    const remuneracionCts = remuneracionComputableCts(sueldoMensual);
+    const montoCts = calcularCts(remuneracionCts, tiempoTotal);
+    const diasCts = tiempoTotal.meses * 30 + tiempoTotal.dias;
+
+    const gratificacionTrunca = calcularGratificacionTrunca(
+      sueldoMensual,
+      mesesDelSemestreGratificatorio(fechaIngreso, fechaTerminacionDate),
+    );
+
+    const indemnizacion =
+      motivoTerminacion === 'despido'
+        ? calcularIndemnizacionDespido(sueldoMensual, tiempoTotal)
+        : 0;
 
     const totalLiquidacion =
-      montoCts + indemnizacion + (sueldoMensual / 30) * vacacionesPendientes;
+      montoCts + montoVacaciones + gratificacionTrunca.total + indemnizacion;
 
     const { data, error } = await this.supabaseService
       .getClient()
@@ -922,6 +937,17 @@ export class RrhhService {
         total_liquidacion: totalLiquidacion,
         estado: 'calculada',
         tenant_id: currentTenantId, // ✅ Incluir tenant
+        // La tabla no tiene columnas para vacaciones truncas ni gratificación
+        // trunca; el desglose queda aquí para poder auditar el importe pagado.
+        metadata: {
+          remuneracion_mensual: sueldoMensual,
+          tiempo_servicios: tiempoTotal,
+          remuneracion_computable_cts: remuneracionCts,
+          monto_vacaciones_truncas: montoVacaciones,
+          gratificacion_trunca: gratificacionTrunca.gratificacion,
+          bonificacion_extraordinaria_9: gratificacionTrunca.bonificacionExtraordinaria,
+          vacaciones_dias_gozados: vacacionesUsadas,
+        },
       })
       .select();
 
@@ -949,12 +975,14 @@ export class RrhhService {
 
   private async calcularVacacionesUsadas(
     empleadoId: string,
-    año: number,
+    desde: Date,
+    hasta: Date,
     tenantId: string,
   ): Promise<number> {
-    // Calcular vacaciones aprobadas en el año (solicitudes estado=aprobado)
-    const startDate = `${año}-01-01`;
-    const endDate = `${año}-12-31`;
+    // Días gozados dentro del periodo vacacional en curso. Contarlos por año
+    // calendario no correspondía: el periodo corre entre aniversarios de ingreso.
+    const startDate = desde.toISOString().slice(0, 10);
+    const endDate = hasta.toISOString().slice(0, 10);
 
     const { data, error } = await this.supabaseService
       .getClient()
@@ -979,25 +1007,6 @@ export class RrhhService {
     );
   }
 
-  private calcularDiasCts(
-    fechaIngreso: Date,
-    fechaTerminacion: Date,
-  ): number {
-    // ✅ FIX: Cálculo de CTS según ley peruana (D.S. 001-97-TR)
-    // CTS se deposita en mayo y noviembre (semestral)
-    // Se calcula: (Sueldo + 1/6 Gratificación) / 12 * meses trabajados
-    // Simplificado: 1 sueldo por cada año completo de servicios
-    
-    const mesesTrabajados =
-      (fechaTerminacion.getFullYear() - fechaIngreso.getFullYear()) * 12 +
-      (fechaTerminacion.getMonth() - fechaIngreso.getMonth());
-    
-    // Días de CTS = meses trabajados (se paga 1/12 del sueldo por mes)
-    // En la práctica, se acumula 1 sueldo por año = 30 días por año
-    const diasCts = Math.floor(mesesTrabajados * (30 / 12)); // 2.5 días por mes
-    
-    return diasCts;
-  }
 
   // ===== HORARIOS =====
   async getHorarios(tenantId?: string) {
