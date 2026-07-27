@@ -206,10 +206,10 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-nombres" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Nombres *
                 </label>
-                <input
+                <input id="candidato-modal-simple-nombres"
                   type="text"
                   name="nombres"
                   value={formData.nombres}
@@ -224,10 +224,10 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-apellidos" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Apellidos *
                 </label>
-                <input
+                <input id="candidato-modal-simple-apellidos"
                   type="text"
                   name="apellidos"
                   value={formData.apellidos}
@@ -244,11 +244,11 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-email" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   <Mail size={16} className="mr-2" />
                   Email *
                 </label>
-                <input
+                <input id="candidato-modal-simple-email"
                   type="email"
                   name="email"
                   value={formData.email}
@@ -263,11 +263,11 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-telefono" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   <Phone size={16} className="mr-2" />
                   Teléfono
                 </label>
-                <input
+                <input id="candidato-modal-simple-telefono"
                   type="tel"
                   name="telefono"
                   value={formData.telefono}
@@ -279,11 +279,11 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[2fr_1fr_1fr] gap-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-direccion" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   <MapPin size={16} className="mr-2" />
                   Dirección
                 </label>
-                <input
+                <input id="candidato-modal-simple-direccion"
                   type="text"
                   name="direccion"
                   value={formData.direccion}
@@ -293,10 +293,10 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-tipo-documento" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Tipo Doc.
                 </label>
-                <select
+                <select id="candidato-modal-simple-tipo-documento"
                   name="tipo_documento"
                   value={formData.tipo_documento}
                   onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-card"
@@ -308,10 +308,10 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-numero-documento" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Número Doc.
                 </label>
-                <input
+                <input id="candidato-modal-simple-numero-documento"
                   type="text"
                   name="numero_documento"
                   value={formData.numero_documento}
@@ -331,10 +331,10 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr] gap-4 mb-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-id-vacante" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Vacante que Postula *
                 </label>
-                <select
+                <select id="candidato-modal-simple-id-vacante"
                   name="id_vacante"
                   value={formData.id_vacante}
                   onChange={handleInputChange} className="w-[100%] p-3 rounded-[6px] text-[0.875rem] bg-card"
@@ -356,11 +356,11 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 mb-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-nivel-educacion" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   <GraduationCap size={16} className="mr-2" />
                   Nivel Educación
                 </label>
-                <select
+                <select id="candidato-modal-simple-nivel-educacion"
                   name="nivel_educacion"
                   value={formData.nivel_educacion}
                   onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-card"
@@ -373,10 +373,10 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-experiencia-anos" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Experiencia (años)
                 </label>
-                <input
+                <input id="candidato-modal-simple-experiencia-anos"
                   type="number"
                   name="experiencia_anos"
                   value={formData.experiencia_anos}
@@ -388,10 +388,10 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-pretension-salarial" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Pretensión Salarial (S/)
                 </label>
-                <input
+                <input id="candidato-modal-simple-pretension-salarial"
                   type="number"
                   name="pretension_salarial"
                   value={formData.pretension_salarial}
@@ -405,10 +405,10 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr_1fr] gap-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-cv-url" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   URL del CV
                 </label>
-                <input
+                <input id="candidato-modal-simple-cv-url"
                   type="url"
                   name="cv_url"
                   value={formData.cv_url}
@@ -418,10 +418,10 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-linkedin-url" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   LinkedIn
                 </label>
-                <input
+                <input id="candidato-modal-simple-linkedin-url"
                   type="url"
                   name="linkedin_url"
                   value={formData.linkedin_url}
@@ -441,10 +441,10 @@ export default function CandidatoModalSimple({
 
             <div className="grid grid-cols-[1fr_2fr] gap-4">
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-estado" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Estado
                 </label>
-                <select
+                <select id="candidato-modal-simple-estado"
                   name="estado"
                   value={formData.estado}
                   onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-card"
@@ -458,10 +458,10 @@ export default function CandidatoModalSimple({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                <label htmlFor="candidato-modal-simple-observaciones" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                   Observaciones
                 </label>
-                <textarea
+                <textarea id="candidato-modal-simple-observaciones"
                   name="observaciones"
                   value={formData.observaciones}
                   onChange={handleInputChange}

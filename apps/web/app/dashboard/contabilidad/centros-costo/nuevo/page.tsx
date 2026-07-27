@@ -103,10 +103,10 @@ export default function NuevoCentroCostoPage() {
           <div className="grid gap-6">
             {/* Código */}
             <div>
-              <label className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
+              <label htmlFor="nuevo-codigo" className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
                 Código <span className="text-[var(--red-600)]">*</span>
               </label>
-              <input
+              <input id="nuevo-codigo"
                 type="text"
                 value={formData.codigo}
                 onChange={(e) => {
@@ -130,10 +130,10 @@ export default function NuevoCentroCostoPage() {
 
             {/* Nombre */}
             <div>
-              <label className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
+              <label htmlFor="nuevo-nombre" className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
                 Nombre <span className="text-[var(--red-600)]">*</span>
               </label>
-              <input
+              <input id="nuevo-nombre"
                 type="text"
                 value={formData.nombre}
                 onChange={(e) => {
@@ -154,10 +154,10 @@ export default function NuevoCentroCostoPage() {
 
             {/* Descripción */}
             <div>
-              <label className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
+              <label htmlFor="nuevo-descripcion" className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
                 Descripción
               </label>
-              <textarea
+              <textarea id="nuevo-descripcion"
                 value={formData.descripcion}
                 onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
                 placeholder="Descripción del centro de costo (opcional)"

@@ -104,10 +104,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6 mb-8">
             {/* Nombres */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-nombres" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Nombres *
               </label>
-              <input
+              <input id="empleado-modal-nombres"
                 type="text"
                 value={formData.nombres}
                 onChange={(e) => handleChange('nombres', e.target.value)}
@@ -125,10 +125,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {/* Apellidos */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-apellidos" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Apellidos *
               </label>
-              <input
+              <input id="empleado-modal-apellidos"
                 type="text"
                 value={formData.apellidos}
                 onChange={(e) => handleChange('apellidos', e.target.value)}
@@ -146,10 +146,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {/* Tipo de Documento */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-tipo-documento" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Tipo de Documento
               </label>
-              <select
+              <select id="empleado-modal-tipo-documento"
                 value={formData.tipo_documento}
                 onChange={(e) => handleChange('tipo_documento', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
@@ -169,10 +169,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {/* Número de Documento */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-numero-documento" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Número de Documento *
               </label>
-              <input
+              <input id="empleado-modal-numero-documento"
                 type="text"
                 value={formData.numero_documento}
                 onChange={(e) => handleChange('numero_documento', e.target.value)}
@@ -190,10 +190,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {/* Email */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-email" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Email
               </label>
-              <input
+              <input id="empleado-modal-email"
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
@@ -210,10 +210,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {/* Teléfono */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-telefono" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Teléfono
               </label>
-              <input
+              <input id="empleado-modal-telefono"
                 type="tel"
                 value={formData.telefono}
                 onChange={(e) => handleChange('telefono', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
@@ -230,10 +230,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {/* Puesto */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-puesto" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Puesto
               </label>
-              <input
+              <input id="empleado-modal-puesto"
                 type="text"
                 value={formData.puesto}
                 onChange={(e) => handleChange('puesto', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
@@ -250,10 +250,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {/* Departamento */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-id-departamento" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Departamento
               </label>
-              <select
+              <select id="empleado-modal-id-departamento"
                 value={formData.id_departamento}
                 onChange={(e) => handleChange('id_departamento', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 onFocus={(e) => {
@@ -276,10 +276,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {/* Fecha de Nacimiento */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-fecha-nacimiento" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Fecha de Nacimiento
               </label>
-              <input
+              <input id="empleado-modal-fecha-nacimiento"
                 type="date"
                 value={formData.fecha_nacimiento}
                 onChange={(e) => handleChange('fecha_nacimiento', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
@@ -296,10 +296,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {/* Fecha de Ingreso */}
             <div>
-              <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+              <label htmlFor="empleado-modal-fecha-ingreso" className="block mb-2 font-semibold text-[var(--primary-700)]">
                 Fecha de Ingreso
               </label>
-              <input
+              <input id="empleado-modal-fecha-ingreso"
                 type="date"
                 value={formData.fecha_ingreso}
                 onChange={(e) => handleChange('fecha_ingreso', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
@@ -316,10 +316,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
             {initialData ? (
               <div>
-                <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+                <label htmlFor="empleado-modal-estado" className="block mb-2 font-semibold text-[var(--primary-700)]">
                   Estado
                 </label>
-                <select
+                <select id="empleado-modal-estado"
                   value={formData.estado}
                   onChange={(e) => handleChange('estado', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
                 >
@@ -332,10 +332,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
           {/* Dirección (campo completo) */}
           <div className="mb-8">
-            <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+            <label htmlFor="empleado-modal-direccion" className="block mb-2 font-semibold text-[var(--primary-700)]">
               Dirección
             </label>
-            <input
+            <input id="empleado-modal-direccion"
               type="text"
               value={formData.direccion}
               onChange={(e) => handleChange('direccion', e.target.value)}
@@ -353,8 +353,8 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
 
           {/* Carga familiar: habilita la asignación familiar (10% de la RMV) en planilla */}
           <div className="mb-8">
-            <label className="flex items-center gap-3 font-semibold text-[var(--primary-700)]">
-              <input
+            <label htmlFor="empleado-modal-tiene-hijos" className="flex items-center gap-3 font-semibold text-[var(--primary-700)]">
+              <input id="empleado-modal-tiene-hijos"
                 type="checkbox"
                 checked={formData.tiene_hijos}
                 onChange={(e) => handleChange('tiene_hijos', e.target.checked)}
@@ -367,10 +367,10 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
             </p>
             {formData.tiene_hijos ? (
               <div className="mt-4">
-                <label className="block mb-2 font-semibold text-[var(--primary-700)]">
+                <label htmlFor="empleado-modal-cantidad-hijos" className="block mb-2 font-semibold text-[var(--primary-700)]">
                   Cantidad de hijos
                 </label>
-                <input
+                <input id="empleado-modal-cantidad-hijos"
                   type="number"
                   min="1"
                   step="1"

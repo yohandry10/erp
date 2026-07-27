@@ -413,10 +413,10 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
 
                 <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-4">
                   <div>
-                    <label className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
+                    <label htmlFor="candidato-modal-id-vacante" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
                       📋 Vacante *
                     </label>
-                    <select
+                    <select id="candidato-modal-id-vacante"
                       value={formData.id_vacante}
                       onChange={(e) => handleInputChange('id_vacante', e.target.value)} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-card"
                       required
@@ -431,8 +431,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Estado del proceso</label>
-                    <select
+                    <label htmlFor="candidato-modal-estado-proceso" className="block text-sm font-medium text-foreground/85 mb-2">Estado del proceso</label>
+                    <select id="candidato-modal-estado-proceso"
                       value={formData.estado_proceso}
                       onChange={(e) => handleInputChange('estado_proceso', e.target.value)}
                       className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -449,8 +449,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Nombres *</label>
-                    <input
+                    <label htmlFor="candidato-modal-nombres" className="block text-sm font-medium text-foreground/85 mb-2">Nombres *</label>
+                    <input id="candidato-modal-nombres"
                       type="text"
                       value={formData.nombres}
                       onChange={(e) => handleInputChange('nombres', e.target.value)}
@@ -461,8 +461,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Apellidos *</label>
-                    <input
+                    <label htmlFor="candidato-modal-apellidos" className="block text-sm font-medium text-foreground/85 mb-2">Apellidos *</label>
+                    <input id="candidato-modal-apellidos"
                       type="text"
                       value={formData.apellidos}
                       onChange={(e) => handleInputChange('apellidos', e.target.value)}
@@ -473,8 +473,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Email *</label>
-                    <input
+                    <label htmlFor="candidato-modal-email" className="block text-sm font-medium text-foreground/85 mb-2">Email *</label>
+                    <input id="candidato-modal-email"
                       type="email"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
@@ -485,8 +485,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Teléfono</label>
-                    <input
+                    <label htmlFor="candidato-modal-telefono" className="block text-sm font-medium text-foreground/85 mb-2">Teléfono</label>
+                    <input id="candidato-modal-telefono"
                       type="tel"
                       value={formData.telefono}
                       onChange={(e) => handleInputChange('telefono', e.target.value)}
@@ -496,8 +496,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Tipo documento</label>
-                    <select
+                    <label htmlFor="candidato-modal-tipo-documento" className="block text-sm font-medium text-foreground/85 mb-2">Tipo documento</label>
+                    <select id="candidato-modal-tipo-documento"
                       value={formData.tipo_documento}
                       onChange={(e) => handleInputChange('tipo_documento', e.target.value)}
                       className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -509,8 +509,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Número de documento</label>
-                    <input
+                    <label htmlFor="candidato-modal-numero-documento" className="block text-sm font-medium text-foreground/85 mb-2">Número de documento</label>
+                    <input id="candidato-modal-numero-documento"
                       type="text"
                       value={formData.numero_documento}
                       onChange={(e) => handleInputChange('numero_documento', e.target.value)}
@@ -520,8 +520,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Fecha de nacimiento</label>
-                    <input
+                    <label htmlFor="candidato-modal-fecha-nacimiento" className="block text-sm font-medium text-foreground/85 mb-2">Fecha de nacimiento</label>
+                    <input id="candidato-modal-fecha-nacimiento"
                       type="date"
                       value={formData.fecha_nacimiento}
                       onChange={(e) => handleInputChange('fecha_nacimiento', e.target.value)}
@@ -530,8 +530,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Estado civil</label>
-                    <select
+                    <label htmlFor="candidato-modal-estado-civil" className="block text-sm font-medium text-foreground/85 mb-2">Estado civil</label>
+                    <select id="candidato-modal-estado-civil"
                       value={formData.estado_civil}
                       onChange={(e) => handleInputChange('estado_civil', e.target.value)}
                       className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -546,8 +546,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                 </div>
 
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">Dirección</label>
-                  <textarea
+                  <label htmlFor="candidato-modal-direccion" className="block text-sm font-medium text-foreground/85 mb-2">Dirección</label>
+                  <textarea id="candidato-modal-direccion"
                     value={formData.direccion}
                     onChange={(e) => handleInputChange('direccion', e.target.value)}
                     className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -567,8 +567,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Nivel de educación</label>
-                    <select
+                    <label htmlFor="candidato-modal-nivel-educacion" className="block text-sm font-medium text-foreground/85 mb-2">Nivel de educación</label>
+                    <select id="candidato-modal-nivel-educacion"
                       value={formData.nivel_educacion}
                       onChange={(e) => handleInputChange('nivel_educacion', e.target.value)}
                       className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -583,8 +583,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Años de experiencia</label>
-                    <input
+                    <label htmlFor="candidato-modal-experiencia-a" className="block text-sm font-medium text-foreground/85 mb-2">Años de experiencia</label>
+                    <input id="candidato-modal-experiencia-a"
                       type="number"
                       value={formData.experiencia_años}
                       onChange={(e) => handleInputChange('experiencia_años', parseInt(e.target.value) || 0)}
@@ -595,8 +595,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Pretensión salarial (S/)</label>
-                    <input
+                    <label htmlFor="candidato-modal-pretension-salarial" className="block text-sm font-medium text-foreground/85 mb-2">Pretensión salarial (S/)</label>
+                    <input id="candidato-modal-pretension-salarial"
                       type="number"
                       value={formData.pretension_salarial}
                       onChange={(e) => handleInputChange('pretension_salarial', parseFloat(e.target.value) || 0)}
@@ -610,8 +610,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">Modalidad de trabajo preferida</label>
-                    <select
+                    <label htmlFor="candidato-modal-modalidad-trabajo-preferida" className="block text-sm font-medium text-foreground/85 mb-2">Modalidad de trabajo preferida</label>
+                    <select id="candidato-modal-modalidad-trabajo-preferida"
                       value={formData.modalidad_trabajo_preferida}
                       onChange={(e) => handleInputChange('modalidad_trabajo_preferida', e.target.value)}
                       className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -641,8 +641,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                 {/* URLs profesionales */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">📄 URL del CV</label>
-                    <input
+                    <label htmlFor="candidato-modal-cv-url" className="block text-sm font-medium text-foreground/85 mb-2">📄 URL del CV</label>
+                    <input id="candidato-modal-cv-url"
                       type="url"
                       value={formData.cv_url || ''}
                       onChange={(e) => handleInputChange('cv_url', e.target.value)}
@@ -652,8 +652,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">💼 LinkedIn</label>
-                    <input
+                    <label htmlFor="candidato-modal-linkedin-url" className="block text-sm font-medium text-foreground/85 mb-2">💼 LinkedIn</label>
+                    <input id="candidato-modal-linkedin-url"
                       type="url"
                       value={formData.linkedin_url || ''}
                       onChange={(e) => handleInputChange('linkedin_url', e.target.value)}
@@ -663,8 +663,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground/85 mb-2">🎨 Portfolio</label>
-                    <input
+                    <label htmlFor="candidato-modal-portfolio-url" className="block text-sm font-medium text-foreground/85 mb-2">🎨 Portfolio</label>
+                    <input id="candidato-modal-portfolio-url"
                       type="url"
                       value={formData.portfolio_url || ''}
                       onChange={(e) => handleInputChange('portfolio_url', e.target.value)}
@@ -860,8 +860,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {['español', 'inglés', 'portugués', 'francés', 'alemán', 'italiano', 'japonés', 'chino'].map(idioma => (
-                    <label key={idioma} className="flex items-center gap-2">
-                      <input
+                    <label htmlFor="candidato-modal-idiomas" key={idioma} className="flex items-center gap-2">
+                      <input id="candidato-modal-idiomas"
                         type="checkbox"
                         checked={formData.idiomas.includes(idioma)}
                         onChange={(e) => {

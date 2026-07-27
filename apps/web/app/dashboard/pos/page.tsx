@@ -1460,8 +1460,17 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     }
   }
 
+  // Catálogo que el POS puede vender: sin stock o sin precio el producto no llega
+  // a la grilla. Los contadores por categoría se calculan sobre esto y no sobre el
+  // catálogo completo, que prometía productos que la grilla ocultaba.
+  const productosVendibles = (productos || []).filter((producto) => {
+    const stockDisponible = producto.stock_disponible ?? producto.stock_actual ?? 0;
+    const tieneStock = producto.es_servicio || stockDisponible > 0;
+    return tieneStock && producto.precio_venta > 0;
+  });
+
   // Búsqueda mejorada con múltiples criterios
-  const productosFiltrados = (productos || []).filter((producto) => {
+  const productosFiltrados = productosVendibles.filter((producto) => {
     const termino = busqueda.toLowerCase().trim();
     const codigoBarras = busquedaPorCodigoBarras.toLowerCase().trim();
 
@@ -1484,17 +1493,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     const coincideCategoria =
       !categoriaFiltro || producto.categoria === categoriaFiltro;
 
-    // Filtrar productos sin stock (excepto servicios)
-    const stockDisponible = producto.stock_disponible ?? producto.stock_actual ?? 0;
-    const tieneStock = producto.es_servicio || stockDisponible > 0;
-
-    // Filtrar productos sin precio válido (precio debe ser > 0)
-    const tienePrecioValido = producto.precio_venta > 0;
-
-    return coincideBusqueda && coincideCategoria && tieneStock && tienePrecioValido;
+    return coincideBusqueda && coincideCategoria;
   });
 
-  const categorias = [...new Set((productos || []).map((p) => p.categoria))];
+  const categorias = [...new Set(productosVendibles.map((p) => p.categoria))];
   const metodoPagoActual = metodosPago.find(
     (m) => m.id === metodoPagoSeleccionado
   );
@@ -1641,8 +1643,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     <>
       {!estadoCaja || estadoCaja.estado === 'CERRADA' ? (
         <div className={posShellClass}>
-          <div className="flex min-h-screen items-center justify-center">
-            <div className={`${posPanelClass} max-w-[500px] p-8 text-center`}>
+          <div className="flex min-h-screen flex-col items-center justify-center gap-6 py-8">
+            <div className={`${posPanelClass} w-full max-w-[500px] p-8 text-center`}>
               <div className="mb-8">
                 <div className="mx-auto mb-8 flex size-[112px] items-center justify-center rounded-3xl border border-cyan-400/25 bg-cyan-400/10 text-primary shadow-[0_22px_55px_rgba(8,145,178,0.18)]">
                   {hayCajasDisponibles ? <Lock className="h-14 w-14" /> : <AlertTriangle className="h-14 w-14" />}
@@ -1674,11 +1676,11 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Panel inline para abrir caja (evita doble modal superpuesto) */}
+          {/* Panel de apertura dentro del mismo bloque centrado: como hermano del
+              contenedor min-h-screen aparecia una pantalla mas abajo. */}
           {mostrarModalAbrirCaja && (
-            <div className={`${posPanelClass} mx-auto mt-6 max-w-[500px] p-6`}>
+            <div className={`${posPanelClass} w-full max-w-[500px] p-6`}>
               <h3 className="mb-4 flex items-center gap-2 text-2xl font-semibold text-white">
                 <CircleDollarSign className="h-6 w-6 text-primary" />
                 Abrir Caja
@@ -1715,6 +1717,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
               </div>
             </div>
           )}
+          </div>
         </div>
       ) : (
         <div className={`${posShellClass} ${modoCajaEnfocado ? 'fixed inset-0 z-[1100] overflow-y-auto bg-background' : 'bg-muted/30'}`}>
@@ -1876,7 +1879,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       onClick={() => setCategoriaFiltro('')}
                       className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${!categoriaFiltro ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'}`}
                     >
-                      Todos · {productos.length}
+                      Todos · {productosVendibles.length}
                     </button>
                     {categorias.map((categoria) => (
                       <button
@@ -1885,7 +1888,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                         onClick={() => setCategoriaFiltro(categoria)}
                         className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${categoriaFiltro === categoria ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'}`}
                       >
-                        {categoria} · {productos.filter((producto) => producto.categoria === categoria).length}
+                        {categoria} · {productosVendibles.filter((producto) => producto.categoria === categoria).length}
                       </button>
                     ))}
                   </div>

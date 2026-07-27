@@ -321,11 +321,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
                 <div className={formGridClass}>
                   <div>
-                    <label className={labelClass}>
+                    <label htmlFor="crear-tenant-modal-pais" className={labelClass}>
                       <MapPin className={labelIconClass} />
                       País <span className={requiredClass}>*</span>
                     </label>
-                    <select
+                    <select id="crear-tenant-modal-pais"
                       name="pais"
                       value={formData.pais}
                       onChange={handleChange}
@@ -340,11 +340,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div>
-                    <label className={labelClass}>
+                    <label htmlFor="crear-tenant-modal-ruc" className={labelClass}>
                       <FileText className={labelIconClass} />
                       {documentoConfig.label} <span className={requiredClass}>*</span>
                     </label>
-                    <input
+                    <input id="crear-tenant-modal-ruc"
                       type="text"
                       name="ruc"
                       value={formData.ruc}
@@ -361,11 +361,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div>
-                    <label className={labelClass}>
+                    <label htmlFor="crear-tenant-modal-telefono" className={labelClass}>
                       <Phone className={labelIconClass} />
                       Teléfono
                     </label>
-                    <input
+                    <input id="crear-tenant-modal-telefono"
                       type="tel"
                       name="telefono"
                       value={formData.telefono}
@@ -376,11 +376,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div className={fullSpanClass}>
-                    <label className={labelClass}>
+                    <label htmlFor="crear-tenant-modal-razon-social" className={labelClass}>
                       <Building2 className={labelIconClass} />
                       Razón Social <span className={requiredClass}>*</span>
                     </label>
-                    <input
+                    <input id="crear-tenant-modal-razon-social"
                       type="text"
                       name="razon_social"
                       value={formData.razon_social}
@@ -392,11 +392,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div className={fullSpanClass}>
-                    <label className={labelClass}>
+                    <label htmlFor="crear-tenant-modal-nombre-comercial" className={labelClass}>
                       <Building2 className={labelIconClass} />
                       Nombre Comercial
                     </label>
-                    <input
+                    <input id="crear-tenant-modal-nombre-comercial"
                       type="text"
                       name="nombre_comercial"
                       value={formData.nombre_comercial}
@@ -407,11 +407,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div className={fullSpanClass}>
-                    <label className={labelClass}>
+                    <label htmlFor="crear-tenant-modal-direccion" className={labelClass}>
                       <MapPin className={labelIconClass} />
                       Dirección <span className={requiredClass}>*</span>
                     </label>
-                    <input
+                    <input id="crear-tenant-modal-direccion"
                       type="text"
                       name="direccion"
                       value={formData.direccion}
@@ -423,11 +423,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div className={fullSpanClass}>
-                    <label className={labelClass}>
+                    <label htmlFor="crear-tenant-modal-email" className={labelClass}>
                       <Mail className={labelIconClass} />
                       Email <span className={requiredClass}>*</span>
                     </label>
-                    <input
+                    <input id="crear-tenant-modal-email"
                       type="email"
                       name="email"
                       value={formData.email}
@@ -454,11 +454,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
                 <div className={formGridClass}>
                   <div>
-                    <label className={labelClass}>
+                    <label htmlFor="crear-tenant-modal-admin-nombre" className={labelClass}>
                       <Building2 className={labelIconClass} />
                       Nombre del Administrador <span className={requiredClass}>*</span>
                     </label>
-                    <input
+                    <input id="crear-tenant-modal-admin-nombre"
                       type="text"
                       name="admin_nombre"
                       value={formData.admin_nombre}
@@ -470,11 +470,11 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div>
-                    <label className={labelClass}>
+                    <label htmlFor="crear-tenant-modal-admin-password" className={labelClass}>
                       <Settings className={labelIconClass} />
                       Contraseña Inicial <span className={requiredClass}>*</span>
                     </label>
-                    <input
+                    <input id="crear-tenant-modal-admin-password"
                       type="password"
                       name="admin_password"
                       value={formData.admin_password}
@@ -502,10 +502,10 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
                 <div className={formGridClass}>
                   <div className={fullSpanClass}>
-                    <label className="mb-2 block text-sm font-semibold text-foreground/80">
+                    <label htmlFor="crear-tenant-modal-tipo-empresa" className="mb-2 block text-sm font-semibold text-foreground/80">
                       Tipo de Empresa <span className={requiredClass}>*</span>
                     </label>
-                    <select
+                    <select id="crear-tenant-modal-tipo-empresa"
                       name="tipo_empresa"
                       value={formData.tipo_empresa}
                       onChange={handleChange}
@@ -525,10 +525,10 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div className={fullSpanClass}>
-                    <label
+                    <label htmlFor="crear-tenant-modal-usar-flujo-logistica"
                       className={cn(optionCardClass, formData.usar_flujo_logistica && optionCardActiveClass)}
                     >
-                      <input
+                      <input id="crear-tenant-modal-usar-flujo-logistica"
                         type="checkbox"
                         name="usar_flujo_logistica"
                         checked={formData.usar_flujo_logistica}
@@ -557,10 +557,10 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
                 <div className={formGridClass}>
                   <div>
-                    <label
+                    <label htmlFor="crear-tenant-modal-gre-obligatorio"
                       className={cn(optionCardClass, formData.gre_obligatorio && optionCardActiveClass)}
                     >
-                      <input
+                      <input id="crear-tenant-modal-gre-obligatorio"
                         type="checkbox"
                         name="gre_obligatorio"
                         checked={formData.gre_obligatorio}
@@ -577,10 +577,10 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div>
-                    <label
+                    <label htmlFor="crear-tenant-modal-gre-automatico-habilitado"
                       className={cn(optionCardClass, formData.gre_automatico_habilitado && optionCardActiveClass)}
                     >
-                      <input
+                      <input id="crear-tenant-modal-gre-automatico-habilitado"
                         type="checkbox"
                         name="gre_automatico_habilitado"
                         checked={formData.gre_automatico_habilitado}
@@ -598,10 +598,10 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
                   {formData.gre_automatico_habilitado && (
                     <div className={cn(fullSpanClass, 'animate-in slide-in-from-top-2 duration-300')}>
-                      <label className="mb-2 block text-sm font-semibold text-foreground/80">
+                      <label htmlFor="crear-tenant-modal-umbral-gre-automatico" className="mb-2 block text-sm font-semibold text-foreground/80">
                         Umbral para Sugerencia (S/)
                       </label>
-                      <input
+                      <input id="crear-tenant-modal-umbral-gre-automatico"
                         type="number"
                         name="umbral_gre_automatico"
                         value={formData.umbral_gre_automatico}

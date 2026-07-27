@@ -178,11 +178,11 @@ export default function ProveedorModal({
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4"
             >
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
+                <label htmlFor="proveedor-modal-ruc" className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   RUC *
                 </label>
-                <input
+                <input id="proveedor-modal-ruc"
                   type="text"
                   value={formData.ruc}
                   onChange={(e) => handleInputChange('ruc', e.target.value)}
@@ -195,11 +195,11 @@ export default function ProveedorModal({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
+                <label htmlFor="proveedor-modal-razon-social" className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Razón Social *
                 </label>
-                <input
+                <input id="proveedor-modal-razon-social"
                   type="text"
                   value={formData.razon_social}
                   onChange={(e) => handleInputChange('razon_social', e.target.value)} className="w-[100%] p-2 rounded-md bg-card"
@@ -211,11 +211,11 @@ export default function ProveedorModal({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
+                <label htmlFor="proveedor-modal-nombre-comercial" className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Nombre Comercial
                 </label>
-                <input
+                <input id="proveedor-modal-nombre-comercial"
                   type="text"
                   value={formData.nombre_comercial}
                   onChange={(e) => handleInputChange('nombre_comercial', e.target.value)} className="w-[100%] p-2 border rounded-md bg-card"
@@ -224,11 +224,11 @@ export default function ProveedorModal({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
+                <label htmlFor="proveedor-modal-condiciones-pago" className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Condiciones de Pago
                 </label>
-                <select
+                <select id="proveedor-modal-condiciones-pago"
                   value={formData.condiciones_pago}
                   onChange={(e) => handleInputChange('condiciones_pago', e.target.value)} className="w-[100%] p-2 border rounded-md bg-card"
                 >
@@ -250,11 +250,11 @@ export default function ProveedorModal({
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4"
             >
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
+                <label htmlFor="proveedor-modal-telefono" className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Teléfono
                 </label>
-                <input
+                <input id="proveedor-modal-telefono"
                   type="text"
                   value={formData.telefono}
                   onChange={(e) => handleInputChange('telefono', e.target.value)} className="w-[100%] p-2 border rounded-md bg-card"
@@ -263,11 +263,11 @@ export default function ProveedorModal({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
+                <label htmlFor="proveedor-modal-email" className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Email
                 </label>
-                <input
+                <input id="proveedor-modal-email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)} className="w-[100%] p-2 rounded-md bg-card"
@@ -279,11 +279,11 @@ export default function ProveedorModal({
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
+                <label htmlFor="proveedor-modal-contacto" className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
                   Persona de Contacto
                 </label>
-                <input
+                <input id="proveedor-modal-contacto"
                   type="text"
                   value={formData.contacto}
                   onChange={(e) => handleInputChange('contacto', e.target.value)} className="w-[100%] p-2 border rounded-md bg-card"
@@ -295,11 +295,11 @@ export default function ProveedorModal({
 
           {/* Dirección */}
           <div className="mb-6">
-            <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
+            <label htmlFor="proveedor-modal-direccion" className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
             >
               Dirección
             </label>
-            <textarea
+            <textarea id="proveedor-modal-direccion"
               value={formData.direccion}
               onChange={(e) => handleInputChange('direccion', e.target.value)}
               rows={3} className="w-[100%] p-2 border rounded-md bg-card"

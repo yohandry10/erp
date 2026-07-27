@@ -412,9 +412,21 @@ export class CashReportsService {
             lineas.push('-'.repeat(48));
             lineas.push('5. ARQUEO FINAL');
             lineas.push('-'.repeat(48));
-            lineas.push(`Saldo teórico: S/ ${datos.sesion.monto_esperado.toFixed(2)}`);
-            lineas.push(`Saldo contado: S/ ${datos.sesion.monto_contado.toFixed(2)}`);
-            lineas.push(`Diferencia: S/ ${datos.sesion.diferencia.toFixed(2)}`);
+            lineas.push(`Saldo teórico: S/ ${Number(datos.sesion.monto_esperado ?? 0).toFixed(2)}`);
+
+            // Un cierre administrativo no cuenta el efectivo. El trigger de
+            // normalización guarda contado 0 y deriva la diferencia, así que
+            // imprimir esos números afirmaría un arqueo que nunca se hizo.
+            if (datos.sesion.cierre_administrativo) {
+                lineas.push('Saldo contado: sin arqueo (cierre administrativo)');
+                lineas.push('Diferencia: no verificada');
+                if (datos.sesion.razon_cierre_administrativo) {
+                    lineas.push(`Motivo: ${datos.sesion.razon_cierre_administrativo}`);
+                }
+            } else {
+                lineas.push(`Saldo contado: S/ ${Number(datos.sesion.monto_contado ?? 0).toFixed(2)}`);
+                lineas.push(`Diferencia: S/ ${Number(datos.sesion.diferencia ?? 0).toFixed(2)}`);
+            }
 
             if (datos.sesion.denominaciones_cierre) {
                 lineas.push('');

@@ -281,10 +281,10 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
               </h3>
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
+                  <label htmlFor="cotizacion-modal-cliente-id" className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Cliente *
                   </label>
-                  <select
+                  <select id="cotizacion-modal-cliente-id"
                     value={formData.cliente_id}
                     onChange={(e) => handleInputChange('cliente_id', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
                     required
@@ -299,10 +299,10 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
+                  <label htmlFor="cotizacion-modal-vendedor" className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Vendedor *
                   </label>
-                  <input
+                  <input id="cotizacion-modal-vendedor"
                     type="text"
                     value={formData.vendedor}
                     onChange={(e) => handleInputChange('vendedor', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
@@ -312,10 +312,10 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
+                  <label htmlFor="cotizacion-modal-moneda" className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Moneda
                   </label>
-                  <select
+                  <select id="cotizacion-modal-moneda"
                     value={formData.moneda}
                     onChange={(e) => handleInputChange('moneda', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
                   >
@@ -325,10 +325,10 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
+                  <label htmlFor="cotizacion-modal-fecha-cotizacion" className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Fecha Cotización
                   </label>
-                  <input
+                  <input id="cotizacion-modal-fecha-cotizacion"
                     type="date"
                     value={formData.fecha_cotizacion}
                     onChange={(e) => handleInputChange('fecha_cotizacion', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
@@ -336,10 +336,10 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
+                  <label htmlFor="cotizacion-modal-fecha-vencimiento" className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Fecha Vencimiento
                   </label>
-                  <input
+                  <input id="cotizacion-modal-fecha-vencimiento"
                     type="date"
                     value={formData.fecha_vencimiento}
                     onChange={(e) => handleInputChange('fecha_vencimiento', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
@@ -347,10 +347,10 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">
+                  <label htmlFor="cotizacion-modal-probabilidad" className="block text-sm font-medium text-foreground/85 mb-[4px]">
                     Probabilidad (%)
                   </label>
-                  <input
+                  <input id="cotizacion-modal-probabilidad"
                     type="number"
                     min="0"
                     max="100"
@@ -439,10 +439,10 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
             <div className="bg-card p-4 rounded-lg border">
               <div className="grid grid-cols-[1fr_300px] gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="cotizacion-modal-observaciones" className="block text-sm font-medium text-foreground/85 mb-2">
                     Observaciones
                   </label>
-                  <textarea
+                  <textarea id="cotizacion-modal-observaciones"
                     value={formData.observaciones}
                     onChange={(e) => handleInputChange('observaciones', e.target.value)}
                     rows={4} className="w-[100%] p-2 border rounded-[4px] text-sm"

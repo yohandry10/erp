@@ -229,10 +229,10 @@ export default function PresupuestoForm({
       <div className="grid gap-6">
         {/* Centro de Costo */}
         <div>
-          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+          <label htmlFor="presupuesto-form-centro-costo-id" className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
             Centro de Costo <span className="text-destructive">*</span>
           </label>
-          <select
+          <select id="presupuesto-form-centro-costo-id"
             value={formData.centro_costo_id}
             onChange={(e) => setFormData({ ...formData, centro_costo_id: e.target.value })}
             disabled={!!presupuestoId}
@@ -254,10 +254,10 @@ export default function PresupuestoForm({
 
         {/* Cuenta Contable */}
         <div>
-          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+          <label htmlFor="presupuesto-form-cuenta-id" className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
             Cuenta Contable <span className="text-destructive">*</span>
           </label>
-          <select
+          <select id="presupuesto-form-cuenta-id"
             value={formData.cuenta_id}
             onChange={(e) => setFormData({ ...formData, cuenta_id: e.target.value })}
             disabled={!!presupuestoId}
@@ -279,10 +279,10 @@ export default function PresupuestoForm({
 
         {/* Período Contable */}
         <div>
-          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+          <label htmlFor="presupuesto-form-periodo-contable-id" className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
             Período Contable <span className="text-destructive">*</span>
           </label>
-          <select
+          <select id="presupuesto-form-periodo-contable-id"
             value={formData.periodo_contable_id}
             onChange={(e) => setFormData({ ...formData, periodo_contable_id: e.target.value })}
             disabled={!!presupuestoId}
@@ -304,10 +304,10 @@ export default function PresupuestoForm({
 
         {/* Monto Presupuestado */}
         <div>
-          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+          <label htmlFor="presupuesto-form-monto-presupuestado" className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
             Monto Presupuestado (S/) <span className="text-destructive">*</span>
           </label>
-          <input
+          <input id="presupuesto-form-monto-presupuestado"
             type="number"
             step="0.01"
             min="0"
@@ -320,10 +320,10 @@ export default function PresupuestoForm({
 
         {/* Notas */}
         <div>
-          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+          <label htmlFor="presupuesto-form-notas" className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
             Notas (Opcional)
           </label>
-          <textarea
+          <textarea id="presupuesto-form-notas"
             value={formData.notas}
             onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
             rows={3} className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
@@ -334,10 +334,10 @@ export default function PresupuestoForm({
         {/* Estado (only when editing) */}
         {presupuestoId && (
           <div>
-            <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+            <label htmlFor="presupuesto-form-estado" className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
               Estado
             </label>
-            <select
+            <select id="presupuesto-form-estado"
               value={formData.estado}
               onChange={(e) => setFormData({ ...formData, estado: e.target.value })} className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
             >

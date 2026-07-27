@@ -534,10 +534,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-[0.875rem] font-semibold mb-2">
+            <label htmlFor="candidatos-nombres" className="block text-[0.875rem] font-semibold mb-2">
               Nombres *
             </label>
-            <input
+            <input id="candidatos-nombres"
               type="text"
               value={formData.nombres}
               onChange={(e) => setFormData({...formData, nombres: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
@@ -547,10 +547,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-semibold mb-2">
+            <label htmlFor="candidatos-apellidos" className="block text-[0.875rem] font-semibold mb-2">
               Apellidos *
             </label>
-            <input
+            <input id="candidatos-apellidos"
               type="text"
               value={formData.apellidos}
               onChange={(e) => setFormData({...formData, apellidos: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
@@ -562,10 +562,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-[0.875rem] font-semibold mb-2">
+            <label htmlFor="candidatos-email" className="block text-[0.875rem] font-semibold mb-2">
               Email *
             </label>
-            <input
+            <input id="candidatos-email"
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
@@ -575,10 +575,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-semibold mb-2">
+            <label htmlFor="candidatos-telefono" className="block text-[0.875rem] font-semibold mb-2">
               Teléfono
             </label>
-            <input
+            <input id="candidatos-telefono"
               type="tel"
               value={formData.telefono}
               onChange={(e) => setFormData({...formData, telefono: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
@@ -588,10 +588,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
         </div>
 
         <div>
-          <label className="block text-[0.875rem] font-semibold mb-2">
+          <label htmlFor="candidatos-id-vacante" className="block text-[0.875rem] font-semibold mb-2">
             Vacante que Postula *
           </label>
-          <select
+          <select id="candidatos-id-vacante"
             value={formData.id_vacante}
             onChange={(e) => setFormData({...formData, id_vacante: e.target.value})} className="w-[100%] p-3 border rounded-[6px] bg-card"
             required
@@ -614,10 +614,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
         <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
-            <label className="block text-[0.875rem] font-semibold mb-2">
+            <label htmlFor="candidatos-experiencia-anos" className="block text-[0.875rem] font-semibold mb-2">
               Experiencia (años)
             </label>
-            <input
+            <input id="candidatos-experiencia-anos"
               type="number"
               value={formData.experiencia_anos}
               onChange={(e) => setFormData({...formData, experiencia_anos: parseInt(e.target.value) || 0})} className="w-[100%] p-3 border rounded-[6px]"
@@ -627,10 +627,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-semibold mb-2">
+            <label htmlFor="candidatos-pretension-salarial" className="block text-[0.875rem] font-semibold mb-2">
               Pretensión Salarial (S/)
             </label>
-            <input
+            <input id="candidatos-pretension-salarial"
               type="number"
               value={formData.pretension_salarial}
               onChange={(e) => setFormData({...formData, pretension_salarial: parseInt(e.target.value) || 0})} className="w-[100%] p-3 border rounded-[6px]"
@@ -640,10 +640,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-semibold mb-2">
+            <label htmlFor="candidatos-estado" className="block text-[0.875rem] font-semibold mb-2">
               Estado del Proceso
             </label>
-            <select
+            <select id="candidatos-estado"
               value={formData.estado}
               onChange={(e) => setFormData({...formData, estado: e.target.value})} className="w-[100%] p-3 border rounded-[6px] bg-card"
             >
@@ -658,10 +658,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-[0.875rem] font-semibold mb-2">
+            <label htmlFor="candidatos-cv-url" className="block text-[0.875rem] font-semibold mb-2">
               URL del CV
             </label>
-            <input
+            <input id="candidatos-cv-url"
               type="url"
               value={formData.cv_url}
               onChange={(e) => setFormData({...formData, cv_url: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
@@ -670,10 +670,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-semibold mb-2">
+            <label htmlFor="candidatos-linkedin-url" className="block text-[0.875rem] font-semibold mb-2">
               LinkedIn
             </label>
-            <input
+            <input id="candidatos-linkedin-url"
               type="url"
               value={formData.linkedin_url}
               onChange={(e) => setFormData({...formData, linkedin_url: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
@@ -685,10 +685,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
       {/* Observaciones */}
       <div className="mb-6">
-        <label className="block text-[0.875rem] font-semibold mb-2">
+        <label htmlFor="candidatos-observaciones" className="block text-[0.875rem] font-semibold mb-2">
           Observaciones
         </label>
-        <textarea
+        <textarea id="candidatos-observaciones"
           value={formData.observaciones}
           onChange={(e) => setFormData({...formData, observaciones: e.target.value})}
           rows={3} className="w-[100%] p-3 border rounded-[6px]"

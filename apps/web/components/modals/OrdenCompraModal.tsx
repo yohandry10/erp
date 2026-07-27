@@ -313,10 +313,10 @@ export default function OrdenCompraModal({
           {/* Información básica */}
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="orden-compra-modal-numero" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Número de Orden
               </label>
-              <input
+              <input id="orden-compra-modal-numero"
                 type="text"
                 value={formData.numero}
                 disabled className="w-[100%] p-2 border rounded-md bg-muted text-muted-foreground"
@@ -324,11 +324,11 @@ export default function OrdenCompraModal({
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="orden-compra-modal-proveedor-id" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Proveedor *
               </label>
               <div className="flex gap-2">
-                <select
+                <select id="orden-compra-modal-proveedor-id"
                   value={formData.proveedor_id}
                   onChange={(e) => setFormData({...formData, proveedor_id: e.target.value})}
                   required className="flex-[1] p-2 border rounded-md bg-card"
@@ -354,10 +354,10 @@ export default function OrdenCompraModal({
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="orden-compra-modal-moneda" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Moneda
               </label>
-              <select
+              <select id="orden-compra-modal-moneda"
                 value={formData.moneda}
                 onChange={(e) => setFormData({...formData, moneda: e.target.value})} className="w-[100%] p-2 border rounded-md bg-card"
               >
@@ -369,10 +369,10 @@ export default function OrdenCompraModal({
 
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="orden-compra-modal-fecha-orden" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha de Orden *
               </label>
-              <input
+              <input id="orden-compra-modal-fecha-orden"
                 type="date"
                 value={formData.fecha_orden}
                 onChange={(e) => setFormData({...formData, fecha_orden: e.target.value})}
@@ -381,10 +381,10 @@ export default function OrdenCompraModal({
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="orden-compra-modal-fecha-entrega" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha de Entrega *
               </label>
-              <input
+              <input id="orden-compra-modal-fecha-entrega"
                 type="date"
                 value={formData.fecha_entrega}
                 onChange={(e) => setFormData({...formData, fecha_entrega: e.target.value})}
@@ -517,10 +517,10 @@ export default function OrdenCompraModal({
 
           {/* Observaciones */}
           <div className="mb-6">
-            <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+            <label htmlFor="orden-compra-modal-observaciones" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
               Observaciones
             </label>
-            <textarea
+            <textarea id="orden-compra-modal-observaciones"
               value={formData.observaciones}
               onChange={(e) => setFormData({...formData, observaciones: e.target.value})}
               rows={3}

@@ -117,8 +117,8 @@ export default function ConvertDemoPage() {
             )}
 
             <div className="mb-5">
-              <label className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Razón Social *</label>
-              <input
+              <label htmlFor="convert-razon-social" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Razón Social *</label>
+              <input id="convert-razon-social"
                 type="text"
                 name="razon_social"
                 value={formData.razon_social}
@@ -129,8 +129,8 @@ export default function ConvertDemoPage() {
             </div>
 
             <div className="mb-5">
-              <label className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">RUC *</label>
-              <input
+              <label htmlFor="convert-ruc" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">RUC *</label>
+              <input id="convert-ruc"
                 type="text"
                 name="ruc"
                 value={formData.ruc}
@@ -145,8 +145,8 @@ export default function ConvertDemoPage() {
             </div>
 
             <div className="mb-5">
-              <label className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Email *</label>
-              <input
+              <label htmlFor="convert-email" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Email *</label>
+              <input id="convert-email"
                 type="email"
                 name="email"
                 value={formData.email}
@@ -160,8 +160,8 @@ export default function ConvertDemoPage() {
             </div>
 
             <div className="mb-5">
-              <label className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Contraseña *</label>
-              <input
+              <label htmlFor="convert-password" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Contraseña *</label>
+              <input id="convert-password"
                 type="password"
                 name="password"
                 value={formData.password}
@@ -173,8 +173,8 @@ export default function ConvertDemoPage() {
             </div>
 
             <div className="mb-6">
-              <label className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Teléfono</label>
-              <input
+              <label htmlFor="convert-telefono" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Teléfono</label>
+              <input id="convert-telefono"
                 type="text"
                 name="telefono"
                 value={formData.telefono}

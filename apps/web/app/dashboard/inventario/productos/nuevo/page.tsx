@@ -150,10 +150,10 @@ export default function NuevoProductoPage() {
           <h2 className="m-0 text-lg font-bold text-foreground">Información Básica</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label>
+              <label htmlFor="nuevo-codigo">
                 Código <span className="text-[var(--red-500)]">*</span>
               </label>
-              <input
+              <input id="nuevo-codigo"
                 type="text"
                 name="codigo"
                 value={formData.codigo}
@@ -174,8 +174,8 @@ export default function NuevoProductoPage() {
               )}
             </div>
             <div>
-              <label>Código de Barras</label>
-              <input
+              <label htmlFor="nuevo-codigo-barras">Código de Barras</label>
+              <input id="nuevo-codigo-barras"
                 type="text"
                 name="codigoBarras"
                 value={formData.codigoBarras}
@@ -186,10 +186,10 @@ export default function NuevoProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>
+            <label htmlFor="nuevo-nombre">
               Nombre <span className="text-[var(--red-500)]">*</span>
             </label>
-            <input
+            <input id="nuevo-nombre"
               type="text"
               name="nombre"
               value={formData.nombre}
@@ -211,8 +211,8 @@ export default function NuevoProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>Descripción</label>
-            <textarea
+            <label htmlFor="nuevo-descripcion">Descripción</label>
+            <textarea id="nuevo-descripcion"
               name="descripcion"
               value={formData.descripcion}
               onChange={handleChange}
@@ -222,10 +222,10 @@ export default function NuevoProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>
+            <label htmlFor="nuevo-categoria">
               Categoría <span className="text-[var(--red-500)]">*</span>
             </label>
-            <select
+            <select id="nuevo-categoria"
               name="categoria"
               value={formData.categoria}
               onChange={handleChange}
@@ -257,8 +257,8 @@ export default function NuevoProductoPage() {
           <h2 className="m-0 text-lg font-bold text-foreground">Precios e Impuestos</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label>Precio de Compra</label>
-              <input
+              <label htmlFor="nuevo-precio-compra">Precio de Compra</label>
+              <input id="nuevo-precio-compra"
                 type="number"
                 name="precioCompra"
                 value={formData.precioCompra}
@@ -283,10 +283,10 @@ export default function NuevoProductoPage() {
               )}
             </div>
             <div>
-              <label>
+              <label htmlFor="nuevo-precio-venta">
                 Precio de Venta <span className="text-[var(--red-500)]">*</span>
               </label>
-              <input
+              <input id="nuevo-precio-venta"
                 type="number"
                 name="precioVenta"
                 value={formData.precioVenta}
@@ -309,8 +309,8 @@ export default function NuevoProductoPage() {
               )}
             </div>
             <div>
-              <label>Impuesto (%)</label>
-              <input
+              <label htmlFor="nuevo-impuesto">Impuesto (%)</label>
+              <input id="nuevo-impuesto"
                 type="number"
                 name="impuesto"
                 value={formData.impuesto}
@@ -340,8 +340,8 @@ export default function NuevoProductoPage() {
           <h2 className="m-0 text-lg font-bold text-foreground">Inventario</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label>Stock Inicial</label>
-              <input
+              <label htmlFor="nuevo-stock">Stock Inicial</label>
+              <input id="nuevo-stock"
                 type="number"
                 name="stock"
                 value={formData.stock}
@@ -363,8 +363,8 @@ export default function NuevoProductoPage() {
               )}
             </div>
             <div>
-              <label>Stock Mínimo</label>
-              <input
+              <label htmlFor="nuevo-stock-minimo">Stock Mínimo</label>
+              <input id="nuevo-stock-minimo"
                 type="number"
                 name="stockMinimo"
                 value={formData.stockMinimo}

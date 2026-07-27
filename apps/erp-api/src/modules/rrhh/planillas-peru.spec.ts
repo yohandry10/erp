@@ -46,6 +46,37 @@ describe('contratoVigenteDe', () => {
     expect(contratoVigenteDe({})).toBeUndefined();
     expect(contratoVigenteDe(null)).toBeUndefined();
   });
+
+  // Una renovación puede dejar dos contratos vigentes a la vez. Sin un criterio
+  // explícito, el sueldo de la planilla dependía del orden en que la base
+  // devolviera las filas.
+  it('con varios vigentes toma el de fecha de inicio mas reciente', () => {
+    const empleado = {
+      contratos: [
+        { estado: 'vigente', fecha_inicio: '2024-01-01', regimen_pensionario: 'ONP' },
+        { estado: 'renovado', fecha_inicio: '2026-01-01', regimen_pensionario: 'AFP' },
+      ],
+    };
+    expect(contratoVigenteDe(empleado)?.regimen_pensionario).toBe('AFP');
+  });
+
+  it('el orden del arreglo no altera el contrato elegido', () => {
+    const nuevo = { estado: 'renovado', fecha_inicio: '2026-01-01', regimen_pensionario: 'AFP' };
+    const viejo = { estado: 'vigente', fecha_inicio: '2024-01-01', regimen_pensionario: 'ONP' };
+
+    expect(contratoVigenteDe({ contratos: [nuevo, viejo] })?.regimen_pensionario).toBe('AFP');
+    expect(contratoVigenteDe({ contratos: [viejo, nuevo] })?.regimen_pensionario).toBe('AFP');
+  });
+
+  it('cae a created_at cuando falta la fecha de inicio', () => {
+    const empleado = {
+      contratos: [
+        { estado: 'vigente', created_at: '2026-05-01', regimen_pensionario: 'AFP' },
+        { estado: 'vigente', created_at: '2024-05-01', regimen_pensionario: 'ONP' },
+      ],
+    };
+    expect(contratoVigenteDe(empleado)?.regimen_pensionario).toBe('AFP');
+  });
 });
 
 // La asignación familiar es remuneración computable (Ley 25129): integra la base de
