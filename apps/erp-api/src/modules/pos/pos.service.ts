@@ -181,6 +181,69 @@ export class PosService {
   }
 
   /**
+   * Descuenta el descuento global de la base imponible de cada ítem, prorrateado
+   * por su peso en el subtotal. El prorrateo evita mover base entre afectaciones
+   * distintas: si se restara todo de un ítem gravado, un descuento sobre una
+   * venta mixta reduciría el IGV más de lo que corresponde.
+   */
+  private aplicarDescuentoGlobal(items: any[], descuentoGlobal: any): void {
+    if (!descuentoGlobal || items.length === 0) return;
+
+    const valor = Number(descuentoGlobal.valor ?? 0);
+    if (!Number.isFinite(valor) || valor <= 0) return;
+
+    const subtotal = items.reduce((acc, item) => acc.plus(item.subtotal ?? 0), new Decimal(0));
+    if (subtotal.lessThanOrEqualTo(0)) return;
+
+    const descuento = String(descuentoGlobal.tipo ?? '').toUpperCase() === 'MONTO_FIJO'
+      ? Decimal.min(new Decimal(valor), subtotal)
+      : subtotal.times(Decimal.min(new Decimal(valor), 100)).dividedBy(100);
+
+    if (descuento.lessThanOrEqualTo(0)) return;
+
+    let repartido = new Decimal(0);
+    items.forEach((item, indice) => {
+      const base = new Decimal(item.subtotal ?? 0);
+      const parte = indice === items.length - 1
+        ? descuento.minus(repartido)
+        : descuento.times(base).dividedBy(subtotal).toDecimalPlaces(2);
+      repartido = repartido.plus(parte);
+
+      const nuevaBase = Decimal.max(new Decimal(0), base.minus(parte)).toDecimalPlaces(2);
+      item.descuento_monto = new Decimal(item.descuento_monto ?? 0).plus(parte).toDecimalPlaces(2).toNumber();
+      item.subtotal = nuevaBase.toNumber();
+    });
+  }
+
+  /**
+   * Reparte el IGV de cabecera entre los ítems gravados. El residuo del redondeo
+   * queda en el último ítem gravado para que la suma sea exacta.
+   */
+  private repartirIgvEntreItems(items: any[], productosMap: Map<string, any>, igvTotal: number): void {
+    const esItemGravado = (item: any) => esGravado(productosMap.get(item.producto_id)?.afectacion_igv);
+    const gravados = items.filter(esItemGravado);
+
+    for (const item of items) {
+      item.igv = 0;
+    }
+
+    if (gravados.length === 0) return;
+
+    const baseGravada = gravados.reduce((acc, item) => acc.plus(item.subtotal ?? 0), new Decimal(0));
+    if (baseGravada.lessThanOrEqualTo(0)) return;
+
+    const total = new Decimal(igvTotal);
+    let repartido = new Decimal(0);
+    gravados.forEach((item, indice) => {
+      const parte = indice === gravados.length - 1
+        ? total.minus(repartido)
+        : total.times(item.subtotal ?? 0).dividedBy(baseGravada).toDecimalPlaces(2);
+      repartido = repartido.plus(parte);
+      item.igv = parte.toNumber();
+    });
+  }
+
+  /**
    * Reserva el siguiente correlativo de la serie fiscal en documento_series, que
    * es la secuencia compartida por POS, Documentos y facturación de pedidos.
    * Un reintento de la misma venta reutiliza el correlativo ya reservado en vez
@@ -711,6 +774,12 @@ export class PosService {
         };
       });
 
+      // El descuento global se aplica a la base imponible, no al total. Restarlo
+      // después del IGV cobraría impuesto sobre un importe que no se cobra, y
+      // dejarlo fuera del recálculo hacía que el POS mostrara un total con
+      // descuento pero registrara y cobrara el total sin él.
+      this.aplicarDescuentoGlobal(recomputed, ventaData?.descuento_global);
+
       // Los productos se validan ANTES de calcular el dinero: su afectación del
       // IGV (Catálogo 07) decide qué parte de la venta es gravada. Calcular un
       // IGV plano cobraría impuesto sobre bienes exonerados o inafectos.
@@ -727,6 +796,11 @@ export class PosService {
         })),
         tasaIgv,
       );
+
+      // La RPC liquida el impuesto sumando el `igv` de cada ítem: se reparte el
+      // IGV de cabecera para que lo cobrado coincida al céntimo con el desglose
+      // que viaja al comprobante.
+      this.repartirIgvEntreItems(recomputed, productosMap, desgloseIgv.igv);
 
       // ✅ FIX: Usar Decimal.js para sumas y cálculos de impuestos
       const subtotalCalculado = recomputed.reduce(
