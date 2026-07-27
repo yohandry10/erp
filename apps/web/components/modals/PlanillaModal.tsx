@@ -316,8 +316,8 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
               <h3 className="text-[18px] font-medium text-foreground mb-4 m-0">⚙️ Configuración</h3>
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Período</label>
-                  <input
+                  <label htmlFor="planilla-modal-periodo" className="block text-sm font-medium text-foreground/85 mb-[4px]">Período</label>
+                  <input id="planilla-modal-periodo"
                     type="text"
                     value={formData.periodo}
                     onChange={(e) => setFormData(prev => ({ ...prev, periodo: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
@@ -326,8 +326,8 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Fecha Inicio</label>
-                  <input
+                  <label htmlFor="planilla-modal-fecha-inicio" className="block text-sm font-medium text-foreground/85 mb-[4px]">Fecha Inicio</label>
+                  <input id="planilla-modal-fecha-inicio"
                     type="date"
                     value={formData.fecha_inicio}
                     onChange={(e) => setFormData(prev => ({ ...prev, fecha_inicio: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
@@ -335,8 +335,8 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Fecha Fin</label>
-                  <input
+                  <label htmlFor="planilla-modal-fecha-fin" className="block text-sm font-medium text-foreground/85 mb-[4px]">Fecha Fin</label>
+                  <input id="planilla-modal-fecha-fin"
                     type="date"
                     value={formData.fecha_fin}
                     onChange={(e) => setFormData(prev => ({ ...prev, fecha_fin: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
@@ -344,8 +344,8 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Fecha Pago</label>
-                  <input
+                  <label htmlFor="planilla-modal-fecha-pago" className="block text-sm font-medium text-foreground/85 mb-[4px]">Fecha Pago</label>
+                  <input id="planilla-modal-fecha-pago"
                     type="date"
                     value={formData.fecha_pago}
                     onChange={(e) => setFormData(prev => ({ ...prev, fecha_pago: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
@@ -353,8 +353,8 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                 </div>
               </div>
               <div className="mt-4">
-                <label className="block text-sm font-medium text-foreground/85 mb-[4px]">Observaciones</label>
-                <textarea
+                <label htmlFor="planilla-modal-observaciones" className="block text-sm font-medium text-foreground/85 mb-[4px]">Observaciones</label>
+                <textarea id="planilla-modal-observaciones"
                   value={formData.observaciones}
                   onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-sm"
                   rows={2}

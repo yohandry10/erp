@@ -91,10 +91,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-codigo" className="block mb-2 font-semibold text-foreground/85">
                 Código *
               </label>
-              <input
+              <input id="product-modal-codigo"
                 type="text"
                 name="codigo"
                 value={formData.codigo}
@@ -104,10 +104,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-nombre" className="block mb-2 font-semibold text-foreground/85">
                 Nombre *
               </label>
-              <input
+              <input id="product-modal-nombre"
                 type="text"
                 name="nombre"
                 value={formData.nombre}
@@ -117,10 +117,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-descripcion" className="block mb-2 font-semibold text-foreground/85">
                 Descripción
               </label>
-              <textarea
+              <textarea id="product-modal-descripcion"
                 name="descripcion"
                 value={formData.descripcion}
                 onChange={handleChange}
@@ -129,10 +129,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-categoria" className="block mb-2 font-semibold text-foreground/85">
                 Categoría *
               </label>
-              <select
+              <select id="product-modal-categoria"
                 name="categoria"
                 value={formData.categoria}
                 onChange={handleChange}
@@ -148,10 +148,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-unidad-medida" className="block mb-2 font-semibold text-foreground/85">
                 Unidad de Medida
               </label>
-              <select
+              <select id="product-modal-unidad-medida"
                 name="unidadMedida"
                 value={formData.unidadMedida}
                 onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
@@ -166,10 +166,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-afectacion-igv" className="block mb-2 font-semibold text-foreground/85">
                 Afectación IGV
               </label>
-              <select
+              <select id="product-modal-afectacion-igv"
                 name="afectacionIgv"
                 value={formData.afectacionIgv}
                 onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
@@ -185,10 +185,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-precio-compra" className="block mb-2 font-semibold text-foreground/85">
                 Precio Compra *
               </label>
-              <input
+              <input id="product-modal-precio-compra"
                 type="number"
                 name="precioCompra"
                 value={formData.precioCompra}
@@ -200,10 +200,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-precio-venta" className="block mb-2 font-semibold text-foreground/85">
                 Precio Venta *
               </label>
-              <input
+              <input id="product-modal-precio-venta"
                 type="number"
                 name="precioVenta"
                 value={formData.precioVenta}
@@ -215,10 +215,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-stock" className="block mb-2 font-semibold text-foreground/85">
                 Stock Inicial *
               </label>
-              <input
+              <input id="product-modal-stock"
                 type="number"
                 name="stock"
                 value={formData.stock}
@@ -229,10 +229,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-stock-minimo" className="block mb-2 font-semibold text-foreground/85">
                 Stock Mínimo *
               </label>
-              <input
+              <input id="product-modal-stock-minimo"
                 type="number"
                 name="stockMinimo"
                 value={formData.stockMinimo}
@@ -243,10 +243,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-stock-maximo" className="block mb-2 font-semibold text-foreground/85">
                 Stock Máximo
               </label>
-              <input
+              <input id="product-modal-stock-maximo"
                 type="number"
                 name="stockMaximo"
                 value={formData.stockMaximo}
@@ -256,10 +256,10 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="product-modal-proveedor" className="block mb-2 font-semibold text-foreground/85">
                 Proveedor
               </label>
-              <input
+              <input id="product-modal-proveedor"
                 type="text"
                 name="proveedor"
                 value={formData.proveedor}

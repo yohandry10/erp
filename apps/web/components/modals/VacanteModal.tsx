@@ -130,10 +130,10 @@ export default function VacanteModal({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-input [&_input]:bg-background [&_input]:p-3 [&_select]:w-full [&_select]:rounded-md [&_select]:border [&_select]:border-input [&_select]:bg-background [&_select]:p-3 [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-input [&_textarea]:bg-background [&_textarea]:p-3">
           <div className="mb-4">
-            <label className="block mb-2 font-semibold">
+            <label htmlFor="vacante-modal-titulo" className="block mb-2 font-semibold">
               Título de la Vacante *
             </label>
-            <input
+            <input id="vacante-modal-titulo"
               type="text"
               name="titulo"
               value={formData.titulo}
@@ -145,10 +145,10 @@ export default function VacanteModal({
 
           <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block mb-2 font-semibold">
+              <label htmlFor="vacante-modal-puesto-solicitado" className="block mb-2 font-semibold">
                 Puesto Solicitado *
               </label>
-              <input
+              <input id="vacante-modal-puesto-solicitado"
                 type="text"
                 name="puesto_solicitado"
                 value={formData.puesto_solicitado}
@@ -159,10 +159,10 @@ export default function VacanteModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold">
+              <label htmlFor="vacante-modal-departamento-id" className="block mb-2 font-semibold">
                 Departamento *
               </label>
-              <select
+              <select id="vacante-modal-departamento-id"
                 name="departamento_id"
                 value={formData.departamento_id}
                 onChange={handleInputChange} className="w-[100%] p-3 rounded-[4px]"
@@ -178,10 +178,10 @@ export default function VacanteModal({
 
           <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block mb-2 font-semibold">
+              <label htmlFor="vacante-modal-ubicacion" className="block mb-2 font-semibold">
                 Ubicación
               </label>
-              <input
+              <input id="vacante-modal-ubicacion"
                 type="text"
                 name="ubicacion"
                 value={formData.ubicacion}
@@ -191,10 +191,10 @@ export default function VacanteModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold">
+              <label htmlFor="vacante-modal-tipo-contrato" className="block mb-2 font-semibold">
                 Tipo de Contrato
               </label>
-              <select
+              <select id="vacante-modal-tipo-contrato"
                 name="tipo_contrato"
                 value={formData.tipo_contrato}
                 onChange={handleInputChange} className="w-[100%] p-3 border rounded-[4px]"
@@ -209,10 +209,10 @@ export default function VacanteModal({
 
           <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="block mb-2 font-semibold">
+              <label htmlFor="vacante-modal-salario-minimo" className="block mb-2 font-semibold">
                 Salario Mín (S/)
               </label>
-              <input
+              <input id="vacante-modal-salario-minimo"
                 type="number"
                 name="salario_minimo"
                 value={formData.salario_minimo}
@@ -224,10 +224,10 @@ export default function VacanteModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold">
+              <label htmlFor="vacante-modal-salario-maximo" className="block mb-2 font-semibold">
                 Salario Máx (S/)
               </label>
-              <input
+              <input id="vacante-modal-salario-maximo"
                 type="number"
                 name="salario_maximo"
                 value={formData.salario_maximo}
@@ -240,10 +240,10 @@ export default function VacanteModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold">
+              <label htmlFor="vacante-modal-fecha-limite" className="block mb-2 font-semibold">
                 Fecha Límite *
               </label>
-              <input
+              <input id="vacante-modal-fecha-limite"
                 type="date"
                 name="fecha_limite"
                 value={formData.fecha_limite}
@@ -255,10 +255,10 @@ export default function VacanteModal({
           </div>
 
           <div className="mb-4">
-            <label className="block mb-2 font-semibold">
+            <label htmlFor="vacante-modal-descripcion" className="block mb-2 font-semibold">
               Descripción del Puesto *
             </label>
-            <textarea
+            <textarea id="vacante-modal-descripcion"
               name="descripcion"
               value={formData.descripcion}
               onChange={handleInputChange}
@@ -270,10 +270,10 @@ export default function VacanteModal({
 
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block mb-2 font-semibold">
+              <label htmlFor="vacante-modal-requisitos" className="block mb-2 font-semibold">
                 Requisitos
               </label>
-              <textarea
+              <textarea id="vacante-modal-requisitos"
                 name="requisitos"
                 value={formData.requisitos}
                 onChange={handleInputChange}
@@ -283,10 +283,10 @@ export default function VacanteModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold">
+              <label htmlFor="vacante-modal-beneficios" className="block mb-2 font-semibold">
                 Beneficios
               </label>
-              <textarea
+              <textarea id="vacante-modal-beneficios"
                 name="beneficios"
                 value={formData.beneficios}
                 onChange={handleInputChange}

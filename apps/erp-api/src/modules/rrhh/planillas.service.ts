@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService, PlanillaCalculadaEvent, PlanillaPagadaEvent } from '../../shared/events/event-bus.service';
 import Decimal from 'decimal.js';
@@ -50,10 +50,25 @@ const NORMATIVA_PERU_2026_DEFAULT: NormativaPeruPeriodo = {
 // renovado o en periodo de prueba sigue vigente y debe entrar a planilla.
 export const ESTADOS_CONTRATO_VIGENTE = ['vigente', 'renovado', 'en_periodo_prueba'];
 
+/**
+ * Contrato que rige la planilla del empleado. Si hay varios vigentes (una
+ * renovación crea una fila nueva sin cerrar la anterior), gana el de fecha de
+ * inicio más reciente. Sin este orden el sueldo de la planilla dependía de en
+ * qué orden devolviera las filas la base de datos.
+ */
 export function contratoVigenteDe(empleado: any): any | undefined {
-  return empleado?.contratos?.find((contrato: any) =>
+  const vigentes = (empleado?.contratos ?? []).filter((contrato: any) =>
     ESTADOS_CONTRATO_VIGENTE.includes(String(contrato?.estado ?? '').toLowerCase()),
   );
+
+  if (vigentes.length <= 1) {
+    return vigentes[0];
+  }
+
+  const desde = (contrato: any) =>
+    new Date(contrato?.fecha_inicio ?? contrato?.created_at ?? 0).getTime() || 0;
+
+  return [...vigentes].sort((a: any, b: any) => desde(b) - desde(a))[0];
 }
 
 const RRHH_CUENTAS_PLANILLA_DEFAULT: Record<string, { nombre: string; tipo: string; tipo_cuenta: string; nivel: number }> = {
@@ -167,7 +182,9 @@ export class PlanillasService {
     const { data: planillaEstado } = await planillaEstadoQuery.single();
 
     if (planillaEstado?.estado === 'calculada' || planillaEstado?.estado === 'pagada') {
-      throw new Error(
+      // El estado de la planilla choca con la operación pedida: es un conflicto
+      // del cliente, no un fallo del servidor.
+      throw new ConflictException(
         `La planilla ya fue ${planillaEstado.estado}. No se puede recalcular sin anular primero.`,
       );
     }
@@ -176,6 +193,7 @@ export class PlanillasService {
     let empleadosQuery = client
       .from('empleados')
       .select('*, contratos(*)')
+      .order('fecha_inicio', { referencedTable: 'contratos', ascending: false })
       .eq('estado', 'activo');
     
     // ✅ Filtrar por tenant si se proporciona
@@ -193,7 +211,7 @@ export class PlanillasService {
     this.logger.debug(`👥 Empleados activos encontrados: ${empleados?.length || 0}`);
 
     if (!empleados || empleados.length === 0) {
-      throw new Error('No se encontraron empleados activos para procesar');
+      throw new BadRequestException('No se encontraron empleados activos para procesar');
     }
 
     const conceptosResult = await this.getConceptos(tenantId);
@@ -202,11 +220,11 @@ export class PlanillasService {
     this.logger.debug(`📋 Conceptos de planilla encontrados: ${conceptos?.length || 0}`);
 
     if (!conceptos || conceptos.length === 0) {
-      throw new Error('No se encontraron conceptos de planilla configurados');
+      throw new BadRequestException('No se encontraron conceptos de planilla configurados');
     }
 
     if (!planillaEstado?.periodo) {
-      throw new Error('Planilla sin periodo; no se puede resolver normativa laboral/tributaria');
+      throw new BadRequestException('Planilla sin periodo; no se puede resolver normativa laboral/tributaria');
     }
 
     const normativa = await this.obtenerNormativaPeruPeriodo(planillaEstado.periodo, tenantId);
@@ -861,7 +879,7 @@ export class PlanillasService {
     this.logger.debug(`📋 Conceptos de planilla encontrados: ${conceptos?.length || 0}`);
 
     if (!conceptos || conceptos.length === 0) {
-      throw new Error('No se encontraron conceptos de planilla configurados');
+      throw new BadRequestException('No se encontraron conceptos de planilla configurados');
     }
 
     let totalIngresos = 0;
@@ -975,7 +993,7 @@ export class PlanillasService {
     // Validar datos del empleado
     if (!empleado) {
       console.error('❌ Empleado no definido');
-      throw new Error('Datos del empleado requeridos');
+      throw new BadRequestException('Datos del empleado requeridos');
     }
 
     const sueldoBasico = parseFloat(empleado.sueldo_base) || 0;
@@ -1192,17 +1210,17 @@ export class PlanillasService {
       const { data: planilla, error: planillaError } = await planillaQuery.single();
 
       if (planillaError || !planilla) {
-        throw new Error('Planilla no encontrada');
+        throw new NotFoundException('Planilla no encontrada');
       }
 
       // ✅ FIX: Normalizar comparación de estados (case-insensitive)
       const estadoNormalizado = (planilla.estado || '').toUpperCase();
       if (estadoNormalizado !== 'CALCULADA') {
-        throw new Error(`Solo se pueden pagar planillas en estado CALCULADA. Estado actual: ${planilla.estado}`);
+        throw new ConflictException(`Solo se pueden pagar planillas en estado CALCULADA. Estado actual: ${planilla.estado}`);
       }
 
       if (planilla.estado_pago === 'PAGADO') {
-        throw new Error('Esta planilla ya ha sido pagada');
+        throw new ConflictException('Esta planilla ya ha sido pagada');
       }
 
       // 2. Crear registro de pago para cada empleado
@@ -1320,7 +1338,7 @@ export class PlanillasService {
       const { empleados_ids, metodo_pago, numero_operacion, observaciones } = pagoData;
 
       if (!empleados_ids || empleados_ids.length === 0) {
-        throw new Error('Debe seleccionar al menos un empleado');
+        throw new BadRequestException('Debe seleccionar al menos un empleado');
       }
 
       let planillaInfoQuery = this.supabaseService.getClient()
@@ -1334,7 +1352,7 @@ export class PlanillasService {
 
       const { data: planillaInfo, error: planillaInfoError } = await planillaInfoQuery.single();
       if (planillaInfoError || !planillaInfo) {
-        throw new Error('Planilla no encontrada para el tenant');
+        throw new NotFoundException('Planilla no encontrada para el tenant');
       }
 
       const tenantIdPlanilla = tenantId || planillaInfo.tenant_id;
@@ -1353,7 +1371,7 @@ export class PlanillasService {
 
       if (error) throw error;
       if (!empleadosPlanilla || empleadosPlanilla.length === 0) {
-        throw new Error('No se encontraron empleados de planilla para pagar');
+        throw new BadRequestException('No se encontraron empleados de planilla para pagar');
       }
 
       let totalPagado = 0;
@@ -1568,12 +1586,12 @@ export class PlanillasService {
       const { data: planilla, error } = await planillaQuery.single();
 
       if (error || !planilla) {
-        throw new Error('Planilla no encontrada');
+        throw new NotFoundException('Planilla no encontrada');
       }
 
       const tenantIdPlanilla = tenantId || planilla.tenant_id;
       if (!tenantIdPlanilla) {
-        throw new Error('La planilla no tiene tenant_id; no se puede generar asiento contable');
+        throw new BadRequestException('La planilla no tiene tenant_id; no se puede generar asiento contable');
       }
 
       const referenciaPlanilla = `PLANILLA-${planillaId}`;
@@ -1625,7 +1643,7 @@ export class PlanillasService {
       this.logger.debug(`🔍 [RRHH] Empleados en planilla: ${planilla.empleado_planilla?.length || 0}`);
 
       if (estadoNormalizado !== 'CALCULADA' && (!planilla.empleado_planilla || planilla.empleado_planilla.length === 0)) {
-        throw new Error(`No se pueden generar asientos - Estado: ${planilla.estado}, Empleados: ${planilla.empleado_planilla?.length || 0}`);
+        throw new ConflictException(`No se pueden generar asientos - Estado: ${planilla.estado}, Empleados: ${planilla.empleado_planilla?.length || 0}`);
       }
 
       // Calcular totales

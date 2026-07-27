@@ -99,10 +99,10 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col gap-4 mb-6">
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="sire-report-modal-tipo-reporte" className="block mb-2 font-semibold text-foreground/85">
                 Tipo de Reporte *
               </label>
-              <select
+              <select id="sire-report-modal-tipo-reporte"
                 name="tipoReporte"
                 value={formData.tipoReporte}
                 onChange={handleChange}
@@ -116,10 +116,10 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="sire-report-modal-periodo" className="block mb-2 font-semibold text-foreground/85">
                 Período *
               </label>
-              <input
+              <input id="sire-report-modal-periodo"
                 type="month"
                 name="periodo"
                 value={formData.periodo}
@@ -130,10 +130,10 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
 
             <div className="grid grid-cols-[1fr_1fr] gap-4">
               <div>
-                <label className="block mb-2 font-semibold text-foreground/85">
+                <label htmlFor="sire-report-modal-fecha-inicio" className="block mb-2 font-semibold text-foreground/85">
                   Fecha Inicio
                 </label>
-                <input
+                <input id="sire-report-modal-fecha-inicio"
                   type="date"
                   name="fechaInicio"
                   value={formData.fechaInicio}
@@ -142,10 +142,10 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-foreground/85">
+                <label htmlFor="sire-report-modal-fecha-fin" className="block mb-2 font-semibold text-foreground/85">
                   Fecha Fin
                 </label>
-                <input
+                <input id="sire-report-modal-fecha-fin"
                   type="date"
                   name="fechaFin"
                   value={formData.fechaFin}
@@ -155,10 +155,10 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="sire-report-modal-formato" className="block mb-2 font-semibold text-foreground/85">
                 Formato *
               </label>
-              <select
+              <select id="sire-report-modal-formato"
                 name="formato"
                 value={formData.formato}
                 onChange={handleChange}

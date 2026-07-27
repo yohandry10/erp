@@ -208,10 +208,10 @@ export default function GreModal({
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="gre-modal-destinatario" className="block mb-2 font-semibold text-foreground/85">
                 Destinatario *
               </label>
-              <input
+              <input id="gre-modal-destinatario"
                 aria-label="Destinatario *"
                 type="text"
                 name="destinatario"
@@ -222,10 +222,10 @@ export default function GreModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="gre-modal-direccion-destino" className="block mb-2 font-semibold text-foreground/85">
                 Dirección de Destino *
               </label>
-              <input
+              <input id="gre-modal-direccion-destino"
                 aria-label="Dirección de Destino *"
                 type="text"
                 name="direccionDestino"
@@ -236,10 +236,10 @@ export default function GreModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="gre-modal-ubigeo-destino" className="block mb-2 font-semibold text-foreground/85">
                 Ubigeo de Destino *
               </label>
-              <input
+              <input id="gre-modal-ubigeo-destino"
                 aria-label="Ubigeo de Destino *"
                 type="text"
                 inputMode="numeric"
@@ -256,10 +256,10 @@ export default function GreModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="gre-modal-fecha-traslado" className="block mb-2 font-semibold text-foreground/85">
                 Fecha de Traslado *
               </label>
-              <input
+              <input id="gre-modal-fecha-traslado"
                 aria-label="Fecha de Traslado *"
                 type="date"
                 name="fechaTraslado"
@@ -270,10 +270,10 @@ export default function GreModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="gre-modal-modalidad" className="block mb-2 font-semibold text-foreground/85">
                 Modalidad de Transporte *
               </label>
-              <select
+              <select id="gre-modal-modalidad"
                 aria-label="Modalidad de Transporte *"
                 name="modalidad"
                 value={formData.modalidad}
@@ -286,10 +286,10 @@ export default function GreModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="gre-modal-motivo" className="block mb-2 font-semibold text-foreground/85">
                 Motivo del Traslado *
               </label>
-              <select
+              <select id="gre-modal-motivo"
                 aria-label="Motivo del Traslado *"
                 name="motivo"
                 value={formData.motivo}
@@ -306,10 +306,10 @@ export default function GreModal({
             </div>
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="gre-modal-peso-total" className="block mb-2 font-semibold text-foreground/85">
                 Peso Total (Kg) *
               </label>
-              <input
+              <input id="gre-modal-peso-total"
                 aria-label="Peso Total (Kg) *"
                 type="number"
                 name="pesoTotal"
@@ -324,10 +324,10 @@ export default function GreModal({
             {formData.modalidad === 'TRANSPORTE_PUBLICO' && (
               <>
                 <div>
-                  <label className="block mb-2 font-semibold text-foreground/85">
+                  <label htmlFor="gre-modal-transportista" className="block mb-2 font-semibold text-foreground/85">
                     Transportista *
                   </label>
-                  <input
+                  <input id="gre-modal-transportista"
                     aria-label="Transportista *"
                     type="text"
                     name="transportista"
@@ -338,10 +338,10 @@ export default function GreModal({
                 </div>
 
                 <div>
-                  <label className="block mb-2 font-semibold text-foreground/85">
+                  <label htmlFor="gre-modal-transportista-documento" className="block mb-2 font-semibold text-foreground/85">
                     RUC del Transportista *
                   </label>
-                  <input
+                  <input id="gre-modal-transportista-documento"
                     aria-label="RUC del Transportista *"
                     type="text"
                     name="transportistaDocumento"
@@ -359,10 +359,10 @@ export default function GreModal({
             {formData.modalidad === 'TRANSPORTE_PRIVADO' && (
               <>
                 <div>
-                  <label className="block mb-2 font-semibold text-foreground/85">
+                  <label htmlFor="gre-modal-placa-vehiculo" className="block mb-2 font-semibold text-foreground/85">
                     Placa del Vehículo *
                   </label>
-                  <input
+                  <input id="gre-modal-placa-vehiculo"
                     aria-label="Placa del Vehículo *"
                     type="text"
                     name="placaVehiculo"
@@ -374,10 +374,10 @@ export default function GreModal({
                 </div>
 
                 <div>
-                  <label className="block mb-2 font-semibold text-foreground/85">
+                  <label htmlFor="gre-modal-licencia-conducir" className="block mb-2 font-semibold text-foreground/85">
                     Licencia de Conducir *
                   </label>
-                  <input
+                  <input id="gre-modal-licencia-conducir"
                     aria-label="Licencia de Conducir *"
                     type="text"
                     name="licenciaConducir"
@@ -389,10 +389,10 @@ export default function GreModal({
                 </div>
 
                 <div>
-                  <label className="block mb-2 font-semibold text-foreground/85">
+                  <label htmlFor="gre-modal-conductor-documento-tipo" className="block mb-2 font-semibold text-foreground/85">
                     Tipo Doc. Conductor *
                   </label>
-                  <select
+                  <select id="gre-modal-conductor-documento-tipo"
                     aria-label="Tipo Doc. Conductor *"
                     name="conductorDocumentoTipo"
                     value={formData.conductorDocumentoTipo}
@@ -407,10 +407,10 @@ export default function GreModal({
                 </div>
 
                 <div>
-                  <label className="block mb-2 font-semibold text-foreground/85">
+                  <label htmlFor="gre-modal-conductor-documento-numero" className="block mb-2 font-semibold text-foreground/85">
                     Documento Conductor *
                   </label>
-                  <input
+                  <input id="gre-modal-conductor-documento-numero"
                     aria-label="Documento Conductor *"
                     type="text"
                     name="conductorDocumentoNumero"
@@ -422,10 +422,10 @@ export default function GreModal({
                 </div>
 
                 <div>
-                  <label className="block mb-2 font-semibold text-foreground/85">
+                  <label htmlFor="gre-modal-conductor-nombres" className="block mb-2 font-semibold text-foreground/85">
                     Nombres Conductor *
                   </label>
-                  <input
+                  <input id="gre-modal-conductor-nombres"
                     aria-label="Nombres Conductor *"
                     type="text"
                     name="conductorNombres"
@@ -436,10 +436,10 @@ export default function GreModal({
                 </div>
 
                 <div>
-                  <label className="block mb-2 font-semibold text-foreground/85">
+                  <label htmlFor="gre-modal-conductor-apellidos" className="block mb-2 font-semibold text-foreground/85">
                     Apellidos Conductor *
                   </label>
-                  <input
+                  <input id="gre-modal-conductor-apellidos"
                     aria-label="Apellidos Conductor *"
                     type="text"
                     name="conductorApellidos"
@@ -452,10 +452,10 @@ export default function GreModal({
             )}
 
             <div>
-              <label className="block mb-2 font-semibold text-foreground/85">
+              <label htmlFor="gre-modal-observaciones" className="block mb-2 font-semibold text-foreground/85">
                 Observaciones
               </label>
-              <textarea
+              <textarea id="gre-modal-observaciones"
                 aria-label="Observaciones"
                 name="observaciones"
                 value={formData.observaciones}

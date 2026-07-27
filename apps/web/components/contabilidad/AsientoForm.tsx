@@ -152,9 +152,9 @@ export default function AsientoForm({
             <CardTitle className="text-base text-white">Informacion general</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 p-5 md:grid-cols-2">
-            <label className="space-y-2">
+            <label htmlFor="asiento-form-fecha" className="space-y-2">
               <span className={labelClass}>Fecha *</span>
-              <input
+              <input id="asiento-form-fecha"
                 type="date"
                 value={formData.fecha}
                 onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
@@ -164,9 +164,9 @@ export default function AsientoForm({
               {fieldError('fecha')}
             </label>
 
-            <label className="space-y-2">
+            <label htmlFor="asiento-form-referencia" className="space-y-2">
               <span className={labelClass}>Referencia</span>
-              <input
+              <input id="asiento-form-referencia"
                 type="text"
                 value={formData.referencia}
                 onChange={(e) => setFormData({ ...formData, referencia: e.target.value })}
@@ -176,9 +176,9 @@ export default function AsientoForm({
               />
             </label>
 
-            <label className="space-y-2 md:col-span-2">
+            <label htmlFor="asiento-form-concepto" className="space-y-2 md:col-span-2">
               <span className={labelClass}>Concepto *</span>
-              <textarea
+              <textarea id="asiento-form-concepto"
                 value={formData.concepto}
                 onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
                 placeholder="Descripcion del asiento contable"

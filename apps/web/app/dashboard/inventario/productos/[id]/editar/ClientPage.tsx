@@ -137,10 +137,10 @@ export default function EditarProductoPage() {
           <h2 className="m-0 text-lg font-bold text-foreground">Información Básica</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label>
+              <label htmlFor="editar-codigo">
                 Código <span className="text-[var(--red-500)]">*</span>
               </label>
-              <input
+              <input id="editar-codigo"
                 type="text"
                 name="codigo"
                 value={formData.codigo}
@@ -150,8 +150,8 @@ export default function EditarProductoPage() {
               />
             </div>
             <div>
-              <label>Código de Barras</label>
-              <input
+              <label htmlFor="editar-codigo-barras">Código de Barras</label>
+              <input id="editar-codigo-barras"
                 type="text"
                 name="codigoBarras"
                 value={formData.codigoBarras}
@@ -162,10 +162,10 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>
+            <label htmlFor="editar-nombre">
               Nombre <span className="text-[var(--red-500)]">*</span>
             </label>
-            <input
+            <input id="editar-nombre"
               type="text"
               name="nombre"
               value={formData.nombre}
@@ -176,8 +176,8 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>Descripción</label>
-            <textarea
+            <label htmlFor="editar-descripcion">Descripción</label>
+            <textarea id="editar-descripcion"
               name="descripcion"
               value={formData.descripcion}
               onChange={handleChange}
@@ -187,10 +187,10 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label>
+            <label htmlFor="editar-categoria">
               Categoría <span className="text-[var(--red-500)]">*</span>
             </label>
-            <select
+            <select id="editar-categoria"
               name="categoria"
               value={formData.categoria}
               onChange={handleChange}
@@ -207,8 +207,8 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
+            <label htmlFor="editar-activo" className="flex items-center gap-2 cursor-pointer">
+              <input id="editar-activo"
                 type="checkbox"
                 name="activo"
                 checked={formData.activo}
@@ -223,8 +223,8 @@ export default function EditarProductoPage() {
           <h2 className="m-0 text-lg font-bold text-foreground">Precios e Impuestos</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label>Precio de Compra</label>
-              <input
+              <label htmlFor="editar-precio-compra">Precio de Compra</label>
+              <input id="editar-precio-compra"
                 type="number"
                 name="precioCompra"
                 value={formData.precioCompra}
@@ -235,10 +235,10 @@ export default function EditarProductoPage() {
               />
             </div>
             <div>
-              <label>
+              <label htmlFor="editar-precio-venta">
                 Precio de Venta <span className="text-[var(--red-500)]">*</span>
               </label>
-              <input
+              <input id="editar-precio-venta"
                 type="number"
                 name="precioVenta"
                 value={formData.precioVenta}
@@ -250,8 +250,8 @@ export default function EditarProductoPage() {
               />
             </div>
             <div>
-              <label>Impuesto (%)</label>
-              <input
+              <label htmlFor="editar-impuesto">Impuesto (%)</label>
+              <input id="editar-impuesto"
                 type="number"
                 name="impuesto"
                 value={formData.impuesto}
@@ -275,8 +275,8 @@ export default function EditarProductoPage() {
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label>Stock Mínimo</label>
-              <input
+              <label htmlFor="editar-stock-minimo">Stock Mínimo</label>
+              <input id="editar-stock-minimo"
                 type="number"
                 name="stockMinimo"
                 value={formData.stockMinimo}

@@ -185,10 +185,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             </h3>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
               <div>
-                <label className="block mb-2 font-semibold text-foreground/85">
+                <label htmlFor="cpe-modal-tipo-comprobante" className="block mb-2 font-semibold text-foreground/85">
                   Tipo de Comprobante *
                 </label>
-                <select
+                <select id="cpe-modal-tipo-comprobante"
                   name="tipoComprobante"
                   value={formData.tipoComprobante}
                   onChange={handleChange}
@@ -202,10 +202,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-foreground/85">
+                <label htmlFor="cpe-modal-serie" className="block mb-2 font-semibold text-foreground/85">
                   Serie *
                 </label>
-                <input
+                <input id="cpe-modal-serie"
                   type="text"
                   name="serie"
                   value={formData.serie}
@@ -215,10 +215,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-foreground/85">
+                <label htmlFor="cpe-modal-fecha-emision" className="block mb-2 font-semibold text-foreground/85">
                   Fecha de Emisión *
                 </label>
-                <input
+                <input id="cpe-modal-fecha-emision"
                   type="date"
                   name="fechaEmision"
                   value={formData.fechaEmision}
@@ -228,10 +228,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-foreground/85">
+                <label htmlFor="cpe-modal-moneda" className="block mb-2 font-semibold text-foreground/85">
                   Moneda
                 </label>
-                <select
+                <select id="cpe-modal-moneda"
                   name="moneda"
                   value={formData.moneda}
                   onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
@@ -250,10 +250,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             </h3>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4">
               <div>
-                <label className="block mb-2 font-semibold text-foreground/85">
+                <label htmlFor="cpe-modal-cliente-ruc" className="block mb-2 font-semibold text-foreground/85">
                   RUC/DNI *
                 </label>
-                <input
+                <input id="cpe-modal-cliente-ruc"
                   type="text"
                   name="clienteRuc"
                   value={formData.clienteRuc}
@@ -263,10 +263,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-foreground/85">
+                <label htmlFor="cpe-modal-cliente-razon-social" className="block mb-2 font-semibold text-foreground/85">
                   Razón Social/Nombre *
                 </label>
-                <input
+                <input id="cpe-modal-cliente-razon-social"
                   type="text"
                   name="clienteRazonSocial"
                   value={formData.clienteRazonSocial}
@@ -276,10 +276,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
               </div>
 
               <div>
-                <label className="block mb-2 font-semibold text-foreground/85">
+                <label htmlFor="cpe-modal-cliente-direccion" className="block mb-2 font-semibold text-foreground/85">
                   Dirección
                 </label>
-                <input
+                <input id="cpe-modal-cliente-direccion"
                   type="text"
                   name="clienteDireccion"
                   value={formData.clienteDireccion}
@@ -420,10 +420,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
           {/* Observaciones */}
           <div className="mb-8">
-            <label className="block mb-2 font-semibold text-foreground/85">
+            <label htmlFor="cpe-modal-observaciones" className="block mb-2 font-semibold text-foreground/85">
               Observaciones
             </label>
-            <textarea
+            <textarea id="cpe-modal-observaciones"
               name="observaciones"
               value={formData.observaciones}
               onChange={handleChange}

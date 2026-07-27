@@ -180,10 +180,10 @@ export default function EditarCentroCostoPage() {
           <div className="grid gap-6">
             {/* Código */}
             <div>
-              <label className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
+              <label htmlFor="editar-codigo" className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
                 Código <span className="text-[var(--red-600)]">*</span>
               </label>
-              <input
+              <input id="editar-codigo"
                 type="text"
                 value={formData.codigo}
                 onChange={(e) => {
@@ -207,10 +207,10 @@ export default function EditarCentroCostoPage() {
 
             {/* Nombre */}
             <div>
-              <label className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
+              <label htmlFor="editar-nombre" className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
                 Nombre <span className="text-[var(--red-600)]">*</span>
               </label>
-              <input
+              <input id="editar-nombre"
                 type="text"
                 value={formData.nombre}
                 onChange={(e) => {
@@ -231,10 +231,10 @@ export default function EditarCentroCostoPage() {
 
             {/* Descripción */}
             <div>
-              <label className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
+              <label htmlFor="editar-descripcion" className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
                 Descripción
               </label>
-              <textarea
+              <textarea id="editar-descripcion"
                 value={formData.descripcion}
                 onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
                 placeholder="Descripción del centro de costo (opcional)"
@@ -245,8 +245,8 @@ export default function EditarCentroCostoPage() {
 
             {/* Estado */}
             <div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
+              <label htmlFor="editar-activo" className="flex items-center gap-2 cursor-pointer">
+                <input id="editar-activo"
                   type="checkbox"
                   checked={formData.activo}
                   onChange={(e) => setFormData({ ...formData, activo: e.target.checked })} className="w-[18px] h-[18px] cursor-pointer"
