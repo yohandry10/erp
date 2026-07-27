@@ -394,11 +394,14 @@ export class DemoService {
   }
 
   private async seedMetodosPago(tenantId: string): Promise<void> {
+    // `tipo` decide qué entra a la gaveta: sin él, la columna cae a su default
+    // 'EFECTIVO' y una venta con tarjeta infla el efectivo esperado al arqueo.
+    // La taxonomía es la del catálogo global (migración 024).
     const metodos = [
-      { codigo: "EFECTIVO", nombre: "Efectivo" },
-      { codigo: "TARJETA", nombre: "Tarjeta" },
-      { codigo: "TRANSFERENCIA", nombre: "Transferencia bancaria" },
-      { codigo: "YAPE", nombre: "Yape / Plin" },
+      { codigo: "EFECTIVO", nombre: "Efectivo", tipo: "EFECTIVO" },
+      { codigo: "TARJETA", nombre: "Tarjeta", tipo: "TARJETA" },
+      { codigo: "TRANSFERENCIA", nombre: "Transferencia bancaria", tipo: "TRANSFERENCIA" },
+      { codigo: "YAPE", nombre: "Yape / Plin", tipo: "BILLETERA_DIGITAL" },
     ].map((m) => ({
       tenant_id: tenantId,
       ...m,
