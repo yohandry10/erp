@@ -95,8 +95,8 @@ export class CajasService {
   }
 
   /**
-   * Saldo teorico de una sesion: lo que deberia haber en la gaveta segun el monto
-   * de apertura y los movimientos registrados. Misma formula que usa el cierre con
+   * Saldo teórico de una sesión: lo que debería haber en la gaveta según el monto
+   * de apertura y los movimientos registrados. Misma fórmula que usa el cierre con
    * arqueo, para que un cierre administrativo no pierda la trazabilidad del efectivo.
    */
   private async calcularSaldoTeoricoSesion(tenantId: string, sesionId: string): Promise<number | null> {
@@ -127,11 +127,11 @@ export class CajasService {
   }
 
   /**
-   * Campos de cierre para una sesion que se cierra sin contar el efectivo.
+   * Campos de cierre para una sesión que se cierra sin contar el efectivo.
    * Antes se guardaba esperado 0 / contado 0 / diferencia 0, afirmando que la caja
-   * estaba vacia y cuadrada y borrando el rastro del efectivo. Ahora se registra el
-   * saldo teorico; el trigger app.normalize_sesiones_caja_row fuerza contado a 0 y
-   * deriva la diferencia, de modo que la sesion queda marcada como descuadrada y
+   * estaba vacía y cuadrada y borrando el rastro del efectivo. Ahora se registra el
+   * saldo teórico; el trigger app.normalize_sesiones_caja_row fuerza contado a 0 y
+   * deriva la diferencia, de modo que la sesión queda marcada como descuadrada y
    * visible en los reportes en vez de pasar como cierre limpio.
    */
   private async construirCierreAdministrativo(
@@ -145,7 +145,7 @@ export class CajasService {
       fecha_cierre: ahoraIso,
       hora_cierre: ahoraIso,
       cierre_administrativo: true,
-      razon_cierre_administrativo: 'Cierre automatico: sesion antigua detectada al abrir nueva caja',
+      razon_cierre_administrativo: 'Cierre automático: sesión antigua detectada al abrir nueva caja',
       usuario_cierre: usuarioCierre,
       monto_esperado: await this.calcularSaldoTeoricoSesion(tenantId, sesionId),
       monto_contado: null,
