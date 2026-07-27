@@ -95,6 +95,65 @@ export class CajasService {
   }
 
   /**
+   * Saldo teorico de una sesion: lo que deberia haber en la gaveta segun el monto
+   * de apertura y los movimientos registrados. Misma formula que usa el cierre con
+   * arqueo, para que un cierre administrativo no pierda la trazabilidad del efectivo.
+   */
+  private async calcularSaldoTeoricoSesion(tenantId: string, sesionId: string): Promise<number | null> {
+    const client = this.supabase.getClient();
+
+    const { data: sesion } = await client
+      .from('sesiones_caja')
+      .select('monto_inicio, monto_inicial')
+      .eq('tenant_id', tenantId)
+      .eq('id', sesionId)
+      .maybeSingle();
+
+    const { data: movimientos, error } = await client
+      .from('movimientos_caja')
+      .select('monto')
+      .eq('tenant_id', tenantId)
+      .eq('sesion_caja_id', sesionId);
+
+    if (error) {
+      return null;
+    }
+
+    const apertura = Number((sesion as any)?.monto_inicio ?? (sesion as any)?.monto_inicial ?? 0);
+    const suma = (movimientos || []).reduce((total, m: any) => total + Number(m.monto ?? 0), 0);
+    const teorico = apertura + suma;
+
+    return Number.isFinite(teorico) ? Number(teorico.toFixed(2)) : null;
+  }
+
+  /**
+   * Campos de cierre para una sesion que se cierra sin contar el efectivo.
+   * Antes se guardaba esperado 0 / contado 0 / diferencia 0, afirmando que la caja
+   * estaba vacia y cuadrada y borrando el rastro del efectivo. Ahora se registra el
+   * saldo teorico; el trigger app.normalize_sesiones_caja_row fuerza contado a 0 y
+   * deriva la diferencia, de modo que la sesion queda marcada como descuadrada y
+   * visible en los reportes en vez de pasar como cierre limpio.
+   */
+  private async construirCierreAdministrativo(
+    tenantId: string,
+    sesionId: string,
+    ahoraIso: string,
+    usuarioCierre: string | null,
+  ): Promise<Record<string, any>> {
+    return {
+      estado: 'CERRADA',
+      fecha_cierre: ahoraIso,
+      hora_cierre: ahoraIso,
+      cierre_administrativo: true,
+      razon_cierre_administrativo: 'Cierre automatico: sesion antigua detectada al abrir nueva caja',
+      usuario_cierre: usuarioCierre,
+      monto_esperado: await this.calcularSaldoTeoricoSesion(tenantId, sesionId),
+      monto_contado: null,
+      diferencia: null,
+    };
+  }
+
+  /**
    * Abre una nueva sesión de caja con validaciones exhaustivas de concurrencia
    * 
    * Validaciones:
@@ -167,14 +226,14 @@ export class CajasService {
         try {
           await this.supabase.getClient()
             .from('sesiones_caja')
-            .update({
-              estado: 'CERRADA',
-              fecha_cierre: ahoraIso,
-              hora_cierre: ahoraIso,
-              cierre_administrativo: true,
-              razon_cierre_administrativo: 'Cierre automático: sesión antigua detectada al abrir nueva caja',
-              usuario_cierre: userId ?? sesionCajaAbierta.cajero_id ?? null,
-            })
+            .update(
+              await this.construirCierreAdministrativo(
+                tenantId,
+                sesionCajaAbierta.id,
+                ahoraIso,
+                userId ?? sesionCajaAbierta.cajero_id ?? null,
+              ),
+            )
             .eq('tenant_id', tenantId)
             .eq('id', sesionCajaAbierta.id);
           this.logger.warn(
@@ -229,14 +288,14 @@ export class CajasService {
           try {
             await this.supabase.getClient()
               .from('sesiones_caja')
-              .update({
-                estado: 'CERRADA',
-                fecha_cierre: ahoraIso,
-                hora_cierre: ahoraIso,
-                cierre_administrativo: true,
-                razon_cierre_administrativo: 'Cierre automático: sesión antigua detectada al abrir nueva caja',
-                usuario_cierre: userId ?? cajeroId ?? null,
-              })
+              .update(
+                await this.construirCierreAdministrativo(
+                  tenantId,
+                  sesionUsuarioAbierta.id,
+                  ahoraIso,
+                  userId ?? cajeroId ?? null,
+                ),
+              )
               .eq('tenant_id', tenantId)
               .eq('id', sesionUsuarioAbierta.id);
             this.logger.warn(

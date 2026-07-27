@@ -604,44 +604,13 @@ export class PosService {
           return { success: true, data: null };
         }
 
-        const hoy = new Date();
-        const hoyString = hoy.toISOString().split('T')[0];
-
-        // Cerrar sesiones anteriores a hoy para evitar arrastre de sesiones "huérfanas"
-        const sesionesVencidas = listaSesiones.filter((s) => {
-          const aperturaIso = s.hora_apertura || s.fecha_apertura || s.created_at;
-          if (!aperturaIso) return true;
-          const apertura = new Date(aperturaIso);
-          const aperturaStr = apertura.toISOString().split('T')[0];
-          return aperturaStr !== hoyString;
-        });
-
-        if (sesionesVencidas.length > 0) {
-          const ids = sesionesVencidas.map((s) => s.id);
-          try {
-            await client
-              .from('sesiones_caja')
-              .update({
-                estado: 'CERRADA',
-                hora_cierre: new Date().toISOString(),
-                fecha_cierre: new Date().toISOString(),
-                notas: 'Cierre automático por sesión anterior al día actual',
-              })
-              .in('id', ids);
-          } catch (cerrarErr) {
-            this.logger.warn('⚠️ No se pudieron cerrar sesiones vencidas:', cerrarErr);
-          }
-        }
-
-        // Quedarse con la sesión más reciente de hoy
-        const sesionHoy = listaSesiones.find((s) => {
-          const aperturaIso = s.hora_apertura || s.fecha_apertura || s.created_at;
-          if (!aperturaIso) return false;
-          const apertura = new Date(aperturaIso);
-          return apertura.toISOString().split('T')[0] === hoyString;
-        });
-
-        return { success: true, data: sesionHoy || null };
+        // Consultar el estado de caja no puede cerrarla. Este GET cerraba toda
+        // sesión cuya apertura no cayera en el día UTC actual, sin saldo teórico,
+        // sin conteo y sin responsable: el efectivo quedaba sin rastro por el solo
+        // hecho de abrir el POS. Además, comparar en UTC parte la jornada peruana
+        // a las 19:00 locales. La sesión abierta se devuelve tal cual y sólo se
+        // cierra desde el flujo de cierre, con su arqueo.
+        return { success: true, data: listaSesiones[0] || null };
       } catch (error) {
         this.logger.error('Error obteniendo sesión de caja POS:', error);
         return {

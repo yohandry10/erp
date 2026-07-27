@@ -347,19 +347,15 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
           // Buscar sesión activa solo del usuario autenticado para evitar tomar cajas de otro cajero
           const sesionActiva = sesionRes?.data || null;
-          const aperturaIso = sesionActiva?.hora_apertura || sesionActiva?.fecha_apertura || sesionActiva?.created_at;
-          const apertura = aperturaIso ? new Date(aperturaIso) : null;
-          const hoy = new Date();
-          const esMismoDia =
-            !!apertura &&
-            apertura.getFullYear() === hoy.getFullYear() &&
-            apertura.getMonth() === hoy.getMonth() &&
-            apertura.getDate() === hoy.getDate();
+          // Una sesión abierta sigue siéndolo aunque se haya abierto ayer: los
+          // negocios que operan pasada la medianoche cruzan de día con la caja
+          // abierta. Exigir que la apertura fuera hoy ocultaba la caja y su
+          // efectivo, y empujaba al cajero a abrir otra, con lo que la anterior
+          // se cerraba automáticamente sin arqueo.
           const sesionValida = sesionActiva
             && sesionActiva.estado === 'ABIERTA'
             && !sesionActiva.hora_cierre
-            && !sesionActiva.fecha_cierre
-            && esMismoDia;
+            && !sesionActiva.fecha_cierre;
 
           const sesionGuardada = sesionGuardadaRef.current;
 
@@ -1724,7 +1720,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
         <div className={`${posShellClass} ${modoCajaEnfocado ? 'fixed inset-0 z-[1100] overflow-y-auto bg-background' : 'bg-muted/30'}`}>
           {/* Cabecera operativa: contexto y acciones secundarias sin competir con el cobro. */}
           <div className={posHeaderClass}>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
                   <ShoppingCart className="h-5 w-5" />
@@ -1741,7 +1737,9 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              {/* Sin shrink-0 los botones comprimían el título hasta dejarlo en
+                  "P..." teniendo espacio libre; con wrap bajan de línea. */}
+              <div className="flex shrink-0 items-center gap-2">
                 <Button
                   type="button"
                   variant={modoCajaEnfocado ? 'secondary' : 'outline'}

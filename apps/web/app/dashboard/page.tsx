@@ -1015,7 +1015,7 @@ export default function Dashboard() {
           <MetricTile
             label="Inventario total"
             value={formatNumber(stats?.totalInventario)}
-            delta={{ value: '', direction: 'neutral', description: 'Productos con stock' }}
+            delta={{ value: '', direction: 'neutral', description: 'Productos en catálogo' }}
             icon={Package}
             tone="emerald"
           />
