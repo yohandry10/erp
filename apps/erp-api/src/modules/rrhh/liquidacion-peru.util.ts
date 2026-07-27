@@ -151,6 +151,42 @@ export function calcularGratificacionTrunca(
 }
 
 /**
+ * Semestre que liquida un depósito de CTS (D.S. 001-97-TR, art. 21). El depósito
+ * de mayo cubre noviembre-abril y el de noviembre cubre mayo-octubre. Devuelve
+ * `null` si el periodo no es uno de los dos meses de depósito.
+ *
+ * `fin` es el primer día posterior al semestre, para que un semestre completo
+ * mida seis meses exactos.
+ */
+export function semestreCts(periodo: string): { inicio: Date; fin: Date } | null {
+  const partes = /^(\d{4})-(\d{2})$/.exec(String(periodo ?? '').trim());
+  if (!partes) return null;
+
+  const anio = Number(partes[1]);
+  const mes = Number(partes[2]);
+
+  if (mes === 5) return { inicio: new Date(anio - 1, 10, 1), fin: new Date(anio, 4, 1) };
+  if (mes === 11) return { inicio: new Date(anio, 4, 1), fin: new Date(anio, 10, 1) };
+
+  return null;
+}
+
+/**
+ * Tiempo computable de un empleado dentro del semestre de CTS: se cuenta desde su
+ * ingreso si entró con el semestre empezado, y hasta el cierre del semestre.
+ */
+export function tiempoComputableCts(periodo: string, fechaIngreso: Date): TiempoServicios | null {
+  const semestre = semestreCts(periodo);
+  if (!semestre) return null;
+
+  const desde = fechaIngreso > semestre.inicio ? fechaIngreso : semestre.inicio;
+  if (desde >= semestre.fin) return { meses: 0, dias: 0 };
+
+  const tiempo = tiempoDeServicios(desde, semestre.fin);
+  return { meses: Math.min(6, tiempo.meses), dias: tiempo.dias };
+}
+
+/**
  * Meses computables para la gratificación de un periodo de planilla `YYYY-MM`.
  * Devuelve `null` si el periodo no es julio ni diciembre, que son los únicos en
  * los que se paga (Ley 27735, art. 1): julio liquida el semestre enero-junio y
