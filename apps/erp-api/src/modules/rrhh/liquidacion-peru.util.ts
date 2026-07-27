@@ -151,6 +151,53 @@ export function calcularGratificacionTrunca(
 }
 
 /**
+ * Días de un rango que caen dentro del mes de un periodo `YYYY-MM`. Un descanso
+ * que cruza el cambio de mes se reparte entre las dos planillas.
+ */
+export function diasEnPeriodo(periodo: string, inicio: Date, fin: Date): number {
+  const partes = /^(\d{4})-(\d{2})$/.exec(String(periodo ?? '').trim());
+  if (!partes) return 0;
+
+  const anio = Number(partes[1]);
+  const mes = Number(partes[2]) - 1;
+  const primerDia = new Date(anio, mes, 1);
+  const primerDiaSiguiente = new Date(anio, mes + 1, 1);
+
+  const desde = inicio > primerDia ? inicio : primerDia;
+  const hasta = fin < primerDiaSiguiente ? fin : new Date(primerDiaSiguiente.getTime() - 86400000);
+  if (desde > hasta) return 0;
+
+  return Math.floor((hasta.getTime() - desde.getTime()) / 86400000) + 1;
+}
+
+/**
+ * Reparte la remuneración del mes entre días trabajados y días de descanso
+ * vacacional (D. Leg. 713, art. 15): en vacaciones el trabajador percibe lo mismo
+ * que si hubiera trabajado, así que el total no cambia. Sólo cambia el concepto,
+ * que es lo que exige declarar la planilla.
+ */
+export function dividirRemuneracionPorVacaciones(
+  remuneracionMensual: number,
+  diasVacaciones: number,
+): { diasVacaciones: number; montoTrabajado: number; montoVacacional: number } {
+  const base = Number(remuneracionMensual) || 0;
+  const dias = Math.max(0, Math.min(30, Math.floor(Number(diasVacaciones) || 0)));
+
+  if (base <= 0 || dias === 0) {
+    return { diasVacaciones: 0, montoTrabajado: redondear(base), montoVacacional: 0 };
+  }
+
+  const montoVacacional = redondear((base / 30) * dias);
+  // El resto se obtiene por diferencia para que la suma sea exactamente la
+  // remuneración del mes aunque el redondeo por treintavos no cierre.
+  return {
+    diasVacaciones: dias,
+    montoTrabajado: redondear(base - montoVacacional),
+    montoVacacional,
+  };
+}
+
+/**
  * Semestre que liquida un depósito de CTS (D.S. 001-97-TR, art. 21). El depósito
  * de mayo cubre noviembre-abril y el de noviembre cubre mayo-octubre. Devuelve
  * `null` si el periodo no es uno de los dos meses de depósito.

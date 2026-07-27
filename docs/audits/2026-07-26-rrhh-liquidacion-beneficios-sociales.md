@@ -168,8 +168,51 @@ un 500. El recálculo del mismo semestre deja las mismas dos filas y el mismo to
 Siete specs adicionales fijan los límites del semestre, el prorrateo por ingreso tardío y
 el rechazo de periodos que no son de depósito. Los datos de prueba se borraron.
 
-## Lo que sigue sin implementar
+## Remuneración vacacional al goce
 
-- Remuneración vacacional al momento del goce.
+Cuando un trabajador tomaba vacaciones durante la relación laboral, la planilla seguía
+declarando el mes íntegro como sueldo básico. La remuneración vacacional no existía como
+concepto.
 
-El módulo ya cubre gratificaciones, CTS semestral y liquidación al cese.
+El punto que define el diseño: en vacaciones el trabajador percibe **lo mismo** que si
+hubiera trabajado (D. Leg. 713, art. 15). No es un pago adicional, es una reclasificación:
+el importe del mes no cambia, cambia el concepto bajo el que se declara. Y como sigue
+siendo remuneración computable, la base de aportes tampoco varía.
+
+- Nuevo concepto `008 Remuneracion vacacional`.
+- `dividirRemuneracionPorVacaciones` reparte la remuneración entre días trabajados y días
+  de descanso; el tramo trabajado se obtiene por diferencia para que la suma cierre exacta
+  aunque el treintavo no sea redondo.
+- `diasEnPeriodo` cuenta el solape del descanso con el mes de la planilla, de modo que unas
+  vacaciones que cruzan el cambio de mes se reparten entre las dos planillas.
+
+### Defecto adicional corregido
+
+`calcularVacacionesUsadas` no filtraba por tipo de solicitud: una licencia, un permiso o un
+descanso médico aprobados descontaban días del récord vacacional y recortaban la
+liquidación. Ahora sólo cuenta las solicitudes de tipo `vacaciones`.
+
+### Verificación end-to-end
+
+Empleado con sueldo S/ 3,000 y vacaciones aprobadas del 28 de marzo al 6 de abril:
+
+| Periodo | Sueldo básico | Remuneración vacacional | Total | ONP | EsSalud |
+|---|---|---|---|---|---|
+| Febrero (sin descanso) | 3,000.00 | — | **3,000.00** | 390.00 | 270.00 |
+| Marzo (4 días) | 2,600.00 | **400.00** | **3,000.00** | 390.00 | 270.00 |
+| Abril (6 días) | 2,400.00 | **600.00** | **3,000.00** | 390.00 | 270.00 |
+
+El descanso se repartió 4/6 entre los dos meses, el total del mes no varió en ninguno y los
+aportes se mantuvieron idénticos a los del mes sin vacaciones. Once specs adicionales fijan
+el reparto, el cierre exacto del redondeo y el solape entre meses. Los datos de prueba se
+borraron.
+
+## Estado del módulo
+
+RRHH ya cubre el ciclo de la planilla peruana: remuneración mensual con asignación
+familiar, remuneración vacacional al goce, gratificaciones de julio y diciembre, depósito
+semestral de CTS y liquidación de beneficios sociales al cese, cada uno con su base de
+afectación correcta.
+
+Queda fuera de este trabajo, como estaba declarado desde antes: PLAME y T-Registro reales,
+y la validación legal externa.

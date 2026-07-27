@@ -992,6 +992,9 @@ export class RrhhService {
       .from('solicitudes')
       .select('dias')
       .eq('id_empleado', empleadoId)
+      // Sin filtrar el tipo, una licencia, un permiso o un descanso médico
+      // descontaban días del récord vacacional y recortaban la liquidación.
+      .eq('tipo', 'vacaciones')
       .eq('estado', 'aprobada')
       .gte('fecha_inicio', startDate)
       .lte('fecha_fin', endDate)
