@@ -107,7 +107,7 @@ export default function ClienteDetallePage() {
               Número de Documento
             </label>
             <p className="text-base font-semibold text-[var(--primary-900)]">
-              {cliente.numero_documento}
+              {cliente.documento_numero}
             </p>
           </div>
 

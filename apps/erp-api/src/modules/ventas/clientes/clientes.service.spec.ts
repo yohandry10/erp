@@ -94,6 +94,28 @@ describe('ClientesService', () => {
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', 'tenant-a');
     });
 
+    it('findOne devuelve el documento textual aunque la columna numérica esté vacía', async () => {
+      // Un RUC de once dígitos no cabe en el integer de documento_numero, así que
+      // se guarda en codigo/ruc. Si la lectura no lo repone, el formulario de
+      // edición abre el campo vacío y ninguna empresa se puede actualizar.
+      mockSupabaseClient.single.mockResolvedValue({
+        data: {
+          id: 'cliente-1',
+          tenant_id: 'tenant-a',
+          documento_tipo: 'RUC',
+          documento_numero: null,
+          numero_documento: null,
+          codigo: '20600900006',
+          ruc: '20600900006',
+        },
+        error: null,
+      });
+
+      const cliente = await service.findOne('cliente-1', 'tenant-a');
+
+      expect(cliente.documento_numero).toBe('20600900006');
+    });
+
     it('create debe insertar con tenant_id del contexto', async () => {
       const tenantA = 'tenant-a';
       const createDto: CreateClienteDto = {

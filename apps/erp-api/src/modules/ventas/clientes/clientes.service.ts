@@ -101,6 +101,20 @@ export class ClientesService {
     return data;
   }
 
+  /**
+   * El documento textual del cliente vive en las columnas `codigo`/`ruc`: un
+   * RUC de once dígitos desborda el integer de `documento_numero`, así que esa
+   * columna queda en null para toda empresa y las pantallas que la leen muestran
+   * el documento vacío. Al leer se devuelve el valor real.
+   */
+  private conDocumentoTextual<T extends Record<string, any>>(fila: T): T {
+    if (!fila) return fila;
+    const documento = fila.ruc ?? fila.codigo ?? fila.numero_documento ?? fila.documento_numero;
+    return documento == null || documento === ''
+      ? fila
+      : { ...fila, documento_numero: String(documento) };
+  }
+
   private toSafeIntegerDocument(documento: string): number | null {
     if (!/^\d+$/.test(documento)) return null;
     const parsed = Number(documento);
@@ -182,7 +196,7 @@ export class ClientesService {
     }
 
     return {
-      data: data || [],
+      data: (data || []).map((fila) => this.conDocumentoTextual(fila)),
       pagination: {
         page,
         limit,
@@ -211,7 +225,7 @@ export class ClientesService {
       throw new NotFoundException('Cliente no encontrado');
     }
 
-    return data;
+    return this.conDocumentoTextual(data);
   }
 
   /**
