@@ -427,6 +427,22 @@ export class PedidosService {
       throw new BadRequestException('El pedido no está pendiente de aprobación');
     }
 
+    if (!userId) {
+      throw new BadRequestException(
+        'No se pudo identificar al aprobador: token de sesión sin user_id.',
+      );
+    }
+
+    // Segregación de funciones: la aprobación existe para que alguien distinto
+    // revise un pedido que excede el límite de crédito o el monto sin aprobación.
+    // Si el creador puede aprobarse a sí mismo, el control no controla nada.
+    // Compras ya aplica esta misma regla a las órdenes de compra.
+    if ((pedido as any).created_by && userId === (pedido as any).created_by) {
+      throw new BadRequestException(
+        'El creador del pedido no puede aprobar su propio pedido. Se requiere aprobación de otro usuario autorizado.',
+      );
+    }
+
     const motivos =
       motivosEntrada.length > 0
         ? motivosEntrada
