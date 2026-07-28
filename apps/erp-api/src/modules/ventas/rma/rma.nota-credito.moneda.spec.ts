@@ -139,5 +139,67 @@ describe('RmaService (nota de crédito)', () => {
       'user-1',
     );
   });
+
+  // Una nota de credito por devolucion tiene que reversar tambien el IGV de lo
+  // devuelto (SUNAT, Catalogo 09). Si solo reversa el valor de venta, el IGV de
+  // esa mercaderia sigue declarado como impuesto por pagar.
+  it('reversa el IGV de la mercaderia devuelta', async () => {
+    const mockSupabaseClient = createMockSupabaseClient({
+      pedidos_venta: {
+        maybeSingle: [
+          {
+            data: {
+              id: 'pedido-1',
+              numero: 'PV-0001',
+              cliente_id: 'cliente-1',
+              clientes: { razon_social: 'Cliente SA', numero_documento: '20123456789', documento_tipo: '6' },
+              detalle: [
+                { id: 'det-1', descripcion: 'Item gravado', precio_unitario: 100, producto_id: 'prod-1', cantidad: 1, cantidad_despachada: 1 },
+              ],
+            },
+            error: null,
+          },
+        ],
+      },
+      empresa_config: {
+        maybeSingle: [{ data: { moneda_defecto: 'PEN', igv_porcentaje: 18 }, error: null }],
+      },
+      productos: {
+        maybeSingle: [{ data: null, error: null }],
+      },
+      rma_solicitudes: { update: [{ data: null, error: null }] },
+      rma_eventos: { insert: [{ data: null, error: null }] },
+    });
+
+    const documentosService = { crearDocumento: jest.fn().mockResolvedValue({ data: { id: 'doc-nc-2' } }) };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        RmaService,
+        { provide: SupabaseService, useValue: { getClient: jest.fn().mockReturnValue(mockSupabaseClient) } },
+        { provide: InventarioService, useValue: {} },
+        { provide: DocumentosService, useValue: documentosService },
+        { provide: AlmacenesService, useValue: {} },
+      ],
+    }).compile();
+
+    const service = module.get<RmaService>(RmaService);
+    jest.spyOn(service as any, 'obtenerPorId').mockResolvedValue({
+      id: 'rma-1',
+      pedido_id: 'pedido-1',
+      estado: 'RECIBIDA',
+      nota_credito_documento_id: null,
+      items: [{ detalle_id: 'det-1', producto_id: 'prod-1', cantidad_devuelta: 1, cantidad_autorizada: 1 }],
+    });
+
+    await service.generarNotaCredito('tenant-1', 'user-1', 'rma-1', { serie: 'NC01', motivo: 'DEV' } as any);
+
+    const payload = documentosService.crearDocumento.mock.calls[0][0];
+    expect(payload.subtotal).toBe(100);
+    expect(payload.impuesto_igv).toBe(18);
+    expect(payload.total).toBe(118);
+    expect(payload.detalles[0].impuesto_igv).toBe(18);
+    expect(payload.detalles[0].total_item).toBe(118);
+  });
 });
 
