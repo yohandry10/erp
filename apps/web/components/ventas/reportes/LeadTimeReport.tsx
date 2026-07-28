@@ -118,7 +118,7 @@ export default function LeadTimeReport({ filters }: Props) {
           <>
             {/* Main Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Clock className="w-4 h-4 text-primary" />
                   <p className="text-sm text-primary font-medium">Promedio</p>
@@ -127,7 +127,7 @@ export default function LeadTimeReport({ filters }: Props) {
                 <p className="text-xs text-primary">días</p>
               </div>
 
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4">
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Clock className="w-4 h-4 text-emerald-400" />
                   <p className="text-sm text-emerald-400 font-medium">Mediana</p>
@@ -136,16 +136,16 @@ export default function LeadTimeReport({ filters }: Props) {
                 <p className="text-xs text-emerald-400">días</p>
               </div>
 
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4">
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-4 h-4 text-violet-400" />
-                  <p className="text-sm text-violet-400 font-medium">Mínimo</p>
+                  <Clock className="w-4 h-4 text-foreground" />
+                  <p className="text-sm text-foreground font-medium">Mínimo</p>
                 </div>
-                <p className="text-3xl font-bold text-violet-400">{data.minimo_dias.toFixed(1)}</p>
-                <p className="text-xs text-violet-400">días</p>
+                <p className="text-3xl font-bold text-foreground">{data.minimo_dias.toFixed(1)}</p>
+                <p className="text-xs text-foreground">días</p>
               </div>
 
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4">
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Clock className="w-4 h-4 text-amber-400" />
                   <p className="text-sm text-amber-400 font-medium">Máximo</p>
@@ -178,7 +178,8 @@ export default function LeadTimeReport({ filters }: Props) {
                     </div>
                     <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
+                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        style={{ width: `${rango.porcentaje}%` }}
                       />
                     </div>
                   </div>
@@ -197,7 +198,7 @@ export default function LeadTimeReport({ filters }: Props) {
                   </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full divide-y divide-border">
                     <thead className="bg-muted/30">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -208,7 +209,7 @@ export default function LeadTimeReport({ filters }: Props) {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-card divide-y divide-gray-200">
+                    <tbody className="bg-card divide-y divide-border">
                       {data.tendencia.map((item, index) => (
                         <tr key={index} className="hover:bg-muted/30">
                           <td className="px-6 py-4 whitespace-nowrap">

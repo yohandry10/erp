@@ -170,11 +170,11 @@ export default function VentasPorClienteReport({ filters }: Props) {
                 <p className="text-sm text-primary font-medium">Total Ventas</p>
                 <p className="text-2xl font-bold text-primary">S/ {totalGeneral.toFixed(2)}</p>
               </div>
-              <div className="bg-emerald-500/10 rounded-lg p-4">
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-emerald-400 font-medium">Total Pedidos</p>
                 <p className="text-2xl font-bold text-emerald-400">{totalPedidos}</p>
               </div>
-              <div className="bg-violet-500/10 rounded-lg p-4">
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-violet-400 font-medium">Total Facturas</p>
                 <p className="text-2xl font-bold text-violet-400">{totalFacturas}</p>
               </div>
@@ -182,7 +182,7 @@ export default function VentasPorClienteReport({ filters }: Props) {
 
             {/* Table */}
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead className="bg-muted/30">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -217,7 +217,7 @@ export default function VentasPorClienteReport({ filters }: Props) {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-card divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-border">
                   {sortedData.map((row, index) => (
                     <tr key={index} className="hover:bg-muted/30">
                       <td className="px-6 py-4 whitespace-nowrap">

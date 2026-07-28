@@ -148,26 +148,26 @@ export default function FillRateReport({ filters }: Props) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="bg-emerald-600 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5" />
               Fill-rate global
             </CardTitle>
-            <CardDescription className="text-emerald-400 dark:text-emerald-200">
+            <CardDescription>
               Porcentaje de unidades entregadas sobre lo solicitado
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{resumen.fillRate.toFixed(1)}%</p>
-            <p className="text-sm text-emerald-400 dark:text-emerald-200 mt-1">
+            <p className="text-4xl font-semibold text-emerald-400">{resumen.fillRate.toFixed(1)}%</p>
+            <p className="text-sm text-muted-foreground mt-1">
               {numberFormatter.format(resumen.totalEntregado)} unidades entregadas de{' '}
               {numberFormatter.format(resumen.totalSolicitado)}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-indigo-600 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <Truck className="h-5 w-5" />
@@ -178,7 +178,7 @@ export default function FillRateReport({ filters }: Props) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{resumen.otif.toFixed(1)}%</p>
+            <p className="text-4xl font-semibold text-primary">{resumen.otif.toFixed(1)}%</p>
             <p className="text-sm text-indigo-100 mt-1">
               {resumen.pedidosEntregados - incidencias.pedidosFueraSla} de {resumen.pedidosEntregados}{' '}
               envíos dentro del SLA
@@ -186,55 +186,55 @@ export default function FillRateReport({ filters }: Props) {
           </CardContent>
         </Card>
 
-        <Card className="bg-sky-600 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <CalendarClock className="h-5 w-5" />
               Backorders pendientes
             </CardTitle>
-            <CardDescription className="text-primary dark:text-sky-200">
+            <CardDescription>
               Líneas reagendadas a seguimiento
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{resumen.pedidosConBackorder}</p>
-            <p className="text-sm text-primary dark:text-sky-200 mt-1">
+            <p className="text-4xl font-semibold text-primary">{resumen.pedidosConBackorder}</p>
+            <p className="text-sm text-muted-foreground mt-1">
               {numberFormatter.format(resumen.unidadesPendientesBackorder)} uds pendientes
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-amber-500 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <PackageMinus className="h-5 w-5" />
               Pedidos sin entrega
             </CardTitle>
-            <CardDescription className="text-amber-400 dark:text-amber-200">
+            <CardDescription>
               Pedidos confirmados sin salidas registradas
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{incidencias.pedidosSinEntrega}</p>
-            <p className="text-sm text-amber-400 dark:text-amber-200 mt-1">
+            <p className="text-4xl font-semibold text-amber-400">{incidencias.pedidosSinEntrega}</p>
+            <p className="text-sm text-muted-foreground mt-1">
               de {resumen.pedidosAnalizados} pedidos analizados
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-rose-500 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <Clock3 className="h-5 w-5" />
               Fuera de SLA
             </CardTitle>
-            <CardDescription className="text-destructive dark:text-rose-200">
+            <CardDescription>
               Entregas completas con retraso
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{incidencias.pedidosFueraSla}</p>
-            <p className="text-sm text-destructive dark:text-rose-200 mt-1">
+            <p className="text-4xl font-semibold text-rose-400">{incidencias.pedidosFueraSla}</p>
+            <p className="text-sm text-muted-foreground mt-1">
               SLA estándar considerado: 5 días calendario
             </p>
           </CardContent>

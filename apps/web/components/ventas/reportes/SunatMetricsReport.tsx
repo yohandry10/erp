@@ -123,51 +123,51 @@ export default function SunatMetricsReport({ filters }: Props) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-emerald-600 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <Check className="h-5 w-5" />
               Documentos aceptados
             </CardTitle>
-            <CardDescription className="text-emerald-400 dark:text-emerald-200">
+            <CardDescription>
               Total de comprobantes conformes en el periodo
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{data.aceptados}</p>
-            <p className="text-sm text-emerald-400 dark:text-emerald-200 mt-1">de {data.total} documentos emitidos</p>
+            <p className="text-4xl font-semibold text-emerald-400">{data.aceptados}</p>
+            <p className="text-sm text-muted-foreground mt-1">de {data.total} documentos emitidos</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-amber-500 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <FileWarning className="h-5 w-5" />
               Tasa de observación
             </CardTitle>
-            <CardDescription className="text-amber-400 dark:text-amber-200">
+            <CardDescription>
               Documentos observados respecto al total emitido
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{data.tasaObservacion.toFixed(2)}%</p>
-            <p className="text-sm text-amber-400 dark:text-amber-200 mt-1">{data.observados} observados</p>
+            <p className="text-4xl font-semibold text-amber-400">{data.tasaObservacion.toFixed(2)}%</p>
+            <p className="text-sm text-muted-foreground mt-1">{data.observados} observados</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-rose-500 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
               Tasa de rechazo
             </CardTitle>
-            <CardDescription className="text-destructive dark:text-rose-200">
+            <CardDescription>
               Documentos rechazados por SUNAT / OSE
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{data.tasaRechazo.toFixed(2)}%</p>
-            <p className="text-sm text-destructive dark:text-rose-200 mt-1">{data.rechazados} rechazados</p>
+            <p className="text-4xl font-semibold text-rose-400">{data.tasaRechazo.toFixed(2)}%</p>
+            <p className="text-sm text-muted-foreground mt-1">{data.rechazados} rechazados</p>
           </CardContent>
         </Card>
 
