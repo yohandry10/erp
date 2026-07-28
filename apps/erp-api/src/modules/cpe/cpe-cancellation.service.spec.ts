@@ -36,4 +36,47 @@ describe('CpeCancellationService', () => {
       }
     });
   });
+
+  // El reverso es efectivo que sale hoy. Cargarlo en la sesion original ya cerrada
+  // rompia un arqueo cuadrado y ademas hacia imposible anular una venta de un turno
+  // anterior: la RPC lo rechazaba y la anulacion fallaba a medias.
+  describe('sesion destino del reverso de caja', () => {
+    const abierta = { id: 'ses-abierta', estado: 'ABIERTA', hora_cierre: null, fecha_cierre: null };
+    const cerrada = { id: 'ses-cerrada', estado: 'CERRADA', hora_cierre: '2026-01-01', fecha_cierre: '2026-01-01' };
+
+    const resolver = (respuestas: any[], sesionOriginalId: string | null = 'ses-original') => {
+      let llamada = 0;
+      const client = {
+        from: () => {
+          const actual = respuestas[llamada++] ?? null;
+          const chain: any = {
+            select: () => chain,
+            eq: () => chain,
+            is: () => chain,
+            order: () => chain,
+            limit: () => chain,
+            maybeSingle: async () => ({ data: actual }),
+          };
+          return chain;
+        },
+      };
+      return (service as any).resolverSesionParaReverso(client, 't1', sesionOriginalId);
+    };
+
+    it('usa la sesion de la venta si sigue abierta', async () => {
+      await expect(resolver([abierta])).resolves.toBe('ses-abierta');
+    });
+
+    it('cae a la sesion abierta vigente si la de la venta ya cerro', async () => {
+      await expect(resolver([cerrada, { id: 'ses-hoy' }])).resolves.toBe('ses-hoy');
+    });
+
+    it('devuelve null si no hay ninguna sesion abierta', async () => {
+      await expect(resolver([cerrada, null])).resolves.toBeNull();
+    });
+
+    it('no exige sesion original para resolver la vigente', async () => {
+      await expect(resolver([{ id: 'ses-hoy' }], null)).resolves.toBe('ses-hoy');
+    });
+  });
 });

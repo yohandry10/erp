@@ -1290,6 +1290,24 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     return Math.max(0, Number((base + calcularImpuestos()).toFixed(2)))
   }
 
+  // Bases por afectación del Catálogo 07, con el descuento global prorrateado.
+  // La representación impresa debe separarlas: un ticket que sólo muestra
+  // "Subtotal" e "IGV" oculta qué parte de la venta no está gravada.
+  const calcularDesgloseAfectacion = () => {
+    const subtotal = calcularSubtotal()
+    const factor = subtotal > 0 ? 1 - calcularDescuentoGlobalMonto() / subtotal : 1
+    const codigoDe = (item: ItemVenta) => String(item.producto?.afectacion_igv ?? '').trim()
+    const acumular = (predicado: (item: ItemVenta) => boolean) =>
+      Number((carrito.filter(predicado).reduce((suma, item) => suma + item.subtotal, 0) * factor).toFixed(2))
+
+    return {
+      gravadas: acumular(esBaseGravada),
+      exoneradas: acumular((item) => codigoDe(item).charAt(0) === '2'),
+      inafectas: acumular((item) => codigoDe(item).charAt(0) === '3'),
+      exportacion: acumular((item) => codigoDe(item) === '40'),
+    }
+  }
+
   const totalPagosMixtos = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0)
 
   const agregarPago = () => {
@@ -1568,6 +1586,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
       descuentos: calcularDescuentoTotal(),
       impuestos: calcularImpuestos(),
       total: calcularTotal(),
+      ...calcularDesgloseAfectacion(),
     })
     setLoadingFactura(false)
   }
@@ -1619,6 +1638,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
         descuentos: Number(facturaSeleccionada.descuentos || 0),
         impuestos: Number(facturaSeleccionada.impuestos || 0),
         total: Number(facturaSeleccionada.total || 0),
+        gravadas: Number(facturaSeleccionada.gravadas ?? facturaSeleccionada.total_gravadas ?? 0),
+        exoneradas: Number(facturaSeleccionada.exoneradas ?? facturaSeleccionada.total_exoneradas ?? 0),
+        inafectas: Number(facturaSeleccionada.inafectas ?? facturaSeleccionada.total_inafectas ?? 0),
+        exportacion: Number(facturaSeleccionada.exportacion ?? facturaSeleccionada.total_exportacion ?? 0),
         items: detallesFactura.map((item: any, index: number) => ({
           id: item.id || index,
           codigo: item.codigo_producto || item.codigo || '—',

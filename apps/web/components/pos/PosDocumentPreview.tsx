@@ -26,6 +26,15 @@ export interface PosDocumentData {
   descuentos: number
   impuestos: number
   total: number
+  /**
+   * Desglose por afectación del IGV (Catálogo 07). La representación impresa debe
+   * separar las operaciones gravadas de las exoneradas e inafectas: mostrar sólo
+   * "Subtotal" e "IGV" oculta que parte de la venta no está gravada.
+   */
+  gravadas?: number
+  exoneradas?: number
+  inafectas?: number
+  exportacion?: number
   items: PosDocumentItem[]
 }
 
@@ -53,6 +62,9 @@ export function PosDocumentPreview({
   currencySymbol = 'S/',
   taxLabel = 'IGV (18%)',
 }: PosDocumentPreviewProps) {
+  const tieneDesglose =
+    (data.exoneradas ?? 0) > 0 || (data.inafectas ?? 0) > 0 || (data.exportacion ?? 0) > 0
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: getPosDocumentStyles(format) }} />
@@ -121,7 +133,19 @@ export function PosDocumentPreview({
         </section>
 
         <section className="pos-doc-totals" aria-label="Totales del comprobante">
-          <div><span>Subtotal</span><strong>{formatCurrency(data.subtotal, currencySymbol)}</strong></div>
+          {/* El desglose por afectación sólo se imprime cuando la venta tiene algo
+              distinto de gravado; una boleta íntegramente gravada mantiene el
+              resumen corto de siempre. */}
+          {tieneDesglose ? (
+            <>
+              {(data.gravadas ?? 0) > 0 ? <div><span>Op. gravada</span><strong>{formatCurrency(data.gravadas ?? 0, currencySymbol)}</strong></div> : null}
+              {(data.exoneradas ?? 0) > 0 ? <div><span>Op. exonerada</span><strong>{formatCurrency(data.exoneradas ?? 0, currencySymbol)}</strong></div> : null}
+              {(data.inafectas ?? 0) > 0 ? <div><span>Op. inafecta</span><strong>{formatCurrency(data.inafectas ?? 0, currencySymbol)}</strong></div> : null}
+              {(data.exportacion ?? 0) > 0 ? <div><span>Op. exportación</span><strong>{formatCurrency(data.exportacion ?? 0, currencySymbol)}</strong></div> : null}
+            </>
+          ) : (
+            <div><span>Subtotal</span><strong>{formatCurrency(data.subtotal, currencySymbol)}</strong></div>
+          )}
           {data.descuentos > 0 ? <div><span>Descuentos</span><strong>- {formatCurrency(data.descuentos, currencySymbol)}</strong></div> : null}
           <div><span>{taxLabel}</span><strong>{formatCurrency(data.impuestos, currencySymbol)}</strong></div>
           <div className="pos-doc-grand-total"><span>Total</span><strong>{formatCurrency(data.total, currencySymbol)}</strong></div>
