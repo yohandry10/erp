@@ -9,7 +9,9 @@ import { ArrowLeft } from 'lucide-react'
 export default function EditarClientePage() {
   const router = useRouter()
   const params = useParams()
-  const { get, put } = useApi()
+  // Propagar el error del backend: sin esto el hook devuelve null y el mensaje
+  // concreto de validación se pierde tras un texto genérico.
+  const { get, put } = useApi({ throwOnError: true, showErrorToast: false })
   const clienteId = params.id as string
 
   const [cliente, setCliente] = useState<any>(null)

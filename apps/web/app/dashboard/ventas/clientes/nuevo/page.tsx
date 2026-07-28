@@ -9,7 +9,9 @@ import { ArrowLeft } from 'lucide-react'
 
 export default function NuevoClientePage() {
   const router = useRouter()
-  const { post } = useApi()
+  // Los toasts tienen TOAST_LIMIT=1: el que emite el hook queda reemplazado por
+  // el genérico de abajo y el usuario pierde el motivo real del rechazo.
+  const { post } = useApi({ throwOnError: true, showErrorToast: false })
 
   const handleSubmit = async (data: any) => {
     try {
