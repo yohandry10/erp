@@ -1,8 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { InventarioService } from '../../inventario/inventario.service';
 import { DocumentosService } from '../../documentos.service';
 import { AlmacenesService } from '../../inventario/almacenes/almacenes.service';
+import { esGravado } from '../../../shared/utils/igv-afectacion.util';
 import {
   CrearRmaDto,
   AprobarRmaDto,
@@ -19,6 +20,8 @@ interface ConfigRma {
 
 @Injectable()
 export class RmaService {
+  private readonly logger = new Logger(RmaService.name);
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly inventarioService: InventarioService,
@@ -364,8 +367,27 @@ export class RmaService {
 
     const detalleMap = new Map<string, any>((pedido.detalle ?? []).map((item: any) => [item.id, item]));
 
+    const { data: empresa, error: empresaError } = await client
+      .from('empresa_config')
+      .select('moneda_defecto, igv_porcentaje')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (empresaError) {
+      throw new BadRequestException('No se pudo obtener la moneda por defecto de la empresa');
+    }
+
+    const tasaIgv = Number((empresa as any)?.igv_porcentaje) > 0
+      ? Number((empresa as any).igv_porcentaje) / 100
+      : 0.18;
+
+    // Código y afectación reales del producto: el código imprimía el UUID, y sin
+    // la afectación no se puede saber qué parte de lo devuelto llevaba IGV.
+    const productosDevueltos = await this.obtenerProductosDeLaDevolucion(tenantId, rma.items ?? []);
+
     const detallesNota = [];
-    let total = 0;
+    let subtotalNota = 0;
+    let igvNota = 0;
 
     for (const item of rma.items ?? []) {
       const fuente = detalleMap.get(item.detalle_id);
@@ -378,17 +400,22 @@ export class RmaService {
       }
 
       const precioUnitario = Number(fuente.precio_unitario ?? 0);
-      const subtotal = precioUnitario * cantidad;
-      total += subtotal;
+      const valorVenta = this.round2(precioUnitario * cantidad);
+      const producto = productosDevueltos.get(fuente.producto_id);
+      const igvItem = esGravado(producto?.afectacion_igv) ? this.round2(valorVenta * tasaIgv) : 0;
+
+      subtotalNota += valorVenta;
+      igvNota += igvItem;
 
       detallesNota.push({
-        codigo_producto: fuente.producto_id,
+        codigo_producto: producto?.codigo ?? fuente.producto_id,
         descripcion: fuente.descripcion,
         unidad_medida: 'NIU',
         cantidad,
         precio_unitario: precioUnitario,
-        valor_venta: subtotal,
-        total_item: subtotal,
+        valor_venta: valorVenta,
+        impuesto_igv: igvItem,
+        total_item: this.round2(valorVenta + igvItem),
       });
     }
 
@@ -396,15 +423,8 @@ export class RmaService {
       throw new BadRequestException('No hay items devueltos para generar nota de crédito');
     }
 
-    const { data: empresa, error: empresaError } = await client
-      .from('empresa_config')
-      .select('moneda_defecto')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-
-    if (empresaError) {
-      throw new BadRequestException('No se pudo obtener la moneda por defecto de la empresa');
-    }
+    subtotalNota = this.round2(subtotalNota);
+    igvNota = this.round2(igvNota);
 
     const documentoData = {
       tipo_documento: 'NOTA_CREDITO',
@@ -413,7 +433,11 @@ export class RmaService {
       receptor_razon_social: (pedido.clientes as any)?.razon_social ?? '',
       receptor_tipo_doc: (pedido.clientes as any)?.documento_tipo ?? '6',
       moneda: empresa?.moneda_defecto || 'PEN',
-      total,
+      // Una nota de crédito por devolución revierte también el IGV de lo
+      // devuelto; sin esto el impuesto de esa mercadería seguía declarado.
+      subtotal: subtotalNota,
+      impuesto_igv: igvNota,
+      total: this.round2(subtotalNota + igvNota),
       serie: dto.serie,
       detalles: detallesNota,
     };
@@ -442,6 +466,46 @@ export class RmaService {
     });
 
     return this.obtenerPorId(tenantId, rmaId);
+  }
+
+  private round2(valor: number): number {
+    return Math.round((Number(valor) + Number.EPSILON) * 100) / 100;
+  }
+
+  /** Código y afectación del IGV de los productos devueltos, por id. */
+  private async obtenerProductosDeLaDevolucion(
+    tenantId: string,
+    items: Array<{ producto_id?: string }>,
+  ): Promise<Map<string, { codigo?: string; afectacion_igv?: string }>> {
+    const mapa = new Map<string, { codigo?: string; afectacion_igv?: string }>();
+    const ids = Array.from(new Set(items.map((item) => item.producto_id).filter(Boolean))) as string[];
+    if (ids.length === 0) return mapa;
+
+    try {
+      const { data, error } = await this.supabase.getClient()
+        .from('productos')
+        .select('id, codigo, afectacion_igv')
+        .eq('tenant_id', tenantId)
+        .in('id', ids);
+
+      if (error) {
+        this.logger.warn(`No se pudo leer los productos devueltos: ${error.message}`);
+        return mapa;
+      }
+
+      for (const producto of data || []) {
+        mapa.set((producto as any).id, {
+          codigo: (producto as any).codigo,
+          afectacion_igv: (producto as any).afectacion_igv,
+        });
+      }
+    } catch (lecturaError: any) {
+      // Sin afectación conocida se asume gravado, que es lo que no deja IGV sin
+      // reversar en la nota de crédito.
+      this.logger.warn(`No se pudo resolver la afectación de la devolución: ${lecturaError?.message ?? lecturaError}`);
+    }
+
+    return mapa;
   }
 
   private async registrarEvento(rmaId: string, tenantId: string, tipo: string, descripcion: string, metadata?: any) {
