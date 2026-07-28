@@ -146,31 +146,31 @@ export default function AgingCxcReport({ filters }: Props) {
           </CardContent>
         </Card>
 
-        <Card className="bg-rose-600 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
               Monto vencido
             </CardTitle>
-            <CardDescription className="text-destructive dark:text-rose-200">
+            <CardDescription>
               Suma de cuentas que excedieron la fecha de vencimiento
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{currencyFormatter.format(resumen.totalVencido)}</p>
-            <p className="text-sm text-destructive dark:text-rose-200 mt-1">
+            <p className="text-4xl font-semibold text-rose-400">{currencyFormatter.format(resumen.totalVencido)}</p>
+            <p className="text-sm text-muted-foreground mt-1">
               {resumen.porcentajeVencido.toFixed(1)}% de la cartera total
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-amber-500 text-white">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <TrendingDown className="h-5 w-5" />
               Riesgo concentrado
             </CardTitle>
-            <CardDescription className="text-amber-400 dark:text-amber-200">
+            <CardDescription>
               Principales buckets con exposición relevante
             </CardDescription>
           </CardHeader>

@@ -77,7 +77,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
       [EstadoCotizacion.ENVIADA]: 'bg-primary/10 text-primary',
       [EstadoCotizacion.APROBADA]: 'bg-emerald-500/10 text-emerald-400',
       [EstadoCotizacion.RECHAZADA]: 'bg-destructive/10 text-destructive',
-      [EstadoCotizacion.CONVERTIDA]: 'bg-violet-500/10 text-violet-400',
+      [EstadoCotizacion.CONVERTIDA]: 'bg-primary/10 text-primary',
       [EstadoCotizacion.VENCIDA]: 'bg-amber-500/10 text-amber-400'
     }
 
@@ -146,11 +146,11 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
                 <p className="text-sm text-primary font-medium">Total Cotizaciones</p>
                 <p className="text-2xl font-bold text-primary">{totalCotizaciones}</p>
               </div>
-              <div className="bg-emerald-500/10 rounded-lg p-4">
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-emerald-400 font-medium">Monto Total</p>
                 <p className="text-2xl font-bold text-emerald-400">S/ {totalMonto.toFixed(2)}</p>
               </div>
-              <div className="bg-amber-500/10 rounded-lg p-4">
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-amber-400 font-medium">Por Vencer</p>
                 <p className="text-2xl font-bold text-amber-400">{porVencer}</p>
               </div>
@@ -162,7 +162,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
 
             {/* Alert for urgent items */}
             {(porVencer > 0 || vencidas > 0) && (
-              <div className="bg-amber-500/10 border border-yellow-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+              <div className="bg-amber-500/10 border border-border rounded-lg p-4 mb-6 flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5" />
                 <div>
                   <p className="font-medium text-amber-400">Atención requerida</p>
@@ -175,7 +175,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
 
             {/* Table */}
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead className="bg-muted/30">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -207,7 +207,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-card divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-border">
                   {data.map((cotizacion) => (
                     <tr key={cotizacion.id} className="hover:bg-muted/30">
                       <td className="px-6 py-4 whitespace-nowrap">

@@ -120,7 +120,7 @@ export default function TopClientesReport({ filters }: Props) {
         ) : (
           <>
             {/* Summary Card */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-6">
+            <div className="rounded-lg border border-border/70 bg-muted/40 p-4 mb-6">
               <p className="text-sm text-foreground/80 font-medium">Facturación Total (Top {topN})</p>
               <p className="text-3xl font-bold text-foreground">S/ {totalFacturacion.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground mt-1">
@@ -135,7 +135,7 @@ export default function TopClientesReport({ filters }: Props) {
                 <div key={cliente.cliente_id} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
                         {index + 1}
                       </span>
                       <span className="font-medium text-foreground/85 truncate">
@@ -148,7 +148,8 @@ export default function TopClientesReport({ filters }: Props) {
                   </div>
                   <div className="w-full bg-muted rounded-full h-2 overflow-hidden ml-8">
                     <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
+                      className="h-full bg-primary rounded-full transition-all duration-500"
+                      style={{ width: `${(cliente.total_facturacion / maxFacturacion) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -157,7 +158,7 @@ export default function TopClientesReport({ filters }: Props) {
 
             {/* Detailed Table */}
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead className="bg-muted/30">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -189,11 +190,11 @@ export default function TopClientesReport({ filters }: Props) {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-card divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-border">
                   {data.map((cliente, index) => (
                     <tr key={cliente.cliente_id} className="hover:bg-muted/30">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold text-sm">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
                           {index + 1}
                         </div>
                       </td>

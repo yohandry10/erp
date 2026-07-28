@@ -143,21 +143,21 @@ export default function PipelineReport({ filters }: Props) {
   }
 
   const renderStageSummary = (titulo: string, stage: PipelineStage, tone: string) => (
-    <Card className={tone}>
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base text-white font-medium">{titulo}</CardTitle>
-        <CardDescription className="text-white/70">
+        <CardTitle className="text-base font-medium">{titulo}</CardTitle>
+        <CardDescription>
           Total de registros y valor acumulado
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-white">
+      <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wide opacity-75">Cantidad</p>
-          <p className="text-2xl font-semibold">{stage.cantidad}</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Cantidad</p>
+          <p className={`text-2xl font-semibold ${tone}`}>{stage.cantidad}</p>
         </div>
         <div>
-          <p className="text-xs uppercase tracking-wide opacity-75">Valor</p>
-          <p className="text-2xl font-semibold">{currencyFormatter.format(stage.valor)}</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Valor</p>
+          <p className={`text-2xl font-semibold ${tone}`}>{currencyFormatter.format(stage.valor)}</p>
         </div>
       </CardContent>
     </Card>
@@ -166,9 +166,9 @@ export default function PipelineReport({ filters }: Props) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {renderStageSummary('Cotizaciones activas', data.pipeline.cotizaciones, 'bg-sky-600')}
-        {renderStageSummary('Pedidos en pipeline', data.pipeline.pedidos, 'bg-indigo-600')}
-        {renderStageSummary('Facturas emitidas', data.pipeline.facturas, 'bg-violet-600')}
+        {renderStageSummary('Cotizaciones activas', data.pipeline.cotizaciones, 'text-primary')}
+        {renderStageSummary('Pedidos en pipeline', data.pipeline.pedidos, 'text-primary')}
+        {renderStageSummary('Facturas emitidas', data.pipeline.facturas, 'text-primary')}
       </div>
 
       <Card>
