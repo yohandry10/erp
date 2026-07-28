@@ -143,14 +143,14 @@ export default function PipelineReport({ filters }: Props) {
   }
 
   const renderStageSummary = (titulo: string, stage: PipelineStage, tone: string) => (
-    <Card>
+    <Card className="flex h-full flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-medium">{titulo}</CardTitle>
         <CardDescription>
           Total de registros y valor acumulado
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <CardContent className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Cantidad</p>
           <p className={`text-2xl font-semibold ${tone}`}>{stage.cantidad}</p>
@@ -239,7 +239,7 @@ export default function PipelineReport({ filters }: Props) {
             <CardDescription>Seguimiento de oportunidades por etapa en el tiempo</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-muted/30">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-foreground/80">Periodo</th>
@@ -248,7 +248,7 @@ export default function PipelineReport({ filters }: Props) {
                   <th className="px-3 py-2 text-right font-medium text-foreground/80">Facturas</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {tendenciaRows.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">

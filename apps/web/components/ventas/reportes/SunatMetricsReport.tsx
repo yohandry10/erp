@@ -123,60 +123,60 @@ export default function SunatMetricsReport({ filters }: Props) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <Check className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <Check className="h-5 w-5 shrink-0" />
               Documentos aceptados
             </CardTitle>
             <CardDescription>
               Total de comprobantes conformes en el periodo
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-emerald-400">{data.aceptados}</p>
             <p className="text-sm text-muted-foreground mt-1">de {data.total} documentos emitidos</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <FileWarning className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <FileWarning className="h-5 w-5 shrink-0" />
               Tasa de observación
             </CardTitle>
             <CardDescription>
               Documentos observados respecto al total emitido
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-amber-400">{data.tasaObservacion.toFixed(2)}%</p>
             <p className="text-sm text-muted-foreground mt-1">{data.observados} observados</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
               Tasa de rechazo
             </CardTitle>
             <CardDescription>
               Documentos rechazados por SUNAT / OSE
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-rose-400">{data.tasaRechazo.toFixed(2)}%</p>
             <p className="text-sm text-muted-foreground mt-1">{data.rechazados} rechazados</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle className="text-base font-medium text-foreground/85">Pendientes</CardTitle>
             <CardDescription>Documentos aún no aceptados ni rechazados</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-foreground">{data.pendientes}</p>
             <p className="text-sm text-muted-foreground mt-1">
               {data.total > 0 ? ((data.pendientes / data.total) * 100).toFixed(2) : '0.00'}%
@@ -231,7 +231,7 @@ export default function SunatMetricsReport({ filters }: Props) {
           <CardDescription>Resumen mensual de estados de emisión electrónica</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-full divide-y divide-border text-sm">
             <thead className="bg-muted/30">
               <tr>
                 <th className="px-3 py-2 text-left font-medium text-foreground/80">Periodo</th>
@@ -241,7 +241,7 @@ export default function SunatMetricsReport({ filters }: Props) {
                 <th className="px-3 py-2 text-right font-medium text-foreground/80">Pendientes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {tendenciaRows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-4 text-center text-muted-foreground">
