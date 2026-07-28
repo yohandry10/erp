@@ -148,17 +148,17 @@ export default function FillRateReport({ filters }: Props) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
               Fill-rate global
             </CardTitle>
             <CardDescription>
               Porcentaje de unidades entregadas sobre lo solicitado
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-emerald-400">{resumen.fillRate.toFixed(1)}%</p>
             <p className="text-sm text-muted-foreground mt-1">
               {numberFormatter.format(resumen.totalEntregado)} unidades entregadas de{' '}
@@ -167,17 +167,17 @@ export default function FillRateReport({ filters }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <Truck className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <Truck className="h-5 w-5 shrink-0" />
               OTIF (On Time In Full)
             </CardTitle>
             <CardDescription className="text-indigo-100">
               Entregas completas dentro del SLA definido
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-primary">{resumen.otif.toFixed(1)}%</p>
             <p className="text-sm text-indigo-100 mt-1">
               {resumen.pedidosEntregados - incidencias.pedidosFueraSla} de {resumen.pedidosEntregados}{' '}
@@ -186,17 +186,17 @@ export default function FillRateReport({ filters }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <CalendarClock className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <CalendarClock className="h-5 w-5 shrink-0" />
               Backorders pendientes
             </CardTitle>
             <CardDescription>
               Líneas reagendadas a seguimiento
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-primary">{resumen.pedidosConBackorder}</p>
             <p className="text-sm text-muted-foreground mt-1">
               {numberFormatter.format(resumen.unidadesPendientesBackorder)} uds pendientes
@@ -204,17 +204,17 @@ export default function FillRateReport({ filters }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <PackageMinus className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <PackageMinus className="h-5 w-5 shrink-0" />
               Pedidos sin entrega
             </CardTitle>
             <CardDescription>
               Pedidos confirmados sin salidas registradas
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-amber-400">{incidencias.pedidosSinEntrega}</p>
             <p className="text-sm text-muted-foreground mt-1">
               de {resumen.pedidosAnalizados} pedidos analizados
@@ -222,17 +222,17 @@ export default function FillRateReport({ filters }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <Clock3 className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <Clock3 className="h-5 w-5 shrink-0" />
               Fuera de SLA
             </CardTitle>
             <CardDescription>
               Entregas completas con retraso
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-rose-400">{incidencias.pedidosFueraSla}</p>
             <p className="text-sm text-muted-foreground mt-1">
               SLA estándar considerado: 5 días calendario
@@ -249,7 +249,7 @@ export default function FillRateReport({ filters }: Props) {
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-full divide-y divide-border text-sm">
             <thead className="bg-muted/30">
               <tr>
                 <th className="px-3 py-2 text-left font-medium text-foreground/80">Pedido</th>
@@ -264,7 +264,7 @@ export default function FillRateReport({ filters }: Props) {
                 <th className="px-3 py-2 text-center font-medium text-foreground/80">SLA</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {topIncidencias.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-3 py-6 text-center text-muted-foreground">
@@ -353,7 +353,7 @@ export default function FillRateReport({ filters }: Props) {
               No hay backorders reprogramados en el periodo seleccionado.
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-muted/30">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-foreground/80">Pedido</th>
@@ -364,7 +364,7 @@ export default function FillRateReport({ filters }: Props) {
                   <th className="px-3 py-2 text-left font-medium text-foreground/80">Estado</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {topBackorders.map((item) => (
                   <tr key={`${item.pedido_id}-${item.detalle_id}-${item.proxima_fecha_compromiso}`} className="bg-card">
                     <td className="px-3 py-2 font-medium text-foreground/85">{item.pedido_numero}</td>

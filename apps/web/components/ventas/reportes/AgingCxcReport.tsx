@@ -128,10 +128,10 @@ export default function AgingCxcReport({ filters }: Props) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-card text-white">
+        <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <PiggyBank className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <PiggyBank className="h-5 w-5 shrink-0" />
               Saldo pendiente total
             </CardTitle>
             <CardDescription className="text-muted-foreground">
@@ -146,17 +146,17 @@ export default function AgingCxcReport({ filters }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
               Monto vencido
             </CardTitle>
             <CardDescription>
               Suma de cuentas que excedieron la fecha de vencimiento
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-rose-400">{currencyFormatter.format(resumen.totalVencido)}</p>
             <p className="text-sm text-muted-foreground mt-1">
               {resumen.porcentajeVencido.toFixed(1)}% de la cartera total
@@ -164,17 +164,17 @@ export default function AgingCxcReport({ filters }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <TrendingDown className="h-5 w-5" />
+            <CardTitle className="text-base font-medium flex items-start gap-2">
+              <TrendingDown className="h-5 w-5 shrink-0" />
               Riesgo concentrado
             </CardTitle>
             <CardDescription>
               Principales buckets con exposición relevante
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <ul className="space-y-2 text-sm">
               {bucketTotales
                 .filter((bucket) => bucket.monto > 0)
@@ -201,7 +201,7 @@ export default function AgingCxcReport({ filters }: Props) {
           <CardDescription>Saldo pendiente agrupado por días de mora</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-full divide-y divide-border text-sm">
             <thead className="bg-muted/30">
               <tr>
                 <th className="px-3 py-2 text-left font-medium text-foreground/80">Bucket</th>
@@ -210,7 +210,7 @@ export default function AgingCxcReport({ filters }: Props) {
                 <th className="px-3 py-2 text-right font-medium text-foreground/80">% del total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {bucketTotales.map((bucket) => (
                 <tr key={bucket.nombre} className="bg-card">
                   <td className="px-3 py-2 text-foreground/85 font-medium">{bucket.nombre}</td>
@@ -235,7 +235,7 @@ export default function AgingCxcReport({ filters }: Props) {
             <CardDescription>Ranking de clientes según saldo pendiente</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-muted/30">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-foreground/80">Cliente</th>
@@ -243,7 +243,7 @@ export default function AgingCxcReport({ filters }: Props) {
                   <th className="px-3 py-2 text-right font-medium text-foreground/80">% cartera</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {data.saldoPorCliente.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="px-3 py-4 text-center text-muted-foreground">
@@ -274,7 +274,7 @@ export default function AgingCxcReport({ filters }: Props) {
             <CardDescription>Documentos con mayor monto y días de mora</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-muted/30">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-foreground/80">Documento</th>
@@ -284,7 +284,7 @@ export default function AgingCxcReport({ filters }: Props) {
                   <th className="px-3 py-2 text-left font-medium text-foreground/80">Estado</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {data.cuentasCriticas.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-3 py-4 text-center text-muted-foreground">
