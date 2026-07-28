@@ -3,6 +3,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AuditService } from '../../audit/audit.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
+import { calcularDesgloseIgv } from '../../../shared/utils/igv-afectacion.util';
 import { NotificationType, NotificationSeverity } from '../../notifications/notification.types';
 import { CreateCotizacionDto, UpdateCotizacionDto, ConvertirPedidoDto } from './dto';
 import { Cotizacion, EstadoCotizacion, CotizacionDetalle } from './entities';
@@ -734,7 +735,7 @@ export class CotizacionesService {
    * ✅ Usa TaxCalculatorService para obtener la tasa correcta según el país
    */
   private async calcularTotales(
-    detalle: Array<{ cantidad: number; precio_unitario: number }>,
+    detalle: Array<{ producto_id?: string; cantidad: number; precio_unitario: number }>,
     tenantId: string,
   ) {
     const subtotal = detalle.reduce(
@@ -742,17 +743,58 @@ export class CotizacionesService {
       0,
     );
     
-    // ✅ CORRECCIÓN SRP: Usar TaxCalculatorService centralizado
-    const taxResult = await this.taxCalculator.calcularImpuestos({
-      subtotal,
-      tenantId,
-    });
+    // La cotización debe ofrecer el mismo importe que después se facturará: si
+    // grava bienes exonerados, el cliente ve un precio que no corresponde y el
+    // pedido que nace de ella arrastra el error.
+    const afectaciones = await this.obtenerAfectacionesProductos(detalle, tenantId);
+    const tasaIgv = await this.taxCalculator.getTasaIgv(tenantId);
+
+    const desglose = calcularDesgloseIgv(
+      detalle.map((item) => ({
+        baseImponible: Math.round(item.cantidad * item.precio_unitario * 100) / 100,
+        afectacionIgv: item.producto_id ? afectaciones.get(item.producto_id) : undefined,
+      })),
+      tasaIgv,
+    );
 
     return {
-      subtotal: Math.round(taxResult.subtotal * 100) / 100,
-      igv: Math.round(taxResult.igv * 100) / 100,
-      total: Math.round(taxResult.total * 100) / 100,
+      subtotal: Math.round(subtotal * 100) / 100,
+      igv: desglose.igv,
+      total: Math.round((subtotal + desglose.igv) * 100) / 100,
     };
+  }
+
+  /** Afectación del IGV por producto, para no depender de lo que envíe el cliente. */
+  private async obtenerAfectacionesProductos(
+    detalle: Array<{ producto_id?: string }>,
+    tenantId: string,
+  ): Promise<Map<string, string>> {
+    const mapa = new Map<string, string>();
+    const ids = Array.from(new Set(detalle.map((item) => item.producto_id).filter(Boolean))) as string[];
+    if (ids.length === 0) return mapa;
+
+    try {
+      const { data, error } = await this.supabase.getClient()
+        .from('productos')
+        .select('id, afectacion_igv')
+        .eq('tenant_id', tenantId)
+        .in('id', ids);
+
+      if (error) {
+        console.warn('⚠️ [CotizacionesService] No se pudo leer la afectación IGV de los productos:', error.message);
+        return mapa;
+      }
+
+      for (const producto of data || []) {
+        mapa.set((producto as any).id, (producto as any).afectacion_igv);
+      }
+    } catch (lecturaError: any) {
+      // Sin afectación conocida se asume gravado, que es el default del Catálogo
+      // 07 y el que no sub-declara IGV.
+      console.warn('⚠️ [CotizacionesService] No se pudo resolver la afectación IGV:', lecturaError?.message ?? lecturaError);
+    }
+
+    return mapa;
   }
 
   /**

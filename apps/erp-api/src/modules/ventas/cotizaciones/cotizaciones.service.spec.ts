@@ -62,6 +62,7 @@ describe('CotizacionesService', () => {
         igv: 180,
         total: 1180,
       }),
+      getTasaIgv: jest.fn().mockResolvedValue(0.18),
     } as any;
 
     pedidosService = {

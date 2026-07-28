@@ -10,6 +10,7 @@ import { CreatePedidoDto, UpdatePedidoDto, DecisionAprobacion } from './dto';
 import { PedidoVenta, EstadoPedido, PedidoDetalle } from './entities';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
+import { calcularDesgloseIgv, esGravado } from '../../../shared/utils/igv-afectacion.util';
 import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 import { DocumentosService } from '../../documentos.service';
 
@@ -1067,7 +1068,9 @@ export class PedidosService {
    * Calcular totales (subtotal, IGV, total)
    * Usa TaxCalculatorService para obtener la tasa correcta según el país
    */
-  private async calcularTotales(detalle: Array<{ cantidad: number; precio_unitario: number }>) {
+  private async calcularTotales(
+    detalle: Array<{ producto_id?: string; cantidad: number; precio_unitario: number }>,
+  ) {
     // Usar Decimal para el cálculo del subtotal
     const subtotalDecimal = detalle.reduce(
       (sum, item) => {
@@ -1078,24 +1081,74 @@ export class PedidosService {
       new Decimal(0),
     );
 
-    // ✅ CORRECCIÓN: Usar TaxCalculatorService
-    const taxResult = await this.taxCalculator.calcularImpuestos({
-      subtotal: subtotalDecimal.toNumber(),
-      tenantId: this.tenantContext.getTenantId(),
-    });
+    const tenantId = this.tenantContext.getTenantId();
 
-    // Convertir resultados a Decimal para redondeo final seguro
-    const igvDecimal = new Decimal(taxResult.igv);
-    const totalDecimal = new Decimal(taxResult.total);
+    // La afectación del IGV (Catálogo 07) decide qué parte del pedido es gravada.
+    // Aplicar la tasa al subtotal completo cobraba impuesto sobre bienes
+    // exonerados o inafectos, y dejaba el pedido descuadrado contra el CPE, que
+    // sí desglosa por afectación.
+    const afectaciones = await this.obtenerAfectacionesProductos(detalle, tenantId);
+    const tasaIgv = await this.taxCalculator.getTasaIgv(tenantId);
+
+    const desglose = calcularDesgloseIgv(
+      detalle.map((item) => ({
+        baseImponible: new Decimal(item.cantidad).mul(item.precio_unitario).toDecimalPlaces(2).toNumber(),
+        afectacionIgv: item.producto_id ? afectaciones.get(item.producto_id) : undefined,
+      })),
+      tasaIgv,
+    );
+
+    const igvDecimal = new Decimal(desglose.igv);
+    const totalDecimal = subtotalDecimal.plus(igvDecimal);
 
     return {
       subtotal: subtotalDecimal.toDecimalPlaces(2).toNumber(), // Redondeo a 2 decimales
       igv: igvDecimal.toDecimalPlaces(2).toNumber(),
       total: totalDecimal.toDecimalPlaces(2).toNumber(),
+      desglose,
+      tasaIgv,
+      afectaciones,
       subtotalDecimal, // Retornar también los objetos Decimal por si se necesitan
       igvDecimal,
       totalDecimal
     };
+  }
+
+  /** Afectación del IGV por producto, para no depender de lo que envíe el cliente. */
+  private async obtenerAfectacionesProductos(
+    detalle: Array<{ producto_id?: string }>,
+    tenantId?: string,
+  ): Promise<Map<string, string>> {
+    const mapa = new Map<string, string>();
+    const ids = Array.from(new Set(detalle.map((item) => item.producto_id).filter(Boolean))) as string[];
+    if (ids.length === 0) return mapa;
+
+    try {
+      let query = this.supabase.getClient()
+        .from('productos')
+        .select('id, afectacion_igv')
+        .in('id', ids);
+
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        this.logger.warn(`No se pudo leer la afectación IGV de los productos: ${error.message}`);
+        return mapa;
+      }
+
+      for (const producto of data || []) {
+        mapa.set((producto as any).id, (producto as any).afectacion_igv);
+      }
+    } catch (lecturaError: any) {
+      // Sin afectación conocida se asume gravado, que es el default del Catálogo
+      // 07 y el que no sub-declara IGV.
+      this.logger.warn(`No se pudo resolver la afectación IGV: ${lecturaError?.message ?? lecturaError}`);
+    }
+
+    return mapa;
   }
 
   /**
@@ -2188,11 +2241,25 @@ export class PedidosService {
 
       this.logger.log(`📋 [PedidosService] Serie: ${serieAUsar}, Número: ${numero}`);
 
-      // 6. Calcular totales con impuestos según país
-      const taxResult = await this.taxCalculator.calcularImpuestos({
+      // 6. Calcular totales por afectación del IGV (Catálogo 07). Aplicar la tasa
+      // al subtotal completo gravaba bienes exonerados e inafectos y dejaba el
+      // documento descuadrado contra el CPE, que sí desglosa.
+      const afectacionesDocumento = await this.obtenerAfectacionesProductos(pedido.detalle, tenantId);
+      const tasaIgvDocumento = await this.taxCalculator.getTasaIgv(tenantId);
+      const desgloseDocumento = calcularDesgloseIgv(
+        (pedido.detalle || []).map((item: any) => ({
+          baseImponible: Number(item.subtotal ?? 0),
+          afectacionIgv: afectacionesDocumento.get(item.producto_id),
+        })),
+        tasaIgvDocumento,
+      );
+
+      const taxResult = {
         subtotal: Number(pedido.subtotal),
-        tenantId,
-      });
+        igv: desgloseDocumento.igv,
+        total: this.round2(Number(pedido.subtotal) + desgloseDocumento.igv),
+        tasaIgv: tasaIgvDocumento,
+      };
 
       // 7. Calcular fecha de vencimiento
       const fechaEmision = new Date();
@@ -2306,9 +2373,14 @@ export class PedidosService {
         precio_unitario: item.precio_unitario,
         descuento_unitario: 0,
         valor_venta: item.subtotal,
-        impuesto_igv: this.round2(item.subtotal * taxResult.tasaIgv),
+        // Un ítem exonerado o inafecto no lleva IGV en la línea del documento.
+        impuesto_igv: esGravado(afectacionesDocumento.get(item.producto_id))
+          ? this.round2(item.subtotal * taxResult.tasaIgv)
+          : 0,
         impuesto_isc: 0,
-        total_item: this.round2(item.subtotal * (1 + taxResult.tasaIgv)),
+        total_item: esGravado(afectacionesDocumento.get(item.producto_id))
+          ? this.round2(item.subtotal * (1 + taxResult.tasaIgv))
+          : this.round2(item.subtotal),
       }));
 
       const { error: detallesError } = await client
