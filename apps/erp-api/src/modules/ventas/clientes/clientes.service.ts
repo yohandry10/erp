@@ -3,6 +3,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { AuditService } from '../../audit/audit.service';
 import { CreateClienteDto, UpdateClienteDto, ValidarRucDto } from './dto';
 import { Cliente } from './entities/cliente.entity';
+import { validarDocumentoIdentidad, validarRucPeru } from '../../../shared/utils/documento-identidad-peru.util';
 import axios from 'axios';
 
 /**
@@ -29,6 +30,17 @@ export class ClientesService {
 
     if (!/^\d+$/.test(documentoTexto)) {
       throw new BadRequestException('El número de documento debe ser numérico');
+    }
+
+    // El documento del cliente termina en el comprobante: un RUC con dígito
+    // verificador incorrecto o un DNI de once dígitos se aceptaban en el alta y
+    // hacían que SUNAT rechazara la factura emitida a ese cliente.
+    const validacionDocumento = validarDocumentoIdentidad(
+      createClienteDto.documento_tipo,
+      documentoTexto,
+    );
+    if (!validacionDocumento.valido) {
+      throw new BadRequestException(validacionDocumento.error);
     }
 
     // Validar duplicados por documento textual. RUC de 11 dígitos excede integer, por eso no se filtra solo por numero_documento.
@@ -225,10 +237,18 @@ export class ClientesService {
         throw new BadRequestException('El número de documento debe ser numérico');
       }
       const documentoNumero = this.toSafeIntegerDocument(documentoTexto);
+      const tipoDocumento = updateClienteDto.documento_tipo || previousCliente.documento_tipo || (previousCliente as any).tipo_documento;
+
+      // Misma validación que en el alta: editar el documento no puede saltarse
+      // las reglas del Catálogo 06.
+      const validacionDocumento = validarDocumentoIdentidad(tipoDocumento, documentoTexto);
+      if (!validacionDocumento.valido) {
+        throw new BadRequestException(validacionDocumento.error);
+      }
+
       updateData.documento_numero = documentoNumero;
       updateData.numero_documento = documentoNumero;
       updateData.codigo = documentoTexto;
-      const tipoDocumento = updateClienteDto.documento_tipo || previousCliente.documento_tipo || (previousCliente as any).tipo_documento;
       updateData.ruc = tipoDocumento === 'RUC' ? documentoTexto : null;
     }
     if (updateClienteDto.razon_social !== undefined) {
@@ -355,25 +375,10 @@ export class ClientesService {
     try {
       const ruc = validarRucDto.ruc;
 
-      // Validación de formato
-      if (!/^[0-9]{11}$/.test(ruc)) {
-        throw new BadRequestException('El RUC debe tener exactamente 11 dígitos');
-      }
-
-      // Validar prefijo (10=persona natural, 15=no domiciliado, 17=no domiciliado, 20=empresa)
-      const prefijo = ruc.substring(0, 2);
-      if (!['10', '15', '17', '20'].includes(prefijo)) {
-        throw new BadRequestException(`Prefijo de RUC inválido: ${prefijo}. Debe iniciar con 10, 15, 17 o 20`);
-      }
-
-      // Validar dígito verificador (módulo 11 SUNAT)
-      const factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
-      const digitos = ruc.split('').map(Number);
-      const suma = factores.reduce((acc, factor, i) => acc + factor * digitos[i], 0);
-      const resto = 11 - (suma % 11);
-      const digitoVerificador = resto === 10 ? 0 : resto === 11 ? 1 : resto;
-      if (digitoVerificador !== digitos[10]) {
-        throw new BadRequestException('RUC inválido: dígito verificador no coincide');
+      // Misma regla que aplica el alta de clientes, en un solo sitio.
+      const validacion = validarRucPeru(ruc);
+      if (!validacion.valido) {
+        throw new BadRequestException(validacion.error);
       }
 
       // Este endpoint no tiene una fuente registral configurada. Devuelve únicamente
