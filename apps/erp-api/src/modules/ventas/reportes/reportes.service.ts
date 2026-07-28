@@ -225,7 +225,7 @@ export class ReportesService {
         cantidad,
         precio_unitario,
         subtotal,
-        pedidos_venta!inner (
+        pedidos_venta!pedidos_venta_detalle_pedido_id_fkey!inner (
           tenant_id,
           fecha,
           estado
