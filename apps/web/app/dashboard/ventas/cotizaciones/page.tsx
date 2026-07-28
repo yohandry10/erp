@@ -52,8 +52,8 @@ export default function CotizacionesPage() {
 
       if (response?.success) {
         setCotizaciones(response.data || [])
-        setTotalCotizaciones(response.total || 0)
-        setTotalPages(Math.ceil((response.total || 0) / itemsPerPage))
+        setTotalCotizaciones(response.pagination?.total || 0)
+        setTotalPages(Math.ceil((response.pagination?.total || 0) / itemsPerPage))
       }
     } catch (error) {
       console.error('Error loading cotizaciones:', error)
