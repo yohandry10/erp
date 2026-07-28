@@ -31,10 +31,10 @@ export class ReportesService {
         fecha,
         estado,
         total,
-        clientes!inner (
+        clientes!pedidos_venta_cliente_id_fkey!inner (
           id,
           razon_social,
-          documento_numero
+          documento_numero:codigo
         )
       `)
       .eq('tenant_id', tenantId);
@@ -63,7 +63,7 @@ export class ReportesService {
         acc[clienteId] = {
           cliente_id: clienteId,
           cliente_nombre: (pedido.clientes as any).razon_social,
-          cliente_documento: (pedido.clientes as any).numero_documento,
+          cliente_documento: (pedido.clientes as any).documento_numero,
           periodo: `${fechaDesde || 'Inicio'} - ${fechaHasta || 'Hoy'}`,
           moneda: 'PEN',
           estado: estadoFiltro || 'Todos',
@@ -106,9 +106,9 @@ export class ReportesService {
         fecha_vencimiento,
         estado,
         total,
-        clientes!inner (
+        clientes!cotizaciones_cliente_id_fkey!inner (
           razon_social,
-          documento_numero
+          documento_numero:codigo
         )
       `)
       .eq('tenant_id', tenantId)
@@ -140,7 +140,7 @@ export class ReportesService {
         id: cot.id,
         numero: cot.numero,
         cliente_nombre: (cot.clientes as any).razon_social,
-        cliente_documento: (cot.clientes as any).numero_documento,
+        cliente_documento: (cot.clientes as any).documento_numero,
         fecha: cot.fecha,
         fecha_vencimiento: cot.fecha_vencimiento,
         estado: cot.estado,
@@ -299,9 +299,9 @@ export class ReportesService {
         cliente_id,
         total,
         estado,
-        clientes!inner (
+        clientes!pedidos_venta_cliente_id_fkey!inner (
           razon_social,
-          documento_numero
+          documento_numero:codigo
         )
       `)
       .eq('tenant_id', tenantId)
@@ -325,7 +325,7 @@ export class ReportesService {
         acc[clienteId] = {
           cliente_id: clienteId,
           cliente_nombre: (pedido.clientes as any).razon_social,
-          cliente_documento: (pedido.clientes as any).numero_documento,
+          cliente_documento: (pedido.clientes as any).documento_numero,
           total_facturacion: 0,
           cantidad_pedidos: 0,
           cantidad_facturas: 0,
@@ -374,7 +374,7 @@ export class ReportesService {
         id,
         fecha,
         cotizacion_id,
-        cotizaciones!inner (
+        cotizaciones!pedidos_venta_cotizacion_id_fkey!inner (
           fecha
         )
       `)
@@ -873,7 +873,7 @@ export class ReportesService {
         fecha_vencimiento,
         estado,
         monto_pendiente,
-        clientes!inner(razon_social, numero_documento)
+        clientes!cuentas_por_cobrar_cliente_id_fkey!inner(razon_social, documento_numero:codigo)
       `,
       )
       .eq('tenant_id', tenantId)
@@ -933,7 +933,7 @@ export class ReportesService {
         monto: this.round2(monto),
         diasMora: diasEnMora > 0 ? diasEnMora : 0,
         estado: cuenta.estado,
-        cliente_documento: (cuenta.clientes as any)?.numero_documento ?? null,
+        cliente_documento: (cuenta.clientes as any)?.documento_numero ?? null,
       };
     });
 
