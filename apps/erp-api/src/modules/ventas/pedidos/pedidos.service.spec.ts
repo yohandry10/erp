@@ -36,6 +36,7 @@ describe('PedidosService', () => {
 
         mockTaxCalculator = {
             calcularImpuestos: jest.fn(),
+            getTasaIgv: jest.fn().mockResolvedValue(0.18),
         };
 
         mockTenantContext = {
@@ -125,10 +126,13 @@ describe('PedidosService', () => {
             expect(result).toBeDefined();
             expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('crear_pedido_completo', expect.any(Object));
 
-            // Verify Decimal precision in tax calc
-            expect(mockTaxCalculator.calcularImpuestos).toHaveBeenCalledWith(expect.objectContaining({
-                subtotal: 100,
-            }));
+            // El subtotal calculado con Decimal viaja al RPC de creación
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'crear_pedido_completo',
+                expect.objectContaining({
+                    p_pedido: expect.objectContaining({ subtotal: 100 }),
+                }),
+            );
         });
 
         it('should throw BadRequestException if stock is insufficient', async () => {
@@ -184,10 +188,13 @@ describe('PedidosService', () => {
 
             await service.create(dto as any, tenantId);
 
-            // Verify that subtotal passed to tax calc is exactly 0.3, not 0.30000000000000004
-            expect(mockTaxCalculator.calcularImpuestos).toHaveBeenCalledWith(expect.objectContaining({
-                subtotal: 0.3,
-            }));
+            // El subtotal debe ser exactamente 0.3, no 0.30000000000000004
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'crear_pedido_completo',
+                expect.objectContaining({
+                    p_pedido: expect.objectContaining({ subtotal: 0.3 }),
+                }),
+            );
         });
     });
 
