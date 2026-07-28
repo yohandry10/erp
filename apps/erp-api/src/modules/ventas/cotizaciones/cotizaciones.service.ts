@@ -225,7 +225,7 @@ export class CotizacionesService {
         cliente:clientes!cotizaciones_cliente_id_fkey (
           id,
           razon_social,
-          numero_documento,
+          documento_numero:codigo,
           documento_tipo
         )
       `, { count: 'exact' })
@@ -289,7 +289,7 @@ export class CotizacionesService {
         cliente:clientes!cotizaciones_cliente_id_fkey (
           id,
           razon_social,
-          numero_documento,
+          documento_numero:codigo,
           documento_tipo
         )
       `)
