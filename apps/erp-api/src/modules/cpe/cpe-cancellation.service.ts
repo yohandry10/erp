@@ -453,6 +453,15 @@ private async aplicarReversionOperativa(
     motivo: string,
     userId?: string,
   ): Promise<void> {
+    // Estas mutaciones son llamadas independientes, sin transacción que las
+    // agrupe: si una de las últimas falla, las anteriores ya quedaron aplicadas.
+    // El reverso de caja es la que puede fallar por estado externo, así que su
+    // condición se valida antes de tocar nada. De lo contrario la anulación
+    // dejaba el documento anulado sin devolver el dinero ni el stock.
+    if (contexto.ventaPos?.id) {
+      await this.verificarReversionCajaPosible(client, tenantId, contexto.ventaPos);
+    }
+
     if (contexto.documento?.id) {
       const { error } = await client
         .from('documentos')
@@ -626,8 +635,19 @@ private async registrarReversionCajaPos(
       .maybeSingle();
     if (reversoExistente) return;
 
+    // El reverso es efectivo que sale de la caja hoy. Si la sesión original ya se
+    // cerró, cargarlo ahí rompería un arqueo cuadrado y además la RPC lo rechaza,
+    // dejando imposible anular una venta de un turno anterior. Se usa la sesión
+    // abierta vigente y se conserva la original en la trazabilidad.
+    const sesionDestino = await this.resolverSesionParaReverso(client, tenantId, efectivo.sesion_caja_id);
+    if (!sesionDestino) {
+      throw new BadRequestException(
+        'No hay una sesión de caja abierta para registrar el reverso en efectivo. Abra la caja antes de anular.',
+      );
+    }
+
     const { error } = await client.rpc('registrar_movimiento_caja', {
-      p_sesion_caja_id: efectivo.sesion_caja_id,
+      p_sesion_caja_id: sesionDestino,
       p_tipo_movimiento: 'AJUSTE',
       p_monto: -Math.abs(Number(efectivo.monto)),
       p_referencia_documento: notaCredito.id,
@@ -638,9 +658,79 @@ private async registrarReversionCajaPos(
         cpe_id: cpe.id,
         nota_credito_id: notaCredito.id,
         venta_pos_id: ventaPos.id,
+        sesion_caja_venta: efectivo.sesion_caja_id,
+        reverso_en_otra_sesion: sesionDestino !== efectivo.sesion_caja_id,
       },
     });
     if (error) throw new BadRequestException(`No se pudo registrar reverso de caja POS: ${error.message}`);
+  }
+
+  /**
+   * Comprueba, sin mutar nada, que el reverso en efectivo va a poder registrarse.
+   * Si la venta no movió efectivo no hay nada que reversar y la anulación sigue.
+   */
+  private async verificarReversionCajaPosible(
+    client: any,
+    tenantId: string,
+    ventaPos: any,
+  ): Promise<void> {
+    const { data: efectivo } = await client
+      .from('movimientos_caja')
+      .select('id, monto, sesion_caja_id')
+      .eq('tenant_id', tenantId)
+      .eq('referencia_tipo', 'venta_pos')
+      .eq('referencia_documento', ventaPos.id)
+      .eq('tipo_movimiento', 'VENTA')
+      .maybeSingle();
+
+    if (!efectivo?.id || Number(efectivo.monto ?? 0) <= 0) return;
+
+    const sesionDestino = await this.resolverSesionParaReverso(client, tenantId, efectivo.sesion_caja_id);
+    if (!sesionDestino) {
+      throw new BadRequestException(
+        'No hay una sesión de caja abierta para registrar el reverso en efectivo. Abra la caja antes de anular.',
+      );
+    }
+  }
+
+  /**
+   * Sesión donde debe caer el reverso: la misma de la venta si sigue abierta
+   * (anulación dentro del turno), o la sesión abierta vigente. Nunca una sesión
+   * cerrada, cuyo arqueo ya está cuadrado.
+   */
+  private async resolverSesionParaReverso(
+    client: any,
+    tenantId: string,
+    sesionOriginalId: string | null,
+  ): Promise<string | null> {
+    const estaAbierta = (sesion: any) =>
+      sesion &&
+      String(sesion.estado ?? '').toUpperCase() === 'ABIERTA' &&
+      !sesion.hora_cierre &&
+      !sesion.fecha_cierre;
+
+    if (sesionOriginalId) {
+      const { data: original } = await client
+        .from('sesiones_caja')
+        .select('id, estado, hora_cierre, fecha_cierre')
+        .eq('tenant_id', tenantId)
+        .eq('id', sesionOriginalId)
+        .maybeSingle();
+      if (estaAbierta(original)) return original.id;
+    }
+
+    const { data: vigente } = await client
+      .from('sesiones_caja')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('estado', 'ABIERTA')
+      .is('hora_cierre', null)
+      .is('fecha_cierre', null)
+      .order('hora_apertura', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return vigente?.id ?? null;
   }
 
 private async obtenerSiguienteNumeroNotaCredito(tenantId: string, serie: string): Promise<number> {
