@@ -292,7 +292,7 @@ export class PedidosService {
       .select(
         `
           *,
-          clientes:clientes!pedidos_venta_cliente_id_fkey(id, razon_social, numero_documento, limite_credito, permite_morosidad)
+          cliente:clientes!pedidos_venta_cliente_id_fkey(id, razon_social, documento_numero:codigo, limite_credito, permite_morosidad)
         `,
       )
       .eq('tenant_id', tenantId)
