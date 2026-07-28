@@ -99,7 +99,8 @@ describe('ClientesService', () => {
       const createDto: CreateClienteDto = {
         tipo: 'EMPRESA' as any,
         documento_tipo: 'RUC' as any,
-        documento_numero: '20600900000',
+        // RUC con dígito verificador válido: el alta ya valida el módulo 11
+        documento_numero: '20600900006',
         razon_social: 'ACME S.A.C.',
         nombre_comercial: 'ACME',
         direccion: 'Av. Demo 123',
