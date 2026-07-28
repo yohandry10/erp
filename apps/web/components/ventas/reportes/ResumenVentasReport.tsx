@@ -66,7 +66,7 @@ export default function ResumenVentasReport({ filters }: Props) {
       const response = await get(`/reports/ventas?${params.toString()}`)
       const ventas = response?.data?.data || response?.data || []
       setData(ventas)
-      setResumen(response?.data?.resumen || { subtotal: 0, igv: 0, total: 0 })
+      setResumen(response?.resumen || response?.data?.resumen || { subtotal: 0, igv: 0, total: 0 })
     } catch (error: any) {
       toast({
         title: 'Error al cargar ventas',
