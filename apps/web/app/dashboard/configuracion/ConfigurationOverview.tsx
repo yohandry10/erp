@@ -133,7 +133,7 @@ function SectionCard({
   ok: boolean
 }) {
   return (
-    <section className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl p-5">
+    <section className="relative rounded-2xl border border-border bg-card/95 text-card-foreground shadow-md backdrop-blur-xl p-5">
       <div className="mb-3 flex items-center justify-between gap-4">
         <h2 className="m-0 flex items-center gap-2 text-base font-semibold text-foreground">
           <Icon className="h-[18px] w-[18px]" />
@@ -210,10 +210,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
     return {
       complete: status?.isComplete === true,
       ruc: status?.ruc?.isConfigured === true && !!empresa?.ruc,
-      certificate:
-        status?.certificate?.exists === true &&
-        status?.certificate?.isValid === true &&
-        status?.certificate?.rucMatches === true,
+      certificate: status?.certificate?.exists === true && status?.certificate?.isValid === true,
       ose: ose?.verificacion?.valid === true && ose?.configuracion?.certificateExists === true,
       fiscal: !!empresa?.regimen && empresa?.emisionCpeModo !== '',
       sales: !!empresa?.serieFactura && !!empresa?.serieBoleta,
@@ -330,8 +327,8 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         <Link className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent" href="/dashboard/wizard">Editar en asistente</Link>
       </nav>
 
-      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 mb-5">
-        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] items-stretch gap-5 mb-5">
+        <div className="relative flex h-full min-h-36 flex-col overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
           <div className={cn('inline-flex size-11 items-center justify-center rounded-xl', isOperationallyReady ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
             {isOperationallyReady ? <CheckCircle className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
           </div>
@@ -340,7 +337,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             <p>Preparación operativa</p>
           </div>
         </div>
-        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+        <div className="relative flex h-full min-h-36 flex-col overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
           <div className={cn('inline-flex size-11 items-center justify-center rounded-xl', checks.certificate ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
             <ShieldCheck className="h-6 w-6" />
           </div>
@@ -354,7 +351,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             )}
           </div>
         </div>
-        <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
+        <div className="relative flex h-full min-h-36 flex-col overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
           <div className={cn('inline-flex size-11 items-center justify-center rounded-xl', checks.ose ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
             <Settings className="h-6 w-6" />
           </div>
@@ -365,7 +362,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-start gap-4">
         {!hidden('empresa') && (
           <SectionCard title="Empresa" icon={Building2} ok={checks.ruc}>
             <FieldRow label="RUC" value={empresa?.ruc} ok={!!empresa?.ruc} />
