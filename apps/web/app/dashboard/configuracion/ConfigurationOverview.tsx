@@ -133,7 +133,7 @@ function SectionCard({
   ok: boolean
 }) {
   return (
-    <section className="relative rounded-2xl border border-border bg-card/95 text-card-foreground shadow-md backdrop-blur-xl p-5">
+    <section className="relative flex h-full flex-col rounded-2xl border border-border bg-card/95 text-card-foreground shadow-md backdrop-blur-xl p-5">
       <div className="mb-3 flex items-center justify-between gap-4">
         <h2 className="m-0 flex items-center gap-2 text-base font-semibold text-foreground">
           <Icon className="h-[18px] w-[18px]" />
@@ -362,7 +362,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-start gap-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-stretch gap-4">
         {!hidden('empresa') && (
           <SectionCard title="Empresa" icon={Building2} ok={checks.ruc}>
             <FieldRow label="RUC" value={empresa?.ruc} ok={!!empresa?.ruc} />
@@ -384,11 +384,9 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
               value={certificado?.rucsEnCertificado?.length ? certificado.rucsEnCertificado.join(', ') : null}
               ok={certificado?.rucMatches === true}
             />
-            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-              SUNAT firma cada comprobante con tu certificado y rechaza los que no
-              pertenecen al RUC que emite. Por eso lo verificamos aquí y no al
-              facturar: si no coincide, tu proveedor de firma digital debe emitirlo a
-              nombre de la empresa, no del representante.
+            <p className="mt-auto pt-3 text-xs leading-snug text-muted-foreground">
+              SUNAT rechaza los comprobantes firmados con un certificado que no
+              pertenece al RUC emisor. Debe estar a nombre de la empresa.
             </p>
             <FieldRow label="OSE/SUNAT válido" value={ose?.verificacion?.valid} ok={ose?.verificacion?.valid === true} />
             <FieldRow label="Certificado OSE resuelto" value={ose?.configuracion?.certificateExists} ok={ose?.configuracion?.certificateExists === true} />
