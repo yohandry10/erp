@@ -343,16 +343,24 @@ export class AccountingBooksService {
       const { data: movimientos, error } = await query;
       if (error) throw error;
 
-      let stockAcumulado = 0;
-      let valorAcumulado = 0;
+      // El kardex se lleva por producto. Acumular en un solo contador mezclaba
+      // articulos distintos: tras recibir 10 cafes a 18 y 5 cuadernos a 6, el
+      // cuaderno figuraba con stock 15 y costo promedio 14 en vez de 5 y 6. Esa
+      // valuacion alimenta el balance y el costo de ventas.
+      const acumuladoPorProducto = new Map<string, { stock: number; valor: number }>();
 
       const kardex = (movimientos || []).map((mov: any) => {
         const cantidad = Number(mov.cantidad_recibida ?? 0);
         const valor = Number(mov.valor_total ?? (mov.costo_unitario ?? 0) * cantidad);
 
-        stockAcumulado += cantidad;
-        valorAcumulado += valor;
+        const clave = String(mov.producto_id ?? mov.producto_codigo ?? '');
+        const acumulado = acumuladoPorProducto.get(clave) ?? { stock: 0, valor: 0 };
+        acumulado.stock += cantidad;
+        acumulado.valor += valor;
+        acumuladoPorProducto.set(clave, acumulado);
 
+        const stockAcumulado = acumulado.stock;
+        const valorAcumulado = acumulado.valor;
         const costoPromedio = stockAcumulado > 0 ? valorAcumulado / stockAcumulado : 0;
 
         return {
