@@ -46,7 +46,7 @@ export class ValidationService {
       const { data: empresa, error } = await this.supabaseService
         .getClient()
         .from('empresa_config')
-        .select('certificado_pfx, certificado_password, certificado_expira_en, ruc, sunat_cert_expected_ruc')
+        .select('certificado_pfx, certificado_password, certificado_expira_en, ruc, sunat_cert_expected_ruc, sunat_environment')
         .eq('tenant_id', tenantId)
         .single();
 
@@ -86,8 +86,17 @@ export class ValidationService {
         rucsEnCertificado = titularidad.rucsEnCertificado;
 
         if (!titularidad.coincide) {
-          errors.push(titularidad.error as string);
-          isValid = false;
+          // Misma politica que el preflight de emision: en homologacion se
+          // avisa y se deja seguir probando, porque no se emite nada real;
+          // en produccion es requisito duro y bloquea.
+          const enProduccion = String(empresa.sunat_environment ?? '').trim().toLowerCase() === 'produccion';
+
+          if (enProduccion) {
+            errors.push(titularidad.error as string);
+            isValid = false;
+          } else {
+            warnings.push(`${titularidad.error} Se permite seguir en homologacion, pero produccion quedara bloqueada.`);
+          }
         }
 
         const now = new Date();
