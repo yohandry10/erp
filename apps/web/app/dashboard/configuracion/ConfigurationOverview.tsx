@@ -141,7 +141,7 @@ function SectionCard({
         </h2>
         <StatusPill ok={ok} />
       </div>
-      {children}
+      <div className="flex flex-1 flex-col justify-between gap-1">{children}</div>
     </section>
   )
 }
