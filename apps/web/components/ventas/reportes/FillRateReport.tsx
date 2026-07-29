@@ -119,7 +119,7 @@ export default function FillRateReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Fill-rate &amp; OTIF</CardTitle>
-          <CardDescription>Evaluando entregas en el periodo seleccionado…</CardDescription>
+          <CardDescription className="text-xs leading-snug">Evaluando entregas en el periodo seleccionado…</CardDescription>
         </CardHeader>
         <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-foreground/80">
           <Loader2 className="h-8 w-8 animate-spin" />
@@ -134,7 +134,7 @@ export default function FillRateReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Fill-rate &amp; OTIF</CardTitle>
-          <CardDescription>No se hallaron pedidos en el intervalo indicado</CardDescription>
+          <CardDescription className="text-xs leading-snug">No se hallaron pedidos en el intervalo indicado</CardDescription>
         </CardHeader>
         <CardContent className="py-12 text-center text-muted-foreground">
           Ajusta los filtros o confirma que existan registros confirmados en el periodo.
@@ -147,14 +147,14 @@ export default function FillRateReport({ filters }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <CheckCircle2 className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
               Fill-rate global
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs leading-snug">
               Porcentaje de unidades entregadas sobre lo solicitado
             </CardDescription>
           </CardHeader>
@@ -168,9 +168,9 @@ export default function FillRateReport({ filters }: Props) {
         </Card>
 
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <Truck className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <Truck className="h-4 w-4 shrink-0" />
               OTIF (On Time In Full)
             </CardTitle>
             <CardDescription className="text-indigo-100">
@@ -187,12 +187,12 @@ export default function FillRateReport({ filters }: Props) {
         </Card>
 
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <CalendarClock className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <CalendarClock className="h-4 w-4 shrink-0" />
               Backorders pendientes
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs leading-snug">
               Líneas reagendadas a seguimiento
             </CardDescription>
           </CardHeader>
@@ -205,12 +205,12 @@ export default function FillRateReport({ filters }: Props) {
         </Card>
 
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <PackageMinus className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <PackageMinus className="h-4 w-4 shrink-0" />
               Pedidos sin entrega
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs leading-snug">
               Pedidos confirmados sin salidas registradas
             </CardDescription>
           </CardHeader>
@@ -223,12 +223,12 @@ export default function FillRateReport({ filters }: Props) {
         </Card>
 
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <Clock3 className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <Clock3 className="h-4 w-4 shrink-0" />
               Fuera de SLA
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs leading-snug">
               Entregas completas con retraso
             </CardDescription>
           </CardHeader>
@@ -244,7 +244,7 @@ export default function FillRateReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Detalle de entregas</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs leading-snug">
             Pedidos con menor nivel de cumplimiento para seguimiento operativo
           </CardDescription>
         </CardHeader>
@@ -343,7 +343,7 @@ export default function FillRateReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Backorders prioritarios</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs leading-snug">
             Próximos compromisos de despacho y líneas pendientes a vigilar
           </CardDescription>
         </CardHeader>
