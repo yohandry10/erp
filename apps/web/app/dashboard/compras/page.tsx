@@ -386,7 +386,8 @@ export default function ComprasPage() {
                             <td className="px-4 py-3 text-right font-semibold text-foreground">{formatCurrency(parseFloat(orden.total) || 0)}</td>
                             <td className="px-4 py-3 text-center">{statusBadge(orden.estado)}</td>
                             <td className="px-4 py-3">
-                              <div className="flex flex-wrap justify-end gap-2">
+                              <div className="flex flex-col items-end gap-2">
+                                <div className="flex items-center gap-2">
                                 <Button type="button" size="sm" variant="outline" onClick={() => handleEditOrden(orden)} className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground">
                                   Ver
                                 </Button>
@@ -402,6 +403,7 @@ export default function ComprasPage() {
                                     Recepcionar
                                   </Button>
                                 )}
+                                </div>
                                 <Button type="button" size="sm" variant="outline" onClick={() => handleDeleteOrden(orden.id)} className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground">
                                   Eliminar
                                 </Button>

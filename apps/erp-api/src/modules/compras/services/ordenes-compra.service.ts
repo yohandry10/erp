@@ -377,11 +377,26 @@ export class OrdenesCompraService {
       );
     }
 
-    // Bloquear auto-aprobación: el creador de la OC no puede aprobarla
+    // Segregación de funciones: quien crea la orden no la aprueba. La regla
+    // protege de que una sola persona comprometa dinero de la empresa, pero
+    // solo tiene sentido cuando hay alguien mas a quien pedirle la firma.
+    //
+    // El administrador queda exento: es el titular de la cuenta y en un tenant
+    // recien creado suele ser el unico operador, de modo que exigirle una
+    // segunda firma inexistente dejaba el circuito de compras bloqueado. Al
+    // resto de roles -cajero, compras, contador- si se les exige.
     if (existingOrden.created_by && aprobadorId === existingOrden.created_by) {
-      throw new BadRequestException(
-        'El creador de la orden de compra no puede aprobar su propia orden. Se requiere aprobación de otro usuario autorizado.',
-      );
+      // La empresa puede exigir la doble firma incluso al administrador, para
+      // cuando ya reparte los roles entre varias personas.
+      const exigirSiempre = await this.tenantExigeAprobacionSegregada(tenantId);
+      const esAdministrador =
+        !exigirSiempre && (await this.aprobadorEsAdministrador(aprobadorId, tenantId));
+
+      if (!esAdministrador) {
+        throw new BadRequestException(
+          'El creador de la orden de compra no puede aprobar su propia orden. Se requiere aprobación de otro usuario autorizado.',
+        );
+      }
     }
 
     let aprobadorNombre = aprobarDto.aprobador_nombre;
@@ -1314,6 +1329,50 @@ export class OrdenesCompraService {
       }
     } catch (error) {
       console.error('❌ Error al emitir evento de orden aprobada:', error);
+    }
+  }
+
+  /**
+   * Lee si la empresa decidio exigir la doble firma sin excepciones. Ante fallo
+   * devuelve false: se conserva el comportamiento por defecto en vez de dejar
+   * el circuito bloqueado por un problema de lectura.
+   */
+  private async tenantExigeAprobacionSegregada(tenantId: string): Promise<boolean> {
+    try {
+      const { data } = await this.supabaseService
+        .getClient()
+        .from('empresa_config')
+        .select('exigir_aprobacion_segregada')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      return data?.exigir_aprobacion_segregada === true;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * true si el usuario tiene un rol de administracion del tenant. Se compara por
+   * prefijo para cubrir las variantes que crea el sistema (ADMIN, ADMIN_DEMO).
+   * Ante cualquier fallo devuelve false, de modo que la duda mantiene el control
+   * activo en vez de relajarlo.
+   */
+  private async aprobadorEsAdministrador(userId: string, tenantId: string): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('user_roles')
+        .select('roles!inner(nombre)')
+        .eq('usuario_sistema_id', userId)
+        .eq('tenant_id', tenantId);
+
+      if (error || !data) return false;
+
+      return data.some((fila: any) =>
+        String(fila?.roles?.nombre ?? '').trim().toUpperCase().startsWith('ADMIN'),
+      );
+    } catch {
+      return false;
     }
   }
 }
