@@ -386,8 +386,11 @@ export class AccountingBooksService {
       const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta, cuentaCodigo } = filtros;
 
-      // Cuentas de caja y bancos (10xxx)
-      const cuentasCajaBancos = cuentaCodigo ? [cuentaCodigo] : ['10111', '10411', '10412'];
+      // Efectivo y equivalentes de efectivo es el elemento 10 del PCGE. Se
+      // filtraba por divisionarias fijas (10111, 10411, 10412), pero un plan
+      // contable puede estar abierto a otro nivel -el que crea el propio sistema
+      // usa "10"- y entonces el libro no encontraba un solo movimiento de caja
+      // aunque los hubiera. Se busca por prefijo para cubrir cualquier apertura.
 
       let query = this.supabase
         .getClient()
@@ -407,9 +410,12 @@ export class AccountingBooksService {
           )
         `,
         )
-        .in('plan_cuentas.codigo', cuentasCajaBancos)
         .eq('tenant_id', tenantId)
         .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
+
+      query = cuentaCodigo
+        ? query.eq('plan_cuentas.codigo', cuentaCodigo)
+        : query.like('plan_cuentas.codigo', '10%');
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
