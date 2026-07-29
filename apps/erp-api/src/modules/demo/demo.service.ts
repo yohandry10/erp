@@ -491,6 +491,21 @@ export class DemoService {
         sunat_environment: "homologacion",
         sunat_username: "20123456786MODDATOS",
         sunat_password: "MODDATOS",
+        // Sin series no se puede numerar ni un comprobante, asi que el POS del
+        // demo quedaba cojo justo en lo que el cliente entra a probar. Se usan
+        // las series estandar: F para factura, B para boleta y FC para la nota
+        // de credito que afecta a una factura.
+        serie_factura: "F001",
+        serie_boleta: "B001",
+        serie_nota_credito: "FC01",
+        // La columna gre_automatico_habilitado viene por defecto en true, lo que
+        // exige una serie de guia de remision que el demo no necesita: la GRE es
+        // logistica avanzada, no parte del circuito que se prueba aqui.
+        gre_automatico_habilitado: false,
+        gre_obligatorio: false,
+        // Regimen general: es el que aplica a una S.A.C. como la del demo y sin
+        // el la configuracion fiscal nunca se da por completa.
+        regimen_tributario: "GENERAL",
       })
       .eq("tenant_id", tenantId);
     if (baseError)
