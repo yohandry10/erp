@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import toast from 'react-hot-toast'
@@ -252,7 +253,7 @@ export default function RecepcionDetallePage() {
               <div>
                 <div className={mutedTextClass}>Fecha Recepción</div>
                 <div className={bodyTextClass}>
-                  {new Date(recepcion.fecha_recepcion).toLocaleDateString('es-PE')}
+                  {parseDateLocal(recepcion.fecha_recepcion).toLocaleDateString('es-PE')}
                 </div>
               </div>
             </div>
@@ -397,7 +398,7 @@ export default function RecepcionDetallePage() {
                     </td>
                     <td className={tableCellClass}>
                       {item.fecha_expiracion
-                        ? new Date(item.fecha_expiracion).toLocaleDateString('es-PE')
+                        ? parseDateLocal(item.fecha_expiracion).toLocaleDateString('es-PE')
                         : '-'
                       }
                     </td>

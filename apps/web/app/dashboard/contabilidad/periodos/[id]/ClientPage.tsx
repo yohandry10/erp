@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Lock, Unlock, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
@@ -262,7 +263,7 @@ export default function PeriodoDetailPage() {
                   Fecha de Cierre
                 </p>
                 <p className="m-0 text-base font-semibold text-foreground">
-                  {new Date(periodo.fecha_cierre).toLocaleDateString('es-PE', {
+                  {parseDateLocal(periodo.fecha_cierre).toLocaleDateString('es-PE', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'

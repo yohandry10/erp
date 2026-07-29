@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { parseDateLocal } from '@/lib/date-utils'
 import { Download, Filter, FileText, RefreshCcw } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { fetchApi } from '@/lib/api-fetch'
@@ -203,7 +204,7 @@ export default function DescargasPage() {
                 {!loading && documentos.map(doc => (
                   <tr key={doc.id}>
                     <td className="px-4 py-2 text-sm text-foreground/85">
-                      {doc.fecha_emision ? format(new Date(doc.fecha_emision), 'dd MMM yyyy', { locale: es }) : '-'}
+                      {doc.fecha_emision ? format(parseDateLocal(doc.fecha_emision), 'dd MMM yyyy', { locale: es }) : '-'}
                     </td>
                     <td className="px-4 py-2 text-sm text-foreground/85">
                       <div className="font-semibold">{doc.tipo_documento || '-'}</div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { parseDateLocal } from '@/lib/date-utils'
 import { Download, Eye, FileText, Plus, RefreshCw, ShieldCheck, Truck } from 'lucide-react'
 
 import GreModal from '@/components/modals/GreModal'
@@ -309,7 +310,7 @@ export default function GREPage() {
                             <div className="max-w-sm truncate text-xs text-muted-foreground">{doc.direccionDestino}</div>
                           </div>
                         </td>
-                        <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-muted-foreground">{new Date(doc.fechaTraslado).toLocaleDateString('es-PE')}</td>
+                        <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-muted-foreground">{parseDateLocal(doc.fechaTraslado).toLocaleDateString('es-PE')}</td>
                         <td className="!border-cyan-400/10 !bg-transparent px-4 py-3">
                           <div className="space-y-1">
                             <div className="truncate text-foreground">{getModalidadText(doc.modalidad)}</div>
