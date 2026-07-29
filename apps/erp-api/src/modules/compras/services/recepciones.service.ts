@@ -834,7 +834,7 @@ export class RecepcionesService {
         // Las condiciones pactadas en la ORDEN mandan sobre las del proveedor:
         // una OC CREDITO_30 no debe generar una CxP que vence el mismo día
         // solo porque el proveedor tiene CONTADO por defecto.
-        diasCredito: ordenData.dias_credito ?? proveedor.dias_credito ?? null,
+        diasCredito: this.resolverDiasCredito(ordenData.dias_credito, proveedor.dias_credito),
         condicionesPago: ordenData.condiciones_pago ?? proveedor.condiciones_pago ?? null,
         greProveedor: recepcion.gre_proveedor ?? null,
         items,
@@ -926,7 +926,7 @@ export class RecepcionesService {
         total: this.round2(Number(orden.total ?? 0)),
         moneda: orden.moneda ?? 'PEN',
         // Prevalecen las condiciones pactadas en la orden (ver evento recepcion.registrada).
-        diasCredito: orden.dias_credito ?? proveedor.dias_credito ?? null,
+        diasCredito: this.resolverDiasCredito(orden.dias_credito, proveedor.dias_credito),
         condicionesPago: orden.condiciones_pago ?? proveedor.condiciones_pago ?? null,
         almacenId: recepcion.items?.[0]?.almacen_id ?? null,
         observaciones: recepcion.observaciones ?? null,
@@ -946,5 +946,24 @@ export class RecepcionesService {
 
   private round2(value: number): number {
     return Math.round(value * 100) / 100;
+  }
+
+  /**
+   * Dias de credito aplicables a la cuenta por pagar.
+   *
+   * La orden solo manda si realmente pacto un plazo. El formulario no pide el
+   * dato, asi que las ordenes nacen con 0 y el operador ?? no cae con 0: ese
+   * cero pisaba los dias negociados con el proveedor y la deuda vencia el mismo
+   * dia de emitirse, apareciendo como vencida desde el primer momento.
+   */
+  private resolverDiasCredito(
+    diasOrden: unknown,
+    diasProveedor: unknown,
+  ): number | null {
+    const dias = Number(diasOrden);
+    if (Number.isFinite(dias) && dias > 0) return dias;
+
+    const delProveedor = Number(diasProveedor);
+    return Number.isFinite(delProveedor) && delProveedor > 0 ? delProveedor : null;
   }
 }
