@@ -6,6 +6,10 @@ export interface ConfigurationStatus {
     exists: boolean;
     isValid: boolean;
     expiresAt?: Date;
+    /** true solo si el certificado pertenece al RUC con el que se emite. */
+    rucMatches?: boolean;
+    rucsEnCertificado?: string[];
+    motivoTitularidad?: string;
   };
   ruc: {
     isConfigured: boolean;

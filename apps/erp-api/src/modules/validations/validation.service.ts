@@ -13,6 +13,7 @@ import {
 } from './validation.types';
 import { ColombiaValidationService } from './colombia-validation.service';
 import { normalizeCertificateInput, parseCertificateBuffer } from '../../shared/utils/certificate.utils';
+import { verificarTitularidadCertificado } from '../../shared/utils/certificado-ruc-peru.util';
 import * as crypto from 'crypto';
 import { ApiPeruService } from './apiperu.service';
 import { ConfigService } from '@nestjs/config';
@@ -37,13 +38,15 @@ export class ValidationService {
     let isValid = true;
     let expiresAt: Date | undefined;
     let daysUntilExpiration: number | undefined;
+    let rucMatches: boolean | undefined;
+    let rucsEnCertificado: string[] = [];
 
     try {
       // Get certificate from empresa_config
       const { data: empresa, error } = await this.supabaseService
         .getClient()
         .from('empresa_config')
-        .select('certificado_pfx, certificado_password, certificado_expira_en')
+        .select('certificado_pfx, certificado_password, certificado_expira_en, ruc, sunat_cert_expected_ruc')
         .eq('tenant_id', tenantId)
         .single();
 
@@ -74,6 +77,19 @@ export class ValidationService {
         const metadata = parseCertificateBuffer(certificadoBuffer, password || '');
         expiresAt = metadata.validTo;
 
+        // Que cargue y no este vencido no basta: SUNAT solo acepta el
+        // certificado del contribuyente que emite. Sin esta comprobacion el
+        // estado daba "valido" a un certificado de otro titular.
+        const rucEmisor = empresa.sunat_cert_expected_ruc || empresa.ruc || null;
+        const titularidad = verificarTitularidadCertificado(metadata.subject, rucEmisor);
+        rucMatches = titularidad.coincide;
+        rucsEnCertificado = titularidad.rucsEnCertificado;
+
+        if (!titularidad.coincide) {
+          errors.push(titularidad.error as string);
+          isValid = false;
+        }
+
         const now = new Date();
         const diffTime = metadata.validTo.getTime() - now.getTime();
         daysUntilExpiration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -102,6 +118,8 @@ export class ValidationService {
         isValid,
         expiresAt,
         daysUntilExpiration,
+        rucMatches,
+        rucsEnCertificado,
         errors,
         warnings,
       };
