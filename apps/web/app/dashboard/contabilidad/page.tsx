@@ -278,6 +278,19 @@ export default function ContabilidadPage() {
     cargarDatos()
   }, [cargarDatos])
 
+  // El radar resume cuatro modulos, pero cargarDatos solo trae la vista activa:
+  // los otros tres contadores quedaban en 0 y parecia que esos modulos no tenian
+  // datos. Se cargan una vez al abrir la pantalla, con independencia de la vista.
+  useEffect(() => {
+    void Promise.allSettled([
+      cargarRegistroCompras(),
+      cargarBalanceComprobacion(),
+      cargarKardexValorizado(),
+      cargarLibroCajaBancos(),
+    ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const currentVista = vistas.find((vista) => vista.id === vistaActual) ?? vistas[0]
   const CurrentIcon = currentVista.icon
 
