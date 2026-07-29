@@ -110,6 +110,12 @@ export default function ContabilidadPage() {
 
   const [registroCompras, setRegistroCompras] = useState<any>(null)
   const [balanceComprobacion, setBalanceComprobacion] = useState<any>(null)
+  // El endpoint responde con el array de cuentas y sus movimientos: no existe
+  // un campo totalCuentas, asi que el balance salia siempre en 0 aunque hubiera
+  // asientos contabilizados.
+  const totalCuentasBalance = Array.isArray(balanceComprobacion)
+    ? balanceComprobacion.length
+    : Number(balanceComprobacion?.totalCuentas) || 0
   const [kardexValorizado, setKardexValorizado] = useState<any>(null)
   const [libroCajaBancos, setLibroCajaBancos] = useState<any>(null)
   const [registroActivosFijos, setRegistroActivosFijos] = useState<any>(null)
@@ -334,7 +340,7 @@ export default function ContabilidadPage() {
     if (vistaActual === 'balance-comprobacion') {
       return renderPanel('Balance de Comprobación', 'Balance contable para validar saldos y consistencia de cuentas.', [
         { label: 'Estado', value: 'Activo' },
-        { label: 'Total cuentas', value: balanceComprobacion?.totalCuentas || 0 },
+        { label: 'Total cuentas', value: totalCuentasBalance },
         { label: 'Control', value: 'Debe/Haber' },
       ])
     }
@@ -401,7 +407,7 @@ export default function ContabilidadPage() {
 
   const connectedMetrics = [
     ['Compras', registroCompras?.total || 0],
-    ['Cuentas en balance', balanceComprobacion?.totalCuentas || 0],
+    ['Cuentas en balance', totalCuentasBalance],
     ['Productos valorizados', kardexValorizado?.totalProductos || 0],
     ['Movimientos caja/bancos', libroCajaBancos?.totalMovimientos || 0],
   ]
