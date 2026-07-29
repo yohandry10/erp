@@ -13,6 +13,7 @@ import {
   WizardCertificateValidationResult,
 } from './configuration.types';
 import { parseCertificateBuffer, toPostgresBytea } from '../../shared/utils/certificate.utils';
+import { verificarTitularidadCertificado } from '../../shared/utils/certificado-ruc-peru.util';
 import { createHash } from 'crypto';
 import { decryptBuffer, decryptText, encryptBuffer, encryptText } from '../../shared/utils/secure-config.utils';
 import {
@@ -598,6 +599,19 @@ export class ConfigurationService {
       const buffer = Buffer.from(normalizedBase64, 'base64');
       const metadata = parseCertificateBuffer(buffer, payload.certificatePassword);
 
+      // Un certificado puede cargar y estar vigente y aun asi no servir: SUNAT
+      // solo acepta el del contribuyente que emite. Se comprueba al subirlo y
+      // no al facturar, que es cuando ya seria tarde.
+      const { data: empresa } = await this.supabaseService
+        .getClient()
+        .from('empresa_config')
+        .select('ruc, sunat_cert_expected_ruc')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      const rucEmisor = empresa?.sunat_cert_expected_ruc || empresa?.ruc || null;
+      const titularidad = verificarTitularidadCertificado(metadata.subject, rucEmisor);
+
       const now = new Date();
       const daysUntilExpiration = Math.ceil(
         (metadata.validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
@@ -614,6 +628,10 @@ export class ConfigurationService {
         validFrom: metadata.validFrom,
         validTo: metadata.validTo,
         daysUntilExpiration,
+        rucEmisor,
+        rucsEnCertificado: titularidad.rucsEnCertificado,
+        perteneceAlEmisor: titularidad.coincide,
+        motivoTitularidad: titularidad.error,
       };
     } catch (error) {
       this.logger.error(`Error validating certificate payload for tenant ${tenantId}:`, error);

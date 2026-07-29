@@ -104,4 +104,12 @@ export interface WizardCertificateValidationResult {
   validFrom: Date;
   validTo: Date;
   daysUntilExpiration: number;
+  /** RUC con el que la empresa va a emitir, para poder contrastarlo. */
+  rucEmisor: string | null;
+  /** RUCs validos hallados en el titular del certificado. */
+  rucsEnCertificado: string[];
+  /** false si el certificado no pertenece al RUC emisor: no sirve para emitir. */
+  perteneceAlEmisor: boolean;
+  /** Motivo redactado para mostrarse al usuario cuando no pertenece. */
+  motivoTitularidad?: string;
 }
