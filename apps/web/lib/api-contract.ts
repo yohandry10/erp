@@ -14,6 +14,10 @@ export function isApiEnvelope(value: unknown): value is ApiEnvelope {
 }
 
 export function apiSucceeded(value: unknown): boolean {
+  // useApi devuelve null cuando la peticion falla. Darlo por bueno hacia que
+  // la UI confirmara operaciones que el backend habia rechazado: una orden de
+  // compra denegada por segregacion de funciones se anunciaba como aprobada.
+  if (value === null || value === undefined) return false
   if (!isApiEnvelope(value) || value.success === undefined) return true
   return value.success === true || value.success === 'true'
 }
