@@ -144,6 +144,10 @@ export class ConfigurationController {
           validFrom: result.validFrom.toISOString(),
           validTo: result.validTo.toISOString(),
           daysUntilExpiration: result.daysUntilExpiration,
+          rucEmisor: result.rucEmisor,
+          rucsEnCertificado: result.rucsEnCertificado,
+          perteneceAlEmisor: result.perteneceAlEmisor,
+          motivoTitularidad: result.motivoTitularidad,
         },
       };
     } catch (error) {
