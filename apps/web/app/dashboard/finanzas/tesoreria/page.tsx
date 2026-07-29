@@ -17,6 +17,7 @@ import {
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { parseDateLocal } from '@/lib/date-utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -137,8 +138,11 @@ export default function TesoreriaPage() {
     }).format(amount)
   }
 
+  // Una fecha sin hora se interpreta como UTC y en Lima retrocede un dia: el
+  // vencimiento del 20/04 se mostraba como 19/04 aunque los dias de mora
+  // estuvieran bien calculados.
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('es-PE', {
+    parseDateLocal(dateString).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
