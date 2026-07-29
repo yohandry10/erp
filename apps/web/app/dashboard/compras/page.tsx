@@ -28,7 +28,9 @@ const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-prima
 
 export default function ComprasPage() {
   const { toast } = useToast()
-  const { get, delete: del, post } = useApi()
+  // throwOnError deja llegar el motivo real del backend al catch; sin esto el
+  // hook devuelve null y solo se puede mostrar un texto generico.
+  const { get, delete: del, post } = useApi({ throwOnError: true, showErrorToast: false })
   const router = useRouter()
 
   const [ordenes, setOrdenes] = useState<any[]>([])
