@@ -1195,18 +1195,22 @@ export class CxpService {
 
     // Procesar cada CxP
     for (const cxp of cxps) {
-      const fechaVencimiento = new Date(cxp.fecha_vencimiento);
-      fechaVencimiento.setHours(0, 0, 0, 0);
+      // new Date("2026-07-29") es medianoche UTC, que en Lima cae el dia 28: el
+      // vencimiento retrocedia una jornada y toda la antiguedad salia con un dia
+      // de mas. Una deuda que vencia hoy figuraba con 1 dia de mora.
+      const fechaVencimiento = this.parseFechaLocal(cxp.fecha_vencimiento);
 
       // Calcular días vencidos (negativos si aún no vence)
       const diasVencidos = Math.floor(
         (hoy.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24),
       );
 
-      // Determinar rango
+      // Una deuda vence al dia siguiente de su fecha: el mismo dia todavia se
+      // puede pagar. Contarla como vencida ese dia hacia que el aging dijera
+      // "1 cuenta vencida" mientras la tarjeta de resumen decia 0.
       let rango: string;
-      if (diasVencidos < 0) {
-        rango = 'por_vencer'; // No vencido aún
+      if (diasVencidos <= 0) {
+        rango = 'por_vencer'; // Aún dentro de plazo
       } else if (diasVencidos <= 30) {
         rango = 'rango_0_30';
       } else if (diasVencidos <= 60) {
@@ -1218,7 +1222,7 @@ export class CxpService {
       }
 
       // Solo contar en el resumen si está vencido
-      if (diasVencidos >= 0) {
+      if (diasVencidos > 0) {
         if (rango === 'rango_0_30') {
           resumen.rango_0_30.cantidad++;
           resumen.rango_0_30.monto += cxp.saldo;
@@ -1409,8 +1413,10 @@ export class CxpService {
     const porMoneda: Record<string, { cantidad: number; monto: number }> = {};
 
     const vencimientos = cxps.map((cxp) => {
-      const fechaVencimiento = new Date(cxp.fecha_vencimiento);
-      fechaVencimiento.setHours(0, 0, 0, 0);
+      // new Date("2026-07-29") es medianoche UTC, que en Lima cae el dia 28: el
+      // vencimiento retrocedia una jornada y toda la antiguedad salia con un dia
+      // de mas. Una deuda que vencia hoy figuraba con 1 dia de mora.
+      const fechaVencimiento = this.parseFechaLocal(cxp.fecha_vencimiento);
 
       // Calcular días hasta vencimiento
       const diasHastaVencimiento = Math.floor(
@@ -1755,5 +1761,19 @@ export class CxpService {
         total_proveedores_con_deuda: proveedoresMap.size,
       },
     };
+  }
+
+  /**
+   * Interpreta una fecha sin hora en la zona local. Postgres devuelve YYYY-MM-DD
+   * y el constructor de Date lo trata como UTC, lo que en zonas negativas mueve
+   * la fecha al dia anterior.
+   */
+  private parseFechaLocal(valor: string | Date): Date {
+    if (valor instanceof Date) return valor;
+
+    const partes = /^(d{4})-(d{2})-(d{2})/.exec(String(valor ?? ''));
+    if (!partes) return new Date(valor);
+
+    return new Date(Number(partes[1]), Number(partes[2]) - 1, Number(partes[3]));
   }
 }
