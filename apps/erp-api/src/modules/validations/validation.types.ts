@@ -2,6 +2,10 @@ export interface CertificateValidationResult {
   isValid: boolean;
   expiresAt?: Date;
   daysUntilExpiration?: number;
+  /** true solo si el certificado pertenece al RUC con el que se emite. */
+  rucMatches?: boolean;
+  /** RUCs hallados en el titular, para poder decir cual trajo el cliente. */
+  rucsEnCertificado?: string[];
   errors: string[];
   warnings: string[];
 }

@@ -226,6 +226,11 @@ export class ConfigurationService {
           exists: certificateValidation.errors.length === 0 || !certificateValidation.errors.some(e => e.includes('No se ha cargado')),
           isValid: certificateValidation.isValid,
           expiresAt: certificateValidation.expiresAt,
+          rucMatches: certificateValidation.rucMatches,
+          rucsEnCertificado: certificateValidation.rucsEnCertificado,
+          motivoTitularidad: certificateValidation.rucMatches === false
+            ? certificateValidation.errors.find((e) => e.includes('certificado'))
+            : undefined,
         },
         ruc: {
           isConfigured: rucValidation.isValid,

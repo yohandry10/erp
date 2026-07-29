@@ -27,6 +27,10 @@ interface ConfigurationStatus {
     isValid: boolean
     expiresAt?: string
     daysUntilExpiration?: number
+    /** true solo si el certificado pertenece al RUC con el que se emite. */
+    rucMatches?: boolean
+    rucsEnCertificado?: string[]
+    motivoTitularidad?: string
   }
   ruc?: {
     isConfigured: boolean
@@ -206,13 +210,27 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
     return {
       complete: status?.isComplete === true,
       ruc: status?.ruc?.isConfigured === true && !!empresa?.ruc,
-      certificate: status?.certificate?.exists === true && status?.certificate?.isValid === true,
+      certificate:
+        status?.certificate?.exists === true &&
+        status?.certificate?.isValid === true &&
+        status?.certificate?.rucMatches === true,
       ose: ose?.verificacion?.valid === true && ose?.configuracion?.certificateExists === true,
       fiscal: !!empresa?.regimen && empresa?.emisionCpeModo !== '',
       sales: !!empresa?.serieFactura && !!empresa?.serieBoleta,
       logistics: !logisticsEnabled || !!empresa?.serieGuiaRemision,
     }
   }, [data])
+
+  const certificado = data?.status?.certificate
+  const certificadoAjeno = certificado?.exists === true && certificado?.rucMatches === false
+  const estadoCertificado = certificadoAjeno
+    ? { titulo: 'No corresponde', detalle: certificado?.motivoTitularidad }
+    : checks.certificate
+      ? { titulo: 'Válido', detalle: null as string | null }
+      : {
+          titulo: 'Pendiente',
+          detalle: 'Súbelo emitido a nombre del RUC con el que vas a facturar.',
+        }
 
   const operationalChecks = [
     checks.ruc,
@@ -327,8 +345,13 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             <ShieldCheck className="h-6 w-6" />
           </div>
           <div className="stat-content">
-            <h3>{checks.certificate ? 'Válido' : 'Pendiente'}</h3>
+            <h3>{estadoCertificado.titulo}</h3>
             <p>Certificado digital</p>
+            {estadoCertificado.detalle && (
+              <p className="mt-2 text-xs leading-snug text-muted-foreground">
+                {estadoCertificado.detalle}
+              </p>
+            )}
           </div>
         </div>
         <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
@@ -359,6 +382,17 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             <FieldRow label="Certificado existe" value={status?.certificate?.exists} ok={status?.certificate?.exists === true} />
             <FieldRow label="Certificado válido" value={status?.certificate?.isValid} ok={status?.certificate?.isValid === true} />
             <FieldRow label="Vencimiento" value={status?.certificate?.expiresAt ? new Date(status.certificate.expiresAt).toLocaleDateString('es-PE') : null} ok={status?.certificate?.isValid === true} />
+            <FieldRow
+              label="Emitido al RUC que factura"
+              value={certificado?.rucsEnCertificado?.length ? certificado.rucsEnCertificado.join(', ') : null}
+              ok={certificado?.rucMatches === true}
+            />
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+              SUNAT firma cada comprobante con tu certificado y rechaza los que no
+              pertenecen al RUC que emite. Por eso lo verificamos aquí y no al
+              facturar: si no coincide, tu proveedor de firma digital debe emitirlo a
+              nombre de la empresa, no del representante.
+            </p>
             <FieldRow label="OSE/SUNAT válido" value={ose?.verificacion?.valid} ok={ose?.verificacion?.valid === true} />
             <FieldRow label="Certificado OSE resuelto" value={ose?.configuracion?.certificateExists} ok={ose?.configuracion?.certificateExists === true} />
             <FieldRow label="Ambiente" value={ose?.configuracion?.environment} />
