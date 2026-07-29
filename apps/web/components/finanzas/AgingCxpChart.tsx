@@ -208,26 +208,26 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-8">
-        <div className="p-4 rounded-lg text-white">
-          <div className="text-xs font-semibold opacity-[0.9]">
+        <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
+          <div className="text-xs font-semibold text-muted-foreground">
             Total Vencido
           </div>
-          <div className="text-[1.75rem] font-bold mt-2">
+          <div className="text-[1.75rem] font-bold mt-2 text-foreground">
             {formatCurrency(resumen.total.monto)}
           </div>
-          <div className="text-[0.875rem] mt-1 opacity-[0.9]">
+          <div className="text-[0.875rem] mt-1 text-muted-foreground">
             {resumen.total.cantidad} cuenta{resumen.total.cantidad !== 1 ? 's' : ''}
           </div>
         </div>
 
-        <div className="p-4 rounded-lg bg-destructive/10 border">
-          <div className="text-xs font-semibold text-destructive">
+        <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
+          <div className="text-xs font-semibold text-muted-foreground">
             Más Crítico (+90 días)
           </div>
-          <div className="text-2xl font-bold mt-2 text-destructive">
+          <div className="text-[1.75rem] font-bold mt-2 text-rose-400">
             {formatCurrency(resumen.rango_mas_90.monto)}
           </div>
-          <div className="text-[0.875rem] mt-1 text-destructive">
+          <div className="text-[0.875rem] mt-1 text-muted-foreground">
             {resumen.rango_mas_90.cantidad} cuenta{resumen.rango_mas_90.cantidad !== 1 ? 's' : ''}
           </div>
         </div>
