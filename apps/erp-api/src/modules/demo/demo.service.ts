@@ -195,6 +195,7 @@ export class DemoService {
       this.seedProductosDemo(tenantId),
       this.seedClientesDemo(tenantId),
       this.seedProveedoresDemo(tenantId),
+      this.seedCuentaBancariaDemo(tenantId),
       this.seedSegundoUserAprobador(tenantId, primerUserId).then((r) => {
         aprobadorResult = r;
       }),
@@ -730,6 +731,29 @@ export class DemoService {
     if (error) throw new Error(`clientes insert: ${error.message}`);
   }
 
+  /**
+   * Sin una cuenta bancaria no hay tesoreria ni conciliacion posibles: la
+   * pantalla de pagos no tiene donde cargar el egreso y la conciliacion no
+   * tiene contra que cuadrar. Se siembra una en soles.
+   */
+  private async seedCuentaBancariaDemo(tenantId: string): Promise<void> {
+    const { error } = await this.adminClient.from("cuentas_bancarias").insert({
+      tenant_id: tenantId,
+      nombre: "BCP Cuenta Corriente Soles",
+      codigo: "BCP-CTE-PEN",
+      banco: "BCP",
+      numero_cuenta: "194-1234567-0-56",
+      tipo_cuenta: "CORRIENTE",
+      moneda: "PEN",
+      saldo: 0,
+      saldo_actual: 0,
+      saldo_contable: 0,
+      permite_sobregiro: false,
+      activa: true,
+      activo: true,
+    });
+    if (error) throw new Error(`cuentas_bancarias insert: ${error.message}`);
+  }
   /**
    * Sin proveedores no se puede crear una orden de compra, asi que el circuito
    * Compras -> Inventario -> CxP quedaba inalcanzable en el demo. Los RUC llevan
