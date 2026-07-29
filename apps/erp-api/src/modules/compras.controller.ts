@@ -806,7 +806,9 @@ export class ComprasController {
       // USAR LAS COLUMNAS EXACTAS DE LA TABLA productos
       const { data, error } = await supabase
         .from('productos')
-        .select('id, codigo, nombre, precio, stock_actual, categoria, activo')
+        // La afectacion decide si la compra genera IGV: sin ella la orden lo
+        // aplicaba plano y se tomaba credito fiscal sobre productos exonerados.
+        .select('id, codigo, nombre, precio, stock_actual, categoria, activo, afectacion_igv')
         .eq('tenant_id', tenantId)
         .eq('activo', true)
         .order('nombre', { ascending: true });

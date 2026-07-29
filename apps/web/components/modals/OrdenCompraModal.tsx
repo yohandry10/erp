@@ -19,6 +19,8 @@ interface OrdenItem {
   cantidad: number
   precio_unitario: number
   subtotal: number
+  /** Catalogo 07 SUNAT: 10 gravado, 20 exonerado, 30 inafecto, 40 exportacion. */
+  afectacion_igv?: string
   esNuevoProducto?: boolean
 }
 
@@ -150,7 +152,14 @@ export default function OrdenCompraModal({
       const itemSubtotal = Number(item.subtotal) || 0
       return sum + itemSubtotal
     }, 0)
-    const igv = subtotal * tasaIgv
+    // Comprar un producto exonerado no genera IGV. Aplicar la tasa sobre todo
+    // el subtotal inflaba la deuda con el proveedor y, peor, se tomaba credito
+    // fiscal de un impuesto inexistente en el Registro de Compras.
+    const baseGravada = items.reduce((sum, item) => {
+      const afectacion = String(item.afectacion_igv ?? '10').trim()
+      return afectacion === '10' ? sum + (Number(item.subtotal) || 0) : sum
+    }, 0)
+    const igv = baseGravada * tasaIgv
     const total = subtotal + igv
 
     setTotales({ subtotal, igv, total })
@@ -208,6 +217,7 @@ export default function OrdenCompraModal({
       if (producto) {
         newItems[index].producto_nombre = producto.nombre
         newItems[index].precio_unitario = Number(producto.precio) || 0
+        newItems[index].afectacion_igv = producto.afectacion_igv ?? '10'
       }
     }
 
