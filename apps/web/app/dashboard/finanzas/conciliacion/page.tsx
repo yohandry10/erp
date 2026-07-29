@@ -449,7 +449,9 @@ function NewConciliacionForm({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
-  const { post } = useApi();
+  // Sin throwOnError el hook devuelve null en caso de error y el motivo real
+  // del backend -por ejemplo el formato del periodo- nunca llega al usuario.
+  const { post } = useApi({ throwOnError: true, showErrorToast: false });
   const [formData, setFormData] = useState({
     cuenta_bancaria_id: "",
     periodo: "",
@@ -485,7 +487,10 @@ function NewConciliacionForm({
       }
     } catch (error) {
       console.error("Error creating conciliacion:", error);
-      alert("Error: No se pudo crear la conciliación");
+      alert(
+        "Error: " +
+          (error instanceof Error ? error.message : "No se pudo crear la conciliación"),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -517,12 +522,12 @@ function NewConciliacionForm({
           <Label htmlFor="nueva-conciliacion-periodo">Período *</Label>
           <Input
             id="nueva-conciliacion-periodo"
-            type="text"
+            type="month"
             value={formData.periodo}
             onChange={(e) =>
               setFormData({ ...formData, periodo: e.target.value })
             }
-            placeholder="Ej: Enero 2024"
+            placeholder="AAAA-MM"
             required
           />
         </div>
