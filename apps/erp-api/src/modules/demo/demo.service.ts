@@ -194,6 +194,7 @@ export class DemoService {
       this.seedCertificadoDemo(tenantId),
       this.seedProductosDemo(tenantId),
       this.seedClientesDemo(tenantId),
+      this.seedProveedoresDemo(tenantId),
       this.seedSegundoUserAprobador(tenantId, primerUserId).then((r) => {
         aprobadorResult = r;
       }),
@@ -727,6 +728,56 @@ export class DemoService {
     });
     const { error } = await this.adminClient.from("clientes").insert(rows);
     if (error) throw new Error(`clientes insert: ${error.message}`);
+  }
+
+  /**
+   * Sin proveedores no se puede crear una orden de compra, asi que el circuito
+   * Compras -> Inventario -> CxP quedaba inalcanzable en el demo. Los RUC llevan
+   * digito verificador correcto porque el alta los valida por modulo 11.
+   */
+  private async seedProveedoresDemo(tenantId: string): Promise<void> {
+    const proveedores = [
+      {
+        ruc: "20512345671",
+        razon_social: "DISTRIBUIDORA ANDINA S.A.C.",
+        contacto: "Ventas Corporativas",
+        email: "ventas@distribuidoraandina.demo",
+        telefono: "013456789",
+        direccion: "Av. Argentina 1234, Callao",
+        dias_credito: 30,
+      },
+      {
+        ruc: "20487654320",
+        razon_social: "IMPORTACIONES DEL SUR E.I.R.L.",
+        contacto: "Mesa de Pedidos",
+        email: "pedidos@impsur.demo",
+        telefono: "014567890",
+        direccion: "Jr. Cusco 456, Lima",
+        dias_credito: 15,
+      },
+    ];
+
+    const rows = proveedores.map((prov) => ({
+      tenant_id: tenantId,
+      razon_social: prov.razon_social,
+      nombre: prov.razon_social,
+      codigo: prov.ruc,
+      ruc: prov.ruc,
+      tipo_documento: "RUC",
+      documento_tipo: "RUC",
+      documento_numero: prov.ruc,
+      numero_documento: prov.ruc,
+      contacto: prov.contacto,
+      email: prov.email,
+      telefono: prov.telefono,
+      direccion: prov.direccion,
+      dias_credito: prov.dias_credito,
+      condiciones_pago: "CREDITO",
+      activo: true,
+    }));
+
+    const { error } = await this.adminClient.from("proveedores").insert(rows);
+    if (error) throw new Error(`proveedores insert: ${error.message}`);
   }
 
   async getDemoStatus(tenantId: string) {
