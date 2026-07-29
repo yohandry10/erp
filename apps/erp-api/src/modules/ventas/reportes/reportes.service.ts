@@ -478,7 +478,7 @@ export class ReportesService {
     const cotizacionesQuery = aplicarFiltroFechas(
       client
         .from('cotizaciones')
-        .select('id,total,estado,fecha', { count: 'exact' })
+        .select('id,total,estado,fecha,pedido_id', { count: 'exact' })
         .eq('tenant_id', tenantId),
       'fecha',
     );
@@ -531,19 +531,32 @@ export class ReportesService {
       },
     };
 
+    // Regla de embudo: cada etapa se mide sobre la que la precede, no sobre
+    // poblaciones distintas. Antes se dividian todas las facturas emitidas entre
+    // los pedidos del periodo, y como el POS emite boletas que nunca nacieron de
+    // un pedido el ratio superaba el 100% (21 facturas / 1 pedido = 2100%).
+    const ESTADOS_PEDIDO_FACTURADO = ['FACTURADO', 'COMPLETADO', 'COMPLETADO_CON_GRE'];
+    const cotizacionesPeriodo = cotizaciones || [];
+    const pedidosPeriodo = pedidos || [];
+
+    const idsPedidosFacturados = new Set(
+      pedidosPeriodo
+        .filter((pedido: any) =>
+          ESTADOS_PEDIDO_FACTURADO.includes(String(pedido?.estado ?? '').toUpperCase()),
+        )
+        .map((pedido: any) => pedido.id),
+    );
+    const cotizacionesConvertidas = cotizacionesPeriodo.filter((cot: any) => cot?.pedido_id);
+    const cotizacionesFacturadas = cotizacionesConvertidas.filter((cot: any) =>
+      idsPedidosFacturados.has(cot.pedido_id),
+    );
+
+    const ratio = (parte: number, base: number) => (base > 0 ? this.round2((parte / base) * 100) : 0);
+
     const conversiones = {
-      cotizaciones_a_pedidos:
-        pipeline.cotizaciones.cantidad > 0
-          ? this.round2((pipeline.pedidos.cantidad / pipeline.cotizaciones.cantidad) * 100)
-          : 0,
-      pedidos_a_facturas:
-        pipeline.pedidos.cantidad > 0
-          ? this.round2((pipeline.facturas.cantidad / pipeline.pedidos.cantidad) * 100)
-          : 0,
-      total:
-        pipeline.cotizaciones.cantidad > 0
-          ? this.round2((pipeline.facturas.cantidad / pipeline.cotizaciones.cantidad) * 100)
-          : 0,
+      cotizaciones_a_pedidos: ratio(cotizacionesConvertidas.length, cotizacionesPeriodo.length),
+      pedidos_a_facturas: ratio(idsPedidosFacturados.size, pedidosPeriodo.length),
+      total: ratio(cotizacionesFacturadas.length, cotizacionesPeriodo.length),
     };
 
     const tendencia = this.agruparPorPeriodo({
