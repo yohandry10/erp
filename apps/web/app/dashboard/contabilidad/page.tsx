@@ -117,6 +117,16 @@ export default function ContabilidadPage() {
     ? balanceComprobacion.length
     : Number(balanceComprobacion?.totalCuentas) || 0
   const [kardexValorizado, setKardexValorizado] = useState<any>(null)
+  // El endpoint responde con el array de movimientos, no con un resumen: los
+  // contadores se derivan de el en vez de leer campos que no existen.
+  const movimientosKardex = Array.isArray(kardexValorizado) ? kardexValorizado : []
+  const productosValorizados = new Set(
+    movimientosKardex.map((mov: any) => mov?.producto_id ?? mov?.producto_codigo),
+  ).size
+  const valorTotalKardex = movimientosKardex.reduce(
+    (suma: number, mov: any) => suma + (Number(mov?.valor_total) || 0),
+    0,
+  )
   const [libroCajaBancos, setLibroCajaBancos] = useState<any>(null)
   const [registroActivosFijos, setRegistroActivosFijos] = useState<any>(null)
   const [libroPlanillas, setLibroPlanillas] = useState<any>(null)
@@ -348,8 +358,8 @@ export default function ContabilidadPage() {
     if (vistaActual === 'kardex-valorizado') {
       return renderPanel('Kardex Valorizado', 'Control valorizado de inventarios con método de valuación operativo.', [
         { label: 'Método', value: kardexValorizado?.metodoValuacion || 'PROMEDIO' },
-        { label: 'Total productos', value: kardexValorizado?.totalProductos || 0 },
-        { label: 'Valor total', value: formatearMoneda(kardexValorizado?.valorTotal || 0) },
+        { label: 'Total productos', value: productosValorizados },
+        { label: 'Valor total', value: formatearMoneda(valorTotalKardex) },
       ])
     }
 
@@ -408,7 +418,7 @@ export default function ContabilidadPage() {
   const connectedMetrics = [
     ['Compras', registroCompras?.total || 0],
     ['Cuentas en balance', totalCuentasBalance],
-    ['Productos valorizados', kardexValorizado?.totalProductos || 0],
+    ['Productos valorizados', productosValorizados],
     ['Movimientos caja/bancos', libroCajaBancos?.totalMovimientos || 0],
   ]
 
