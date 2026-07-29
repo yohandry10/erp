@@ -96,7 +96,7 @@ export default function SunatMetricsReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>KPIs SUNAT</CardTitle>
-          <CardDescription>Evaluando respuestas de emisión electrónica…</CardDescription>
+          <CardDescription className="text-xs leading-snug">Evaluando respuestas de emisión electrónica…</CardDescription>
         </CardHeader>
         <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-foreground/80">
           <Loader2 className="h-8 w-8 animate-spin" />
@@ -111,7 +111,7 @@ export default function SunatMetricsReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>KPIs SUNAT</CardTitle>
-          <CardDescription>No se encontraron documentos en el periodo revisado</CardDescription>
+          <CardDescription className="text-xs leading-snug">No se encontraron documentos en el periodo revisado</CardDescription>
         </CardHeader>
         <CardContent className="py-12 text-center text-muted-foreground">
           Ajusta los filtros para analizar la aceptación de comprobantes electrónicos.
@@ -122,14 +122,14 @@ export default function SunatMetricsReport({ filters }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <Check className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <Check className="h-4 w-4 shrink-0" />
               Documentos aceptados
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs leading-snug">
               Total de comprobantes conformes en el periodo
             </CardDescription>
           </CardHeader>
@@ -140,12 +140,12 @@ export default function SunatMetricsReport({ filters }: Props) {
         </Card>
 
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <FileWarning className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <FileWarning className="h-4 w-4 shrink-0" />
               Tasa de observación
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs leading-snug">
               Documentos observados respecto al total emitido
             </CardDescription>
           </CardHeader>
@@ -156,12 +156,12 @@ export default function SunatMetricsReport({ filters }: Props) {
         </Card>
 
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
               Tasa de rechazo
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs leading-snug">
               Documentos rechazados por SUNAT / OSE
             </CardDescription>
           </CardHeader>
@@ -172,9 +172,9 @@ export default function SunatMetricsReport({ filters }: Props) {
         </Card>
 
         <Card className="flex h-full flex-col">
-          <CardHeader>
-            <CardTitle className="text-base font-medium text-foreground/85">Pendientes</CardTitle>
-            <CardDescription>Documentos aún no aceptados ni rechazados</CardDescription>
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pendientes</CardTitle>
+            <CardDescription className="text-xs leading-snug">Documentos aún no aceptados ni rechazados</CardDescription>
           </CardHeader>
           <CardContent className="mt-auto">
             <p className="text-4xl font-semibold text-foreground">{data.pendientes}</p>
@@ -188,7 +188,7 @@ export default function SunatMetricsReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Incidencias recientes</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs leading-snug">
             Detalle de documentos observados o rechazados para priorizar correcciones
           </CardDescription>
         </CardHeader>
@@ -228,7 +228,7 @@ export default function SunatMetricsReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Tendencia mensual</CardTitle>
-          <CardDescription>Resumen mensual de estados de emisión electrónica</CardDescription>
+          <CardDescription className="text-xs leading-snug">Resumen mensual de estados de emisión electrónica</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border text-sm">

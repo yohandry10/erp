@@ -99,7 +99,7 @@ export default function AgingCxcReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Aging de cuentas por cobrar</CardTitle>
-          <CardDescription>Calculando exposición por rangos de vencimiento…</CardDescription>
+          <CardDescription className="text-xs leading-snug">Calculando exposición por rangos de vencimiento…</CardDescription>
         </CardHeader>
         <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-foreground/80">
           <Loader2 className="h-8 w-8 animate-spin" />
@@ -114,7 +114,7 @@ export default function AgingCxcReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Aging de cuentas por cobrar</CardTitle>
-          <CardDescription>No se encontraron registros de cuentas por cobrar</CardDescription>
+          <CardDescription className="text-xs leading-snug">No se encontraron registros de cuentas por cobrar</CardDescription>
         </CardHeader>
         <CardContent className="py-12 text-center text-muted-foreground">
           Ajusta los filtros o verifica que existan facturas pendientes en el periodo.
@@ -127,14 +127,14 @@ export default function AgingCxcReport({ filters }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <PiggyBank className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <PiggyBank className="h-4 w-4 shrink-0" />
               Saldo pendiente total
             </CardTitle>
-            <CardDescription className="text-muted-foreground">
+            <CardDescription className="text-xs leading-snug">
               Cartera total de cuentas por cobrar analizada
             </CardDescription>
           </CardHeader>
@@ -147,12 +147,12 @@ export default function AgingCxcReport({ filters }: Props) {
         </Card>
 
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
               Monto vencido
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs leading-snug">
               Suma de cuentas que excedieron la fecha de vencimiento
             </CardDescription>
           </CardHeader>
@@ -165,12 +165,12 @@ export default function AgingCxcReport({ filters }: Props) {
         </Card>
 
         <Card className="flex h-full flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-start gap-2">
-              <TrendingDown className="h-5 w-5 shrink-0" />
+          <CardHeader className="pb-2 space-y-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
+              <TrendingDown className="h-4 w-4 shrink-0" />
               Riesgo concentrado
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs leading-snug">
               Principales buckets con exposición relevante
             </CardDescription>
           </CardHeader>
@@ -198,7 +198,7 @@ export default function AgingCxcReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Distribución por buckets</CardTitle>
-          <CardDescription>Saldo pendiente agrupado por días de mora</CardDescription>
+          <CardDescription className="text-xs leading-snug">Saldo pendiente agrupado por días de mora</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border text-sm">
@@ -232,7 +232,7 @@ export default function AgingCxcReport({ filters }: Props) {
         <Card>
           <CardHeader>
             <CardTitle>Clientes con mayor exposición</CardTitle>
-            <CardDescription>Ranking de clientes según saldo pendiente</CardDescription>
+            <CardDescription className="text-xs leading-snug">Ranking de clientes según saldo pendiente</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border text-sm">
@@ -271,7 +271,7 @@ export default function AgingCxcReport({ filters }: Props) {
         <Card>
           <CardHeader>
             <CardTitle>Cuentas críticas</CardTitle>
-            <CardDescription>Documentos con mayor monto y días de mora</CardDescription>
+            <CardDescription className="text-xs leading-snug">Documentos con mayor monto y días de mora</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border text-sm">
