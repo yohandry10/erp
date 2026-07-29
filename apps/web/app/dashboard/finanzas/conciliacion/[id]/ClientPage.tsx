@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import MatchManualModal from '@/components/finanzas/MatchManualModal';
 import { ImportarExtractoCSV, ConciliacionTable, ConciliacionWizard, ConciliacionGuide } from '@/components/finanzas';
@@ -158,6 +159,49 @@ export default function ConciliacionDetailPage() {
   const handleMatchSuccess = () => {
     // Reload data after successful match
     loadConciliacion();
+  };
+
+  const [matchEnCurso, setMatchEnCurso] = useState(false);
+
+  const handleMatchAutomatico = async () => {
+    try {
+      setMatchEnCurso(true);
+      const response = await fetchApi(
+        `/api/finanzas/conciliacion/${conciliacionId}/match-automatico`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tolerancia_dias: 2 }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Error al ejecutar el match automático');
+      }
+
+      const cuerpo = await response.json().catch(() => ({}));
+      const datos = cuerpo?.data ?? cuerpo;
+      const conciliados = Number(datos?.movimientos_conciliados ?? datos?.conciliados ?? 0);
+
+      toast({
+        title: conciliados > 0 ? 'Conciliación automática completada' : 'Sin coincidencias',
+        description:
+          conciliados > 0
+            ? `Se conciliaron ${conciliados} movimiento${conciliados === 1 ? "" : "s"}.`
+            : 'Ningún movimiento del extracto coincide con los del sistema. Revísalos manualmente.',
+      });
+
+      loadConciliacion();
+    } catch (error) {
+      toast({
+        title: 'No se pudo conciliar',
+        description: error instanceof Error ? error.message : 'Error al ejecutar el match automático',
+        variant: 'destructive',
+      });
+    } finally {
+      setMatchEnCurso(false);
+    }
   };
 
   const handleImportSuccess = () => {
@@ -383,8 +427,12 @@ export default function ConciliacionDetailPage() {
             >
               Importar Extracto CSV
             </Button>
-            <Button variant="outline" disabled={conciliacion.estado === 'CERRADA'}>
-              Match Automático
+            <Button
+              onClick={handleMatchAutomatico}
+              disabled={conciliacion.estado === 'CERRADA' || matchEnCurso}
+              variant="outline"
+            >
+              {matchEnCurso ? 'Conciliando…' : 'Match Automático'}
             </Button>
             <Button
               onClick={() => setShowMatchModal(true)}
