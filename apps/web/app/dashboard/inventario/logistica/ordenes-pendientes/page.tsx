@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { useEmpresaConfig } from '@/hooks/use-empresa-config'
@@ -58,7 +59,7 @@ export default function OrdenesPendientesPage() {
 
   const formatFecha = (fecha: string) => {
     try {
-      return format(new Date(fecha), 'dd/MM/yyyy', { locale: es })
+      return format(parseDateLocal(fecha), 'dd/MM/yyyy', { locale: es })
     } catch {
       return fecha
     }

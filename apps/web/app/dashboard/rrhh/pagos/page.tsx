@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { parseDateLocal } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { fetchApi } from '@/lib/api-fetch';
@@ -315,7 +316,7 @@ const PagosPage = () => {
                   <td className="text-right">S/ {(pago.monto_bruto || 0).toLocaleString()}</td>
                   <td className="text-right text-destructive">S/ {(pago.total_descuentos || 0).toLocaleString()}</td>
                   <td className="text-right font-bold text-emerald-400">S/ {(pago.monto_neto || 0).toLocaleString()}</td>
-                  <td>{pago.fecha_pago ? new Date(pago.fecha_pago).toLocaleDateString('es-PE') : '-'}</td>
+                  <td>{pago.fecha_pago ? parseDateLocal(pago.fecha_pago).toLocaleDateString('es-PE') : '-'}</td>
                   <td>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoColor(pago.estado)}`}>
                       {pago.estado?.toUpperCase() || 'PENDIENTE'}

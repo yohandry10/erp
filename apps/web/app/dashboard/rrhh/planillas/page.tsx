@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { parseDateLocal } from '@/lib/date-utils'
 import PlanillaModal from '@/components/modals/PlanillaModal';
 import PlanillaCalcularModal from '@/components/modals/PlanillaCalcularModal';
 import PlanillaPagarModal from '@/components/modals/PlanillaPagarModal';
@@ -338,7 +339,7 @@ const PlanillasPage = () => {
                 <strong>Empleado:</strong> ${data?.empleados?.nombres || 'N/A'} ${data?.empleados?.apellidos || ''}<br>
                 <strong>Documento:</strong> ${data?.empleados?.numero_documento || 'N/A'}<br>
                 <strong>Puesto:</strong> ${data?.empleados?.puesto || 'N/A'}<br>
-                <strong>Fecha de Pago:</strong> ${data?.planillas?.fecha_pago ? new Date(data.planillas.fecha_pago).toLocaleDateString('es-PE') : 'N/A'}
+                <strong>Fecha de Pago:</strong> ${data?.planillas?.fecha_pago ? parseDateLocal(data.planillas.fecha_pago).toLocaleDateString('es-PE') : 'N/A'}
             </div>
 
             <div class="section">

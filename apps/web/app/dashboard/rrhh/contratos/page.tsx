@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { parseDateLocal } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import PromptDialog from '@/components/ui/PromptDialog';
@@ -382,8 +383,8 @@ const ContratosPage = () => {
                       </span>
                     </td>
                     <td className="text-right font-medium">S/ {(contrato.salario || 0).toLocaleString()}</td>
-                    <td>{new Date(contrato.fecha_inicio).toLocaleDateString('es-PE')}</td>
-                    <td>{contrato.fecha_fin ? new Date(contrato.fecha_fin).toLocaleDateString('es-PE') : 'Indefinido'}</td>
+                    <td>{parseDateLocal(contrato.fecha_inicio).toLocaleDateString('es-PE')}</td>
+                    <td>{contrato.fecha_fin ? parseDateLocal(contrato.fecha_fin).toLocaleDateString('es-PE') : 'Indefinido'}</td>
                     <td className={alertaVencimiento}>
                       {diasRestantes !== null ? (
                         diasRestantes < 0 ?
@@ -585,7 +586,7 @@ const ContratosPage = () => {
                       FECHA INICIO
                     </label>
                     <div className="text-[0.875rem] font-medium text-foreground/85">
-                      {new Date(contratoDetail.fecha_inicio).toLocaleDateString('es-PE', {
+                      {parseDateLocal(contratoDetail.fecha_inicio).toLocaleDateString('es-PE', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
@@ -598,7 +599,7 @@ const ContratosPage = () => {
                     </label>
                     <div className="text-[0.875rem] font-medium text-foreground/85">
                       {contratoDetail.fecha_fin ?
-                        new Date(contratoDetail.fecha_fin).toLocaleDateString('es-PE', {
+                        parseDateLocal(contratoDetail.fecha_fin).toLocaleDateString('es-PE', {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric'

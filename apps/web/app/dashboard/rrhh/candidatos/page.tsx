@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { parseDateLocal } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api';
 import { fetchApi } from '@/lib/api-fetch';
 
@@ -324,7 +325,7 @@ const CandidatosPage = () => {
                       {candidato.estado?.toUpperCase() || 'POSTULANTE'}
                     </span>
                   </td>
-                  <td>{new Date(candidato.fecha_postulacion).toLocaleDateString('es-PE')}</td>
+                  <td>{parseDateLocal(candidato.fecha_postulacion).toLocaleDateString('es-PE')}</td>
                   <td>
                     <div className="flex gap-2">
                       <button
