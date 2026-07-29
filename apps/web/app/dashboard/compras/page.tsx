@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter } from 'next/navigation'
 import { Building2, CheckCircle2, FileText, PackageCheck, Plus, RefreshCw, ShoppingCart, Truck, type LucideIcon } from 'lucide-react'
 import OrdenCompraModal from '../../../components/modals/OrdenCompraModal'
@@ -203,7 +204,9 @@ export default function ComprasPage() {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-'
-    const date = new Date(dateString)
+    // new Date('2026-07-29') se interpreta como UTC y en Lima (UTC-5) retrocede
+    // un dia: la orden aparecia fechada el 28.
+    const date = parseDateLocal(dateString)
     return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('es-PE')
   }
 
