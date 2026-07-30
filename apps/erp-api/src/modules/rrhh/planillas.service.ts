@@ -1154,6 +1154,25 @@ export class PlanillasService {
       totalIngresos += sueldoProporcional;
     }
 
+    // Asignación familiar: 10% de la RMV vigente (Ley 25129).
+    //
+    // Este calculo lo usa la planilla creada desde la pantalla, que envia los
+    // importes por empleado. Solo la otra rama aplicaba la asignacion, de modo
+    // que quien tenia hijos cobraba S/ 113 de menos y la base de aportes salia
+    // subdeclarada.
+    const conceptoAsigFam = conceptos.find(c => c.codigo === '002');
+    if (conceptoAsigFam && this.tieneHijos(empleado)) {
+      const asignacionFamiliar = new Decimal(normativa.asignacionFamiliar)
+        .toDecimalPlaces(2)
+        .toNumber();
+      conceptosDetalle.push({
+        id: conceptoAsigFam.id,
+        monto: asignacionFamiliar,
+        observaciones: 'Asignación familiar',
+      });
+      totalIngresos += asignacionFamiliar;
+    }
+
     // Horas extras 25%
     if (horasExtras25 > 0) {
       const conceptoHE25 = conceptos.find(c => c.codigo === '003');
