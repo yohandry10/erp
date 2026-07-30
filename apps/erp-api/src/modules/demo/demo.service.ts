@@ -196,6 +196,7 @@ export class DemoService {
       this.seedClientesDemo(tenantId),
       this.seedProveedoresDemo(tenantId),
       this.seedCuentaBancariaDemo(tenantId),
+      this.seedEmpleadoDemo(tenantId),
       this.seedSegundoUserAprobador(tenantId, primerUserId).then((r) => {
         aprobadorResult = r;
       }),
@@ -759,6 +760,56 @@ export class DemoService {
    * Compras -> Inventario -> CxP quedaba inalcanzable en el demo. Los RUC llevan
    * digito verificador correcto porque el alta los valida por modulo 11.
    */
+  /**
+   * Sin empleados no hay planillas, contratos ni asistencia que probar: RRHH
+   * quedaba tan inalcanzable como lo estaban compras sin proveedores o la
+   * conciliacion sin cuenta bancaria.
+   *
+   * Se siembra con hijos a cargo a proposito, porque asi el demo ejercita la
+   * asignacion familiar, el concepto legal que mas facil pasa inadvertido
+   * cuando no se calcula.
+   */
+  private async seedEmpleadoDemo(tenantId: string): Promise<void> {
+    const { data: empleado, error: empleadoError } = await this.adminClient
+      .from("empleados")
+      .insert({
+        tenant_id: tenantId,
+        nombres: "María Elena",
+        apellidos: "Quispe Huamán",
+        tipo_documento: "DNI",
+        numero_documento: "44556677",
+        email: "mquispe@demo.local",
+        puesto: "Asistente Administrativo",
+        fecha_ingreso: "2024-01-15",
+        estado: "activo",
+        tiene_hijos: true,
+        cantidad_hijos: 1,
+        asignacion_familiar: true,
+        activo: true,
+      })
+      .select("id")
+      .single();
+
+    if (empleadoError)
+      throw new Error(`empleados insert: ${empleadoError.message}`);
+
+    const { error: contratoError } = await this.adminClient
+      .from("contratos")
+      .insert({
+        tenant_id: tenantId,
+        id_empleado: empleado.id,
+        empleado_id: empleado.id,
+        tipo_contrato: "INDEFINIDO",
+        fecha_inicio: "2024-01-15",
+        sueldo_bruto: 2500,
+        regimen_pensionario: "ONP",
+        estado: "VIGENTE",
+      });
+
+    if (contratoError)
+      throw new Error(`contratos insert: ${contratoError.message}`);
+  }
+
   private async seedProveedoresDemo(tenantId: string): Promise<void> {
     const proveedores = [
       {
