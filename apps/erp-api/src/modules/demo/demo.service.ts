@@ -746,9 +746,12 @@ export class DemoService {
       numero_cuenta: "194-1234567-0-56",
       tipo_cuenta: "CORRIENTE",
       moneda: "PEN",
-      saldo: 0,
-      saldo_actual: 0,
-      saldo_contable: 0,
+      // Saldo de apertura: sin fondos el control de sobregiro rechaza -con
+      // razon- cualquier pago a proveedor, y el circuito de tesoreria queda sin
+      // poder demostrarse.
+      saldo: 50000,
+      saldo_actual: 50000,
+      saldo_contable: 50000,
       permite_sobregiro: false,
       activa: true,
       activo: true,
