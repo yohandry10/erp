@@ -86,6 +86,27 @@ export class RrhhService {
     'contacto_emergencia', 'telefono_emergencia', 'foto_url',
   ];
 
+  /**
+   * Deriva el derecho a asignacion familiar de tener hijos.
+   *
+   * La Ley 25129 concede la asignacion a quien tiene hijos menores de 18 -o
+   * hasta 24 si siguen estudios-, de modo que tener hijos ES la condicion del
+   * derecho. El formulario capturaba tiene_hijos pero nadie derivaba
+   * asignacion_familiar, asi que ambos campos quedaban en contradiccion y la
+   * planilla no pagaba los S/ 113 que corresponden.
+   */
+  private derivarAsignacionFamiliar(datos: any) {
+    const tieneHijos =
+      datos?.tiene_hijos === true || Number(datos?.cantidad_hijos ?? 0) > 0;
+
+    if (tieneHijos) {
+      datos.tiene_hijos = true;
+      datos.asignacion_familiar = true;
+    }
+
+    return datos;
+  }
+
   private limpiarEmpleadoData(empleadoData: any) {
     return Object.fromEntries(
       Object.entries(empleadoData || {})
@@ -156,7 +177,7 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const datosLimpios = this.limpiarEmpleadoData(empleadoData);
+    const datosLimpios = this.derivarAsignacionFamiliar(this.limpiarEmpleadoData(empleadoData));
     this.validarEmpleadoData(datosLimpios);
     await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento));
 
@@ -182,7 +203,7 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const datosLimpios = this.limpiarEmpleadoData(empleadoData);
+    const datosLimpios = this.derivarAsignacionFamiliar(this.limpiarEmpleadoData(empleadoData));
     this.validarEmpleadoData(datosLimpios, true);
     if (datosLimpios.numero_documento) {
       await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento), id);
