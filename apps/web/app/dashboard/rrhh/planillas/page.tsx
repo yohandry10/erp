@@ -415,6 +415,12 @@ const PlanillasPage = () => {
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
+      // Las fechas llegan a medianoche UTC; interpretarlas en hora local las
+      // retrasa un dia en Lima, asi que se toma solo la parte de la fecha.
+      const partes = String(dateString).slice(0, 10).split('-').map(Number);
+      if (partes.length === 3 && partes.every((n) => !Number.isNaN(n))) {
+        return new Date(partes[0], partes[1] - 1, partes[2]).toLocaleDateString('es-PE');
+      }
       return new Date(dateString).toLocaleDateString('es-PE');
     } catch (error: any) {
       return 'N/A';
