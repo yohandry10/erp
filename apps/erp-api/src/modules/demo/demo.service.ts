@@ -614,6 +614,19 @@ export class DemoService {
         precio_compra: 10.0,
         stock_actual: 40,
       },
+      {
+        // Las papas frescas figuran en el Apéndice I de la Ley del IGV, así
+        // que estan exoneradas. Sin un producto exonerado el reparto del IGV
+        // por afectación no se puede ejercitar: todo saldría gravado y un
+        // error en ese reparto pasaría inadvertido.
+        codigo: "DEMO-006",
+        nombre: "Papa Blanca 1kg",
+        categoria: "ALIMENTOS",
+        precio_venta: 3.5,
+        precio_compra: 2.2,
+        stock_actual: 200,
+        afectacion_igv: "20",
+      },
     ];
     const rows = productos.map((p) => ({
       tenant_id: tenantId,
@@ -629,7 +642,7 @@ export class DemoService {
       impuesto: 18,
       es_servicio: false,
       controla_stock: true,
-      afectacion_igv: "10",
+      afectacion_igv: (p as { afectacion_igv?: string }).afectacion_igv ?? "10",
       favorito: false,
       imagen_url: "",
     }));
