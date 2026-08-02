@@ -571,7 +571,11 @@ const PlanillasPage = () => {
                         <div>
                           <strong>{planilla?.periodo || 'N/A'}</strong>
                           <div className="text-xs text-[var(--primary-500)]">
-                            {formatDate(planilla?.fecha_inicio)} - {formatDate(planilla?.fecha_fin)}
+                            {/* La tabla planillas no tiene fecha_inicio ni fecha_fin: se
+                                leian campos inexistentes y la fila mostraba "N/A - N/A". */}
+                            {planilla?.fecha_pago
+                              ? `Pago: ${formatDate(planilla.fecha_pago)}`
+                              : 'Pago sin programar'}
                           </div>
                         </div>
                       </td>
