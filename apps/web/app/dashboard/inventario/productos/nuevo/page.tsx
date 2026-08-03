@@ -10,6 +10,11 @@ import {
   etiquetaSinImpuesto,
 } from "@/lib/afectacion-labels";
 
+// Ni las etiquetas ni los campos tenian estilo propio: el navegador los pintaba
+// en linea y el texto de cada label quedaba pegado a su input.
+const camposClass =
+  '[&_label]:mb-1.5 [&_label]:block [&_label]:text-sm [&_label]:font-medium [&_label]:text-foreground/85 [&_input:not([type=checkbox])]:w-full [&_select]:w-full [&_textarea]:w-full [&_input:not([type=checkbox])]:rounded-lg [&_select]:rounded-lg [&_textarea]:rounded-lg [&_input:not([type=checkbox])]:px-3 [&_select]:px-3 [&_textarea]:px-3 [&_input:not([type=checkbox])]:py-2.5 [&_select]:py-2.5 [&_textarea]:py-2.5 [&_input]:text-sm [&_select]:text-sm [&_textarea]:text-sm [&_input:focus-visible]:border-primary [&_select:focus-visible]:border-primary [&_textarea:focus-visible]:border-primary [&_input:focus-visible]:outline-none [&_select:focus-visible]:outline-none [&_textarea:focus-visible]:outline-none';
+
 export default function NuevoProductoPage() {
   const router = useRouter();
   const { get, post } = useApi();
@@ -179,7 +184,7 @@ export default function NuevoProductoPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} noValidate>
+      <form onSubmit={handleSubmit} noValidate className={camposClass}>
         {(submitError || Object.keys(errors).length > 0) && (
           <div
             role="alert"

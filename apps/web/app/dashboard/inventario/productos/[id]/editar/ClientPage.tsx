@@ -10,6 +10,11 @@ import {
   etiquetaSinImpuesto,
 } from "@/lib/afectacion-labels";
 
+// Ni las etiquetas ni los campos tenian estilo propio: el navegador los pintaba
+// en linea y el texto de cada label quedaba pegado a su input.
+const camposClass =
+  '[&_label]:mb-1.5 [&_label]:block [&_label]:text-sm [&_label]:font-medium [&_label]:text-foreground/85 [&_input:not([type=checkbox])]:w-full [&_select]:w-full [&_textarea]:w-full [&_input:not([type=checkbox])]:rounded-lg [&_select]:rounded-lg [&_textarea]:rounded-lg [&_input:not([type=checkbox])]:px-3 [&_select]:px-3 [&_textarea]:px-3 [&_input:not([type=checkbox])]:py-2.5 [&_select]:py-2.5 [&_textarea]:py-2.5 [&_input]:text-sm [&_select]:text-sm [&_textarea]:text-sm [&_input:focus-visible]:border-primary [&_select:focus-visible]:border-primary [&_textarea:focus-visible]:border-primary [&_input:focus-visible]:outline-none [&_select:focus-visible]:outline-none [&_textarea:focus-visible]:outline-none';
+
 export default function EditarProductoPage() {
   const router = useRouter();
   const params = useParams();
@@ -141,7 +146,7 @@ export default function EditarProductoPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className={camposClass}>
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
           <h2 className="m-0 text-lg font-bold text-foreground">Información Básica</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -216,7 +221,7 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="mt-4">
-            <label htmlFor="editar-activo" className="flex items-center gap-2 cursor-pointer">
+            <label htmlFor="editar-activo" className="!mb-0 !flex items-center gap-2 cursor-pointer">
               <input id="editar-activo"
                 type="checkbox"
                 name="activo"
