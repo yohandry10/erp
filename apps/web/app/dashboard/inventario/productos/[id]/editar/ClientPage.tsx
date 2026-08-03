@@ -4,11 +4,18 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useApi } from "@/hooks/use-api";
 import { ArrowLeft, Package, Save } from "lucide-react";
+import { useCountryContext } from "@/hooks/use-country-context";
+import {
+  etiquetaNoGravado,
+  etiquetaSinImpuesto,
+} from "@/lib/afectacion-labels";
 
 export default function EditarProductoPage() {
   const router = useRouter();
   const params = useParams();
   const { get, put } = useApi();
+  const country = useCountryContext();
+  const impuestoNombre = country.paisCodigo === "AR" || country.paisCodigo === "CO" ? "IVA" : "IGV";
   const productoId = params.id as string | undefined;
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -22,6 +29,7 @@ export default function EditarProductoPage() {
     stockMinimo: "",
     codigoBarras: "",
     impuesto: "18",
+    afectacionIgv: "10",
     activo: true,
   });
 
@@ -43,6 +51,7 @@ export default function EditarProductoPage() {
           stockMinimo: p.stock_minimo?.toString() || "",
           codigoBarras: p.codigo_barras || "",
           impuesto: p.impuesto?.toString() || "18",
+          afectacionIgv: String(p.afectacion_igv || "10"),
           activo: p.activo !== false,
         });
       }
@@ -250,7 +259,7 @@ export default function EditarProductoPage() {
               />
             </div>
             <div>
-              <label htmlFor="editar-impuesto">Impuesto (%)</label>
+              <label htmlFor="editar-impuesto">{impuestoNombre} (%)</label>
               <input id="editar-impuesto"
                 type="number"
                 name="impuesto"
@@ -261,6 +270,26 @@ export default function EditarProductoPage() {
                 max="100"
                 placeholder="18"
               />
+            </div>
+            <div>
+              <label htmlFor="editar-afectacion">
+                Afectación {impuestoNombre}
+              </label>
+              <select
+                id="editar-afectacion"
+                name="afectacionIgv"
+                value={formData.afectacionIgv}
+                onChange={handleChange}
+              >
+                <option value="10">Gravado (paga {impuestoNombre})</option>
+                <option value="20">
+                  {etiquetaSinImpuesto(country.paisCodigo)} (sin {impuestoNombre})
+                </option>
+                <option value="30">
+                  {etiquetaNoGravado(country.paisCodigo)} (sin {impuestoNombre})
+                </option>
+                <option value="40">Exportación</option>
+              </select>
             </div>
           </div>
         </div>

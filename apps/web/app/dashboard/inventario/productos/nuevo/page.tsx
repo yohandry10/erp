@@ -1,13 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/use-api";
 import { ArrowLeft, Package, Save } from "lucide-react";
+import { useCountryContext } from "@/hooks/use-country-context";
+import {
+  etiquetaNoGravado,
+  etiquetaSinImpuesto,
+} from "@/lib/afectacion-labels";
 
 export default function NuevoProductoPage() {
   const router = useRouter();
-  const { post } = useApi();
+  const { get, post } = useApi();
+  const country = useCountryContext();
+  const impuestoNombre = country.paisCodigo === "AR" || country.paisCodigo === "CO" ? "IVA" : "IGV";
+  // El backend exige almacen_id para abrir el stock fisico. El formulario
+  // nunca lo pedia, asi que toda alta con stock inicial fallaba.
+  const [almacenes, setAlmacenes] = useState<
+    Array<{ id: string; nombre: string; codigo?: string }>
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -22,7 +34,32 @@ export default function NuevoProductoPage() {
     stockMinimo: "",
     codigoBarras: "",
     impuesto: "18",
+    afectacionIgv: "10",
+    almacenId: "",
   });
+
+  useEffect(() => {
+    let vigente = true;
+    (async () => {
+      try {
+        const response = await get("/inventario/almacenes");
+        if (!vigente || !response?.success || !Array.isArray(response.data)) return;
+        setAlmacenes(response.data);
+        // Con un solo almacen no tiene sentido hacer elegir: se preselecciona.
+        if (response.data.length > 0) {
+          setFormData((prev) =>
+            prev.almacenId ? prev : { ...prev, almacenId: response.data[0].id },
+          );
+        }
+      } catch {
+        if (vigente) setAlmacenes([]);
+      }
+    })();
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const validateForm = () => {
     const nextErrors: Record<string, string> = {};
@@ -56,6 +93,9 @@ export default function NuevoProductoPage() {
     if (Number.isNaN(impuesto) || impuesto < 0 || impuesto > 100) {
       nextErrors.impuesto = "El impuesto debe estar entre 0 y 100";
     }
+    if (stock > 0 && !formData.almacenId) {
+      nextErrors.almacenId = "Elige el almacén donde entra el stock inicial";
+    }
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -71,7 +111,10 @@ export default function NuevoProductoPage() {
 
     setIsLoading(true);
     try {
-      const response = await post("/inventario/productos", formData);
+      const response = await post("/inventario/productos", {
+        ...formData,
+        almacen_id: formData.almacenId || null,
+      });
 
       if (response?.success) {
         alert("✅ Producto creado exitosamente");
@@ -309,7 +352,7 @@ export default function NuevoProductoPage() {
               )}
             </div>
             <div>
-              <label htmlFor="nuevo-impuesto">Impuesto (%)</label>
+              <label htmlFor="nuevo-impuesto">{impuestoNombre} (%)</label>
               <input id="nuevo-impuesto"
                 type="number"
                 name="impuesto"
@@ -333,12 +376,70 @@ export default function NuevoProductoPage() {
                 </p>
               )}
             </div>
+            <div>
+              <label htmlFor="nuevo-afectacion">
+                Afectación {impuestoNombre}
+              </label>
+              <select
+                id="nuevo-afectacion"
+                name="afectacionIgv"
+                value={formData.afectacionIgv}
+                onChange={handleChange}
+              >
+                <option value="10">Gravado (paga {impuestoNombre})</option>
+                <option value="20">
+                  {etiquetaSinImpuesto(country.paisCodigo)} (sin {impuestoNombre})
+                </option>
+                <option value="30">
+                  {etiquetaNoGravado(country.paisCodigo)} (sin {impuestoNombre})
+                </option>
+                <option value="40">Exportación</option>
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Decide si el producto paga {impuestoNombre} y en qué casilla se
+                declara.
+                {country.paisCodigo === "PE" &&
+                  " Los alimentos del Apéndice I de la Ley del IGV (papa, arroz, leche fresca) van como exonerados."}
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
           <h2 className="m-0 text-lg font-bold text-foreground">Inventario</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="nuevo-almacen">Almacén</label>
+              <select
+                id="nuevo-almacen"
+                name="almacenId"
+                value={formData.almacenId}
+                onChange={handleChange}
+                aria-invalid={Boolean(errors.almacenId)}
+                aria-describedby={
+                  errors.almacenId ? "producto-almacen-error" : undefined
+                }
+              >
+                <option value="">Sin stock inicial</option>
+                {almacenes.map((almacen) => (
+                  <option key={almacen.id} value={almacen.id}>
+                    {almacen.codigo ? `${almacen.codigo} · ` : ""}
+                    {almacen.nombre}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Dónde entra el stock inicial. El kardex necesita saberlo.
+              </p>
+              {errors.almacenId && (
+                <p
+                  id="producto-almacen-error"
+                  className="text-red-500 text-xs mt-1"
+                >
+                  {errors.almacenId}
+                </p>
+              )}
+            </div>
             <div>
               <label htmlFor="nuevo-stock">Stock Inicial</label>
               <input id="nuevo-stock"
