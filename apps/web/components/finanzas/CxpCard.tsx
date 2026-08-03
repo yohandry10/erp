@@ -1,6 +1,7 @@
 'use client'
 
 import { Clock, CheckCircle, XCircle, AlertCircle, Eye, DollarSign } from 'lucide-react'
+import { getDaysUntilDue, getVencimientoText, parseDateLocal } from '@/lib/date-utils'
 
 interface CxpCardProps {
   cuenta: {
@@ -76,19 +77,11 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
     })
-  }
-
-  const getDaysUntilDue = (vencimiento: string) => {
-    const today = new Date()
-    const dueDate = new Date(vencimiento)
-    const diffTime = dueDate.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
   }
 
   const daysUntilDue = getDaysUntilDue(cuenta.fecha_vencimiento)
@@ -173,10 +166,7 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
       {(isOverdue || isDueSoon) && cuenta.estado !== 'PAGADA' && cuenta.estado !== 'ANULADA' && (
         <div className="p-2 rounded-[6px] text-xs font-semibold mb-3 flex items-center gap-2">
           <AlertCircle size={14} />
-          {isOverdue 
-            ? `Vencido hace ${Math.abs(daysUntilDue)} días`
-            : `Vence en ${daysUntilDue} días`
-          }
+          {getVencimientoText(cuenta.fecha_vencimiento)}
         </div>
       )}
 

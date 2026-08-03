@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, BarChart3, CheckCircle, Clock, DollarSign, Download, Eye, FileText, List, Plus, RefreshCw, XCircle, type LucideIcon } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
-import { parseDateLocal } from '@/lib/date-utils'
+import { getDaysUntilDue, getVencimientoText, parseDateLocal } from '@/lib/date-utils'
 import AgingCxpChart from '@/components/finanzas/AgingCxpChart'
 import VencimientosAlert from '@/components/finanzas/VencimientosAlert'
 import { Button } from '@/components/ui/button'
@@ -121,13 +121,6 @@ export default function CuentasPorPagarPage() {
       month: '2-digit',
       day: '2-digit',
     })
-  }
-
-  const getDaysUntilDue = (vencimiento: string) => {
-    const today = new Date()
-    const dueDate = new Date(vencimiento)
-    const diffTime = dueDate.getTime() - today.getTime()
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   }
 
   const isFilterActive = estadoFilter || proveedorFilter || vencimientoDesde || vencimientoHasta
@@ -313,7 +306,7 @@ export default function CuentasPorPagarPage() {
                               <div className="text-muted-foreground">{formatDate(cuenta.fecha_vencimiento)}</div>
                               {(isOverdue || isDueSoon) && cuenta.estado !== 'PAGADA' && cuenta.estado !== 'ANULADA' && (
                                 <div className="text-xs font-semibold text-amber-400 dark:text-amber-200">
-                                  {isOverdue ? `Vencido hace ${Math.abs(daysUntilDue)} dias` : `Vence en ${daysUntilDue} dias`}
+                                  {getVencimientoText(cuenta.fecha_vencimiento)}
                                 </div>
                               )}
                             </td>

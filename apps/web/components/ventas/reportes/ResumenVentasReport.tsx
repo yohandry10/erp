@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Download } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { parseDateLocal } from '@/lib/date-utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
@@ -201,7 +202,7 @@ export default function ResumenVentasReport({ filters }: Props) {
               data.map((venta) => (
                 <tr key={venta.id}>
                   <td className="px-4 py-2 text-sm text-foreground">
-                    {venta.fecha ? format(new Date(venta.fecha), 'dd MMM yyyy', { locale: es }) : '-'}
+                    {venta.fecha ? format(parseDateLocal(venta.fecha), 'dd MMM yyyy', { locale: es }) : '-'}
                   </td>
                   <td className="px-4 py-2 text-sm text-foreground">
                     <div className="font-medium">{venta.tipo_documento || '-'}</div>
