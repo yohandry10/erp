@@ -15,6 +15,7 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
+    "test:cov": "turbo run test:cov",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "type-check": "turbo run type-check",
