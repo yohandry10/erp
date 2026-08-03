@@ -21,16 +21,21 @@ module.exports = {
   // el numero solo vive en el log y nadie lo mira.
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   // Suelo, no meta. El 80% que habia aqui no lo cumplia nadie (la cobertura real
-  // era del 32%) y ademas nunca se evaluaba, porque CI corria `jest` sin
-  // --coverage: el umbral era texto muerto. Se fija en lo que hay hoy para que
-  // deje de bajar, y se sube a medida que se cubren los modulos que mueven
-  // dinero. Un suelo honesto que asciende protege; un 80% decorativo, no.
+  // ronda el 31%) y ademas nunca se evaluaba, porque CI corria `jest` sin
+  // --coverage: el umbral era texto muerto.
+  //
+  // El numero sale de lo que mide CI sobre el codigo commiteado, no de una
+  // medicion local: en un arbol de trabajo con specs sin commitear la cobertura
+  // sale mas alta de lo que el repositorio puede sostener, y el suelo quedaria
+  // por encima de la realidad.
+  //
+  // Puede subir, nunca bajar.
   coverageThreshold: {
     global: {
       branches: 29,
-      functions: 30,
-      lines: 32,
-      statements: 32
+      functions: 29,
+      lines: 31,
+      statements: 31
     }
   },
   moduleNameMapper: {
