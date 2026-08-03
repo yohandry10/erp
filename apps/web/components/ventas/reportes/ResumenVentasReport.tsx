@@ -29,6 +29,10 @@ interface VentaResumen {
   total?: number
   moneda?: string
   metodo_pago?: string
+  total_gravadas?: number
+  total_exoneradas?: number
+  total_inafectas?: number
+  total_exportacion?: number
   clientes?: {
     nombre?: string
     numero_documento?: string
@@ -36,6 +40,9 @@ interface VentaResumen {
 }
 
 interface ResumenTotales {
+  exoneradas?: number
+  inafectas?: number
+  exportacion?: number
   subtotal: number
   igv: number
   total: number
@@ -94,7 +101,12 @@ export default function ResumenVentasReport({ filters }: Props) {
       'DocumentoCliente',
       'Estado',
       'Moneda',
-      'Subtotal',
+      // El Registro de Ventas pide las bases separadas: una sola columna
+      // "Subtotal" dejaba lo exonerado fuera de la exportacion.
+      'BaseGravada',
+      'Exoneradas',
+      'Inafectas',
+      'Exportacion',
       'IGV',
       'Total',
       'MetodoPago'
@@ -107,13 +119,21 @@ export default function ResumenVentasReport({ filters }: Props) {
       v.clientes?.numero_documento || '',
       v.estado || '',
       v.moneda || 'PEN',
-      Number(v.subtotal || 0).toFixed(2),
+      Number(v.total_gravadas ?? v.subtotal ?? 0).toFixed(2),
+      Number(v.total_exoneradas || 0).toFixed(2),
+      Number(v.total_inafectas || 0).toFixed(2),
+      Number(v.total_exportacion || 0).toFixed(2),
       Number(v.igv || 0).toFixed(2),
       Number(v.total || 0).toFixed(2),
       v.metodo_pago || ''
     ])
     return [headers, ...rows].map(r => r.join(',')).join('\n')
   }, [data])
+
+  const noGravadas =
+    Number(resumen.exoneradas || 0) +
+    Number(resumen.inafectas || 0) +
+    Number(resumen.exportacion || 0)
 
   const handleExport = () => {
     if (!csvData) {
@@ -152,6 +172,14 @@ export default function ResumenVentasReport({ filters }: Props) {
           </CardHeader>
           <CardContent className="text-2xl font-semibold text-foreground">
             S/ {formatMoney(resumen.subtotal)}
+            {/* Sin esta linea las tres tarjetas no cuadraban: la base
+                imponible no incluye lo exonerado, asi que subtotal + IGV se
+                quedaba corto frente al total y no habia forma de saberlo. */}
+            {noGravadas > 0 && (
+              <div className="mt-1 text-xs font-normal text-muted-foreground">
+                + S/ {formatMoney(noGravadas)} en operaciones exoneradas e inafectas
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -177,7 +205,8 @@ export default function ResumenVentasReport({ filters }: Props) {
               <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Fecha</th>
               <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Documento</th>
               <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Cliente</th>
-              <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Subtotal</th>
+              <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Base gravada</th>
+              <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Exoneradas</th>
               <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">IGV</th>
               <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
               <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">Estado</th>
@@ -186,14 +215,14 @@ export default function ResumenVentasReport({ filters }: Props) {
           <tbody className="divide-y divide-border bg-card">
             {loading && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                <td colSpan={8} className="px-4 py-6 text-center text-sm text-muted-foreground">
                   Cargando ventas...
                 </td>
               </tr>
             )}
             {!loading && data.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                <td colSpan={8} className="px-4 py-6 text-center text-sm text-muted-foreground">
                   No hay ventas en el rango seleccionado
                 </td>
               </tr>
@@ -212,7 +241,10 @@ export default function ResumenVentasReport({ filters }: Props) {
                     <div className="font-medium">{venta.clientes?.nombre || 'Sin cliente'}</div>
                     <div className="text-xs text-muted-foreground">{venta.clientes?.numero_documento || ''}</div>
                   </td>
-                  <td className="px-4 py-2 text-right text-sm text-foreground">S/ {formatMoney(venta.subtotal)}</td>
+                  <td className="px-4 py-2 text-right text-sm text-foreground">S/ {formatMoney(venta.total_gravadas ?? venta.subtotal)}</td>
+                  <td className="px-4 py-2 text-right text-sm text-foreground">
+                    S/ {formatMoney((venta.total_exoneradas || 0) + (venta.total_inafectas || 0) + (venta.total_exportacion || 0))}
+                  </td>
                   <td className="px-4 py-2 text-right text-sm text-foreground">S/ {formatMoney(venta.igv)}</td>
                   <td className="px-4 py-2 text-sm text-right font-semibold text-emerald-400">
                     S/ {formatMoney(venta.total)}
