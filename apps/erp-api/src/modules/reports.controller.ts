@@ -41,6 +41,7 @@ export class ReportsController {
         .select(`
           id, fecha:fecha_emision, estado, numero_documento:numero, tipo_documento,
           subtotal, igv:impuesto_igv, total, moneda, cliente_id, metodo_pago,
+          total_gravadas, total_exoneradas, total_inafectas, total_exportacion,
           clientes(nombre, numero_documento, tipo_documento)
         `)
         .eq('tenant_id', tenantId)
@@ -61,12 +62,18 @@ export class ReportsController {
           acc.subtotal = acc.subtotal.plus(v.subtotal || 0);
           acc.igv = acc.igv.plus(v.igv || 0);
           acc.total = acc.total.plus(v.total || 0);
+          acc.exoneradas = acc.exoneradas.plus(v.total_exoneradas || 0);
+          acc.inafectas = acc.inafectas.plus(v.total_inafectas || 0);
+          acc.exportacion = acc.exportacion.plus(v.total_exportacion || 0);
           return acc;
         },
         {
           subtotal: new Decimal(0),
           igv: new Decimal(0),
-          total: new Decimal(0)
+          total: new Decimal(0),
+          exoneradas: new Decimal(0),
+          inafectas: new Decimal(0),
+          exportacion: new Decimal(0)
         },
       );
 
@@ -77,7 +84,12 @@ export class ReportsController {
         resumen: {
           subtotal: resumen.subtotal.toDecimalPlaces(2).toNumber(),
           igv: resumen.igv.toDecimalPlaces(2).toNumber(),
-          total: resumen.total.toDecimalPlaces(2).toNumber()
+          total: resumen.total.toDecimalPlaces(2).toNumber(),
+          // Sin estas bases el resumen no cuadraba: subtotal + IGV se quedaba
+          // corto en toda venta con lineas exoneradas o inafectas.
+          exoneradas: resumen.exoneradas.toDecimalPlaces(2).toNumber(),
+          inafectas: resumen.inafectas.toDecimalPlaces(2).toNumber(),
+          exportacion: resumen.exportacion.toDecimalPlaces(2).toNumber()
         },
       };
     } catch (error) {
@@ -111,6 +123,7 @@ export class ReportsController {
         .select(`
           id, fecha:fecha_emision, estado, numero_documento:numero, tipo_documento,
           subtotal, igv:impuesto_igv, total, moneda, cliente_id, metodo_pago,
+          total_gravadas, total_exoneradas, total_inafectas, total_exportacion,
           clientes(nombre, numero_documento, tipo_documento)
         `)
         .eq('tenant_id', tenantId)
@@ -134,7 +147,10 @@ export class ReportsController {
         { header: 'Cliente', key: 'cliente', width: 30 },
         { header: 'Estado', key: 'estado', width: 15 },
         { header: 'Moneda', key: 'moneda', width: 10 },
-        { header: 'Subtotal', key: 'subtotal', width: 15 },
+        { header: 'Base gravada', key: 'gravadas', width: 15 },
+        { header: 'Exoneradas', key: 'exoneradas', width: 15 },
+        { header: 'Inafectas', key: 'inafectas', width: 15 },
+        { header: 'Exportación', key: 'exportacion', width: 15 },
         { header: 'IGV', key: 'igv', width: 15 },
         { header: 'Total', key: 'total', width: 15 },
       ];
@@ -146,7 +162,12 @@ export class ReportsController {
           cliente: v.clientes?.nombre || 'Sin Cliente',
           estado: v.estado,
           moneda: v.moneda,
-          subtotal: v.subtotal,
+          // El Registro de Ventas pide las bases separadas; una sola columna
+          // "Subtotal" obligaba al contador a deducir lo exonerado a mano.
+          gravadas: v.total_gravadas ?? v.subtotal,
+          exoneradas: v.total_exoneradas ?? 0,
+          inafectas: v.total_inafectas ?? 0,
+          exportacion: v.total_exportacion ?? 0,
           igv: v.igv,
           total: v.total,
         });

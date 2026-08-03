@@ -172,6 +172,13 @@ async ensureDocumentoParaCpe(cpeRecord: any, tenantId: string): Promise<string |
         subtotal: cpeRecord.total_gravadas ?? 0,
         impuesto_igv: cpeRecord.total_igv ?? 0,
         total: cpeRecord.total_venta ?? 0,
+        // Sin las bases por afectación el documento perdía lo exonerado y lo
+        // inafecto: subtotal + IGV no llegaba al total y el Registro de Ventas
+        // se quedaba sin las columnas que SUNAT pide separadas.
+        total_gravadas: cpeRecord.total_gravadas ?? 0,
+        total_exoneradas: cpeRecord.total_exoneradas ?? 0,
+        total_inafectas: cpeRecord.total_inafectas ?? 0,
+        total_exportacion: cpeRecord.total_exportacion ?? 0,
         // El documento operativo nace desde un CPE ya generado: reflejar su estado
         // real. Dejarlo en BORRADOR mostraba la misma factura como "Borrador" en
         // Documentos y "FIRMADO" en CPE.
