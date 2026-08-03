@@ -678,11 +678,17 @@ export class ContabilidadLibrosController {
       };
 
       if (libro === "todos") {
-        const archivos = await this.pleExportService.exportarTodosPLE(
-          anioNum,
-          mesNum,
-        );
-        return { success: true, data: archivos };
+        const { archivos, fallidos } =
+          await this.pleExportService.exportarTodosPLE(anioNum, mesNum);
+        return {
+          success: true,
+          data: archivos,
+          // Se devuelve lo que si se genero, pero sin ocultar lo que no: dar
+          // cuatro libros por cinco en silencio seria peor que no dar ninguno.
+          message: fallidos.length
+            ? `No se pudieron generar: ${fallidos.join(" | ")}`
+            : undefined,
+        };
       }
 
       const exportador = exportadores[libro];

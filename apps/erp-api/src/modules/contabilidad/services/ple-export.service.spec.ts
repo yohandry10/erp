@@ -132,6 +132,16 @@ describe('PleExportService', () => {
       expect(campos[24]).toBe('33.00');
     });
 
+    it('emite los 41 campos del Anexo 2, ni uno menos', async () => {
+      const service = montarServicio('documentos', [boletaMixta]);
+
+      const result = await service.exportarRegistroVentas(2026, 8);
+      // El separador final cierra el ultimo campo, no abre uno nuevo.
+      const campos = result.content.split('|').slice(0, -1);
+
+      expect(campos).toHaveLength(41);
+    });
+
     it('usa el codigo de libro 140100 en el nombre del archivo', async () => {
       const service = montarServicio('documentos', [boletaMixta]);
 
@@ -205,8 +215,8 @@ describe('PleExportService', () => {
 
       expect(campos[13]).toBe('100.00');
       expect(campos[14]).toBe('18.00');
-      expect(campos[20]).toBe('0.00');
-      expect(campos[23]).toBe('118.00');
+      expect(campos[19]).toBe('0.00');
+      expect(campos[22]).toBe('118.00');
     });
 
     it('sin IGV en el comprobante la base va como no gravada, no como credito fiscal', async () => {
@@ -219,7 +229,16 @@ describe('PleExportService', () => {
 
       expect(campos[13]).toBe('0.00');
       expect(campos[14]).toBe('0.00');
-      expect(campos[20]).toBe('100.00');
+      expect(campos[19]).toBe('100.00');
+    });
+
+    it('emite los 42 campos del Anexo 2, ni uno menos', async () => {
+      const service = montarServicio('cuentas_por_pagar', [facturaCompra]);
+
+      const result = await service.exportarRegistroCompras(2026, 8);
+      const campos = result.content.split('|').slice(0, -1);
+
+      expect(campos).toHaveLength(42);
     });
 
     it('usa el codigo de libro 080100 en el nombre del archivo', async () => {

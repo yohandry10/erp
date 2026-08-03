@@ -17,6 +17,15 @@ import { TenantContextService } from '../../../shared/tenant/tenant-context.serv
  * en una declaración real hay que pasarlos por el validador PVS: aquí no hay
  * forma de contrastarlos contra él.
  */
+/** Mismo orden que exportarTodosPLE, para poder nombrar el que falle. */
+const NOMBRES_LIBROS_PLE = [
+  'Registro de Ventas 14.1',
+  'Registro de Compras 8.1',
+  'Libro Diario 5.1',
+  'Libro Mayor 6.1',
+  'Balance de Comprobación 3.1',
+];
+
 @Injectable()
 export class PleExportService {
   private readonly logger = new Logger(PleExportService.name);
@@ -152,9 +161,9 @@ export class PleExportService {
       .from('asientos_contables')
       .select(`
         id, numero_asiento, fecha, concepto, referencia,
-        detalle_asientos(
+        detalle_asientos!fk_detalle_asientos_asiento_id(
           id, cuenta_id, debe, haber, concepto,
-          plan_cuentas(codigo, nombre)
+          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
         )
       `)
       .eq('tenant_id', tenantId)
@@ -270,8 +279,8 @@ export class PleExportService {
       .from('detalle_asientos')
       .select(`
         id, cuenta_id, debe, haber, concepto,
-        plan_cuentas(codigo, nombre),
-        asientos_contables!inner(
+        plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre),
+        asientos_contables!fk_detalle_asientos_asiento_id!inner(
           id, numero_asiento, fecha, concepto, tenant_id
         )
       `)
@@ -486,12 +495,17 @@ export class PleExportService {
           '',                                                             // 28 Fecha del comprobante modificado
           '',                                                             // 29 Tipo del comprobante modificado
           '',                                                             // 30 Serie del comprobante modificado
-          '',                                                             // 31 Numero del comprobante modificado
-          '',                                                             // 32 Identificacion del contrato o proyecto
-          '',                                                             // 33 Error tipo 1: inconsistencia en el tipo de cambio
-          '',                                                             // 34 Indicador de comprobante de pago cancelado
-          '',                                                             // 35 Campo libre
+          '',                                                             // 31 Codigo de la dependencia aduanera
+          '',                                                             // 32 Numero del comprobante modificado
+          '',                                                             // 33 Identificacion del contrato o proyecto
+          '',                                                             // 34 Error tipo 1: inconsistencia en el tipo de cambio
+          '',                                                             // 35 Indicador de comprobante cancelado con medio de pago
           anulado ? '2' : '1',                                            // 36 Estado (1=informado, 2=anulado)
+          '',                                                             // 37 Campo de libre utilizacion
+          '',                                                             // 38 Campo de libre utilizacion
+          '',                                                             // 39 Campo de libre utilizacion
+          '',                                                             // 40 Campo de libre utilizacion
+          '',                                                             // 41 Campo de libre utilizacion
         ]),
       );
       correlativo++;
@@ -588,26 +602,29 @@ export class PleExportService {
           '0.00',                                                         // 17 IGV de la casilla 16
           '0.00',                                                         // 18 Base imponible destinada a op. no gravadas
           '0.00',                                                         // 19 IGV de la casilla 18
-          '0.00',                                                         // 20 Valor de las adquisiciones no gravadas
-          this.formatPleAmount(baseNoGravada),                            // 21 Importe de adquisiciones no gravadas
-          '0.00',                                                         // 22 ISC
-          '0.00',                                                         // 23 Otros tributos y cargos
-          this.formatPleAmount(doc.total),                                // 24 Importe total de la adquisicion
-          '',                                                             // 25 Codigo del pais del no domiciliado
-          this.sanitizePleText(doc.moneda || 'PEN', 3),                   // 26 Codigo de moneda (cat. 02)
-          '1.000',                                                        // 27 Tipo de cambio
-          '',                                                             // 28 Fecha del comprobante modificado
-          '',                                                             // 29 Tipo del comprobante modificado
-          '',                                                             // 30 Serie del comprobante modificado
-          '',                                                             // 31 Numero del comprobante modificado
-          '',                                                             // 32 Fecha de emision de la constancia de detraccion
-          '',                                                             // 33 Numero de la constancia de detraccion
-          '',                                                             // 34 Marca del comprobante sujeto a retencion
-          '',                                                             // 35 Clasificacion de los bienes y servicios
-          '',                                                             // 36 Identificacion del contrato o proyecto
-          '',                                                             // 37 Error tipo 1: comprobante que no cumple los requisitos
-          '',                                                             // 38 Campo libre
-          anulado ? '2' : '1',                                            // 39 Estado (1=informado, 2=anulado)
+          this.formatPleAmount(baseNoGravada),                            // 20 Valor de las adquisiciones no gravadas
+          '0.00',                                                         // 21 ISC
+          '0.00',                                                         // 22 Otros tributos y cargos
+          this.formatPleAmount(doc.total),                                // 23 Importe total de la adquisicion
+          this.sanitizePleText(doc.moneda || 'PEN', 3),                   // 24 Codigo de moneda (cat. 02)
+          '1.000',                                                        // 25 Tipo de cambio
+          '',                                                             // 26 Fecha del comprobante modificado
+          '',                                                             // 27 Tipo del comprobante modificado
+          '',                                                             // 28 Serie del comprobante modificado
+          '',                                                             // 29 Codigo de la dependencia aduanera
+          '',                                                             // 30 Numero del comprobante modificado
+          '',                                                             // 31 Fecha de emision de la constancia de detraccion
+          '',                                                             // 32 Numero de la constancia de detraccion
+          '',                                                             // 33 Marca del comprobante sujeto a retencion
+          '',                                                             // 34 Clasificacion de los bienes y servicios adquiridos
+          '',                                                             // 35 Identificacion del contrato o proyecto
+          '',                                                             // 36 Error tipo 1: comprobante que no cumple los requisitos
+          '',                                                             // 37 Error tipo 2: proveedor con baja de inscripcion
+          '',                                                             // 38 Error tipo 3: proveedor no habido
+          '',                                                             // 39 Error tipo 4: comprobante que incumple la Ley 29215
+          '',                                                             // 40 Indicador de operaciones con medios de pago
+          anulado ? '2' : '1',                                            // 41 Estado (1=informado, 2=anulado)
+          '',                                                             // 42 Campo de libre utilizacion
         ]),
       );
       correlativo++;
@@ -723,10 +740,15 @@ export class PleExportService {
   /**
    * Exporta todos los libros PLE del período
    */
-  async exportarTodosPLE(anio: number, mes: number): Promise<Array<{ filename: string; content: string }>> {
+  async exportarTodosPLE(
+    anio: number,
+    mes: number,
+  ): Promise<{ archivos: Array<{ filename: string; content: string }>; fallidos: string[] }> {
     this.logger.log(`📚 Exportando todos los libros PLE ${anio}-${mes.toString().padStart(2, '0')}`);
 
-    const resultados = await Promise.all([
+    // allSettled y no all: con Promise.all, un solo libro que falle deja al
+    // contador sin los otros cuatro, que si estaban bien.
+    const intentos = await Promise.allSettled([
       this.exportarRegistroVentas(anio, mes),
       this.exportarRegistroCompras(anio, mes),
       this.exportarLibroDiario(anio, mes),
@@ -734,8 +756,24 @@ export class PleExportService {
       this.exportarBalanceComprobacion(anio, mes),
     ]);
 
-    this.logger.log(`✅ Exportación PLE completa: ${resultados.length} archivos generados`);
+    const resultados: Array<{ filename: string; content: string }> = [];
+    const fallidos: string[] = [];
+    intentos.forEach((intento, indice) => {
+      if (intento.status === 'fulfilled') {
+        resultados.push(intento.value);
+        return;
+      }
+      const nombre = NOMBRES_LIBROS_PLE[indice];
+      fallidos.push(`${nombre}: ${intento.reason?.message || intento.reason}`);
+      this.logger.error(`❌ ${nombre} no se pudo generar`, intento.reason);
+    });
 
-    return resultados;
+    if (resultados.length === 0) {
+      throw new Error(`Ningun libro PLE se pudo generar. ${fallidos.join(' | ')}`);
+    }
+
+    this.logger.log(`✅ Exportación PLE: ${resultados.length} archivos generados`);
+
+    return { archivos: resultados, fallidos };
   }
 }

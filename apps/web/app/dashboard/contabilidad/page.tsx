@@ -177,6 +177,8 @@ export default function ContabilidadPage() {
         document.body.removeChild(enlace)
         URL.revokeObjectURL(url)
       }
+      // Al pedir todos, alguno puede fallar sin tumbar al resto: se avisa cual.
+      if (response.message) setPleError(response.message)
     } catch (error: any) {
       setPleError(error?.message || 'No se pudo generar el archivo PLE')
     } finally {
