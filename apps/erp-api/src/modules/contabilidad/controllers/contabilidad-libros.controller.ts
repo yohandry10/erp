@@ -14,6 +14,7 @@ import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { AccountingBooksService } from "../../../shared/integration/accounting-books.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { EstadosFinancierosService } from "../services/estados-financieros.service";
+import { PleExportService } from "../services/ple-export.service";
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -22,6 +23,7 @@ export class ContabilidadLibrosController {
   constructor(
     private readonly accountingService: AccountingBooksService,
     private readonly estadosFinancierosService: EstadosFinancierosService,
+    private readonly pleExportService: PleExportService,
   ) {}
 
   @Get("libro-mayor/:cuentaCodigo")
@@ -637,4 +639,70 @@ export class ContabilidadLibrosController {
   // =============================================
   // 📒 GESTIÓN DE ASIENTOS CONTABLES
   // =============================================
+
+  // =============================================
+  // 📤 EXPORTACIÓN PLE (SUNAT)
+  // =============================================
+
+  /**
+   * El servicio de exportación existía sin ninguna ruta que lo alcanzara: los
+   * libros electrónicos no se podían descargar desde ningún sitio.
+   */
+  @Get("ple/:libro")
+  @RequirePermission("contabilidad.reportes.read")
+  @ApiOperation({ summary: "Exportar un libro electrónico PLE del período" })
+  @ApiResponse({ status: 200, description: "Archivo PLE generado" })
+  async exportarPle(
+    @Param("libro") libro: string,
+    @Query("anio") anio: string,
+    @Query("mes") mes: string,
+  ) {
+    const anioNum = Number(anio);
+    const mesNum = Number(mes);
+
+    try {
+      const exportadores: Record<
+        string,
+        () => Promise<{ filename: string; content: string }>
+      > = {
+        "registro-ventas": () =>
+          this.pleExportService.exportarRegistroVentas(anioNum, mesNum),
+        "registro-compras": () =>
+          this.pleExportService.exportarRegistroCompras(anioNum, mesNum),
+        "libro-diario": () =>
+          this.pleExportService.exportarLibroDiario(anioNum, mesNum),
+        "libro-mayor": () =>
+          this.pleExportService.exportarLibroMayor(anioNum, mesNum),
+        "balance-comprobacion": () =>
+          this.pleExportService.exportarBalanceComprobacion(anioNum, mesNum),
+      };
+
+      if (libro === "todos") {
+        const archivos = await this.pleExportService.exportarTodosPLE(
+          anioNum,
+          mesNum,
+        );
+        return { success: true, data: archivos };
+      }
+
+      const exportador = exportadores[libro];
+      if (!exportador) {
+        return {
+          success: false,
+          message: `Libro PLE no reconocido: ${libro}`,
+          data: null,
+        };
+      }
+
+      return { success: true, data: [await exportador()] };
+    } catch (error: any) {
+      // El mensaje importa: "RUC de empresa requerido" le dice al contador qué
+      // le falta configurar, y un texto genérico se lo escondería.
+      return {
+        success: false,
+        message: error?.message || "Error generando el archivo PLE",
+        data: null,
+      };
+    }
+  }
 }

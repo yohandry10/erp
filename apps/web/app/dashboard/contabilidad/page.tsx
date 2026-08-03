@@ -136,6 +136,54 @@ export default function ContabilidadPage() {
 
   const { get } = useApi()
 
+  // La exportacion PLE existia en el backend sin ninguna ruta ni boton que la
+  // alcanzara: el contador no podia bajar ningun libro electronico.
+  const hoy = new Date()
+  const [pleAnio, setPleAnio] = useState(String(hoy.getFullYear()))
+  const [pleMes, setPleMes] = useState(String(hoy.getMonth() + 1).padStart(2, '0'))
+  const [pleLibroEnCurso, setPleLibroEnCurso] = useState<string | null>(null)
+  const [pleError, setPleError] = useState<string | null>(null)
+
+  const LIBROS_PLE: Array<{ id: string; etiqueta: string }> = [
+    { id: 'registro-ventas', etiqueta: 'Registro de Ventas 14.1' },
+    { id: 'registro-compras', etiqueta: 'Registro de Compras 8.1' },
+    { id: 'libro-diario', etiqueta: 'Libro Diario 5.1' },
+    { id: 'libro-mayor', etiqueta: 'Libro Mayor 6.1' },
+    { id: 'balance-comprobacion', etiqueta: 'Balance de Comprobación 3.1' },
+    { id: 'todos', etiqueta: 'Descargar todos' },
+  ]
+
+  const descargarPle = async (libro: string) => {
+    setPleError(null)
+    setPleLibroEnCurso(libro)
+    try {
+      const response = await get(
+        `/contabilidad/ple/${libro}?anio=${Number(pleAnio)}&mes=${Number(pleMes)}`,
+      )
+      if (!response?.success || !Array.isArray(response.data)) {
+        // El mensaje del backend dice que falta configurar (por ejemplo el RUC);
+        // tragarselo dejaria al contador sin saber por que no baja nada.
+        setPleError(response?.message || 'No se pudo generar el archivo PLE')
+        return
+      }
+      for (const archivo of response.data as Array<{ filename: string; content: string }>) {
+        const blob = new Blob([archivo.content], { type: 'text/plain;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const enlace = document.createElement('a')
+        enlace.href = url
+        enlace.setAttribute('download', archivo.filename)
+        document.body.appendChild(enlace)
+        enlace.click()
+        document.body.removeChild(enlace)
+        URL.revokeObjectURL(url)
+      }
+    } catch (error: any) {
+      setPleError(error?.message || 'No se pudo generar el archivo PLE')
+    } finally {
+      setPleLibroEnCurso(null)
+    }
+  }
+
   const formatearMoneda = (valor: number) => {
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
@@ -420,12 +468,85 @@ export default function ContabilidadPage() {
       ])
     }
 
-    return renderPanel('Libros Electrónicos SUNAT', 'Preparación para PLE y control de archivos electrónicos.', [
+    const panelLibros = renderPanel('Libros Electrónicos SUNAT', 'Preparación para PLE y control de archivos electrónicos.', [
       { label: 'Libros configurados', value: librosElectronicosSunat?.librosConfigurados || 0 },
       { label: 'Archivos generados', value: librosElectronicosSunat?.archivosGenerados || 0 },
       { label: 'Último envío', value: librosElectronicosSunat?.ultimoEnvio || 'Pendiente' },
       { label: 'Estado PLE', value: librosElectronicosSunat?.estadoPLE || 'Configurado' },
     ])
+
+    return (
+      <div className="space-y-6">
+        {panelLibros}
+        <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-card/70 text-foreground shadow-2xl shadow-blue-950/20')}>
+          <CardHeader className={cn('border-b', darkMode ? 'border-cyan-400/10 bg-card/45' : 'border-border bg-card')}>
+            <CardTitle className={cn('text-lg', darkMode && 'text-foreground')}>
+              Descargar libros electrónicos (PLE)
+            </CardTitle>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Archivos TXT con la estructura de SUNAT, listos para el validador PVS.
+              El nombre lo arma el sistema con el RUC y el período.
+            </p>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label htmlFor="ple-anio" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Año
+                </label>
+                <input
+                  id="ple-anio"
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  value={pleAnio}
+                  onChange={(event) => setPleAnio(event.target.value)}
+                  className="w-28 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="ple-mes" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Mes
+                </label>
+                <select
+                  id="ple-mes"
+                  value={pleMes}
+                  onChange={(event) => setPleMes(event.target.value)}
+                  className="w-32 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {Array.from({ length: 12 }, (_, indice) => String(indice + 1).padStart(2, '0')).map((mes) => (
+                    <option key={mes} value={mes}>
+                      {mes}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {LIBROS_PLE.map((libro) => (
+                <Button
+                  key={libro.id}
+                  type="button"
+                  variant={libro.id === 'todos' ? 'default' : 'outline'}
+                  size="sm"
+                  disabled={pleLibroEnCurso !== null}
+                  onClick={() => descargarPle(libro.id)}
+                >
+                  {pleLibroEnCurso === libro.id ? 'Generando…' : libro.etiqueta}
+                </Button>
+              ))}
+            </div>
+
+            {pleError && (
+              <p role="alert" className="mt-4 text-sm text-destructive">
+                {pleError}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   const connectedMetrics = [

@@ -7,9 +7,15 @@ import { TenantContextService } from '../../../shared/tenant/tenant-context.serv
  * Q56: Exporta libros contables en formato TXT pipe-delimited según especificaciones SUNAT
  * 
  * Libros soportados:
+ * - 14.1 Registro de Ventas e Ingresos
+ * - 8.1 Registro de Compras
  * - 5.1 Libro Diario
  * - 6.1 Libro Mayor
  * - 3.1 Balance de Comprobación
+ *
+ * Los archivos siguen la estructura publicada por SUNAT, pero antes de usarlos
+ * en una declaración real hay que pasarlos por el validador PVS: aquí no hay
+ * forma de contrastarlos contra él.
  */
 @Injectable()
 export class PleExportService {
@@ -43,6 +49,14 @@ export class PleExportService {
       throw new Error('RUC de empresa requerido para exportación PLE SUNAT');
     }
     return ruc;
+  }
+
+  private assertPeruPle(empresa?: { pais?: string | null } | null): void {
+    if (String(empresa?.pais || 'PE').toUpperCase() !== 'PE') {
+      throw new Error(
+        'La exportación PLE corresponde únicamente a SUNAT Perú; Argentina utiliza Libro Diario, Mayor y libros IVA.',
+      );
+    }
   }
 
   private formatPleDate(value: unknown): string {
@@ -123,10 +137,11 @@ export class PleExportService {
     // Obtener datos de empresa
     const { data: empresa } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('ruc, razon_social')
+      .select('ruc, razon_social, pais')
       .eq('tenant_id', tenantId)
       .single();
 
+    this.assertPeruPle(empresa);
     const ruc = this.resolveRucPle(empresa);
 
     // Obtener asientos del período
@@ -240,10 +255,11 @@ export class PleExportService {
 
     const { data: empresa } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('ruc')
+      .select('ruc, pais')
       .eq('tenant_id', tenantId)
       .single();
 
+    this.assertPeruPle(empresa);
     const ruc = this.resolveRucPle(empresa);
 
     // Obtener movimientos agrupados por cuenta
@@ -321,6 +337,291 @@ export class PleExportService {
   }
 
   /**
+   * Catálogo 10 de SUNAT. El registro de ventas y el de compras identifican el
+   * comprobante por su código, no por el nombre interno del documento.
+   */
+  private codigoTipoComprobante(tipo: unknown): string {
+    const clave = String(tipo || '')
+      .toUpperCase()
+      .replace(/[\s_-]/g, '');
+    const catalogo: Record<string, string> = {
+      FACTURA: '01',
+      BOLETA: '03',
+      BOLETADEVENTA: '03',
+      NOTACREDITO: '07',
+      NOTADEBITO: '08',
+      GUIAREMISION: '09',
+      RECIBOHONORARIOS: '02',
+      TICKET: '12',
+    };
+    return catalogo[clave] || '00';
+  }
+
+  /**
+   * Catálogo 06 de SUNAT: tipo de documento de identidad de la contraparte.
+   * Un RUC de 11 dígitos es siempre 6 aunque el registro diga otra cosa.
+   */
+  private codigoTipoDocumentoIdentidad(tipo: unknown, numero: string): string {
+    if (/^\d{11}$/.test(numero)) return '6';
+    const clave = String(tipo || '')
+      .toUpperCase()
+      .replace(/[\s_.-]/g, '');
+    const catalogo: Record<string, string> = {
+      DNI: '1',
+      RUC: '6',
+      CE: '4',
+      CARNETEXTRANJERIA: '4',
+      PASAPORTE: '7',
+      PARTIDANACIMIENTO: '0',
+    };
+    if (catalogo[clave]) return catalogo[clave];
+    return /^\d{8}$/.test(numero) ? '1' : '0';
+  }
+
+  /**
+   * Los comprobantes de compra llegan como "F001-00000123": el PLE los pide en
+   * dos campos separados.
+   */
+  private partirSerieNumero(valor: unknown): { serie: string; numero: string } {
+    const crudo = String(valor || '').trim().toUpperCase();
+    const guion = crudo.indexOf('-');
+    if (guion > 0) {
+      return {
+        serie: crudo.slice(0, guion),
+        numero: crudo.slice(guion + 1),
+      };
+    }
+    return { serie: '', numero: crudo };
+  }
+
+  /**
+   * Exporta el Registro de Ventas e Ingresos (14.1) en formato PLE.
+   *
+   * Las bases van separadas porque SUNAT las declara en casillas distintas: lo
+   * gravado paga IGV, lo exonerado (Apéndice I) y lo inafecto no, y la
+   * exportación tiene su propio campo. Sumarlas en una sola columna obligaría al
+   * contador a deshacer la suma a mano.
+   */
+  async exportarRegistroVentas(anio: number, mes: number): Promise<{ filename: string; content: string }> {
+    this.assertPeriodoValido(anio, mes);
+    const tenantId = this.resolveTenantId();
+    this.logger.log(`📚 Exportando Registro de Ventas PLE ${anio}-${mes.toString().padStart(2, '0')}`);
+
+    const { data: empresa } = await this.supabase.getClient()
+      .from('empresa_config')
+      .select('ruc, pais')
+      .eq('tenant_id', tenantId)
+      .single();
+
+    this.assertPeruPle(empresa);
+    const ruc = this.resolveRucPle(empresa);
+
+    const fechaInicio = `${anio}-${mes.toString().padStart(2, '0')}-01`;
+    const fechaFin = this.getFechaFinMes(anio, mes);
+
+    const { data: comprobantes, error } = await this.supabase.getClient()
+      .from('documentos')
+      .select(`
+        id, serie, numero, tipo_documento, fecha_emision, fecha_vencimiento,
+        moneda, tipo_cambio, estado,
+        subtotal, impuesto_igv, total,
+        total_gravadas, total_exoneradas, total_inafectas, total_exportacion,
+        receptor_tipo_doc, receptor_numero_doc, receptor_razon_social
+      `)
+      .eq('tenant_id', tenantId)
+      .in('tipo_documento', ['FACTURA', 'BOLETA', 'NOTA_CREDITO', 'NOTA_DEBITO'])
+      .gte('fecha_emision', fechaInicio)
+      .lte('fecha_emision', `${fechaFin}T23:59:59`)
+      .order('fecha_emision')
+      .order('serie')
+      .order('numero');
+
+    if (error) {
+      this.logger.error('Error obteniendo comprobantes de venta:', error);
+      throw error;
+    }
+
+    const periodo = this.getPeriodoPle(anio, mes);
+    const lineas: string[] = [];
+    let correlativo = 1;
+
+    for (const comprobante of comprobantes || []) {
+      const doc = comprobante as any;
+      const anulado = ['ANULADO', 'ANULADA', 'CANCELADO', 'CANCELADA'].includes(
+        String(doc.estado || '').toUpperCase(),
+      );
+      const numeroDocIdentidad = String(doc.receptor_numero_doc || '').trim();
+      const gravadas = Number(doc.total_gravadas ?? doc.subtotal ?? 0);
+      const igv = Number(doc.impuesto_igv || 0);
+
+      lineas.push(
+        this.toPleLine([
+          periodo,                                                        // 1  Periodo
+          `M${correlativo.toString().padStart(8, '0')}`,                  // 2  CUO
+          this.getCorrelativoPle(correlativo),                            // 3  Correlativo del asiento
+          this.formatPleDate(doc.fecha_emision),                          // 4  Fecha de emision
+          this.formatPleDate(doc.fecha_vencimiento),                      // 5  Fecha de vencimiento o pago
+          this.codigoTipoComprobante(doc.tipo_documento),                 // 6  Tipo de comprobante (cat. 10)
+          this.sanitizePleText(doc.serie, 20),                            // 7  Serie
+          '',                                                             // 8  Numero de maquina registradora
+          this.sanitizePleText(doc.numero, 20),                           // 9  Numero del comprobante
+          '',                                                             // 10 Numero final (rangos de boletas)
+          this.codigoTipoDocumentoIdentidad(doc.receptor_tipo_doc, numeroDocIdentidad), // 11 Tipo doc identidad (cat. 06)
+          numeroDocIdentidad,                                             // 12 Numero doc identidad
+          this.sanitizePleText(doc.receptor_razon_social, 100),           // 13 Apellidos y nombres o razon social
+          this.formatPleAmount(doc.total_exportacion),                    // 14 Valor facturado de la exportacion
+          this.formatPleAmount(gravadas),                                 // 15 Base imponible de la operacion gravada
+          '0.00',                                                         // 16 Descuento de la base imponible
+          this.formatPleAmount(igv),                                      // 17 IGV
+          '0.00',                                                         // 18 Descuento del IGV
+          this.formatPleAmount(doc.total_exoneradas),                     // 19 Importe total de la operacion exonerada
+          this.formatPleAmount(doc.total_inafectas),                      // 20 Importe total de la operacion inafecta
+          '0.00',                                                         // 21 ISC
+          '0.00',                                                         // 22 Base imponible del arroz pilado
+          '0.00',                                                         // 23 IVAP
+          '0.00',                                                         // 24 Otros tributos y cargos
+          this.formatPleAmount(doc.total),                                // 25 Importe total del comprobante
+          this.sanitizePleText(doc.moneda || 'PEN', 3),                   // 26 Codigo de moneda (cat. 02)
+          this.formatPleAmount(doc.tipo_cambio || 1),                     // 27 Tipo de cambio
+          '',                                                             // 28 Fecha del comprobante modificado
+          '',                                                             // 29 Tipo del comprobante modificado
+          '',                                                             // 30 Serie del comprobante modificado
+          '',                                                             // 31 Numero del comprobante modificado
+          '',                                                             // 32 Identificacion del contrato o proyecto
+          '',                                                             // 33 Error tipo 1: inconsistencia en el tipo de cambio
+          '',                                                             // 34 Indicador de comprobante de pago cancelado
+          '',                                                             // 35 Campo libre
+          anulado ? '2' : '1',                                            // 36 Estado (1=informado, 2=anulado)
+        ]),
+      );
+      correlativo++;
+    }
+
+    const filename = this.generarNombreArchivoPLE(ruc, anio, mes, '140100', lineas.length > 0);
+    const content = lineas.join('\r\n');
+
+    this.logger.log(`✅ Registro de Ventas PLE generado: ${filename} (${lineas.length} líneas)`);
+
+    return { filename, content };
+  }
+
+  /**
+   * Exporta el Registro de Compras (8.1) en formato PLE.
+   *
+   * Se toma de cuentas por pagar, que es donde queda el comprobante del
+   * proveedor con su IGV. Solo lo gravado da derecho a credito fiscal: una
+   * compra exonerada con IGV declarado seria un credito indebido, asi que
+   * cuando el comprobante no trae impuesto la base va como no gravada.
+   */
+  async exportarRegistroCompras(anio: number, mes: number): Promise<{ filename: string; content: string }> {
+    this.assertPeriodoValido(anio, mes);
+    const tenantId = this.resolveTenantId();
+    this.logger.log(`📚 Exportando Registro de Compras PLE ${anio}-${mes.toString().padStart(2, '0')}`);
+
+    const { data: empresa } = await this.supabase.getClient()
+      .from('empresa_config')
+      .select('ruc, pais')
+      .eq('tenant_id', tenantId)
+      .single();
+
+    this.assertPeruPle(empresa);
+    const ruc = this.resolveRucPle(empresa);
+
+    const fechaInicio = `${anio}-${mes.toString().padStart(2, '0')}-01`;
+    const fechaFin = this.getFechaFinMes(anio, mes);
+
+    const { data: compras, error } = await this.supabase.getClient()
+      .from('cuentas_por_pagar')
+      .select(`
+        id, numero_documento, tipo_documento, fecha_emision, fecha_vencimiento,
+        subtotal, igv, total, moneda, estado,
+        proveedores!cuentas_por_pagar_proveedor_id_fkey(ruc, numero_documento, razon_social, tipo_documento)
+      `)
+      .eq('tenant_id', tenantId)
+      .gte('fecha_emision', fechaInicio)
+      .lte('fecha_emision', fechaFin)
+      .order('fecha_emision')
+      .order('numero_documento');
+
+    if (error) {
+      this.logger.error('Error obteniendo comprobantes de compra:', error);
+      throw error;
+    }
+
+    const periodo = this.getPeriodoPle(anio, mes);
+    const lineas: string[] = [];
+    let correlativo = 1;
+
+    for (const compra of compras || []) {
+      const doc = compra as any;
+      const anulado = ['ANULADA', 'ANULADO'].includes(String(doc.estado || '').toUpperCase());
+      const proveedor = (Array.isArray(doc.proveedores) ? doc.proveedores[0] : doc.proveedores) || {};
+      const numeroDocIdentidad = String(
+        proveedor.ruc || proveedor.numero_documento || '',
+      ).trim();
+      const { serie, numero } = this.partirSerieNumero(doc.numero_documento);
+      const igv = Number(doc.igv || 0);
+      const base = Number(doc.subtotal || 0);
+      // Sin IGV en el comprobante no hay credito fiscal que sustentar: la base
+      // se declara como adquisicion no gravada, no como gravada con IGV cero.
+      const baseGravada = igv > 0 ? base : 0;
+      const baseNoGravada = igv > 0 ? 0 : base;
+
+      lineas.push(
+        this.toPleLine([
+          periodo,                                                        // 1  Periodo
+          `M${correlativo.toString().padStart(8, '0')}`,                  // 2  CUO
+          this.getCorrelativoPle(correlativo),                            // 3  Correlativo del asiento
+          this.formatPleDate(doc.fecha_emision),                          // 4  Fecha de emision del comprobante
+          this.formatPleDate(doc.fecha_vencimiento),                      // 5  Fecha de vencimiento o pago
+          this.codigoTipoComprobante(doc.tipo_documento),                 // 6  Tipo de comprobante (cat. 10)
+          serie,                                                          // 7  Serie del comprobante
+          '',                                                             // 8  Año de emision de la DUA
+          numero,                                                         // 9  Numero del comprobante
+          '',                                                             // 10 Numero final (rangos)
+          this.codigoTipoDocumentoIdentidad(proveedor.tipo_documento, numeroDocIdentidad), // 11 Tipo doc identidad proveedor
+          numeroDocIdentidad,                                             // 12 Numero doc identidad proveedor
+          this.sanitizePleText(proveedor.razon_social, 100),              // 13 Apellidos y nombres o razon social
+          this.formatPleAmount(baseGravada),                              // 14 Base imponible de adquisiciones gravadas destinadas a op. gravadas
+          this.formatPleAmount(igv),                                      // 15 IGV de la casilla 14
+          '0.00',                                                         // 16 Base imponible gravadas y no gravadas
+          '0.00',                                                         // 17 IGV de la casilla 16
+          '0.00',                                                         // 18 Base imponible destinada a op. no gravadas
+          '0.00',                                                         // 19 IGV de la casilla 18
+          '0.00',                                                         // 20 Valor de las adquisiciones no gravadas
+          this.formatPleAmount(baseNoGravada),                            // 21 Importe de adquisiciones no gravadas
+          '0.00',                                                         // 22 ISC
+          '0.00',                                                         // 23 Otros tributos y cargos
+          this.formatPleAmount(doc.total),                                // 24 Importe total de la adquisicion
+          '',                                                             // 25 Codigo del pais del no domiciliado
+          this.sanitizePleText(doc.moneda || 'PEN', 3),                   // 26 Codigo de moneda (cat. 02)
+          '1.000',                                                        // 27 Tipo de cambio
+          '',                                                             // 28 Fecha del comprobante modificado
+          '',                                                             // 29 Tipo del comprobante modificado
+          '',                                                             // 30 Serie del comprobante modificado
+          '',                                                             // 31 Numero del comprobante modificado
+          '',                                                             // 32 Fecha de emision de la constancia de detraccion
+          '',                                                             // 33 Numero de la constancia de detraccion
+          '',                                                             // 34 Marca del comprobante sujeto a retencion
+          '',                                                             // 35 Clasificacion de los bienes y servicios
+          '',                                                             // 36 Identificacion del contrato o proyecto
+          '',                                                             // 37 Error tipo 1: comprobante que no cumple los requisitos
+          '',                                                             // 38 Campo libre
+          anulado ? '2' : '1',                                            // 39 Estado (1=informado, 2=anulado)
+        ]),
+      );
+      correlativo++;
+    }
+
+    const filename = this.generarNombreArchivoPLE(ruc, anio, mes, '080100', lineas.length > 0);
+    const content = lineas.join('\r\n');
+
+    this.logger.log(`✅ Registro de Compras PLE generado: ${filename} (${lineas.length} líneas)`);
+
+    return { filename, content };
+  }
+
+  /**
    * Exporta Balance de Comprobación (3.1) en formato PLE
    */
   async exportarBalanceComprobacion(anio: number, mes: number): Promise<{ filename: string; content: string }> {
@@ -330,10 +631,11 @@ export class PleExportService {
 
     const { data: empresa } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('ruc')
+      .select('ruc, pais')
       .eq('tenant_id', tenantId)
       .single();
 
+    this.assertPeruPle(empresa);
     const ruc = this.resolveRucPle(empresa);
 
     // Obtener saldos por cuenta
@@ -425,6 +727,8 @@ export class PleExportService {
     this.logger.log(`📚 Exportando todos los libros PLE ${anio}-${mes.toString().padStart(2, '0')}`);
 
     const resultados = await Promise.all([
+      this.exportarRegistroVentas(anio, mes),
+      this.exportarRegistroCompras(anio, mes),
       this.exportarLibroDiario(anio, mes),
       this.exportarLibroMayor(anio, mes),
       this.exportarBalanceComprobacion(anio, mes),
