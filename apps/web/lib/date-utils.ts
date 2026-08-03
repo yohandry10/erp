@@ -6,6 +6,19 @@
 // PARSEO SEGURO DE FECHAS
 // ============================================
 
+/** `2026-08-02` */
+const SOLO_FECHA = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * `2026-08-02T00:00:00+00:00`. Varias columnas guardan una fecha de calendario
+ * en un `timestamptz`: al escribir "2026-08-02" Postgres lo convierte a
+ * medianoche UTC, que en Lima es el día anterior. Nadie emite un comprobante a
+ * las 00:00:00.000 exactas en UTC, así que ese instante es siempre una fecha
+ * disfrazada, no una hora real.
+ */
+const MEDIANOCHE_UTC =
+  /^(\d{4})-(\d{2})-(\d{2})T00:00:00(?:\.000)?(?:Z|\+00:?00)$/;
+
 /**
  * Parsea una fecha respetando la zona local.
  * Un string date-only (YYYY-MM-DD) pasado a `new Date()` se interpreta como UTC
@@ -13,13 +26,9 @@
  */
 export function parseDateLocal(value: string | Date): Date {
   if (value instanceof Date) return value;
-  const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (soloFecha) {
-    return new Date(
-      Number(soloFecha[1]),
-      Number(soloFecha[2]) - 1,
-      Number(soloFecha[3]),
-    );
+  const fecha = SOLO_FECHA.exec(value) ?? MEDIANOCHE_UTC.exec(value);
+  if (fecha) {
+    return new Date(Number(fecha[1]), Number(fecha[2]) - 1, Number(fecha[3]));
   }
   return new Date(value);
 }
@@ -37,8 +46,9 @@ export function getDaysUntilDue(vencimiento: string | Date): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const dueDate =
-    typeof vencimiento === "string" ? new Date(vencimiento) : vencimiento;
+  // Un date-only (YYYY-MM-DD) leido como UTC retrocede un dia en Lima, asi
+  // que una cuenta que vencia hoy se contaba como vencida ayer.
+  const dueDate = parseDateLocal(vencimiento);
   dueDate.setHours(0, 0, 0, 0);
 
   const diffTime = dueDate.getTime() - today.getTime();
