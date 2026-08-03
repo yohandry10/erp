@@ -24,6 +24,7 @@ import { ContabilidadEventsListener } from "./listeners/contabilidad-events.list
 import { AuthModule } from "../auth/auth.module";
 import { PermissionsModule } from "../permissions/permissions.module";
 import { CashflowService } from "./services/cashflow.service";
+import { PleExportService } from "./services/ple-export.service";
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { CashflowService } from "./services/cashflow.service";
     PresupuestosService,
     CentrosCostoService,
     CashflowService,
+    PleExportService,
     DepreciacionSchedulerService,
     ContabilidadEventsListener,
     {
@@ -69,6 +71,7 @@ import { CashflowService } from "./services/cashflow.service";
     PresupuestosService,
     CentrosCostoService,
     CashflowService,
+    PleExportService,
   ],
 })
 export class ContabilidadModule {}
