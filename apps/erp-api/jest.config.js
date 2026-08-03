@@ -4,6 +4,10 @@ module.exports = {
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.spec.ts'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  // Fabrica certs/demo.pfx si falta: nueve pruebas de firma dependian de un
+  // fichero gitignoreado, asi que en CI fallaban y la suite solo estaba verde
+  // en las maquinas que ya lo tenian.
+  globalSetup: '<rootDir>/jest.global-setup.ts',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverageFrom: [
     'src/**/*.ts',
