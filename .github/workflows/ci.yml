@@ -27,17 +27,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # pnpm antes que setup-node: la cache de pnpm necesita el binario ya en
+      # PATH, y al reves el job moria con "Unable to locate executable file: pnpm".
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -56,17 +58,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # pnpm antes que setup-node: la cache de pnpm necesita el binario ya en
+      # PATH, y al reves el job moria con "Unable to locate executable file: pnpm".
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -88,17 +92,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # pnpm antes que setup-node: la cache de pnpm necesita el binario ya en
+      # PATH, y al reves el job moria con "Unable to locate executable file: pnpm".
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -120,17 +126,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # pnpm antes que setup-node: la cache de pnpm necesita el binario ya en
+      # PATH, y al reves el job moria con "Unable to locate executable file: pnpm".
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -168,17 +176,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # pnpm antes que setup-node: la cache de pnpm necesita el binario ya en
+      # PATH, y al reves el job moria con "Unable to locate executable file: pnpm".
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -200,17 +210,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # pnpm antes que setup-node: la cache de pnpm necesita el binario ya en
+      # PATH, y al reves el job moria con "Unable to locate executable file: pnpm".
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

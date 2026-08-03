@@ -41,17 +41,17 @@ jobs:
             echo "listo=si" >> $GITHUB_OUTPUT
           fi
 
-      - name: Setup Node
-        if: steps.guard.outputs.listo == 'si'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Setup pnpm
         if: steps.guard.outputs.listo == 'si'
         uses: pnpm/action-setup@v4
         with:
           version: 8
+
+      - name: Setup Node
+        if: steps.guard.outputs.listo == 'si'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Install dependencies
         if: steps.guard.outputs.listo == 'si'
