@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { SupabaseService } from "../../shared/supabase/supabase.service";
+import { camposALimpiarEnConversionReal } from "./demo-conversion-cleanup";
 import { TenantContextService } from "../../shared/tenant/tenant-context.service";
 import { AuthService } from "../auth/auth.service";
 import * as bcrypt from "bcrypt";
@@ -1041,6 +1042,12 @@ export class DemoService {
           demo_conversion_attempted: true,
           estado: "ACTIVO",
           plan: (dto.plan_id || "basico").toUpperCase(),
+          // Los fixtures del demo —certificado de demostración y credenciales
+          // SOL de pruebas— no pueden sobrevivir a la conversión: con el RUC
+          // real del cliente, SUNAT los rechaza y nadie sabría por qué. Van en
+          // la misma sentencia para que no exista un instante con la cuenta ya
+          // marcada como real y las credenciales del demo todavía puestas.
+          ...camposALimpiarEnConversionReal(),
           updated_at: new Date().toISOString(),
         })
         .eq("tenant_id", tenantId);
