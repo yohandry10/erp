@@ -7,6 +7,7 @@ import { AuditService } from '../audit/audit.service';
 import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
 import { CpeOperationalDocumentService } from './cpe-operational-document.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
+import { fechaHoyEnPeru } from '../../shared/utils/fecha-peru.util';
 
 /** Registra XML firmado por el escritorio y normaliza su payload de entrada. */
 export class CpeRegistrationService {
@@ -116,8 +117,11 @@ async registerDesktopSignedXml(payload: any, tenantId: string, userId?: string) 
       tipo_documento: tipoDocumento,
       serie,
       numero: Number.isFinite(numero) && numero > 0 ? numero : 1,
-      fecha_emision: new Date().toISOString(),
-      fecha_vencimiento: new Date().toISOString(),
+      // En horario de Peru, no en el del servidor: con el proceso en UTC, entre
+      // las 19:00 y las 24:00 de Lima esto fechaba el comprobante al dia
+      // siguiente y el validador de emision lo rechazaba por futuro.
+      fecha_emision: fechaHoyEnPeru(),
+      fecha_vencimiento: fechaHoyEnPeru(),
       ruc_emisor: emisor.ruc,
       razon_social_emisor: emisor.razonSocial,
       tipo_documento_receptor: tipoDocumentoReceptor,
