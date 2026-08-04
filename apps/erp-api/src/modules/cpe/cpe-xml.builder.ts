@@ -88,12 +88,15 @@ resolveDueDate(emissionDate: string, fechaVencimiento?: string): string {
     return this.formatDate(due);
   }
 
-private formatDate(date: Date): string {
-    return [
-      date.getFullYear(),
-      String(date.getMonth() + 1).padStart(2, '0'),
-      String(date.getDate()).padStart(2, '0'),
-    ].join('-');
+/**
+   * La fecha del comprobante se resuelve en horario de Perú, no en el del
+   * proceso. Un servidor en UTC fechaba con el dia siguiente entre las 19:00 y
+   * las 24:00 de Lima, y el propio validador de emision —que si compara contra
+   * America/Lima— rechazaba el comprobante por futuro.
+   */
+  private formatDate(date: Date): string {
+    // 'en-CA' devuelve YYYY-MM-DD, que es el formato que espera SUNAT.
+    return date.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
   }
 
 private resolveSunatDate(value: any, fieldName: string): string {
