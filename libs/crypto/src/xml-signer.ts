@@ -16,6 +16,15 @@ export interface SigningOptions {
   allowRucMismatchWithConfirmation?: boolean;
 }
 
+/**
+ * Fallo de titularidad del certificado. Es terminal por definicion: si el PFX no
+ * pertenece al contribuyente que factura, no hay nada que salvar cayendo a otro
+ * certificado. Se marca aparte para que ningun fallback pueda absorberla.
+ */
+export class CertificateOwnershipError extends Error {
+  readonly esErrorDeTitularidad = true as const;
+}
+
 export class XmlSigner {
   private certificate!: forge.pki.Certificate;
   private privateKey!: forge.pki.PrivateKey;
@@ -36,7 +45,16 @@ export class XmlSigner {
         this.loadRealCertificate();
       }
     } catch (error) {
-      if (this.options.allowDemoFallback === false) {
+      // La titularidad no se negocia: si el certificado no es del contribuyente,
+      // caer a demo convertiria el bloqueo en una firma silenciosa con otro
+      // certificado, que es justo lo que el guardia venia a impedir.
+      if (error instanceof CertificateOwnershipError) {
+        throw error;
+      }
+      // El fallback a demo se pide, no se hereda. Antes bastaba con no decir
+      // nada para que una clave mal tecleada o un PFX corrupto acabaran
+      // firmando con un autofirmado, y el emisor creyendo que uso el suyo.
+      if (this.options.allowDemoFallback !== true) {
         throw error;
       }
       console.error('❌ Error cargando certificado, usando modo demo:', error);
@@ -88,7 +106,9 @@ export class XmlSigner {
 
     const expectedRuc = this.options.expectedRuc?.replace(/\D/g, '');
     if (!expectedRuc) {
-      throw new Error('SUNAT producción requiere configurar el RUC esperado del certificado.');
+      throw new CertificateOwnershipError(
+        'SUNAT producción requiere configurar el RUC esperado del certificado.',
+      );
     }
 
     const certificateText = this.getCertificateIdentityText().replace(/\D/g, '');
@@ -103,7 +123,7 @@ export class XmlSigner {
       return;
     }
 
-    throw new Error(
+    throw new CertificateOwnershipError(
       `El certificado fiscal no contiene el RUC esperado ${expectedRuc}. ` +
         'SUNAT producción para persona jurídica requiere un certificado asociado al contribuyente; ' +
         'use un PFX con el RUC de la empresa o configure una confirmación explícita documentada.',
