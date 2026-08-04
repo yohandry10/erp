@@ -20,6 +20,11 @@ export default function ConvertDemoPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Que pasa con lo que el cliente probo en el demo. Se pregunta en vez de
+  // decidirlo por el: hay quien viene de cargar su catalogo entero y hay quien
+  // solo estuvo trasteando y quiere entrar limpio.
+  const [mostrarEleccionDatos, setMostrarEleccionDatos] = useState(false);
+  const [eleccionDatos, setEleccionDatos] = useState<'conservar' | 'reiniciar'>('conservar');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -28,8 +33,18 @@ export default function ConvertDemoPage() {
     telefono: '',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setNotice(null);
+    // El formulario ya esta validado por el navegador; antes de activar hay
+    // que resolver que pasa con los datos, porque una de las dos opciones no
+    // tiene vuelta atras.
+    setMostrarEleccionDatos(true);
+  };
+
+  const convertir = async (conservarDatos: boolean) => {
+    setMostrarEleccionDatos(false);
     setLoading(true);
     setError(null);
     setNotice(null);
@@ -40,7 +55,7 @@ export default function ConvertDemoPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, conservar_datos: conservarDatos }),
       });
 
       if (!response.ok) {
@@ -90,7 +105,7 @@ export default function ConvertDemoPage() {
             Convierte tu Demo a Cuenta Real
           </h1>
           <p className="text-muted-foreground">
-            Mantén todos tus datos y obtén acceso completo al sistema
+            Acceso completo al sistema. Tú eliges qué pasa con lo que probaste.
           </p>
         </div>
 
@@ -191,7 +206,7 @@ export default function ConvertDemoPage() {
                 <li className="mb-1">✓ Acceso ilimitado sin expiración</li>
                 <li className="mb-1">✓ Facturación electrónica real a SUNAT</li>
                 <li className="mb-1">✓ Soporte técnico prioritario</li>
-                <li className="mb-1">✓ Todos tus datos demo se mantienen</li>
+                <li className="mb-1">✓ Eliges si conservas lo que probaste o empiezas de cero</li>
                 <li>✓ Certificado digital propio</li>
               </ul>
             </div>
@@ -214,6 +229,89 @@ export default function ConvertDemoPage() {
               Al activar tu cuenta, aceptas nuestros términos y condiciones
             </p>
           </form>
+
+          {mostrarEleccionDatos && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="titulo-eleccion-datos"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            >
+              <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl">
+                <h3 id="titulo-eleccion-datos" className="text-xl font-bold text-foreground">
+                  ¿Qué hacemos con lo que probaste?
+                </h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Tu cuenta y tus datos ya viven donde vivirá la cuenta real, así que
+                  no hay nada que migrar. Solo decide con qué quieres empezar.
+                </p>
+
+                <div className="mt-5 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setEleccionDatos('conservar')}
+                    className={`w-full rounded-xl border p-4 text-left transition ${
+                      eleccionDatos === 'conservar'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="font-semibold text-foreground">Conservar mis datos</div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      Se queda todo: productos, clientes, proveedores y los documentos
+                      que hayas emitido durante la prueba.
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEleccionDatos('reiniciar')}
+                    className={`w-full rounded-xl border p-4 text-left transition ${
+                      eleccionDatos === 'reiniciar'
+                        ? 'border-destructive bg-destructive/10'
+                        : 'border-border hover:border-destructive/40'
+                    }`}
+                  >
+                    <div className="font-semibold text-foreground">Empezar de cero</div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      Se borran los productos, clientes, ventas y documentos de prueba.
+                      Se conservan tu empresa, tus usuarios, el almacén, el plan de
+                      cuentas y los métodos de pago, para que la cuenta siga siendo
+                      usable desde el primer minuto.
+                    </div>
+                    {eleccionDatos === 'reiniciar' && (
+                      <div className="mt-3 rounded-lg bg-destructive/15 px-3 py-2 text-sm font-medium text-destructive">
+                        Esto no se puede deshacer.
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                <div className="mt-6 flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMostrarEleccionDatos(false)}
+                    className="rounded-xl border border-border px-5 py-3 text-sm font-semibold text-foreground transition hover:bg-accent"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => convertir(eleccionDatos === 'conservar')}
+                    className={`rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
+                      eleccionDatos === 'reiniciar'
+                        ? 'bg-destructive hover:bg-destructive/90'
+                        : 'bg-primary hover:bg-primary/90'
+                    }`}
+                  >
+                    {eleccionDatos === 'reiniciar'
+                      ? 'Borrar los datos y activar'
+                      : 'Conservar los datos y activar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="text-center mt-6">
