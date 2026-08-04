@@ -991,6 +991,9 @@ ${billingPayments}
         this.configService.get<string>('EMPRESA_RUC'),
       enforceRucInCertificate: sunatEnvironment === 'produccion',
       allowRucMismatchWithConfirmation: mismatchConfirmed,
+      // Misma regla que en la emisión: en producción una baja no puede salir
+      // firmada con un certificado de demostración.
+      allowDemoFallback: sunatEnvironment !== 'produccion',
     };
   }
 

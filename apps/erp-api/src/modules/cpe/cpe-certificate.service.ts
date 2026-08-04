@@ -1,6 +1,6 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SigningOptions, XmlSigner } from '@erp-suite/crypto';
+import { CertificateOwnershipError, SigningOptions, XmlSigner } from '@erp-suite/crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { normalizeCertificateInput } from '../../shared/utils/certificate.utils';
 import * as crypto from 'crypto';
@@ -34,14 +34,33 @@ async getXmlSigner(tenantId: string): Promise<XmlSigner> {
           );
         } else {
           // Crear XmlSigner con el certificado del tenant
-          return new XmlSigner({
-            pfxBuffer: certificadoBuffer, // Buffer del certificado
-            pfxPassword: this.decryptText(typedEmpresa.certificado_password) || '',
-            ...this.getCertificateRucGuardOptions(typedEmpresa),
-          });
+          try {
+            return new XmlSigner({
+              pfxBuffer: certificadoBuffer, // Buffer del certificado
+              pfxPassword: this.decryptText(typedEmpresa.certificado_password) || '',
+              ...this.getCertificateRucGuardOptions(typedEmpresa),
+            });
+          } catch (error: any) {
+            // Se marca el origen para que el catch exterior no lo confunda con
+            // un fallo de lectura y lo derive al certificado global.
+            error.esCertificadoDelTenant = true;
+            throw error;
+          }
         }
       }
     } catch (error) {
+      // Si el tenant tiene certificado propio y falla, el problema es ese
+      // certificado: caer al global lo haria firmar con uno ajeno sin avisar,
+      // que es peor que no emitir. Solo se sigue al fallback cuando el fallo es
+      // de lectura, no del certificado en si.
+      if (error instanceof CertificateOwnershipError) {
+        throw new BadRequestException(error.message);
+      }
+      if (error?.esCertificadoDelTenant) {
+        throw new BadRequestException(
+          `El certificado cargado para este tenant no se pudo usar: ${error.message}`,
+        );
+      }
       console.warn('⚠️ Error obteniendo certificado del tenant:', error.message);
     }
 
@@ -80,6 +99,11 @@ private getCertificateRucGuardOptions(empresa?: any): Partial<SigningOptions> {
         this.configService.get<string>('EMPRESA_RUC'),
       enforceRucInCertificate: sunatEnvironment === 'produccion',
       allowRucMismatchWithConfirmation: mismatchConfirmed,
+      // En homologación el demo tiene que poder emitir sin certificado real; en
+      // producción no. Firmar con un autofirmado cuando el PFX del cliente no
+      // carga —clave mal tecleada, fichero corrupto— produciria un comprobante
+      // que SUNAT rechaza y un emisor convencido de haber usado el suyo.
+      allowDemoFallback: sunatEnvironment !== 'produccion',
     };
   }
 
