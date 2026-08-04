@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsEmail, MinLength, Length, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, IsEmail, MinLength, Length, IsIn, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDemoTenantDto {
@@ -39,6 +39,16 @@ export class ConvertDemoToRealDto {
   @IsOptional()
   @IsString()
   telefono?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Si el cliente conserva lo que probó en el demo o arranca con la cuenta vacía. ' +
+      'Por defecto conserva: borrar sin que lo haya pedido es irreversible.',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  conservar_datos?: boolean;
 
   @ApiPropertyOptional({ description: 'ID del plan: basico, profesional, enterprise' })
   @IsOptional()

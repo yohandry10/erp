@@ -986,6 +986,10 @@ export class DemoService {
         plan_id: dto.plan_id || "basico",
         periodo: dto.periodo || "mensual",
         monto,
+        // La elección viaja con la conversión pendiente: el webhook
+        // reconstruye el DTO desde aquí, y sin este campo el cliente que
+        // pidió empezar de cero se encontraba la cuenta con todo el demo.
+        conservar_datos: dto.conservar_datos !== false,
         estado: "PENDIENTE",
       });
 
@@ -1053,6 +1057,29 @@ export class DemoService {
         .eq("tenant_id", tenantId);
 
       if (empresaError) throw empresaError;
+
+      // El cliente eligió empezar de cero. Se hace después de convertir,
+      // nunca antes: si el borrado va primero y la conversión falla, se
+      // queda sin datos y además sigue siendo demo. Al revés, un fallo aquí
+      // deja la cuenta real con sus datos, que es recuperable.
+      if (dto.conservar_datos === false) {
+        const { data: reinicio, error: reinicioError } =
+          await this.adminClient.rpc("reiniciar_datos_tenant", {
+            p_tenant: tenantId,
+          });
+
+        if (reinicioError || reinicio?.reiniciado !== true) {
+          throw new BadRequestException(
+            `La cuenta se activó pero no se pudieron borrar los datos de prueba: ${
+              reinicioError?.message || "el reinicio no confirmó"
+            }. Vuelva a intentarlo desde la configuración.`,
+          );
+        }
+
+        this.logger.log(
+          `[demo] tenant ${tenantId} convertido empezando de cero: ${reinicio.filas_borradas} filas borradas`,
+        );
+      }
 
       const { error: usuarioError } = await authClient
         .from("usuarios_sistema")
@@ -1125,6 +1152,9 @@ export class DemoService {
       telefono: conversion.telefono,
       plan_id: conversion.plan_id,
       periodo: conversion.periodo,
+      // Lo que el cliente eligió antes de pagar; sin esto la decisión se
+      // perdía justo en el paso que la hace efectiva.
+      conservar_datos: conversion.conservar_datos !== false,
     });
 
     // Marcar como completada
