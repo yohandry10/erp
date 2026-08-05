@@ -254,6 +254,8 @@ export class InventarioController {
       
       if (query.estado) {
         supaQuery = supaQuery.eq('activo', query.estado === 'ACTIVO');
+      } else {
+        supaQuery = supaQuery.eq('activo', true);
       }
 
       const { data, error } = await supaQuery.order('created_at', { ascending: false });
@@ -610,46 +612,24 @@ export class InventarioController {
         };
       }
 
-      const { data: movimientos } = await this.supabase.getClient()
-        .from('stock_movimientos')
-        .select('id')
+      // Un producto es parte del historial fiscal y del ledger canónico. Nunca
+      // se borra físicamente: incluso sin movimientos actuales puede ser
+      // referenciado después por documentos, precios o sincronizaciones.
+      const { data: updatedProduct, error: updateError } = await this.supabase.getClient()
+        .from('productos')
+        .update({ activo: false, updated_at: new Date().toISOString() })
         .eq('tenant_id', tenantId)
-        .eq('producto_id', id)
-        .limit(1);
+        .eq('id', id)
+        .select()
+        .single();
 
-      if (movimientos && movimientos.length > 0) {
-        const { data: updatedProduct, error: updateError } = await this.supabase.getClient()
-          .from('productos')
-          .update({ activo: false })
-          .eq('tenant_id', tenantId)
-          .eq('id', id)
-          .select()
-          .single();
+      if (updateError) throw updateError;
 
-        if (updateError) throw updateError;
-
-        return {
-          success: true,
-          data: updatedProduct,
-          message: 'Producto desactivado exitosamente'
-        };
-      } else {
-        const { error: deleteError } = await this.supabase.getClient()
-          .from('productos')
-          .delete()
-          .eq('tenant_id', tenantId)
-          .eq('id', id);
-
-        if (deleteError) {
-          throw deleteError;
-        }
-
-        return {
-          success: true,
-          data: producto,
-          message: 'Producto eliminado exitosamente'
-        };
-      }
+      return {
+        success: true,
+        data: updatedProduct,
+        message: 'Producto desactivado exitosamente'
+      };
     } catch (error) {
       this.logger.error('❌ Error eliminando producto', error as Error);
       return {
