@@ -79,6 +79,7 @@ export class DemoService {
   async createDemoTenant(dto: CreateDemoTenantDto = {}) {
     const diasDuracion = dto.dias_duracion || 14;
     const nombre = dto.nombre || "DEMO COMERCIAL SAC";
+    let createdTenantId: string | null = null;
 
     try {
       const { data, error } = await this.client.rpc("create_demo_tenant", {
@@ -89,11 +90,11 @@ export class DemoService {
       if (error) throw new Error(error.message);
       if (!data || !data.success)
         throw new Error("No se pudo crear el tenant demo");
+      createdTenantId = data.tenant_id;
 
-      // Seed operacional best-effort: el RPC crea tenant + empresa + admin pero
-      // deja el tenant "esqueleto". Agregamos datos mínimos para que el demo sea
-      // realmente usable (POS, CPE, Inventario, Contabilidad). Una falla aquí
-      // NO debe romper el flujo de creación de demo.
+      // La demo es una empresa lista para explorar, no un onboarding. El RPC
+      // crea tenant + empresa + admin y esta fase exige la semilla completa. Si
+      // algo requerido falla, no se entregan credenciales de una demo parcial.
       // Como /api/demo/create es Public (sin auth), no hay tenant context en
       // AsyncLocalStorage. Lo seteamos explícitamente para que el guard de
       // tablas multi-tenant deje pasar los inserts.
@@ -103,19 +104,7 @@ export class DemoService {
           userId: data.user_id,
           isSuperAdmin: true, // seed system-level
         },
-        () =>
-          this.seedDemoOperationalData(data.tenant_id, data.user_id).catch(
-            (err) => {
-              this.logger.warn(
-                `[demo seed] fallo parcial al hidratar tenant ${data.tenant_id}: ${err?.message || err}`,
-              );
-              return {
-                aprobadorUserId: null,
-                aprobadorEmail: null,
-                aprobadorPassword: null,
-              };
-            },
-          ),
+        () => this.seedDemoOperationalData(data.tenant_id, data.user_id),
       );
 
       // El dashboard puede consultar sus métricas apenas inicia la sesión. Si
@@ -149,6 +138,18 @@ export class DemoService {
         aprobador_password: seedResult.aprobadorPassword,
       };
     } catch (error) {
+      if (createdTenantId) {
+        const { error: rollbackError } = await this.supabase
+          .getAdminClient()
+          .rpc("rollback_failed_demo_tenant", {
+            p_tenant_id: createdTenantId,
+          });
+        if (rollbackError) {
+          this.logger.error(
+            `[demo seed] no se pudo revertir tenant fallido ${createdTenantId}: ${rollbackError.message}`,
+          );
+        }
+      }
       throw new BadRequestException(
         `Error creando tenant demo: ${error.message}`,
       );
@@ -162,9 +163,10 @@ export class DemoService {
   /**
    * Hidrata el tenant demo con datos operativos mínimos: almacén, plan contable
    * básico, métodos de pago, caja y certificado de prueba.
-   * Cada paso es independiente (allSettled) para que una falla parcial no rompa
-   * los demás. Sin esto los e2e/flujos cross-module fallan por gaps de setup
-   * (no por bugs).
+   * Los pasos de base se intentan todos para obtener un diagnóstico completo.
+   * Después se exige que los requeridos hayan funcionado y un único RPC
+   * transaccional crea ventas, compras, finanzas, contabilidad, logística y
+   * RR. HH. Nunca se considera exitosa una demo parcialmente hidratada.
    */
   /**
    * Resultado del seed operacional. Incluye datos del segundo user "aprobador"
@@ -212,25 +214,51 @@ export class DemoService {
       "certificado",
       "productos",
       "clientes",
+      "proveedores",
+      "cuenta_bancaria",
+      "empleado",
       "aprobador",
     ];
     const failures = results
       .map((r, i) => ({ r, step: stepNames[i] }))
       .filter((x) => x.r.status === "rejected");
-    if (failures.length) {
+    const optionalFailures = failures.filter((failure) => failure.step === "certificado");
+    const requiredFailures = failures.filter((failure) => failure.step !== "certificado");
+    if (optionalFailures.length) {
       this.logger.warn(
-        `[demo seed] ${failures.length}/${results.length} pasos fallaron para tenant ${tenantId}: ${failures
+        `[demo seed] certificado PFX opcional no disponible para tenant ${tenantId}: ${optionalFailures
           .map(
             (f) =>
               `${f.step}=${(f.r as PromiseRejectedResult).reason?.message || "unknown"}`,
           )
           .join(", ")}`,
       );
-    } else {
-      this.logger.log(
-        `[demo seed] tenant ${tenantId} hidratado con datos operativos completos`,
+    }
+    if (requiredFailures.length) {
+      throw new Error(
+        `fallaron ${requiredFailures.length} pasos requeridos: ${requiredFailures
+          .map(
+            (f) =>
+              `${f.step}=${(f.r as PromiseRejectedResult).reason?.message || "unknown"}`,
+          )
+          .join(", ")}`,
       );
     }
+
+    const { data: readiness, error: businessSeedError } = await this.adminClient.rpc(
+      "hydrate_demo_business_sample_tx",
+      { p_tenant_id: tenantId, p_user_id: primerUserId },
+    );
+    if (businessSeedError) {
+      throw new Error(`semilla empresarial transaccional: ${businessSeedError.message}`);
+    }
+    if (readiness?.ready !== true) {
+      throw new Error(`contrato de demo incompleto: ${JSON.stringify(readiness)}`);
+    }
+
+    this.logger.log(
+      `[demo seed] tenant ${tenantId} listo: inventario, ventas, compras, finanzas, contabilidad y RRHH`,
+    );
     return {
       aprobadorUserId: aprobadorResult?.userId ?? null,
       aprobadorEmail: aprobadorResult?.email ?? null,

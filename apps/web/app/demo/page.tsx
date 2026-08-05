@@ -61,8 +61,10 @@ const features = [
 // Lo que ocurre de verdad al crear la demo, en el orden en que ocurre.
 const PASOS_DEMO = [
   'Creando tu empresa',
-  'Sembrando productos, clientes y almacen',
-  'Configurando roles, permisos y plan de cuentas',
+  'Cargando inventario, clientes y proveedores',
+  'Cargando ventas, compras, caja y contabilidad',
+  'Cargando empleados, asistencia y planilla',
+  'Validando que todos los modulos esten listos',
   'Abriendo tu sesion',
 ];
 
@@ -172,7 +174,7 @@ export default function DemoPage() {
               onClick={handleContinue}
               className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-blue-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800"
             >
-              Configurar mi empresa
+              Entrar al dashboard
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -269,7 +271,7 @@ export default function DemoPage() {
           )}
           <h2 className="text-2xl font-bold tracking-normal">Listo para explorar</h2>
           <p className="mt-2 text-sm leading-6 text-foreground/80">
-            Crearemos una empresa demo con credenciales temporales y dejaremos la sesion iniciada.
+            Crearemos una empresa peruana ya configurada, con RUC y datos de prueba en todos los modulos.
           </p>
 
           {error && (
