@@ -76,8 +76,12 @@ USER nestjs
 EXPOSE 3002
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "const port=process.env.PORT||'3002'; const http=require('http'); const req=http.get(`http://localhost:${port}/api/health/ready`, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"
+# Sin comillas invertidas: dentro de "..." la shell las trata como sustitucion
+# de comando, ejecutaba la URL como si fuera un programa y dejaba la direccion
+# vacia. El healthcheck llevaba fallando siempre. Y arrancar tarda mas de 5s,
+# asi que el periodo de gracia sube a 40s.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "const p=process.env.PORT||'3002';require('http').get('http://localhost:'+p+'/api/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 # Start the application
 # La etapa de build garantiza que este fichero existe, sea cual sea la raiz que
