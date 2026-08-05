@@ -71,6 +71,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Next precarga todos los links visibles del sidebar. Validar cada prefetch
+  // contra Render crea decenas de /auth/profile simultáneos y termina agotando
+  // el rate limit antes de la navegación real. El prefetch sólo obtiene el
+  // shell estático; los datos siguen protegidos por el API y la navegación
+  // efectiva vuelve a pasar por la validación autoritativa de abajo.
+  const isPrefetch =
+    request.headers.has('next-router-prefetch') ||
+    request.headers.get('purpose')?.toLowerCase() === 'prefetch';
+  if (isPrefetch) {
+    if (protectedRoute && !request.cookies.has('access_token')) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', normalizedPathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next();
+  }
+
   const authenticated = await hasValidJwt(request);
 
   if (!authenticated && protectedRoute) {
