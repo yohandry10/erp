@@ -196,13 +196,22 @@ describe('env.schema', () => {
     expect(result.error?.message).toContain('EXPECTED_SUPABASE_PROJECT_REF');
   });
 
-  it('rechaza habilitar demos en PROD', () => {
+  it('permite habilitar demos en PROD, que es donde vive la prueba gratuita', () => {
     const result = envSchema.validate({
       ...baseConfig,
       DEMO_API_ENABLED: true,
     });
 
-    expect(result.error?.message).toContain('prohibe DEMO_API_ENABLED=true');
+    expect(result.error).toBeUndefined();
+    expect(result.value.DEMO_API_ENABLED).toBe(true);
+  });
+
+  it('deja las demos apagadas si nadie las enciende', () => {
+    const { DEMO_API_ENABLED: _omitido, ...sinBandera } = baseConfig as Record<string, unknown>;
+    const result = envSchema.validate(sinBandera);
+
+    expect(result.error).toBeUndefined();
+    expect(result.value.DEMO_API_ENABLED).toBe(false);
   });
 
   it('rechaza usar PROD con un proceso de desarrollo', () => {
