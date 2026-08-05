@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
-import { AlertTriangle, Boxes, ClipboardList, Package, RefreshCw, Truck } from 'lucide-react'
+import { AlertTriangle, Boxes, ClipboardList, Package, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { PageShell } from '@/components/erp/page-shell'
 import { MetricCard } from '@/components/erp/metric-card'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 type InventoryStats = {
   totalProductos: number
@@ -30,15 +31,7 @@ type Producto = {
   updatedAt?: string | null
 }
 
-type Movimiento = {
-  id: string
-  tipo: string
-  cantidad: number
-  motivo?: string | null
-  referencia?: string | null
-  productoId?: string | null
-  creadoEn?: string | null
-}
+
 
 type Filters = {
   search: string
@@ -92,21 +85,15 @@ function ProductsFallback() {
   )
 }
 
-function MovementsFallback() {
-  return (
-    <div className="rounded-2xl border border-cyan-400/20 bg-card/60 p-4 text-sm text-primary group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
-      Necesitas <code>inventario.movimientos.read</code> para consultar la bitácora de movimientos.
-    </div>
-  )
-}
+
 
 export default function InventarioPage() {
+  const country = useCountryContext()
   const { get } = useApi()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<InventoryStats>(DEFAULT_STATS)
   const [productos, setProductos] = useState<Producto[]>([])
-  const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [filters, setFilters] = useState<Filters>({
     search: '',
     estado: 'ACTIVO',
@@ -123,10 +110,9 @@ export default function InventarioPage() {
     setLoading(true)
     setError(null)
     try {
-      const [statsResp, productosResp, movimientosResp] = await Promise.all([
+      const [statsResp, productosResp] = await Promise.all([
         get('/inventario/stats'),
         get('/inventario/productos'),
-        get('/inventario/movimientos?limit=8'),
       ])
 
       if (statsResp?.success && statsResp.data) {
@@ -156,28 +142,11 @@ export default function InventarioPage() {
       } else {
         setProductos([])
       }
-
-      if (movimientosResp?.success && Array.isArray(movimientosResp.data)) {
-        setMovimientos(
-          movimientosResp.data.map((item: any, index: number) => ({
-            id: item.id ?? `${item.producto_id ?? 'mov'}-${index}`,
-            tipo: String(item.tipo_movimiento ?? item.tipo ?? 'MOVIMIENTO').toUpperCase(),
-            cantidad: Number(item.cantidad ?? item.cantidad_recibida ?? 0),
-            motivo: item.motivo ?? null,
-            referencia: item.referencia ?? null,
-            productoId: item.producto_id ?? null,
-            creadoEn: item.created_at ?? item.fecha ?? null,
-          })),
-        )
-      } else {
-        setMovimientos([])
-      }
     } catch (err) {
       console.error('Error cargando dashboard de inventario', err)
       setError('No se pudo cargar el dashboard de inventario. Intenta nuevamente.')
       setStats(DEFAULT_STATS)
       setProductos([])
-      setMovimientos([])
     } finally {
       setLoading(false)
     }
@@ -192,11 +161,6 @@ export default function InventarioPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'es-PE'))
   }, [productos])
 
-  const productoPorId = useMemo(() => {
-    const map = new Map<string, Producto>()
-    productos.forEach((producto) => map.set(producto.id, producto))
-    return map
-  }, [productos])
 
   const productosFiltrados = useMemo(() => {
     const termino = filters.search.trim().toLowerCase()
@@ -232,13 +196,11 @@ export default function InventarioPage() {
 
   return (
     <PageShell
-      title="Inventario"
-      description="Control operativo de productos, stock crítico, recepciones y movimientos de kardex por tenant."
+      title="Productos"
+      description="Catálogo de productos, stock crítico y control de inventario por tenant."
       actions={
         <>
-          <Button asChild variant="secondary"><Link href="/dashboard/inventario/productos">Productos</Link></Button>
-          <Button asChild variant="secondary"><Link href="/dashboard/inventario/recepciones">Recepciones</Link></Button>
-          <Button asChild variant="secondary"><Link href="/dashboard/inventario/kardex">Kardex</Link></Button>
+          <Button asChild variant="secondary"><Link href="/dashboard/inventario/productos">Ver todos</Link></Button>
           <Button type="button" onClick={loadDashboard} className="gap-2"><RefreshCw className="h-4 w-4" /> Actualizar</Button>
         </>
       }
@@ -263,9 +225,8 @@ export default function InventarioPage() {
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard title="Productos" value={stats.totalProductos.toLocaleString('es-PE')} description="Activos registrados" icon={Package} tone="info" />
-              <MetricCard title="Valor inventario" value={formatCurrency(stats.valorInventario)} description="Inventario valorizado" icon={Boxes} tone="success" />
+              <MetricCard title="Valor inventario" value={formatCurrency(stats.valorInventario, country.moneda || 'PEN')} description="Inventario valorizado" icon={Boxes} tone="success" />
               <MetricCard title="Stock crítico" value={stats.productosStockBajo.toLocaleString('es-PE')} description="Por debajo del mínimo" icon={AlertTriangle} tone="warning" />
-              <MetricCard title="Movimientos" value={stats.movimientosHoy.toLocaleString('es-PE')} description="Registrados hoy" icon={Truck} tone="default" />
             </div>
           </ProtectedComponent>
 
@@ -384,51 +345,6 @@ export default function InventarioPage() {
             </Card>
           </ProtectedComponent>
 
-          {/* Movimientos recientes */}
-          <ProtectedComponent
-            modulo="inventario"
-            recurso="movimientos"
-            accion="read"
-            fallback={<MovementsFallback />}
-          >
-            <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">Movimientos recientes</CardTitle>
-                <Button asChild size="sm"><Link href="/dashboard/inventario/kardex">Ver kardex</Link></Button>
-              </CardHeader>
-              <CardContent>
-
-              {movimientos.length === 0 ? (
-                <p className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">Sin movimientos recientes.</p>
-              ) : (
-                <div className="grid gap-3">
-                  {movimientos.map((movimiento) => {
-                    const producto = movimiento.productoId ? productoPorId.get(movimiento.productoId) : null
-                    return (
-                      <div key={movimiento.id} className="flex flex-col gap-2 rounded-2xl border border-cyan-400/15 bg-card/50 p-4 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-muted/30 md:flex-row md:items-center md:justify-between">
-                        <div className="min-w-0">
-                          <strong className="block truncate">{producto?.nombre ?? 'Movimiento de inventario'}</strong>
-                          <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
-                            <span>
-                              Tipo:{' '}
-                              <strong>{movimiento.tipo === 'ENTRADA' ? 'Entrada' : movimiento.tipo === 'SALIDA' ? 'Salida' : 'Ajuste'}</strong>
-                            </span>
-                            <span>
-                              Cantidad: <strong>{formatNumber(movimiento.cantidad)}</strong>
-                            </span>
-                            {movimiento.motivo && <span>Motivo: {movimiento.motivo}</span>}
-                            {movimiento.referencia && <span>Ref: {movimiento.referencia}</span>}
-                          </div>
-                        </div>
-                        <div className="text-xs font-semibold text-primary group-data-[erp-theme=light]/dashboard:text-blue-700">{formatDateTime(movimiento.creadoEn)}</div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-              </CardContent>
-            </Card>
-          </ProtectedComponent>
         </>
       )}
     </PageShell>

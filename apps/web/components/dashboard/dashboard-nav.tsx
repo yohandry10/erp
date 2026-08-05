@@ -42,7 +42,7 @@ const navigation = [
     icon: Download,
   },
   {
-    name: 'Inventario',
+    name: 'Productos',
     href: '/dashboard/inventario',
     icon: Package,
   },
@@ -65,7 +65,17 @@ export function DashboardNav() {
   const { toast } = useToast()
   const country = useCountryContext()
   const isPeru = country.paisCodigo === 'PE'
-  const visibleNavigation = navigation.filter((item) => isPeru || item.href !== '/dashboard/sire')
+  const fiscalCenterName = `Comprobantes ${country.servicioFiscal || 'fiscales'}`
+  const visibleNavigation = navigation
+    .filter(
+      (item) =>
+        isPeru || (item.href !== '/dashboard/sire' && item.href !== '/dashboard/gre'),
+    )
+    .map((item) =>
+      !isPeru && item.href === '/dashboard/cpe'
+        ? { ...item, name: fiscalCenterName }
+        : item,
+    )
 
   const handleLogout = async () => {
     try {

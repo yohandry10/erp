@@ -378,7 +378,8 @@ export class InventarioController {
         tipo_operacion: productData.tipo_operacion || productData.tipoOperacion || null,
         clasificador_sunat: productData.clasificador_sunat || productData.clasificadorSunat || null,
         favorito: productData.favorito === true || `${productData.favorito}`.toLowerCase() === 'true',
-        imagen_url: productData.imagen_url || productData.imagenUrl || ''
+        imagen_url: productData.imagen_url || productData.imagenUrl || '',
+        atributos_extra: productData.atributos_extra || {},
       };
 
       const { data: insertedProduct, error } = await this.supabase.getClient()
@@ -809,6 +810,9 @@ export class InventarioController {
       if (productData.imagen_url !== undefined || productData.imagenUrl !== undefined) {
         updateData.imagen_url = productData.imagen_url ?? productData.imagenUrl;
       }
+      if (productData.atributos_extra !== undefined) {
+        updateData.atributos_extra = productData.atributos_extra;
+      }
 
       const solicitaStock = productData.stock !== undefined
         || productData.stockActual !== undefined
@@ -902,6 +906,136 @@ export class InventarioController {
         success: false,
         message: 'Error al actualizar el producto: ' + (error as Error).message
       };
+    }
+  }
+
+  // ============================================================
+  // CRUD de Categorías de Producto
+  // ============================================================
+
+  /**
+   * Listar categorías de producto del tenant
+   */
+  @Get('categorias')
+  @RequirePermission('inventario.productos.read')
+  @ApiOperation({ summary: 'Listar categorías de producto' })
+  @ApiResponse({ status: 200, description: 'Categorías listadas exitosamente' })
+  async getCategorias(@CurrentTenant() tenantId: string) {
+    try {
+      this.logger.log(`🏷️ [Tenant: ${tenantId}] Obteniendo categorías de producto...`);
+      const { data, error } = await this.supabase.getClient()
+        .from('categorias_producto')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('orden', { ascending: true });
+
+      if (error) throw error;
+
+      return { success: true, data: data || [] };
+    } catch (error) {
+      this.logger.error('❌ Error obteniendo categorías', error as Error);
+      return { success: false, message: 'Error al obtener categorías: ' + (error as Error).message, data: [] };
+    }
+  }
+
+  /**
+   * Crear categoría de producto
+   */
+  @Post('categorias')
+  @RequirePermission('inventario.productos.create')
+  @ApiOperation({ summary: 'Crear categoría de producto' })
+  @ApiResponse({ status: 201, description: 'Categoría creada exitosamente' })
+  async createCategoria(@CurrentTenant() tenantId: string, @Body() body: any) {
+    try {
+      if (!body.nombre?.trim()) {
+        return { success: false, message: 'El nombre de la categoría es requerido' };
+      }
+
+      const { data, error } = await this.supabase.getClient()
+        .from('categorias_producto')
+        .insert([{
+          tenant_id: tenantId,
+          nombre: body.nombre.trim(),
+          codigo: body.codigo?.trim() || null,
+          descripcion: body.descripcion?.trim() || null,
+          campos_extra: Array.isArray(body.campos_extra) ? body.campos_extra : [],
+          activo: true,
+          orden: body.orden ?? 0,
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      this.logger.log(`✅ Categoría creada: ${data.id}`);
+      return { success: true, data, message: 'Categoría creada exitosamente' };
+    } catch (error) {
+      this.logger.error('❌ Error creando categoría', error as Error);
+      return { success: false, message: 'Error al crear la categoría: ' + (error as Error).message };
+    }
+  }
+
+  /**
+   * Actualizar categoría de producto
+   */
+  @Put('categorias/:id')
+  @RequirePermission('inventario.productos.update')
+  @ApiOperation({ summary: 'Actualizar categoría de producto' })
+  @ApiResponse({ status: 200, description: 'Categoría actualizada exitosamente' })
+  async updateCategoria(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    try {
+      const updateData: any = { updated_at: new Date().toISOString() };
+      if (body.nombre !== undefined) updateData.nombre = body.nombre.trim();
+      if (body.codigo !== undefined) updateData.codigo = body.codigo?.trim() || null;
+      if (body.descripcion !== undefined) updateData.descripcion = body.descripcion?.trim() || null;
+      if (body.campos_extra !== undefined) updateData.campos_extra = body.campos_extra;
+      if (body.activo !== undefined) updateData.activo = body.activo;
+      if (body.orden !== undefined) updateData.orden = body.orden;
+
+      const { data, error } = await this.supabase.getClient()
+        .from('categorias_producto')
+        .update(updateData)
+        .eq('tenant_id', tenantId)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      this.logger.log(`✅ Categoría actualizada: ${id}`);
+      return { success: true, data, message: 'Categoría actualizada exitosamente' };
+    } catch (error) {
+      this.logger.error('❌ Error actualizando categoría', error as Error);
+      return { success: false, message: 'Error al actualizar la categoría: ' + (error as Error).message };
+    }
+  }
+
+  /**
+   * Eliminar categoría de producto
+   */
+  @Delete('categorias/:id')
+  @RequirePermission('inventario.productos.delete')
+  @ApiOperation({ summary: 'Eliminar categoría de producto' })
+  @ApiResponse({ status: 200, description: 'Categoría eliminada exitosamente' })
+  async deleteCategoria(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    try {
+      const { error } = await this.supabase.getClient()
+        .from('categorias_producto')
+        .delete()
+        .eq('tenant_id', tenantId)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      this.logger.log(`✅ Categoría eliminada: ${id}`);
+      return { success: true, message: 'Categoría eliminada exitosamente' };
+    } catch (error) {
+      this.logger.error('❌ Error eliminando categoría', error as Error);
+      return { success: false, message: 'Error al eliminar la categoría: ' + (error as Error).message };
     }
   }
 }
