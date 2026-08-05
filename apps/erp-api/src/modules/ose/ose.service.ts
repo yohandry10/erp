@@ -80,7 +80,8 @@ const SUNAT_ENDPOINTS: Record<'homologacion' | 'produccion', Record<SunatEndpoin
 @Injectable()
 export class OseService implements OnModuleInit {
   private readonly logger = new Logger(OseService.name);
-  private xmlSigner: XmlSigner;
+  // Opcional: en produccion no existe firmador global, firma el del tenant.
+  private xmlSigner?: XmlSigner;
   private oseConfig: OseConfig;
 
   constructor(
@@ -167,6 +168,12 @@ export class OseService implements OnModuleInit {
     const requireRealCertificate = this.oseConfig.environment === 'produccion'
       || this.configService.get<string | boolean>('REQUIRE_REAL_FISCAL_CERTIFICATE') === true
       || this.configService.get<string | boolean>('REQUIRE_REAL_FISCAL_CERTIFICATE') === 'true';
+    // El certificado demo se genera aqui mismo, autofirmado. En un servidor de
+    // produccion eso significaria firmar comprobantes de un cliente con un
+    // certificado inventado y que el cliente no se enterara. La decision no
+    // puede depender de SUNAT_ENVIRONMENT —que por defecto es homologacion, y
+    // una cuenta real recien creada empieza ahi— sino de si esto es produccion.
+    const enProduccion = this.configService.get<string>('NODE_ENV') === 'production';
     const resolvedCertificatePath = this.resolveCertificatePath(this.oseConfig.certificatePath);
 
     try {
@@ -174,7 +181,9 @@ export class OseService implements OnModuleInit {
         this.xmlSigner = new XmlSigner({
           pfxPath: resolvedCertificatePath,
           pfxPassword: this.oseConfig.certificatePassword,
-          allowDemoFallback: !requireRealCertificate,
+          // Ni en produccion ni cuando se exige certificado real: una clave mal
+          // puesta o un PFX corrupto no pueden terminar en una firma demo.
+          allowDemoFallback: !requireRealCertificate && !enProduccion,
           expectedRuc: this.configService.get<string>('SUNAT_CERT_EXPECTED_RUC') || this.oseConfig.ruc,
           enforceRucInCertificate: this.oseConfig.environment === 'produccion',
           allowRucMismatchWithConfirmation: this.isCertificateRucMismatchConfirmed(),
@@ -183,6 +192,15 @@ export class OseService implements OnModuleInit {
       } else {
         if (requireRealCertificate) {
           throw new Error(`Certificado fiscal requerido no encontrado: ${this.oseConfig.certificatePath}`);
+        }
+        if (enProduccion) {
+          // Sin certificado global no se arranca en modo demo: se arranca sin
+          // firmador. Cada tenant trae el suyo y quien intente enviar sin el
+          // recibe un error, no una firma falsa.
+          this.logger.warn(
+            'Sin certificado fiscal global: la firma queda a cargo del certificado de cada tenant.',
+          );
+          return;
         }
         this.logger.warn('⚠️ Certificado no encontrado, usando modo DEMO para testing');
         // Usar modo demo con la flag correcta
@@ -193,7 +211,7 @@ export class OseService implements OnModuleInit {
       }
     } catch (error) {
       this.logger.error('❌ Error inicializando certificado:', error);
-      if (requireRealCertificate) {
+      if (requireRealCertificate || enProduccion) {
         throw error;
       }
       // Fallback a modo demo si hay cualquier error
@@ -596,6 +614,13 @@ export class OseService implements OnModuleInit {
   }
 
   private prepareXmlForSend(xml: string, signer: XmlSigner = this.xmlSigner): { xmlSigned: string; hash: string } {
+    // En produccion no hay firmador global: si nadie paso el del tenant, se
+    // corta aqui. Firmar con cualquier otra cosa seria emitir a nombre ajeno.
+    if (!signer) {
+      throw new Error(
+        'No hay certificado para firmar: cargue el certificado digital del contribuyente antes de enviar.',
+      );
+    }
     const xmlSigned = this.isSignedXml(xml) ? xml : signer.signXml(xml);
     return {
       xmlSigned,
