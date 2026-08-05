@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { hasPlausibleUnexpiredJwt } from './lib/middleware-auth';
 
 // Validación local del JWT con jose cuando Vercel y el API comparten secreto.
 // En la topología actual Render genera su JWT_SECRET y Vercel tiene otro; en
@@ -49,9 +50,19 @@ async function hasValidJwt(request: NextRequest): Promise<boolean> {
       cache: 'no-store',
       signal: controller.signal,
     });
-    return response.ok;
-  } catch {
+    if (response.ok) return true;
+    // Una negativa autoritativa sí invalida la sesión. En cambio, 429/5xx son
+    // fallos transitorios del proxy/Render y no deben expulsar al usuario del
+    // shell; los endpoints de datos vuelven a validar token + sesión.
+    if (response.status === 401 || response.status === 403) return false;
+    if (response.status === 429 || response.status >= 500) {
+      return hasPlausibleUnexpiredJwt(accessToken);
+    }
     return false;
+  } catch {
+    // Un timeout de Render no equivale a credenciales inválidas. Solo dejamos
+    // pasar el shell si el payload aún tiene usuario/tenant y no ha vencido.
+    return hasPlausibleUnexpiredJwt(accessToken);
   } finally {
     clearTimeout(timeout);
   }
