@@ -441,7 +441,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
             }
           };
           setConfigurationStatus(configData);
-          if (!configResponse.data.isComplete && process.env.NODE_ENV === 'development') {
+          if (!configResponse.data.isDemo && !configResponse.data.isComplete && process.env.NODE_ENV === 'development') {
             console.info('Configuración POS incompleta:', configResponse.data.missingItems);
           }
         }
@@ -1822,13 +1822,16 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           </div>
 
           {/* Configuration Warning Banner */}
-          <ConfigStatusBanner
-            onOpenWizard={() => window.location.href = '/dashboard/wizard'}
-            configurationStatus={configurationStatus}
-          />
+          {!configurationStatus?.isDemo && (
+            <ConfigStatusBanner
+              onOpenWizard={() => window.location.href = '/dashboard/wizard'}
+              configurationStatus={configurationStatus}
+            />
+          )}
 
           {/* Certificate Expiring Warning */}
           {configurationStatus &&
+            !configurationStatus.isDemo &&
             configurationStatus.certificate.isValid &&
             configurationStatus.certificate.expiresAt && (
               (() => {

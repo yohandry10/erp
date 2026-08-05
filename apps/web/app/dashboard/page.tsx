@@ -842,7 +842,7 @@ export default function Dashboard() {
   }, [fetchDashboardData])
 
   useEffect(() => {
-    if (!isLoadingConfig && configStatus && !configStatus.isComplete) {
+    if (!isLoadingConfig && configStatus && !configStatus.isDemo && !configStatus.isComplete) {
       const timer = setTimeout(() => setShowConfigModal(true), 1000)
       return () => clearTimeout(timer)
     }
@@ -926,14 +926,14 @@ export default function Dashboard() {
 
       <div className="relative mx-auto flex w-full max-w-[1720px] flex-col gap-4">
         {/* Banners superiores */}
-        {configStatus && !configStatus.isComplete && (
+        {configStatus && !configStatus.isDemo && !configStatus.isComplete && (
           <ConfigurationModal
             isOpen={showConfigModal}
             onClose={() => setShowConfigModal(false)}
             missingItems={configStatus.missingItems}
           />
         )}
-        {configStatus && !configStatus.isComplete && (
+        {configStatus && !configStatus.isDemo && !configStatus.isComplete && (
           <ConfigurationBanner
             missingItems={configStatus.missingItems}
             completionPercentage={configStatus.completionPercentage}

@@ -54,6 +54,7 @@ export class ConfigurationService {
           .getClient()
           .from('empresa_config')
           .select([
+            'is_demo',
             'pais',
             'emision_cpe_modo',
             'gre_obligatorio',
@@ -102,7 +103,12 @@ export class ConfigurationService {
         );
       }
 
-      // Build missing items list
+      const typedEmpresaConfig = empresaConfig as any;
+      const isDemo = typedEmpresaConfig?.is_demo === true;
+
+      // Build missing items list. Se calcula normalmente para tenants reales;
+      // una demo queda exenta al construir la respuesta final porque ya trae
+      // datos transaccionales y no debe pedir certificado ni onboarding.
       const missingItems: string[] = [];
       
       if (!certificateValidation.isValid) {
@@ -113,7 +119,6 @@ export class ConfigurationService {
         missingItems.push(...rucValidation.missingFields);
       }
 
-      const typedEmpresaConfig = empresaConfig as any;
       const rawPaisCodigo = (typedEmpresaConfig?.pais || INITIAL_ACTIVE_COUNTRY_CODE).toString().toUpperCase();
       if (!isInitialActiveCountryCode(rawPaisCodigo)) {
         missingItems.push(INITIAL_ACTIVE_COUNTRY_MESSAGE);
@@ -213,18 +218,24 @@ export class ConfigurationService {
         dianRequirements += 1; // dian_resolucion_fecha_fin
       }
       const totalRequirements = baseRequirements + sunatRequirements + oseRequirements + dianRequirements;
-      const completedRequirements = Math.max(totalRequirements - missingItems.length, 0);
-      const completionPercentage = Math.round((completedRequirements / totalRequirements) * 100);
-
-      const isComplete = missingItems.length === 0 && certificateValidation.isValid && rucValidation.isValid;
+      const effectiveMissingItems = isDemo ? [] : missingItems;
+      const completedRequirements = Math.max(totalRequirements - effectiveMissingItems.length, 0);
+      const completionPercentage = isDemo
+        ? 100
+        : Math.round((completedRequirements / totalRequirements) * 100);
+      const certificateReady = isDemo || certificateValidation.isValid;
+      const isComplete = isDemo || (
+        effectiveMissingItems.length === 0 && certificateReady && rucValidation.isValid
+      );
 
       const status: ConfigurationStatus = {
         isComplete,
+        isDemo,
         completionPercentage,
-        missingItems,
+        missingItems: effectiveMissingItems,
         certificate: {
           exists: certificateValidation.errors.length === 0 || !certificateValidation.errors.some(e => e.includes('No se ha cargado')),
-          isValid: certificateValidation.isValid,
+          isValid: certificateReady,
           expiresAt: certificateValidation.expiresAt,
           rucMatches: certificateValidation.rucMatches,
           rucsEnCertificado: certificateValidation.rucsEnCertificado,
