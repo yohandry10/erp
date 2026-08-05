@@ -58,18 +58,52 @@ const features = [
   },
 ];
 
+// Lo que ocurre de verdad al crear la demo, en el orden en que ocurre.
+const PASOS_DEMO = [
+  'Creando tu empresa',
+  'Sembrando productos, clientes y almacen',
+  'Configurando roles, permisos y plan de cuentas',
+  'Abriendo tu sesion',
+];
+
 export default function DemoPage() {
   const router = useRouter();
   const { signIn } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<DemoCredentials | null>(null);
+  // Crear la demo tarda entre seis y treinta segundos: se levanta el tenant, se
+  // siembran catalogo, almacen y plan de cuentas, y se abre la sesion. Sin
+  // decirlo, la pantalla parece congelada y la gente vuelve a pulsar.
+  const [pasoActual, setPasoActual] = useState(0);
+  const [segundos, setSegundos] = useState(0);
   // window.location tras montar (no useSearchParams) para no requerir un
   // boundary de Suspense en el prerender ni causar mismatch de hidratación.
   const [demoExpirada, setDemoExpirada] = useState(false);
   useEffect(() => {
     setDemoExpirada(new URLSearchParams(window.location.search).get('expired') === '1');
   }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      setPasoActual(0);
+      setSegundos(0);
+      return;
+    }
+
+    const reloj = window.setInterval(() => setSegundos((s) => s + 1), 1000);
+    // El ultimo paso se queda puesto hasta que responde el servidor: es
+    // preferible a una barra que llega al final y se queda ahi mintiendo.
+    const avance = window.setInterval(
+      () => setPasoActual((p) => Math.min(p + 1, PASOS_DEMO.length - 1)),
+      3000,
+    );
+
+    return () => {
+      window.clearInterval(reloj);
+      window.clearInterval(avance);
+    };
+  }, [loading]);
 
   const handleStartDemo = async () => {
     setLoading(true);
@@ -84,6 +118,13 @@ export default function DemoPage() {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
+        // El limite antifraude devuelve "ThrottlerException: Too Many
+        // Requests", que no le dice nada a quien solo queria probar el sistema.
+        if (response.status === 429) {
+          throw new Error(
+            'Se alcanzo el limite de demos por hora desde esta conexion. Intentalo dentro de un rato o escribenos a operaciones@nextelco.cloud.',
+          );
+        }
         throw new Error(payload.message || 'Error creando demo');
       }
 
@@ -133,7 +174,7 @@ export default function DemoPage() {
 
             <button
               onClick={handleContinue}
-              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-background px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-muted"
+              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-blue-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800"
             >
               Configurar mi empresa
               <ArrowRight className="h-4 w-4" />
@@ -167,6 +208,59 @@ export default function DemoPage() {
           </div>
         </div>
 
+        {loading ? (
+          <aside
+            aria-live="polite"
+            aria-busy="true"
+            className="rounded-lg border border-border bg-card p-7 shadow-sm"
+          >
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md bg-blue-100 text-blue-700">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+
+            <h2 className="text-2xl font-bold tracking-normal">
+              Creando tu empresa demo
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-foreground/80">
+              Tarda unos segundos. No cierres esta pantalla.
+            </p>
+
+            <ol className="mt-6 space-y-3">
+              {PASOS_DEMO.map((paso, i) => {
+                const hecho = i < pasoActual;
+                const enCurso = i === pasoActual;
+                return (
+                  <li key={paso} className="flex items-start gap-3 text-sm leading-6">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+                      {hecho ? (
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      ) : enCurso ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-700" />
+                      ) : (
+                        <span className="h-2 w-2 rounded-full bg-border" />
+                      )}
+                    </span>
+                    <span
+                      className={
+                        hecho
+                          ? 'text-foreground/60'
+                          : enCurso
+                            ? 'font-semibold text-foreground'
+                            : 'text-foreground/50'
+                      }
+                    >
+                      {paso}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+
+            <p className="mt-6 text-xs text-muted-foreground">
+              {segundos}s transcurridos
+            </p>
+          </aside>
+        ) : (
         <aside className="rounded-lg border border-border bg-card p-7 shadow-sm">
           <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md bg-blue-100 text-blue-700">
             <Check className="h-6 w-6" />
@@ -219,6 +313,7 @@ export default function DemoPage() {
             </a>
           </p>
         </aside>
+        )}
       </section>
     </main>
   );
