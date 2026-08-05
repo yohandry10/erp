@@ -12,11 +12,15 @@ import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 export class DemoController {
   constructor(private readonly demoService: DemoService) {}
 
+  /**
+   * La prueba gratuita es parte del producto y tiene que funcionar en
+   * producción: es donde el cliente prueba y donde luego vive su cuenta real,
+   * para que al activarla conserve lo que cargó. Antes se bloqueaba en PROD sin
+   * excepción, así que el embudo entero era inalcanzable para un cliente.
+   * El interruptor sigue siendo explícito y apagado por defecto.
+   */
   private ensureDemoApiEnabled() {
-    const isProduction =
-      process.env.NODE_ENV === 'production' || process.env.DEPLOYMENT_ENV === 'PROD';
-
-    if (isProduction || process.env.DEMO_API_ENABLED !== 'true') {
+    if (process.env.DEMO_API_ENABLED !== 'true') {
       throw new ForbiddenException('Demo endpoints are disabled in this environment');
     }
   }

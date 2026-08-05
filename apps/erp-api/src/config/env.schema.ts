@@ -75,6 +75,9 @@ export const envSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'staging', 'production').default('development'),
   DEPLOYMENT_ENV: Joi.string().valid('DEV', 'PROD').default('DEV'),
   EXPECTED_SUPABASE_PROJECT_REF: Joi.string().pattern(/^[a-z]{20}$/).optional(),
+  // La prueba gratuita vive en producción a propósito: el cliente prueba con su
+  // cuenta y, al activarla, conserva lo que cargó. Sigue apagada por defecto,
+  // así que hay que encenderla a mano en el entorno donde se quiera ofrecer.
   DEMO_API_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
   PORT: Joi.number().port().default(3002),
   LOG_LEVEL: Joi.string().optional().default('info'),
@@ -169,12 +172,6 @@ export const envSchema = Joi.object({
   if (value.DEPLOYMENT_ENV === 'PROD' && value.NODE_ENV !== 'production') {
     return helpers.message({
       custom: 'DEPLOYMENT_ENV=PROD requiere NODE_ENV=production.',
-    });
-  }
-
-  if (value.DEPLOYMENT_ENV === 'PROD' && value.DEMO_API_ENABLED) {
-    return helpers.message({
-      custom: 'DEPLOYMENT_ENV=PROD prohibe DEMO_API_ENABLED=true.',
     });
   }
 

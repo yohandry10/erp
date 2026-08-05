@@ -55,9 +55,21 @@ describe('DemoController security gates', () => {
     expect(createDemoTenant).toHaveBeenCalledWith(dto);
   });
 
-  it('bloquea demos en PROD aunque DEMO_API_ENABLED este activo', async () => {
+  it('sirve la demo en PROD cuando esta habilitada: ahi vive la prueba gratuita', async () => {
     process.env.DEMO_API_ENABLED = 'true';
     process.env.DEPLOYMENT_ENV = 'PROD';
+    process.env.NODE_ENV = 'production';
+    const getPlanes = jest.fn().mockReturnValue({ planes: [] });
+
+    const controller = new DemoController({ getPlanes } as any);
+
+    await expect(controller.getPlanes()).resolves.toEqual({ planes: [] });
+  });
+
+  it('bloquea demos en PROD si nadie las habilito', async () => {
+    process.env.DEMO_API_ENABLED = 'false';
+    process.env.DEPLOYMENT_ENV = 'PROD';
+    process.env.NODE_ENV = 'production';
 
     const controller = new DemoController({ getPlanes: jest.fn() } as any);
 
