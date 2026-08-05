@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-// Validación local del JWT con jose. Antes este middleware hacía fetch a
-// ${API_BASE_URL}/api/auth/profile en CADA request a /dashboard/* y /login,
-// agregando ~1.4s de roundtrip a Supabase por navegación. Ahora verificamos
-// firma + expiración localmente: <5ms.
+// Validación local del JWT con jose cuando Vercel y el API comparten secreto.
+// En la topología actual Render genera su JWT_SECRET y Vercel tiene otro; en
+// ese caso la firma local no puede ser autoritativa y se consulta al API.
 //
 // Tradeoff: una sesión revocada server-side (logout desde otro dispositivo,
 // expulsión administrativa) puede seguir cargando páginas SSR hasta que el
@@ -14,35 +13,47 @@ import { jwtVerify } from 'jose';
 // de mutación, así que ninguna acción sensible se ejecuta con sesión muerta.
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 const encoder = new TextEncoder();
 // Encodeamos el secret una sola vez al cargar el módulo.
 const secretKey = JWT_SECRET ? encoder.encode(JWT_SECRET) : null;
 
 async function hasValidJwt(request: NextRequest): Promise<boolean> {
-  if (!secretKey) {
-    // Falta config — no podemos validar. Fail-closed: tratamos como no auth
-    // para forzar al login. En dev/local esto loggea para no romper en silencio.
-    console.error('[middleware] JWT_SECRET no está configurado en apps/web/.env.local');
-    return false;
-  }
-
   const accessToken = request.cookies.get('access_token')?.value;
   if (!accessToken) return false;
 
-  try {
-    const { payload } = await jwtVerify(accessToken, secretKey, {
-      algorithms: ['HS256'],
-    });
-    // El backend incluye tenant_id en el payload; sin él el JWT no es útil para
-    // este sistema multi-tenant aunque la firma sea válida. La excepción es el
-    // superadmin, que no pertenece a ningún tenant: sin esto no podía entrar ni
-    // a su propio panel.
-    if (!payload.tenant_id && payload.is_super_admin !== true) return false;
-    return true;
-  } catch {
-    // jose lanza si firma inválida, expirado, o malformado. Cualquiera de los
-    // tres significa "no autenticado".
+  if (secretKey) {
+    try {
+      const { payload } = await jwtVerify(accessToken, secretKey, {
+        algorithms: ['HS256'],
+      });
+      if (!payload.tenant_id && payload.is_super_admin !== true) return false;
+      return true;
+    } catch {
+      // Un secreto distinto entre Vercel y Render no implica token inválido.
+      // Continuamos con la validación autoritativa del emisor.
+    }
+  }
+
+  if (!API_BASE_URL) {
+    console.error('[middleware] NEXT_PUBLIC_API_URL no está configurado');
     return false;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/profile/`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
