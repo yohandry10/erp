@@ -1,40 +1,19 @@
 import { Module, Global } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { XmlSigner } from '@erp-suite/crypto';
 
+/**
+ * Aqui vivia un proveedor 'XML_SIGNER' construido con un certificado global
+ * (PFX_PATH/PFX_PASS). Venia de cuando el sistema servia a una sola empresa.
+ *
+ * Hoy cada tenant firma con SU certificado: CpeCertificateService y
+ * ComunicacionBajaService construyen el XmlSigner por tenant y se niegan a
+ * firmar si el certificado no pertenece al RUC que emite. Nadie inyectaba el
+ * proveedor global —ni una sola referencia en todo el repo— pero al arrancar
+ * en produccion exigia un certificado que en un SaaS multi-tenant no existe, y
+ * tumbaba la API antes de servir la primera peticion.
+ *
+ * El modulo se queda porque tres modulos lo importan; si algun dia vuelve a
+ * tener algo que exportar, este es su sitio.
+ */
 @Global()
-@Module({
-  providers: [
-    {
-      provide: 'XML_SIGNER',
-      useFactory: (configService: ConfigService) => {
-        const pfxPath = configService.get<string>('PFX_PATH');
-        const pfxPassword = configService.get<string>('PFX_PASS');
-        const nodeEnv = configService.get<string>('NODE_ENV', 'development');
-        const sunatEnvironment = configService.get<string>('SUNAT_ENVIRONMENT', 'homologacion');
-        const expectedRuc = configService.get<string>('SUNAT_CERT_EXPECTED_RUC') || configService.get<string>('EMPRESA_RUC');
-        const mismatchConfirmed =
-          configService.get<string | boolean>('SUNAT_CERT_RUC_MISMATCH_CONFIRMED') === true ||
-          configService.get<string | boolean>('SUNAT_CERT_RUC_MISMATCH_CONFIRMED') === 'true';
-
-        if (!pfxPath || !pfxPassword) {
-          if (nodeEnv !== 'production') {
-            return new XmlSigner({ useDemoMode: true });
-          }
-          throw new Error('PFX_PATH y PFX_PASS son requeridos para inicializar XML_SIGNER.');
-        }
-
-        return new XmlSigner({
-          pfxPath,
-          pfxPassword,
-          expectedRuc,
-          enforceRucInCertificate: sunatEnvironment === 'produccion',
-          allowRucMismatchWithConfirmation: mismatchConfirmed,
-        });
-      },
-      inject: [ConfigService],
-    },
-  ],
-  exports: ['XML_SIGNER'],
-})
-export class CryptoModule {} 
+@Module({})
+export class CryptoModule {}
