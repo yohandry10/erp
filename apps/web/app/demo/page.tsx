@@ -140,13 +140,9 @@ export default function DemoPage() {
   };
 
   const handleContinue = () => {
-    // Tras crear el tenant demo aún falta configurar (RUC real, certificado,
-    // configuración fiscal). Mandamos directo al wizard en vez de /dashboard
-    // para que el usuario pueda completar la configuración. Antes esto saltaba
-    // a /dashboard y, si el layout no redirigía por requiresSetup=false (porque
-    // el seed ya pone empresa_config.pais='PE'), el usuario quedaba bloqueado
-    // sin poder configurar el tenant.
-    router.push('/dashboard/wizard');
+    // La demo ya nace hidratada con país, moneda y configuración fiscal
+    // simulada. Las credenciales reales se cargan únicamente al convertirla.
+    router.push('/dashboard');
   };
 
   const copyToClipboard = async (text: string) => {
