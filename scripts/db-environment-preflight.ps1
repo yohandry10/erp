@@ -55,14 +55,19 @@ if ($actualUrlRef -ne $requiredRef) {
   throw "SUPABASE_URL no apunta al project_ref canonico de $Environment"
 }
 
-if ($Environment -eq 'PROD' -and $values['DEMO_API_ENABLED'] -ne 'false') {
-  throw 'PROD requiere DEMO_API_ENABLED=false de forma explicita'
+if ($Environment -eq 'PROD' -and $values['DEMO_API_ENABLED'] -notin @('true', 'false')) {
+  throw 'PROD requiere DEMO_API_ENABLED=true|false de forma explicita'
 }
 
 $sql = @"
 SELECT environment || '|' || project_ref || '|' || allow_demo_data::text || '|' ||
        COALESCE((SELECT bool_and(ok)::text
-                 FROM public.validar_deployment_environment_runtime('$Environment', '$requiredRef')), 'false')
+                 FROM public.validar_deployment_environment_runtime('$Environment', '$requiredRef')
+                 WHERE check_name IN (
+                   'environment_configured',
+                   'environment_matches',
+                   'project_ref_matches'
+                 )), 'false')
 FROM app.deployment_environment
 WHERE singleton = true;
 "@
@@ -76,8 +81,8 @@ $parts = $result.Split('|')
 if ($parts.Count -ne 4 -or $parts[0] -ne $Environment -or $parts[1] -ne $requiredRef -or $parts[3] -ne 'true') {
   throw "La marca interna de la base no coincide o su validador fallo: $result"
 }
-if ($Environment -eq 'PROD' -and $parts[2] -ne 'false') {
-  throw 'La base PROD permite datos demo; despliegue bloqueado'
+if ($Environment -eq 'PROD' -and $parts[2] -ne $values['DEMO_API_ENABLED']) {
+  throw 'La politica demo de PROD no coincide entre DEMO_API_ENABLED y allow_demo_data'
 }
 
-Write-Output "OK: $Environment -> $requiredRef; marca interna y politica de demos validadas."
+Write-Output "OK: $Environment -> $requiredRef; marca interna y politica demo=$($parts[2]) validadas."
