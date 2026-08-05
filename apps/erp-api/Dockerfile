@@ -64,4 +64,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "const port=process.env.PORT||'3002'; const http=require('http'); const req=http.get(`http://localhost:${port}/api/health/ready`, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"
 
 # Start the application
-CMD ["node", "apps/erp-api/dist/main.js"]
+# dist/src/main.js y no dist/main.js: el tsconfig incluye src/ como rootDir, asi
+# que nest build deja la salida bajo dist/src. Con la ruta anterior el contenedor
+# moria al arrancar con "Cannot find module".
+CMD ["node", "apps/erp-api/dist/src/main.js"]

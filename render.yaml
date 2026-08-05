@@ -1,0 +1,82 @@
+# ============================================================================
+# Blueprint de Render para la API.
+#
+# El front vive en Vercel: Next.js encaja ahi y la API no, porque necesita un
+# proceso largo con Redis y trabajos en segundo plano.
+#
+# El Key Value (Redis) se crea aparte y se conecta por REDIS_HOST: el
+# identificador del servicio es su nombre de host en la red interna de Render.
+# ============================================================================
+services:
+  - type: web
+    name: erp-api
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: codex/accounting-production-closure
+    # El Dockerfile copia package.json, pnpm-workspace.yaml, libs/ y apps/erp-api
+    # desde la raiz: el contexto tiene que ser el repo entero, no apps/erp-api.
+    dockerfilePath: ./apps/erp-api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEPLOYMENT_ENV
+        value: PROD
+      - key: PORT
+        value: 3002
+
+      # La prueba gratuita vive en produccion: el cliente prueba con su cuenta y
+      # al activarla conserva lo que cargo.
+      - key: DEMO_API_ENABLED
+        value: true
+
+      # Con NODE_ENV=production el arranque exige Redis disponible.
+      - key: REDIS_REQUIRED
+        value: true
+      - key: REDIS_PORT
+        value: 6379
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PASSWORD
+        sync: false
+
+      # Base de datos de produccion. EXPECTED_SUPABASE_PROJECT_REF hace que la
+      # API se niegue a arrancar si la apuntan a otro proyecto por error.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: EXPECTED_SUPABASE_PROJECT_REF
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+
+      # Secretos de sesion y cifrado. Se generan al desplegar y no salen del
+      # panel: si alguna vez se filtran, se rotan aqui.
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: CSRF_SECRET
+        sync: false
+      - key: AUTH_SIGNATURE_SECRET
+        sync: false
+      - key: DB_ENCRYPTION_KEY
+        sync: false
+      # Cifra los certificados de cada tenant en la base. Cambiarla deja
+      # ilegibles los ya guardados, asi que se fija una vez y no se rota a la
+      # ligera.
+      - key: ENCRYPTION_KEY
+        sync: false
+
+      # Origen del front, para CORS y para los enlaces que se envian al cliente.
+      - key: FRONTEND_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
