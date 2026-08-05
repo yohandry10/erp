@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, Logger } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common';
@@ -12,6 +12,7 @@ import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
 import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
 import { randomUUID } from 'node:crypto';
+import { CreateCategoriaProductoDto, UpdateCategoriaProductoDto } from './dto/categoria-producto.dto';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -184,21 +185,14 @@ export class InventarioController {
       
       const client = this.supabase.getClient();
       if (!client) {
-        return {
-          success: true,
-          data: {
-            totalProductos: 0,
-            valorInventario: 0,
-            movimientosHoy: 0,
-            productosStockBajo: 0
-          }
-        };
+        throw new Error('Cliente de base de datos no disponible');
       }
 
       const { data: productos, error: productosError } = await client
         .from('productos')
-        .select('precio_venta, stock_actual, stock_minimo')
-        .eq('tenant_id', tenantId);
+        .select('precio_compra, costo, stock_actual, stock_minimo')
+        .eq('tenant_id', tenantId)
+        .eq('activo', true);
 
       if (productosError) throw productosError;
 
@@ -206,7 +200,9 @@ export class InventarioController {
       const valorInventario =
         productos?.reduce(
           (sum, p) =>
-            sum + parseFloat(p.precio_venta || 0) * parseFloat((p as any).stock_actual || 0),
+            sum +
+              (parseFloat(p.precio_compra || 0) || parseFloat((p as any).costo || 0)) *
+                parseFloat((p as any).stock_actual || 0),
           0,
         ) || 0;
       const productosStockBajo =
@@ -215,14 +211,13 @@ export class InventarioController {
         ).length || 0;
 
       const hoy = new Date().toISOString().split('T')[0];
-      const { data: movimientos } = await client
-        .from('stock_movimientos')
-        .select('*')
+      const { count: movimientosHoy, error: movimientosError } = await client
+        .from('movimientos_inventario')
+        .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
         .gte('created_at', `${hoy}T00:00:00`)
-        .lt('created_at', `${hoy}T23:59:59`);
-
-      const movimientosHoy = movimientos?.length || 0;
+        .lt('created_at', `${hoy}T23:59:59.999`);
+      if (movimientosError) throw movimientosError;
 
       return {
         success: true,
@@ -230,20 +225,12 @@ export class InventarioController {
           totalProductos,
           valorInventario,
           productosStockBajo,
-          movimientosHoy
+          movimientosHoy: movimientosHoy || 0
         }
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo estadísticas', error as Error);
-      return {
-        success: true,
-        data: {
-          totalProductos: 0,
-          valorInventario: 0,
-          movimientosHoy: 0,
-          productosStockBajo: 0
-        }
-      };
+      throw new InternalServerErrorException('No fue posible calcular las estadísticas de inventario');
     }
   }
 
@@ -326,33 +313,27 @@ export class InventarioController {
         };
       }
 
-      const { data: existingProduct } = await this.supabase.getClient()
-        .from('productos')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('codigo', productData.codigo)
-        .single();
-
-      if (existingProduct) {
-        return {
-          success: false,
-          message: 'Ya existe un producto con ese código'
-        };
-      }
-
       // ✅ FIX H09: Obtener tasa de impuesto desde configuración fiscal
       const tasaIgv = await this.taxCalculator.getTasaIgv(tenantId);
       const impuestoPorcentaje = tasaIgv * 100; // Convertir 0.18 a 18.0
 
+      const parseNonNegative = (value: unknown, field: string): number => {
+        const parsed = Number(value ?? 0);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          throw new BadRequestException(`${field} debe ser un número mayor o igual a cero`);
+        }
+        return parsed;
+      };
+
       const esServicio = productData.es_servicio === true || `${productData.es_servicio}`.toLowerCase() === 'true';
       const controlaStock = esServicio ? false : !(productData.controla_stock === false || `${productData.controla_stock}`.toLowerCase() === 'false');
-      const precioVenta = parseFloat(productData.precioVenta || productData.precio_venta || 0);
-      const precioCompra = parseFloat(productData.precioCompra || productData.precio_compra || 0);
-      const stockMinimo = parseFloat(productData.stockMinimo || productData.stock_minimo || 0);
-      const stockReservado = parseFloat(productData.stockReservado || productData.stock_reservado || 0);
+      const precioVenta = parseNonNegative(productData.precioVenta ?? productData.precio_venta, 'precioVenta');
+      const precioCompra = parseNonNegative(productData.precioCompra ?? productData.precio_compra, 'precioCompra');
+      const stockMinimo = parseNonNegative(productData.stockMinimo ?? productData.stock_minimo, 'stockMinimo');
+      const stockReservado = parseNonNegative(productData.stockReservado ?? productData.stock_reservado, 'stockReservado');
       const sucursalId = productData.sucursal_id || null;
       const almacenId = productData.almacen_id || null;
-      const stockInicial = controlaStock ? parseFloat(productData.stock || 0) : 0;
+      const stockInicial = controlaStock ? parseNonNegative(productData.stock, 'stock') : 0;
       if (controlaStock && (stockInicial > 0 || stockReservado > 0) && !almacenId) {
         throw new BadRequestException('almacen_id es obligatorio para inicializar stock físico');
       }
@@ -382,48 +363,10 @@ export class InventarioController {
         atributos_extra: productData.atributos_extra || {},
       };
 
-      const { data: insertedProduct, error } = await this.supabase.getClient()
-        .from('productos')
-        .insert([nuevoProducto])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      if (controlaStock && stockInicial > 0) {
-        const { error: initialStockError } = await this.supabase.getClient().rpc(
-          'aplicar_movimiento_inventario_tx',
-          {
-            p_tenant_id: tenantId,
-            p_producto_id: insertedProduct.id,
-            p_almacen_id: almacenId,
-            p_tipo: 'ENTRADA',
-            p_cantidad: stockInicial,
-            p_referencia_tipo: 'PRODUCTO_STOCK_INICIAL',
-            p_referencia_id: insertedProduct.id,
-            p_notas: 'Stock inicial del producto',
-            p_metadata: { source: 'inventario_producto_create', costo_unitario: precioCompra },
-          },
-        );
-        if (initialStockError) throw initialStockError;
-      }
-
-      if (controlaStock && stockReservado > 0) {
-        const { error: reserveError } = await this.supabase.getClient().rpc('reservar_stock_en_almacen_tx', {
-          p_tenant_id: tenantId,
-          p_producto_id: insertedProduct.id,
-          p_almacen_id: almacenId,
-          p_cantidad: stockReservado,
-          p_referencia_tipo: 'PRODUCTO_RESERVA_INICIAL',
-          p_referencia_id: insertedProduct.id,
-          p_notas: 'Reserva inicial del producto',
-          p_metadata: { source: 'inventario_producto_create' },
-        });
-        if (reserveError) throw reserveError;
-      }
-
-      // Guardar precios por sucursal (acepta arreglo o sucursal_id individual)
-      const preciosSucursal = Array.isArray(productData.precios_sucursal) ? productData.precios_sucursal : [];
+      // El RPC inserta producto, stock/reserva y precios en una sola transacción.
+      const preciosSucursal = Array.isArray(productData.precios_sucursal)
+        ? [...productData.precios_sucursal]
+        : [];
       if (sucursalId) {
         preciosSucursal.push({
           sucursal_id: sucursalId,
@@ -432,45 +375,46 @@ export class InventarioController {
           activo: productData.activo ?? true,
         });
       }
-      if (preciosSucursal.length > 0) {
-        const preciosPayload = preciosSucursal
-          .filter((p: any) => p?.sucursal_id)
-          .map((p: any) => ({
-            producto_id: insertedProduct.id,
-            sucursal_id: p.sucursal_id,
-            moneda: p.moneda || 'PEN',
-            precio: parseFloat(p.precio ?? precioVenta ?? 0),
-            activo: p.activo ?? true,
-          }));
-        if (preciosPayload.length > 0) {
-          await this.supabase.getClient()
-            .from('producto_precios_sucursal')
-            .upsert(preciosPayload, { onConflict: 'producto_id,sucursal_id,moneda' });
+      const preciosPayload = preciosSucursal.map((precio: any, index: number) => {
+        if (!precio?.sucursal_id) {
+          throw new BadRequestException(`precios_sucursal[${index}].sucursal_id es obligatorio`);
         }
+        return {
+          sucursal_id: precio.sucursal_id,
+          moneda: precio.moneda || 'PEN',
+          precio: parseNonNegative(precio.precio ?? precioVenta, `precios_sucursal[${index}].precio`),
+          activo: precio.activo ?? true,
+        };
+      });
+
+      const { data: productoCreado, error } = await this.supabase.getClient().rpc(
+        'crear_producto_inventario_tx',
+        {
+          p_tenant_id: tenantId,
+          p_producto: nuevoProducto,
+          p_almacen_id: almacenId,
+          p_stock_inicial: stockInicial,
+          p_stock_reservado: stockReservado,
+          p_precios_sucursal: preciosPayload,
+        },
+      );
+      if (error) {
+        if (error.code === '23505' || error.message?.includes('ux_productos_tenant_codigo_ci')) {
+          throw new BadRequestException('Ya existe un producto con ese código');
+        }
+        throw error;
       }
 
-      const { data: productoCreado, error: reloadError } = await this.supabase
-        .getClient()
-        .from('productos')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('id', insertedProduct.id)
-        .single();
-      if (reloadError || !productoCreado) {
-        throw reloadError ?? new Error('No se pudo recargar el producto creado');
-      }
-
-      this.logger.log(`✅ Producto creado exitosamente: ${insertedProduct.id}`); // HARDENING: confirma alta.
+      this.logger.log(`✅ Producto creado exitosamente: ${productoCreado?.id}`); // HARDENING: confirma alta.
 
       return {
         success: true,
-        // El RPC de stock inicial actualiza la proyección del producto. Devolver
-        // el INSERT original exponía stock=0 aunque el ledger ya tuviera saldo.
         data: productoCreado,
         message: 'Producto creado exitosamente'
       };
     } catch (error) {
       this.logger.error('❌ Error creando producto', error as Error);
+      if (error instanceof BadRequestException) throw error;
       return {
         success: false,
         message: 'Error al crear el producto: ' + (error as Error).message
@@ -927,6 +871,7 @@ export class InventarioController {
         .from('categorias_producto')
         .select('*')
         .eq('tenant_id', tenantId)
+        .eq('activo', true)
         .order('orden', { ascending: true });
 
       if (error) throw error;
@@ -945,12 +890,8 @@ export class InventarioController {
   @RequirePermission('inventario.productos.create')
   @ApiOperation({ summary: 'Crear categoría de producto' })
   @ApiResponse({ status: 201, description: 'Categoría creada exitosamente' })
-  async createCategoria(@CurrentTenant() tenantId: string, @Body() body: any) {
+  async createCategoria(@CurrentTenant() tenantId: string, @Body() body: CreateCategoriaProductoDto) {
     try {
-      if (!body.nombre?.trim()) {
-        return { success: false, message: 'El nombre de la categoría es requerido' };
-      }
-
       const { data, error } = await this.supabase.getClient()
         .from('categorias_producto')
         .insert([{
@@ -971,6 +912,9 @@ export class InventarioController {
       return { success: true, data, message: 'Categoría creada exitosamente' };
     } catch (error) {
       this.logger.error('❌ Error creando categoría', error as Error);
+      if ((error as any)?.code === '23505') {
+        throw new BadRequestException('Ya existe una categoría con ese nombre');
+      }
       return { success: false, message: 'Error al crear la categoría: ' + (error as Error).message };
     }
   }
@@ -985,7 +929,7 @@ export class InventarioController {
   async updateCategoria(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
-    @Body() body: any,
+    @Body() body: UpdateCategoriaProductoDto,
   ) {
     try {
       const updateData: any = { updated_at: new Date().toISOString() };
@@ -1023,18 +967,22 @@ export class InventarioController {
   @ApiResponse({ status: 200, description: 'Categoría eliminada exitosamente' })
   async deleteCategoria(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     try {
-      const { error } = await this.supabase.getClient()
+      const { data, error } = await this.supabase.getClient()
         .from('categorias_producto')
-        .delete()
+        .update({ activo: false, updated_at: new Date().toISOString() })
         .eq('tenant_id', tenantId)
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new NotFoundException('Categoría no encontrada');
 
       this.logger.log(`✅ Categoría eliminada: ${id}`);
       return { success: true, message: 'Categoría eliminada exitosamente' };
     } catch (error) {
       this.logger.error('❌ Error eliminando categoría', error as Error);
+      if (error instanceof NotFoundException) throw error;
       return { success: false, message: 'Error al eliminar la categoría: ' + (error as Error).message };
     }
   }
