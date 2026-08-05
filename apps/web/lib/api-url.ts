@@ -31,10 +31,24 @@ export function withTrailingSlash(url: string) {
   return query === undefined ? normalizedPath : `${normalizedPath}?${query}`
 }
 
+function shouldUseSameOriginProxy() {
+  if (typeof window === 'undefined') return false
+  if (process.env.NEXT_PUBLIC_API_PROXY === 'false') return false
+
+  // Tauri no tiene un servidor Next capaz de resolver /backend. En navegador,
+  // en cambio, el proxy mismo-origen es obligatorio para que la cookie HttpOnly
+  // pertenezca al dominio de la aplicación y el middleware pueda verla.
+  return !('__TAURI_INTERNALS__' in window)
+}
+
 export function buildApiUrl(endpoint: string) {
   const normalized = normalizeApiEndpoint(endpoint)
   if (/^https?:\/\//i.test(normalized)) {
     return normalized
+  }
+
+  if (shouldUseSameOriginProxy()) {
+    return `/backend${normalized}`
   }
 
   return `${getApiBaseUrl()}${normalized}`

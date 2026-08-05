@@ -3,6 +3,7 @@ const path = require('path')
 const isTauriBuild =
   process.env.NODE_ENV === 'production' &&
   (process.env.TAURI_BUILD === '1' || process.env.npm_lifecycle_event === 'build:tauri')
+const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002').replace(/\/+$/, '')
 const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../..'),
   // Para Tauri necesitamos static export solo en build para producción
@@ -15,6 +16,7 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002',
+    NEXT_PUBLIC_API_PROXY: process.env.NEXT_PUBLIC_API_PROXY,
     NEXT_PUBLIC_COOKIE_AUTH: process.env.NEXT_PUBLIC_COOKIE_AUTH,
     TAURI_PLATFORM: process.env.TAURI_PLATFORM,
     TAURI_ARCH: process.env.TAURI_ARCH,
@@ -49,6 +51,22 @@ const nextConfig = {
   },
   // Configuración específica para Tauri - corregida
   assetPrefix: process.env.NODE_ENV === 'production' && process.env.TAURI_BUILD ? '' : undefined,
+  // El navegador y el middleware deben compartir la cookie de sesión. Vercel y
+  // Render viven en dominios distintos, por lo que las llamadas directas al API
+  // dejan la cookie en onrender.com y /dashboard no puede verla. Este rewrite
+  // convierte /backend/* en un proxy mismo-origen sin afectar el build Tauri.
+  ...(isTauriBuild
+    ? {}
+    : {
+        async rewrites() {
+          return [
+            {
+              source: '/backend/:path*',
+              destination: `${apiBaseUrl}/:path*`,
+            },
+          ]
+        },
+      }),
 }
 
 module.exports = nextConfig
