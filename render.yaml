@@ -55,25 +55,25 @@ services:
       - key: DATABASE_URL
         sync: false
 
-      # Secretos de sesion y cifrado. Se generan al desplegar y no salen del
-      # panel: si alguna vez se filtran, se rotan aqui.
+      # Los genera Render: valores de 256 bits que no pasan por ninguna otra
+      # mano. Si alguna vez se filtran, se rotan desde el panel.
       - key: JWT_SECRET
-        sync: false
+        generateValue: true
       - key: JWT_REFRESH_SECRET
-        sync: false
+        generateValue: true
       - key: SESSION_SECRET
-        sync: false
+        generateValue: true
       - key: CSRF_SECRET
-        sync: false
+        generateValue: true
       - key: AUTH_SIGNATURE_SECRET
-        sync: false
+        generateValue: true
       - key: DB_ENCRYPTION_KEY
-        sync: false
+        generateValue: true
       # Cifra los certificados de cada tenant en la base. Cambiarla deja
       # ilegibles los ya guardados, asi que se fija una vez y no se rota a la
       # ligera.
       - key: ENCRYPTION_KEY
-        sync: false
+        generateValue: true
 
       # Origen del front, para CORS y para los enlaces que se envian al cliente.
       - key: FRONTEND_URL
