@@ -13,7 +13,7 @@ export default function SuperAdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { isSuperAdmin, loading: tenantLoading } = useTenant();
+  const { isSuperAdmin, tenant, loading: tenantLoading } = useTenant();
   const { theme: dashboardTheme, toggleTheme } = useDashboardTheme();
 
   // Guard: redirect non-superadmin users
@@ -38,7 +38,10 @@ export default function SuperAdminLayout({
       className="group/dashboard min-h-screen overflow-auto bg-gradient-to-br from-background via-muted/50 to-background p-4 text-foreground group-data-[erp-theme=light]/dashboard:from-slate-50 group-data-[erp-theme=light]/dashboard:via-slate-100 group-data-[erp-theme=light]/dashboard:to-slate-200 md:p-6 lg:p-8"
     >
       <div className="fixed right-5 top-5 z-50 flex items-center gap-2">
-        <NotificationBell />
+        {/* Las notificaciones son de un tenant y el superadmin no tiene ninguno:
+            la campana pedía /notifications/unread, recibía 401 y sacaba un
+            "No autorizado para consultar este recurso" en su propio panel. */}
+        {tenant ? <NotificationBell /> : null}
         <DashboardThemeToggle
           theme={dashboardTheme}
           onToggle={toggleTheme}

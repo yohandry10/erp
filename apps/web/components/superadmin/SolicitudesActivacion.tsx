@@ -26,12 +26,21 @@ interface Solicitud {
  * credenciales que él mismo eligió en el formulario.
  */
 export default function SolicitudesActivacion() {
-  const { get, post } = useApi({ showErrorToast: false })
+  // throwOnError: sin esto useApi resuelve tambien cuando el servidor rechaza,
+  // y el panel daba por aprobada o rechazada una solicitud que no se habia
+  // tocado. Un fallo tiene que verse.
+  const { get, post } = useApi({ showErrorToast: false, throwOnError: true })
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [procesando, setProcesando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  // Activar cobra dinero de verdad y rechazar deja al cliente esperando: las
+  // dos se confirman dentro de la página, no con un diálogo del navegador.
+  const [confirmando, setConfirmando] = useState<
+    { id: string; accion: 'aprobar' | 'rechazar' } | null
+  >(null)
+  const [motivo, setMotivo] = useState('')
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -39,7 +48,12 @@ export default function SolicitudesActivacion() {
     try {
       const respuesta = await get('/demo/conversiones-pendientes')
       const filas = respuesta?.data ?? respuesta
-      setSolicitudes(Array.isArray(filas) ? filas : [])
+      // Si no llega una lista, algo fallo: mostrarlo. Vaciar la tabla en
+      // silencio hace creer que no hay nadie esperando su cuenta.
+      if (!Array.isArray(filas)) {
+        throw new Error(respuesta?.message || 'El servidor no devolvió la lista de solicitudes')
+      }
+      setSolicitudes(filas)
     } catch (e: any) {
       setError(e?.message || 'No se pudieron cargar las solicitudes')
     } finally {
@@ -53,18 +67,15 @@ export default function SolicitudesActivacion() {
   }, [])
 
   const aprobar = async (solicitud: Solicitud) => {
-    // Activar una cuenta cobra dinero de verdad: se confirma antes.
-    const seguro = window.confirm(
-      `¿Confirmas que recibiste S/ ${Number(solicitud.monto).toFixed(2)} de ${solicitud.razon_social}?\n\n` +
-        `Al aceptar, la cuenta queda activa y el cliente entra con ${solicitud.email}.`,
-    )
-    if (!seguro) return
-
+    setConfirmando(null)
     setProcesando(solicitud.id)
     setError(null)
     setAviso(null)
     try {
       const respuesta = await post(`/demo/conversiones-pendientes/${solicitud.id}/aprobar`, {})
+      if (respuesta?.success === false) {
+        throw new Error(respuesta?.message || 'No se pudo activar la cuenta')
+      }
       setAviso(respuesta?.message || `Cuenta de ${solicitud.razon_social} activada.`)
       await cargar()
     } catch (e: any) {
@@ -74,18 +85,22 @@ export default function SolicitudesActivacion() {
     }
   }
 
-  const rechazar = async (solicitud: Solicitud) => {
-    const motivo = window.prompt(
-      `¿Por qué se rechaza la solicitud de ${solicitud.razon_social}?\n(El cliente necesita saber qué corregir)`,
-    )
-    if (!motivo || !motivo.trim()) return
+  const rechazar = async (solicitud: Solicitud, motivoDado: string) => {
+    const motivo = motivoDado.trim()
+    if (!motivo) return
 
+    setConfirmando(null)
     setProcesando(solicitud.id)
     setError(null)
     setAviso(null)
     try {
-      await post(`/demo/conversiones-pendientes/${solicitud.id}/rechazar`, { motivo: motivo.trim() })
-      setAviso(`Solicitud de ${solicitud.razon_social} rechazada.`)
+      const respuesta = await post(`/demo/conversiones-pendientes/${solicitud.id}/rechazar`, {
+        motivo,
+      })
+      if (respuesta?.success === false) {
+        throw new Error(respuesta?.message || 'No se pudo rechazar la solicitud')
+      }
+      setAviso(respuesta?.message || `Solicitud de ${solicitud.razon_social} rechazada.`)
       await cargar()
     } catch (e: any) {
       setError(e?.message || 'No se pudo rechazar la solicitud')
@@ -166,23 +181,75 @@ export default function SolicitudesActivacion() {
               </p>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button
-                size="sm"
-                onClick={() => void aprobar(solicitud)}
-                disabled={procesando === solicitud.id}
-              >
-                {procesando === solicitud.id ? 'Activando...' : 'Confirmé el pago, activar'}
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => void rechazar(solicitud)}
-                disabled={procesando === solicitud.id}
-              >
-                Rechazar
-              </Button>
-            </div>
+            {confirmando?.id === solicitud.id && confirmando.accion === 'aprobar' ? (
+              <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4">
+                <p className="text-sm font-semibold text-foreground">
+                  ¿Recibiste S/ {Number(solicitud.monto).toFixed(2)} de {solicitud.razon_social}?
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Al confirmar, la cuenta queda activa y el cliente entra con {solicitud.email}.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Button size="sm" onClick={() => void aprobar(solicitud)}>
+                    Sí, recibí el pago
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => setConfirmando(null)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : confirmando?.id === solicitud.id && confirmando.accion === 'rechazar' ? (
+              <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+                <label
+                  htmlFor={`motivo-${solicitud.id}`}
+                  className="text-sm font-semibold text-foreground"
+                >
+                  ¿Por qué se rechaza? El cliente necesita saber qué corregir.
+                </label>
+                <textarea
+                  id={`motivo-${solicitud.id}`}
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  rows={2}
+                  placeholder="Ej: el comprobante no coincide con el monto"
+                  className="mt-2 w-full rounded-lg border border-border bg-card p-3 text-sm text-foreground outline-none focus:border-primary"
+                />
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={!motivo.trim()}
+                    onClick={() => void rechazar(solicitud, motivo)}
+                  >
+                    Rechazar solicitud
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => setConfirmando(null)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button
+                  size="sm"
+                  onClick={() => setConfirmando({ id: solicitud.id, accion: 'aprobar' })}
+                  disabled={procesando === solicitud.id}
+                >
+                  {procesando === solicitud.id ? 'Activando...' : 'Confirmé el pago, activar'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setMotivo('')
+                    setConfirmando({ id: solicitud.id, accion: 'rechazar' })
+                  }}
+                  disabled={procesando === solicitud.id}
+                >
+                  Rechazar
+                </Button>
+              </div>
+            )}
           </div>
         ))}
       </CardContent>

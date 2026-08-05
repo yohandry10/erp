@@ -28,6 +28,9 @@ export default function DashboardLayout({
   const { session, loading: authLoading } = useAuth();
   const country = useCountryContext();
   const { theme: dashboardTheme, toggleTheme } = useDashboardTheme();
+  const esSuperadminSinTenant = Boolean(
+    session?.user?.is_super_admin && !session.user.tenant_id,
+  );
 
   // El script del layout raíz solo fija el tema en cargas completas. En navegación
   // cliente (p.ej. login → dashboard) <html> queda sin data-erp-theme y los tokens
@@ -58,10 +61,10 @@ export default function DashboardLayout({
     // El superadmin no tiene tenant, así que el dashboard de empresa no tiene
     // nada que mostrarle: sin configuración fiscal acabaría en el asistente de
     // alta con todas las llamadas devolviendo 401. Su sitio es su propio panel.
-    if (session.user?.is_super_admin && !session.user?.tenant_id) {
+    if (esSuperadminSinTenant) {
       router.replace("/superadmin/dashboard");
     }
-  }, [session, authLoading, router]);
+  }, [session, authLoading, esSuperadminSinTenant, router]);
 
   useEffect(() => {
     if (authLoading || !session) {
@@ -69,6 +72,13 @@ export default function DashboardLayout({
     }
 
     if (country.loading) {
+      return;
+    }
+
+    // El asistente de alta configura UN tenant; el superadmin no tiene ninguno.
+    // Sin esta salida gana la carrera contra el efecto de arriba y el
+    // superadmin acaba en un formulario de alta que no es el suyo.
+    if (esSuperadminSinTenant) {
       return;
     }
 
@@ -81,6 +91,7 @@ export default function DashboardLayout({
     session,
     country.loading,
     country.requiresSetup,
+    esSuperadminSinTenant,
     pathname,
     router,
   ]);
@@ -93,6 +104,7 @@ export default function DashboardLayout({
   if (
     !authLoading &&
     session &&
+    !esSuperadminSinTenant &&
     !country.loading &&
     country.requiresSetup &&
     !isWizardRoute
