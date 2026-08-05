@@ -1,5 +1,7 @@
 export interface ConfigurationStatus {
   isComplete: boolean;
+  /** Las demos ya vienen listas y no requieren onboarding fiscal. */
+  isDemo: boolean;
   completionPercentage: number;
   missingItems: string[];
   certificate: {
