@@ -1,6 +1,62 @@
 import { DemoService } from './demo.service';
 
 describe('DemoService operational seed', () => {
+  function buildSeedService(readiness: any = { ready: true }) {
+    const rpc = jest.fn().mockResolvedValue({ data: readiness, error: null });
+    const service = new DemoService(
+      { getClient: () => ({ rpc }) } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { get: () => 'demo-encryption-key-that-is-long-enough' } as any,
+      {} as any,
+    );
+
+    for (const method of [
+      'seedAlmacenDefault',
+      'seedPlanContableMinimo',
+      'seedMetodosPago',
+      'seedCajaDefault',
+      'seedProductosDemo',
+      'seedClientesDemo',
+      'seedProveedoresDemo',
+      'seedCuentaBancariaDemo',
+      'seedEmpleadoDemo',
+    ]) {
+      jest.spyOn(service as any, method).mockResolvedValue(undefined);
+    }
+    jest.spyOn(service as any, 'seedCertificadoDemo').mockRejectedValue(new Error('PFX opcional ausente'));
+    jest.spyOn(service as any, 'seedSegundoUserAprobador').mockResolvedValue({
+      userId: 'aprobador-id',
+      email: 'aprobador@temp.local',
+      password: 'temporal',
+    });
+
+    return { service, rpc };
+  }
+
+  it('solo declara lista la demo después del RPC empresarial transaccional', async () => {
+    const { service, rpc } = buildSeedService({ ready: true, productos: 6, pedidos: 2 });
+
+    const result = await (service as any).seedDemoOperationalData('tenant-demo', 'user-demo');
+
+    expect(rpc).toHaveBeenCalledWith('hydrate_demo_business_sample_tx', {
+      p_tenant_id: 'tenant-demo',
+      p_user_id: 'user-demo',
+    });
+    expect(result).toEqual(expect.objectContaining({ aprobadorUserId: 'aprobador-id' }));
+  });
+
+  it('falla cerrado y no intenta la semilla empresarial si falta una base requerida', async () => {
+    const { service, rpc } = buildSeedService();
+    jest.spyOn(service as any, 'seedClientesDemo').mockRejectedValue(new Error('clientes no disponibles'));
+
+    await expect(
+      (service as any).seedDemoOperationalData('tenant-demo', 'user-demo'),
+    ).rejects.toThrow('clientes=clientes no disponibles');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it('inicializa el stock demo exclusivamente mediante el writer canónico', async () => {
     const insertedByTable = new Map<string, any>();
     const productosInsertados = [
