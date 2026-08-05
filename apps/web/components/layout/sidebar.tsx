@@ -100,7 +100,7 @@ const menuItems: MenuItem[] = [
     }
   },
   {
-    title: 'Inventario',
+    title: 'Productos',
     icon: Package,
     permission: {
       modulo: 'inventario',
@@ -109,9 +109,19 @@ const menuItems: MenuItem[] = [
     },
     submenu: [
       {
-        title: 'Resumen',
+        title: 'Catálogo',
         href: '/dashboard/inventario',
         icon: Package,
+        permission: {
+          modulo: 'inventario',
+          accion: 'ver',
+          recurso: 'productos'
+        }
+      },
+      {
+        title: 'Categorías',
+        href: '/dashboard/inventario/categorias',
+        icon: Settings,
         permission: {
           modulo: 'inventario',
           accion: 'ver',
@@ -304,7 +314,7 @@ const menuItems: MenuItem[] = [
   },
   {
     title: 'Configuración',
-    href: '/dashboard/wizard',
+    href: '/dashboard/configuracion/',
     icon: Settings,
     permission: {
       modulo: 'configuracion',
@@ -347,7 +357,7 @@ const getDataTour = (title: string): string => {
     Clientes: 'menu-clientes',
     Cotizaciones: 'menu-cotizaciones',
     Pedidos: 'menu-pedidos',
-    Inventario: 'menu-inventario',
+    Productos: 'menu-productos',
     Finanzas: 'menu-finanzas',
     Configuración: 'menu-configuracion',
     Usuarios: 'menu-usuarios',
@@ -602,11 +612,24 @@ export default function Sidebar() {
           // HARDENING: ocultar módulos deshabilitados por feature flags en el menú.
           if (!posEnabled && item.href === '/dashboard/pos') return false
           if (!rrhhEnabled && item.href === '/dashboard/rrhh') return false
-          if (!inventarioEnabled && item.title === 'Inventario') return false
-          if (!isPeru && (item.href === '/dashboard/sire' || item.title === 'Reportes SIRE')) return false
+          if (!inventarioEnabled && item.title === 'Productos') return false
+          if (
+            !isPeru &&
+            (
+              item.href === '/dashboard/gre' ||
+              item.href === '/dashboard/sire' ||
+              item.title === 'Reportes SIRE'
+            )
+          ) return false
           return true
         })
         .map((item) => {
+          if (!isPeru && item.href === '/dashboard/cpe') {
+            return {
+              ...item,
+              title: `Comprobantes ${country.servicioFiscal || 'fiscales'}`,
+            }
+          }
           if (!rrhhEnabled && item.submenu) {
             return {
               ...item,
@@ -615,7 +638,7 @@ export default function Sidebar() {
           }
           return item
         }),
-    [inventarioEnabled, isPeru, posEnabled, rrhhEnabled],
+    [country.servicioFiscal, inventarioEnabled, isPeru, posEnabled, rrhhEnabled],
   )
 
   const menuHrefs = useMemo(() => collectMenuHrefs(filteredMenuItems), [filteredMenuItems])

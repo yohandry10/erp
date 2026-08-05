@@ -10,6 +10,21 @@ import {
   etiquetaSinImpuesto,
 } from "@/lib/afectacion-labels";
 
+type CampoExtra = {
+  key: string;
+  label: string;
+  tipo: 'text' | 'number' | 'date' | 'select';
+  requerido: boolean;
+  opciones?: string[];
+};
+
+type CategoriaConfig = {
+  id: string;
+  nombre: string;
+  codigo: string | null;
+  campos_extra: CampoExtra[];
+};
+
 // Ni las etiquetas ni los campos tenian estilo propio: el navegador los pintaba
 // en linea y el texto de cada label quedaba pegado a su input.
 const camposClass =
@@ -19,15 +34,16 @@ export default function NuevoProductoPage() {
   const router = useRouter();
   const { get, post } = useApi();
   const country = useCountryContext();
-  const impuestoNombre = country.paisCodigo === "AR" || country.paisCodigo === "CO" ? "IVA" : "IGV";
-  // El backend exige almacen_id para abrir el stock fisico. El formulario
-  // nunca lo pedia, asi que toda alta con stock inicial fallaba.
+  // El backend exige almacen_id para poder abrir el stock fisico. El formulario
+  // nunca lo pedia, asi que cualquier alta con stock inicial fallaba.
   const [almacenes, setAlmacenes] = useState<
     Array<{ id: string; nombre: string; codigo?: string }>
   >([]);
+  const [categoriasConfig, setCategoriasConfig] = useState<CategoriaConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [atributosExtra, setAtributosExtra] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     codigo: "",
     nombre: "",
@@ -43,21 +59,40 @@ export default function NuevoProductoPage() {
     almacenId: "",
   });
 
+  const impuestoNombre = country.paisCodigo === "PE" ? "IGV" : "IVA";
+
   useEffect(() => {
     let vigente = true;
     (async () => {
       try {
-        const response = await get("/inventario/almacenes");
-        if (!vigente || !response?.success || !Array.isArray(response.data)) return;
-        setAlmacenes(response.data);
-        // Con un solo almacen no tiene sentido hacer elegir: se preselecciona.
-        if (response.data.length > 0) {
-          setFormData((prev) =>
-            prev.almacenId ? prev : { ...prev, almacenId: response.data[0].id },
+        const [almResp, catResp] = await Promise.all([
+          get("/inventario/almacenes"),
+          get("/inventario/categorias"),
+        ]);
+        if (!vigente) return;
+        if (almResp?.success && Array.isArray(almResp.data)) {
+          setAlmacenes(almResp.data);
+          if (almResp.data.length > 0) {
+            setFormData((prev) =>
+              prev.almacenId ? prev : { ...prev, almacenId: almResp.data[0].id },
+            );
+          }
+        }
+        if (catResp?.success && Array.isArray(catResp.data)) {
+          setCategoriasConfig(
+            catResp.data.map((c: any) => ({
+              id: c.id,
+              nombre: c.nombre ?? '',
+              codigo: c.codigo ?? null,
+              campos_extra: Array.isArray(c.campos_extra) ? c.campos_extra : [],
+            })),
           );
         }
       } catch {
-        if (vigente) setAlmacenes([]);
+        if (vigente) {
+          setAlmacenes([]);
+          setCategoriasConfig([]);
+        }
       }
     })();
     return () => {
@@ -65,6 +100,14 @@ export default function NuevoProductoPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (country.loading) return;
+    setFormData((prev) => ({
+      ...prev,
+      impuesto: String(Math.round(country.impuestoRate * 10000) / 100),
+    }));
+  }, [country.loading, country.impuestoRate]);
 
   const validateForm = () => {
     const nextErrors: Record<string, string> = {};
@@ -99,7 +142,8 @@ export default function NuevoProductoPage() {
       nextErrors.impuesto = "El impuesto debe estar entre 0 y 100";
     }
     if (stock > 0 && !formData.almacenId) {
-      nextErrors.almacenId = "Elige el almacén donde entra el stock inicial";
+      nextErrors.almacenId =
+        "Elige el almacén donde entra el stock inicial";
     }
 
     setErrors(nextErrors);
@@ -119,6 +163,7 @@ export default function NuevoProductoPage() {
       const response = await post("/inventario/productos", {
         ...formData,
         almacen_id: formData.almacenId || null,
+        atributos_extra: Object.keys(atributosExtra).length > 0 ? atributosExtra : undefined,
       });
 
       if (response?.success) {
@@ -142,6 +187,10 @@ export default function NuevoProductoPage() {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Al cambiar la categoría, limpiar atributos extra
+    if (name === 'categoria') {
+      setAtributosExtra({});
+    }
     if (errors[name]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -283,12 +332,24 @@ export default function NuevoProductoPage() {
               }
             >
               <option value="">Seleccione una categoría</option>
-              <option value="ELECTRONICA">Electrónica</option>
-              <option value="ALIMENTOS">Alimentos</option>
-              <option value="ROPA">Ropa</option>
-              <option value="HOGAR">Hogar</option>
-              <option value="OFICINA">Oficina</option>
-              <option value="OTROS">Otros</option>
+              {categoriasConfig.length > 0
+                ? categoriasConfig.map((cat) => (
+                    <option key={cat.id} value={cat.nombre}>
+                      {cat.nombre}
+                    </option>
+                  ))
+                : (
+                  <>
+                    <option value="ELECTRONICA">Electrónica</option>
+                    <option value="ALIMENTOS">Alimentos</option>
+                    <option value="ROPA">Ropa</option>
+                    <option value="FARMACIA">Farmacia</option>
+                    <option value="HOGAR">Hogar</option>
+                    <option value="OFICINA">Oficina</option>
+                    <option value="OTROS">Otros</option>
+                  </>
+                )
+              }
             </select>
             {errors.categoria && (
               <p
@@ -301,11 +362,73 @@ export default function NuevoProductoPage() {
           </div>
         </div>
 
+        {/* Campos dinámicos según categoría */}
+        {(() => {
+          const catConfig = categoriasConfig.find(
+            (c) => c.nombre === formData.categoria,
+          );
+          if (!catConfig || catConfig.campos_extra.length === 0) return null;
+          return (
+            <div className="relative rounded-2xl border border-primary/20 bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8 mt-4">
+              <h2 className="m-0 text-lg font-bold text-foreground">
+                Atributos de {catConfig.nombre}
+              </h2>
+              <p className="text-sm text-muted-foreground mb-3">
+                Campos específicos para productos de esta categoría.
+              </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {catConfig.campos_extra.map((campo) => (
+                  <div key={campo.key}>
+                    <label htmlFor={`attr-${campo.key}`}>
+                      {campo.label}
+                      {campo.requerido && (
+                        <span className="text-[var(--red-500)]"> *</span>
+                      )}
+                    </label>
+                    {campo.tipo === 'select' && campo.opciones ? (
+                      <select
+                        id={`attr-${campo.key}`}
+                        value={atributosExtra[campo.key] ?? ''}
+                        onChange={(e) =>
+                          setAtributosExtra((prev) => ({
+                            ...prev,
+                            [campo.key]: e.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">Seleccione...</option>
+                        {campo.opciones.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        id={`attr-${campo.key}`}
+                        type={campo.tipo === 'number' ? 'number' : campo.tipo === 'date' ? 'date' : 'text'}
+                        value={atributosExtra[campo.key] ?? ''}
+                        onChange={(e) =>
+                          setAtributosExtra((prev) => ({
+                            ...prev,
+                            [campo.key]: e.target.value,
+                          }))
+                        }
+                        placeholder={campo.label}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
           <h2 className="m-0 text-lg font-bold text-foreground">Precios e Impuestos</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label htmlFor="nuevo-precio-compra">Precio de Compra</label>
+              <label htmlFor="nuevo-precio-compra">Precio de Compra ({country.moneda || 'PEN'})</label>
               <input id="nuevo-precio-compra"
                 type="number"
                 name="precioCompra"
@@ -332,7 +455,7 @@ export default function NuevoProductoPage() {
             </div>
             <div>
               <label htmlFor="nuevo-precio-venta">
-                Precio de Venta <span className="text-[var(--red-500)]">*</span>
+                Precio de Venta ({country.moneda || 'PEN'}) <span className="text-[var(--red-500)]">*</span>
               </label>
               <input id="nuevo-precio-venta"
                 type="number"
@@ -357,7 +480,7 @@ export default function NuevoProductoPage() {
               )}
             </div>
             <div>
-              <label htmlFor="nuevo-impuesto">{impuestoNombre} (%)</label>
+              <label htmlFor="nuevo-impuesto">{country.paisCodigo === 'PE' ? 'IGV' : 'IVA'} (%)</label>
               <input id="nuevo-impuesto"
                 type="number"
                 name="impuesto"
@@ -370,7 +493,7 @@ export default function NuevoProductoPage() {
                 aria-describedby={
                   errors.impuesto ? "producto-impuesto-error" : undefined
                 }
-                placeholder="18"
+                placeholder={String(Math.round(country.impuestoRate * 10000) / 100)}
               />
               {errors.impuesto && (
                 <p
@@ -382,6 +505,9 @@ export default function NuevoProductoPage() {
               )}
             </div>
             <div>
+              {/* Sin este campo todo producto nacia gravado y no habia forma de
+                  registrar los del Apendice I de la Ley del IGV: al venderlos se
+                  cobraba un impuesto que no corresponde. */}
               <label htmlFor="nuevo-afectacion">
                 Afectación {impuestoNombre}
               </label>
