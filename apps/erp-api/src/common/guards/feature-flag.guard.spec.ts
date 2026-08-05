@@ -59,6 +59,15 @@ describe('FeatureFlagGuard', () => {
     expect(guard.canActivate(createExecutionContext())).toBe(true);
   });
 
+  it.each(['pos', 'rrhh'])('mantiene %s habilitado por defecto para el ERP y la demo', async (flag) => {
+    delete process.env.FEATURE_POS_ENABLED;
+    delete process.env.FEATURE_RRHH_ENABLED;
+    const { FeatureFlagGuard } = await import('./feature-flag.guard');
+    const guard = new FeatureFlagGuard({ get: jest.fn().mockReturnValue(flag) } as any);
+
+    expect(guard.canActivate(createExecutionContext())).toBe(true);
+  });
+
   it('no aplica validación cuando no hay metadata de feature flag', async () => {
     const { FeatureFlagGuard } = await import('./feature-flag.guard');
     const guard = new FeatureFlagGuard({ get: jest.fn().mockReturnValue(undefined) } as any);
