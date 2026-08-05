@@ -26,6 +26,22 @@ RUN pnpm --filter=@erp-suite/crypto build
 # Build the application
 RUN pnpm --filter=@erp-suite/erp-api build
 
+# Segun que fichero entre en el tsconfig, TypeScript deduce como raiz src/ o el
+# directorio de la app, y la salida queda en dist/main.js o en dist/src/main.js.
+# Adivinar cual de los dos costo un despliegue caido en bucle, asi que aqui se
+# aplana a una sola forma y se comprueba: si no hay main.js, falla el BUILD, que
+# se ve, en vez de fallar al arrancar, que no.
+RUN if [ -f apps/erp-api/dist/src/main.js ]; then \
+      mv apps/erp-api/dist/src apps/erp-api/.dist-plano && \
+      rm -rf apps/erp-api/dist && \
+      mv apps/erp-api/.dist-plano apps/erp-api/dist; \
+    fi && \
+    if [ ! -f apps/erp-api/dist/main.js ]; then \
+      echo "ERROR: el build no produjo apps/erp-api/dist/main.js. Contenido:" && \
+      ls -R apps/erp-api/dist 2>/dev/null | head -40 && \
+      exit 1; \
+    fi
+
 # Production stage
 FROM node:20-alpine AS production
 
@@ -64,7 +80,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "const port=process.env.PORT||'3002'; const http=require('http'); const req=http.get(`http://localhost:${port}/api/health/ready`, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"
 
 # Start the application
-# dist/src/main.js y no dist/main.js: el tsconfig incluye src/ como rootDir, asi
-# que nest build deja la salida bajo dist/src. Con la ruta anterior el contenedor
-# moria al arrancar con "Cannot find module".
-CMD ["node", "apps/erp-api/dist/src/main.js"]
+# La etapa de build garantiza que este fichero existe, sea cual sea la raiz que
+# haya deducido TypeScript.
+CMD ["node", "apps/erp-api/dist/main.js"]

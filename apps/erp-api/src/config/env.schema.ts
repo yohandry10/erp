@@ -65,11 +65,27 @@ export interface AppEnvironment {
 
 const secretPattern = /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+=[\]{}|\\:;"'<>,.?/~`-])/;
 
-const requiredInProduction = (schema: Joi.StringSchema) => Joi.when('NODE_ENV', {
-  is: 'test',
-  then: schema.optional(),
-  otherwise: schema.required(),
-});
+/**
+ * Un secreto de servidor no lo teclea nadie: lo genera una maquina y se guarda
+ * en el gestor de secretos del entorno. Exigirle "una mayuscula y un simbolo"
+ * es una regla de contrasenas humanas mal aplicada: rechaza 64 caracteres
+ * hexadecimales —256 bits de entropia— y acepta "Aa1!" repetido ocho veces.
+ *
+ * Se aceptan dos formas: suficientemente largo para venir de un generador, o
+ * mas corto pero con mezcla de tipos, para los que todavia se escriban a mano.
+ */
+const LONGITUD_SECRETO_GENERADO = 44;
+const secretoDeServidor = Joi.alternatives().try(
+  Joi.string().min(LONGITUD_SECRETO_GENERADO),
+  Joi.string().min(32).pattern(secretPattern),
+);
+
+const requiredInProduction = (schema: Joi.StringSchema | Joi.AlternativesSchema) =>
+  Joi.when('NODE_ENV', {
+    is: 'test',
+    then: schema.optional(),
+    otherwise: schema.required(),
+  });
 
 export const envSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'staging', 'production').default('development'),
@@ -86,7 +102,7 @@ export const envSchema = Joi.object({
 
   SUPABASE_URL: requiredInProduction(Joi.string().uri()),
   SUPABASE_SERVICE_ROLE_KEY: requiredInProduction(
-    Joi.string().min(32).pattern(secretPattern),
+    secretoDeServidor,
   ),
   SUPABASE_ANON_KEY: requiredInProduction(Joi.string().min(32)),
   HASH_SALT_ROUNDS: Joi.number().integer().min(8).max(20).default(12),
@@ -94,7 +110,7 @@ export const envSchema = Joi.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: Joi.string().min(32).optional(),
 
   JWT_SECRET: requiredInProduction(
-    Joi.string().min(32).pattern(secretPattern),
+    secretoDeServidor,
   ),
   JWT_REFRESH_SECRET: requiredInProduction(
     Joi.string().min(32),
@@ -106,7 +122,7 @@ export const envSchema = Joi.object({
   SESSION_SECRET: requiredInProduction(Joi.string().min(32)),
   CSRF_SECRET: requiredInProduction(Joi.string().min(32)),
   AUTH_SIGNATURE_SECRET: requiredInProduction(
-    Joi.string().min(32).pattern(secretPattern),
+    secretoDeServidor,
   ),
 
   HEALTH_TOKEN: Joi.string().optional(),
