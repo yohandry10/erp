@@ -115,14 +115,25 @@ describe('env.schema', () => {
     expect(onlyPass.error).toBeDefined();
   });
 
-  it('requiere certificado fiscal real en production', () => {
+  it('arranca en production sin certificado global: cada tenant sube el suyo', () => {
     const result = envSchema.validate({
       ...baseConfig,
       PFX_PATH: undefined,
       PFX_PASS: undefined,
     });
 
-    expect(result.error).toBeDefined();
+    expect(result.error).toBeUndefined();
+  });
+
+  it('exige el certificado global si se pide explicitamente', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      REQUIRE_REAL_FISCAL_CERTIFICATE: true,
+      PFX_PATH: undefined,
+      PFX_PASS: undefined,
+    });
+
+    expect(result.error?.message).toContain('REQUIRE_REAL_FISCAL_CERTIFICATE');
   });
 
   it('permite omitir certificado fiscal global en development', () => {

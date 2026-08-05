@@ -190,9 +190,14 @@ export const envSchema = Joi.object({
     });
   }
 
-  if ((value.NODE_ENV === 'production' || value.REQUIRE_REAL_FISCAL_CERTIFICATE) && !(hasPfxPath && hasPfxPass)) {
+  // Un SaaS multi-tenant no tiene un certificado fiscal global: cada cliente
+  // sube el suyo y la emision ya se niega si el certificado no es del RUC que
+  // firma (ver CertificateOwnershipError; no hay fallback silencioso). Exigirlo
+  // al arrancar hacia imposible desplegar en produccion. Queda como opcion
+  // explicita para instalaciones de una sola empresa con certificado propio.
+  if (value.REQUIRE_REAL_FISCAL_CERTIFICATE && !(hasPfxPath && hasPfxPass)) {
     return helpers.message({
-      custom: 'Produccion fiscal requiere PFX_PATH y PFX_PASS, o un certificado fiscal valido por tenant antes de emitir.',
+      custom: 'REQUIRE_REAL_FISCAL_CERTIFICATE exige PFX_PATH y PFX_PASS.',
     });
   }
 
