@@ -6,7 +6,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 type TestRequest = {
   path: string;
   headers: Record<string, string>;
-  user?: { tenant_id?: string; email?: string };
+  user?: { tenant_id?: string; email?: string; is_super_admin?: boolean };
   tenantId?: string;
   tenant_id?: string;
 };
@@ -98,4 +98,21 @@ describe('JwtAuthGuard', () => {
 
     await expect(guard.canActivate(context)).rejects.toThrow('Token inválido: falta tenant_id');
   });
-}); 
+
+  it('deja pasar al superadmin sin tenant_id pero no le inventa uno', async () => {
+    const reflector = createReflector(false);
+    const guard = new JwtAuthGuard(undefined, reflector);
+    const request: TestRequest = {
+      path: '/api/demo/conversiones-pendientes',
+      headers: { authorization: 'Bearer token' },
+      user: { email: 'superadmin@prueba.com', is_super_admin: true },
+    };
+
+    const context = mockExecutionContext(request);
+    getJwtCanActivateSpy(guard).mockResolvedValue(true);
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(request.tenantId).toBeUndefined();
+    expect(request.tenant_id).toBeUndefined();
+  });
+});

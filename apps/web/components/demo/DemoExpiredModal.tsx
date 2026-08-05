@@ -37,7 +37,7 @@ export function DemoExpiredModal({ open, onClose }: DemoExpiredModalProps) {
   };
 
   const handleContactSales = () => {
-    window.location.href = 'mailto:ventas@tuerp.com?subject=Consulta sobre cuenta real';
+    window.location.href = 'mailto:operaciones@nextelco.cloud?subject=Consulta sobre cuenta real';
   };
 
   return (

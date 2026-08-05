@@ -34,8 +34,10 @@ async function hasValidJwt(request: NextRequest): Promise<boolean> {
       algorithms: ['HS256'],
     });
     // El backend incluye tenant_id en el payload; sin él el JWT no es útil para
-    // este sistema multi-tenant aunque la firma sea válida.
-    if (!payload.tenant_id) return false;
+    // este sistema multi-tenant aunque la firma sea válida. La excepción es el
+    // superadmin, que no pertenece a ningún tenant: sin esto no podía entrar ni
+    // a su propio panel.
+    if (!payload.tenant_id && payload.is_super_admin !== true) return false;
     return true;
   } catch {
     // jose lanza si firma inválida, expirado, o malformado. Cualquiera de los

@@ -54,6 +54,13 @@ export default function DashboardLayout({
       router.replace("/login");
       return;
     }
+
+    // El superadmin no tiene tenant, así que el dashboard de empresa no tiene
+    // nada que mostrarle: sin configuración fiscal acabaría en el asistente de
+    // alta con todas las llamadas devolviendo 401. Su sitio es su propio panel.
+    if (session.user?.is_super_admin && !session.user?.tenant_id) {
+      router.replace("/superadmin/dashboard");
+    }
   }, [session, authLoading, router]);
 
   useEffect(() => {

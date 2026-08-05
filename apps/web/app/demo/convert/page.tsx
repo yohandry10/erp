@@ -5,6 +5,22 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/lib/api-fetch';
 
+interface InstruccionesDePago {
+  solicitud_id: string;
+  monto: number;
+  plan: string;
+  datos_pago: {
+    titular: string;
+    banco: string;
+    cuenta: string;
+    cci: string;
+    moneda: string;
+    whatsapp: string;
+    whatsappUrl: string;
+    email: string;
+  };
+}
+
 export default function ConvertDemoPage() {
   const router = useRouter();
   const { signIn } = useAuth();
@@ -20,6 +36,10 @@ export default function ConvertDemoPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Instrucciones de transferencia. Mientras estén puestas, la pantalla deja de
+  // ser un formulario y pasa a ser "pague y espere".
+  const [pago, setPago] = useState<InstruccionesDePago | null>(null);
+  const [copiado, setCopiado] = useState<string | null>(null);
   // Que pasa con lo que el cliente probo en el demo. Se pregunta en vez de
   // decidirlo por el: hay quien viene de cargar su catalogo entero y hay quien
   // solo estuvo trasteando y quiere entrar limpio.
@@ -68,8 +88,19 @@ export default function ConvertDemoPage() {
         window.location.assign(data.payment_url);
         return;
       }
-      // Pago pendiente (sin pasarela configurada): es un estado válido, no un
-      // error. Se muestra como aviso informativo en lugar de la caja roja.
+      // Pago por transferencia: es un estado válido, no un error. Se cambia el
+      // formulario por las instrucciones y la pantalla se queda esperando.
+      if (data.payment_pending && data.datos_pago) {
+        setPago({
+          solicitud_id: data.solicitud_id,
+          monto: Number(data.monto) || 0,
+          plan: data.plan,
+          datos_pago: data.datos_pago,
+        });
+        setLoading(false);
+        return;
+      }
+
       if (!data.token) {
         setNotice(
           data.instrucciones ||
@@ -87,6 +118,58 @@ export default function ConvertDemoPage() {
     } catch (err: any) {
       setError(err.message || 'Error al convertir la cuenta');
       setLoading(false);
+    }
+  };
+
+  // Mientras la solicitud esté pendiente se pregunta cada 15 s. En cuanto se
+  // confirma el pago, el cliente entra sin tocar nada: ya eligió su correo y su
+  // contraseña en el formulario, no hace falta pedírselos otra vez. Y si cerró
+  // la pestaña, entra por el login normal con esas mismas credenciales.
+  useEffect(() => {
+    if (!pago) return;
+
+    let cancelado = false;
+
+    const revisar = async () => {
+      try {
+        const response = await fetchApi(
+          `/api/demo/conversiones-pendientes/${pago.solicitud_id}/estado`,
+        );
+        if (!response.ok || cancelado) return;
+
+        const { estado } = await response.json();
+        if (cancelado) return;
+
+        if (estado === 'COMPLETADA') {
+          await signIn(formData.email, formData.password);
+          router.push('/dashboard');
+        } else if (estado !== 'PENDIENTE') {
+          setPago(null);
+          setError(
+            'La solicitud no siguió adelante. Escríbenos y la revisamos contigo.',
+          );
+        }
+      } catch {
+        // Un fallo de red no cancela la espera: se reintenta en el siguiente turno.
+      }
+    };
+
+    const temporizador = window.setInterval(revisar, 15000);
+    void revisar();
+
+    return () => {
+      cancelado = true;
+      window.clearInterval(temporizador);
+    };
+  }, [pago, formData.email, formData.password, signIn, router]);
+
+  const copiar = async (etiqueta: string, valor: string) => {
+    try {
+      await navigator.clipboard.writeText(valor);
+      setCopiado(etiqueta);
+      window.setTimeout(() => setCopiado(null), 2000);
+    } catch {
+      // Sin permiso de portapapeles el número sigue visible para copiarlo a mano.
     }
   };
 
@@ -109,6 +192,78 @@ export default function ConvertDemoPage() {
           </p>
         </div>
 
+        {pago ? (
+          <div className="rounded-3xl p-10 shadow bg-card border border-border">
+            <h2 className="text-xl font-bold text-foreground mb-2">
+              Ya casi: falta la transferencia
+            </h2>
+            <p className="text-muted-foreground mb-6 text-[0.875rem]">
+              {pago.plan}. Transfiere el monto, envíanos el comprobante por
+              WhatsApp y activamos tu cuenta.
+            </p>
+
+            <div className="rounded-2xl border border-primary/30 bg-primary/10 p-5 mb-6 text-center">
+              <p className="text-sm text-muted-foreground">Monto a transferir</p>
+              <p className="text-[2rem] font-extrabold text-primary leading-tight">
+                S/ {pago.monto.toFixed(2)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border divide-y divide-border mb-6">
+              {[
+                { etiqueta: 'Titular', valor: pago.datos_pago.titular, copiable: false },
+                { etiqueta: 'Banco', valor: pago.datos_pago.banco, copiable: false },
+                { etiqueta: 'Tipo de cuenta', valor: pago.datos_pago.moneda, copiable: false },
+                { etiqueta: 'Número de cuenta', valor: pago.datos_pago.cuenta, copiable: true },
+                { etiqueta: 'CCI', valor: pago.datos_pago.cci, copiable: true },
+              ].map((fila) => (
+                <div key={fila.etiqueta} className="flex items-center justify-between gap-4 p-4">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">{fila.etiqueta}</p>
+                    <p className="font-semibold text-foreground break-all">{fila.valor}</p>
+                  </div>
+                  {fila.copiable && (
+                    <button
+                      type="button"
+                      onClick={() => copiar(fila.etiqueta, fila.valor)}
+                      className="shrink-0 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-accent"
+                    >
+                      {copiado === fila.etiqueta ? 'Copiado' : 'Copiar'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <a
+              href={pago.datos_pago.whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-[100%] py-4 px-8 bg-[#25D366] text-white rounded-xl text-base font-semibold shadow transition hover:brightness-95 flex items-center justify-center gap-2"
+            >
+              Enviar el comprobante por WhatsApp ({pago.datos_pago.whatsapp})
+            </a>
+
+            <p className="text-xs text-center text-muted-foreground mt-4">
+              ¿Prefieres correo? Escríbenos a{' '}
+              <a href={`mailto:${pago.datos_pago.email}`} className="text-primary font-semibold">
+                {pago.datos_pago.email}
+              </a>
+            </p>
+
+            <div className="mt-6 rounded-xl border border-border bg-accent/40 p-4 text-center">
+              <p className="text-sm font-semibold text-foreground">
+                Esperando la confirmación del pago…
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                En cuanto lo verifiquemos entrarás automáticamente. Si cierras esta
+                pantalla, entra en el login normal con{' '}
+                <span className="font-semibold text-foreground">{formData.email}</span> y la
+                contraseña que acabas de elegir.
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="rounded-3xl p-10 shadow bg-card border border-border">
           <h2 className="text-xl font-bold text-foreground mb-2">
             Información de tu Empresa
@@ -313,6 +468,7 @@ export default function ConvertDemoPage() {
             </div>
           )}
         </div>
+        )}
 
         <div className="text-center mt-6">
           <button

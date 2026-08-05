@@ -67,6 +67,21 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
     const currentUser = session.user
 
+    // El superadmin no pertenece a ningún tenant: se queda con sesión y sin
+    // tenant. Antes caía en el signOut de abajo, así que iniciaba sesión
+    // correctamente y acto seguido se le cerraba, sin poder llegar nunca a su
+    // panel.
+    if (!currentUser.tenant_id && currentUser.is_super_admin) {
+      setUser({
+        ...currentUser,
+        nombre: currentUser.nombre || currentUser.email?.split('@')[0] || 'Usuario',
+      })
+      setTenant(null)
+      setError(null)
+      setLoading(false)
+      return
+    }
+
     if (!currentUser.tenant_id) {
       await customAuth.signOut()
       setUser(null)
