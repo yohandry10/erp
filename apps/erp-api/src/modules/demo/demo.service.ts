@@ -7,6 +7,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { SupabaseService } from "../../shared/supabase/supabase.service";
 import { camposALimpiarEnConversionReal } from "./demo-conversion-cleanup";
+import { obtenerDatosDePago } from "./datos-de-pago";
 import { TenantContextService } from "../../shared/tenant/tenant-context.service";
 import { AuthService } from "../auth/auth.service";
 import * as bcrypt from "bcrypt";
@@ -1008,9 +1009,54 @@ export class DemoService {
       return this.completarConversion(tenantId, dto);
     }
 
+    // Pago por transferencia. La solicitud tiene que quedar registrada aquí:
+    // antes solo se guardaba en la rama de Stripe, así que el cliente veía
+    // "solicitud registrada" y no había ninguna solicitud en ningún sitio. El
+    // superadmin no tenía nada que aprobar y el pago se perdía.
+    const { data: solicitud, error: solicitudError } = await this.client
+      .from("demo_conversiones_pendientes")
+      .upsert(
+        {
+          tenant_id: tenantId,
+          stripe_session_id: null,
+          razon_social: dto.razon_social,
+          ruc: dto.ruc,
+          email: dto.email,
+          password_hash: await bcrypt.hash(dto.password, 10),
+          telefono: dto.telefono,
+          plan_id: dto.plan_id || "basico",
+          periodo: dto.periodo || "mensual",
+          monto,
+          conservar_datos: dto.conservar_datos !== false,
+          // Marca el medio de pago: sin esto la fila pasa por el normalizador
+          // como si fuera un checkout de Stripe al que le falta la sesión, y
+          // se cancela sola antes de que nadie la vea.
+          checkout_provider: "TRANSFERENCIA",
+          estado: "PENDIENTE",
+        },
+        // Si el cliente reenvía el formulario no se apilan solicitudes: se
+        // actualiza la suya, que es lo que espera ver el que aprueba.
+        { onConflict: "tenant_id" },
+      )
+      .select("id")
+      .single();
+
+    if (solicitudError) {
+      throw new BadRequestException(
+        `No se pudo registrar la solicitud de activación: ${solicitudError.message}`,
+      );
+    }
+
+    const pago = obtenerDatosDePago({
+      razonSocial: dto.razon_social,
+      ruc: dto.ruc,
+      monto,
+    });
+
     return {
       success: true,
       payment_pending: true,
+      solicitud_id: solicitud?.id,
       plan: plan.nombre,
       plan_id: plan.id,
       periodo: dto.periodo || "mensual",
@@ -1022,7 +1068,140 @@ export class DemoService {
         email: dto.email,
         telefono: dto.telefono,
       },
-      instrucciones: "Contacte a ventas@erp.pe para completar el pago",
+      datos_pago: pago,
+      instrucciones: `Transfiera S/ ${monto.toFixed(2)} a la cuenta ${pago.banco} ${pago.cuenta} de ${pago.titular} y envíe el comprobante por WhatsApp al ${pago.whatsapp} o a ${pago.email}. Su cuenta se activa en cuanto verifiquemos el pago.`,
+    };
+  }
+
+  /**
+   * Estado de una solicitud, para que la pantalla del cliente sepa cuándo se
+   * confirmó el pago sin tener que reintentar el login a ciegas. Devuelve solo
+   * el estado: no expone ningún dato del negocio a quien tenga el id.
+   */
+  async estadoConversionPendiente(solicitudId: string) {
+    // getAdminClient y no adminClient: la consulta llega sin sesión —el cliente
+    // solo espera— y adminClient exige contexto de tenant.
+    const { data } = await this.supabase
+      .getAdminClient()
+      .from("demo_conversiones_pendientes")
+      .select("estado")
+      .eq("id", solicitudId)
+      .maybeSingle();
+
+    if (!data) {
+      throw new NotFoundException("La solicitud no existe");
+    }
+
+    return { estado: String(data.estado).toUpperCase() };
+  }
+
+  /**
+   * Solicitudes de activación esperando que se verifique la transferencia.
+   * Solo para el superadmin: lleva datos de contacto de otros negocios.
+   */
+  async listarConversionesPendientes() {
+    const { data, error } = await this.adminClient
+      .from("demo_conversiones_pendientes")
+      .select(
+        "id, tenant_id, razon_social, ruc, email, telefono, plan_id, periodo, monto, conservar_datos, estado, created_at",
+      )
+      .eq("estado", "PENDIENTE")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      throw new BadRequestException(
+        `No se pudieron leer las solicitudes: ${error.message}`,
+      );
+    }
+
+    return { success: true, data: data || [], total: (data || []).length };
+  }
+
+  /**
+   * El superadmin confirma que la transferencia llegó y la cuenta se activa.
+   * Es el mismo camino que recorre el webhook de Stripe: no hay dos formas de
+   * convertir una cuenta, solo dos formas de confirmar que se pagó.
+   */
+  async aprobarConversionPendiente(solicitudId: string, aprobadoPor?: string) {
+    const { data: solicitud, error } = await this.adminClient
+      .from("demo_conversiones_pendientes")
+      .select("*")
+      .eq("id", solicitudId)
+      .eq("estado", "PENDIENTE")
+      .maybeSingle();
+
+    if (error || !solicitud) {
+      throw new NotFoundException("La solicitud no existe o ya fue procesada");
+    }
+
+    const resultado = await this.completarConversion(solicitud.tenant_id, {
+      razon_social: solicitud.razon_social,
+      ruc: solicitud.ruc,
+      email: solicitud.email,
+      password: "", // No se usa: la contraseña ya viaja hasheada.
+      password_hash: solicitud.password_hash,
+      telefono: solicitud.telefono,
+      plan_id: solicitud.plan_id,
+      periodo: solicitud.periodo,
+      conservar_datos: solicitud.conservar_datos !== false,
+    } as ConvertDemoToRealDto);
+
+    // La solicitud se cierra después de convertir, nunca antes: si se marcara
+    // completada primero y la conversión fallara, quedaría un cliente que pagó
+    // y no aparece en ninguna lista.
+    await this.adminClient
+      .from("demo_conversiones_pendientes")
+      .update({
+        estado: "COMPLETADA",
+        completed_at: new Date().toISOString(),
+        aprobado_por: aprobadoPor || null,
+        aprobado_at: new Date().toISOString(),
+      })
+      .eq("id", solicitudId);
+
+    return {
+      success: true,
+      message: `Cuenta de ${solicitud.razon_social} activada. Ya puede entrar con ${solicitud.email}.`,
+      tenant_id: solicitud.tenant_id,
+      email: solicitud.email,
+      plan: resultado.plan,
+    };
+  }
+
+  /**
+   * Rechazo con motivo: el cliente tiene que poder saber qué corregir.
+   */
+  async rechazarConversionPendiente(solicitudId: string, motivo: string) {
+    const { data: solicitud } = await this.adminClient
+      .from("demo_conversiones_pendientes")
+      .select("id, razon_social")
+      .eq("id", solicitudId)
+      .eq("estado", "PENDIENTE")
+      .maybeSingle();
+
+    if (!solicitud) {
+      throw new NotFoundException("La solicitud no existe o ya fue procesada");
+    }
+
+    const { error } = await this.adminClient
+      .from("demo_conversiones_pendientes")
+      .update({
+        estado: "CANCELADA",
+        failed_at: new Date().toISOString(),
+        motivo_rechazo: motivo,
+      })
+      .eq("id", solicitudId);
+
+    if (error) {
+      throw new BadRequestException(
+        `No se pudo rechazar la solicitud: ${error.message}`,
+      );
+    }
+
+    return {
+      success: true,
+      message: `Solicitud de ${solicitud.razon_social} rechazada.`,
+      motivo,
     };
   }
 
@@ -1081,6 +1260,25 @@ export class DemoService {
         );
       }
 
+      // El demo no tiene un solo usuario: además del principal se siembra un
+      // "Aprobador" para que las OC puedan aprobarse sin autoaprobación. Poner
+      // el correo del cliente en todos a la vez rompía la conversión con
+      // "usuarios_sistema_email_key". El correo va al principal —el que crea el
+      // RPC, siempre el primero— y el resto solo deja de ser demo.
+      const { data: usuariosDemo, error: usuariosDemoError } = await authClient
+        .from("usuarios_sistema")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("is_demo_user", true)
+        .order("created_at", { ascending: true });
+
+      if (usuariosDemoError) throw usuariosDemoError;
+      if (!usuariosDemo?.length) {
+        throw new Error("La cuenta demo no tiene usuario que convertir");
+      }
+
+      const [principal, ...acompanantes] = usuariosDemo;
+
       const { error: usuarioError } = await authClient
         .from("usuarios_sistema")
         .update({
@@ -1090,10 +1288,25 @@ export class DemoService {
           demo_email_temp: null,
           updated_at: new Date().toISOString(),
         })
-        .eq("tenant_id", tenantId)
-        .eq("is_demo_user", true);
+        .eq("id", principal.id);
 
       if (usuarioError) throw usuarioError;
+
+      if (acompanantes.length) {
+        const { error: acompanantesError } = await authClient
+          .from("usuarios_sistema")
+          .update({
+            is_demo_user: false,
+            demo_email_temp: null,
+            updated_at: new Date().toISOString(),
+          })
+          .in(
+            "id",
+            acompanantes.map((u) => u.id),
+          );
+
+        if (acompanantesError) throw acompanantesError;
+      }
 
       const { data: usuario } = await authClient
         .from("usuarios_sistema")
@@ -1106,12 +1319,20 @@ export class DemoService {
         throw new Error("Usuario convertido no encontrado");
       }
 
-      const authResult = await this.authService.login(
-        { email: dto.email, password: dto.password },
-        "demo-webhook",
-        "demo-conversion",
-      );
-      const token = authResult.access_token;
+      // Solo se devuelve sesión iniciada si tenemos la contraseña en claro, que
+      // es el caso en que el propio cliente acaba de enviar el formulario. Si la
+      // conversión la confirma el superadmin días después, la contraseña solo
+      // existe hasheada: el cliente entra por el login normal con las
+      // credenciales que él mismo eligió.
+      let token: string | undefined;
+      if (dto.password) {
+        const authResult = await this.authService.login(
+          { email: dto.email, password: dto.password },
+          "demo-webhook",
+          "demo-conversion",
+        );
+        token = authResult.access_token;
+      }
 
       return {
         success: true,

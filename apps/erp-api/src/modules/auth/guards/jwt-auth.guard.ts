@@ -77,7 +77,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
 
     // ✅ A3: Validar tenant_id en el payload
-    if (!user.tenant_id) {
+    // El superadmin pasa sin tenant_id porque no pertenece a ninguno; a cambio
+    // no se le fija tenantId en el request, así que cualquier servicio que
+    // dependa del tenant seguirá fallando en vez de asumir uno.
+    if (!user.tenant_id && user.is_super_admin !== true) {
       this.logger.warn(
         `⚠️ [A3] Request sin tenant_id - Usuario: ${user.id}, Path: ${request.path}`
       );
@@ -85,8 +88,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
 
     // ✅ A3: Poner tenant_id en request para uso en servicios y guards
-    request.tenantId = user.tenant_id;
-    request.tenant_id = user.tenant_id;
+    if (user.tenant_id) {
+      request.tenantId = user.tenant_id;
+      request.tenant_id = user.tenant_id;
+    }
 
     // Validar sesión activa si AuthService está disponible y el token tiene session_token
     if (this.authService && user.session_token) {

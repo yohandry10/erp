@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTenant } from '@/contexts/TenantContext'
 import { useApi } from '@/hooks/use-api'
 import CrearTenants from '@/components/superadmin/CrearTenants'
+import SolicitudesActivacion from '@/components/superadmin/SolicitudesActivacion'
 import { TenantSwitcher } from '@/components/tenant/TenantSwitcher'
 import { Building2, Shield, UserCheck, Users } from 'lucide-react'
 import { PageShell } from '@/components/erp/page-shell'
@@ -158,6 +159,9 @@ export default function SuperAdminDashboard() {
           </button>
         </CardContent>
       </Card>
+
+      {/* Pagos por transferencia esperando confirmación */}
+      <SolicitudesActivacion />
 
       {/* Tenant Management */}
       <CrearTenants />

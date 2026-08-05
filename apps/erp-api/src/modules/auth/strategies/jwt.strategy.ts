@@ -52,7 +52,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
       
       // ✅ MULTI-TENANT: Validar tenant_id en el payload
-      if (!payload.tenant_id) {
+      // El superadmin es la única excepción: no pertenece a ningún tenant, los
+      // atraviesa todos (ver TenantGuard), así que su token sale sin tenant_id.
+      if (!payload.tenant_id && payload.is_super_admin !== true) {
         console.warn('⚠️ [JWT Strategy] Token sin tenant_id detectado');
         throw new UnauthorizedException('Token inválido: falta tenant_id');
       }

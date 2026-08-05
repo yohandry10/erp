@@ -101,6 +101,10 @@ export class PermissionGuard implements CanActivate {
 
       user = request.user;
 
+      if (user.is_super_admin) {
+        return true;
+      }
+
       if (!user.tenant_id) {
         throw new UnauthorizedException('Tenant no identificado en token');
       }
