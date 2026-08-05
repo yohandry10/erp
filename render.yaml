@@ -31,6 +31,10 @@ services:
       # al activarla conserva lo que cargo.
       - key: DEMO_API_ENABLED
         value: true
+      - key: FEATURE_POS_ENABLED
+        value: true
+      - key: FEATURE_RRHH_ENABLED
+        value: true
 
       # Con NODE_ENV=production el arranque exige Redis disponible.
       - key: REDIS_REQUIRED
