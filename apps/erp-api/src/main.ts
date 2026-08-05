@@ -312,4 +312,9 @@ Para más información, consulte la documentación técnica en el repositorio.
   console.log(`🔗 CORS configurado para entornos permitidos`);
 }
 
-bootstrap();
+// Sin este catch, un fallo al arrancar terminaba el proceso sin decir por que:
+// en un servidor gestionado solo se veia "Exited with status 1" y a adivinar.
+bootstrap().catch((error) => {
+  console.error('[bootstrap] La API no pudo arrancar:', error);
+  process.exit(1);
+});
