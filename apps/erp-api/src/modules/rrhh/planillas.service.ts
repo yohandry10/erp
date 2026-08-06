@@ -1648,6 +1648,8 @@ export class PlanillasService {
         .eq('tenant_id', tenantId)
         .eq('codigo', codigo)
         .eq('activo', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
 
       if (error || !data) {
@@ -1687,6 +1689,8 @@ export class PlanillasService {
             .eq('tenant_id', tenantId)
             .eq('codigo', codigo)
             .eq('activo', true)
+            .order('created_at', { ascending: true })
+            .limit(1)
             .maybeSingle();
 
           if (!existenteError && existente?.id) {

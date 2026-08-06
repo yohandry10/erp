@@ -192,6 +192,8 @@ export class RecepcionesService {
           items:recepcion_items!recepcion_items_recepcion_id_fkey_runtime(
             *,
             producto:productos!recepcion_items_producto_id_fkey_runtime(id, codigo, nombre, sku),
+            almacen:almacenes!fk_recepcion_items_almacen_id_v2(id, codigo, nombre),
+            ubicacion:almacen_ubicaciones!fk_recepcion_items_ubicacion_id_v2(id, codigo, nombre),
             detalle:orden_compra_detalles!recepcion_items_detalle_id_fkey_runtime(
               id,
               descripcion,
@@ -227,8 +229,35 @@ export class RecepcionesService {
 
       this.logger.log(`✅ Recepción obtenida: ${(data as any).numero}`);
       const items = Array.isArray((data as any).items) ? (data as any).items : [];
+      const normalizarDetalle = (devueltoPorItem = new Map<string, number>()) => ({
+        ...(data as any),
+        orden: (data as any).orden
+          ? {
+              ...(data as any).orden,
+              proveedores: (data as any).orden.proveedor ?? (data as any).orden.proveedores,
+            }
+          : null,
+        almacenes: items[0]?.almacen ?? null,
+        ubicaciones: items[0]?.ubicacion ?? null,
+        items: items.map((item: any) => {
+          const cantidadRecibida = Number(item.cantidad_recibida || item.cantidad || 0);
+          const cantidadDevuelta = devueltoPorItem.get(item.id) || 0;
+          const calidadRaw = String(item.calidad || '').toUpperCase();
+          const calidad = calidadRaw === 'CONFORME' ? 'OK' : calidadRaw;
+
+          return {
+            ...item,
+            cantidad: cantidadRecibida,
+            calidad,
+            productos: item.producto ?? item.productos,
+            observaciones: item.observaciones ?? item.metadata?.observaciones ?? null,
+            cantidad_devuelta: cantidadDevuelta,
+            cantidad_disponible_devolucion: Math.max(cantidadRecibida - cantidadDevuelta, 0),
+          };
+        }),
+      });
       if (items.length === 0) {
-        return data;
+        return normalizarDetalle();
       }
 
       const itemIds = items.map((item: any) => item.id).filter(Boolean);
@@ -251,7 +280,7 @@ export class RecepcionesService {
         this.logger.warn(
           `⚠️ No se pudo calcular disponibilidad de devolución para recepción ${recepcionId}: ${devolucionesPreviasError.message}`,
         );
-        return data;
+        return normalizarDetalle();
       }
 
       const devueltoPorItem = new Map<string, number>();
@@ -272,20 +301,7 @@ export class RecepcionesService {
         devueltoPorItem.set(itemId, (devueltoPorItem.get(itemId) || 0) + Number((row as any).cantidad || 0));
       }
 
-      return {
-        ...(data as any),
-        items: items.map((item: any) => {
-          const cantidadRecibida = Number(item.cantidad_recibida || 0);
-          const cantidadDevuelta = devueltoPorItem.get(item.id) || 0;
-          const cantidadDisponible = Math.max(cantidadRecibida - cantidadDevuelta, 0);
-
-          return {
-            ...item,
-            cantidad_devuelta: cantidadDevuelta,
-            cantidad_disponible_devolucion: cantidadDisponible,
-          };
-        }),
-      };
+      return normalizarDetalle(devueltoPorItem);
     } catch (error) {
       await this.registrarIntegrationLog({
         tenantId,

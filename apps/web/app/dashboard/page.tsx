@@ -348,8 +348,8 @@ function FinancialFlowChart({
 
     return (
       <div className="rounded-xl border border-cyan-400/35 bg-slate-950/95 px-3 py-2 shadow-xl backdrop-blur-sm">
-        <p className="mb-1 text-xs font-bold text-slate-100">{label}</p>
-        <p className="text-xs font-semibold text-slate-300">
+        <p className="mb-1 text-xs font-bold text-white">{label}</p>
+        <p className="text-xs font-semibold text-white/75">
           Valor:{' '}
           <span className="text-violet-300">
             {formatCurrency(Number(payload[0]?.value), currencySymbol)}
