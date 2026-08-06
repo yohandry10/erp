@@ -459,6 +459,9 @@ export function useWizard() {
       if (!state.configuration.regimen_tributario) {
         return false
       }
+      if (country.paisCodigo === 'PE' && !state.configuration.serie_guia_remision) {
+        return false
+      }
       return true
     }
 

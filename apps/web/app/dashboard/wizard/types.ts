@@ -53,6 +53,7 @@ export interface WizardConfiguration {
   serie_factura?: string
   serie_boleta?: string
   serie_nota_credito?: string
+  serie_guia_remision?: string
   // Configuración SUNAT/OSE
   emision_cpe_modo?: 'SUNAT_DIRECTO' | 'OSE_API'
   sunat_environment?: 'homologacion' | 'produccion'

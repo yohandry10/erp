@@ -111,6 +111,7 @@ const createInitialState = (): WizardState => ({
     serie_factura: '',
     serie_boleta: '',
     serie_nota_credito: '',
+    serie_guia_remision: 'T001',
     // Configuración SUNAT
     emision_cpe_modo: 'SUNAT_DIRECTO',
     sunat_environment: 'homologacion',

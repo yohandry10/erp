@@ -601,6 +601,8 @@ export class ConfigurationController {
           serieNotaCredito: data.serie_nota_credito,
           serieNotaDebito: data.serie_nota_debito,
           serieGuiaRemision: data.serie_guia_remision,
+          certificateConfigured: !!data.certificado_pfx,
+          certificateExpiresAt: data.certificado_expira_en,
           // OSE
           oseActivo: data.ose_activo,
           oseUrl: data.ose_url,

@@ -782,6 +782,7 @@ export class ConfigurationService {
           serie_factura: config.serie_factura,
           serie_boleta: config.serie_boleta,
           serie_nota_credito: config.serie_nota_credito,
+          serie_guia_remision: config.serie_guia_remision || 'T001',
           // Configuración OSE (opcional)
           emision_cpe_modo: config.emision_cpe_modo || 'SUNAT_DIRECTO',
           sunat_environment: config.sunat_environment || 'homologacion',
