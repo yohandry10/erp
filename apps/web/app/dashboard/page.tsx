@@ -404,6 +404,8 @@ function FinancialFlowChart({
                   color: '#f8fafc',
                   fontSize: 12,
                 }}
+                labelStyle={{ color: '#f8fafc', fontWeight: 700, marginBottom: 4 }}
+                itemStyle={{ color: '#e2e8f0', fontWeight: 600, padding: 0 }}
                 formatter={(value: any) => [formatCurrency(Number(value), currencySymbol), 'Valor']}
               />
               <Bar dataKey="value" radius={[8, 8, 0, 0]} isAnimationActive={false}>
@@ -490,6 +492,8 @@ function FiscalDonut({
                   color: '#f8fafc',
                   fontSize: 12,
                 }}
+                labelStyle={{ color: '#f8fafc', fontWeight: 700, marginBottom: 4 }}
+                itemStyle={{ color: '#e2e8f0', fontWeight: 600, padding: 0 }}
                 formatter={(value: any, name: any) => [formatNumber(Number(value)), name]}
               />
             </RPieChart>
