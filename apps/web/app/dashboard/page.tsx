@@ -343,6 +343,22 @@ function FinancialFlowChart({
   const total = chartData.reduce((s, d) => s + d.value, 0)
   const hasReal = total > 0
 
+  const renderTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null
+
+    return (
+      <div className="rounded-xl border border-cyan-400/35 bg-slate-950/95 px-3 py-2 shadow-xl backdrop-blur-sm">
+        <p className="mb-1 text-xs font-bold text-slate-100">{label}</p>
+        <p className="text-xs font-semibold text-slate-300">
+          Valor:{' '}
+          <span className="text-violet-300">
+            {formatCurrency(Number(payload[0]?.value), currencySymbol)}
+          </span>
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className={`${surface} flex h-full flex-col gap-4 p-6`}>
       <header className="flex items-start justify-between gap-3">
@@ -397,16 +413,7 @@ function FinancialFlowChart({
               />
               <Tooltip
                 cursor={{ fill: 'rgba(56,189,248,0.06)' }}
-                contentStyle={{
-                  background: 'rgba(2, 8, 23, 0.96)',
-                  border: '1px solid rgba(56, 189, 248, 0.35)',
-                  borderRadius: 12,
-                  color: '#f8fafc',
-                  fontSize: 12,
-                }}
-                labelStyle={{ color: '#f8fafc', fontWeight: 700, marginBottom: 4 }}
-                itemStyle={{ color: '#e2e8f0', fontWeight: 600, padding: 0 }}
-                formatter={(value: any) => [formatCurrency(Number(value), currencySymbol), 'Valor']}
+                content={renderTooltip}
               />
               <Bar dataKey="value" radius={[8, 8, 0, 0]} isAnimationActive={false}>
                 {chartData.map((entry, i) => (
