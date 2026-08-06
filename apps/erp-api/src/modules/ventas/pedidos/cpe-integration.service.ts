@@ -451,10 +451,9 @@ export class CPEIntegrationService {
   ): Promise<{ serie: string; numero: number }> {
     const esBoleta = tipoDocumento === TipoDocumento.BOLETA;
     const serieField = esBoleta ? 'serie_boleta' : 'serie_factura';
-    const numeroField = esBoleta ? 'ultimo_numero_boleta' : 'ultimo_numero_factura';
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('serie_factura, ultimo_numero_factura, serie_boleta, ultimo_numero_boleta')
+      .select('serie_factura, serie_boleta')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -463,28 +462,28 @@ export class CPEIntegrationService {
     }
 
     const serie = config[serieField] || (esBoleta ? 'B001' : 'F001');
-    const ultimoNumero = Number(config[numeroField] || 0);
-    const numero = ultimoNumero + 1;
+    const { data: correlativoData, error: correlativoError } = await this.supabase
+      .getClient()
+      .rpc('obtener_siguiente_numero_documento', {
+        p_tenant_id: tenantId,
+        p_tipo_documento: tipoDocumento,
+        p_serie: serie,
+      });
 
-    // Actualizar correlativo con optimistic concurrency control
-    const { data: updateResult, error: updateError } = await this.supabase.getClient()
-      .from('empresa_config')
-      .update({ [numeroField]: numero, updated_at: new Date().toISOString() })
-      .eq('tenant_id', tenantId)
-      .eq(numeroField, ultimoNumero)
-      .select(numeroField)
-      .single();
-
-    if (updateError) {
-      if (updateError.code === 'PGRST116') {
-        throw new BadRequestException(
-          `Conflicto de concurrencia en numeración de ${esBoleta ? 'boleta' : 'factura'}. Otro proceso actualizó el correlativo. Reintente la operación.`,
-        );
-      }
-      throw new BadRequestException(`Error actualizando correlativo de ${esBoleta ? 'boleta' : 'factura'}`);
+    if (correlativoError) {
+      throw new BadRequestException(
+        `No se pudo obtener el correlativo de ${esBoleta ? 'boleta' : 'factura'}: ${correlativoError.message}`,
+      );
     }
 
-    return { serie, numero };
+    const numero = Number(Array.isArray(correlativoData) ? correlativoData[0] : correlativoData);
+    if (!Number.isFinite(numero) || numero <= 0) {
+      throw new BadRequestException(
+        `Correlativo fiscal inválido para ${tipoDocumento}-${serie}: ${JSON.stringify(correlativoData)}`,
+      );
+    }
+
+    return { serie, numero: Math.trunc(numero) };
   }
 
   private async registrarExitoIntegracion(options: {
