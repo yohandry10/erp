@@ -247,13 +247,50 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
     'cerrar recepción SIRE',
   );
 
-  return { proveedor, recepcion: cerrada };
+  const numeroFactura = `F001-SIRE-${runId}`;
+  const cxp = await parseOk<any>(
+    await apiContext.post(api('/finanzas/cxp'), {
+      data: {
+        proveedor_id: proveedor.id,
+        orden_id: orden.id,
+        recepcion_id: cerrada.id,
+        tipo_documento: 'FACTURA',
+        serie: 'F001',
+        numero_documento: numeroFactura,
+        fecha_emision: new Date().toISOString().slice(0, 10),
+        condiciones_pago: 'CREDITO_30',
+        dias_credito: 30,
+        subtotal: 200,
+        igv: 36,
+        total: 236,
+        moneda: 'PEN',
+        tipo_cambio: 1,
+        referencia_tipo: 'RECEPCION',
+        referencia_id: cerrada.id,
+      },
+    }),
+    'registrar factura proveedor para SIRE',
+  );
+
+  return { proveedor, recepcion: cerrada, cxp, numeroFactura };
 }
 
 test.describe('T12 SIRE completo', () => {
   test.setTimeout(180000);
 
-  test('SIRE refleja ventas CPE y compras CxP por periodo, totales, filtros, descarga y envío SUNAT mock', async ({ page }) => {
+  test('UI SIRE hidrata el dashboard y muestra sus controles', async ({ page }) => {
+    const browserFailures = await collectBrowserFailures(page);
+    await login(page);
+    await gotoAuthenticated(page, '/dashboard/sire');
+
+    await expect(page.getByRole('heading', { name: /SIRE - Sistema de Registros Electr[oó]nicos/i }))
+      .toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /Generar reporte/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Actualizar/i })).toBeVisible();
+    expect(browserFailures).toEqual([]);
+  });
+
+  test('SIRE refleja ventas CPE y compras CxP por periodo, descarga y bloquea envío SUNAT no configurado', async ({ page }) => {
     const browserFailures = await collectBrowserFailures(page);
     await login(page);
     const { headers, tenantId } = await authContext(page);
@@ -271,25 +308,18 @@ test.describe('T12 SIRE completo', () => {
     const fechaCompra = `${periodoSire}-11T12:00:00.000Z`;
     const { error: cpeUpdateError } = await supabase
       .from('cpe')
-      .update({ fecha_emision: fechaVenta })
+      // SIRE sólo declara comprobantes aceptados. En E2E se simula el CDR
+      // aceptado; una demo nunca debe fingir que lo envió a SUNAT.
+      .update({ fecha_emision: fechaVenta, estado: 'ACEPTADO', sunat_status: 'ACEPTADO' })
       .eq('id', venta.cpe.id)
       .eq('tenant_id', tenantId);
     expect(cpeUpdateError?.message || '', 'alinear fecha CPE SIRE').toBe('');
-
-    await expect.poll(async () => {
-      const response = await apiContext.get(api(`/finanzas/cxp?proveedor_id=${compra.proveedor.id}`));
-      const cxp = await parseOk<any[]>(response, 'listar CxP SIRE');
-      return cxp.find((item) => item.referencia_id === compra.recepcion.id || item.numero_documento === compra.recepcion.numero) ?? null;
-    }, {
-      message: 'la compra debe crear CxP para SIRE',
-      timeout: 30000,
-    }).not.toBeNull();
 
     const cxpList = await parseOk<any[]>(
       await apiContext.get(api(`/finanzas/cxp?proveedor_id=${compra.proveedor.id}`)),
       'listar CxP SIRE final',
     );
-    const cxp = cxpList.find((item) => item.referencia_id === compra.recepcion.id || item.numero_documento === compra.recepcion.numero);
+    const cxp = cxpList.find((item) => item.id === compra.cxp.id && item.recepcion_id === compra.recepcion.id);
     expect(cxp?.id, 'CxP de compra SIRE persistida').toBeTruthy();
 
     const { error: cxpUpdateError } = await supabase
@@ -350,7 +380,7 @@ test.describe('T12 SIRE completo', () => {
     expect(ventaRows.every((row) => row[1]?.startsWith(periodoSire)), 'ventas SIRE no debe mezclar periodos').toBeTruthy();
     expect(compraRows.every((row) => row[1]?.startsWith(periodoSire)), 'compras SIRE no debe mezclar periodos').toBeTruthy();
     expect(ventaRows.some((row) => row[3] === venta.cpe.serie && Number(row[4]) === Number(venta.cpe.numero) && Number(row[9]) > 0)).toBeTruthy();
-    expect(compraRows.some((row) => row[2] === cxp.numero_documento && Number(row[6]) > 0)).toBeTruthy();
+    expect(compraRows.some((row) => row[3] === cxp.numero_documento && Number(row[6]) > 0)).toBeTruthy();
 
     const ventasFiltradas = await parseOk<any[]>(
       await apiContext.get(api(`/sire/reportes?periodo=${periodoSire}&tipoReporte=REGISTRO_VENTAS&estado=${reporteVentasFinal.estado}`)),
@@ -359,15 +389,14 @@ test.describe('T12 SIRE completo', () => {
     expect(ventasFiltradas.every((item) => item.tipo === 'REG_VEN' && item.periodo === periodoSire && item.estado === reporteVentasFinal.estado)).toBeTruthy();
 
     if (reporteVentasFinal.estado === 'GENERADO') {
-      await parseOk<any>(
-        await apiContext.post(api(`/sire/reportes/${reporteVentasFinal.id}/enviar-sunat`)),
-        'enviar SIRE ventas SUNAT mock',
-      );
+      const envio = await apiContext.post(api(`/sire/reportes/${reporteVentasFinal.id}/enviar-sunat`));
+      expect(envio.status(), 'sin integración SUNAT real, SIRE debe rechazar el envío').toBe(501);
+      expect(await envio.text()).toMatch(/no est[aá] configurado|ticket|acuse SUNAT/i);
       const enviados = await parseOk<any[]>(
         await apiContext.get(api(`/sire/reportes?periodo=${periodoSire}&tipoReporte=REGISTRO_VENTAS&estado=ENVIADO`)),
         'listar SIRE enviados',
       );
-      expect(enviados.some((item) => item.id === reporteVentasFinal.id)).toBeTruthy();
+      expect(enviados.some((item) => item.id === reporteVentasFinal.id)).toBeFalsy();
     }
 
     const stats = await parseOk<any>(await apiContext.get(api('/sire/stats')), 'stats SIRE');

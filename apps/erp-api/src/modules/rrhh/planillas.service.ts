@@ -1,9 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
-import { EventBusService, PlanillaCalculadaEvent, PlanillaPagadaEvent } from '../../shared/events/event-bus.service';
+import { EventBusService, PlanillaCalculadaEvent } from '../../shared/events/event-bus.service';
 import Decimal from 'decimal.js';
 import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
-import { v4 as uuidv4 } from 'uuid';
 import {
   calcularGratificacionTrunca,
   diasEnPeriodo,
@@ -41,6 +40,24 @@ type NormativaPeruPeriodo = {
   onpAporte: number;
   essaludAporte: number;
   quintaDeduccionUit: number;
+};
+
+type CalculoEmpleadoPersistencia = {
+  empleado_id: string;
+  dias_trabajados: number;
+  horas_extras_25: number;
+  horas_extras_35: number;
+  tardanzas_minutos: number;
+  faltas: number;
+  total_ingresos: number;
+  total_descuentos: number;
+  total_aportes: number;
+  neto_pagar: number;
+  conceptos: Array<{
+    concepto_id: string;
+    monto: number;
+    observaciones?: string;
+  }>;
 };
 
 const NORMATIVA_PERU_2026_DEFAULT: NormativaPeruPeriodo = {
@@ -98,6 +115,44 @@ export class PlanillasService {
     private readonly supabaseService: SupabaseService,
     private readonly eventBus: EventBusService
   ) { }
+
+  private async guardarCalculoPlanillaAtomico(
+    planillaId: string,
+    tenantId: string | undefined,
+    empleados: CalculoEmpleadoPersistencia[],
+  ) {
+    if (!tenantId) {
+      throw new BadRequestException('El tenant es obligatorio para calcular una planilla');
+    }
+
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'guardar_calculo_planilla_tx',
+      {
+        p_tenant_id: tenantId,
+        p_planilla_id: planillaId,
+        p_empleados: empleados,
+      },
+    );
+
+    if (error) {
+      if (error.code === '23514' || error.code === '23505') {
+        throw new ConflictException(error.message);
+      }
+      if (error.code === 'P0002') {
+        throw new NotFoundException(error.message);
+      }
+      if (error.code === '22023' || error.code === '23503') {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+
+    if (!data?.success) {
+      throw new Error('La transaccion de calculo de planilla no confirmo su finalizacion');
+    }
+
+    return data;
+  }
 
   // Obtener todas las planillas
   // ✅ FIX: Agregar soporte multi-tenant
@@ -244,6 +299,7 @@ export class PlanillasService {
     let totalAportes = 0;
     let totalNeto = 0;
     const empleadosCalculados = [];
+    const calculosPersistencia: CalculoEmpleadoPersistencia[] = [];
 
     const planillaInfo = planillaEstado;
 
@@ -273,44 +329,23 @@ export class PlanillasService {
         vacacionesPorEmpleado.get(empleado.id) ?? 0,
       );
 
-      // Insertar empleado en planilla
-      const { data: empleadoPlanilla, error: empError } = await client
-        .from('empleado_planilla')
-        .insert({
-          id_planilla: planillaId,
-          id_empleado: empleado.id,
-          dias_trabajados: 30,
-          total_ingresos: calculoEmpleado.totalIngresos,
-          total_descuentos: calculoEmpleado.totalDescuentos,
-          total_aportes: calculoEmpleado.totalAportes,
-          neto_pagar: calculoEmpleado.netoPagar
-        })
-        .select();
-
-      if (empError) {
-        console.error('❌ Error insertando empleado en planilla:', empError);
-        throw empError;
-      }
-
-      this.logger.debug(`Empleado insertado: ID=${empleadoPlanilla[0].id}`);
-
-      // Insertar conceptos detallados
-      this.logger.debug(`Insertando ${calculoEmpleado.conceptosDetalle.length} conceptos para empleado ID=${empleado.id}`);
-      for (const concepto of calculoEmpleado.conceptosDetalle) {
-        const { error: conceptoError } = await client
-          .from('empleado_planilla_conceptos')
-          .insert({
-            id_empleado_planilla: empleadoPlanilla[0].id,
-            id_concepto: concepto.id,
-            monto: concepto.monto,
-            observaciones: concepto.observaciones
-          });
-
-        if (conceptoError) {
-          console.error('❌ Error insertando concepto:', conceptoError);
-          // No hacer throw aquí, solo loggear el error y continuar
-        }
-      }
+      calculosPersistencia.push({
+        empleado_id: empleado.id,
+        dias_trabajados: 30,
+        horas_extras_25: 0,
+        horas_extras_35: 0,
+        tardanzas_minutos: 0,
+        faltas: 0,
+        total_ingresos: calculoEmpleado.totalIngresos,
+        total_descuentos: calculoEmpleado.totalDescuentos,
+        total_aportes: calculoEmpleado.totalAportes,
+        neto_pagar: calculoEmpleado.netoPagar,
+        conceptos: calculoEmpleado.conceptosDetalle.map((concepto: any) => ({
+          concepto_id: concepto.id,
+          monto: concepto.monto,
+          observaciones: concepto.observaciones,
+        })),
+      });
 
       totalIngresos += calculoEmpleado.totalIngresos;
       totalDescuentos += calculoEmpleado.totalDescuentos;
@@ -330,22 +365,7 @@ export class PlanillasService {
       });
     }
 
-    // Actualizar totales de la planilla
-    const { error: updateError } = await client
-      .from('planillas')
-      .update({
-        total_ingresos: totalIngresos,
-        total_descuentos: totalDescuentos,
-        total_aportes: totalAportes,
-        total_neto: totalNeto,
-        estado: 'calculada'
-      })
-      .eq('id', planillaId);
-
-    if (updateError) {
-      console.error('❌ Error actualizando totales:', updateError);
-      throw updateError;
-    }
+    await this.guardarCalculoPlanillaAtomico(planillaId, tenantId, calculosPersistencia);
 
     this.logger.debug(`✅ Planilla calculada exitosamente:`);
     this.logger.debug(`   - Empleados procesados: ${empleados.length}`);
@@ -978,21 +998,61 @@ export class PlanillasService {
 
   async calcularPlanillaPersonalizada(planillaId: string, empleadosPersonalizados: any[], tenantId?: string) {
     this.logger.debug(`🧮 Iniciando cálculo personalizado de planilla: ${planillaId}`);
+    if (!Array.isArray(empleadosPersonalizados) || empleadosPersonalizados.length === 0) {
+      throw new BadRequestException('Debe seleccionar al menos un empleado');
+    }
+    if (!tenantId) {
+      throw new BadRequestException('El tenant es obligatorio para calcular una planilla');
+    }
+
     this.logger.debug(`👥 Empleados personalizados: ${empleadosPersonalizados.length}`);
 
     const client = this.supabaseService.getClient();
 
-    let planillaQuery = client
+    const { data: planillaInfo, error: planillaError } = await client
       .from('planillas')
-      .select('periodo')
-      .eq('id', planillaId);
-    if (tenantId) {
-      planillaQuery = planillaQuery.eq('tenant_id', tenantId);
-    }
-    const { data: planillaInfo, error: planillaError } = await planillaQuery.maybeSingle();
+      .select('periodo, estado, estado_pago')
+      .eq('id', planillaId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
     if (planillaError) {
       throw planillaError;
     }
+    if (!planillaInfo) {
+      throw new NotFoundException('Planilla no encontrada');
+    }
+    if (String(planillaInfo.estado).toLowerCase() !== 'borrador') {
+      throw new ConflictException(
+        `La planilla ya fue ${planillaInfo.estado}. No se puede recalcular sin anular primero.`,
+      );
+    }
+
+    const entradasPorId = new Map<string, any>();
+    for (const entrada of empleadosPersonalizados) {
+      const empleadoId = String(entrada?.id ?? entrada?.empleado_id ?? '').trim();
+      if (!empleadoId) {
+        throw new BadRequestException('Cada registro debe incluir empleado_id');
+      }
+      if (entradasPorId.has(empleadoId)) {
+        throw new BadRequestException(`Empleado duplicado en la solicitud: ${empleadoId}`);
+      }
+      entradasPorId.set(empleadoId, entrada);
+    }
+
+    const { data: empleadosCanonicos, error: empleadosError } = await client
+      .from('empleados')
+      .select('*, contratos(*)')
+      .in('id', [...entradasPorId.keys()])
+      .eq('tenant_id', tenantId)
+      .eq('estado', 'activo');
+
+    if (empleadosError) {
+      throw empleadosError;
+    }
+    if ((empleadosCanonicos?.length ?? 0) !== entradasPorId.size) {
+      throw new BadRequestException('La solicitud contiene empleados inexistentes, inactivos o de otro tenant');
+    }
+
     const normativa = await this.obtenerNormativaPeruPeriodo(planillaInfo?.periodo, tenantId);
 
     const conceptosResult = await this.getConceptos(tenantId);
@@ -1004,101 +1064,61 @@ export class PlanillasService {
       throw new BadRequestException('No se encontraron conceptos de planilla configurados');
     }
 
-    let totalIngresos = 0;
-    let totalDescuentos = 0;
-    let totalAportes = 0;
-    let totalNeto = 0;
+    const calculosPersistencia: CalculoEmpleadoPersistencia[] = [];
 
-    // Procesar cada empleado personalizado
-    for (const empleado of empleadosPersonalizados) {
-      this.logger.debug(`Procesando empleado personalizado ID=${empleado.id}`);
+    for (const empleadoCanonico of empleadosCanonicos || []) {
+      const entrada = entradasPorId.get(empleadoCanonico.id);
+      const contrato = contratoVigenteDe(empleadoCanonico);
+      if (!contrato) {
+        throw new BadRequestException(
+          `El empleado ${empleadoCanonico.nombres || empleadoCanonico.id} no tiene contrato vigente`,
+        );
+      }
 
+      const empleado = {
+        ...empleadoCanonico,
+        dias_trabajados: entrada.dias_trabajados,
+        horas_extras_25: entrada.horas_extras_25,
+        horas_extras_35: entrada.horas_extras_35,
+        tardanzas_minutos: entrada.tardanzas_minutos,
+        faltas: entrada.faltas,
+        bonos_adicionales: entrada.bonos_adicionales,
+        sueldo_base: contrato.sueldo_bruto,
+      };
       const calculoEmpleado = this.calcularEmpleadoPersonalizado(empleado, conceptos, normativa);
 
-      // Insertar empleado en planilla
-      const { data: empleadoPlanilla, error: empError } = await client
-        .from('empleado_planilla')
-        .insert({
-          id_planilla: planillaId,
-          id_empleado: empleado.id,
-          dias_trabajados: empleado.dias_trabajados,
-          horas_extras_25: empleado.horas_extras_25,
-          horas_extras_35: empleado.horas_extras_35,
-          tardanzas_minutos: empleado.tardanzas_minutos,
-          faltas: empleado.faltas,
-          total_ingresos: calculoEmpleado.totalIngresos,
-          total_descuentos: calculoEmpleado.totalDescuentos,
-          total_aportes: calculoEmpleado.totalAportes,
-          neto_pagar: calculoEmpleado.netoPagar
-        })
-        .select();
-
-      if (empError) {
-        console.error('❌ Error insertando empleado en planilla:', empError);
-        throw empError;
-      }
-
-      this.logger.debug(`Empleado insertado: ID=${empleadoPlanilla[0].id}`);
-
-      // Insertar conceptos detallados
-      this.logger.debug(`Insertando ${calculoEmpleado.conceptosDetalle.length} conceptos para empleado ID=${empleado.id}`);
-      for (const concepto of calculoEmpleado.conceptosDetalle) {
-        // Validar que el concepto tenga monto válido
-        if (!concepto.monto || concepto.monto <= 0) {
-          console.warn(`⚠️ Concepto con monto inválido omitido: ${concepto.observaciones} - Monto: ${concepto.monto}`);
-          continue;
-        }
-
-        const { error: conceptoError } = await client
-          .from('empleado_planilla_conceptos')
-          .insert({
-            id_empleado_planilla: empleadoPlanilla[0].id,
-            id_concepto: concepto.id,
-            monto: parseFloat(concepto.monto) || 0,
-            observaciones: concepto.observaciones || ''
-          });
-
-        if (conceptoError) {
-          console.error('❌ Error insertando concepto:', conceptoError);
-        }
-      }
-
-      totalIngresos += calculoEmpleado.totalIngresos;
-      totalDescuentos += calculoEmpleado.totalDescuentos;
-      totalAportes += calculoEmpleado.totalAportes;
-      totalNeto += calculoEmpleado.netoPagar;
+      calculosPersistencia.push({
+        empleado_id: empleadoCanonico.id,
+        dias_trabajados: Number(empleado.dias_trabajados ?? 0),
+        horas_extras_25: Number(empleado.horas_extras_25 ?? 0),
+        horas_extras_35: Number(empleado.horas_extras_35 ?? 0),
+        tardanzas_minutos: Number(empleado.tardanzas_minutos ?? 0),
+        faltas: Number(empleado.faltas ?? 0),
+        total_ingresos: calculoEmpleado.totalIngresos,
+        total_descuentos: calculoEmpleado.totalDescuentos,
+        total_aportes: calculoEmpleado.totalAportes,
+        neto_pagar: calculoEmpleado.netoPagar,
+        conceptos: calculoEmpleado.conceptosDetalle.map((concepto: any) => ({
+          concepto_id: concepto.id,
+          monto: concepto.monto,
+          observaciones: concepto.observaciones,
+        })),
+      });
     }
 
-    // Actualizar totales de la planilla
-    const { error: updateError } = await client
-      .from('planillas')
-      .update({
-        total_ingresos: totalIngresos,
-        total_descuentos: totalDescuentos,
-        total_aportes: totalAportes,
-        total_neto: totalNeto,
-        estado: 'calculada'
-      })
-      .eq('id', planillaId);
-
-    if (updateError) {
-      console.error('❌ Error actualizando totales:', updateError);
-      throw updateError;
-    }
+    const resultado = await this.guardarCalculoPlanillaAtomico(
+      planillaId,
+      tenantId,
+      calculosPersistencia,
+    );
 
     this.logger.debug(`✅ Planilla personalizada calculada exitosamente:`);
-    this.logger.debug(`   - Empleados procesados: ${empleadosPersonalizados.length}`);
-    this.logger.debug(`   - Total ingresos: S/ ${totalIngresos.toFixed(2)}`);
-    this.logger.debug(`   - Total descuentos: S/ ${totalDescuentos.toFixed(2)}`);
-    this.logger.debug(`   - Total neto: S/ ${totalNeto.toFixed(2)}`);
+    this.logger.debug(`   - Empleados procesados: ${resultado.totalEmpleados}`);
+    this.logger.debug(`   - Total ingresos: S/ ${Number(resultado.totalIngresos).toFixed(2)}`);
+    this.logger.debug(`   - Total descuentos: S/ ${Number(resultado.totalDescuentos).toFixed(2)}`);
+    this.logger.debug(`   - Total neto: S/ ${Number(resultado.totalNeto).toFixed(2)}`);
 
-    return {
-      success: true,
-      totalEmpleados: empleadosPersonalizados.length,
-      totalIngresos,
-      totalDescuentos,
-      totalNeto
-    };
+    return resultado;
   }
 
   // Lógica de cálculo personalizada por empleado
@@ -1118,8 +1138,8 @@ export class PlanillasService {
       throw new BadRequestException('Datos del empleado requeridos');
     }
 
-    const sueldoBasico = parseFloat(empleado.sueldo_base) || 0;
-    const diasTrabajados = parseInt(empleado.dias_trabajados) || 30;
+    const sueldoBasico = Number(empleado.sueldo_base);
+    const diasTrabajados = Number(empleado.dias_trabajados);
     const horasExtras25 = parseFloat(empleado.horas_extras_25) || 0;
     const horasExtras35 = parseFloat(empleado.horas_extras_35) || 0;
     const tardanzasMinutos = parseInt(empleado.tardanzas_minutos) || 0;
@@ -1128,16 +1148,15 @@ export class PlanillasService {
 
     this.logger.debug(`Calculando empleado ID=${empleado.id}`);
 
-    if (sueldoBasico <= 0) {
-      console.warn(`⚠️ Sueldo básico inválido para empleado ${empleado.nombres || 'Sin nombre'}: ${sueldoBasico}`);
-      // No procesar si no hay sueldo básico válido
-      return {
-        conceptosDetalle: [],
-        totalIngresos: 0,
-        totalDescuentos: 0,
-        totalAportes: 0,
-        netoPagar: 0
-      };
+    if (!Number.isFinite(sueldoBasico) || sueldoBasico <= 0) {
+      throw new BadRequestException(
+        `El empleado ${empleado.nombres || empleado.id} no tiene sueldo contractual válido`,
+      );
+    }
+    if (!Number.isInteger(diasTrabajados) || diasTrabajados < 0 || diasTrabajados > 30) {
+      throw new BadRequestException(
+        `Días trabajados inválidos para ${empleado.nombres || empleado.id}: ${empleado.dias_trabajados}`,
+      );
     }
 
     // 1. INGRESOS
@@ -1250,7 +1269,17 @@ export class PlanillasService {
 
     // Descuentos automáticos (AFP/ONP) - usar datos del empleado si están disponibles
     const contratoVigente = contratoVigenteDe(empleado);
-    const regimenPensionario = contratoVigente?.regimen_pensionario || 'AFP';
+    if (!contratoVigente) {
+      throw new BadRequestException(
+        `El empleado ${empleado.nombres || empleado.id} no tiene contrato vigente`,
+      );
+    }
+    const regimenPensionario = String(contratoVigente.regimen_pensionario || '').toUpperCase();
+    if (!['AFP', 'ONP'].includes(regimenPensionario)) {
+      throw new BadRequestException(
+        `El empleado ${empleado.nombres || empleado.id} no tiene régimen pensionario válido`,
+      );
+    }
 
     if (regimenPensionario === 'AFP') {
       // TODO: Tasas AFP deben ser configurables por tenant y AFP del empleado
@@ -1303,6 +1332,17 @@ export class PlanillasService {
       }
     }
 
+    const impuestoRenta = this.calcularImpuestoRenta(totalIngresos, normativa);
+    const conceptoImpuesto = conceptos.find(c => c.codigo === '105');
+    if (conceptoImpuesto && impuestoRenta > 0) {
+      conceptosDetalle.push({
+        id: conceptoImpuesto.id,
+        monto: impuestoRenta,
+        observaciones: 'Impuesto a la Renta de quinta categoría',
+      });
+      totalDescuentos += impuestoRenta;
+    }
+
     const aporteESSALUD = new Decimal(totalIngresos).times(normativa.essaludAporte).toDecimalPlaces(2).toNumber();
     const conceptoESSALUD = conceptos.find(c => c.codigo === '201');
     if (conceptoESSALUD && aporteESSALUD > 0) {
@@ -1314,7 +1354,12 @@ export class PlanillasService {
       totalAportes += aporteESSALUD;
     }
 
-    const netoPagar = totalIngresos - totalDescuentos;
+    const netoPagar = new Decimal(totalIngresos).minus(totalDescuentos).toDecimalPlaces(2).toNumber();
+    if (netoPagar < 0) {
+      throw new BadRequestException(
+        `Los descuentos superan los ingresos del empleado ${empleado.nombres || empleado.id}`,
+      );
+    }
 
     return {
       conceptosDetalle,
@@ -1329,144 +1374,41 @@ export class PlanillasService {
    * Pagar planilla completa - Genera pagos individuales y emite evento contable
    */
   async pagarPlanillaCompleta(planillaId: string, metodoPago: 'efectivo' | 'transferencia', tenantId?: string) {
-    try {
-      this.logger.debug(`💰 [RRHH] Iniciando pago de planilla ${planillaId} por ${metodoPago}`);
+    if (!tenantId) {
+      throw new BadRequestException('El tenant es obligatorio para pagar una planilla');
+    }
 
-      // 1. Obtener planilla con detalles
-      let planillaQuery = this.supabaseService.getClient()
-        .from('planillas')
-        .select(`
-          *,
-          empleado_planilla(
-            *,
-            empleados(*)
-          )
-        `)
-        .eq('id', planillaId);
+    this.logger.debug(`💰 [RRHH] Pago atómico de planilla ${planillaId} por ${metodoPago}`);
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'pagar_planilla_completa_tx',
+      {
+        p_tenant_id: tenantId,
+        p_planilla_id: planillaId,
+        p_metodo_pago: metodoPago,
+        p_usuario_id: 'sistema',
+      },
+    );
 
-      if (tenantId) {
-        planillaQuery = planillaQuery.eq('tenant_id', tenantId);
+    if (error) {
+      if (error.code === 'P0002') throw new NotFoundException(error.message);
+      if (error.code === '23514' || error.code === '40001') {
+        throw new ConflictException(error.message);
       }
-
-      const { data: planilla, error: planillaError } = await planillaQuery.single();
-
-      if (planillaError || !planilla) {
-        throw new NotFoundException('Planilla no encontrada');
-      }
-
-      // ✅ FIX: Normalizar comparación de estados (case-insensitive)
-      const estadoNormalizado = (planilla.estado || '').toUpperCase();
-      if (estadoNormalizado !== 'CALCULADA') {
-        throw new ConflictException(`Solo se pueden pagar planillas en estado CALCULADA. Estado actual: ${planilla.estado}`);
-      }
-
-      if (planilla.estado_pago === 'PAGADO') {
-        throw new ConflictException('Esta planilla ya ha sido pagada');
-      }
-
-      // 2. Crear registro de pago para cada empleado
-      const pagosCreados = [];
-      const pagosFallidos = [];
-      let totalPagado = 0;
-
-      for (const empleadoPlanilla of planilla.empleado_planilla) {
-        const montoPago = empleadoPlanilla.neto_pagar;
-        if (montoPago <= 0) continue;
-
-        const { data: pago, error: pagoError } = await this.supabaseService.getClient()
-          .from('pagos_empleados')
-          .insert({
-            empleado_id: empleadoPlanilla.empleado_id,
-            planilla_id: planillaId,
-            periodo: planilla.periodo,
-            sueldo_bruto: empleadoPlanilla.total_ingresos,
-            descuentos: empleadoPlanilla.total_descuentos,
-            monto_neto: montoPago,
-            metodo_pago: metodoPago,
-            estado: 'PROCESADO',
-            fecha_pago: new Date().toISOString(),
-            usuario_id: 'sistema'
-          })
-          .select()
-          .single();
-
-        if (pagoError) {
-          console.error('❌ Error creando pago para empleado:', pagoError);
-          pagosFallidos.push({
-            empleado_id: empleadoPlanilla.empleado_id,
-            error: pagoError.message,
-          });
-          continue;
-        }
-
-        pagosCreados.push(pago);
-        totalPagado += montoPago;
-      }
-
-      // Si hubo pagos fallidos, abortar — no marcar la planilla como PAGADO
-      if (pagosFallidos.length > 0) {
-        throw new Error(
-          `No se pudo completar el pago de la planilla. ${pagosFallidos.length} empleados fallaron: ${pagosFallidos.map(f => f.empleado_id).join(', ')}. Los pagos exitosos (${pagosCreados.length}) requieren revisión manual.`,
-        );
-      }
-
-      // 3. Actualizar estado de la planilla
-      const { error: updateError } = await this.supabaseService.getClient()
-        .from('planillas')
-        .update({
-          estado_pago: 'PAGADO',
-          fecha_pago: new Date().toISOString(),
-          metodo_pago: metodoPago,
-          total_pagado: totalPagado
-        })
-        .eq('id', planillaId)
-        .eq('tenant_id', tenantId || planilla.tenant_id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // 4. 🎯 EMITIR EVENTO PARA CONTABILIDAD
-      this.logger.debug('🎯 [RRHH] Emitiendo evento de planilla pagada para contabilidad...');
-
-      const effectiveTenantId = tenantId || planilla.tenant_id;
-      const eventoPago: PlanillaPagadaEvent = {
-        eventId: uuidv4(),
-        tenantId: effectiveTenantId,
-        idempotencyKey: `planilla.pagada:${effectiveTenantId}:${planillaId}`,
-        planillaId: planillaId,
-        periodo: planilla.periodo,
-        totalPagado: totalPagado,
-        metodoPago: metodoPago,
-        cantidadEmpleados: pagosCreados.length,
-        fechaPago: new Date().toISOString()
-      };
-
-      this.eventBus.emitPlanillaPagada(eventoPago);
-      this.logger.debug('✅ [RRHH] Evento de planilla pagada emitido exitosamente');
-
-      this.logger.debug(`✅ Planilla ${planilla.periodo} pagada exitosamente`);
-      this.logger.debug(`   💰 Total pagado: S/ ${totalPagado}`);
-      this.logger.debug(`   👥 Empleados pagados: ${pagosCreados.length}`);
-      this.logger.debug(`   💳 Método: ${metodoPago}`);
-
-      return {
-        success: true,
-        message: 'Planilla pagada exitosamente',
-        data: {
-          planillaId,
-          periodo: planilla.periodo,
-          totalPagado,
-          empleadosPagados: pagosCreados.length,
-          metodoPago,
-          pagos: pagosCreados
-        }
-      };
-
-    } catch (error) {
-      console.error('❌ Error pagando planilla:', error);
+      if (error.code === '22023') throw new BadRequestException(error.message);
       throw error;
     }
+    if (!data?.success) {
+      throw new Error('La transacción de pago de planilla no confirmó su finalización');
+    }
+
+    this.logger.debug(
+      `✅ Planilla ${data.periodo} pagada: S/ ${data.totalPagado}, ${data.empleadosPagados} empleados`,
+    );
+    return {
+      success: true,
+      message: 'Planilla pagada exitosamente',
+      data,
+    };
   }
 
   /**

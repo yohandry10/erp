@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, NotImplementedException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
@@ -572,29 +572,12 @@ export class SireService {
         throw new BadRequestException('El reporte debe estar generado para poder enviarse');
       }
 
-      // Update status to ENVIADO
-      const { error: updateError } = await this.supabaseService.update(
-        'sire_files',
-        {
-          estado: 'ENVIADO',
-          updated_at: new Date().toISOString(),
-        },
-        { id, tenant_id: currentTenantId }
+      throw new NotImplementedException(
+        'El envío SIRE real no está configurado. El archivo puede descargarse para validación, pero no se marcará como enviado sin ticket ni acuse SUNAT.',
       );
-
-      if (updateError) {
-        throw new BadRequestException('Error updating report status: ' + updateError.message);
-      }
-
-      console.log('✅ Reporte SIRE enviado a SUNAT exitosamente');
-
-      return {
-        success: true,
-        message: 'Reporte enviado a SUNAT correctamente',
-      };
     } catch (error) {
       console.error('❌ Error sending SIRE report to SUNAT:', error);
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException || error instanceof NotImplementedException) {
         throw error;
       }
       throw new BadRequestException('Error al enviar el reporte a SUNAT');
@@ -693,9 +676,9 @@ export class SireService {
         .gte('fecha_emision', start)
         .lt('fecha_emision', end);
 
-      if (!incluirAnulados) {
-        query = query.not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")');
-      }
+      query = incluirAnulados
+        ? query.in('estado', ['ACEPTADO', 'ANULADO'])
+        : query.eq('estado', 'ACEPTADO');
 
       const { data: ventas, error } = await query;
       if (error) {
@@ -724,8 +707,9 @@ export class SireService {
     if (tipo === 'REG_COM') {
       let query = client
         .from('cuentas_por_pagar')
-        .select('fecha_emision, numero_documento, proveedor_id, subtotal, igv, total, moneda, estado')
+        .select('fecha_emision, numero_documento, tipo_documento, subtotal, igv, total, moneda, estado, fiscal_metadata, proveedores!cuentas_por_pagar_proveedor_id_fkey(ruc,numero_documento,razon_social,tipo_documento)')
         .eq('tenant_id', tenantId)
+        .in('tipo_documento', ['FACTURA', 'NOTA_CREDITO', 'NOTA_DEBITO', 'RECIBO_HONORARIOS'])
         .gte('fecha_emision', start)
         .lt('fecha_emision', end);
 
@@ -738,19 +722,30 @@ export class SireService {
         throw new BadRequestException('Error generando registro de compras SIRE: ' + error.message);
       }
 
-      const header = 'PERIODO|FECHA_EMISION|NUMERO|PROVEEDOR|VALOR_ADQUISICIONES|IGV|TOTAL|MONEDA';
-      const rows = (compras || []).map(c =>
-        [
+      const header = 'PERIODO|FECHA_EMISION|TIPO_DOCUMENTO|NUMERO|RUC_PROVEEDOR|PROVEEDOR|VALOR_ADQUISICIONES|IGV|TOTAL|MONEDA|TIPO_CAMBIO|DOC_MODIFICADO';
+      const rows = (compras || []).map(c => {
+        const proveedor = Array.isArray(c.proveedores) ? c.proveedores[0] : c.proveedores;
+        const fiscal = c.fiscal_metadata || {};
+        const signo = String(c.tipo_documento).toUpperCase() === 'NOTA_CREDITO' ? -1 : 1;
+        const tipoCambio = String(c.moneda || 'PEN').toUpperCase() === 'PEN' ? 1 : Number(fiscal.tipo_cambio);
+        if (!Number.isFinite(tipoCambio) || tipoCambio <= 0) {
+          throw new BadRequestException(`Tipo de cambio faltante para ${c.numero_documento}`);
+        }
+        return [
           periodo,
           (c.fecha_emision || '').toString().slice(0, 10),
+          c.tipo_documento || '',
           c.numero_documento || '',
-          c.proveedor_id || '',
-          Number(c.subtotal || 0),
-          Number(c.igv || 0),
-          Number(c.total || 0),
+          proveedor?.ruc || proveedor?.numero_documento || '',
+          (proveedor?.razon_social || '').replace(/\|/g, ' '),
+          signo * Number(c.subtotal || 0),
+          signo * Number(c.igv || 0),
+          signo * Number(c.total || 0),
           c.moneda || 'PEN',
-        ].join('|')
-      );
+          tipoCambio,
+          [fiscal.documento_referencia_tipo, fiscal.documento_referencia_serie, fiscal.documento_referencia_numero].filter(Boolean).join('-'),
+        ].join('|');
+      });
       return [header, ...rows].join('\n');
     }
 

@@ -403,6 +403,15 @@ export class PleExportService {
     return { serie: '', numero: crudo };
   }
 
+  private resolveTipoCambioPle(moneda: unknown, valor: unknown): string {
+    if (String(moneda || 'PEN').toUpperCase() === 'PEN') return '1.000';
+    const tipoCambio = Number(valor);
+    if (!Number.isFinite(tipoCambio) || tipoCambio <= 0) {
+      throw new Error('Tipo de cambio requerido para comprobante PLE en moneda extranjera');
+    }
+    return tipoCambio.toFixed(3);
+  }
+
   /**
    * Exporta el Registro de Ventas e Ingresos (14.1) en formato PLE.
    *
@@ -435,7 +444,7 @@ export class PleExportService {
         moneda, tipo_cambio, estado,
         subtotal, impuesto_igv, total,
         total_gravadas, total_exoneradas, total_inafectas, total_exportacion,
-        receptor_tipo_doc, receptor_numero_doc, receptor_razon_social
+        receptor_tipo_doc, receptor_numero_doc, receptor_razon_social, metadata
       `)
       .eq('tenant_id', tenantId)
       .in('tipo_documento', ['FACTURA', 'BOLETA', 'NOTA_CREDITO', 'NOTA_DEBITO'])
@@ -462,6 +471,8 @@ export class PleExportService {
       const numeroDocIdentidad = String(doc.receptor_numero_doc || '').trim();
       const gravadas = Number(doc.total_gravadas ?? doc.subtotal ?? 0);
       const igv = Number(doc.impuesto_igv || 0);
+      const signo = this.codigoTipoComprobante(doc.tipo_documento) === '07' ? -1 : 1;
+      const referencia = doc.metadata?.documento_referencia ?? doc.metadata ?? {};
 
       lineas.push(
         this.toPleLine([
@@ -478,25 +489,25 @@ export class PleExportService {
           this.codigoTipoDocumentoIdentidad(doc.receptor_tipo_doc, numeroDocIdentidad), // 11 Tipo doc identidad (cat. 06)
           numeroDocIdentidad,                                             // 12 Numero doc identidad
           this.sanitizePleText(doc.receptor_razon_social, 100),           // 13 Apellidos y nombres o razon social
-          this.formatPleAmount(doc.total_exportacion),                    // 14 Valor facturado de la exportacion
-          this.formatPleAmount(gravadas),                                 // 15 Base imponible de la operacion gravada
+          this.formatPleAmount(signo * Number(doc.total_exportacion || 0)), // 14 Valor facturado de la exportacion
+          this.formatPleAmount(signo * gravadas),                         // 15 Base imponible de la operacion gravada
           '0.00',                                                         // 16 Descuento de la base imponible
-          this.formatPleAmount(igv),                                      // 17 IGV
+          this.formatPleAmount(signo * igv),                              // 17 IGV
           '0.00',                                                         // 18 Descuento del IGV
-          this.formatPleAmount(doc.total_exoneradas),                     // 19 Importe total de la operacion exonerada
-          this.formatPleAmount(doc.total_inafectas),                      // 20 Importe total de la operacion inafecta
+          this.formatPleAmount(signo * Number(doc.total_exoneradas || 0)), // 19 Importe total de la operacion exonerada
+          this.formatPleAmount(signo * Number(doc.total_inafectas || 0)),  // 20 Importe total de la operacion inafecta
           '0.00',                                                         // 21 ISC
           '0.00',                                                         // 22 Base imponible del arroz pilado
           '0.00',                                                         // 23 IVAP
           '0.00',                                                         // 24 Otros tributos y cargos
-          this.formatPleAmount(doc.total),                                // 25 Importe total del comprobante
+          this.formatPleAmount(signo * Number(doc.total || 0)),           // 25 Importe total del comprobante
           this.sanitizePleText(doc.moneda || 'PEN', 3),                   // 26 Codigo de moneda (cat. 02)
-          this.formatPleAmount(doc.tipo_cambio || 1),                     // 27 Tipo de cambio
-          '',                                                             // 28 Fecha del comprobante modificado
-          '',                                                             // 29 Tipo del comprobante modificado
-          '',                                                             // 30 Serie del comprobante modificado
+          this.resolveTipoCambioPle(doc.moneda, doc.tipo_cambio),         // 27 Tipo de cambio
+          this.formatPleDate(referencia.fecha ?? referencia.fecha_emision), // 28 Fecha del comprobante modificado
+          this.codigoTipoComprobante(referencia.tipo ?? referencia.tipo_documento) === '00' ? '' : this.codigoTipoComprobante(referencia.tipo ?? referencia.tipo_documento), // 29 Tipo modificado
+          this.sanitizePleText(referencia.serie, 20),                      // 30 Serie del comprobante modificado
           '',                                                             // 31 Codigo de la dependencia aduanera
-          '',                                                             // 32 Numero del comprobante modificado
+          this.sanitizePleText(referencia.numero, 20),                     // 32 Numero del comprobante modificado
           '',                                                             // 33 Identificacion del contrato o proyecto
           '',                                                             // 34 Error tipo 1: inconsistencia en el tipo de cambio
           '',                                                             // 35 Indicador de comprobante cancelado con medio de pago
@@ -548,10 +559,11 @@ export class PleExportService {
       .from('cuentas_por_pagar')
       .select(`
         id, numero_documento, tipo_documento, fecha_emision, fecha_vencimiento,
-        subtotal, igv, total, moneda, estado,
+        subtotal, igv, total, moneda, estado, fiscal_metadata,
         proveedores!cuentas_por_pagar_proveedor_id_fkey(ruc, numero_documento, razon_social, tipo_documento)
       `)
       .eq('tenant_id', tenantId)
+      .in('tipo_documento', ['FACTURA', 'NOTA_CREDITO', 'NOTA_DEBITO', 'RECIBO_HONORARIOS'])
       .gte('fecha_emision', fechaInicio)
       .lte('fecha_emision', fechaFin)
       .order('fecha_emision')
@@ -580,6 +592,9 @@ export class PleExportService {
       // se declara como adquisicion no gravada, no como gravada con IGV cero.
       const baseGravada = igv > 0 ? base : 0;
       const baseNoGravada = igv > 0 ? 0 : base;
+      const tipoComprobante = this.codigoTipoComprobante(doc.tipo_documento);
+      const signo = tipoComprobante === '07' ? -1 : 1;
+      const fiscal = doc.fiscal_metadata || {};
 
       lineas.push(
         this.toPleLine([
@@ -596,23 +611,25 @@ export class PleExportService {
           this.codigoTipoDocumentoIdentidad(proveedor.tipo_documento, numeroDocIdentidad), // 11 Tipo doc identidad proveedor
           numeroDocIdentidad,                                             // 12 Numero doc identidad proveedor
           this.sanitizePleText(proveedor.razon_social, 100),              // 13 Apellidos y nombres o razon social
-          this.formatPleAmount(baseGravada),                              // 14 Base imponible de adquisiciones gravadas destinadas a op. gravadas
-          this.formatPleAmount(igv),                                      // 15 IGV de la casilla 14
+          this.formatPleAmount(signo * baseGravada),                      // 14 Base imponible de adquisiciones gravadas destinadas a op. gravadas
+          this.formatPleAmount(signo * igv),                              // 15 IGV de la casilla 14
           '0.00',                                                         // 16 Base imponible gravadas y no gravadas
           '0.00',                                                         // 17 IGV de la casilla 16
           '0.00',                                                         // 18 Base imponible destinada a op. no gravadas
           '0.00',                                                         // 19 IGV de la casilla 18
-          this.formatPleAmount(baseNoGravada),                            // 20 Valor de las adquisiciones no gravadas
+          this.formatPleAmount(signo * baseNoGravada),                    // 20 Valor de las adquisiciones no gravadas
           '0.00',                                                         // 21 ISC
           '0.00',                                                         // 22 Otros tributos y cargos
-          this.formatPleAmount(doc.total),                                // 23 Importe total de la adquisicion
+          this.formatPleAmount(signo * Number(doc.total || 0)),           // 23 Importe total de la adquisicion
           this.sanitizePleText(doc.moneda || 'PEN', 3),                   // 24 Codigo de moneda (cat. 02)
-          '1.000',                                                        // 25 Tipo de cambio
-          '',                                                             // 26 Fecha del comprobante modificado
-          '',                                                             // 27 Tipo del comprobante modificado
-          '',                                                             // 28 Serie del comprobante modificado
+          this.resolveTipoCambioPle(doc.moneda, fiscal.tipo_cambio),      // 25 Tipo de cambio
+          this.formatPleDate(fiscal.documento_referencia_fecha),          // 26 Fecha del comprobante modificado
+          this.codigoTipoComprobante(fiscal.documento_referencia_tipo) === '00'
+            ? ''
+            : this.codigoTipoComprobante(fiscal.documento_referencia_tipo), // 27 Tipo del comprobante modificado
+          fiscal.documento_referencia_serie || '',                        // 28 Serie del comprobante modificado
           '',                                                             // 29 Codigo de la dependencia aduanera
-          '',                                                             // 30 Numero del comprobante modificado
+          fiscal.documento_referencia_numero || '',                       // 30 Numero del comprobante modificado
           '',                                                             // 31 Fecha de emision de la constancia de detraccion
           '',                                                             // 32 Numero de la constancia de detraccion
           '',                                                             // 33 Marca del comprobante sujeto a retencion

@@ -10,7 +10,7 @@ const AsistenciaPage = () => {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
   const { get, post } = useApi();
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
 
   const formatLocalDate = (date: string) => {
     const [year, month, day] = date.split('-').map(Number);

@@ -38,11 +38,11 @@ function getApiOrigin() {
 }
 
 function getOperationalPassword() {
-  if (process.env.DATABASE_URL) {
-    return decodeURIComponent(new URL(process.env.DATABASE_URL).password);
-  }
   if (process.env.TEST_USER_PASSWORD) {
     return process.env.TEST_USER_PASSWORD;
+  }
+  if (process.env.DATABASE_URL) {
+    return decodeURIComponent(new URL(process.env.DATABASE_URL).password);
   }
   throw new Error('TEST_USER_PASSWORD o DATABASE_URL es requerido para E2E');
 }

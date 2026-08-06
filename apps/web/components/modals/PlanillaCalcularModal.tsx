@@ -61,7 +61,7 @@ export default function PlanillaCalcularModal({
 
       if (response?.success && response.data) {
         const empleadosActivos = response.data.filter(
-          (emp: any) => emp.estado === "activo",
+          (emp: any) => String(emp.estado || "").toLowerCase() === "activo",
         );
 
         const empleadosConCalculos = empleadosActivos.map((emp: any) => {
@@ -179,6 +179,9 @@ export default function PlanillaCalcularModal({
     try {
       setCalculando(true);
 
+      // El navegador sólo envía variables operativas. Sueldo, contrato,
+      // régimen pensionario, tasas y totales se vuelven a resolver y calcular
+      // en el backend tenant-scoped; nunca se confían importes del preview.
       const datosCalculados = {
         empleados: empleados.map((emp) => ({
           empleado_id: emp.id,
@@ -188,9 +191,6 @@ export default function PlanillaCalcularModal({
           tardanzas_minutos: emp.tardanzas_minutos,
           faltas: emp.faltas,
           bonos_adicionales: emp.bonos_adicionales,
-          total_ingresos: emp.total_ingresos,
-          total_descuentos: emp.total_descuentos,
-          neto_pagar: emp.neto_pagar,
         })),
       };
 

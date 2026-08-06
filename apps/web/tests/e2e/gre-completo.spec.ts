@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
+import { generateValidRucFromRunId } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: any };
 
@@ -103,7 +104,7 @@ test.describe('T11 GRE completo', () => {
         data: {
           tipo: 'EMPRESA',
           documento_tipo: 'RUC',
-          documento_numero: `20${runId}`,
+          documento_numero: generateValidRucFromRunId(`gre-cliente-${runId}`),
           razon_social: `${qaPrefix} Cliente GRE T11`,
           direccion: `${qaPrefix} Av. Logistica GRE 123`,
           email: `gre-t11-${runId}@example.com`,

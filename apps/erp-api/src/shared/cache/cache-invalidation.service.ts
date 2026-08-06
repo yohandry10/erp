@@ -92,9 +92,10 @@ export class CacheInvalidationService {
   async invalidateAllTenantCache(tenantId: string): Promise<void> {
     this.logger.log(`🗑️ [CacheInvalidation] Invalidando todo el cache para tenant ${tenantId}`);
     await this.invalidateDashboardCache(tenantId);
-    
-    // Aquí se pueden agregar más invalidaciones específicas si es necesario
-    // Por ejemplo: cache de reportes, cache de métricas específicas, etc.
+    await Promise.all([
+      this.cacheService.del(`config:country:${tenantId}`),
+      this.cacheService.del(`config:status:${tenantId}`),
+    ]);
   }
 }
 

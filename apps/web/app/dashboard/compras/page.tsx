@@ -181,7 +181,8 @@ export default function ComprasPage() {
   }
 
   // La recepción es un flujo propio (wizard) que llama a los endpoints reales
-  // POST /compras/recepciones/ordenes/:id y .../cerrar (postea stock, CxP y asiento).
+  // POST /compras/recepciones/ordenes/:id y .../cerrar registra stock y recepción contable.
+  // La CxP y el IGV nacen recién al registrar la factura del proveedor.
   const handleRecepcionar = (orden: AnyRecord) => {
     router.push(`/dashboard/compras/recepciones/nueva?orden_id=${orden.id}`)
   }

@@ -81,6 +81,7 @@ Documentación técnica del ERP, organizada por dominio. Solo se listan document
 | [audits/2026-07-15-dependency-and-large-file-cleanup.md](audits/2026-07-15-dependency-and-large-file-cleanup.md) | Limpieza de dependencias/archivos huerfanos, ciclos arquitectonicos y catalogo completo de archivos mayores a 1.000 lineas. |
 | [audits/2026-07-22-inventory-single-ledger-closure.md](audits/2026-07-22-inventory-single-ledger-closure.md) | Verificación y cierre DEV del doble-ledger de inventario, almacén de caja POS, idempotencia y concurrencia. |
 | [audits/2026-07-24-production-closure-functional-qa.md](audits/2026-07-24-production-closure-functional-qa.md) | Cierre QA funcional DEV por verticales e interconexiones; anulación CPE POS, secuencia fiscal única, ADMIN normal/demo, stock inicial por almacén, gates técnicos y bloqueantes reales de producción. |
+| [audits/2026-08-06-prod-demo-rrhh-procure-to-pay-hardening.md](audits/2026-08-06-prod-demo-rrhh-procure-to-pay-hardening.md) | Política de demo comercial en PROD y hardening DEV de RRHH, recepción/factura proveedor, CxP/pagos, contabilidad, PLE/SIRE y CPE. |
 
 ## ⚙️ Configuración y operación
 

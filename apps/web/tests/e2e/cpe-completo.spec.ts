@@ -379,14 +379,17 @@ test.describe('T10 CPE completo', () => {
       }),
       'anular CPE firmado',
     );
-    expect(anulacion.cpe_anulado?.estado || anulacion.estado).toMatch(/ANULADO/i);
+    // Crear la NC sólo inicia la anulación. El comprobante original no puede
+    // quedar ANULADO hasta que SUNAT acepte la nota y exista CDR.
+    expect(anulacion.cpe_anulado?.estado).toBe('FIRMADO');
+    expect(anulacion.cpe_anulado?.anulacion_estado || anulacion.estado).toBe('PENDIENTE_CDR');
     expect(anulacion.nota_credito?.id).toBeTruthy();
     await expectRejected(
       await apiContext.post(api(`/cpe/${facturaAnulable.id}/anular`), {
         data: { motivo: `${qaPrefix} doble anulación CASE-10` },
       }),
       'no debe duplicar anulación CPE',
-      /ya está anulado|ya esta anulado|No se puede anular/i,
+      /ya está anulado|ya esta anulado|nota de crédito asociada|nota de credito asociada|No se puede anular/i,
     );
 
     const envio1 = await parseOk<any>(
@@ -464,7 +467,7 @@ test.describe('T10 CPE completo', () => {
       .eq('id', facturaAnulable.id)
       .single();
     expect(cpeAnulableDbError?.message || '', 'leer CPE anulable persistido').toBe('');
-    expect(String(cpeAnulableDb?.estado || '')).toMatch(/ANULADO/i);
+    expect(String(cpeAnulableDb?.estado || '')).toBe('FIRMADO');
     expect(cpeAnulableDb?.nota_credito_id).toBeTruthy();
 
     await expect.poll(async () => {
@@ -542,10 +545,11 @@ test.describe('T10 CPE completo', () => {
       }),
       'anular boleta POS desde Documentos',
     );
-    expect(anulacionPos.cpe_anulado?.estado).toMatch(/ANULADO/i);
+    expect(anulacionPos.cpe_anulado?.estado).toBe(String(cpePos?.estado));
+    expect(anulacionPos.cpe_anulado?.anulacion_estado).toBe('PENDIENTE_CDR');
     expect(anulacionPos.nota_credito?.id).toBeTruthy();
 
-    await expect.poll(async () => {
+    const estadoPendienteCdr = await (async () => {
       const [venta, cpeActual, documento, producto, reversoStock, reversoCaja, asientoReverso] = await Promise.all([
         supabase.from('ventas_pos').select('estado').eq('tenant_id', tenantId).eq('id', boletaPos.venta_id).single(),
         supabase.from('cpe').select('estado, nota_credito_id').eq('tenant_id', tenantId).eq('id', cpePos!.id).single(),
@@ -561,9 +565,8 @@ test.describe('T10 CPE completo', () => {
       const error = [venta, cpeActual, documento, producto, reversoStock, reversoCaja, asientoReverso]
         .map((result) => result.error?.message)
         .find(Boolean);
-      if (error) return { ok: false, error };
+      expect(error || '', 'leer estado operativo pendiente de CDR').toBe('');
       return {
-        ok: true,
         venta: venta.data?.estado,
         cpe: cpeActual.data?.estado,
         nota_credito_id: cpeActual.data?.nota_credito_id,
@@ -573,21 +576,17 @@ test.describe('T10 CPE completo', () => {
         reverso_caja: Boolean(reversoCaja.data?.id) && Number(reversoCaja.data?.monto) < 0,
         reverso_contable: Boolean(asientoReverso.data?.id),
       };
-    }, {
-      message: 'la anulación POS debe revertir documento, venta, stock, caja y contabilidad',
-      timeout: 90000,
-      intervals: [1000, 2000, 5000],
-    }).toMatchObject({
-      ok: true,
-      venta: 'ANULADA',
-      cpe: 'ANULADO',
+    })();
+    expect(estadoPendienteCdr).toMatchObject({
+      cpe: cpePos?.estado,
       nota_credito_id: anulacionPos.nota_credito.id,
-      documento: 'ANULADO',
-      stock: 5,
-      reverso_stock: true,
-      reverso_caja: true,
-      reverso_contable: true,
+      stock: 4,
+      reverso_stock: false,
+      reverso_caja: false,
+      reverso_contable: false,
     });
+    expect(estadoPendienteCdr.venta).not.toBe('ANULADA');
+    expect(estadoPendienteCdr.documento).not.toBe('ANULADO');
 
     const { data: empresaConfig, error: empresaError } = await supabase
       .from('empresa_config')

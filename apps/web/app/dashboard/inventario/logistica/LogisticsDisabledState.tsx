@@ -1,8 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import { useState, type ComponentType } from 'react'
-import { ArrowRight, CheckCircle2, Settings2 } from 'lucide-react'
+import { CheckCircle2, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
 import { useApi } from '@/hooks/use-api'
@@ -77,12 +76,6 @@ export function LogisticsDisabledState({ icon: Icon, title, description }: Logis
           <Button onClick={activateLogistics} disabled={activating} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 min-w-[220px]">
             <Settings2 className={activating ? 'animate-spin' : ''} />
             {activating ? 'Activando...' : 'Activar flujo logístico'}
-          </Button>
-          <Button asChild variant="outline" className="min-w-[220px]">
-            <Link href="/dashboard/wizard">
-              Revisar configuración
-              <ArrowRight />
-            </Link>
           </Button>
         </div>
       </section>

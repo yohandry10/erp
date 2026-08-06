@@ -320,15 +320,39 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
     'cerrar recepcion T14',
   );
 
+  const numeroFactura = `F001-CON-${runId}`;
+  const cxpCreada = await parseOk<any>(
+    await apiContext.post(api('/finanzas/cxp'), {
+      data: {
+        proveedor_id: proveedor.id,
+        orden_id: orden.id,
+        recepcion_id: cerrada.id,
+        tipo_documento: 'FACTURA',
+        serie: 'F001',
+        numero_documento: numeroFactura,
+        fecha_emision: new Date().toISOString().slice(0, 10),
+        condiciones_pago: 'CREDITO_30',
+        subtotal: 200,
+        igv: 36,
+        total: 236,
+        moneda: 'PEN',
+        tipo_cambio: 1,
+        referencia_tipo: 'RECEPCION',
+        referencia_id: cerrada.id,
+      },
+    }),
+    'registrar factura proveedor T14',
+  );
+
   await expect.poll(async () => {
     const data = await parseOk<any[]>(await apiContext.get(api(`/finanzas/cxp?proveedor_id=${proveedor.id}`)), 'listar CxP T14');
-    return data.find((item) => item.referencia_id === cerrada.id || item.numero_documento === cerrada.numero)?.id ?? '';
+    return data.find((item) => item.id === cxpCreada.id && item.recepcion_id === cerrada.id)?.id ?? '';
   }, { message: 'compra T14 debe crear CxP', timeout: 30000 }).not.toBe('');
 
   const cxps = await parseOk<any[]>(await apiContext.get(api(`/finanzas/cxp?proveedor_id=${proveedor.id}`)), 'listar CxP T14 final');
-  const cxp = cxps.find((item) => item.referencia_id === cerrada.id || item.numero_documento === cerrada.numero);
+  const cxp = cxps.find((item) => item.id === cxpCreada.id && item.recepcion_id === cerrada.id);
   expect(cxp?.id, 'CxP de compra T14 persistida').toBeTruthy();
-  return { proveedor, cxp, referencia: cerrada.numero || orden.numero };
+  return { proveedor, cxp, referencia: numeroFactura };
 }
 
 async function ensureMetodoPago(supabase: SupabaseClient, tenantId: string) {

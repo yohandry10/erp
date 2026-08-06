@@ -28,7 +28,7 @@ const ContratosPage = () => {
   const [contratoDetail, setContratoDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { get, post, put } = useApi();
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
 
   // Estado para diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState<{
