@@ -6,7 +6,6 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { SupabaseService } from "../../shared/supabase/supabase.service";
-import { camposALimpiarEnConversionReal } from "./demo-conversion-cleanup";
 import { obtenerDatosDePago } from "./datos-de-pago";
 import { TenantContextService } from "../../shared/tenant/tenant-context.service";
 import { AuthService } from "../auth/auth.service";
@@ -58,6 +57,12 @@ const PLANES = {
     facturas_mes: -1,
   },
 };
+
+interface ConversionCompletionContext {
+  solicitudId?: string;
+  aprobadoPor?: string;
+  stripeSessionId?: string;
+}
 
 @Injectable()
 export class DemoService {
@@ -1173,30 +1178,21 @@ export class DemoService {
       throw new NotFoundException("La solicitud no existe o ya fue procesada");
     }
 
-    const resultado = await this.completarConversion(solicitud.tenant_id, {
-      razon_social: solicitud.razon_social,
-      ruc: solicitud.ruc,
-      email: solicitud.email,
-      password: "", // No se usa: la contraseña ya viaja hasheada.
-      password_hash: solicitud.password_hash,
-      telefono: solicitud.telefono,
-      plan_id: solicitud.plan_id,
-      periodo: solicitud.periodo,
-      conservar_datos: solicitud.conservar_datos !== false,
-    } as ConvertDemoToRealDto);
-
-    // La solicitud se cierra después de convertir, nunca antes: si se marcara
-    // completada primero y la conversión fallara, quedaría un cliente que pagó
-    // y no aparece en ninguna lista.
-    await this.adminClient
-      .from("demo_conversiones_pendientes")
-      .update({
-        estado: "COMPLETADA",
-        completed_at: new Date().toISOString(),
-        aprobado_por: aprobadoPor || null,
-        aprobado_at: new Date().toISOString(),
-      })
-      .eq("id", solicitudId);
+    const resultado = await this.completarConversion(
+      solicitud.tenant_id,
+      {
+        razon_social: solicitud.razon_social,
+        ruc: solicitud.ruc,
+        email: solicitud.email,
+        password: "", // No se usa: la contraseña ya viaja hasheada.
+        password_hash: solicitud.password_hash,
+        telefono: solicitud.telefono,
+        plan_id: solicitud.plan_id,
+        periodo: solicitud.periodo,
+        conservar_datos: solicitud.conservar_datos !== false,
+      } as ConvertDemoToRealDto,
+      { solicitudId, aprobadoPor },
+    );
 
     return {
       success: true,
@@ -1247,115 +1243,48 @@ export class DemoService {
   /**
    * Completa la conversión después del pago (llamado por webhook)
    */
-  async completarConversion(tenantId: string, dto: ConvertDemoToRealDto) {
-    const authClient = this.supabase.getClient();
+  async completarConversion(
+    tenantId: string,
+    dto: ConvertDemoToRealDto,
+    context: ConversionCompletionContext = {},
+  ) {
     const passwordHash =
       dto.password_hash || (await bcrypt.hash(dto.password, 10));
 
     try {
-      const { error: empresaError } = await authClient
-        .from("empresa_config")
-        .update({
-          razon_social: dto.razon_social,
-          ruc: dto.ruc,
-          telefono: dto.telefono,
-          is_demo: false,
-          demo_expires_at: null,
-          demo_conversion_attempted: true,
-          estado: "ACTIVO",
-          plan: (dto.plan_id || "basico").toUpperCase(),
-          // Los fixtures del demo —certificado de demostración y credenciales
-          // SOL de pruebas— no pueden sobrevivir a la conversión: con el RUC
-          // real del cliente, SUNAT los rechaza y nadie sabría por qué. Van en
-          // la misma sentencia para que no exista un instante con la cuenta ya
-          // marcada como real y las credenciales del demo todavía puestas.
-          ...camposALimpiarEnConversionReal(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("tenant_id", tenantId);
+      // Todo ocurre en una única transacción PostgreSQL: limpieza de semillas,
+      // empresa real, credenciales y cierre de solicitud. Antes eran varias
+      // llamadas HTTP independientes y un fallo dejaba el tenant medio convertido.
+      const { data: conversion, error: conversionError } =
+        await this.adminClient.rpc("completar_conversion_demo", {
+          p_tenant: tenantId,
+          p_razon_social: dto.razon_social,
+          p_ruc: dto.ruc,
+          p_telefono: dto.telefono || null,
+          p_plan: dto.plan_id || "basico",
+          p_email: dto.email,
+          p_password_hash: passwordHash,
+          p_conservar_datos: dto.conservar_datos !== false,
+          p_solicitud_id: context.solicitudId || null,
+          p_aprobado_por: context.aprobadoPor || null,
+          p_stripe_session_id: context.stripeSessionId || null,
+        });
 
-      if (empresaError) throw empresaError;
-
-      // El cliente eligió empezar de cero. Se hace después de convertir,
-      // nunca antes: si el borrado va primero y la conversión falla, se
-      // queda sin datos y además sigue siendo demo. Al revés, un fallo aquí
-      // deja la cuenta real con sus datos, que es recuperable.
-      if (dto.conservar_datos === false) {
-        const { data: reinicio, error: reinicioError } =
-          await this.adminClient.rpc("reiniciar_datos_tenant", {
-            p_tenant: tenantId,
-          });
-
-        if (reinicioError || reinicio?.reiniciado !== true) {
-          throw new BadRequestException(
-            `La cuenta se activó pero no se pudieron borrar los datos de prueba: ${
-              reinicioError?.message || "el reinicio no confirmó"
-            }. Vuelva a intentarlo desde la configuración.`,
-          );
-        }
-
-        this.logger.log(
-          `[demo] tenant ${tenantId} convertido empezando de cero: ${reinicio.filas_borradas} filas borradas`,
+      if (conversionError || conversion?.success !== true) {
+        throw new Error(
+          conversionError?.message || "La conversión atómica no confirmó su finalización",
         );
       }
 
-      // El demo no tiene un solo usuario: además del principal se siembra un
-      // "Aprobador" para que las OC puedan aprobarse sin autoaprobación. Poner
-      // el correo del cliente en todos a la vez rompía la conversión con
-      // "usuarios_sistema_email_key". El correo va al principal —el que crea el
-      // RPC, siempre el primero— y el resto solo deja de ser demo.
-      const { data: usuariosDemo, error: usuariosDemoError } = await authClient
-        .from("usuarios_sistema")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("is_demo_user", true)
-        .order("created_at", { ascending: true });
+      // El reset cambia decenas de fuentes del dashboard en una sola operación.
+      // Sin invalidar, Redis seguía mostrando productos, ventas y compras del
+      // demo aunque PostgreSQL ya estuviera limpio.
+      await this.cacheInvalidation.invalidateAllTenantCache(tenantId);
 
-      if (usuariosDemoError) throw usuariosDemoError;
-      if (!usuariosDemo?.length) {
-        throw new Error("La cuenta demo no tiene usuario que convertir");
-      }
-
-      const [principal, ...acompanantes] = usuariosDemo;
-
-      const { error: usuarioError } = await authClient
-        .from("usuarios_sistema")
-        .update({
-          email: dto.email,
-          password_hash: passwordHash,
-          is_demo_user: false,
-          demo_email_temp: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", principal.id);
-
-      if (usuarioError) throw usuarioError;
-
-      if (acompanantes.length) {
-        const { error: acompanantesError } = await authClient
-          .from("usuarios_sistema")
-          .update({
-            is_demo_user: false,
-            demo_email_temp: null,
-            updated_at: new Date().toISOString(),
-          })
-          .in(
-            "id",
-            acompanantes.map((u) => u.id),
-          );
-
-        if (acompanantesError) throw acompanantesError;
-      }
-
-      const { data: usuario } = await authClient
-        .from("usuarios_sistema")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("email", dto.email)
-        .single();
-
-      if (!usuario?.id) {
-        throw new Error("Usuario convertido no encontrado");
+      if (conversion.reinicio?.reiniciado === true) {
+        this.logger.log(
+          `[demo] tenant ${tenantId} convertido empezando de cero: ${conversion.reinicio.filas_borradas} filas borradas`,
+        );
       }
 
       // Solo se devuelve sesión iniciada si tenemos la contraseña en claro, que
@@ -1403,25 +1332,23 @@ export class DemoService {
     }
 
     // Completar la conversión
-    const result = await this.completarConversion(conversion.tenant_id, {
-      razon_social: conversion.razon_social,
-      ruc: conversion.ruc,
-      email: conversion.email,
-      password: "", // No se usa, usamos password_hash
-      password_hash: conversion.password_hash,
-      telefono: conversion.telefono,
-      plan_id: conversion.plan_id,
-      periodo: conversion.periodo,
-      // Lo que el cliente eligió antes de pagar; sin esto la decisión se
-      // perdía justo en el paso que la hace efectiva.
-      conservar_datos: conversion.conservar_datos !== false,
-    });
-
-    // Marcar como completada
-    await this.client
-      .from("demo_conversiones_pendientes")
-      .update({ estado: "COMPLETADA", completed_at: new Date().toISOString() })
-      .eq("stripe_session_id", sessionId);
+    const result = await this.completarConversion(
+      conversion.tenant_id,
+      {
+        razon_social: conversion.razon_social,
+        ruc: conversion.ruc,
+        email: conversion.email,
+        password: "", // No se usa, usamos password_hash
+        password_hash: conversion.password_hash,
+        telefono: conversion.telefono,
+        plan_id: conversion.plan_id,
+        periodo: conversion.periodo,
+        // Lo que el cliente eligió antes de pagar; sin esto la decisión se
+        // perdía justo en el paso que la hace efectiva.
+        conservar_datos: conversion.conservar_datos !== false,
+      },
+      { stripeSessionId: sessionId },
+    );
 
     return result;
   }
