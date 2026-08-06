@@ -1419,7 +1419,19 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
         return
       }
 
-      // Mostrar modal de cierre de caja
+      const saldoResponse = await api.get(`/cajas/saldo-esperado/${sesionCajaId}`)
+      const saldoEsperado = Number(saldoResponse?.data?.saldo ?? saldoResponse?.saldo)
+
+      if (Number.isFinite(saldoEsperado)) {
+        setEstadoCaja((prev) => prev ? {
+          ...prev,
+          montoFinal: saldoEsperado,
+          ventasEfectivo: saldoEsperado - prev.montoInicial,
+        } : prev)
+        setMontoContadoInput(formatMoney(saldoEsperado))
+      }
+
+      // Mostrar modal de cierre de caja con el saldo calculado por el backend.
       setMostrarModalCerrarCaja(true)
     } catch (error) {
       console.error('❌ Error preparando cierre de caja:', error)
@@ -2557,8 +2569,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   <p className="mt-1 font-semibold">{formatCurrency(estadoCaja?.montoInicial || 0)}</p>
                 </div>
                 <div className="rounded-lg border bg-muted/30 p-3">
-                  <span className="text-xs text-muted-foreground">Ventas en efectivo</span>
-                  <p className="mt-1 font-semibold">{formatCurrency(estadoCaja?.ventasEfectivo || 0)}</p>
+                  <span className="text-xs text-muted-foreground">Saldo esperado</span>
+                  <p className="mt-1 font-semibold">{formatCurrency(estadoCaja?.montoFinal || 0)}</p>
                 </div>
               </div>
 

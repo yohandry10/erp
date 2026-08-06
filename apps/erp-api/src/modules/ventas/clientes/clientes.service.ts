@@ -71,6 +71,7 @@ export class ClientesService {
       codigo: documentoTexto,
       direccion: createClienteDto.direccion || null,
       email: createClienteDto.email || null,
+      telefono: createClienteDto.telefono?.trim() || null,
       ruc: createClienteDto.documento_tipo === 'RUC' ? documentoTexto : null,
       activo: true,
     };
@@ -274,6 +275,7 @@ export class ClientesService {
     }
     if (updateClienteDto.direccion !== undefined) updateData.direccion = updateClienteDto.direccion || null;
     if (updateClienteDto.email !== undefined) updateData.email = updateClienteDto.email || null;
+    if (updateClienteDto.telefono !== undefined) updateData.telefono = updateClienteDto.telefono?.trim() || null;
 
     // Si se está actualizando el documento, validar duplicados usando el documento textual canónico.
     if (updateClienteDto.documento_numero) {
