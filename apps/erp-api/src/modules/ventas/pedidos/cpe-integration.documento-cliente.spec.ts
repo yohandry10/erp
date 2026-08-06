@@ -121,4 +121,31 @@ describe('CPEIntegrationService documento de cliente', () => {
       }),
     );
   });
+
+  it('reserva el correlativo en la secuencia fiscal compartida', async () => {
+    const single = jest.fn().mockResolvedValue({
+      data: { serie_factura: 'F001', serie_boleta: 'B001' },
+      error: null,
+    });
+    const eq = jest.fn().mockReturnValue({ single });
+    const select = jest.fn().mockReturnValue({ eq });
+    const from = jest.fn().mockReturnValue({ select });
+    const rpc = jest.fn().mockResolvedValue({ data: 2, error: null });
+    const service = new CPEIntegrationService(
+      { getClient: () => ({ from, rpc }) } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    await expect(
+      (service as any).obtenerSerieYNumero('tenant-demo', TipoDocumento.BOLETA),
+    ).resolves.toEqual({ serie: 'B001', numero: 2 });
+    expect(rpc).toHaveBeenCalledWith('obtener_siguiente_numero_documento', {
+      p_tenant_id: 'tenant-demo',
+      p_tipo_documento: TipoDocumento.BOLETA,
+      p_serie: 'B001',
+    });
+  });
 });
