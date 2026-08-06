@@ -152,10 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleSessionStorageChange = (event: StorageEvent) => {
       if (event.key !== AUTH_SESSION_STORAGE_KEY) return
-      // Otra pestaña inició/cerró/cambió de cuenta. Invalidamos la hidratación
-      // optimista y volvemos a consultar la cookie HttpOnly autoritativa.
-      setLoading(true)
-      void loadSession()
+      // Otra pestaña inició/cerró/cambió de cuenta. Una navegación completa deja
+      // que el middleware valide la cookie HttpOnly y decida entre login/dashboard,
+      // evitando que una ruta pública conserve un AuthContext de otro tenant.
+      window.location.reload()
     }
 
     window.addEventListener('storage', handleSessionStorageChange)
