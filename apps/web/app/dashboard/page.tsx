@@ -789,7 +789,7 @@ function ModuleTile({
 // ============================================================================
 
 export default function Dashboard() {
-  const api = useApiCall({ throwOnError: true, timeoutMs: 30000 })
+  const { get } = useApiCall({ throwOnError: true, timeoutMs: 30000 })
   const dashboardFetchInFlightRef = useRef(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -814,8 +814,8 @@ export default function Dashboard() {
       setError(null)
 
       const [statsResult, activitiesResult] = await Promise.allSettled([
-        api.get('/dashboard/stats'),
-        api.get('/dashboard/activities'),
+        get('/dashboard/stats'),
+        get('/dashboard/activities'),
       ])
 
       if (statsResult.status === 'fulfilled' && statsResult.value?.success) {
@@ -845,8 +845,7 @@ export default function Dashboard() {
       dashboardFetchInFlightRef.current = false
       setIsRefreshing(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [get])
 
   useEffect(() => {
     fetchDashboardData(true)

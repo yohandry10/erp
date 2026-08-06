@@ -94,7 +94,10 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       // Si ya hay user hidratado procedemos sin esperar a AuthContext (la cookie/token
       // autentican igual); solo resolvemos vía getSession() cuando falta. Esto elimina
       // los sleeps fijos y el fetch redundante a /auth/profile en el arranque.
-      if (!resolvedSession?.user) {
+      // Un snapshot persistido puede pertenecer a la cuenta anterior. Mientras
+      // AuthContext valida la cookie, obtener el perfil canónico antes de enviar
+      // cualquier request evita mezclar el tenant viejo con el JWT actual.
+      if (authLoading || !resolvedSession?.user) {
         if (authLoading) {
           console.log('⏳ [useApi] Esperando a que AuthContext termine de cargar...')
         }
@@ -137,9 +140,9 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         ...(resolvedSession?.access_token ? { Authorization: `Bearer ${resolvedSession.access_token}` } : {}),
         ...optionsHeaders,
       }
-      if (resolvedSession?.user?.tenant_id && !headers['x-tenant-id'] && !headers['X-Tenant-Id']) {
-        headers['x-tenant-id'] = resolvedSession.user.tenant_id
-      }
+      // No inferir X-Tenant-Id desde la caché del navegador. El backend deriva el
+      // tenant del JWT/cookie. Un override sólo se envía si el caller lo especifica
+      // explícitamente (caso superadmin), y el backend vuelve a validarlo.
       if (!isFormDataBody && !headers['Content-Type'] && !headers['content-type']) {
         headers['Content-Type'] = 'application/json'
       }
