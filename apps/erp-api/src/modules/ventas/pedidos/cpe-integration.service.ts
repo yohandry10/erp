@@ -418,7 +418,7 @@ export class CPEIntegrationService {
   private async obtenerEmpresaConfig(tenantId: string): Promise<any> {
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('ruc, razon_social, serie_factura, ultimo_numero_factura, serie_boleta, ultimo_numero_boleta')
+      .select('ruc, razon_social, serie_factura, serie_boleta')
       .eq('tenant_id', tenantId)
       .single();
 
