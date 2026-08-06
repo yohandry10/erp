@@ -99,7 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [session, setSession] = useState<Session | null>(() => readStoredSession())
   const [user, setUser] = useState<User | null>(() => readStoredSession()?.user ?? null)
-  const [loading, setLoading] = useState(() => readStoredSession() === null)
+  // El snapshot solo sirve para pintar la identidad de forma optimista. Hasta que
+  // /auth/profile confirme la cookie actual no puede considerarse autoritativo:
+  // el usuario puede haber cambiado de cuenta/tenant en otra pestaña.
+  const [loading, setLoading] = useState(true)
 
   const loadSession = async () => {
     // En rutas públicas (/login, /demo, /) el middleware ya garantiza que no hay

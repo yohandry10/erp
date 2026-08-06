@@ -106,7 +106,6 @@ export default function OfflinePage() {
       const { session, accessToken } = customAuth.getCachedSession()
       const token = accessToken ?? session?.access_token
       if (token) headers.set('Authorization', `Bearer ${token}`)
-      if (session?.user?.tenant_id) headers.set('x-tenant-id', session.user.tenant_id)
       const result = await refreshLocalFirstSnapshots(undefined, headers)
       const ok = result.filter((item) => item.ok).length
       setSnapshotSummary(`${ok}/${result.length} snapshots actualizados`)
