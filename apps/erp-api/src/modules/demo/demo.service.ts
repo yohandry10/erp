@@ -422,13 +422,24 @@ export class DemoService {
       },
       {
         codigo: "627",
-        nombre: "Servicios Prestados por Terceros",
+        nombre: "Seguridad, previsión social y otras contribuciones",
         tipo: "GASTO",
       },
+      { codigo: "69", nombre: "Costo de Ventas", tipo: "GASTO" },
       { codigo: "70", nombre: "Ventas", tipo: "INGRESO" },
       { codigo: "94", nombre: "Gastos de Administración", tipo: "GASTO" },
     ];
-    const rows = cuentas.map((c) => ({
+    const { data: existentes, error: existentesError } = await this.adminClient
+      .from("plan_cuentas")
+      .select("codigo")
+      .eq("tenant_id", tenantId)
+      .in("codigo", cuentas.map((cuenta) => cuenta.codigo));
+    if (existentesError) {
+      throw new Error(`plan_cuentas select: ${existentesError.message}`);
+    }
+
+    const codigosExistentes = new Set((existentes ?? []).map((cuenta) => cuenta.codigo));
+    const rows = cuentas.filter((cuenta) => !codigosExistentes.has(cuenta.codigo)).map((c) => ({
       tenant_id: tenantId,
       codigo: c.codigo,
       nombre: c.nombre,
@@ -438,6 +449,7 @@ export class DemoService {
       acepta_movimiento: true,
       nivel: 2,
     }));
+    if (rows.length === 0) return;
     const { error } = await this.adminClient.from("plan_cuentas").insert(rows);
     if (error) throw new Error(`plan_cuentas insert: ${error.message}`);
   }

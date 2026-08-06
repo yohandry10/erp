@@ -72,6 +72,7 @@ export class CotizacionesCompraRepository {
 
     // Insertar detalles
     const detallesConSubtotal = createDto.detalles.map(detalle => ({
+      tenant_id: tenantId,
       cotizacion_id: cotizacion.id,
       producto_id: detalle.producto_id,
       descripcion: detalle.descripcion,
@@ -90,7 +91,8 @@ export class CotizacionesCompraRepository {
       await supabase
         .from('cotizaciones_compra')
         .delete()
-        .eq('id', cotizacion.id);
+        .eq('id', cotizacion.id)
+        .eq('tenant_id', tenantId);
       
       throw new Error(`Error al crear detalles de cotización: ${detallesError.message}`);
     }
@@ -125,7 +127,8 @@ export class CotizacionesCompraRepository {
         *,
         producto:productos(id, codigo, nombre)
       `)
-      .eq('cotizacion_id', id);
+      .eq('cotizacion_id', id)
+      .eq('tenant_id', tenantId);
 
     if (detallesError) {
       throw new Error(`Error al obtener detalles: ${detallesError.message}`);
@@ -302,7 +305,8 @@ export class CotizacionesCompraRepository {
       const { error: deleteError } = await supabase
         .from('cotizacion_compra_detalles')
         .delete()
-        .eq('cotizacion_id', id);
+        .eq('cotizacion_id', id)
+        .eq('tenant_id', tenantId);
 
       if (deleteError) {
         throw new Error(`Error al eliminar detalles existentes: ${deleteError.message}`);
@@ -310,6 +314,7 @@ export class CotizacionesCompraRepository {
 
       // Insertar nuevos detalles
       const detallesConSubtotal = updateDto.detalles.map(detalle => ({
+        tenant_id: tenantId,
         cotizacion_id: id,
         producto_id: detalle.producto_id,
         descripcion: detalle.descripcion,
@@ -337,7 +342,8 @@ export class CotizacionesCompraRepository {
     const { data: detalles } = await supabase
       .from('cotizacion_compra_detalles')
       .select('*')
-      .eq('cotizacion_id', id);
+      .eq('cotizacion_id', id)
+      .eq('tenant_id', tenantId);
 
     return {
       ...cotizacion,
@@ -378,7 +384,8 @@ export class CotizacionesCompraRepository {
         *,
         producto:productos(id, codigo, nombre)
       `)
-      .eq('cotizacion_id', id);
+      .eq('cotizacion_id', id)
+      .eq('tenant_id', tenantId);
 
     return {
       ...data,
@@ -421,7 +428,8 @@ export class CotizacionesCompraRepository {
         *,
         producto:productos(id, codigo, nombre)
       `)
-      .eq('cotizacion_id', id);
+      .eq('cotizacion_id', id)
+      .eq('tenant_id', tenantId);
 
     return {
       ...data,

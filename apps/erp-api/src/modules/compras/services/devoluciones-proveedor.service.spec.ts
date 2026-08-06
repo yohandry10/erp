@@ -226,7 +226,13 @@ describe('DevolucionesProveedorService', () => {
       });
       expect(repository.generarNumeroDevolucion).toHaveBeenCalledWith('tenant-123');
       expect(repository.crear).toHaveBeenCalled();
-      expect(repository.crearItems).toHaveBeenCalled();
+      expect(repository.crearItems).toHaveBeenCalledWith([
+        expect.objectContaining({
+          tenant_id: 'tenant-123',
+          devolucion_id: 'devolucion-123',
+          producto_id: 'producto-1',
+        }),
+      ]);
       expect(auditService.registrarCambio).toHaveBeenCalledWith(
         'devoluciones_proveedor',
         'INSERT',

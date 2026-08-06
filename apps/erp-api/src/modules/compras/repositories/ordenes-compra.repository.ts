@@ -119,6 +119,7 @@ export class OrdenesCompraRepository {
 
     // Insertar detalles
     const detallesConSubtotal = createDto.detalles.map(detalle => ({
+      tenant_id: tenantId,
       orden_id: orden.id,
       producto_id: detalle.producto_id,
       descripcion: detalle.descripcion,
@@ -139,7 +140,8 @@ export class OrdenesCompraRepository {
       await supabase
         .from('ordenes_compra')
         .delete()
-        .eq('id', orden.id);
+        .eq('id', orden.id)
+        .eq('tenant_id', tenantId);
       
       throw new Error(`Error al crear detalles de orden de compra: ${detallesError.message}`);
     }
@@ -172,7 +174,8 @@ export class OrdenesCompraRepository {
     const { data: detalles, error: detallesError } = await supabase
       .from('orden_compra_detalles')
       .select('*')
-      .eq('orden_id', id);
+      .eq('orden_id', id)
+      .eq('tenant_id', tenantId);
 
     if (detallesError) {
       throw new Error(`Error al obtener detalles: ${detallesError.message}`);
@@ -403,7 +406,8 @@ export class OrdenesCompraRepository {
       const { error: deleteError } = await supabase
         .from('orden_compra_detalles')
         .delete()
-        .eq('orden_id', id);
+        .eq('orden_id', id)
+        .eq('tenant_id', tenantId);
 
       if (deleteError) {
         throw new Error(`Error al eliminar detalles existentes: ${deleteError.message}`);
@@ -411,6 +415,7 @@ export class OrdenesCompraRepository {
 
       // Insertar nuevos detalles
       const detallesConSubtotal = updateDto.detalles.map((detalle: any) => ({
+        tenant_id: tenantId,
         orden_id: id,
         producto_id: detalle.producto_id,
         descripcion: detalle.descripcion,
@@ -440,7 +445,8 @@ export class OrdenesCompraRepository {
     const { data: detalles } = await supabase
       .from('orden_compra_detalles')
       .select('*')
-      .eq('orden_id', id);
+      .eq('orden_id', id)
+      .eq('tenant_id', tenantId);
 
     return {
       ...orden,
@@ -486,7 +492,8 @@ export class OrdenesCompraRepository {
     const { data: detalles } = await supabase
       .from('orden_compra_detalles')
       .select('*')
-      .eq('orden_id', id);
+      .eq('orden_id', id)
+      .eq('tenant_id', tenantId);
 
     return {
       ...data,

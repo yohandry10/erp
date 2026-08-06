@@ -166,8 +166,54 @@ describe('RecepcionesService', () => {
 
       const result = await service.obtenerRecepcionPorId('rec-1', 'tenant-1');
 
-      expect(result).toEqual(mockRecepcion);
+      expect(result).toEqual({
+        ...mockRecepcion,
+        orden: null,
+        almacenes: null,
+        ubicaciones: null,
+      });
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('recepciones');
+    });
+
+    it('normaliza el contrato de BD para el detalle consumido por la UI', async () => {
+      const mockRecepcion = {
+        id: 'rec-1',
+        numero: 'REC-DEMO-001',
+        tenant_id: 'tenant-1',
+        orden: { id: 'oc-1', proveedor: { id: 'prov-1', razon_social: 'Proveedor Demo' } },
+        items: [
+          {
+            id: 'item-1',
+            cantidad_recibida: 10,
+            calidad: 'CONFORME',
+            producto: { id: 'prod-1', nombre: 'Detergente' },
+            almacen: { id: 'alm-1', nombre: 'Principal' },
+            ubicacion: null,
+            metadata: { observaciones: 'Sin daños' },
+          },
+        ],
+      };
+
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: mockRecepcion, error: null });
+      Object.assign(mockQueryBuilder, { data: [], error: null });
+
+      const result = await service.obtenerRecepcionPorId('rec-1', 'tenant-1');
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          almacenes: mockRecepcion.items[0].almacen,
+          orden: expect.objectContaining({ proveedores: mockRecepcion.orden.proveedor }),
+          items: [
+            expect.objectContaining({
+              cantidad: 10,
+              calidad: 'OK',
+              productos: mockRecepcion.items[0].producto,
+              observaciones: 'Sin daños',
+              cantidad_disponible_devolucion: 10,
+            }),
+          ],
+        }),
+      );
     });
 
     it('should throw NotFoundException when recepcion not found', async () => {

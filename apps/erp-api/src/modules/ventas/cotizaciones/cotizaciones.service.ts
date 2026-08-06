@@ -137,7 +137,8 @@ export class CotizacionesService {
     const { data: productos } = await client
       .from('productos')
       .select('id, codigo, nombre')
-      .in('id', productosIds);
+      .in('id', productosIds)
+      .eq('tenant_id', tenantId);
 
     const productosMap = new Map(productos?.map(p => [p.id, p]) || []);
 
@@ -167,7 +168,7 @@ export class CotizacionesService {
     if (detalleError) {
       console.error('Error creating cotizacion detalle:', detalleError);
       // Rollback: eliminar cotización
-      await client.from('cotizaciones').delete().eq('id', cotizacion.id);
+      await client.from('cotizaciones').delete().eq('id', cotizacion.id).eq('tenant_id', tenantId);
       throw new BadRequestException('Error al crear el detalle de la cotización');
     }
 
@@ -309,6 +310,7 @@ export class CotizacionesService {
       .from('cotizacion_detalles')
       .select('*')
       .eq('cotizacion_id', id)
+      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true });
 
     if (detalleError) {
@@ -376,7 +378,8 @@ export class CotizacionesService {
       const { error: deleteDetalleError } = await client
         .from('cotizacion_detalles')
         .delete()
-        .eq('cotizacion_id', id);
+        .eq('cotizacion_id', id)
+        .eq('tenant_id', tenantId);
 
       if (deleteDetalleError) {
         console.error('Error deleting cotizacion detalle:', deleteDetalleError);
@@ -385,6 +388,7 @@ export class CotizacionesService {
 
       // Crear nuevo detalle
       const detalleData = updateCotizacionDto.detalle.map((item) => ({
+        tenant_id: tenantId,
         cotizacion_id: id,
         producto_id: item.producto_id,
         descripcion: item.descripcion,
@@ -441,7 +445,7 @@ export class CotizacionesService {
     }
 
     // Eliminar detalle (por nombre de tabla real: cotizacion_detalles)
-    await client.from('cotizacion_detalles').delete().eq('cotizacion_id', id);
+    await client.from('cotizacion_detalles').delete().eq('cotizacion_id', id).eq('tenant_id', tenantId);
 
     // Eliminar cotización
     const { error } = await client
@@ -922,7 +926,8 @@ export class CotizacionesService {
     const { error: detalleError } = await client
       .from('cotizacion_detalles')
       .delete()
-      .eq('cotizacion_id', id);
+      .eq('cotizacion_id', id)
+      .eq('tenant_id', tenantId);
 
     if (detalleError) {
       console.error('❌ [CotizacionesService] Error deleting cotizacion detalle:', detalleError);
