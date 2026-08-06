@@ -73,6 +73,53 @@ FOR EACH ROW
 WHEN (NEW.estado = 'COMPLETADA')
 EXECUTE FUNCTION app.normalizar_identidad_conversion_demo();
 
+-- El rol ADMIN_DEMO sólo existe mientras empresa_config.is_demo=true. El
+-- cambio de identidad del tenant debe promover también su RBAC principal.
+CREATE OR REPLACE FUNCTION app.promover_admin_al_convertir_demo()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, app
+AS $$
+DECLARE
+  v_principal uuid;
+  v_admin uuid;
+BEGIN
+  IF OLD.is_demo IS NOT TRUE OR NEW.is_demo IS NOT FALSE THEN RETURN NEW; END IF;
+
+  SELECT id INTO v_principal
+  FROM public.usuarios_sistema
+  WHERE tenant_id = NEW.tenant_id AND activo = true AND is_super_admin = false
+  ORDER BY created_at, id LIMIT 1;
+
+  SELECT id INTO v_admin
+  FROM public.roles
+  WHERE tenant_id = NEW.tenant_id AND upper(nombre) = 'ADMIN'
+  ORDER BY created_at, id LIMIT 1;
+
+  IF v_principal IS NULL OR v_admin IS NULL THEN
+    RAISE EXCEPTION 'No se pudo resolver usuario principal o rol ADMIN para tenant %', NEW.tenant_id;
+  END IF;
+
+  DELETE FROM public.user_roles ur
+  USING public.roles r
+  WHERE ur.role_id = r.id AND ur.usuario_sistema_id = v_principal
+    AND ur.tenant_id = NEW.tenant_id AND upper(r.nombre) = 'ADMIN_DEMO';
+
+  INSERT INTO public.user_roles (usuario_sistema_id, role_id, tenant_id)
+  VALUES (v_principal, v_admin, NEW.tenant_id)
+  ON CONFLICT (usuario_sistema_id, role_id, tenant_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_promover_admin_al_convertir_demo ON public.empresa_config;
+CREATE TRIGGER trg_promover_admin_al_convertir_demo
+AFTER UPDATE OF is_demo ON public.empresa_config
+FOR EACH ROW
+WHEN (OLD.is_demo IS TRUE AND NEW.is_demo IS FALSE)
+EXECUTE FUNCTION app.promover_admin_al_convertir_demo();
+
 -- Replace the atomic conversion with the definitive identity cleanup. When a
 -- tenant chooses "start from zero", secondary demo users are test data too:
 -- their RBAC rows are removed by the existing foreign-key cascades.
