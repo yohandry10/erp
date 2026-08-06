@@ -126,6 +126,7 @@ export class AsientosGeneratorService {
           total_debe: totalDebe,
           total_haber: totalHaber,
           estado: 'CONFIRMADO',
+          origen: sourceEventId ? 'Automático' : 'Manual',
           source_event_id: sourceEventId
         })
         .select()

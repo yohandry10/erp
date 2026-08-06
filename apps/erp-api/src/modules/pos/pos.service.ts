@@ -777,6 +777,20 @@ export class PosService {
         ventaData?.permite_venta_sin_stock === true,
       );
 
+      const costoVentas = parseFloat(
+        recomputed
+          .reduce((totalCosto: number, item: any) => {
+            const producto = productosMap.get(item.producto_id) || {};
+            if (producto.es_servicio === true || producto.controla_stock === false) {
+              return totalCosto;
+            }
+            const costoUnitario = Number(producto.costo ?? producto.precio_compra ?? 0);
+            const cantidad = Number(item.cantidad ?? 0);
+            return totalCosto + (Number.isFinite(costoUnitario) ? costoUnitario : 0) * cantidad;
+          }, 0)
+          .toFixed(2),
+      );
+
       const desgloseIgv = calcularDesgloseIgv(
         recomputed.map((item: any) => ({
           baseImponible: Number(item.subtotal ?? 0),
@@ -1202,6 +1216,7 @@ export class PosService {
           total_exportacion: desgloseIgv.exportacion,
           total_igv: parseFloat(impuestosCalculados.toFixed(2)),
           total_venta: parseFloat(totalCalculado.toFixed(2)),
+          costo_ventas: costoVentas,
           items: (recomputed || []).map((item: any) => {
             const producto = productosMap.get(item.producto_id) || {};
             const cantidad = parseFloat(item.cantidad) || 1;

@@ -1137,7 +1137,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         total,
         base_imponible: baseImponible,
         igv,
-        costo_ventas: Number(eventData.costo_ventas ?? 0),
+        costo_ventas: Number(eventData.costoVentas ?? eventData.costo_ventas ?? 0),
         centro_costo_id: eventData.centro_costo_id,
         referencia,
         event_id: evento.event_id || eventData.eventId,

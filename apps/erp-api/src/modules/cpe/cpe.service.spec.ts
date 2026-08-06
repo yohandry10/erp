@@ -63,6 +63,7 @@ describe('CpeService', () => {
         total_gravadas: 100,
         total_igv: 18,
         total_venta: 118,
+        costo_ventas: 60,
         condicion_pago: 'CONTADO'
     } as any;
 
@@ -215,7 +216,7 @@ describe('CpeService', () => {
             expect(mockSupabaseClient.update).toHaveBeenCalledWith({ documento_id: 'doc-123' });
             expect(eventBusService.emitFacturaEmitidaEvent).toHaveBeenCalled();
             expect(eventBusService.emitFacturaEmitidaEvent).toHaveBeenCalledWith(
-                expect.objectContaining({ facturaId: 'doc-123' }),
+                expect.objectContaining({ facturaId: 'doc-123', costoVentas: 60 }),
             );
             expect(supabaseService.update).toHaveBeenCalled();
         });
