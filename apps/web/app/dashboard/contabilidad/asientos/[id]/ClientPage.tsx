@@ -213,7 +213,7 @@ export default function AsientoDetallePage() {
                   ['Numero', asiento.numero_asiento],
                   ['Fecha', formatDate(asiento.fecha)],
                   ['Referencia', asiento.referencia || 'Sin referencia'],
-                  ['Origen', asiento.origen || 'Manual'],
+                  ['Origen', asiento.origen || (asiento.source_event_id ? 'Automático' : 'Manual')],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-cyan-400/15 bg-card/70 p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">{label}</div>

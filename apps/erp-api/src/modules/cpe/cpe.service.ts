@@ -540,6 +540,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         subtotal: createFacturaDto.total_gravadas,
         impuestos: createFacturaDto.total_igv,
         total: createFacturaDto.total_venta,
+        costoVentas: Number((createFacturaDto as any).costo_ventas ?? 0),
         moneda: createFacturaDto.moneda,
         fechaEmision: emissionDate,
         fechaVencimiento: dueDate,

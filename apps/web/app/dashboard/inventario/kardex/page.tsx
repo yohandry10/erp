@@ -7,6 +7,7 @@ import { useApi } from '@/hooks/use-api'
 
 type KardexMovimiento = {
   id: string
+  tipo: 'ENTRADA' | 'SALIDA' | 'AJUSTE' | 'DEVOLUCION'
   fecha: string | null
   documento?: string | null
   estado?: string | null
@@ -33,12 +34,15 @@ type KardexMovimiento = {
   serie?: string | null
   fechaExpiracion?: string | null
   recepcionId?: string | null
+  referenciaTipo?: string | null
 }
 
 type KardexResumen = {
   totalMovimientos: number
   totalEntradas: number
+  totalSalidas: number
   valorEntradas: number
+  valorSalidas: number
   saldoCantidad: number
   saldoValorizado: number
   valorPorMoneda: Record<string, number>
@@ -54,7 +58,9 @@ type FilterState = {
 const DEFAULT_RESUMEN: KardexResumen = {
   totalMovimientos: 0,
   totalEntradas: 0,
+  totalSalidas: 0,
   valorEntradas: 0,
+  valorSalidas: 0,
   saldoCantidad: 0,
   saldoValorizado: 0,
   valorPorMoneda: {},
@@ -146,6 +152,7 @@ export default function KardexPage() {
         setMovimientos(
           (Array.isArray(response.data) ? response.data : []).map((item: any) => ({
             id: item.id ?? item.recepcionItemId ?? crypto.randomUUID(),
+            tipo: String(item.tipo ?? 'ENTRADA').toUpperCase() as KardexMovimiento['tipo'],
             fecha: item.fecha ?? item.fechaRecepcion ?? null,
             documento: item.documento ?? item.recepcionNumero ?? null,
             estado: item.estado ?? item.recepcionEstado ?? null,
@@ -180,6 +187,7 @@ export default function KardexPage() {
             serie: item.serie ?? null,
             fechaExpiracion: item.fechaExpiracion ?? null,
             recepcionId: item.recepcionId ?? null,
+            referenciaTipo: item.referenciaTipo ?? null,
           })),
         )
         const resumenPayload = response.resumen ?? {}
@@ -225,18 +233,18 @@ export default function KardexPage() {
       {
         label: 'Movimientos',
         value: resumen.totalMovimientos,
-        note: 'Entradas contabilizadas',
+        note: 'Entradas y salidas contabilizadas',
       },
       {
-        label: 'Cantidad total',
-        value: resumen.totalEntradas,
-        note: 'Unidades recibidas',
+        label: 'Saldo unidades',
+        value: resumen.saldoCantidad,
+        note: `${formatNumber(resumen.totalEntradas)} entradas · ${formatNumber(resumen.totalSalidas)} salidas`,
       },
       {
-        label: 'Valor entradas',
-        value: resumen.valorEntradas,
-        note: 'Total valorizado',
-        formatted: formatCurrency(resumen.valorEntradas),
+        label: 'Valor movimientos',
+        value: resumen.valorEntradas - resumen.valorSalidas,
+        note: `${formatCurrency(resumen.valorEntradas)} entradas · ${formatCurrency(resumen.valorSalidas)} salidas`,
+        formatted: formatCurrency(resumen.valorEntradas - resumen.valorSalidas),
       },
       {
         label: 'Saldo valorizado',
@@ -259,7 +267,7 @@ export default function KardexPage() {
           </span>
         </div>
         <p className="m-0 text-foreground/80 max-w-[760px] leading-7">
-          Consulta las entradas de inventario con costo valorizado, filtrando por producto, almacén y rango de
+          Consulta entradas y salidas de inventario con costo valorizado, filtrando por producto, almacén y rango de
           fechas. Los datos respetan el tenant activo y exponen el total por moneda para conciliación contable.
         </p>
         <div className="flex gap-3 flex-wrap">
@@ -399,7 +407,7 @@ export default function KardexPage() {
 
               <section className="rounded-2xl border bg-card p-5 flex flex-col gap-4"
               >
-                <h2 className="m-0 text-[1.15rem] font-bold text-foreground">Detalle de entradas</h2>
+                <h2 className="m-0 text-[1.15rem] font-bold text-foreground">Detalle de movimientos</h2>
                 {movimientos.length === 0 ? (
                   <div className="text-muted-foreground text-sm">No se encontraron movimientos para los filtros seleccionados.</div>
                 ) : (
@@ -409,6 +417,7 @@ export default function KardexPage() {
                         <tr className="border-b text-left text-foreground/80 text-xs">
                           <th className="py-[0.65rem] px-2">Fecha</th>
                           <th className="py-[0.65rem] px-2">Documento</th>
+                          <th className="py-[0.65rem] px-2">Tipo</th>
                           <th className="py-[0.65rem] px-2">Producto</th>
                           <th className="py-[0.65rem] px-2">Almacén</th>
                           <th className="py-[0.65rem] px-2 text-right">Cantidad</th>
@@ -422,6 +431,11 @@ export default function KardexPage() {
                           <tr key={mov.id} className="border-b">
                             <td className="py-3 px-2 text-foreground font-semibold">{formatDateTime(mov.fecha)}</td>
                             <td className="py-3 px-2 text-foreground/80">{mov.documento ?? '—'}</td>
+                            <td className="py-3 px-2">
+                              <span className={mov.tipo === 'SALIDA' ? 'font-semibold text-rose-400' : 'font-semibold text-emerald-400'}>
+                                {mov.tipo}
+                              </span>
+                            </td>
                             <td className="py-3 px-2">
                               <div className="flex flex-col">
                                 <span className="font-semibold text-foreground">{mov.producto.nombre}</span>
@@ -439,13 +453,13 @@ export default function KardexPage() {
                               ) : null}
                             </td>
                             <td className="py-3 px-2 text-right text-foreground font-semibold">
-                              {formatNumber(mov.cantidad)}
+                              {mov.tipo === 'SALIDA' ? '-' : '+'}{formatNumber(mov.cantidad)}
                             </td>
                             <td className="py-3 px-2 text-right text-foreground/80">
                               {formatCurrency(mov.costoUnitario, mov.moneda)}
                             </td>
                             <td className="py-3 px-2 text-right text-foreground font-semibold">
-                              {formatCurrency(mov.valorTotal, mov.moneda)}
+                              {mov.tipo === 'SALIDA' ? '-' : '+'}{formatCurrency(mov.valorTotal, mov.moneda)}
                             </td>
                             <td className="py-3 px-2 text-foreground/80">
                               {mov.lote ?? '—'} {mov.serie ? ` / ${mov.serie}` : ''}
