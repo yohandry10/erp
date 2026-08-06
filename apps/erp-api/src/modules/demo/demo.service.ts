@@ -245,12 +245,23 @@ export class DemoService {
       );
     }
 
-    const { data: readiness, error: businessSeedError } = await this.adminClient.rpc(
+    const { data: baseReadiness, error: businessSeedError } = await this.adminClient.rpc(
       "hydrate_demo_business_sample_tx",
       { p_tenant_id: tenantId, p_user_id: primerUserId },
     );
     if (businessSeedError) {
       throw new Error(`semilla empresarial transaccional: ${businessSeedError.message}`);
+    }
+    if (baseReadiness?.ready !== true) {
+      throw new Error(`contrato base de demo incompleto: ${JSON.stringify(baseReadiness)}`);
+    }
+
+    const { data: readiness, error: hrSeedError } = await this.adminClient.rpc(
+      "hydrate_demo_hr_sample_tx",
+      { p_tenant_id: tenantId },
+    );
+    if (hrSeedError) {
+      throw new Error(`semilla RRHH transaccional: ${hrSeedError.message}`);
     }
     if (readiness?.ready !== true) {
       throw new Error(`contrato de demo incompleto: ${JSON.stringify(readiness)}`);

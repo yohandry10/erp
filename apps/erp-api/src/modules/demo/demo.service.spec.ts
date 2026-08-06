@@ -44,6 +44,10 @@ describe('DemoService operational seed', () => {
       p_tenant_id: 'tenant-demo',
       p_user_id: 'user-demo',
     });
+    expect(rpc).toHaveBeenCalledWith('hydrate_demo_hr_sample_tx', {
+      p_tenant_id: 'tenant-demo',
+    });
+    expect(rpc).toHaveBeenCalledTimes(2);
     expect(result).toEqual(expect.objectContaining({ aprobadorUserId: 'aprobador-id' }));
   });
 
