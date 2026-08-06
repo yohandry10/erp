@@ -374,6 +374,25 @@ export class TenantManagementService {
         throw new BadRequestException('Error al obtener tenants');
       }
 
+      const [totalTenantsResult, activeTenantsResult, totalUsersResult, activeUsersResult] = await Promise.all([
+        client.from('empresa_config').select('tenant_id', { count: 'exact', head: true }),
+        client.from('empresa_config').select('tenant_id', { count: 'exact', head: true }).eq('estado', 'ACTIVO'),
+        client.from('usuarios_sistema').select('id', { count: 'exact', head: true }),
+        client.from('usuarios_sistema').select('id', { count: 'exact', head: true }).eq('estado', 'ACTIVO'),
+      ]);
+
+      const statsError = [
+        totalTenantsResult.error,
+        activeTenantsResult.error,
+        totalUsersResult.error,
+        activeUsersResult.error,
+      ].find(Boolean);
+
+      if (statsError) {
+        console.error('Error fetching global tenant statistics:', statsError);
+        throw new BadRequestException('Error al obtener estadísticas globales');
+      }
+
       const mappedData = (data || []).map(tenant => ({
         id: tenant.tenant_id,
         razon_social: tenant.razon_social,
@@ -398,6 +417,12 @@ export class TenantManagementService {
       return {
         success: true,
         data: mappedData,
+        stats: {
+          totalTenants: totalTenantsResult.count || 0,
+          activeTenants: activeTenantsResult.count || 0,
+          totalUsers: totalUsersResult.count || 0,
+          activeUsers: activeUsersResult.count || 0,
+        },
         pagination: {
           page,
           limit,
