@@ -28,6 +28,24 @@ import {
 } from "../../shared/utils/secure-config.utils";
 import { CacheInvalidationService } from "../../shared/cache/cache-invalidation.service";
 
+export const DEMO_PCGE_ACCOUNTS = [
+  { codigo: "10", nombre: "Efectivo y Equivalentes de Efectivo", tipo: "ACTIVO" },
+  { codigo: "12", nombre: "Cuentas por Cobrar Comerciales - Terceros", tipo: "ACTIVO" },
+  { codigo: "20", nombre: "Mercaderías", tipo: "ACTIVO" },
+  { codigo: "40", nombre: "Tributos por Pagar", tipo: "PASIVO" },
+  { codigo: "403", nombre: "Instituciones Públicas (ESSALUD/ONP)", tipo: "PASIVO" },
+  { codigo: "411", nombre: "Remuneraciones por Pagar", tipo: "PASIVO" },
+  { codigo: "42", nombre: "Cuentas por Pagar Comerciales - Terceros", tipo: "PASIVO" },
+  { codigo: "4699", nombre: "Mercaderías recibidas por facturar", tipo: "PASIVO" },
+  { codigo: "50", nombre: "Capital", tipo: "PATRIMONIO" },
+  { codigo: "60", nombre: "Compras", tipo: "GASTO" },
+  { codigo: "621", nombre: "Remuneraciones - Sueldos y Salarios", tipo: "GASTO" },
+  { codigo: "627", nombre: "Seguridad, previsión social y otras contribuciones", tipo: "GASTO" },
+  { codigo: "69", nombre: "Costo de Ventas", tipo: "GASTO" },
+  { codigo: "70", nombre: "Ventas", tipo: "INGRESO" },
+  { codigo: "94", nombre: "Gastos de Administración", tipo: "GASTO" },
+] as const;
+
 const PLANES = {
   basico: {
     id: "basico",
@@ -387,48 +405,7 @@ export class DemoService {
    * estructura completa, todas con activo=true (campo que el e2e filtra).
    */
   private async seedPlanContableMinimo(tenantId: string): Promise<void> {
-    const cuentas = [
-      // Elementos PCGE peruano + cuentas de detalle que los e2e contables/RRHH
-      // consultan explícitamente (621/627 RRHH, 411/403 planillas).
-      {
-        codigo: "10",
-        nombre: "Efectivo y Equivalentes de Efectivo",
-        tipo: "ACTIVO",
-      },
-      {
-        codigo: "12",
-        nombre: "Cuentas por Cobrar Comerciales - Terceros",
-        tipo: "ACTIVO",
-      },
-      { codigo: "20", nombre: "Mercaderías", tipo: "ACTIVO" },
-      { codigo: "40", nombre: "Tributos por Pagar", tipo: "PASIVO" },
-      {
-        codigo: "403",
-        nombre: "Instituciones Públicas (ESSALUD/ONP)",
-        tipo: "PASIVO",
-      },
-      { codigo: "411", nombre: "Remuneraciones por Pagar", tipo: "PASIVO" },
-      {
-        codigo: "42",
-        nombre: "Cuentas por Pagar Comerciales - Terceros",
-        tipo: "PASIVO",
-      },
-      { codigo: "50", nombre: "Capital", tipo: "PATRIMONIO" },
-      { codigo: "60", nombre: "Compras", tipo: "GASTO" },
-      {
-        codigo: "621",
-        nombre: "Remuneraciones - Sueldos y Salarios",
-        tipo: "GASTO",
-      },
-      {
-        codigo: "627",
-        nombre: "Seguridad, previsión social y otras contribuciones",
-        tipo: "GASTO",
-      },
-      { codigo: "69", nombre: "Costo de Ventas", tipo: "GASTO" },
-      { codigo: "70", nombre: "Ventas", tipo: "INGRESO" },
-      { codigo: "94", nombre: "Gastos de Administración", tipo: "GASTO" },
-    ];
+    const cuentas = DEMO_PCGE_ACCOUNTS;
     const { data: existentes, error: existentesError } = await this.adminClient
       .from("plan_cuentas")
       .select("codigo")

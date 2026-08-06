@@ -579,8 +579,8 @@ export default function Sidebar() {
   const country = useCountryContext()
   const prefetchedRoutes = useRef<Set<string>>(new Set())
   const isPeru = country.paisCodigo === 'PE'
-  const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
+  const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED !== 'false'
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false'
   const inventarioEnabled =
     process.env.NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED === undefined
       ? true

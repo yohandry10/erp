@@ -121,10 +121,22 @@ BEGIN
       (tenant_id,nombre,codigo,cuenta_bancaria_id,fecha,tipo,monto,descripcion,
        referencia,saldo_anterior,saldo_nuevo,saldo,conciliado,estado,activo,metadata)
     SELECT p_tenant_id,'Saldo inicial demo','MOV-BAN-DEMO-001',v_banco.id,current_date,
-      'ABONO',COALESCE(v_banco.saldo_actual,v_banco.saldo,50000),
+      'ABONO',CASE
+        WHEN COALESCE(v_banco.saldo_actual,v_banco.saldo,0) > 0
+          THEN COALESCE(v_banco.saldo_actual,v_banco.saldo)
+        ELSE 50000
+      END,
       'Saldo de apertura para pruebas de tesorería y conciliación','APERTURA-DEMO',
-      0,COALESCE(v_banco.saldo_actual,v_banco.saldo,50000),
-      COALESCE(v_banco.saldo_actual,v_banco.saldo,50000),false,'ACTIVO',true,
+      0,CASE
+        WHEN COALESCE(v_banco.saldo_actual,v_banco.saldo,0) > 0
+          THEN COALESCE(v_banco.saldo_actual,v_banco.saldo)
+        ELSE 50000
+      END,
+      CASE
+        WHEN COALESCE(v_banco.saldo_actual,v_banco.saldo,0) > 0
+          THEN COALESCE(v_banco.saldo_actual,v_banco.saldo)
+        ELSE 50000
+      END,false,'ACTIVO',true,
       '{"source":"demo_business_seed_v4"}'::jsonb
     WHERE NOT EXISTS (
       SELECT 1 FROM public.movimientos_bancarios
@@ -138,9 +150,12 @@ BEGIN
     SELECT p_tenant_id,'Conciliación demo '||to_char(current_date,'YYYY-MM'),
       'CONC-DEMO-'||to_char(current_date,'YYYYMM'),v_banco.id,v_banco.banco,
       v_banco.numero_cuenta,to_char(current_date,'YYYY-MM'),COALESCE(v_banco.moneda,'PEN'),
-      COALESCE(v_banco.saldo_actual,v_banco.saldo,50000),
-      COALESCE(v_banco.saldo_actual,v_banco.saldo,50000),
-      COALESCE(v_banco.saldo_actual,v_banco.saldo,50000),0,
+      CASE WHEN COALESCE(v_banco.saldo_actual,v_banco.saldo,0) > 0
+        THEN COALESCE(v_banco.saldo_actual,v_banco.saldo) ELSE 50000 END,
+      CASE WHEN COALESCE(v_banco.saldo_actual,v_banco.saldo,0) > 0
+        THEN COALESCE(v_banco.saldo_actual,v_banco.saldo) ELSE 50000 END,
+      CASE WHEN COALESCE(v_banco.saldo_actual,v_banco.saldo,0) > 0
+        THEN COALESCE(v_banco.saldo_actual,v_banco.saldo) ELSE 50000 END,0,
       date_trunc('month',current_date)::date,
       (date_trunc('month',current_date)+interval '1 month - 1 day')::date,
       'ABIERTA','Conciliación bancaria de ejemplo preparada para practicar el cierre',

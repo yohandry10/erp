@@ -54,7 +54,7 @@ export default function RrhhPage() {
     variant: 'default',
   })
 
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false'
 
   const toList = (d: any): any[] =>
     d?.success && Array.isArray(d.data) ? d.data : Array.isArray(d) ? d : []

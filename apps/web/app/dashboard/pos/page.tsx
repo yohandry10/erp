@@ -146,7 +146,7 @@ const posSecondaryButtonClass =
   'rounded-lg border bg-background px-4 py-3 font-semibold text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50'
 
 export default function POSPage() {
-  const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
+  const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED !== 'false'
 
   const api = useApi()
   const posSaleApi = useApi({ retries: 1, timeoutMs: 30000 })

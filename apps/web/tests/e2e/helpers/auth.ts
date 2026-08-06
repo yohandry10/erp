@@ -23,10 +23,13 @@ for (const envPath of [
 }
 
 function getDefaultPassword(): string {
+  if (process.env.TEST_USER_PASSWORD) {
+    return process.env.TEST_USER_PASSWORD;
+  }
   if (process.env.DATABASE_URL) {
     return decodeURIComponent(new URL(process.env.DATABASE_URL).password);
   }
-  return process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+  return 'AdminProd2026!';
 }
 
 function getApiOrigin(): string {

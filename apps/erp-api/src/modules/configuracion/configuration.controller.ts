@@ -24,6 +24,7 @@ import {
   ValidateWizardCertificateDto,
 } from './configuration.types';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
 import {
   INITIAL_ACTIVE_COUNTRY_CODE,
   INITIAL_ACTIVE_COUNTRY_ID,
@@ -44,6 +45,7 @@ export class ConfigurationController {
     private readonly configurationService: ConfigurationService,
     private readonly supabaseService: SupabaseService,
     private readonly auditService: AuditService,
+    private readonly cacheInvalidation: CacheInvalidationService,
   ) {}
 
   private assertInitialActiveCountry(paisId?: number | null, paisCodigo?: string | null): void {
@@ -859,6 +861,11 @@ export class ConfigurationController {
         data?.id,
         { accion: 'ACTUALIZAR_CONFIGURACION_EMPRESA' },
       );
+
+      // El contexto de país/empresa se cachea para el bootstrap del dashboard.
+      // Sin invalidarlo, cambios como usar_flujo_logistica podían tardar hasta
+      // un minuto en reflejarse y dejaban UI y backend en estados distintos.
+      await this.cacheInvalidation.invalidateAllTenantCache(tenantId);
 
       return {
         success: true,

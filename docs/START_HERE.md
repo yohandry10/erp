@@ -10,7 +10,7 @@
 > Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
 <!-- DOC-NAV:END -->
 
-Fecha de actualizacion: 2026-07-24
+Fecha de actualizacion: 2026-08-06
 
 Este es el primer documento que debe leerse al abrir una sesion nueva. Su objetivo es ubicar el estado real del proyecto, indicar que documentos leer segun la tarea y evitar tomar reportes historicos como verdad vigente.
 
@@ -70,6 +70,7 @@ Checklist obligatorio antes de tocar codigo:
 
 ## Estado ejecutivo en 2 minutos
 
+- La prueba gratuita comercial vive en PROD y se convierte *in-place* para conservar tenant y usuario. `DEMO_API_ENABLED` debe coincidir con `app.deployment_environment.allow_demo_data`; el seed permitido es exclusivamente tenant-scoped. La conversion atomica elimina datos/credenciales demo cuando el cliente empieza de cero, cambia identidad y promueve `ADMIN_DEMO` a `ADMIN`. DEV queda para desarrollo/QA; fixtures QA y seeds globales siguen prohibidos en PROD. Fuente: `docs/architecture/ENVIRONMENT_DATABASE_BOUNDARIES.md`, migraciones `378`, `381`, `385`, `386`, `390`.
 - El cierre QA DEV del 2026-07-24 dejó backend Jest 120/120 suites y 1106/1106 tests, Web type-check/build 111/111, smoke UI desktop/narrow 148/148, tema 2/2 y calidad UI 4/4. Se corrigieron numeración fiscal compartida POS/Documentos (`354`), seed ADMIN no-demo (`355`), anulación POS por referencia fiscal canónica, auth con trailing slash, primer paint móvil y persistencia/contraste del tema. `stock_inicial.almacen_id` queda obligatorio. `347..355` siguen sólo en DEV; antes de PROD se deben auditar colisiones fiscales históricas y ejecutar el runbook. Fuente: `docs/audits/2026-07-24-production-closure-functional-qa.md`.
 - Inventario quedó cerrado técnicamente en DEV como single-ledger el 2026-07-22: `producto_existencias` es la fuente física por almacén, POS deriva el almacén desde la caja y los agregados/proyecciones rechazan escrituras paralelas. Venta real, retry idempotente y concurrencia fueron verificados. Las migraciones `347..352` aún no se promovieron a PROD. Leer `docs/audits/2026-07-22-inventory-single-ledger-closure.md` antes de tocar stock, POS, reservas o importaciones.
 - La arquitectura de datos tiene dos proyectos fisicos y un contrato inmutable: DEV `hbueraexcbowpfnjlppi` es para desarrollo/QA/demos; PROD `wypnbcptofqdmoynlonq` es exclusivamente para datos reales. El 2026-07-14 se purgaron de PROD 41 tenants QA/demo, 133 usuarios Auth y 49,613 filas tenant-scoped; quedo vacia y con validadores 5/5 entorno, 5/5 contabilidad, 6/6 inventario y 11/11 tesoreria. La migracion `346` y el preflight bloquean demos o project refs cruzados. Leer `docs/architecture/ENVIRONMENT_DATABASE_BOUNDARIES.md` antes de tocar cualquier base.

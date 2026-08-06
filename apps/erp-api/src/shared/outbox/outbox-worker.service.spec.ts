@@ -21,6 +21,7 @@ describe('OutboxWorker', () => {
     };
     const eventBus = {
       emit: jest.fn().mockResolvedValue(undefined),
+      emitAndAwait: jest.fn().mockResolvedValue(undefined),
     };
     const tenantContext = {
       run: jest.fn(async (_ctx, callback) => callback()),
@@ -42,6 +43,8 @@ describe('OutboxWorker', () => {
     'cxc.creada',
     'cpe.anulado',
     'factura.emitida',
+    'factura.proveedor.registrada',
+    'FacturaProveedorRegistrada',
   ])('deja %s al ContabilidadEventsListener para evitar carreras contables', async (eventType) => {
     const pendingEvent = {
       id: 'outbox-row-1',
@@ -58,6 +61,24 @@ describe('OutboxWorker', () => {
     expect(outboxService.markEventProcessing).not.toHaveBeenCalled();
     expect(outboxService.markEventCompleted).not.toHaveBeenCalled();
     expect(eventBus.emit).not.toHaveBeenCalled();
+  });
+
+  it('tambien reserva los eventos contables durante el procesamiento manual', async () => {
+    const pendingEvent = {
+      id: 'outbox-row-supplier-invoice',
+      event_id: 'event-supplier-invoice',
+      event_type: 'factura.proveedor.registrada',
+      tenant_id: 'tenant-1',
+      payload: { tenantId: 'tenant-1', numeroDocumento: 'F001-00000001' },
+      created_at: new Date().toISOString(),
+    };
+    const { worker, outboxService, eventBus } = buildWorker([pendingEvent]);
+
+    await expect(worker.processPendingEventsManual()).resolves.toEqual({ processed: 0, failed: 0 });
+
+    expect(outboxService.markEventProcessing).not.toHaveBeenCalled();
+    expect(outboxService.markEventCompleted).not.toHaveBeenCalled();
+    expect(eventBus.emitAndAwait).not.toHaveBeenCalled();
   });
 
   it('reemite eventos no contables y los marca completados', async () => {

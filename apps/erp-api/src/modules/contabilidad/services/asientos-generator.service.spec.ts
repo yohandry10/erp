@@ -52,6 +52,10 @@ describe('AsientosGeneratorService', () => {
         });
       }
 
+      if (fn === 'crear_asiento_contable_tx') {
+        return mock.single();
+      }
+
       return Promise.resolve({ data: true, error: null });
     });
 
@@ -329,7 +333,10 @@ describe('AsientosGeneratorService', () => {
 
       expect(resultado).toEqual(asientoCreado);
       expect(resultado.source_event_id).toBe(sourceEventId);
-      expect(mockSupabaseClient.insert).toHaveBeenCalled();
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_asiento_contable_tx',
+        expect.objectContaining({ p_source_event_id: sourceEventId })
+      );
     });
 
     it('debe rechazar source_event_id duplicado en lugar de crear otro asiento', async () => {
@@ -405,7 +412,10 @@ describe('AsientosGeneratorService', () => {
       );
 
       expect(resultado).toEqual(asientoExistente);
-      expect(mockSupabaseClient.insert).toHaveBeenCalledTimes(1);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_asiento_contable_tx',
+        expect.objectContaining({ p_source_event_id: sourceEventId })
+      );
       expect(mockSupabaseClient.update).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'completed' })
       );
@@ -961,14 +971,17 @@ describe('AsientosGeneratorService', () => {
         evento.tenant_id,
         ['621', '627', '403', '407', '411']
       );
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
-        expect.arrayContaining([
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_asiento_contable_tx',
+        expect.objectContaining({
+          p_detalles: expect.arrayContaining([
           expect.objectContaining({ cuenta_id: 'cuenta-621', debe: 10000, haber: 0 }),
           expect.objectContaining({ cuenta_id: 'cuenta-627', debe: 930, haber: 0 }),
           expect.objectContaining({ cuenta_id: 'cuenta-403', debe: 0, haber: 1300 }),
           expect.objectContaining({ cuenta_id: 'cuenta-407', debe: 0, haber: 930 }),
           expect.objectContaining({ cuenta_id: 'cuenta-411', debe: 0, haber: 8700 }),
-        ])
+          ]),
+        })
       );
     });
   });

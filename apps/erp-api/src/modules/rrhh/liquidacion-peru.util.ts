@@ -234,6 +234,28 @@ export function tiempoComputableCts(periodo: string, fechaIngreso: Date): Tiempo
 }
 
 /**
+ * Tiempo de CTS todavía no cubierto por un depósito semestral al momento del
+ * cese. La liquidación sólo paga el semestre inconcluso (noviembre-abril o
+ * mayo-octubre), nunca toda la vida laboral del trabajador.
+ */
+export function tiempoCtsTrunca(fechaIngreso: Date, fechaCese: Date): TiempoServicios {
+  if (Number.isNaN(fechaIngreso.getTime()) || Number.isNaN(fechaCese.getTime())) {
+    return { meses: 0, dias: 0 };
+  }
+
+  const anio = fechaCese.getFullYear();
+  const mes = fechaCese.getMonth();
+  const inicioSemestre = mes >= 4 && mes <= 9
+    ? new Date(anio, 4, 1)
+    : mes >= 10
+      ? new Date(anio, 10, 1)
+      : new Date(anio - 1, 10, 1);
+  const desde = fechaIngreso > inicioSemestre ? fechaIngreso : inicioSemestre;
+
+  return tiempoDeServicios(desde, fechaCese);
+}
+
+/**
  * Meses computables para la gratificación de un periodo de planilla `YYYY-MM`.
  * Devuelve `null` si el periodo no es julio ni diciembre, que son los únicos en
  * los que se paga (Ley 27735, art. 1): julio liquida el semestre enero-junio y
@@ -266,4 +288,3 @@ export function mesesDelSemestreGratificatorio(ingreso: Date, cese: Date): numbe
   const desde = ingreso > inicioSemestre ? ingreso : inicioSemestre;
   return tiempoDeServicios(desde, cese).meses;
 }
-

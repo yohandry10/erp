@@ -78,6 +78,7 @@ function getSupabase(): SupabaseClient {
 
 async function setLogisticaConfig(
   supabase: SupabaseClient,
+  apiContext: APIRequestContext,
   tenantId: string,
   values: {
     usar_flujo_logistica: boolean;
@@ -91,6 +92,12 @@ async function setLogisticaConfig(
     .update(values)
     .eq('tenant_id', tenantId);
   expect(error?.message || '', 'actualizar configuración logística').toBe('');
+  await parseOk(
+    await apiContext.put(api('/configuration/empresa'), {
+      data: { usar_flujo_logistica: values.usar_flujo_logistica },
+    }),
+    'invalidar configuración logística mediante API',
+  );
 }
 
 async function getProducto(apiContext: APIRequestContext, productoId: string): Promise<any> {
@@ -148,7 +155,7 @@ test.describe('T09 Inventario y logística', () => {
       expect(almacenes.length, 'debe existir al menos un almacén operativo').toBeGreaterThan(0);
       const almacenId = almacenes[0].id;
 
-      await setLogisticaConfig(supabase, tenantId, {
+      await setLogisticaConfig(supabase, apiContext, tenantId, {
         usar_flujo_logistica: false,
         habilitar_multialmacen: false,
         requiere_ubicaciones_inventario: false,
@@ -162,13 +169,18 @@ test.describe('T09 Inventario y logística', () => {
       expect(ordenesDisabled, 'logística deshabilitada debe devolver lista vacía controlada').toEqual([]);
 
       await gotoAuthenticated(page, '/dashboard/inventario/logistica/ordenes-pendientes');
+      // El provider de configuración vive en el layout del dashboard. La
+      // mutación de prueba se hace por service role y no emite la invalidación
+      // que sí ejecuta el endpoint de configuración, por lo que recargamos para
+      // comprobar el estado persistido real.
+      await page.reload({ waitUntil: 'domcontentloaded' });
       // La UI muestra el componente LogisticsDisabledState con título
       // "Activa logística para preparar pedidos". El test buscaba texto literal
       // "Flujo de logística desactivado" que no existe — fix de regex.
       await expect(page.getByText(/Activa logística|Activar flujo logístico|flujo logístico/i).first()).toBeVisible({ timeout: 15000 });
       await expect(page.locator('body')).not.toContainText(/Application error|Unhandled|Error fatal/i);
 
-      await setLogisticaConfig(supabase, tenantId, {
+      await setLogisticaConfig(supabase, apiContext, tenantId, {
         usar_flujo_logistica: true,
         habilitar_multialmacen: false,
         requiere_ubicaciones_inventario: false,
@@ -407,7 +419,7 @@ test.describe('T09 Inventario y logística', () => {
       expect(listos.some((item) => item.id === pedido.id)).toBeTruthy();
 
       const invalidUuid = '00000000-0000-4000-8000-000000000009';
-      await setLogisticaConfig(supabase, tenantId, {
+      await setLogisticaConfig(supabase, apiContext, tenantId, {
         usar_flujo_logistica: true,
         habilitar_multialmacen: true,
         requiere_ubicaciones_inventario: false,
@@ -420,7 +432,7 @@ test.describe('T09 Inventario y logística', () => {
         [400, 404],
         'no debe mover stock desde almacén inválido',
       );
-      await setLogisticaConfig(supabase, tenantId, {
+      await setLogisticaConfig(supabase, apiContext, tenantId, {
         usar_flujo_logistica: true,
         habilitar_multialmacen: false,
         requiere_ubicaciones_inventario: false,
@@ -490,7 +502,7 @@ test.describe('T09 Inventario y logística', () => {
       expect(browserFailures).toEqual([]);
     } finally {
       if (originalConfig) {
-        await setLogisticaConfig(supabase, tenantId, {
+        await setLogisticaConfig(supabase, apiContext, tenantId, {
           usar_flujo_logistica: Boolean(originalConfig.usar_flujo_logistica),
           habilitar_multialmacen: Boolean(originalConfig.habilitar_multialmacen),
           requiere_ubicaciones_inventario: Boolean(originalConfig.requiere_ubicaciones_inventario),

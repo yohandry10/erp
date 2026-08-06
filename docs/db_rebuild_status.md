@@ -13,6 +13,8 @@
 > Aviso vigente 2026-05-16: este documento queda como registro historico de la reconstruccion base. El estado de readiness actual, migraciones remotas aplicadas y decision de alta se mantiene en `docs/production-readiness/ERP_PRODUCTION_READINESS.md`.
 >
 > Las migraciones nuevas `312..326` fueron aplicadas manualmente en Supabase remoto el 2026-05-16 con `psql`. No usar este archivo como unica fuente para declarar produccion real.
+
+> Actualizacion incremental 2026-08-06: `396..402` estan aplicadas y verificadas unicamente en DEV `hbueraexcbowpfnjlppi`; cubren atomicidad RRHH, cuenta 4699, asientos, factura proveedor y pago CxP/banco. No estan aplicadas en PROD. Ver `docs/audits/2026-08-06-prod-demo-rrhh-procure-to-pay-hardening.md`.
 >
 > Nota 2026-05-24: el directorio local de migraciones ya contiene cambios posteriores `327..335`. La colision inicial de prefijo `333__` quedo resuelta dejando `333__inventory_stock_reconciliation_hardening.sql` y renumerando tesoreria a `334__treasury_cash_bank_forensic_closure.sql`; luego `335__descontar_stock_authoritative.sql` corrigio la salida autoritativa de inventario. Antes de reconstruir desde cero o declarar una linea limpia, verificar nuevamente que no existan prefijos duplicados.
 >

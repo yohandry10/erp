@@ -232,7 +232,15 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
       console.log('🔥 Calculando planilla personalizada...')
       // Calcular con empleados personalizados
       const calcResponse = await post(`/api/rrhh/planillas/${createResponse.id}/calcular-personalizada`, {
-        empleados: empleadosSeleccionados
+        empleados: empleadosSeleccionados.map((empleado) => ({
+          empleado_id: empleado.id,
+          dias_trabajados: empleado.dias_trabajados,
+          horas_extras_25: empleado.horas_extras_25,
+          horas_extras_35: empleado.horas_extras_35,
+          tardanzas_minutos: empleado.tardanzas_minutos,
+          faltas: empleado.faltas,
+          bonos_adicionales: empleado.bonos_adicionales,
+        })),
       })
       console.log('🔥 Respuesta calcular:', calcResponse)
 

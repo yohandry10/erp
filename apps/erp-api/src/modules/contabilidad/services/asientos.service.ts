@@ -272,52 +272,27 @@ export class AsientosService {
         throw new BadRequestException('Una o más cuentas no existen o no pertenecen a su organización');
       }
 
-      // Crear asiento contable
-      const { data: asiento, error: asientoError } = await this.supabaseService
+      const { data: asientoData, error: asientoError } = await this.supabaseService
         .getClient()
-        .from('asientos_contables')
-        .insert({
-          tenant_id: tenantId,
-          fecha: fecha.toISOString(),
-          concepto: createAsientoDto.concepto,
-          referencia: createAsientoDto.referencia,
-          total_debe: totalDebe,
-          total_haber: totalHaber,
-          estado: 'CONFIRMADO'
-        })
-        .select()
-        .single();
+        .rpc('crear_asiento_contable_tx', {
+          p_tenant_id: tenantId,
+          p_fecha: fecha.toISOString(),
+          p_concepto: createAsientoDto.concepto,
+          p_referencia: createAsientoDto.referencia ?? null,
+          p_origen: 'Manual',
+          p_source_event_id: null,
+          p_usuario_id: userId || null,
+          p_created_by: userId || null,
+          p_detalles: createAsientoDto.detalles,
+        });
+      const asiento = Array.isArray(asientoData) ? asientoData[0] : asientoData;
 
       if (asientoError) {
         this.logger.error(`❌ Error creando asiento: ${asientoError.message}`);
         throw new Error(`Error creando asiento contable: ${asientoError.message}`);
       }
 
-      // Crear detalles del asiento
-      const detallesConAsientoId = createAsientoDto.detalles.map(detalle => ({
-        asiento_id: asiento.id,
-        cuenta_id: detalle.cuenta_id,
-        debe: detalle.debe,
-        haber: detalle.haber,
-        concepto: detalle.concepto,
-        centro_costo_id: detalle.centro_costo_id
-      }));
-
-      const { error: detallesError } = await this.supabaseService
-        .getClient()
-        .from('detalle_asientos')
-        .insert(detallesConAsientoId);
-
-      if (detallesError) {
-        this.logger.error(`❌ Error creando detalles: ${detallesError.message}`);
-        // Rollback: eliminar asiento
-        await this.supabaseService
-          .getClient()
-          .from('asientos_contables')
-          .delete()
-          .eq('id', asiento.id);
-        throw new Error(`Error creando detalles del asiento: ${detallesError.message}`);
-      }
+      if (!asiento?.id) throw new Error('La transacción contable no retornó un asiento válido');
 
       this.logger.log(
         `✅ Asiento manual ${asiento.codigo ?? asiento.numero_asiento ?? asiento.id} creado exitosamente para tenant ${tenantId}`

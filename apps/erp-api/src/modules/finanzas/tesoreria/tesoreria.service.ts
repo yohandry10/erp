@@ -26,9 +26,55 @@ export class TesoreriaService {
       idempotency_key: dto.idempotency_key?.trim() || undefined,
     };
 
+    if (dto.monto <= 0) {
+      throw new BadRequestException('El monto del pago debe ser mayor a 0');
+    }
+
     const client = this.supabase.getClient();
     const submittedIdempotencyKey = dto.idempotency_key ?? null;
+    const pagoId = uuidv4();
+    const eventId = uuidv4();
+    const idempotencyKey = submittedIdempotencyKey
+      ?? `tesoreria:pago:${tenantId}:${dto.cxp_id}:${pagoId}`;
+    const { data: resultadoPago, error: errorPago } = await client.rpc(
+      'aplicar_pago_cxp_tx',
+      {
+        p_tenant_id: tenantId,
+        p_cxp_id: dto.cxp_id,
+        p_pago: {
+          ...dto,
+          pago_id: pagoId,
+          event_id: eventId,
+          idempotency_key: idempotencyKey,
+        },
+        p_usuario_id: userId || null,
+      },
+    );
 
+    if (errorPago || !resultadoPago?.cxp?.id) {
+      const message = errorPago?.message || 'No se pudo aplicar el pago a la cuenta por pagar';
+      if (/no encontrada/i.test(message)) throw new NotFoundException(message);
+      throw new BadRequestException(message);
+    }
+
+    return {
+      success: true,
+      data: {
+        ...resultadoPago,
+        pago: {
+          ...resultadoPago.pago,
+          pago_id: resultadoPago.pago?.id ?? pagoId,
+          monto: dto.monto,
+          fecha_pago: dto.fecha_pago,
+          metodo_pago: dto.metodo_pago,
+          referencia: dto.referencia ?? null,
+          cuenta_bancaria_id: dto.cuenta_bancaria_id ?? null,
+          idempotent_replay: Boolean(resultadoPago.idempotent),
+        },
+      },
+    };
+
+    /* istanbul ignore next -- implementación pre-RPC conservada temporalmente para trazabilidad */
     if (submittedIdempotencyKey) {
       const { data: pagoExistente, error: errorPagoExistente } = await client
         .from('movimientos_bancarios')

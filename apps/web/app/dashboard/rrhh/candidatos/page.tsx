@@ -37,7 +37,7 @@ const CandidatosPage = () => {
   const [loading, setLoading] = useState(true);
   const { get, post } = useApi();
   const { toast } = useToast();
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
 
   const loadData = useCallback(async () => {
     if (!rrhhEnabled) {

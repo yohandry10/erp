@@ -11,7 +11,6 @@ import { ProveedoresService } from './services/proveedores.service';
 import { CotizacionesCompraService } from './services/cotizaciones-compra.service';
 import { OrdenesCompraService } from './services/ordenes-compra.service';
 import { DevolucionesProveedorService } from './services/devoluciones-proveedor.service';
-import { ComprasCxpIntegrationService } from './services/compras-cxp-integration.service';
 import { ProveedoresRepository } from './repositories/proveedores.repository';
 import { CotizacionesCompraRepository } from './repositories/cotizaciones-compra.repository';
 import { OrdenesCompraRepository } from './repositories/ordenes-compra.repository';
@@ -44,7 +43,6 @@ import { PermissionsModule } from '../permissions/permissions.module';
     CotizacionesCompraService,
     OrdenesCompraService,
     DevolucionesProveedorService,
-    ComprasCxpIntegrationService,
     ProveedoresRepository,
     CotizacionesCompraRepository,
     OrdenesCompraRepository,

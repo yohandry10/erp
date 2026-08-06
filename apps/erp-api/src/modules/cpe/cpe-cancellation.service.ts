@@ -57,8 +57,6 @@ async anularComprobante(
 
     await this.assertCpeOriginalAccountingReady(client, tenantId, cpe, userId, motivo);
 
-    const contextoOperacion = await this.resolveOperacionReversaContext(client, tenantId, cpe);
-
     // 3. Generar nota de crédito
     console.log(`📝 [CPE] Generando nota de crédito para CPE ${cpeId}...`);
     const serieNotaCredito = this.resolveSerieNotaCredito(cpe.serie);
@@ -97,15 +95,14 @@ async anularComprobante(
       throw new BadRequestException('No se pudo crear la nota de crédito');
     }
 
-    // 4. Actualizar estado del CPE original
+    // 4. Vincular la solicitud sin anular todavía el comprobante original. La
+    // reversión fiscal, contable y operativa sólo procede cuando SUNAT acepte la
+    // nota de crédito y exista CDR.
     const { error: updateError } = await client
       .from('comprobantes_electronicos')
       .update({
-        estado: 'ANULADO',
         nota_credito_id: notaCredito.id,
         motivo_anulacion: motivo,
-        anulado_por: userId,
-        anulado_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', cpeId)
@@ -113,65 +110,18 @@ async anularComprobante(
 
     if (updateError) {
       console.error('Error actualizando estado del CPE:', updateError);
-      throw new BadRequestException('No se pudo anular el comprobante');
+      throw new BadRequestException('No se pudo registrar la solicitud de anulación');
     }
-
-    await this.aplicarReversionOperativa(client, tenantId, cpe, notaCredito, contextoOperacion, motivo, userId);
-
-    // 5. Emitir evento CPEAnulado para que otros módulos reviertan operaciones
-    // Este evento será escuchado por:
-    // - Contabilidad: Revertir asiento contable
-    // - Finanzas: Liberar CxC
-    // - Inventario: Restaurar stock (si aplica)
-    try {
-      const eventToInsert = OutboxEventBuilder.build({
-        tenantId,
-        eventType: 'cpe.anulado',
-        aggregateType: 'cpe',
-        aggregateId: cpeId,
-        idempotencyKey: `cpe.anulado:${tenantId}:${cpeId}:${notaCredito.id}`,
-        eventData: {
-          cpe_id: cpeId,
-          nota_credito_id: notaCredito.id,
-          serie: cpe.serie,
-          numero: cpe.numero,
-          total: cpe.total_venta,
-          motivo: motivo,
-          anulado_por: userId,
-          anulado_at: new Date().toISOString(),
-          source: contextoOperacion.source,
-          venta_pos_id: contextoOperacion.ventaPos?.id,
-          pedido_id: contextoOperacion.pedido?.id,
-          documento_id: contextoOperacion.documento?.id,
-          cxc_id: contextoOperacion.cxc?.id,
-          items: contextoOperacion.items.map((item) => ({
-            producto_id: item.producto_id,
-            cantidad: item.cantidad,
-            precio_unitario: item.precio_unitario,
-          })),
-        },
-      });
-
-      await client
-        .from('outbox_events')
-        .insert(eventToInsert);
-
-      console.log(`✅ [CPE] Evento CPEAnulado emitido para CPE ${cpeId}`);
-    } catch (error) {
-      console.error('Error emitiendo evento CPEAnulado:', error);
-      // No fallar la anulación si el evento no se puede emitir
-    }
-
-    console.log(`✅ [CPE] Comprobante ${cpe.serie}-${cpe.numero} anulado exitosamente`);
 
     return {
       success: true,
-      message: 'Comprobante anulado exitosamente',
+      message: 'Nota de crédito creada. La anulación se completará después del CDR aceptado.',
       cpe_anulado: {
         id: cpeId,
         serie: cpe.serie,
         numero: cpe.numero,
-        estado: 'ANULADO',
+        estado: cpe.estado,
+        anulacion_estado: 'PENDIENTE_CDR',
       },
       nota_credito: {
         id: notaCredito.id,
@@ -180,6 +130,97 @@ async anularComprobante(
         estado: notaCredito.estado,
       },
     };
+  }
+
+async finalizarAnulacionAceptada(
+    notaCreditoId: string,
+    tenantId: string,
+    userId?: string,
+  ): Promise<any | null> {
+    const client = this.supabaseService.getClient();
+    const notaResponse = await client
+      .from('comprobantes_electronicos')
+      .select('*')
+      .eq('id', notaCreditoId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    // Facilita clientes de prueba parciales y, en runtime, trata una respuesta
+    // vacía como un CPE que no participa del flujo de anulación.
+    if (!notaResponse) return null;
+    const { data: notaCredito, error: notaError } = notaResponse;
+
+    if (notaError) throw new BadRequestException(`No se pudo validar la nota de crédito: ${notaError.message}`);
+    if (!notaCredito || String(notaCredito.tipo_documento) !== '07') return null;
+
+    const estadoNota = String(notaCredito.estado || '').toUpperCase();
+    const tieneCdr = Boolean(notaCredito.cdr_sunat || notaCredito.cdr_content || notaCredito.cdr);
+    if (estadoNota !== 'ACEPTADO' || !tieneCdr) {
+      return { success: true, estado: 'PENDIENTE_CDR', nota_credito_id: notaCreditoId };
+    }
+
+    const { data: cpe, error: originalError } = await client
+      .from('comprobantes_electronicos')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('nota_credito_id', notaCreditoId)
+      .maybeSingle();
+    if (originalError) throw new BadRequestException(`No se pudo resolver el CPE original: ${originalError.message}`);
+    if (!cpe) return null;
+    if (String(cpe.estado || '').toUpperCase() === 'ANULADO') {
+      return { success: true, estado: 'ANULADO', cpe_id: cpe.id, nota_credito_id: notaCreditoId };
+    }
+
+    const motivo = cpe.motivo_anulacion || notaCredito.motivo_nota || 'Anulación con nota de crédito aceptada';
+    await this.assertCpeOriginalAccountingReady(client, tenantId, cpe, userId, motivo);
+    const contextoOperacion = await this.resolveOperacionReversaContext(client, tenantId, cpe);
+    await this.aplicarReversionOperativa(
+      client, tenantId, cpe, notaCredito, contextoOperacion, motivo, userId,
+    );
+
+    const anuladoAt = new Date().toISOString();
+    const { error: updateError } = await client
+      .from('comprobantes_electronicos')
+      .update({
+        estado: 'ANULADO',
+        anulado_por: userId,
+        anulado_at: anuladoAt,
+        updated_at: anuladoAt,
+      })
+      .eq('id', cpe.id)
+      .eq('tenant_id', tenantId);
+    if (updateError) throw new BadRequestException(`No se pudo finalizar la anulación: ${updateError.message}`);
+
+    const eventToInsert = OutboxEventBuilder.build({
+      tenantId,
+      eventType: 'cpe.anulado',
+      aggregateType: 'cpe',
+      aggregateId: cpe.id,
+      idempotencyKey: `cpe.anulado:${tenantId}:${cpe.id}:${notaCredito.id}`,
+      eventData: {
+        cpe_id: cpe.id,
+        nota_credito_id: notaCredito.id,
+        serie: cpe.serie,
+        numero: cpe.numero,
+        total: cpe.total_venta,
+        motivo,
+        anulado_por: userId,
+        anulado_at: anuladoAt,
+        cdr_confirmado: true,
+        source: contextoOperacion.source,
+        venta_pos_id: contextoOperacion.ventaPos?.id,
+        pedido_id: contextoOperacion.pedido?.id,
+        documento_id: contextoOperacion.documento?.id,
+        cxc_id: contextoOperacion.cxc?.id,
+        items: contextoOperacion.items,
+      },
+    });
+    const { error: outboxError } = await client.from('outbox_events').upsert(
+      eventToInsert,
+      { onConflict: 'tenant_id,event_type,idempotency_key', ignoreDuplicates: true },
+    );
+    if (outboxError) throw new BadRequestException(`No se pudo publicar la anulación: ${outboxError.message}`);
+
+    return { success: true, estado: 'ANULADO', cpe_id: cpe.id, nota_credito_id: notaCredito.id };
   }
 
 private resolveSerieNotaCredito(serie: string): string {

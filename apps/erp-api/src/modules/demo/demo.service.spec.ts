@@ -1,6 +1,13 @@
-import { DemoService } from './demo.service';
+import { DEMO_PCGE_ACCOUNTS, DemoService } from './demo.service';
 
 describe('DemoService operational seed', () => {
+  it('incluye todas las cuentas PCGE requeridas por los flujos demo', () => {
+    expect(new Set(DEMO_PCGE_ACCOUNTS.map((cuenta) => cuenta.codigo))).toEqual(new Set([
+      '10', '12', '20', '40', '403', '411', '42', '4699',
+      '50', '60', '621', '627', '69', '70', '94',
+    ]));
+  });
+
   function buildSeedService(readiness: any = { ready: true }) {
     const rpc = jest.fn().mockResolvedValue({ data: readiness, error: null });
     const service = new DemoService(

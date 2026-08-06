@@ -15,7 +15,7 @@ describe('CxpEventsListener', () => {
     jest.clearAllMocks();
   });
 
-  it('crea una CxP cuando llega recepcion.registrada', async () => {
+  it('no crea una CxP hasta que se registre la factura del proveedor', async () => {
     const listener = new CxpEventsListener(eventBus, cxpService);
     listener.onModuleInit();
 
@@ -52,20 +52,7 @@ describe('CxpEventsListener', () => {
 
     await callback({ data: recepcionEvent });
 
-    expect(crearCuentaPorPagar).toHaveBeenCalledWith(
-      'tenant-1',
-      expect.objectContaining({
-        proveedor_id: 'prov-1',
-        orden_id: 'oc-1',
-        recepcion_id: 'rec-1',
-        numero_documento: 'REC-001',
-        subtotal: 90,
-        igv: 16.2,
-        total: 106.2,
-        idempotency_key: 'idem-1',
-      }),
-      null,
-    );
+    expect(crearCuentaPorPagar).not.toHaveBeenCalled();
   });
 
   it('aplica reversa en CxP cuando llega devolucion.proveedor.emitida', async () => {

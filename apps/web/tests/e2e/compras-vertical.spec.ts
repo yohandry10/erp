@@ -236,12 +236,48 @@ test.describe('T06 Compras vertical completo', () => {
     );
     expect(kardex.some((mov) => mov.recepcionId === recepcionCerrada.id && mov.cantidad === cantidadCompra)).toBeTruthy();
 
+    const cxpAntesFactura = await parseOk<any[]>(
+      await apiContext.get(api(`/finanzas/cxp?proveedor_id=${proveedor.id}`)),
+      'listar CxP antes de factura proveedor',
+    );
+    expect(
+      cxpAntesFactura.some((item) => item.recepcion_id === recepcionCerrada.id),
+      'la recepción física no debe reconocer CxP ni crédito fiscal',
+    ).toBe(false);
+
+    const subtotalFactura = cantidadCompra * 42;
+    const igvFactura = Math.round(subtotalFactura * 0.18 * 100) / 100;
+    const facturaProveedor = await parseOk<any>(
+      await apiContext.post(api('/finanzas/cxp'), {
+        data: {
+          proveedor_id: proveedor.id,
+          orden_id: orden.id,
+          recepcion_id: recepcionCerrada.id,
+          tipo_documento: 'FACTURA',
+          serie: 'F001',
+          numero_documento: `F001-${runId}`,
+          fecha_emision: new Date().toISOString().slice(0, 10),
+          condiciones_pago: 'CREDITO_30',
+          subtotal: subtotalFactura,
+          igv: igvFactura,
+          total: subtotalFactura + igvFactura,
+          moneda: 'PEN',
+          tipo_cambio: 1,
+          referencia_tipo: 'RECEPCION',
+          referencia_id: recepcionCerrada.id,
+          observaciones: 'Factura proveedor vertical T06',
+        },
+      }),
+      'registrar factura proveedor',
+    );
+    expect(facturaProveedor.id, 'la factura debe crear CxP').toBeTruthy();
+
     await expect.poll(async () => {
       const response = await apiContext.get(api(`/finanzas/cxp?proveedor_id=${proveedor.id}`));
       const data = await parseOk<any[]>(response, 'listar CxP');
-      return data.find((item) => item.referencia_id === recepcionCerrada.id || item.numero_documento === recepcionCerrada.numero) ?? null;
+      return data.find((item) => item.id === facturaProveedor.id && item.recepcion_id === recepcionCerrada.id) ?? null;
     }, {
-      message: 'el cierre de recepción debe crear CxP',
+      message: 'la factura del proveedor debe crear CxP vinculada a la recepción',
       timeout: 30000,
     }).not.toBeNull();
 

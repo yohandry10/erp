@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 
 const PlanillasPage = () => {
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
   const { get } = useApi();
   const [planillas, setPlanillas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
