@@ -88,6 +88,24 @@ describe('PresupuestosService', () => {
 
   });
 
+  describe('obtenerPresupuestos', () => {
+    it('incluye las relaciones que la lista necesita para no mostrar guiones', async () => {
+      mockSupabaseClient.order.mockResolvedValueOnce({ data: [], error: null });
+
+      await service.obtenerPresupuestos('tenant-1');
+
+      expect(mockSupabaseClient.select).toHaveBeenCalledWith(
+        expect.stringContaining('centro_costo:centros_costo!fk_presupuestos_centro_costo_id'),
+      );
+      expect(mockSupabaseClient.select).toHaveBeenCalledWith(
+        expect.stringContaining('cuenta:plan_cuentas!fk_presupuestos_cuenta_id'),
+      );
+      expect(mockSupabaseClient.select).toHaveBeenCalledWith(
+        expect.stringContaining('periodo:periodos_contables!fk_presupuestos_periodo_contable_id'),
+      );
+    });
+  });
+
   describe('obtenerAlertasSobregiro', () => {
     const tenantId = '55555555-5555-5555-5555-555555555555';
     const periodoId = 'periodo-123';
