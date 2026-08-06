@@ -26,6 +26,7 @@ interface GenerarFacturaButtonProps {
   pedidoId: string;
   onSuccess: () => Promise<void>;
   config: EmpresaConfig;
+  tipoDocumento?: "factura" | "boleta";
   onGenerated?: (result: {
     facturaId: string | null;
     sugerioGre: boolean;
@@ -36,6 +37,7 @@ export default function GenerarFacturaButton({
   pedidoId,
   onSuccess,
   config,
+  tipoDocumento = "factura",
   onGenerated,
 }: GenerarFacturaButtonProps) {
   const { post } = useApi();
@@ -45,6 +47,7 @@ export default function GenerarFacturaButton({
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [facturaId, setFacturaId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const documentoLabel = tipoDocumento === "boleta" ? "boleta" : "factura";
 
   const resolveErrorMessage = (error: unknown): string => {
     if (!error) {
@@ -118,8 +121,8 @@ export default function GenerarFacturaButton({
         setShowGREModal(true);
       } else {
         toast({
-          title: "Factura generada",
-          description: "La factura ha sido generada exitosamente",
+          title: `${documentoLabel === "boleta" ? "Boleta" : "Factura"} generada`,
+          description: `La ${documentoLabel} ha sido generada exitosamente`,
         });
         await onSuccess();
         router.refresh();
@@ -169,19 +172,19 @@ export default function GenerarFacturaButton({
         className="bg-blue-600 hover:bg-blue-700"
       >
         <FileText className="w-4 h-4 mr-2" />
-        {generating ? "Generando..." : "Generar Factura"}
+        {generating ? "Generando..." : `Generar ${documentoLabel === "boleta" ? "Boleta" : "Factura"}`}
       </Button>
 
       <ConfirmDialog
         isOpen={showConfirmation}
         onClose={() => setShowConfirmation(false)}
         onConfirm={handleGenerate}
-        title="Confirmar factura"
-        confirmText="Generar factura"
+        title={`Confirmar ${documentoLabel}`}
+        confirmText={`Generar ${documentoLabel}`}
         variant="success"
         message={
           <div className="space-y-4 text-left">
-            <p>¿Desea generar la factura para este pedido?</p>
+            <p>¿Desea generar la {documentoLabel} para este pedido?</p>
             <div className="rounded-lg border border-border bg-muted/50 p-4 text-foreground">
               {config.usar_flujo_logistica
                 ? "Se emitirá el documento fiscal usando el despacho confirmado."

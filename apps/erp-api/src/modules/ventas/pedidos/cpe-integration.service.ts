@@ -4,7 +4,7 @@ import { CpeService } from '../../cpe/cpe.service';
 import { ValidationService } from '../../validations/validation.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { AFECTACION_IGV, calcularDesgloseIgv, esGravado } from '../../../shared/utils/igv-afectacion.util';
-import { CreateFacturaDto, TipoDocumento, ItemFacturaDto } from '@erp-suite/dtos';
+import { CondicionPago, CreateFacturaDto, TipoDocumento, ItemFacturaDto } from '@erp-suite/dtos';
 import { PedidoVenta, PedidoDetalle } from './entities';
 import { IntegrationAlertsService } from '../../notifications/integration-alerts.service';
 
@@ -154,9 +154,6 @@ export class CPEIntegrationService {
     cliente: any,
     empresaConfig: any,
   ): Promise<CreateFacturaDto> {
-    // Obtener serie y número de factura
-    const { serie, numero } = await this.obtenerSerieYNumero(pedido.tenant_id);
-
     // ✅ CORRECCIÓN SRP: Obtener tasa de IGV una sola vez usando TaxCalculatorService
     const tasaIgv = await this.taxCalculator.getTasaIgv(pedido.tenant_id);
 
@@ -209,6 +206,10 @@ export class CPEIntegrationService {
     }
 
     const tipoDocumentoSunat = this.mapearTipoDocumentoSunat(cliente.documento_tipo);
+    const tipoComprobante = tipoDocumentoSunat === '6' && /^\d{11}$/.test(numeroDocumentoCliente)
+      ? TipoDocumento.FACTURA
+      : TipoDocumento.BOLETA;
+    const { serie, numero } = await this.obtenerSerieYNumero(pedido.tenant_id, tipoComprobante);
     const razonSocialCliente = cliente.razon_social || cliente.nombre_comercial;
 
     if (!razonSocialCliente) {
@@ -222,7 +223,7 @@ export class CPEIntegrationService {
     const facturaDto: CreateFacturaDto = {
       serie: serie,
       numero: numero,
-      tipo_documento: TipoDocumento.FACTURA,
+      tipo_documento: tipoComprobante,
       ruc_emisor: empresaConfig.ruc,
       razon_social_emisor: empresaConfig.razon_social,
       tipo_documento_receptor: tipoDocumentoSunat,
@@ -239,7 +240,17 @@ export class CPEIntegrationService {
       total_exportacion: desgloseIgv.exportacion,
       total_igv: desgloseIgv.igv,
       total_venta: desgloseIgv.total,
+      condicion_pago: CondicionPago.CREDITO,
     };
+
+    (facturaDto as any).costo_ventas = Number(
+      pedido.detalle
+        .reduce(
+          (sum, item) => sum + Number((item as any).costo_unitario ?? 0) * Number(item.cantidad ?? 0),
+          0,
+        )
+        .toFixed(2),
+    );
 
     return facturaDto;
   }
@@ -407,7 +418,7 @@ export class CPEIntegrationService {
   private async obtenerEmpresaConfig(tenantId: string): Promise<any> {
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('ruc, razon_social, serie_factura, ultimo_numero_factura')
+      .select('ruc, razon_social, serie_factura, ultimo_numero_factura, serie_boleta, ultimo_numero_boleta')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -434,10 +445,16 @@ export class CPEIntegrationService {
   /**
    * Obtiene serie y número de factura
    */
-  private async obtenerSerieYNumero(tenantId: string): Promise<{ serie: string; numero: number }> {
+  private async obtenerSerieYNumero(
+    tenantId: string,
+    tipoDocumento: TipoDocumento.FACTURA | TipoDocumento.BOLETA = TipoDocumento.FACTURA,
+  ): Promise<{ serie: string; numero: number }> {
+    const esBoleta = tipoDocumento === TipoDocumento.BOLETA;
+    const serieField = esBoleta ? 'serie_boleta' : 'serie_factura';
+    const numeroField = esBoleta ? 'ultimo_numero_boleta' : 'ultimo_numero_factura';
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('serie_factura, ultimo_numero_factura')
+      .select('serie_factura, ultimo_numero_factura, serie_boleta, ultimo_numero_boleta')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -445,26 +462,26 @@ export class CPEIntegrationService {
       throw new BadRequestException('No se pudo obtener la serie de factura');
     }
 
-    const serie = config.serie_factura || 'F001';
-    const ultimoNumero = config.ultimo_numero_factura || 0;
+    const serie = config[serieField] || (esBoleta ? 'B001' : 'F001');
+    const ultimoNumero = Number(config[numeroField] || 0);
     const numero = ultimoNumero + 1;
 
     // Actualizar correlativo con optimistic concurrency control
     const { data: updateResult, error: updateError } = await this.supabase.getClient()
       .from('empresa_config')
-      .update({ ultimo_numero_factura: numero, updated_at: new Date().toISOString() })
+      .update({ [numeroField]: numero, updated_at: new Date().toISOString() })
       .eq('tenant_id', tenantId)
-      .eq('ultimo_numero_factura', ultimoNumero)
-      .select('ultimo_numero_factura')
+      .eq(numeroField, ultimoNumero)
+      .select(numeroField)
       .single();
 
     if (updateError) {
       if (updateError.code === 'PGRST116') {
         throw new BadRequestException(
-          'Conflicto de concurrencia en numeración de factura. Otro proceso actualizó el correlativo. Reintente la operación.',
+          `Conflicto de concurrencia en numeración de ${esBoleta ? 'boleta' : 'factura'}. Otro proceso actualizó el correlativo. Reintente la operación.`,
         );
       }
-      throw new BadRequestException('Error actualizando correlativo de factura');
+      throw new BadRequestException(`Error actualizando correlativo de ${esBoleta ? 'boleta' : 'factura'}`);
     }
 
     return { serie, numero };
