@@ -40,6 +40,7 @@ export default function NuevoProductoPage() {
     Array<{ id: string; nombre: string; codigo?: string }>
   >([]);
   const [categoriasConfig, setCategoriasConfig] = useState<CategoriaConfig[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -93,6 +94,8 @@ export default function NuevoProductoPage() {
           setAlmacenes([]);
           setCategoriasConfig([]);
         }
+      } finally {
+        if (vigente) setCatalogLoading(false);
       }
     })();
     return () => {
@@ -326,30 +329,24 @@ export default function NuevoProductoPage() {
               name="categoria"
               value={formData.categoria}
               onChange={handleChange}
+              disabled={catalogLoading}
               aria-invalid={Boolean(errors.categoria)}
               aria-describedby={
                 errors.categoria ? "producto-categoria-error" : undefined
               }
             >
-              <option value="">Seleccione una categoría</option>
-              {categoriasConfig.length > 0
-                ? categoriasConfig.map((cat) => (
-                    <option key={cat.id} value={cat.nombre}>
-                      {cat.nombre}
-                    </option>
-                  ))
-                : (
-                  <>
-                    <option value="ELECTRONICA">Electrónica</option>
-                    <option value="ALIMENTOS">Alimentos</option>
-                    <option value="ROPA">Ropa</option>
-                    <option value="FARMACIA">Farmacia</option>
-                    <option value="HOGAR">Hogar</option>
-                    <option value="OFICINA">Oficina</option>
-                    <option value="OTROS">Otros</option>
-                  </>
-                )
-              }
+              <option value="">
+                {catalogLoading
+                  ? 'Cargando categorías...'
+                  : categoriasConfig.length === 0
+                    ? 'No hay categorías configuradas'
+                    : 'Seleccione una categoría'}
+              </option>
+              {categoriasConfig.map((cat) => (
+                <option key={cat.id} value={cat.nombre}>
+                  {cat.nombre}
+                </option>
+              ))}
             </select>
             {errors.categoria && (
               <p
@@ -546,12 +543,15 @@ export default function NuevoProductoPage() {
                 name="almacenId"
                 value={formData.almacenId}
                 onChange={handleChange}
+                disabled={catalogLoading}
                 aria-invalid={Boolean(errors.almacenId)}
                 aria-describedby={
                   errors.almacenId ? "producto-almacen-error" : undefined
                 }
               >
-                <option value="">Sin stock inicial</option>
+                <option value="">
+                  {catalogLoading ? 'Cargando almacenes...' : 'Sin stock inicial'}
+                </option>
                 {almacenes.map((almacen) => (
                   <option key={almacen.id} value={almacen.id}>
                     {almacen.codigo ? `${almacen.codigo} · ` : ""}
