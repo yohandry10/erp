@@ -27,6 +27,8 @@ interface EmpresaConfig {
   serieNotaCredito?: string
   serieNotaDebito?: string
   serieGuiaRemision?: string
+  certificateConfigured?: boolean
+  certificateExpiresAt?: string
   logoUrl?: string
   emisionCpeModo?: string
   sunatEnvironment?: string
@@ -290,14 +292,18 @@ export function ConfigurationSummaryStep() {
         <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
           <span className="text-muted-foreground">Estado:</span>
           <span>
-            {state.validationResults.certificate?.isValid ? '✓ Válido' : 'Pendiente'}
+            {state.validationResults.certificate?.isValid || empresaConfig?.certificateConfigured
+              ? '✓ Válido'
+              : 'Pendiente'}
           </span>
         </div>
-        {state.validationResults.certificate?.expiresAt && (
+        {(state.validationResults.certificate?.expiresAt || empresaConfig?.certificateExpiresAt) && (
           <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
             <span className="text-muted-foreground">Vence:</span>
             <span className="text-foreground">
-              {new Date(state.validationResults.certificate.expiresAt).toLocaleDateString()}
+              {new Date(
+                state.validationResults.certificate?.expiresAt || empresaConfig?.certificateExpiresAt || ''
+              ).toLocaleDateString()}
             </span>
           </div>
         )}
