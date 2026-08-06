@@ -18,6 +18,9 @@ describe('CPEIntegrationService documento de cliente', () => {
         numero: 151,
       }),
     );
+    jest.spyOn(service as any, 'obtenerCostoPorProducto').mockResolvedValue(
+      new Map([['58184a08-1dca-4c90-9fc8-4a1222b0fb85', 50]]),
+    );
 
     return service;
   };
@@ -118,6 +121,7 @@ describe('CPEIntegrationService documento de cliente', () => {
         tipo_documento_receptor: '1',
         documento_receptor: '12345678',
         condicion_pago: 'CREDITO',
+        costo_ventas: 50,
       }),
     );
   });

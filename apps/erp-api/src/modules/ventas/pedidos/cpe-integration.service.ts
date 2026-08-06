@@ -159,10 +159,11 @@ export class CPEIntegrationService {
 
     // La afectación del IGV vive en el producto (SUNAT Catálogo 07): sin ella,
     // una factura con bienes exonerados cobraría IGV que no corresponde.
-    const afectacionPorProducto = await this.obtenerAfectacionPorProducto(
-      pedido.tenant_id,
-      pedido.detalle.map((item) => item.producto_id),
-    );
+    const productoIds = pedido.detalle.map((item) => item.producto_id);
+    const [afectacionPorProducto, costoPorProducto] = await Promise.all([
+      this.obtenerAfectacionPorProducto(pedido.tenant_id, productoIds),
+      this.obtenerCostoPorProducto(pedido.tenant_id, productoIds),
+    ]);
 
     // Mapear items del pedido a items de factura
     const items: ItemFacturaDto[] = pedido.detalle.map((item) => {
@@ -246,11 +247,13 @@ export class CPEIntegrationService {
     (facturaDto as any).costo_ventas = Number(
       pedido.detalle
         .reduce(
-          (sum, item) => sum + Number((item as any).costo_unitario ?? 0) * Number(item.cantidad ?? 0),
+          (sum, item) =>
+            sum + Number(costoPorProducto.get(item.producto_id) ?? 0) * Number(item.cantidad ?? 0),
           0,
         )
         .toFixed(2),
     );
+    (facturaDto as any).cliente_id = pedido.cliente_id;
 
     return facturaDto;
   }
@@ -294,6 +297,46 @@ export class CPEIntegrationService {
     }
 
     return afectaciones;
+  }
+
+  /**
+   * Resuelve el costo real desde el catálogo porque pedidos_venta_detalle no
+   * persiste costo_unitario. `costo` puede venir en cero en datos migrados, por
+   * lo que precio_compra es el fallback operativo usado también por POS.
+   */
+  private async obtenerCostoPorProducto(
+    tenantId: string,
+    productoIds: string[],
+  ): Promise<Map<string, number>> {
+    const ids = Array.from(new Set((productoIds ?? []).filter(Boolean)));
+    const costos = new Map<string, number>();
+    if (ids.length === 0) return costos;
+
+    try {
+      const { data, error } = await this.supabase
+        .getClient()
+        .from('productos')
+        .select('id, costo, precio_compra')
+        .eq('tenant_id', tenantId)
+        .in('id', ids);
+
+      if (error) {
+        this.logger.warn(`No se pudo leer el costo de los productos del pedido: ${error.message}`);
+        return costos;
+      }
+
+      for (const producto of data ?? []) {
+        const costo = Number(producto.costo ?? 0);
+        const precioCompra = Number(producto.precio_compra ?? 0);
+        costos.set(producto.id, costo > 0 ? costo : Math.max(precioCompra, 0));
+      }
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo leer el costo de los productos del pedido: ${(error as Error)?.message}`,
+      );
+    }
+
+    return costos;
   }
 
   /**
