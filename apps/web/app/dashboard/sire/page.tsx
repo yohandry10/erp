@@ -135,10 +135,8 @@ export default function SIREPage() {
     }
 
     if (apiSucceeded(response)) {
-      console.log('SIRE Reports recibidos:', reports)
       setReports(reports)
     } else {
-      console.log('No hay reportes SIRE o respuesta incorrecta:', response)
       setReports([])
     }
   }, [get])
@@ -152,10 +150,8 @@ export default function SIREPage() {
         enviadosASunat: 0,
         pendientes: 0
       })
-      console.log('SIRE Stats recibidas:', stats)
       setStats(stats)
     } else {
-      console.log('No hay estadisticas SIRE o respuesta incorrecta:', response)
       setStats({
         reportesDelMes: 0,
         registrosTotales: 0,
@@ -186,7 +182,6 @@ export default function SIREPage() {
 
     if (hasGeneratingReports) {
       const interval = setInterval(() => {
-        console.log('Auto-recargando por reportes en estado GENERANDO...')
         loadData()
       }, 2000)
 

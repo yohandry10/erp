@@ -274,16 +274,61 @@ const menuItems: MenuItem[] = [
   {
     title: 'Finanzas',
     icon: DollarSign,
-    permission: {
-      modulo: 'finanzas',
-      accion: 'ver',
-      recurso: 'cxc'
-    },
     submenu: [
       {
         title: 'Cuentas por Cobrar',
         href: '/dashboard/finanzas/cxc',
         icon: DollarSign,
+        permission: {
+          modulo: 'finanzas',
+          accion: 'ver',
+          recurso: 'cxc'
+        }
+      },
+      {
+        title: 'Cuentas por Pagar',
+        href: '/dashboard/finanzas/cxp',
+        icon: FileText,
+        permission: {
+          modulo: 'finanzas',
+          accion: 'ver',
+          recurso: 'cxp'
+        }
+      },
+      {
+        title: 'Bancos',
+        href: '/dashboard/finanzas/bancos',
+        icon: Building2,
+        permission: {
+          modulo: 'finanzas',
+          accion: 'ver',
+          recurso: 'bancos'
+        }
+      },
+      {
+        title: 'Tesorería',
+        href: '/dashboard/finanzas/tesoreria',
+        icon: DollarSign,
+        permission: {
+          modulo: 'finanzas',
+          accion: 'ver',
+          recurso: 'tesoreria'
+        }
+      },
+      {
+        title: 'Conciliación bancaria',
+        href: '/dashboard/finanzas/conciliacion',
+        icon: CheckCircle,
+        permission: {
+          modulo: 'finanzas',
+          accion: 'ver',
+          recurso: 'conciliacion'
+        }
+      },
+      {
+        title: 'Reportes financieros',
+        href: '/dashboard/finanzas/reportes',
+        icon: FileSpreadsheet,
         permission: {
           modulo: 'finanzas',
           accion: 'ver',

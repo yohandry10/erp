@@ -40,9 +40,6 @@ export default function OrdenCompraModal({
   const { toast } = useToast()
 
   // DEBUG: Log de props recibidas
-  console.log('🔍 OrdenCompraModal recibido props:', { isOpen, orden })
-  console.log('🔍 Modal renderizando con isOpen:', isOpen)
-  console.log('🔍 Elemento Dialog debe estar visible:', isOpen ? 'SÍ' : 'NO')
 
   const [formData, setFormData] = useState({
     numero: '',
@@ -74,12 +71,10 @@ export default function OrdenCompraModal({
 
   const loadProveedores = useCallback(async () => {
     try {
-      console.log('🔥 [MODAL] CARGANDO PROVEEDORES...')
       const resp = await get('/api/compras/proveedores')
       if ((resp as any)?.success) {
         const proveedoresData = (resp as any).data || []
         setProveedores(proveedoresData)
-        console.log('🔥 [MODAL] Proveedores cargados:', proveedoresData.length)
       } else {
         console.error('🔥 [MODAL] Error en respuesta:', (resp as any)?.error || (resp as any)?.message)
       }
@@ -115,7 +110,6 @@ export default function OrdenCompraModal({
 
   const loadOrdenData = useCallback(() => {
     if (orden) {
-      console.log('🔍 Cargando datos de orden:', JSON.stringify(orden, null, 2))
 
       setFormData({
         numero: orden.numero,
@@ -132,7 +126,6 @@ export default function OrdenCompraModal({
 
       // Procesar los items correctamente
       const itemsArray = Array.isArray(orden.items) ? orden.items : []
-      console.log('📋 Items raw de orden:', JSON.stringify(orden.items, null, 2))
 
       const itemsToLoad: OrdenItem[] = itemsArray.map((item: any, index: number) => {
         const processedItem: OrdenItem = {
@@ -143,11 +136,9 @@ export default function OrdenCompraModal({
           precio_unitario: Number(item.precio_unitario) || 0,
           subtotal: Number(item.subtotal) || (Number(item.cantidad) * Number(item.precio_unitario)) || 0,
         }
-        console.log(`📋 Item ${index} procesado:`, JSON.stringify(processedItem, null, 2))
         return processedItem
       })
 
-      console.log('📋 Items procesados para cargar:', JSON.stringify(itemsToLoad, null, 2))
       setItems(itemsToLoad)
     }
   }, [orden])
@@ -186,9 +177,7 @@ export default function OrdenCompraModal({
 
   // Cargar datos iniciales
   useEffect(() => {
-    console.log('🔥 [MODAL] useEffect triggered - isOpen:', isOpen)
     if (isOpen) {
-      console.log('🔥 [MODAL] Modal está abierto, cargando datos...')
       loadProveedores()
       loadProductos()
       generateNumeroOrden()
@@ -246,7 +235,6 @@ export default function OrdenCompraModal({
     setIsLoading(true)
 
     try {
-      console.log('🚀 Enviando orden con items:', JSON.stringify(items, null, 2))
 
       // El backend (CreateOrdenCompraDto) usa whitelist estricta: espera `detalles[]`
       // con { producto_id, descripcion, cantidad, precio_unitario } y calcula él mismo
@@ -266,7 +254,6 @@ export default function OrdenCompraModal({
         })),
       }
 
-      console.log('📤 Datos completos a enviar:', JSON.stringify(ordenData, null, 2))
 
       const result = orden
         ? await put(`/api/compras/ordenes/${orden.id}`, ordenData)

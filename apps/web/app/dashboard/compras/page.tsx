@@ -34,7 +34,7 @@ export default function ComprasPage() {
   const { toast } = useToast()
   // throwOnError deja llegar el motivo real del backend al catch; sin esto el
   // hook devuelve null y solo se puede mostrar un texto generico.
-  const { get, delete: del, post } = useApi({ throwOnError: true, showErrorToast: false })
+  const { get, post } = useApi({ throwOnError: true, showErrorToast: false })
   const router = useRouter()
 
   const [ordenes, setOrdenes] = useState<any[]>([])
@@ -129,34 +129,6 @@ export default function ComprasPage() {
   const handleEditOrden = (orden: AnyRecord) => {
     setSelectedOrden(orden)
     setIsModalOpen(true)
-  }
-
-  const handleDeleteOrden = async (id: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar Orden de Compra',
-      message: '¿Está seguro que desea eliminar esta orden de compra?\n\nEsta acción no se puede deshacer.',
-      variant: 'danger',
-      onConfirm: async () => {
-        try {
-          const data = await del(`/compras/ordenes/${id}`)
-          if (data?.success) {
-            toast({ title: 'Éxito', description: 'Orden eliminada correctamente' })
-            loadOrdenes()
-            loadStats()
-          } else {
-            throw new Error(data?.message || 'Error al eliminar')
-          }
-        } catch (error) {
-          console.error('Error deleting orden:', error)
-          toast({
-            title: 'Error',
-            description: error instanceof Error ? error.message : 'Error al eliminar la orden',
-            variant: 'destructive',
-          })
-        }
-      },
-    })
   }
 
   // Aprueba la orden (PENDIENTE → APROBADA) contra el endpoint real del backend.
@@ -412,9 +384,6 @@ export default function ComprasPage() {
                                   </Button>
                                 )}
                                 </div>
-                                <Button type="button" size="sm" variant="outline" onClick={() => handleDeleteOrden(orden.id)} className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground">
-                                  Eliminar
-                                </Button>
                               </div>
                             </td>
                           </tr>

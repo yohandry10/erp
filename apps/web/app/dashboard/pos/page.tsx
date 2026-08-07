@@ -306,7 +306,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   }, [estadoCaja?.estado, sesionCajaId]);
 
   const cargarDatos = useCallback(async () => {
-    console.log('🔄 Cargando datos POS empresarial...')
     setIsLoading(true)
     try {
       const productosPromise = api.get('/api/pos/productos');
@@ -321,9 +320,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
       // Cargar productos (bloqueante para mostrar el POS)
       const productosResponse = await productosPromise;
-      console.log('📦 Respuesta completa del API:', productosResponse);
       const productosData = productosResponse?.data || [];
-      console.log('📦 Productos extraídos:', productosData);
       setProductos(productosData);
 
       // Obtener cajas y sesión abierta (prioritario para el estado de caja)
@@ -351,7 +348,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         } else {
           setHayCajasDisponibles(true);
           setCajaId((prev) => prev ?? cajas[0].id);
-          console.log(`✅ ${cajas.length} caja(s) encontrada(s), usando: ${cajas[0].nombre || cajas[0].id}`);
 
           // Buscar sesión activa solo del usuario autenticado para evitar tomar cajas de otro cajero
           const sesionActiva = sesionRes?.data || null;
@@ -372,7 +368,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
             if (sesionGuardada && sesionGuardada !== sesionActiva.id && typeof window !== 'undefined') {
               localStorage.removeItem('pos_sesion_caja_id');
             }
-            console.log('✅ Sesión de caja activa encontrada:', sesionActiva.id);
             const cajaActivaId = sesionActiva.caja_id || cajas[0].id;
             setCajaId(cajaActivaId);
             setSesionCajaId(sesionActiva.id);
@@ -390,7 +385,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
             if (typeof window !== 'undefined') {
               localStorage.removeItem('pos_sesion_caja_id');
             }
-            console.log('ℹ️ No hay sesión de caja activa, mostrando pantalla de apertura');
             setSesionCajaId(null);
             setEstadoCaja({
               estado: 'CERRADA',
@@ -414,7 +408,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         });
       }
 
-      console.log(`✅ POS cargado: ${productosData.length} productos disponibles`);
       setDatosInicializados(true)
       setIsLoading(false)
 
@@ -437,7 +430,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
       if (configResult.status === 'fulfilled') {
         const configResponse = configResult.value;
-        console.log('⚙️ Configuration status:', configResponse);
         if (configResponse?.success && configResponse?.data) {
           const configData = {
             ...configResponse.data,
@@ -459,7 +451,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
       if (greResult.status === 'fulfilled') {
         const greConfigResponse = greResult.value;
-        console.log('📦 GRE config:', greConfigResponse);
         if (greConfigResponse?.success && greConfigResponse?.data) {
           setGreThreshold(greConfigResponse.data.umbralGREAutomatico || 700);
           setGreEnabled(greConfigResponse.data.greAutomaticoHabilitado === true);
@@ -555,7 +546,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         throw new Error(ventasRes?.message || 'Error cargando historial');
       }
 
-      console.log(`✅ Historial cargado: ${ventasRes.data?.length || 0} ventas encontradas`);
       setHistorialVentas(ventasRes.data || []);
     } catch (error) {
       console.error('❌ Error recargando historial de ventas:', error);
@@ -565,18 +555,14 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
   const recargarProductos = async () => {
     try {
-      console.log('🔄 Recargando productos en POS...');
       const productosResponse = await api.get('/api/pos/productos');
-      console.log('📦 Respuesta de recarga:', productosResponse);
 
       if (!productosResponse.success) {
         throw new Error(`API Error: ${productosResponse.message}`);
       }
 
       const productosData = productosResponse?.data || [];
-      console.log('📦 Productos extraídos en recarga:', productosData);
       setProductos(productosData);
-      console.log(`✅ ${productosData.length} productos recargados`);
 
       // Mostrar éxito si se recargaron productos
       if (productosData.length > 0) {
@@ -604,7 +590,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     setDetallesFactura([]);
 
     try {
-      console.log('👁️ Cargando detalles de venta:', venta);
 
       const itemsObservados = (() => {
         if (!venta.observaciones) return []
@@ -622,9 +607,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
       if (detallesResponse?.success && Array.isArray(detallesResponse.data) && detallesResponse.data.length > 0) {
         detalles = detallesResponse.data;
-        console.log('✅ Detalles obtenidos desde API POS:', detalles);
       } else {
-        console.log('⚠️ No se encontraron detalles en API, intentando reconstruir desde observaciones...');
 
         // Fallback: usar observaciones almacenadas en la venta
         if (venta.observaciones) {
@@ -641,7 +624,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                 descuento: item.descuento_monto || 0,
                 total_parcial: item.subtotal || 0,
               }));
-              console.log('✅ Detalles reconstruidos desde observaciones:', detalles);
             }
           } catch (parseError) {
             console.warn('⚠️ Error parseando observaciones:', parseError);
@@ -650,7 +632,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
         // Último fallback: crear detalle básico
         if (detalles.length === 0) {
-          console.log('⚠️ Creando detalles básicos de fallback...');
           detalles = [{
             id: 1,
             venta_id: venta.id,
@@ -701,7 +682,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       })
 
       setDetallesFactura(detallesNormalizados);
-      console.log(`✅ Se cargaron ${detalles.length} detalles para la factura`);
 
     } catch (error) {
       console.error("❌ Error general al cargar detalles de la factura:", error);
@@ -872,9 +852,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   }
 
   const eliminarDelCarrito = (productoId: string) => {
-    console.log('🗑️ Eliminando producto del carrito:', productoId);
     setCarrito(carrito.filter(item => item.producto.id !== productoId));
-    console.log('✅ Producto eliminado del carrito');
   }
 
   const procesarVenta = async () => {
@@ -1092,20 +1070,15 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       }
 
       // 5. Procesar venta en backend con 1 reintento en caso de error de red
-      console.log('📤 Enviando venta al backend...', ventaData)
       let resultado: any = null;
 
       const enviarVenta = async () => {
-        console.log('🔄 Iniciando llamada API...')
         const resp = await posSaleApi.post('/api/pos/venta', ventaData)
-        console.log('📨 Respuesta completa del backend:', resp)
-        console.log('📨 Tipo de respuesta:', typeof resp, 'Es null?', resp === null, 'Es undefined?', resp === undefined)
         return resp
       }
 
       try {
         resultado = await enviarVenta()
-        console.log('✅ Resultado recibido:', resultado)
       } catch (apiError: any) {
         console.error('❌ Error de conexión API:', apiError)
         toast({
@@ -1158,7 +1131,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         }
 
         // 8. Mostrar confirmación inmediatamente; la recarga posterior no debe bloquear al cajero.
-        console.log('✅ Venta procesada exitosamente:', resultado)
         const totalVenta = totalServidor ?? calcularTotal()
 
         setVentaExitosaData({
@@ -1354,7 +1326,6 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
       estado: estadoVentaActual.estado
     }
 
-    console.log('📄 Comprobante generado:', comprobante)
     return comprobante
   }
 

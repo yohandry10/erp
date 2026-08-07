@@ -241,7 +241,6 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
         } else {
           // Create new request and track it
           const fetchPromise = (async () => {
-            console.log(`[usePermission] Fetching permissions for user ${user.id}`)
             const response = await get('/usuarios-sistema/me/permissions')
 
             if (!response) {
@@ -250,7 +249,6 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
             }
 
             const perms = Array.isArray(response) ? response : (response.data || [])
-            console.log(`[usePermission] Fetched ${perms.length} permissions for user ${user.id}`)
 
             // Update cache
             const nextCache = {

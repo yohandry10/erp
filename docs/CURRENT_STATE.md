@@ -18,6 +18,11 @@ migraciones verificados, prevalece la implementación actual.
 - El cierre Web del 2026-08-07 reporta type-check limpio y build Next 124/124
   rutas; 73 rutas se verificaron en escritorio y móvil (146 casos) y el
   recorrido visible de demos nuevas PE/AR/CO no presentó errores de consola.
+  La inspección autenticada posterior en PROD confirmó los flujos Perú de
+  contabilidad, PLE 3.17, impuestos, SIRE, RRHH/PLAME, POS, compras, inventario
+  y finanzas; el menú financiero expone CxC, CxP, bancos, tesorería,
+  conciliación y reportes según permiso, sin trazas de objetos operativos en la
+  consola del navegador.
 - Los cálculos de nómina PE/AR/CO conservan cobertura automatizada sin depender
   de una base remota. Las pruebas con escritura no se ejecutan en PROD.
 - Factura `01`, boleta `03`, nota de crédito `07`, nota de débito `08`, RA y RC
