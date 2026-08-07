@@ -8,6 +8,8 @@ describe('SireController security metadata', () => {
     generarReporte: 'sire.emitir',
     downloadReporte: 'sire.read',
     enviarSunat: 'sire.emitir',
+    consultarTicket: 'sire.emitir',
+    getOperaciones: 'sire.read',
     testEvento: 'system.debug',
     testIntegracionPOS: 'system.debug',
     findAll: 'sire.read',

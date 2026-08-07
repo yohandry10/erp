@@ -35,6 +35,7 @@ interface EmpresaConfig {
   sunatUsernameConfigured?: boolean
   sunatGreTransport?: string
   sunatGreClientConfigured?: boolean
+  sireActivo?: boolean
   oseActivo?: boolean
   oseUrl?: string
   oseStatusUrl?: string
@@ -331,7 +332,7 @@ export function ConfigurationSummaryStep() {
             {modoEmisionLabel}
           </span>
         </div>
-        {isPeru && empresaConfig?.emisionCpeModo !== 'OSE_API' && (
+        {isPeru && (
           <>
             <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
               <span className="text-muted-foreground">Ambiente SUNAT:</span>
@@ -351,6 +352,10 @@ export function ConfigurationSummaryStep() {
                 <span>{empresaConfig?.sunatGreClientConfigured ? 'Configuradas' : 'Pendientes'}</span>
               </div>
             )}
+            <div className="flex justify-between gap-4 border-t border-border/20 pt-2">
+              <span className="text-muted-foreground">SIRE RVIE/RCE</span>
+              <span>{empresaConfig?.sireActivo ? 'Habilitado' : 'No habilitado'}</span>
+            </div>
           </>
         )}
         {isArgentina && (

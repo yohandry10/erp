@@ -29,14 +29,17 @@ No leas toda la documentación por defecto.
 
 Código y migraciones verificados prevalecen sobre documentación.
 
-## Contrato DEV/PROD
+## Contrato PROD-only
 
-- DEV: `hbueraexcbowpfnjlppi`. Desarrollo, QA, demos y datos sintéticos.
-- PROD: `wypnbcptofqdmoynlonq`. Sólo datos reales.
-- Antes de operar una base, leer `docs/OPERATIONS.md` y ejecutar
-  `scripts/db-environment-preflight.ps1` para el target.
-- Nunca usar `.env.local` para PROD.
-- PROD usa `.env.production` o secretos inyectados.
+- PROD: `wypnbcptofqdmoynlonq`. Es el único proyecto remoto autorizado.
+- DEV `hbueraexcbowpfnjlppi` está retirado y debe ser rechazado por runtime,
+  scripts y CI; no se usa para desarrollo, QA ni demos.
+- Antes de operar PROD, leer `docs/OPERATIONS.md` y ejecutar
+  `scripts/db-environment-preflight.ps1 -Environment PROD`.
+- El runtime usa `.env.production` o secretos inyectados; `.env.local` y `.env`
+  no son fuentes operativas.
+- Las pruebas con escritura usan dobles o infraestructura local efímera; nunca
+  se redirigen a PROD.
 - Todo borrado PROD exige autorización explícita, respaldo, transacción y
   evidencia posterior.
 

@@ -2,7 +2,7 @@ import * as Joi from 'joi';
 
 export interface AppEnvironment {
   NODE_ENV: string;
-  DEPLOYMENT_ENV: 'DEV' | 'PROD';
+  DEPLOYMENT_ENV: 'PROD';
   EXPECTED_SUPABASE_PROJECT_REF?: string;
   DEMO_API_ENABLED: boolean;
   PORT: number;
@@ -64,6 +64,8 @@ export interface AppEnvironment {
 }
 
 const secretPattern = /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+=[\]{}|\\:;"'<>,.?/~`-])/;
+export const PROD_SUPABASE_PROJECT_REF = 'wypnbcptofqdmoynlonq';
+export const DISABLED_DEV_SUPABASE_PROJECT_REF = 'hbueraexcbowpfnjlppi';
 
 /**
  * Un secreto de servidor no lo teclea nadie: lo genera una maquina y se guarda
@@ -89,7 +91,10 @@ const requiredInProduction = (schema: Joi.StringSchema | Joi.AlternativesSchema)
 
 export const envSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'staging', 'production').default('development'),
-  DEPLOYMENT_ENV: Joi.string().valid('DEV', 'PROD').default('DEV'),
+  // Contrato operativo: este repositorio sólo puede ejecutar el ERP contra
+  // PROD. DEV quedó retirado y se rechaza incluso si alguien conserva un .env
+  // antiguo. Los tests unitarios no necesitan una base remota.
+  DEPLOYMENT_ENV: Joi.string().valid('PROD').default('PROD'),
   EXPECTED_SUPABASE_PROJECT_REF: Joi.string().pattern(/^[a-z]{20}$/).optional(),
   // La prueba gratuita vive en producción a propósito: el cliente prueba con su
   // cuenta y, al activarla, conserva lo que cargó. Sigue apagada por defecto,
@@ -167,27 +172,42 @@ export const envSchema = Joi.object({
     ? new URL(value.SUPABASE_URL).hostname.split('.')[0]
     : undefined;
 
+  if (
+    actualProjectRef === DISABLED_DEV_SUPABASE_PROJECT_REF ||
+    value.EXPECTED_SUPABASE_PROJECT_REF === DISABLED_DEV_SUPABASE_PROJECT_REF
+  ) {
+    return helpers.message({
+      custom: 'DEV está deshabilitado. El proyecto hbueraexcbowpfnjlppi no puede usarse desde este repositorio.',
+    });
+  }
+
+  if (value.NODE_ENV !== 'test') {
+    if (value.NODE_ENV !== 'production' || value.DEPLOYMENT_ENV !== 'PROD') {
+      return helpers.message({
+        custom: 'El runtime operativo sólo admite NODE_ENV=production y DEPLOYMENT_ENV=PROD.',
+      });
+    }
+    if (value.EXPECTED_SUPABASE_PROJECT_REF !== PROD_SUPABASE_PROJECT_REF) {
+      return helpers.message({
+        custom: `El runtime operativo exige EXPECTED_SUPABASE_PROJECT_REF=${PROD_SUPABASE_PROJECT_REF}.`,
+      });
+    }
+    if (actualProjectRef !== PROD_SUPABASE_PROJECT_REF) {
+      return helpers.message({
+        custom: `SUPABASE_URL debe apuntar exclusivamente a PROD (${PROD_SUPABASE_PROJECT_REF}).`,
+      });
+    }
+  }
+
   if (value.EXPECTED_SUPABASE_PROJECT_REF && actualProjectRef !== value.EXPECTED_SUPABASE_PROJECT_REF) {
     return helpers.message({
       custom: `SUPABASE_URL apunta a ${actualProjectRef || 'un host desconocido'}, no al EXPECTED_SUPABASE_PROJECT_REF declarado.`,
     });
   }
 
-  if (value.NODE_ENV === 'production' && value.DEPLOYMENT_ENV !== 'PROD') {
-    return helpers.message({
-      custom: 'NODE_ENV=production requiere DEPLOYMENT_ENV=PROD.',
-    });
-  }
-
   if (value.NODE_ENV === 'production' && !value.EXPECTED_SUPABASE_PROJECT_REF) {
     return helpers.message({
       custom: 'NODE_ENV=production requiere EXPECTED_SUPABASE_PROJECT_REF.',
-    });
-  }
-
-  if (value.DEPLOYMENT_ENV === 'PROD' && value.NODE_ENV !== 'production') {
-    return helpers.message({
-      custom: 'DEPLOYMENT_ENV=PROD requiere NODE_ENV=production.',
     });
   }
 

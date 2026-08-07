@@ -67,6 +67,7 @@ export class ConfigurationService {
             'sunat_gre_transport',
             'sunat_gre_client_id',
             'sunat_gre_client_secret',
+            'sire_activo',
             'ose_activo',
             'ose_url',
             'ose_status_url',
@@ -117,6 +118,9 @@ export class ConfigurationService {
 
       // Build missing items list
       const missingItems: string[] = [];
+      const addMissingItem = (item: string) => {
+        if (!missingItems.includes(item)) missingItems.push(item);
+      };
       
       const typedEmpresaConfig = empresaConfig as any;
       const isDemo = typedEmpresaConfig?.is_demo === true;
@@ -145,6 +149,7 @@ export class ConfigurationService {
       const requiereSunatDirecto = paisCodigo === 'PE' && emisionModo === 'SUNAT_DIRECTO';
       const requiereArca = paisCodigo === 'AR' && !isDemo;
       const sunatGreTransport = (typedEmpresaConfig?.sunat_gre_transport || 'soap').toString().toLowerCase();
+      const sireActivo = paisCodigo === 'PE' && typedEmpresaConfig?.sire_activo === true && !isDemo;
 
       if (requiereOse) {
         if (!oseActivo) {
@@ -166,12 +171,19 @@ export class ConfigurationService {
       }
 
       if (requiereSunatDirecto) {
-        if (!typedEmpresaConfig?.sunat_username) missingItems.push('Usuario SOL secundario');
-        if (!typedEmpresaConfig?.sunat_password) missingItems.push('Clave SOL secundaria');
+        if (!typedEmpresaConfig?.sunat_username) addMissingItem('Usuario SOL secundario');
+        if (!typedEmpresaConfig?.sunat_password) addMissingItem('Clave SOL secundaria');
         if (sunatGreTransport === 'rest') {
-          if (!typedEmpresaConfig?.sunat_gre_client_id) missingItems.push('Client ID GRE REST');
-          if (!typedEmpresaConfig?.sunat_gre_client_secret) missingItems.push('Client secret GRE REST');
+          if (!typedEmpresaConfig?.sunat_gre_client_id) addMissingItem('Client ID API SUNAT');
+          if (!typedEmpresaConfig?.sunat_gre_client_secret) addMissingItem('Client secret API SUNAT');
         }
+      }
+
+      if (sireActivo) {
+        if (!typedEmpresaConfig?.sunat_username) addMissingItem('Usuario SOL secundario');
+        if (!typedEmpresaConfig?.sunat_password) addMissingItem('Clave SOL secundaria');
+        if (!typedEmpresaConfig?.sunat_gre_client_id) addMissingItem('Client ID API SUNAT');
+        if (!typedEmpresaConfig?.sunat_gre_client_secret) addMissingItem('Client secret API SUNAT');
       }
 
       if (requiereArca) {
@@ -212,12 +224,16 @@ export class ConfigurationService {
       let oseRequirements = 0;
       let dianRequirements = 0;
       let arcaRequirements = 0;
-      if (requiereSunatDirecto) {
-        sunatRequirements += 2; // usuario y clave SOL secundaria
-        if (sunatGreTransport === 'rest') {
-          sunatRequirements += 2; // client_id/client_secret GRE REST
-        }
+      const sunatRequiredFields = new Set<string>();
+      if (requiereSunatDirecto || sireActivo) {
+        sunatRequiredFields.add('username');
+        sunatRequiredFields.add('password');
       }
+      if ((requiereSunatDirecto && sunatGreTransport === 'rest') || sireActivo) {
+        sunatRequiredFields.add('client_id');
+        sunatRequiredFields.add('client_secret');
+      }
+      sunatRequirements = sunatRequiredFields.size;
       if (requiereOse) {
         oseRequirements += 1; // ose_activo
         oseRequirements += 1; // ose_url
@@ -361,6 +377,7 @@ export class ConfigurationService {
           ? encryptText(this.configService, config.sunatGreClientSecret)
           : '';
       }
+      if (config.sireActivo !== undefined) updateData.sire_activo = config.sireActivo;
       if (config.sunatCertExpectedRuc !== undefined) updateData.sunat_cert_expected_ruc = config.sunatCertExpectedRuc;
       if (config.sunatCertRucMismatchConfirmed !== undefined) updateData.sunat_cert_ruc_mismatch_confirmed = config.sunatCertRucMismatchConfirmed;
       if (config.sunatCertRucMismatchReason !== undefined) updateData.sunat_cert_ruc_mismatch_reason = config.sunatCertRucMismatchReason;
@@ -791,6 +808,15 @@ export class ConfigurationService {
           throw new Error('GRE REST requiere client_id y client_secret SUNAT');
         }
       }
+      const sireActivo = paisCodigo === 'PE' && config.sire_activo !== false;
+      if (sireActivo && (
+        !config.sunat_username
+        || !config.sunat_password
+        || !config.sunat_gre_client_id
+        || !config.sunat_gre_client_secret
+      )) {
+        throw new Error('SIRE requiere usuario/clave SOL secundaria y client_id/client_secret API SUNAT');
+      }
       if (paisCodigo === 'AR') {
         if (!validateArgentinaCuit(config.ruc)) {
           throw new Error('Argentina requiere un CUIT válido de 11 dígitos');
@@ -878,6 +904,7 @@ export class ConfigurationService {
           sunat_gre_client_secret: config.sunat_gre_client_secret
             ? encryptText(this.configService, config.sunat_gre_client_secret)
             : null,
+          sire_activo: paisCodigo === 'PE' ? config.sire_activo !== false : false,
           sunat_cert_expected_ruc: config.sunat_cert_expected_ruc || config.ruc || null,
           sunat_cert_ruc_mismatch_confirmed: config.sunat_cert_ruc_mismatch_confirmed === true,
           sunat_cert_ruc_mismatch_reason: config.sunat_cert_ruc_mismatch_reason || null,

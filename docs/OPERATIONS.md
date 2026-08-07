@@ -48,27 +48,26 @@ Los esquemas de configuración en código son la fuente exacta. Categorías:
 Reglas:
 
 - No versionar secretos.
-- DEV usa credenciales de DEV.
 - PROD usa `.env.production` o secretos inyectados.
+- `.env.local`, `.env` y el antiguo proyecto DEV no son fuentes operativas.
 - El frontend sólo recibe variables `NEXT_PUBLIC_*` expresamente públicas.
 - Logs y evidencia deben redactar tokens, passwords y claves.
 
-## Contrato DEV/PROD
+## Contrato PROD-only
 
-| Entorno | Project ref            | Datos                             |
-| ------- | ---------------------- | --------------------------------- |
-| DEV     | `hbueraexcbowpfnjlppi` | Sintéticos, QA y demos permitidos |
-| PROD    | `wypnbcptofqdmoynlonq` | Sólo reales                       |
+| Entorno | Project ref            | Estado                                      |
+| ------- | ---------------------- | ------------------------------------------- |
+| PROD    | `wypnbcptofqdmoynlonq` | Único destino remoto; sólo datos reales     |
+| DEV     | `hbueraexcbowpfnjlppi` | Retirado y rechazado por runtime/scripts/CI |
 
 Antes de cualquier operación DB:
 
 ```powershell
-.\scripts\db-environment-preflight.ps1 -Environment DEV
 .\scripts\db-environment-preflight.ps1 -Environment PROD
 ```
 
-Usar sólo el target correspondiente. No continuar si project ref, marca de
-entorno o archivo de variables no coincide.
+No continuar si project ref, marca interna o archivo de variables no coincide
+exactamente con PROD. Las pruebas con escritura no se ejecutan contra PROD.
 
 ## Migraciones
 
@@ -155,7 +154,7 @@ pnpm test:quality
 
 Según el cambio, añadir:
 
-- Playwright E2E.
+- Playwright sólo con dobles o infraestructura local efímera, nunca contra PROD.
 - Pruebas offline y build Tauri.
 - Preflight SUNAT.
 - Validadores SQL.
@@ -188,10 +187,9 @@ afectación de IGV), `ple-export.service.ts` (libros electrónicos),
   pruebas fijan el número de campos, pero quien certifica que un archivo es
   válido es el validador PVS, que no se puede ejecutar en CI.
 
-Los E2E corren en el workflow `e2e.yml`: lunes a viernes a las 07:00 UTC y a
-petición. Sin los secrets `E2E_SUPABASE_URL` y `E2E_SUPABASE_SERVICE_ROLE_KEY`
-el job se salta y lo dice, en vez de quedarse en rojo permanente: un job siempre
-rojo se acaba ignorando, y deja de avisar el día que el fallo es real.
+El workflow remoto `e2e.yml` está bloqueado porque las specs actuales escriben y
+aprovisionan datos. No se reactivará hasta disponer de infraestructura local o
+efímera aislada; queda expresamente prohibido conectarlo a PROD.
 
 Conviene recordar qué **no** cazan las pruebas. La suite estaba verde mientras el
 sistema adelantaba las fechas un día pasadas las 19:00, perdía las bases

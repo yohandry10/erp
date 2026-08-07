@@ -4,10 +4,10 @@
   "description": "Backend ERP Suite API (NestJS)",
   "main": "dist/src/main.js",
   "scripts": {
-    "dev": "dotenv -e .env -- nodemon --exec ts-node --transpile-only src/main.ts",
+    "dev": "node -e \"throw new Error('Runtime local bloqueado: use build/start con .env.production; DEV está retirado')\"",
     "start": "node dist/src/main.js",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
+    "start:dev": "node -e \"throw new Error('Runtime local bloqueado: DEV está retirado')\"",
+    "start:debug": "node -e \"throw new Error('Runtime debug bloqueado: DEV está retirado')\"",
     "build": "nest build",
     "lint": "eslint src --ext .ts",
     "type-check": "tsc -p tsconfig.json --noEmit",

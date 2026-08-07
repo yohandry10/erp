@@ -6,11 +6,11 @@ describe('env.schema', () => {
   const baseConfig = {
     NODE_ENV: 'production',
     DEPLOYMENT_ENV: 'PROD',
-    EXPECTED_SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+    EXPECTED_SUPABASE_PROJECT_REF: 'wypnbcptofqdmoynlonq',
     DEMO_API_ENABLED: false,
     PORT: 3002,
     LOG_LEVEL: 'info',
-    SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co',
+    SUPABASE_URL: 'https://wypnbcptofqdmoynlonq.supabase.co',
     SUPABASE_SERVICE_ROLE_KEY: strongSecret,
     SUPABASE_ANON_KEY: 'b'.repeat(40),
     JWT_SECRET: strongSecret,
@@ -56,8 +56,6 @@ describe('env.schema', () => {
     const result = envSchema.validate({
       ...baseConfig,
       PORT: undefined,
-      NODE_ENV: 'development',
-      DEPLOYMENT_ENV: 'DEV',
       JWT_SECRET: strongSecret,
       JWT_REFRESH_SECRET: 'C'.repeat(40),
     });
@@ -136,11 +134,10 @@ describe('env.schema', () => {
     expect(result.error?.message).toContain('REQUIRE_REAL_FISCAL_CERTIFICATE');
   });
 
-  it('permite omitir certificado fiscal global en development', () => {
+  it('permite omitir certificado fiscal global en tests unitarios', () => {
     const result = envSchema.validate({
       ...baseConfig,
-      NODE_ENV: 'development',
-      DEPLOYMENT_ENV: 'DEV',
+      NODE_ENV: 'test',
       PFX_PATH: undefined,
       PFX_PASS: undefined,
     });
@@ -204,7 +201,7 @@ describe('env.schema', () => {
       SUPABASE_URL: 'https://zyxwvutsrqponmlkjihg.supabase.co',
     });
 
-    expect(result.error?.message).toContain('EXPECTED_SUPABASE_PROJECT_REF');
+    expect(result.error?.message).toContain('exclusivamente a PROD');
   });
 
   it('permite habilitar demos en PROD, que es donde vive la prueba gratuita', () => {
@@ -231,7 +228,29 @@ describe('env.schema', () => {
       NODE_ENV: 'development',
     });
 
-    expect(result.error?.message).toContain('requiere NODE_ENV=production');
+    expect(result.error?.message).toContain('sólo admite NODE_ENV=production');
+  });
+
+  it('rechaza explícitamente el proyecto DEV aunque NODE_ENV sea test', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      NODE_ENV: 'test',
+      DEPLOYMENT_ENV: 'PROD',
+      EXPECTED_SUPABASE_PROJECT_REF: 'hbueraexcbowpfnjlppi',
+      SUPABASE_URL: 'https://hbueraexcbowpfnjlppi.supabase.co',
+    });
+
+    expect(result.error?.message).toContain('DEV está deshabilitado');
+  });
+
+  it('rechaza cualquier project_ref distinto de PROD en runtime', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      EXPECTED_SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+      SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co',
+    });
+
+    expect(result.error?.message).toContain('wypnbcptofqdmoynlonq');
   });
 
   it('requiere declarar project_ref en production', () => {
@@ -240,6 +259,6 @@ describe('env.schema', () => {
       EXPECTED_SUPABASE_PROJECT_REF: undefined,
     });
 
-    expect(result.error?.message).toContain('requiere EXPECTED_SUPABASE_PROJECT_REF');
+    expect(result.error?.message).toContain('exige EXPECTED_SUPABASE_PROJECT_REF');
   });
 });

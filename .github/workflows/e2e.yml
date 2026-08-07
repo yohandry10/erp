@@ -1,96 +1,16 @@
-name: E2E
+name: E2E remoto deshabilitado
 
-# Las 24 specs de Playwright existian sin que ningun workflow las invocara.
-# No van en el CI de cada push porque necesitan API y base de datos reales: se
-# ejecutan de noche y a peticion, contra el entorno que se configure por secrets.
+# Las specs existentes aprovisionan y modifican datos. DEV fue retirado y no se
+# redirigen a PROD porque eso mezclaría QA sintético con clientes reales.
 on:
-  schedule:
-    - cron: '0 7 * * 1-5'
   workflow_dispatch:
-    inputs:
-      base_url:
-        description: 'URL del frontend a probar (vacio = levanta el dev server)'
-        required: false
-        default: ''
-
-concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
-  e2e:
-    name: Playwright
+  blocked:
+    name: Bloqueado por contrato PROD-only
     runs-on: ubuntu-latest
-    timeout-minutes: 40
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # Sin credenciales no hay nada que probar. Se sale en verde y se deja
-      # dicho por que: un job en rojo permanente se acaba ignorando, y entonces
-      # deja de avisar el dia que si hay un fallo de verdad.
-      - name: Comprobar credenciales
-        id: guard
+      - name: Explicar bloqueo
         run: |
-          if [ -z "${{ secrets.E2E_SUPABASE_URL }}" ] || [ -z "${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}" ]; then
-            echo "listo=no" >> $GITHUB_OUTPUT
-            echo "## E2E omitido" >> $GITHUB_STEP_SUMMARY
-            echo "Faltan los secrets E2E_SUPABASE_URL y E2E_SUPABASE_SERVICE_ROLE_KEY." >> $GITHUB_STEP_SUMMARY
-            echo "Sin base de datos accesible las 24 specs no pueden autenticarse." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "listo=si" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Setup pnpm
-        if: steps.guard.outputs.listo == 'si'
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
-        if: steps.guard.outputs.listo == 'si'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        if: steps.guard.outputs.listo == 'si'
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Chromium
-        if: steps.guard.outputs.listo == 'si'
-        run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
-
-      - name: Build API
-        if: steps.guard.outputs.listo == 'si'
-        run: pnpm --filter @erp-suite/erp-api build
-
-      - name: Arrancar API
-        if: steps.guard.outputs.listo == 'si'
-        env:
-          SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
-          JWT_SECRET: ${{ secrets.E2E_JWT_SECRET }}
-          REDIS_REQUIRED: 'false'
-          PORT: '3002'
-        run: |
-          node apps/erp-api/dist/src/main.js &
-          for i in $(seq 1 60); do
-            curl -sf http://localhost:3002/api/health && break
-            sleep 2
-          done
-
-      - name: Ejecutar E2E
-        if: steps.guard.outputs.listo == 'si'
-        env:
-          BASE_URL: ${{ github.event.inputs.base_url || 'http://localhost:3001' }}
-          NEXT_PUBLIC_API_URL: 'http://localhost:3002/api'
-        run: pnpm --filter @erp-suite/web test:e2e
-
-      - name: Publicar reporte
-        if: always() && steps.guard.outputs.listo == 'si'
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: apps/web/playwright-report/
-          retention-days: 14
-          if-no-files-found: warn
+          echo "## E2E remoto bloqueado" >> "$GITHUB_STEP_SUMMARY"
+          echo "DEV está deshabilitado y las pruebas con escritura están prohibidas en PROD." >> "$GITHUB_STEP_SUMMARY"

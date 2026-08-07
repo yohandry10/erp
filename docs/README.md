@@ -70,11 +70,14 @@ pnpm check-docs
 
 ## Bases de datos
 
-- DEV: `hbueraexcbowpfnjlppi`, para desarrollo, QA y demos.
-- PROD: `wypnbcptofqdmoynlonq`, sólo para datos reales.
+- PROD: `wypnbcptofqdmoynlonq`, único proyecto remoto autorizado y sólo para
+  datos reales.
+- DEV está retirado y bloqueado. Las pruebas usan dobles o infraestructura local
+  efímera y nunca se redirigen a PROD.
 
 Antes de operar una base, leer `OPERATIONS.md` y ejecutar
-`scripts/db-environment-preflight.ps1`. Nunca usar `.env.local` para PROD.
+`scripts/db-environment-preflight.ps1 -Environment PROD`. El runtime no carga
+`.env.local` ni `.env`.
 
 ## Historial y evidencia
 
