@@ -7,6 +7,7 @@ import {
   BadgeDollarSign,
   Briefcase,
   CalendarClock,
+  FileCheck2,
   FileText,
   UserPlus,
   Users,
@@ -22,6 +23,7 @@ import { Badge } from '@/components/ui/badge'
 
 const rrhhModules = [
   { href: '/dashboard/rrhh/planillas', title: 'Planillas', description: 'Cálculo de sueldos y beneficios', icon: BadgeDollarSign },
+  { href: '/dashboard/rrhh/planilla-electronica', title: 'PLAME / T-Registro', description: 'Fuentes PVS, ticket y CIR de SUNAT', icon: FileCheck2 },
   { href: '/dashboard/rrhh/asistencia', title: 'Asistencia', description: 'Control de horarios y marcaciones', icon: CalendarClock },
   { href: '/dashboard/rrhh/contratos', title: 'Contratos', description: 'Gestión de contratos laborales', icon: FileText },
   { href: '/dashboard/rrhh/candidatos', title: 'Candidatos', description: 'Reclutamiento y selección', icon: Users },
