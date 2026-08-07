@@ -6,6 +6,7 @@ import { RequirePermission } from '../../../common/decorators/require-permission
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { AjustesTributariosMensuales, TributosMensualesService } from '../services/tributos-mensuales.service';
+import { AjustesTributariosAnuales, TributosAnualesService } from '../services/tributos-anuales.service';
 
 class PeriodoTributarioQueryDto {
   @IsString()
@@ -36,11 +37,33 @@ class RegistrarConstanciaDto {
   fecha_presentacion?: string;
 }
 
+class EjercicioTributarioQueryDto {
+  @IsNumber()
+  @Min(2024)
+  @Max(2100)
+  ejercicio!: number;
+}
+
+class CalcularTributoAnualDto implements AjustesTributariosAnuales {
+  @IsNumber() @Min(2024) @Max(2100) ejercicio!: number;
+  @IsOptional() @IsNumber() @Min(0) adiciones_tributarias?: number;
+  @IsOptional() @IsNumber() @Min(0) deducciones_tributarias?: number;
+  @IsOptional() @IsNumber() @Min(0) perdidas_compensables?: number;
+  @IsOptional() @IsNumber() @Min(0) pagos_cuenta_renta?: number;
+  @IsOptional() @IsNumber() @Min(0) credito_itan_renta?: number;
+  @IsOptional() @IsNumber() @Min(0) otros_creditos_renta?: number;
+  @IsOptional() @IsNumber() @Min(0) deducciones_itan?: number;
+  @IsOptional() @IsString() notas?: string;
+}
+
 @ApiTags('contabilidad')
 @Controller('contabilidad/impuestos')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class ContabilidadTributosController {
-  constructor(private readonly service: TributosMensualesService) {}
+  constructor(
+    private readonly service: TributosMensualesService,
+    private readonly anual: TributosAnualesService,
+  ) {}
 
   @Get('mensual')
   @RequirePermission('contabilidad.reportes.read')
@@ -108,6 +131,62 @@ export class ContabilidadTributosController {
         dto.fecha_presentacion,
       ),
       message: 'Constancia SUNAT registrada como evidencia externa.',
+    };
+  }
+
+  @Get('anual')
+  @RequirePermission('contabilidad.reportes.read')
+  @ApiOperation({ summary: 'Calcular borrador FV 710 e ITAN desde estados contables; no presenta a SUNAT' })
+  async calcularAnualBase(
+    @CurrentTenant() tenantId: string,
+    @Query() query: EjercicioTributarioQueryDto,
+  ) {
+    return { success: true, data: await this.anual.calcular(tenantId, query.ejercicio) };
+  }
+
+  @Post('anual/calcular')
+  @RequirePermission('contabilidad.reportes.read')
+  async calcularAnual(
+    @CurrentTenant() tenantId: string,
+    @Body() dto: CalcularTributoAnualDto,
+  ) {
+    const { ejercicio, ...ajustes } = dto;
+    return { success: true, data: await this.anual.calcular(tenantId, ejercicio, ajustes) };
+  }
+
+  @Post('anual')
+  @RequirePermission('contabilidad.reportes.actualizar')
+  async guardarAnual(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: CalcularTributoAnualDto,
+  ) {
+    const { ejercicio, ...ajustes } = dto;
+    return {
+      success: true,
+      data: await this.anual.guardar(tenantId, userId, ejercicio, ajustes),
+      message: 'Borrador anual versionado. Presente FV 710/ITAN en SUNAT antes de registrar la constancia.',
+    };
+  }
+
+  @Get('anuales')
+  @RequirePermission('contabilidad.reportes.read')
+  async listarAnuales(@CurrentTenant() tenantId: string, @Query('limite') limite?: string) {
+    return { success: true, data: await this.anual.listar(tenantId, Number(limite) || 12) };
+  }
+
+  @Post('anuales/:id/constancia')
+  @RequirePermission('contabilidad.reportes.actualizar')
+  async registrarConstanciaAnual(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RegistrarConstanciaDto,
+  ) {
+    return {
+      success: true,
+      data: await this.anual.registrarConstancia(tenantId, userId, id, dto.constancia, dto.fecha_presentacion),
+      message: 'Constancia anual SUNAT registrada como evidencia externa.',
     };
   }
 }

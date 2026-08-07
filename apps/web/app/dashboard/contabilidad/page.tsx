@@ -616,6 +616,7 @@ export default function ContabilidadPage() {
     { title: 'Presupuestos', description: 'Ejecución y alertas del periodo.', href: '/dashboard/contabilidad/presupuestos', icon: Landmark },
     { title: 'Consolidación', description: 'Grupos empresariales y reportes configurables.', href: '/dashboard/contabilidad/consolidacion', icon: Building2 },
     { title: 'Impuestos Perú', description: 'Borrador mensual IGV/Renta y constancias SUNAT.', href: '/dashboard/contabilidad/impuestos', icon: Receipt },
+    { title: 'Renta anual e ITAN', description: 'Conciliación FV 710, escala RMT e ITAN.', href: '/dashboard/contabilidad/impuestos/anual', icon: Calculator },
   ]
 
   const barMetrics = connectedMetrics.map(([label, value]) => {

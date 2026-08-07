@@ -15,7 +15,7 @@ migraciones verificados, prevalece la implementación actual.
 - PROD `wypnbcptofqdmoynlonq` es el único proyecto remoto operativo. El antiguo
   DEV está retirado y bloqueado por runtime, scripts y CI.
 - El cierre más reciente del backend reporta 163/163 suites y 1533/1533 pruebas.
-- El cierre Web del 2026-08-07 reporta type-check limpio y build Next 121/121
+- El cierre Web del 2026-08-07 reporta type-check limpio y build Next 122/122
   rutas; 73 rutas se verificaron en escritorio y móvil (146 casos) y el
   recorrido visible de demos nuevas PE/AR/CO no presentó errores de consola.
 - Los cálculos de nómina PE/AR/CO conservan cobertura automatizada sin depender
@@ -67,6 +67,10 @@ prueba.
   Añade borradores mensuales versionados de IGV/Renta Perú, fuentes auditables
   y registro de constancia externa; la validación confirmó cero declaraciones
   creadas por la migración.
+- `397`: aplicada y registrada en PROD el 2026-08-07 después de preflight,
+  respaldo PostgreSQL 17 verificable y ensayo con `ROLLBACK`. Añade conciliación
+  anual FV 710/ITAN versionada y corrige el momento en que una constancia
+  anterior pasa a `RECTIFICADA`; la validación confirmó cero declaraciones.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -107,6 +111,8 @@ Cambios recientes principales:
   ajustes sin alterar libros, mapeo de cuentas y reportes configurables seguros.
 - `396`: IGV/Renta mensual Perú para NRUS, RER, RMT y General, con cálculo
   server-side, advertencias, versionado y constancia SUNAT externa.
+- `397`: Renta Anual/ITAN Perú para RMT y General, conciliación manual
+  sustentable, bloqueo por ejercicio abierto/descuadre y constancia externa.
 
 ## Flujos cerrados técnicamente
 
@@ -212,7 +218,7 @@ productivo autorizado.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `396` en PROD.
+1. Código y migraciones actuales; estado remoto verificado hasta `397` en PROD.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.
