@@ -1,4 +1,4 @@
-import { ExecutionContext, ServiceUnavailableException } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
 
 const createExecutionContext = (): ExecutionContext => ({
   switchToHttp: () => ({ getRequest: () => ({}) }),
@@ -58,6 +58,25 @@ describe('FeatureFlagGuard', () => {
 
     expect(guard.canActivate(createExecutionContext())).toBe(true);
   });
+
+  it.each(['pos', 'rrhh'] as const)(
+    'mantiene %s habilitado por defecto y permite apagarlo explícitamente',
+    async (feature) => {
+      const envName = feature === 'pos' ? 'FEATURE_POS_ENABLED' : 'FEATURE_RRHH_ENABLED';
+      delete process.env[envName];
+      const { FeatureFlagGuard } = await import('./feature-flag.guard');
+      const guard = new FeatureFlagGuard({ get: jest.fn().mockReturnValue(feature) } as any);
+
+      expect(guard.canActivate(createExecutionContext())).toBe(true);
+
+      process.env[envName] = 'false';
+      expect(() => guard.canActivate(createExecutionContext())).toThrow(
+        feature === 'pos'
+          ? 'POS no habilitado en este entorno'
+          : 'RRHH nómina no habilitado en este entorno',
+      );
+    },
+  );
 
   it('no aplica validación cuando no hay metadata de feature flag', async () => {
     const { FeatureFlagGuard } = await import('./feature-flag.guard');

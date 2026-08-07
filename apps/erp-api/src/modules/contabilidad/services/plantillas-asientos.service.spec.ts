@@ -14,6 +14,7 @@ describe('PlantillasAsientosService', () => {
 
   let tablas: Record<string, any>;
   let inserciones: Array<{ tabla: string; payload: any }>;
+  let rpcs: Array<{ funcion: string; parametros: any }>;
 
   const construirQuery = (tabla: string) => {
     const filtros: string[] = [];
@@ -52,6 +53,7 @@ describe('PlantillasAsientosService', () => {
   beforeEach(async () => {
     tablas = {};
     inserciones = [];
+    rpcs = [];
     asientos = {
       crearAsientoManual: jest.fn().mockResolvedValue({ id: 'asiento-1', numero_asiento: 10 })
     };
@@ -62,7 +64,13 @@ describe('PlantillasAsientosService', () => {
         {
           provide: SupabaseService,
           useValue: {
-            getClient: jest.fn(() => ({ from: jest.fn((tabla: string) => construirQuery(tabla)) }))
+            getClient: jest.fn(() => ({
+              from: jest.fn((tabla: string) => construirQuery(tabla)),
+              rpc: jest.fn(async (funcion: string, parametros: any) => {
+                rpcs.push({ funcion, parametros });
+                return tablas[`rpc:${funcion}`] ?? { data: { id: 'plantilla-1' }, error: null };
+              })
+            }))
           }
         },
         { provide: AsientosService, useValue: asientos }
@@ -198,8 +206,8 @@ describe('PlantillasAsientosService', () => {
         detalles: detallesValidos
       });
 
-      const cabecera = inserciones.find(i => i.tabla === 'plantillas_asientos')!.payload;
-      expect(cabecera.proxima_ejecucion).toBe('2026-09-01');
+      const cabecera = rpcs.find(i => i.funcion === 'guardar_plantilla_con_detalles_tx')!.parametros.p_plantilla;
+      expect(cabecera.fecha_inicio).toBe('2026-09-01');
       expect(cabecera.periodicidad).toBe('MENSUAL');
     });
 
@@ -210,8 +218,9 @@ describe('PlantillasAsientosService', () => {
         detalles: detallesValidos
       });
 
-      const cabecera = inserciones.find(i => i.tabla === 'plantillas_asientos')!.payload;
-      expect(cabecera.proxima_ejecucion).toBeNull();
+      const llamada = rpcs.find(i => i.funcion === 'guardar_plantilla_con_detalles_tx')!;
+      const cabecera = llamada.parametros.p_plantilla;
+      expect(llamada.parametros.p_plantilla_id).toBeNull();
       expect(cabecera.periodicidad).toBe('NINGUNA');
     });
 
@@ -222,19 +231,37 @@ describe('PlantillasAsientosService', () => {
         detalles: detallesValidos
       });
 
-      const cabecera = inserciones.find(i => i.tabla === 'plantillas_asientos')!.payload;
+      const cabecera = rpcs.find(i => i.funcion === 'guardar_plantilla_con_detalles_tx')!.parametros.p_plantilla;
       expect(cabecera.crear_en_estado).toBe('BORRADOR');
     });
 
-    it('numera las líneas por orden de llegada', async () => {
+    it('preserva el orden de llegada de las líneas para que la RPC las numere', async () => {
       await service.crear(TENANT, USER, {
         nombre: 'Alquiler',
         concepto: 'Provisión',
         detalles: detallesValidos
       });
 
-      const lineas = inserciones.find(i => i.tabla === 'plantillas_asientos_detalle')!.payload;
-      expect(lineas.map((l: any) => l.orden)).toEqual([1, 2]);
+      const lineas = rpcs.find(i => i.funcion === 'guardar_plantilla_con_detalles_tx')!.parametros.p_detalles;
+      expect(lineas).toEqual(detallesValidos);
+    });
+
+    it('envía cabecera y líneas a una única operación transaccional', async () => {
+      await service.crear(TENANT, USER, {
+        nombre: 'Alquiler',
+        concepto: 'Provisión',
+        detalles: detallesValidos
+      });
+
+      expect(rpcs).toContainEqual({
+        funcion: 'guardar_plantilla_con_detalles_tx',
+        parametros: expect.objectContaining({
+          p_tenant_id: TENANT,
+          p_user_id: USER,
+          p_plantilla_id: null,
+          p_detalles: detallesValidos
+        })
+      });
     });
   });
 

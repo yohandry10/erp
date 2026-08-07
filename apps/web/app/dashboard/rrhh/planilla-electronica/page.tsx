@@ -37,7 +37,7 @@ export default function PlanillaElectronicaPeruPage() {
     const items = Array.isArray(planillasResponse) ? planillasResponse : planillasResponse?.data || []
     setPlanillas(items)
     setHistorial(historialResponse?.data || [])
-    setPlanillaId((actual) => actual || items.find((item: any) => ['calculada', 'pagada'].includes(String(item.estado).toLowerCase()))?.id || items[0]?.id || '')
+    setPlanillaId((actual) => actual || items.find((item: any) => ['calculada', 'aprobada', 'pagada'].includes(String(item.estado).toLowerCase()))?.id || items[0]?.id || '')
     setCargando(false)
   }, [get])
 

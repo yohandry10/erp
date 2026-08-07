@@ -17,6 +17,7 @@ const createEmptyForm = (countryCode = 'PE') => ({
   tipo_documento: countryCode === 'AR' ? 'CUIL' : countryCode === 'CO' ? 'CC' : 'DNI',
   numero_documento: '',
   fecha_nacimiento: '',
+  genero: '',
   direccion: '',
   telefono: '',
   email: '',
@@ -62,6 +63,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
       tipo_documento: initialData.tipo_documento || (isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI'),
       numero_documento: initialData.numero_documento || '',
       fecha_nacimiento: initialData.fecha_nacimiento || '',
+      genero: initialData.genero || '',
       direccion: initialData.direccion || '',
       telefono: initialData.telefono || '',
       email: initialData.email || '',
@@ -386,6 +388,24 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
                   e.currentTarget.style.boxShadow = 'none'
                 }}
               />
+            </div>
+
+            {/* Sexo registrado */}
+            <div>
+              <label htmlFor="empleado-modal-genero" className="block mb-2 font-semibold text-[var(--primary-700)]">
+                Sexo registrado{isPeru ? ' (SUNAT)' : ''}
+              </label>
+              <select
+                id="empleado-modal-genero"
+                value={formData.genero}
+                onChange={(e) => handleChange('genero', e.target.value)}
+                required={isPeru}
+                className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
+              >
+                <option value="">Seleccionar</option>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+              </select>
             </div>
 
             {/* Fecha de Ingreso */}

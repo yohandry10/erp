@@ -213,6 +213,34 @@ describe('PlanCuentasService', () => {
       expect(result.get('12')).toEqual(cuentaClientes);
     });
 
+    it('reconoce la cuenta PCGE 18 requerida por gastos diferidos', async () => {
+      const cuentaAnticipada = {
+        id: '18-id',
+        tenant_id: 'tenant-1',
+        codigo: '18',
+        nombre: 'Servicios y otros contratados por anticipado',
+        tipo: 'ACTIVO',
+        nivel: 2,
+        acepta_movimiento: true,
+        estado: 'ACTIVO'
+      };
+
+      mockSupabaseClient.in.mockResolvedValueOnce({ data: [], error: null });
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: cuentaAnticipada, error: null });
+
+      const result = await service.obtenerCuentasPorCodigos('tenant-1', ['18']);
+
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-1',
+          codigo: '18',
+          tipo: 'ACTIVO',
+          nombre: 'Servicios y otros contratados por anticipado'
+        })
+      );
+      expect(result.get('18')).toEqual(cuentaAnticipada);
+    });
+
     it('debe crear la cuenta operativa con nomenclatura argentina para un tenant AR', async () => {
       const cuentaArgentina = {
         id: '12-ar-id',

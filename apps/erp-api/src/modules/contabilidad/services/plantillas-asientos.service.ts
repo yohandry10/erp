@@ -125,36 +125,20 @@ export class PlantillasAsientosService {
 
     const periodicidad = dto.periodicidad ?? PeriodicidadPlantilla.NINGUNA;
 
-    const { data: plantilla, error } = await this.supabaseService
-      .getClient()
-      .from('plantillas_asientos')
-      .insert({
-        tenant_id: tenantId,
-        nombre: dto.nombre,
-        descripcion: dto.descripcion,
-        concepto: dto.concepto,
-        referencia: dto.referencia,
-        periodicidad,
-        dia_ejecucion: dto.dia_ejecucion ?? null,
-        fecha_inicio: dto.fecha_inicio ?? null,
-        fecha_fin: dto.fecha_fin ?? null,
-        proxima_ejecucion:
-          periodicidad === PeriodicidadPlantilla.NINGUNA
-            ? null
-            : dto.fecha_inicio ?? new Date().toISOString().slice(0, 10),
-        crear_en_estado: dto.crear_en_estado ?? EstadoAsiento.BORRADOR,
-        activa: dto.activa ?? true,
-        estado: 'ACTIVO',
-        created_by: userId
-      })
-      .select()
-      .single();
+    const { data: plantilla, error } = await this.supabaseService.getClient().rpc(
+      'guardar_plantilla_con_detalles_tx',
+      {
+        p_tenant_id: tenantId,
+        p_user_id: userId,
+        p_plantilla_id: null,
+        p_plantilla: this.construirCabeceraRpc(dto, periodicidad),
+        p_detalles: dto.detalles
+      }
+    );
 
     if (error || !plantilla) {
       throw new Error(`Error creando plantilla: ${error?.message}`);
     }
-
-    await this.reemplazarDetalles(tenantId, plantilla.id, dto.detalles);
 
     this.logger.log(`🧾 Plantilla "${dto.nombre}" creada para ${tenantId}`);
     return this.obtener(tenantId, plantilla.id);
@@ -170,30 +154,21 @@ export class PlantillasAsientosService {
 
     const periodicidad = dto.periodicidad ?? PeriodicidadPlantilla.NINGUNA;
 
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('plantillas_asientos')
-      .update({
-        nombre: dto.nombre,
-        descripcion: dto.descripcion,
-        concepto: dto.concepto,
-        referencia: dto.referencia,
-        periodicidad,
-        dia_ejecucion: dto.dia_ejecucion ?? null,
-        fecha_inicio: dto.fecha_inicio ?? null,
-        fecha_fin: dto.fecha_fin ?? null,
-        crear_en_estado: dto.crear_en_estado ?? EstadoAsiento.BORRADOR,
-        activa: dto.activa ?? true,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', plantillaId)
-      .eq('tenant_id', tenantId);
+    const { error } = await this.supabaseService.getClient().rpc(
+      'guardar_plantilla_con_detalles_tx',
+      {
+        p_tenant_id: tenantId,
+        p_user_id: null,
+        p_plantilla_id: plantillaId,
+        p_plantilla: this.construirCabeceraRpc(dto, periodicidad),
+        p_detalles: dto.detalles
+      }
+    );
 
     if (error) {
       throw new Error(`Error actualizando plantilla: ${error.message}`);
     }
 
-    await this.reemplazarDetalles(tenantId, plantillaId, dto.detalles);
     return this.obtener(tenantId, plantillaId);
   }
 
@@ -436,37 +411,21 @@ export class PlantillasAsientosService {
     }));
   }
 
-  private async reemplazarDetalles(
-    tenantId: string,
-    plantillaId: string,
-    detalles: DetallePlantillaDto[]
-  ): Promise<void> {
-    await this.supabaseService
-      .getClient()
-      .from('plantillas_asientos_detalle')
-      .delete()
-      .eq('tenant_id', tenantId)
-      .eq('plantilla_id', plantillaId);
-
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('plantillas_asientos_detalle')
-      .insert(
-        detalles.map((detalle, indice) => ({
-          tenant_id: tenantId,
-          plantilla_id: plantillaId,
-          orden: indice + 1,
-          cuenta_id: detalle.cuenta_id,
-          debe: detalle.debe,
-          haber: detalle.haber,
-          concepto: detalle.concepto,
-          centro_costo_id: detalle.centro_costo_id ?? null,
-          estado: 'ACTIVO'
-        }))
-      );
-
-    if (error) {
-      throw new Error(`Error guardando los detalles de la plantilla: ${error.message}`);
-    }
+  private construirCabeceraRpc(
+    dto: CreatePlantillaAsientoDto | UpdatePlantillaAsientoDto,
+    periodicidad: PeriodicidadPlantilla
+  ): Record<string, unknown> {
+    return {
+      nombre: dto.nombre,
+      descripcion: dto.descripcion ?? null,
+      concepto: dto.concepto,
+      referencia: dto.referencia ?? null,
+      periodicidad,
+      dia_ejecucion: dto.dia_ejecucion ?? null,
+      fecha_inicio: dto.fecha_inicio ?? null,
+      fecha_fin: dto.fecha_fin ?? null,
+      crear_en_estado: dto.crear_en_estado ?? EstadoAsiento.BORRADOR,
+      activa: dto.activa ?? true
+    };
   }
 }

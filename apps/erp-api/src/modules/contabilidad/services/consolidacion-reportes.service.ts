@@ -666,7 +666,9 @@ export class ConsolidacionReportesService {
           asientos_contables!fk_detalle_asientos_asiento_id_v2 (tenant_id, fecha, estado)
         `)
         .eq('asientos_contables.tenant_id', tenantId)
-        .lte('asientos_contables.fecha', fechaHasta)
+        // `fecha` puede llegar como timestamptz. Comparar contra YYYY-MM-DD
+        // equivale a medianoche y excluye las operaciones del propio día.
+        .lte('asientos_contables.fecha', `${fechaHasta}T23:59:59.999Z`)
         .eq('asientos_contables.estado', 'CONFIRMADO')
         .range(offset, offset + pageSize - 1);
       if (error) this.dbError('Error leyendo movimientos contables', error);

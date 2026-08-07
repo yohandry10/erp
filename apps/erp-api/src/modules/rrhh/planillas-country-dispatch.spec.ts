@@ -1,4 +1,5 @@
 import { PlanillasService } from './planillas.service';
+import { ConflictException } from '@nestjs/common';
 
 type Country = 'PE' | 'AR' | 'CO';
 
@@ -17,6 +18,23 @@ const thenableQuery = (result: any) => {
   };
   return query;
 };
+
+describe('PlanillasService approval persistence', () => {
+  it('no anuncia aprobación cuando el trigger devuelve la planilla como calculada', async () => {
+    const query: any = {
+      update: jest.fn(() => query),
+      eq: jest.fn(() => query),
+      select: jest.fn().mockResolvedValue({ data: [{ id: 'plan-1', estado: 'calculada' }], error: null }),
+    };
+    const service = new PlanillasService(
+      { getClient: () => ({ from: () => query }) } as any,
+      {} as any,
+    );
+
+    await expect(service.updatePlanilla('plan-1', { estado: 'aprobada' }, 'tenant-1'))
+      .rejects.toBeInstanceOf(ConflictException);
+  });
+});
 
 function buildHarness(country: Country) {
   const planilla = { estado: 'borrador', periodo: '2026-08' };

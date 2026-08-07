@@ -50,6 +50,28 @@ export class PlantillasSchedulerService {
         );
         await this.plantillas.avanzarAgenda(plantilla.tenant_id, plantilla.id, new Date(hoy));
       } catch (error: any) {
+        // Si una persona ya generó manualmente el asiento del período, o el
+        // proceso cayó después de crear el asiento pero antes de mover la
+        // agenda, la idempotencia hizo su trabajo. Avanzar evita que la misma
+        // plantilla quede vencida y falle cada madrugada para siempre.
+        if (/ya generó un asiento para el período/i.test(error?.message ?? '')) {
+          try {
+            await this.plantillas.avanzarAgenda(
+              plantilla.tenant_id,
+              plantilla.id,
+              new Date(hoy)
+            );
+            this.logger.warn(
+              `Plantilla ${plantilla.id}: período ya generado; agenda recuperada.`
+            );
+            continue;
+          } catch (agendaError: any) {
+            this.logger.error(
+              `Plantilla ${plantilla.id}: no se pudo recuperar la agenda: ${agendaError.message}`
+            );
+            continue;
+          }
+        }
         this.logger.error(
           `Plantilla ${plantilla.id} (tenant ${plantilla.tenant_id}) no pudo generarse: ${error.message}`
         );

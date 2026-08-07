@@ -27,9 +27,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!authLoading && session) {
-      router.replace('/dashboard')
+      const target = session.user.is_super_admin ? '/superadmin/dashboard/' : '/dashboard/'
+      window.location.replace(target)
     }
-  }, [authLoading, session, router])
+  }, [authLoading, session])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -57,7 +58,7 @@ export default function LoginPage() {
 
     try {
       // ✅ SOLUCIÓN: Usar signIn del contexto (maneja la sesión automáticamente)
-      await signIn(email, password)
+      const authenticatedUser = await signIn(email, password)
 
       console.log('✅ [LoginPage] Login exitoso')
 
@@ -71,8 +72,13 @@ export default function LoginPage() {
         description: `Has iniciado sesión correctamente - ${selectedCountry.nombre}`,
       })
 
-      console.log('🚀 [LoginPage] Redirigiendo a dashboard...')
-      router.push('/dashboard')
+      console.log('🚀 [LoginPage] Redirigiendo al espacio autenticado...')
+      // La navegación completa obliga al navegador a reenviar la cookie HttpOnly
+      // que acaba de emitir la API. Con router.push el middleware podía evaluar
+      // una precarga anterior al login y dejar al usuario en /login pese al 200.
+      window.location.replace(
+        authenticatedUser.is_super_admin ? '/superadmin/dashboard/' : '/dashboard/',
+      )
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         console.info('[LoginPage] Login rechazado:', error instanceof Error ? error.message : error)

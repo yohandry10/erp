@@ -38,7 +38,7 @@ type Reporte = { id: string; codigo: string; nombre: string; lineas: any[] }
 
 const hoy = new Date().toISOString().slice(0, 10)
 const inicioAnio = `${new Date().getFullYear()}-01-01`
-const campo = 'rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground'
+const campo = 'min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground'
 
 const lineasIniciales: LineaEditor[] = [
   {
@@ -220,10 +220,10 @@ export default function ConsolidacionPage() {
         ) : (
           <>
             <div className="grid gap-4 xl:grid-cols-2">
-              <Card className="border-cyan-400/20 bg-card/70">
+              <Card className="min-w-0 border-cyan-400/20 bg-card/70">
                 <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /> Grupos empresariales</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-2 md:grid-cols-4">
+                  <div className="grid gap-2 md:grid-cols-4 [&>*]:min-w-0">
                     <Input placeholder="Código" value={nuevoGrupo.codigo} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, codigo: e.target.value })} />
                     <Input className="md:col-span-2" placeholder="Nombre del grupo" value={nuevoGrupo.nombre} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, nombre: e.target.value })} />
                     <div className="flex gap-2">
@@ -265,12 +265,12 @@ export default function ConsolidacionPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-cyan-400/20 bg-card/70">
+              <Card className="min-w-0 border-cyan-400/20 bg-card/70">
                 <CardHeader><CardTitle>Tasas y ajustes del consolidado</CardTitle></CardHeader>
                 <CardContent className="space-y-5">
                   <div>
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Homologación de cuentas</div>
-                    <div className="grid gap-2 md:grid-cols-[2fr_1fr_1fr_auto]">
+                    <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] [&>*]:min-w-0">
                       <select className={campo} value={mapeo.tenant_miembro_id} onChange={(e) => setMapeo({ ...mapeo, tenant_miembro_id: e.target.value })}>
                         <option value="">Empresa miembro</option>
                         {grupo?.miembros.filter((m) => m.estado === 'ACTIVO' && !m.es_controladora).map((m) => <option key={m.tenant_id} value={m.tenant_id}>{m.empresa?.razon_social || m.tenant_id}</option>)}
@@ -282,7 +282,7 @@ export default function ConsolidacionPage() {
                   </div>
                   <div>
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tasa de presentación</div>
-                    <div className="grid gap-2 md:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+                    <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(0,2fr)_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_auto] [&>*]:min-w-0">
                       <select className={campo} value={tasa.tenant_miembro_id} onChange={(e) => setTasa({ ...tasa, tenant_miembro_id: e.target.value })}>
                         <option value="">Empresa miembro</option>
                         {grupo?.miembros.filter((m) => m.estado === 'ACTIVO' && !m.es_controladora).map((m) => <option key={m.tenant_id} value={m.tenant_id}>{m.empresa?.razon_social || m.tenant_id}</option>)}
@@ -295,7 +295,7 @@ export default function ConsolidacionPage() {
                   </div>
                   <div>
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Eliminación o reclasificación</div>
-                    <div className="grid gap-2 md:grid-cols-4">
+                    <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-4 [&>*]:min-w-0">
                       <Input type="date" value={ajuste.fecha} onChange={(e) => setAjuste({ ...ajuste, fecha: e.target.value })} />
                       <select className={campo} value={ajuste.tipo} onChange={(e) => setAjuste({ ...ajuste, tipo: e.target.value })}><option>ELIMINACION</option><option>RECLASIFICACION</option></select>
                       <Input placeholder="Cuenta" value={ajuste.cuenta_codigo} onChange={(e) => setAjuste({ ...ajuste, cuenta_codigo: e.target.value })} />

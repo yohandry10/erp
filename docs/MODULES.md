@@ -89,6 +89,9 @@ Código principal: `apps/erp-api/src/modules/inventario`,
 ## Finanzas y tesorería
 
 - CxC y CxP gestionan saldo, vencimiento, pagos y estados.
+- El rol CONTADOR puede consultar proveedores para filtrar CxP, pero no recibe
+  por ello permisos de alta, edición, recepción ni pago. Las listas CxC/CxP
+  exportan CSV real y neutralizan fórmulas de hoja de cálculo.
 - Tesorería cubre cajas, bancos, movimientos y conciliaciones.
 - Cobranzas y pagos por lote requieren referencias idempotentes.
 - Retenciones y detracciones respetan configuración fiscal del tenant.
@@ -105,6 +108,12 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - Asientos se originan en eventos de ventas, compras, POS, caja, RRHH y activos.
 - Debe/haber debe cuadrar y el período debe permitir la operación.
 - Libros, estados financieros y materialized views son proyecciones.
+- La descarga PLE de Diario y Mayor filtra exclusivamente asientos
+  `CONFIRMADO`. El Balance de Comprobación electrónico es el formato SUNAT 3.17
+  (`031700`), con período `AAAAMMDD` al cierre y 19 campos posicionales; el
+  formato 3.1 pertenece al Estado de Situación Financiera y no se usa para este
+  reporte. Los TXT son insumos para PVS: el ERP no los presenta ni sustituye la
+  validación oficial.
 - El asiento manual nace en `BORRADOR` o `CONFIRMADO`; un confirmado es
   inmutable y se corrige mediante un contra-asiento enlazado, nunca reescribiendo
   silenciosamente el original.

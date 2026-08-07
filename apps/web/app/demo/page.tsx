@@ -163,7 +163,7 @@ export default function DemoPage() {
   const handleContinue = () => {
     // La demo ya nace hidratada con país, moneda y configuración fiscal
     // simulada. Las credenciales reales se cargan únicamente al convertirla.
-    router.push('/dashboard');
+    window.location.replace('/dashboard/');
   };
 
   const copyToClipboard = async (text: string) => {

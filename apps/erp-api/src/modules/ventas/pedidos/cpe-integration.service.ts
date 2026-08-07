@@ -154,9 +154,6 @@ export class CPEIntegrationService {
     cliente: any,
     empresaConfig: any,
   ): Promise<CreateFacturaDto> {
-    // Obtener serie y número de factura
-    const { serie, numero } = await this.obtenerSerieYNumero(pedido.tenant_id);
-
     // ✅ CORRECCIÓN SRP: Obtener tasa de IGV una sola vez usando TaxCalculatorService
     const tasaIgv = await this.taxCalculator.getTasaIgv(pedido.tenant_id);
 
@@ -211,6 +208,25 @@ export class CPEIntegrationService {
     const tipoDocumentoSunat = this.mapearTipoDocumentoSunat(cliente.documento_tipo);
     const razonSocialCliente = cliente.razon_social || cliente.nombre_comercial;
 
+    const esRucValido = tipoDocumentoSunat === '6' && /^\d{11}$/.test(numeroDocumentoCliente);
+    if (tipoDocumentoSunat === '6' && !esRucValido) {
+      throw new BadRequestException({
+        message: 'El cliente marcado como RUC debe tener 11 dígitos para emitir factura',
+        code: 'CLIENTE_RUC_INVALIDO',
+      });
+    }
+
+    // SUNAT: la factura (01) exige receptor RUC; consumidores con DNI, CE,
+    // pasaporte u otro documento reciben boleta (03). El pedido no debe forzar
+    // una factura sólo por provenir del flujo comercial.
+    const tipoDocumentoCpe = esRucValido
+      ? TipoDocumento.FACTURA
+      : TipoDocumento.BOLETA;
+    const { serie, numero } = await this.obtenerSerieYNumero(
+      pedido.tenant_id,
+      tipoDocumentoCpe,
+    );
+
     if (!razonSocialCliente) {
       throw new BadRequestException({
         message: 'El cliente no tiene una razón social configurada',
@@ -222,7 +238,7 @@ export class CPEIntegrationService {
     const facturaDto: CreateFacturaDto = {
       serie: serie,
       numero: numero,
-      tipo_documento: TipoDocumento.FACTURA,
+      tipo_documento: tipoDocumentoCpe,
       ruc_emisor: empresaConfig.ruc,
       razon_social_emisor: empresaConfig.razon_social,
       tipo_documento_receptor: tipoDocumentoSunat,
@@ -434,7 +450,40 @@ export class CPEIntegrationService {
   /**
    * Obtiene serie y número de factura
    */
-  private async obtenerSerieYNumero(tenantId: string): Promise<{ serie: string; numero: number }> {
+  private async obtenerSerieYNumero(
+    tenantId: string,
+    tipoDocumento: TipoDocumento = TipoDocumento.FACTURA,
+  ): Promise<{ serie: string; numero: number }> {
+    if (tipoDocumento === TipoDocumento.BOLETA) {
+      const client = this.supabase.getClient();
+      const { data: config, error } = await client
+        .from('empresa_config')
+        .select('serie_boleta')
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (error || !config) {
+        throw new BadRequestException('No se pudo obtener la serie de boleta');
+      }
+
+      const serie = config.serie_boleta || 'B001';
+      const { data: numeroReservado, error: numeroError } = await client.rpc(
+        'obtener_siguiente_numero_documento',
+        {
+          p_tenant_id: tenantId,
+          p_tipo_documento: 'BOLETA',
+          p_serie: serie,
+        },
+      );
+
+      const numero = Number.parseInt(String(numeroReservado ?? ''), 10);
+      if (numeroError || !Number.isFinite(numero) || numero <= 0) {
+        throw new BadRequestException('Error reservando correlativo de boleta');
+      }
+
+      return { serie, numero };
+    }
+
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
       .select('serie_factura, ultimo_numero_factura')

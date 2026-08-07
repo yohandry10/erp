@@ -21,7 +21,7 @@ interface AuthContextType {
   session: Session | null
   user: User | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<User>
   signOut: () => Promise<void>
   refreshSession: () => Promise<void>
 }
@@ -162,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
     storeSessionSnapshot(data.session)
     clearPermissionCache(data.user.id)
+    return data.user
   }
 
   const signOut = async () => {

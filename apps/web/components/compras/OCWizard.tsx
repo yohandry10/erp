@@ -11,6 +11,7 @@ import { useCountryContext } from '@/hooks/use-country-context'
 import { Proveedor } from '@/types/compras'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { cn } from '@/lib/utils'
+import { parseDateLocal } from '@/lib/date-utils'
 
 const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
 const requiredMarkClass = 'text-muted-foreground'
@@ -679,7 +680,7 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'No especificada'
-    return new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'

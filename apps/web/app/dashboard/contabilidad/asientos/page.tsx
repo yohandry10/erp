@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface AsientoContable {
   id: string
@@ -93,7 +94,7 @@ export default function AsientosPage() {
     }).format(amount)
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
+    parseDateLocal(dateString).toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

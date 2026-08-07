@@ -13,7 +13,7 @@ services:
     runtime: docker
     plan: free
     region: oregon
-    branch: codex/accounting-production-closure
+    branch: main
     # El Dockerfile copia package.json, pnpm-workspace.yaml, libs/ y apps/erp-api
     # desde la raiz: el contexto tiene que ser el repo entero, no apps/erp-api.
     dockerfilePath: ./apps/erp-api/Dockerfile
@@ -30,6 +30,15 @@ services:
       # La prueba gratuita vive en produccion: el cliente prueba con su cuenta y
       # al activarla conserva lo que cargo.
       - key: DEMO_API_ENABLED
+        value: true
+
+      # Los módulos cerrados para Perú quedan activos por defecto. Una
+      # desactivación de emergencia debe ser explícita en el panel.
+      - key: FEATURE_RRHH_ENABLED
+        value: true
+      - key: FEATURE_POS_ENABLED
+        value: true
+      - key: FEATURE_INVENTARIO_ENABLED
         value: true
 
       # Con NODE_ENV=production el arranque exige Redis disponible.

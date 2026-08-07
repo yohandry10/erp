@@ -70,7 +70,7 @@ export function construirPaquetePlanillaElectronicaPeru(fuente: FuentePlanillaPe
   }
   if (!/^\d{11}$/.test(ruc)) bloqueos.push({ codigo: 'RUC_INVALIDO', mensaje: 'Configure un RUC peruano de 11 dígitos.' });
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) bloqueos.push({ codigo: 'PERIODO_INVALIDO', mensaje: 'La planilla no tiene período YYYY-MM válido.' });
-  if (!['calculada', 'pagada'].includes(String(planilla.estado || '').toLowerCase())) {
+  if (!['calculada', 'aprobada', 'pagada'].includes(String(planilla.estado || '').toLowerCase())) {
     bloqueos.push({ codigo: 'PLANILLA_NO_CALCULADA', mensaje: 'Calcule la planilla antes de preparar PLAME.' });
   }
   if (!fuente.detalles.length) bloqueos.push({ codigo: 'SIN_TRABAJADORES', mensaje: 'La planilla no contiene trabajadores calculados.' });

@@ -26,6 +26,7 @@ interface GenerarFacturaButtonProps {
   pedidoId: string;
   onSuccess: () => Promise<void>;
   config: EmpresaConfig;
+  documentType?: "FACTURA" | "BOLETA";
   onGenerated?: (result: {
     facturaId: string | null;
     sugerioGre: boolean;
@@ -36,19 +37,22 @@ export default function GenerarFacturaButton({
   pedidoId,
   onSuccess,
   config,
+  documentType = "FACTURA",
   onGenerated,
 }: GenerarFacturaButtonProps) {
-  const { post } = useApi();
+  const { post } = useApi({ throwOnError: true });
   const router = useRouter();
 
   const [showGREModal, setShowGREModal] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [facturaId, setFacturaId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const documentLabel = documentType === "BOLETA" ? "boleta" : "factura";
+  const documentLabelTitle = documentType === "BOLETA" ? "Boleta" : "Factura";
 
   const resolveErrorMessage = (error: unknown): string => {
     if (!error) {
-      return "No se pudo generar la factura";
+      return `No se pudo generar la ${documentLabel}`;
     }
 
     if (typeof error === "string") {
@@ -56,7 +60,7 @@ export default function GenerarFacturaButton({
     }
 
     if (error instanceof Error) {
-      const raw = error.message || "No se pudo generar la factura";
+      const raw = error.message || `No se pudo generar la ${documentLabel}`;
       const jsonStart = raw.indexOf("{");
       if (jsonStart !== -1) {
         try {
@@ -81,13 +85,13 @@ export default function GenerarFacturaButton({
       }
     }
 
-    return "No se pudo generar la factura";
+    return `No se pudo generar la ${documentLabel}`;
   };
 
   const handleGenerate = async () => {
     try {
       setGenerating(true);
-      console.debug("[GenerarFacturaButton] Generando factura...", {
+      console.debug("[GenerarFacturaButton] Generando comprobante...", {
         pedidoId,
       });
 
@@ -104,7 +108,7 @@ export default function GenerarFacturaButton({
       const fueExitoso = !!response && response?.success !== false;
 
       if (!fueExitoso) {
-        throw new Error(response?.message || "Error al generar la factura");
+        throw new Error(response?.message || `Error al generar la ${documentLabel}`);
       }
 
       setFacturaId(response?.factura_id || null);
@@ -118,14 +122,14 @@ export default function GenerarFacturaButton({
         setShowGREModal(true);
       } else {
         toast({
-          title: "Factura generada",
-          description: "La factura ha sido generada exitosamente",
+          title: `${documentLabelTitle} generada`,
+          description: `La ${documentLabel} ha sido generada exitosamente`,
         });
         await onSuccess();
         router.refresh();
       }
     } catch (error: any) {
-      console.error("Error generating factura:", error);
+      console.error("Error generating fiscal document:", error);
       toast({
         title: "Error",
         description: resolveErrorMessage(error),
@@ -142,14 +146,14 @@ export default function GenerarFacturaButton({
 
     if (generated) {
       toast({
-        title: "Factura y GRE generados",
+        title: `${documentLabelTitle} y GRE generadas`,
         description:
-          "La factura y la guía de remisión han sido generadas exitosamente",
+          `La ${documentLabel} y la guía de remisión han sido generadas exitosamente`,
       });
     } else {
       toast({
-        title: "Factura generada",
-        description: "La factura ha sido generada exitosamente",
+        title: `${documentLabelTitle} generada`,
+        description: `La ${documentLabel} ha sido generada exitosamente`,
       });
     }
 
@@ -169,19 +173,19 @@ export default function GenerarFacturaButton({
         className="bg-blue-600 hover:bg-blue-700"
       >
         <FileText className="w-4 h-4 mr-2" />
-        {generating ? "Generando..." : "Generar Factura"}
+        {generating ? "Generando..." : `Generar ${documentLabelTitle}`}
       </Button>
 
       <ConfirmDialog
         isOpen={showConfirmation}
         onClose={() => setShowConfirmation(false)}
         onConfirm={handleGenerate}
-        title="Confirmar factura"
-        confirmText="Generar factura"
+        title={`Confirmar ${documentLabel}`}
+        confirmText={`Generar ${documentLabel}`}
         variant="success"
         message={
           <div className="space-y-4 text-left">
-            <p>¿Desea generar la factura para este pedido?</p>
+            <p>¿Desea generar la {documentLabel} para este pedido?</p>
             <div className="rounded-lg border border-border bg-muted/50 p-4 text-foreground">
               {config.usar_flujo_logistica
                 ? "Se emitirá el documento fiscal usando el despacho confirmado."

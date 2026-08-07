@@ -14,7 +14,7 @@ migraciones verificados, prevalece la implementación actual.
   `COP`, DIAN).
 - PROD `wypnbcptofqdmoynlonq` es el único proyecto remoto operativo. El antiguo
   DEV está retirado y bloqueado por runtime, scripts y CI.
-- El cierre más reciente del backend reporta 165/165 suites y 1546/1546 pruebas.
+- El cierre más reciente del backend reporta 167/167 suites y 1562/1562 pruebas.
 - El cierre Web del 2026-08-07 reporta type-check limpio y build Next 123/123
   rutas; 73 rutas se verificaron en escritorio y móvil (146 casos) y el
   recorrido visible de demos nuevas PE/AR/CO no presentó errores de consola.
@@ -44,8 +44,8 @@ Reglas vigentes:
   evidencia posterior.
 
 La migración `346__deployment_environment_boundary.sql` está aplicada en PROD.
-PROD fue purgada de datos demo el 2026-07-14 y quedó sin tenants ni usuarios de
-prueba.
+La purga de datos demo del 2026-07-14 se completó; PROD alberga actualmente los
+tenants operativos y ninguna dependencia del proyecto DEV retirado.
 
 ## Migraciones
 
@@ -85,6 +85,20 @@ prueba.
   constancia PLAME del ticket/CIR de T-Registro y sólo exige estos últimos cuando
   el paquete contiene novedades registrales; la validación confirmó la nueva
   firma transaccional, la columna CIR y cero datos creados.
+- `401..411`: aplicadas y registradas en PROD el 2026-08-07 con preflight,
+  respaldos verificables, ensayo transaccional y verificadores posteriores.
+  Cierran RBAC de CONTADOR para PLAME y lectura operativa de proveedores,
+  normalizan el estado `APROBADA`, publican los puentes RPC tributarios,
+  hacen atómica e idempotente la generación/reagenda de plantillas y completan
+  las cuentas PCGE usadas por diferidos. `410` deja el seeder canónico listo
+  para tenants existentes y futuros; la verificación cubrió 32 de 32 roles
+  CONTADOR sin otorgar permisos de mutación.
+- `411`: agrega la RPC backend-only del Balance de Comprobación PLE 3.17. La
+  agregación tenant-scoped ocurre en PostgreSQL para no truncar movimientos por
+  el límite de PostgREST; sólo toma asientos confirmados y separa apertura,
+  movimientos y cierre. El ensayo se revirtió, la función quedó como
+  `SECURITY INVOKER`, `anon/authenticated` no pueden ejecutarla y el tenant de
+  verificación devolvió 15 cuentas PCGE.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -134,6 +148,8 @@ Cambios recientes principales:
   cambios no vuelve a proponerse y cualquier cambio reactiva la fuente PVS.
 - `400`: evidencia PLAME y evidencia T-Registro independientes, preservadas en
   una sola transacción con las huellas de los trabajadores aceptados.
+- `401..411`: paridad operativa del rol CONTADOR, RPC transaccionales de Perú,
+  PCGE para diferidos y recurrencia contable reprogramable.
 
 ## Flujos cerrados técnicamente
 
@@ -151,6 +167,10 @@ Cambios recientes principales:
 - Finanzas, CxC, CxP, bancos y conciliación. Contabilidad cubre las siete fases
   auditadas: ciclo de vida, multi-moneda, recurrentes, activos, partidas
   abiertas, analítica/diferidos y consolidación/reportes configurables.
+- Los TXT PLE de Diario y Mayor sólo incluyen asientos `CONFIRMADO`. El Balance
+  de Comprobación usa la estructura oficial 3.17 (`031700`), fecha de cierre y
+  19 campos; 3.1 queda reservado al Estado de Situación Financiera. Todo TXT
+  debe pasar por el validador PVS antes de adquirir valor legal.
 - RRHH con despacho normativo por país: Perú conserva AFP/ONP, EsSalud, quinta
   categoría, gratificaciones, CTS y vacaciones; Argentina usa SIPA, INSSJP,
   obra social, contribuciones patronales, ART, SAC, vacaciones LCT,
@@ -246,7 +266,7 @@ productivo autorizado.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `400` en PROD.
+1. Código y migraciones actuales; estado remoto verificado hasta `411` en PROD.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.

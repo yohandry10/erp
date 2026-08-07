@@ -10,6 +10,7 @@ import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { Proveedor } from '@/types/compras'
 import { cn } from '@/lib/utils'
+import { parseDateLocal } from '@/lib/date-utils'
 
 const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
 const requiredMarkClass = 'text-muted-foreground'
@@ -596,7 +597,7 @@ function Step3Review({ formData, detalles, proveedores, calculateTotals, formatC
   const { subtotal, igv, total } = calculateTotals()
 
   const calcularFechaVencimiento = () => {
-    const fecha = new Date(formData.fecha_cotizacion)
+    const fecha = parseDateLocal(formData.fecha_cotizacion)
     fecha.setDate(fecha.getDate() + formData.validez_dias)
     return fecha.toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
@@ -643,7 +644,7 @@ function Step3Review({ formData, detalles, proveedores, calculateTotals, formatC
               Fecha Cotización
             </span>
             <p className={summaryValueClass}>
-              {new Date(formData.fecha_cotizacion).toLocaleDateString(country.locale || 'es-PE')}
+              {parseDateLocal(formData.fecha_cotizacion).toLocaleDateString(country.locale || 'es-PE')}
             </p>
           </div>
           <div>

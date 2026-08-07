@@ -18,17 +18,19 @@ const encoder = new TextEncoder();
 // Encodeamos el secret una sola vez al cargar el módulo.
 const secretKey = JWT_SECRET ? encoder.encode(JWT_SECRET) : null;
 
-async function hasValidJwt(request: NextRequest): Promise<boolean> {
+type JwtValidation = 'valid' | 'invalid' | 'unavailable';
+
+async function validateJwt(request: NextRequest): Promise<JwtValidation> {
   const accessToken = request.cookies.get('access_token')?.value;
-  if (!accessToken) return false;
+  if (!accessToken) return 'invalid';
 
   if (secretKey) {
     try {
       const { payload } = await jwtVerify(accessToken, secretKey, {
         algorithms: ['HS256'],
       });
-      if (!payload.tenant_id && payload.is_super_admin !== true) return false;
-      return true;
+      if (!payload.tenant_id && payload.is_super_admin !== true) return 'invalid';
+      return 'valid';
     } catch {
       // Un secreto distinto entre Vercel y Render no implica token inválido.
       // Continuamos con la validación autoritativa del emisor.
@@ -37,7 +39,7 @@ async function hasValidJwt(request: NextRequest): Promise<boolean> {
 
   if (!API_BASE_URL) {
     console.error('[middleware] NEXT_PUBLIC_API_URL no está configurado');
-    return false;
+    return 'unavailable';
   }
 
   const controller = new AbortController();
@@ -49,9 +51,18 @@ async function hasValidJwt(request: NextRequest): Promise<boolean> {
       cache: 'no-store',
       signal: controller.signal,
     });
-    return response.ok;
+    if (response.ok) return 'valid';
+
+    // Sólo una respuesta autoritativa de autenticación invalida la cookie. Un
+    // 429 o un 5xx significa que el verificador está temporalmente indisponible;
+    // expulsar al usuario en ese caso transforma navegación rápida, una caída de
+    // Render o un rate limit en un cierre de sesión falso. Los endpoints de datos
+    // siguen protegidos por JwtAuthGuard, de modo que permitir renderizar el shell
+    // no concede acceso a información ni a mutaciones.
+    if (response.status === 401 || response.status === 403) return 'invalid';
+    return 'unavailable';
   } catch {
-    return false;
+    return 'unavailable';
   } finally {
     clearTimeout(timeout);
   }
@@ -88,15 +99,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const authenticated = await hasValidJwt(request);
+  const validation = await validateJwt(request);
 
-  if (!authenticated && protectedRoute) {
+  if (validation === 'invalid' && protectedRoute) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', normalizedPathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (authenticated && loginRoute) {
+  if (validation === 'valid' && loginRoute) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

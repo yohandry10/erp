@@ -33,6 +33,14 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
+  '18': {
+    codigo: '18',
+    nombre: 'Servicios y otros contratados por anticipado',
+    tipo: 'ACTIVO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
   '20': {
     codigo: '20',
     nombre: 'Mercaderias',
@@ -84,6 +92,14 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
   '42': {
     codigo: '42',
     nombre: 'Cuentas por pagar comerciales',
+    tipo: 'PASIVO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '49': {
+    codigo: '49',
+    nombre: 'Pasivo diferido',
     tipo: 'PASIVO',
     nivel: 2,
     acepta_movimiento: true,
@@ -182,9 +198,11 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
 const NOMBRES_CUENTAS_ARGENTINA: Record<string, string> = {
   '10': 'Caja y bancos',
   '12': 'Créditos por ventas',
+  '18': 'Gastos pagados por adelantado',
   '20': 'Bienes de cambio',
   '40': 'Deudas fiscales (IVA e Ingresos Brutos)',
   '42': 'Proveedores',
+  '49': 'Ingresos diferidos',
   '403': 'Retenciones de seguridad social por pagar',
   '407': 'Contribuciones patronales y ART por pagar',
   '411': 'Sueldos por pagar',
