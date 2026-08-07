@@ -6,6 +6,7 @@ import { EventBusService } from '../../shared/events/event-bus.service';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { isProduction } from '../../common/feature-flags';
 
 @ApiTags('sire')
@@ -63,9 +64,32 @@ export class SireController {
   @ApiOperation({ summary: 'Send SIRE report to SUNAT' })
   @ApiResponse({ status: 200, description: 'SIRE report sent to SUNAT successfully' })
   @RequirePermission('sire.emitir')
-  async enviarSunat(@Param('id') id: string, @CurrentTenant() tenantId: string) {
-    console.log('📡 Endpoint SIRE enviar-sunat llamado para ID:', id);
-    return await this.sireService.enviarSunat(id, tenantId);
+  async enviarSunat(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    console.log('📡 Endpoint SIRE aceptar-propuesta llamado para ID:', id);
+    return await this.sireService.enviarSunat(id, tenantId, userId);
+  }
+
+  @Post('reportes/:id/consultar-ticket')
+  @ApiOperation({ summary: 'Consultar estado del ticket SIRE en SUNAT' })
+  @ApiResponse({ status: 200, description: 'Estado del ticket persistido con evidencia' })
+  @RequirePermission('sire.emitir')
+  async consultarTicket(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return await this.sireService.consultarTicket(id, tenantId, userId);
+  }
+
+  @Get('reportes/:id/operaciones')
+  @ApiOperation({ summary: 'Obtener bitácora de operaciones SUNAT del reporte SIRE' })
+  @RequirePermission('sire.read')
+  async getOperaciones(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return await this.sireService.getOperaciones(id, tenantId);
   }
 
   @Post('test-evento')
@@ -167,7 +191,7 @@ export class SireController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get SIRE exports (placeholder)' })
+  @ApiOperation({ summary: 'Get SIRE module status' })
   @RequirePermission('sire.read')
   findAll() {
     return this.sireService.findAll();

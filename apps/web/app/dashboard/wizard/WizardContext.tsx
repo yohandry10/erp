@@ -127,6 +127,7 @@ const createInitialState = (): WizardState => ({
     sunat_gre_auth_url: '',
     sunat_gre_client_id: '',
     sunat_gre_client_secret: '',
+    sire_activo: true,
     sunat_cert_expected_ruc: '',
     sunat_cert_ruc_mismatch_confirmed: false,
     sunat_cert_ruc_mismatch_reason: '',

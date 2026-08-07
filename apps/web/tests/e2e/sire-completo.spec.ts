@@ -1,7 +1,5 @@
 import { APIRequestContext, APIResponse, Page, expect, request as playwrightRequest, test } from '@playwright/test';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import fs from 'node:fs';
-import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
 import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
@@ -13,19 +11,6 @@ const api = (route: string) => `/api${route}`;
 const periodoYear = 2030 + Number(runId.slice(-2)) % 20;
 const periodoMonth = String((Number(runId.slice(-4, -2)) % 12) + 1).padStart(2, '0');
 const periodoSire = `${periodoYear}-${periodoMonth}`;
-
-for (const envPath of [
-  path.resolve(process.cwd(), '../../.env'),
-  path.resolve(process.cwd(), '.env.local'),
-  path.resolve(process.cwd(), '../erp-api/.env'),
-]) {
-  if (!fs.existsSync(envPath)) continue;
-  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)\s*$/);
-    if (!match || process.env[match[1]]) continue;
-    process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
-  }
-}
 
 function unwrap<T>(payload: ApiEnvelope<T> | T): T {
   if (payload && typeof payload === 'object' && 'data' in payload) return (payload as ApiEnvelope<T>).data as T;
@@ -253,7 +238,7 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
 test.describe('T12 SIRE completo', () => {
   test.setTimeout(180000);
 
-  test('SIRE refleja ventas CPE y compras CxP por periodo, totales, filtros, descarga y envío SUNAT mock', async ({ page }) => {
+  test('SIRE refleja ventas CPE y compras CxP por periodo, totales, filtros y descarga', async ({ page }) => {
     const browserFailures = await collectBrowserFailures(page);
     await login(page);
     const { headers, tenantId } = await authContext(page);
@@ -357,18 +342,6 @@ test.describe('T12 SIRE completo', () => {
       'filtrar SIRE por periodo tipo estado',
     );
     expect(ventasFiltradas.every((item) => item.tipo === 'REG_VEN' && item.periodo === periodoSire && item.estado === reporteVentasFinal.estado)).toBeTruthy();
-
-    if (reporteVentasFinal.estado === 'GENERADO') {
-      await parseOk<any>(
-        await apiContext.post(api(`/sire/reportes/${reporteVentasFinal.id}/enviar-sunat`)),
-        'enviar SIRE ventas SUNAT mock',
-      );
-      const enviados = await parseOk<any[]>(
-        await apiContext.get(api(`/sire/reportes?periodo=${periodoSire}&tipoReporte=REGISTRO_VENTAS&estado=ENVIADO`)),
-        'listar SIRE enviados',
-      );
-      expect(enviados.some((item) => item.id === reporteVentasFinal.id)).toBeTruthy();
-    }
 
     const stats = await parseOk<any>(await apiContext.get(api('/sire/stats')), 'stats SIRE');
     expect(stats.registrosTotales, 'stats SIRE debe reflejar registros reales').toBeGreaterThan(0);

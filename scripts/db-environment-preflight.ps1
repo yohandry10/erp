@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('DEV', 'PROD')]
+  [ValidateSet('PROD')]
   [string]$Environment,
 
   [string]$EnvFile
@@ -9,13 +9,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$expectedRefs = @{
-  DEV  = 'hbueraexcbowpfnjlppi'
-  PROD = 'wypnbcptofqdmoynlonq'
-}
+$requiredRef = 'wypnbcptofqdmoynlonq'
 
 if (-not $EnvFile) {
-  $EnvFile = if ($Environment -eq 'PROD') { '.env.production' } else { '.env.local' }
+  $EnvFile = '.env.production'
 }
 
 $resolvedEnvFile = if ([System.IO.Path]::IsPathRooted($EnvFile)) {
@@ -35,7 +32,6 @@ Get-Content -LiteralPath $resolvedEnvFile | ForEach-Object {
   }
 }
 
-$requiredRef = $expectedRefs[$Environment]
 if ($values['DEPLOYMENT_ENV'] -ne $Environment) {
   throw "DEPLOYMENT_ENV no coincide: esperado=$Environment"
 }
@@ -55,7 +51,7 @@ if ($actualUrlRef -ne $requiredRef) {
   throw "SUPABASE_URL no apunta al project_ref canonico de $Environment"
 }
 
-if ($Environment -eq 'PROD' -and $values['DEMO_API_ENABLED'] -notin @('true', 'false')) {
+if ($values['DEMO_API_ENABLED'] -notin @('true', 'false')) {
   throw 'PROD requiere DEMO_API_ENABLED=true|false de forma explicita'
 }
 
@@ -81,7 +77,7 @@ $parts = $result.Split('|')
 if ($parts.Count -ne 4 -or $parts[0] -ne $Environment -or $parts[1] -ne $requiredRef -or $parts[3] -ne 'true') {
   throw "La marca interna de la base no coincide o su validador fallo: $result"
 }
-if ($Environment -eq 'PROD' -and $parts[2] -ne $values['DEMO_API_ENABLED']) {
+if ($parts[2] -ne $values['DEMO_API_ENABLED']) {
   throw 'La politica demo de PROD no coincide entre DEMO_API_ENABLED y allow_demo_data'
 }
 

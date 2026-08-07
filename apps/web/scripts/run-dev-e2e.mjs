@@ -1,6 +1,10 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+throw new Error(
+  'E2E remoto DEV está deshabilitado. Use pruebas aisladas; nunca aprovisione datos QA en PROD.',
+);
+
 const webRoot = fileURLToPath(new URL('..', import.meta.url));
 const apiOrigin = process.env.E2E_API_ORIGIN || 'http://localhost:3002';
 const baseUrl = process.env.BASE_URL || 'http://localhost:3001';

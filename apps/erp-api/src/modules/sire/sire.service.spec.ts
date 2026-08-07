@@ -80,9 +80,18 @@ function createService(rowsByTable: Record<string, any[]> = {}) {
   const tenantContext = {
     getTenantId: jest.fn(() => tenantId),
   };
+  const sireApiClient = {
+    aceptarPropuesta: jest.fn(),
+    consultarTicket: jest.fn(),
+  };
 
   return {
-    service: new SireService(supabaseService as any, eventBus as any, tenantContext as any),
+    service: new SireService(
+      supabaseService as any,
+      eventBus as any,
+      tenantContext as any,
+      sireApiClient as any,
+    ),
     queries,
   };
 }
@@ -183,5 +192,20 @@ describe('SireService', () => {
     await expect(
       service.generarContenidoSire({ periodo: 'mayo-2026', tipo: 'REG_VEN', metadata: {} }, tenantId),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rechaza meses fuera del rango calendario', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.generarContenidoSire({ periodo: '2026-13', tipo: 'REG_VEN', metadata: {} }, tenantId),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('no presenta libros distintos de RVIE o RCE como SIRE', () => {
+    const { service } = createService();
+
+    expect(() => (service as any).mapTipoReporte('LIBRO_DIARIO'))
+      .toThrow(BadRequestException);
   });
 });

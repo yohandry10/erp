@@ -1,5 +1,26 @@
 /** @type {import('next').NextConfig} */
 const path = require('path')
+const disabledDevProjectRef = 'hbueraexcbowpfnjlppi'
+const prodProjectRef = 'wypnbcptofqdmoynlonq'
+
+for (const [name, value] of Object.entries({
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+})) {
+  if (String(value || '').includes(disabledDevProjectRef)) {
+    throw new Error(`${name} apunta al proyecto DEV retirado; el build fue bloqueado.`)
+  }
+}
+if (process.env.DEPLOYMENT_ENV && process.env.DEPLOYMENT_ENV !== 'PROD') {
+  throw new Error('El frontend sólo admite DEPLOYMENT_ENV=PROD.')
+}
+if (
+  process.env.EXPECTED_SUPABASE_PROJECT_REF &&
+  process.env.EXPECTED_SUPABASE_PROJECT_REF !== prodProjectRef
+) {
+  throw new Error(`El frontend sólo admite EXPECTED_SUPABASE_PROJECT_REF=${prodProjectRef}.`)
+}
 const isTauriBuild =
   process.env.NODE_ENV === 'production' &&
   (process.env.TAURI_BUILD === '1' || process.env.npm_lifecycle_event === 'build:tauri')

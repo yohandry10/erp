@@ -51,16 +51,24 @@ function preguntar(texto: string, oculto = false): Promise<string> {
 
 async function principal(): Promise<void> {
   const raiz = path.resolve(__dirname, '..');
-  for (const archivo of ['.env.local', '.env']) {
-    cargarEnv({ path: path.join(raiz, archivo) });
-  }
+  cargarEnv({ path: path.resolve(raiz, '../../.env.production') });
+  cargarEnv({ path: path.join(raiz, '.env.production'), override: true });
 
   const url = process.env.SUPABASE_URL;
   const clave = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !clave) {
     throw new Error(
-      'Faltan SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY. Apunte el .env al entorno donde quiere crear el superadmin.',
+      'Faltan SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en .env.production.',
     );
+  }
+
+  const projectRef = new URL(url).hostname.split('.')[0];
+  if (
+    process.env.DEPLOYMENT_ENV !== 'PROD' ||
+    process.env.EXPECTED_SUPABASE_PROJECT_REF !== 'wypnbcptofqdmoynlonq' ||
+    projectRef !== 'wypnbcptofqdmoynlonq'
+  ) {
+    throw new Error('Operación rechazada: crear-superadmin sólo admite PROD wypnbcptofqdmoynlonq.');
   }
 
   console.log(`\nBase de datos: ${url}\n`);

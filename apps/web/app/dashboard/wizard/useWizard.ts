@@ -535,6 +535,15 @@ export function useWizard() {
         }
       }
 
+      if (state.configuration.sire_activo !== false) {
+        if (!state.configuration.sunat_username || !state.configuration.sunat_password) {
+          return false
+        }
+        if (!state.configuration.sunat_gre_client_id || !state.configuration.sunat_gre_client_secret) {
+          return false
+        }
+      }
+
       if (modo === 'OSE_API') {
         if (!state.configuration.ose_activo) {
           return false

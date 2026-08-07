@@ -71,6 +71,7 @@ export interface WizardConfiguration {
   sunat_gre_auth_url?: string
   sunat_gre_client_id?: string
   sunat_gre_client_secret?: string
+  sire_activo?: boolean
   sunat_cert_expected_ruc?: string
   sunat_cert_ruc_mismatch_confirmed?: boolean
   sunat_cert_ruc_mismatch_reason?: string

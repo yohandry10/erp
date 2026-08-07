@@ -641,6 +641,7 @@ export class ConfigurationController {
           sunatUsernameConfigured: !!data.sunat_username,
           sunatGreTransport: data.sunat_gre_transport,
           sunatGreClientConfigured: !!data.sunat_gre_client_id && !!data.sunat_gre_client_secret,
+          sireActivo: data.sire_activo === true,
           // ARCA / Argentina
           arcaActivo: data.arca_activo,
           arcaEnvironment: data.arca_environment,

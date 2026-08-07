@@ -15,7 +15,8 @@ inventario, finanzas, contabilidad, RRHH y cliente desktop offline.
 
 ## Inicio rápido
 
-Requisitos: Node.js 18+, pnpm 9 y variables de entorno de DEV.
+Requisitos: Node.js 18+ y pnpm 9. Las pruebas locales no requieren una base
+remota; el runtime real exige configuración explícita de PROD.
 
 ```powershell
 pnpm install
@@ -37,19 +38,19 @@ pnpm desktop:build
 
 ## Entornos
 
-| Entorno | Supabase               | Uso                    |
-| ------- | ---------------------- | ---------------------- |
-| DEV     | `hbueraexcbowpfnjlppi` | Desarrollo, QA y demos |
-| PROD    | `wypnbcptofqdmoynlonq` | Sólo datos reales      |
+| Entorno | Supabase               | Uso                                      |
+| ------- | ---------------------- | ---------------------------------------- |
+| PROD    | `wypnbcptofqdmoynlonq` | Único destino remoto; sólo datos reales  |
+| DEV     | retirado               | Bloqueado por runtime, scripts y CI      |
 
 No operar una base sin ejecutar primero:
 
 ```powershell
-.\scripts\db-environment-preflight.ps1 -Target DEV
-.\scripts\db-environment-preflight.ps1 -Target PROD
+.\scripts\db-environment-preflight.ps1 -Environment PROD
 ```
 
-Usar únicamente el target autorizado. PROD nunca usa `.env.local`.
+El runtime sólo carga `.env.production` o secretos inyectados. Las pruebas con
+escritura no se ejecutan contra PROD.
 
 ## Documentación
 

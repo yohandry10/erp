@@ -36,13 +36,10 @@ transacción explícita.
 - El backend con service role siempre aplica el tenant de la sesión; nunca acepta
   un tenant arbitrario del body.
 
-Los proyectos de datos son:
-
-- DEV: `hbueraexcbowpfnjlppi`.
-- PROD: `wypnbcptofqdmoynlonq`.
-
-La separación es contractual. Los guards de despliegue, la migración `346` y el
-preflight deben bloquear cualquier cruce.
+El único proyecto remoto operativo es PROD: `wypnbcptofqdmoynlonq`. El antiguo
+DEV `hbueraexcbowpfnjlppi` está retirado: el esquema de entorno, las herramientas
+operativas y CI lo rechazan. Las pruebas con escritura sólo pueden usar dobles o
+una infraestructura local efímera sin datos de clientes.
 
 ## Autenticación y autorización
 
@@ -73,9 +70,8 @@ preflight deben bloquear cualquier cruce.
 - Argentina usa CUIT/ARS/IVA y el adaptador ARCA: firma CMS del TRA para WSAA,
   autorización secuencial y consulta por WSFEv1, CAE y QR. Los códigos WSFE de
   Facturas A/B/C/E/M y sus notas viven en catálogos por país.
-- Las demos son tenants reales de DEV, nacen hidratadas por país y simulan el
-  transporte fiscal; nunca habilitan ARCA/SUNAT productivos ni se permiten en
-  PROD.
+- El aprovisionamiento automático de demos y QA remoto está deshabilitado. No se
+  crean tenants sintéticos en PROD ni se simulan transportes fiscales allí.
 - GRE puede usar Plataforma Nueva REST; un ticket de envío no equivale a CDR
   aceptado.
 - Los rechazos, timeouts y estados asíncronos se registran sin declarar éxito

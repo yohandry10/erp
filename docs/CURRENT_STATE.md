@@ -12,52 +12,56 @@ migraciones verificados, prevalece la implementación actual.
 - El alcance operativo activo es Perú (`PE`, `pais_id=1`, `PEN`, SUNAT),
   Argentina (`AR`, `pais_id=5`, `ARS`, ARCA) y Colombia (`CO`, `pais_id=2`,
   `COP`, DIAN).
-- DEV y PROD son proyectos físicos separados y no intercambiables.
+- PROD `wypnbcptofqdmoynlonq` es el único proyecto remoto operativo. El antiguo
+  DEV está retirado y bloqueado por runtime, scripts y CI.
 - El cierre más reciente del backend reporta 160/160 suites y 1513/1513 pruebas.
 - El cierre Web del 2026-08-07 reporta type-check limpio y build Next 120/120
   rutas; 73 rutas se verificaron en escritorio y móvil (146 casos) y el
   recorrido visible de demos nuevas PE/AR/CO no presentó errores de consola.
-- Nóminas reales de prueba se calcularon y persistieron en DEV: PE
-  `2613.00/339.69/2273.31`, AR `1800000/306000/1494000` y CO
-  `2749095/200000/2549095` (bruto/descuentos/neto). Una mutación deliberada de
-  la tasa colombiana fue detectada por las pruebas antes de restaurarla.
+- Los cálculos de nómina PE/AR/CO conservan cobertura automatizada sin depender
+  de una base remota. Las pruebas con escritura no se ejecutan en PROD.
 - Factura `01`, boleta `03`, nota de crédito `07`, nota de débito `08`, RA y RC
   cuentan con evidencia aceptada en SUNAT beta.
-- Inventario opera en DEV con un único ledger físico por almacén.
+- Inventario usa un único ledger físico por almacén.
 - Desktop/Tauri está implementado como cliente offline-first con SQLite y outbox
   por tenant.
 
 ## Entornos
 
-| Entorno | Proyecto Supabase      | Uso permitido                            |
-| ------- | ---------------------- | ---------------------------------------- |
-| DEV     | `hbueraexcbowpfnjlppi` | Desarrollo, QA, demos y datos sintéticos |
-| PROD    | `wypnbcptofqdmoynlonq` | Únicamente datos reales                  |
+| Entorno | Proyecto Supabase      | Estado                                      |
+| ------- | ---------------------- | ------------------------------------------- |
+| PROD    | `wypnbcptofqdmoynlonq` | Único destino remoto; datos reales          |
+| DEV     | retirado               | Bloqueado; no se usa para desarrollo ni QA  |
 
 Reglas vigentes:
 
 - Nunca ejecutar QA, demos ni seeds sintéticos en PROD.
-- PROD usa `.env.production` o secretos inyectados; nunca `.env.local`.
+- El runtime usa `.env.production` o secretos inyectados; no carga `.env.local`
+  ni `.env`.
+- QA con escritura usa dobles o infraestructura local efímera; nunca PROD.
 - Toda operación DB comienza con `scripts/db-environment-preflight.ps1`.
 - Todo borrado en PROD exige autorización explícita, respaldo, transacción y
   evidencia posterior.
 
-La migración `346__deployment_environment_boundary.sql` está aplicada en ambos
-entornos. PROD fue purgada de datos demo el 2026-07-14 y quedó sin tenants ni
-usuarios de prueba.
+La migración `346__deployment_environment_boundary.sql` está aplicada en PROD.
+PROD fue purgada de datos demo el 2026-07-14 y quedó sin tenants ni usuarios de
+prueba.
 
 ## Migraciones
 
-- `000..346`: baseline y hardening presentes según el esquema verificado. El
-  historial remoto no es comparable entre entornos porque PROD conserva
-  `000..002` como baseline consolidado y DEV registra sólo el tramo reciente.
+- `000..346`: baseline y hardening presentes según el esquema verificado en
+  PROD, que conserva `000..002` como baseline consolidado.
 - `347..382`: sus relaciones, columnas, constraints e índices están presentes
-  en PROD y DEV. No deben reaplicarse a ciegas: el contraste de catálogos del
+  en PROD. No deben reaplicarse a ciegas: el contraste de catálogos del
   2026-08-07 encontró deriva previa en 13 definiciones de funciones y dos
   políticas ajenas al cierre contable, que requiere reconciliación separada.
-- `383..394`: aplicadas y registradas en DEV y PROD. La promoción productiva del
+- `383..394`: aplicadas y registradas en PROD. La promoción productiva del
   2026-08-07 tuvo preflight satisfactorio, respaldo PostgreSQL 17 verificable,
   ensayo transaccional con `ROLLBACK` y aplicación oficial sin seeds ni roles.
+- `395`: aplicada y registrada en PROD el 2026-08-07, después de preflight,
+  respaldo PostgreSQL 17 verificable y ensayo integral con `ROLLBACK`. Añade
+  activación SIRE opt-in por tenant, ticket/estado SUNAT y bitácora RLS; la
+  validación posterior confirmó cero activaciones automáticas y cero operaciones.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -136,6 +140,9 @@ productivo autorizado.
   ticket interno.
 - Recepciones y reservas usan RPC transaccionales e idempotentes.
 - CPE y GRE fallan cerrado ante firma, credenciales o respuesta inválidas.
+- SIRE real sólo puede ejecutarse cuando `EXPECTED_SUPABASE_PROJECT_REF` apunta
+  a PROD. Un ticket queda pendiente y sólo el estado SUNAT `06 Terminado` se
+  presenta como propuesta aceptada; la generación final del libro sigue en SOL.
 - El adaptador fiscal se resuelve por país: SUNAT para PE, ARCA WSAA/WSFEv1
   para AR y DIAN para CO; el modo demo colombiano es explícitamente simulado y
   el caché de contexto web incluye `tenant_id`.
@@ -158,6 +165,10 @@ productivo autorizado.
 - Confirmar que no existan colisiones históricas fiscales antes de resincronizar
   series.
 - Completar secretos productivos y ejecutar smoke controlado.
+- La migración `395` ya está aplicada. Falta que cada contribuyente cargue sus
+  credenciales API SUNAT y active SIRE explícitamente antes de una aceptación
+  controlada RVIE/RCE; no hay smoke real posible sin consentimiento y datos de
+  su período.
 - Confirmar que el PFX está autorizado para el RUC productivo o reemplazarlo.
 - Configurar credenciales GRE REST si el contribuyente emitirá guías.
 - Para un contribuyente argentino real, cargar su certificado X.509 autorizado,
@@ -194,7 +205,7 @@ productivo autorizado.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales verificados hasta `394` en DEV.
+1. Código y migraciones actuales; estado remoto verificado hasta `394` en PROD.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.

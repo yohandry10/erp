@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Building2, KeyRound, PlugZap, Truck } from 'lucide-react'
+import { AlertCircle, BookOpenCheck, Building2, KeyRound, PlugZap, Truck } from 'lucide-react'
 
 import { useWizardContext } from '../WizardContext'
 import { useCountryContext } from '@/hooks/use-country-context'
@@ -56,6 +56,7 @@ export function SunatConfigStep() {
   const dianEnvironment = state.configuration.dian_environment || 'HOMOLOGACION'
   const sunatEnvironment = state.configuration.sunat_environment || 'homologacion'
   const greTransport = state.configuration.sunat_gre_transport || 'soap'
+  const sireActivo = state.configuration.sire_activo !== false
 
   const handleEmisionModoChange = (value: 'SUNAT_DIRECTO' | 'OSE_API' | 'ARCA_WSFE' | 'DIAN_DIRECTO') => {
     updateConfiguration({
@@ -281,7 +282,7 @@ export function SunatConfigStep() {
         </Card>
       ) : null}
 
-      {isPeru && !isOseApi ? (
+      {isPeru ? (
         <>
           <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
             <CardHeader className="border-b border-cyan-400/10">
@@ -348,6 +349,34 @@ export function SunatConfigStep() {
           <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
             <CardHeader className="border-b border-cyan-400/10">
               <CardTitle className="flex items-center gap-2 text-lg text-white">
+                <BookOpenCheck className="h-5 w-5 text-primary" />
+                SIRE — RVIE y RCE
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 p-5">
+              <InfoPanel
+                tone="blue"
+                title="Aceptación real, server-side y con ticket"
+                description="El ERP aceptará la propuesta oficial y consultará el ticket hasta estado Terminado. La generación final del libro continúa en SUNAT Operaciones en Línea."
+              />
+              <label className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-card/70 p-4">
+                <input
+                  type="checkbox"
+                  checked={sireActivo}
+                  onChange={(event) => updateConfiguration({ sire_activo: event.target.checked })}
+                  className="mt-1 h-4 w-4"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-foreground">Habilitar SIRE para esta empresa peruana</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">Requiere usuario SOL secundario y credenciales API SUNAT. Las demos y DEV nunca transmiten.</span>
+                </span>
+              </label>
+            </CardContent>
+          </Card>
+
+          <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
+            <CardHeader className="border-b border-cyan-400/10">
+              <CardTitle className="flex items-center gap-2 text-lg text-white">
                 <Truck className="h-5 w-5 text-primary" />
                 GRE SUNAT
               </CardTitle>
@@ -371,17 +400,17 @@ export function SunatConfigStep() {
                 </Select>
               </div>
 
-              {greTransport === 'rest' ? (
+              {greTransport === 'rest' || sireActivo ? (
                 <>
                   <InfoPanel
                     tone="slate"
-                    title="Credenciales API SUNAT GRE REST"
-                    description="Estas credenciales se obtienen desde SUNAT para la Plataforma Nueva GRE."
+                    title="Credenciales API SUNAT"
+                    description="Se obtienen en Credenciales de API SUNAT y se usan server-side para SIRE y, si corresponde, GRE REST."
                   />
                   <div className={fieldGridClass}>
                     <div>
                       <Label htmlFor="sunat_gre_client_id" className={labelClass}>
-                        Client ID <span className={requiredClass}>*</span>
+                        Client ID API SUNAT <span className={requiredClass}>*</span>
                       </Label>
                       <Input
                         id="sunat_gre_client_id"
@@ -393,7 +422,7 @@ export function SunatConfigStep() {
                     </div>
                     <div>
                       <Label htmlFor="sunat_gre_client_secret" className={labelClass}>
-                        Client secret <span className={requiredClass}>*</span>
+                        Client secret API SUNAT <span className={requiredClass}>*</span>
                       </Label>
                       <Input
                         id="sunat_gre_client_secret"

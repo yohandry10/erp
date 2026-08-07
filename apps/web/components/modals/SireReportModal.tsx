@@ -30,8 +30,6 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
   const [formData, setFormData] = useState({
     tipoReporte: 'REGISTRO_VENTAS',
     periodo: getCurrentPeriod(),
-    fechaInicio: '',
-    fechaFin: '',
     formato: 'TXT',
     incluirAnulados: false
   })
@@ -55,8 +53,6 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
       setFormData({
         tipoReporte: 'REGISTRO_VENTAS',
         periodo: getCurrentPeriod(),
-        fechaInicio: '',
-        fechaFin: '',
         formato: 'TXT',
         incluirAnulados: false
       })
@@ -110,8 +106,6 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
               >
                 <option value="REGISTRO_VENTAS">Registro de Ventas</option>
                 <option value="REGISTRO_COMPRAS">Registro de Compras</option>
-                <option value="LIBROS_ELECTRONICOS">Libros Electrónicos</option>
-                <option value="RETENCIONES">Retenciones</option>
               </select>
             </div>
 
@@ -128,32 +122,6 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
               />
             </div>
 
-            <div className="grid grid-cols-[1fr_1fr] gap-4">
-              <div>
-                <label htmlFor="sire-report-modal-fecha-inicio" className="block mb-2 font-semibold text-foreground/85">
-                  Fecha Inicio
-                </label>
-                <input id="sire-report-modal-fecha-inicio"
-                  type="date"
-                  name="fechaInicio"
-                  value={formData.fechaInicio}
-                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="sire-report-modal-fecha-fin" className="block mb-2 font-semibold text-foreground/85">
-                  Fecha Fin
-                </label>
-                <input id="sire-report-modal-fecha-fin"
-                  type="date"
-                  name="fechaFin"
-                  value={formData.fechaFin}
-                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
-                />
-              </div>
-            </div>
-
             <div>
               <label htmlFor="sire-report-modal-formato" className="block mb-2 font-semibold text-foreground/85">
                 Formato *
@@ -165,8 +133,6 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
                 required className="w-[100%] p-3 border rounded-[6px] text-sm"
               >
                 <option value="TXT">TXT</option>
-                <option value="XML">XML</option>
-                <option value="EXCEL">Excel</option>
               </select>
             </div>
 

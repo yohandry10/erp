@@ -62,6 +62,7 @@ export interface UpdateEmpresaConfigDto {
   sunatGreAuthUrl?: string;
   sunatGreClientId?: string;
   sunatGreClientSecret?: string;
+  sireActivo?: boolean;
   sunatCertExpectedRuc?: string;
   sunatCertRucMismatchConfirmed?: boolean;
   sunatCertRucMismatchReason?: string;

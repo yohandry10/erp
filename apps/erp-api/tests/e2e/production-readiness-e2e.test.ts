@@ -14,6 +14,10 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
+throw new Error(
+  'E2E productivo con escritura retirado: está prohibido crear datos sintéticos en PROD y DEV está deshabilitado.',
+);
+
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), 'apps/web/.env.local'), override: false });
 

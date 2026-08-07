@@ -43,7 +43,14 @@ Código principal: `apps/erp-api/src/modules/pos`,
   representación impresa.
 - Factura, boleta, notas, RA y RC tienen soporte beta verificado.
 - GRE usa transporte configurable y conserva estados asíncronos.
-- SIRE importa, valida y concilia registros por período.
+- SIRE genera una vista local de comparación por período para RVIE y RCE. La
+  aceptación de la propuesta oficial usa la API SUNAT exclusivamente desde el
+  backend, exige `sire_activo`, credenciales SOL/API y la referencia física de
+  PROD; DEV y empresas demo fallan cerrado aunque contengan credenciales.
+- Recibir `numTicket` deja el reporte en `PENDIENTE`; no se informa como
+  aceptado hasta que la consulta oficial devuelve el código `06` (`Terminado`).
+  Cada aceptación y consulta queda en `sire_operaciones` sin tokens ni secretos.
+  La generación final del registro continúa en SUNAT Operaciones en Línea.
 - Todo flujo fiscal falla cerrado ante credenciales, certificado, firma o
   respuesta inválidos.
 
@@ -167,6 +174,8 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   opciones de módulos; el contexto se vuelve a resolver desde el tenant.
 - La configuración fiscal SUNAT/OSE (PE), ARCA WSAA/WSFE (AR) o DIAN (CO) es
   por tenant y cifra secretos; GRE y SIRE sólo están disponibles para Perú.
+  SIRE comparte las credenciales API SUNAT cifradas con GRE REST, pero su
+  activación y su frontera de ejecución son independientes.
 - La demo Perú se crea en PEN, con IGV, RUC/DNI, series F001/B001/T001,
   SUNAT/OSE simulado, GRE/SIRE y flujo logístico habilitado. El PCGE inicial se
   inserta por código sin duplicar cuentas ya existentes.

@@ -17,7 +17,7 @@ interface SireReport {
   tipoReporte: string
   periodo: string
   fechaGeneracion: string
-  estado: 'GENERANDO' | 'GENERADO' | 'ENVIADO' | 'ERROR'
+  estado: 'GENERANDO' | 'GENERADO' | 'PENDIENTE' | 'ENVIADO' | 'ERROR'
   registros: number
   archivo?: string
   observaciones?: string
@@ -25,6 +25,10 @@ interface SireReport {
   filename?: string
   created_at?: string
   total_registros?: number
+  sunat_ticket?: string
+  sunat_estado?: string
+  sunat_codigo_estado?: string
+  sunat_ultima_consulta?: string
 }
 
 interface SireStats {
@@ -40,6 +44,19 @@ interface SireFilters {
   estado: string
 }
 
+interface SireOperation {
+  id: string
+  accion: string
+  estado: string
+  ticket?: string
+  codigo_estado_sunat?: string
+  descripcion_estado_sunat?: string
+  error_code?: string
+  error_message?: string
+  solicitado_at: string
+  completado_at?: string
+}
+
 const inputClass =
   'rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
@@ -51,6 +68,8 @@ const getStatusClass = (estado: string) => {
       return 'border-cyan-300/30 bg-cyan-300/10 text-primary'
     case 'ENVIADO':
       return 'border-blue-300/30 bg-blue-300/10 text-primary dark:text-blue-200'
+    case 'PENDIENTE':
+      return 'border-amber-300/30 bg-amber-300/10 text-amber-700 dark:text-amber-200'
     case 'GENERANDO':
       return 'border-sky-300/30 bg-sky-300/10 text-primary dark:text-sky-200'
     case 'ERROR':
@@ -69,6 +88,8 @@ export default function SIREPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null)
   const [activeSunatSendId, setActiveSunatSendId] = useState<string | null>(null)
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
+  const [operations, setOperations] = useState<SireOperation[]>([])
   const [filters, setFiltersState] = useState<SireFilters>({
     periodo: getCurrentPeriod(),
     tipoReporte: '',
@@ -80,6 +101,7 @@ export default function SIREPage() {
 
   const { get, post, loading } = useApiCall<SireReport[]>()
   const { get: getStats } = useApiCall<SireStats>()
+  const { get: getOperations } = useApiCall<SireOperation[]>()
 
   const updateFilters = useCallback((patch: Partial<SireFilters>) => {
     setFiltersState(prev => {
@@ -196,6 +218,7 @@ export default function SIREPage() {
 
   const sendToSunat = async (reportId: string) => {
     if (activeSunatSendId) return
+    if (!window.confirm('Esta acción aceptará la propuesta oficial RVIE/RCE del período en SUNAT. ¿Deseas continuar?')) return
     setActiveSunatSendId(reportId)
     try {
       const response = await post(`/api/sire/reportes/${reportId}/enviar-sunat`)
@@ -208,12 +231,34 @@ export default function SIREPage() {
     }
   }
 
+  const querySunatTicket = async (reportId: string) => {
+    if (activeSunatSendId) return
+    setActiveSunatSendId(reportId)
+    try {
+      const response = await post(`/api/sire/reportes/${reportId}/consultar-ticket`)
+      if (apiSucceeded(response)) {
+        await loadReports(filtersRef.current)
+        await loadStats()
+      }
+    } finally {
+      setActiveSunatSendId(null)
+    }
+  }
+
+  const viewOperations = async (reportId: string) => {
+    const response = await getOperations(`/api/sire/reportes/${reportId}/operaciones`)
+    setSelectedReportId(reportId)
+    setOperations(apiSucceeded(response) ? unwrapApiArray<SireOperation>(response) : [])
+  }
+
   const getStatusText = (estado: string) => {
     switch (estado) {
       case 'GENERADO':
         return 'Generado'
       case 'ENVIADO':
-        return 'Enviado'
+        return 'Propuesta aceptada'
+      case 'PENDIENTE':
+        return 'Ticket pendiente'
       case 'GENERANDO':
         return 'Generando'
       case 'ERROR':
@@ -262,7 +307,7 @@ export default function SIREPage() {
                 ERP Fiscal Center
               </div>
               <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">SIRE - Sistema de Registros Electrónicos</h1>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Reportes tributarios SUNAT con datos reales del tenant.</p>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Compara los datos del ERP con RVIE/RCE, acepta la propuesta oficial y conserva el ticket SUNAT. La generación final del libro se realiza en SOL.</p>
             </div>
             <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <FileText className="h-4 w-4" />
@@ -275,8 +320,8 @@ export default function SIREPage() {
           {[
             ['Reportes del mes', stats?.reportesDelMes || 0, 'Reportes generados'],
             ['Registros totales', stats?.registrosTotales?.toLocaleString() || '0', 'Transacciones procesadas'],
-            ['Enviados a SUNAT', stats?.enviadosASunat || 0, 'Reportes enviados'],
-            ['Pendientes', stats?.pendientes || 0, 'Por enviar'],
+            ['Aceptados por SUNAT', stats?.enviadosASunat || 0, 'Tickets en estado Terminado'],
+            ['Pendientes', stats?.pendientes || 0, 'Por aceptar o consultar'],
           ].map(([label, value, description]) => (
             <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
               <CardContent className="flex items-start justify-between gap-3 p-4">
@@ -323,8 +368,6 @@ export default function SIREPage() {
               <option value="">Todos los tipos</option>
               <option value="REGISTRO_VENTAS">Registro de Ventas</option>
               <option value="REGISTRO_COMPRAS">Registro de Compras</option>
-              <option value="LIBROS_ELECTRONICOS">Libros Electronicos</option>
-              <option value="RETENCIONES">Retenciones</option>
             </select>
             <select
               value={filters.estado}
@@ -386,6 +429,12 @@ export default function SIREPage() {
                             {report.filename ? (
                               <div className="max-w-md truncate text-xs text-muted-foreground">{report.filename}</div>
                             ) : null}
+                            {report.sunat_ticket ? (
+                              <div className="font-mono text-xs text-primary">Ticket {report.sunat_ticket}</div>
+                            ) : null}
+                            {report.sunat_estado ? (
+                              <div className="text-xs text-muted-foreground">SUNAT: {report.sunat_estado}</div>
+                            ) : null}
                           </div>
                         </td>
                         <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-muted-foreground">
@@ -422,9 +471,21 @@ export default function SIREPage() {
                                   className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500"
                                 >
                                   <Send className="h-4 w-4" />
-                                  {activeSunatSendId === report.id ? 'Enviando...' : 'Enviar'}
+                                  {activeSunatSendId === report.id ? 'Solicitando...' : 'Aceptar propuesta'}
                                 </Button>
                               </>
+                            ) : null}
+                            {report.estado === 'PENDIENTE' ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => querySunatTicket(report.id)}
+                                disabled={activeSunatSendId === report.id}
+                                className="gap-1 bg-amber-600 text-white hover:bg-amber-500"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                {activeSunatSendId === report.id ? 'Consultando...' : 'Consultar ticket'}
+                              </Button>
                             ) : null}
                             {report.estado === 'ENVIADO' ? (
                               <Button
@@ -455,6 +516,15 @@ export default function SIREPage() {
                                 Reintentar
                               </Button>
                             ) : null}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => viewOperations(report.id)}
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              Bitácora
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -465,6 +535,37 @@ export default function SIREPage() {
             )}
           </CardContent>
         </Card>
+
+        {selectedReportId ? (
+          <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
+            <CardHeader className="flex-row items-center justify-between border-b border-cyan-400/10 px-5 py-4">
+              <CardTitle className="text-base text-foreground">Bitácora SUNAT del reporte</CardTitle>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedReportId(null)}>Cerrar</Button>
+            </CardHeader>
+            <CardContent className="p-4">
+              {operations.length ? (
+                <div className="space-y-2">
+                  {operations.map((operation) => (
+                    <div key={operation.id} className="rounded-xl border border-cyan-400/10 bg-card/60 p-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-foreground">{operation.accion.replaceAll('_', ' ')}</span>
+                        <span className="rounded-full border border-cyan-400/20 px-2 py-0.5 text-xs">{operation.estado}</span>
+                      </div>
+                      <div className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                        <span>{new Date(operation.solicitado_at).toLocaleString('es-PE')}</span>
+                        <span>{operation.ticket ? `Ticket ${operation.ticket}` : 'Sin ticket'}</span>
+                        {operation.descripcion_estado_sunat ? <span>SUNAT: {operation.descripcion_estado_sunat}</span> : null}
+                        {operation.error_message ? <span className="text-red-500">{operation.error_code}: {operation.error_message}</span> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Todavía no hay operaciones SUNAT para este reporte.</p>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
 
       <SireReportModal

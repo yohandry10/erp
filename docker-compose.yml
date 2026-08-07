@@ -38,9 +38,9 @@ services:
     ports:
       - "${API_HOST_PORT:-13002}:3002"
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV:-DEV}
-      - EXPECTED_SUPABASE_PROJECT_REF=${EXPECTED_SUPABASE_PROJECT_REF:-hbueraexcbowpfnjlppi}
+      - NODE_ENV=${NODE_ENV:-production}
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV:-PROD}
+      - EXPECTED_SUPABASE_PROJECT_REF=${EXPECTED_SUPABASE_PROJECT_REF:-wypnbcptofqdmoynlonq}
       - DEMO_API_ENABLED=${DEMO_API_ENABLED:-false}
       - PORT=3002
       - SUPABASE_URL=${SUPABASE_URL}
