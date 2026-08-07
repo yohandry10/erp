@@ -14,8 +14,8 @@ migraciones verificados, prevalece la implementación actual.
   `COP`, DIAN).
 - PROD `wypnbcptofqdmoynlonq` es el único proyecto remoto operativo. El antiguo
   DEV está retirado y bloqueado por runtime, scripts y CI.
-- El cierre más reciente del backend reporta 160/160 suites y 1513/1513 pruebas.
-- El cierre Web del 2026-08-07 reporta type-check limpio y build Next 120/120
+- El cierre más reciente del backend reporta 163/163 suites y 1533/1533 pruebas.
+- El cierre Web del 2026-08-07 reporta type-check limpio y build Next 121/121
   rutas; 73 rutas se verificaron en escritorio y móvil (146 casos) y el
   recorrido visible de demos nuevas PE/AR/CO no presentó errores de consola.
 - Los cálculos de nómina PE/AR/CO conservan cobertura automatizada sin depender
@@ -62,6 +62,11 @@ prueba.
   respaldo PostgreSQL 17 verificable y ensayo integral con `ROLLBACK`. Añade
   activación SIRE opt-in por tenant, ticket/estado SUNAT y bitácora RLS; la
   validación posterior confirmó cero activaciones automáticas y cero operaciones.
+- `396`: aplicada y registrada en PROD el 2026-08-07 después de preflight,
+  respaldo PostgreSQL 17 verificable y ensayo transaccional con `ROLLBACK`.
+  Añade borradores mensuales versionados de IGV/Renta Perú, fuentes auditables
+  y registro de constancia externa; la validación confirmó cero declaraciones
+  creadas por la migración.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -100,6 +105,8 @@ Cambios recientes principales:
   distribución, devengos, depreciaciones, bajas y transiciones de borrador.
 - `393..394`: consolidación multiempresa con aceptación, tasas tipificadas,
   ajustes sin alterar libros, mapeo de cuentas y reportes configurables seguros.
+- `396`: IGV/Renta mensual Perú para NRUS, RER, RMT y General, con cálculo
+  server-side, advertencias, versionado y constancia SUNAT externa.
 
 ## Flujos cerrados técnicamente
 
@@ -205,7 +212,7 @@ productivo autorizado.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `394` en PROD.
+1. Código y migraciones actuales; estado remoto verificado hasta `396` en PROD.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.

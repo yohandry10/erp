@@ -50,7 +50,7 @@ export function FiscalConfigStep() {
                   <option value="GENERAL">Régimen General (IGV %)</option>
                   <option value="MYPE">Régimen MYPE Tributario</option>
                   <option value="RER">RER (%)</option>
-                  <option value="RUS">RUS</option>
+                  <option value="NRUS">Nuevo RUS (NRUS)</option>
                 </select>
                 {errors.regimen_tributario && (
                   <p className="text-xs text-red-500 mt-1">

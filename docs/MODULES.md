@@ -127,6 +127,16 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - Los reportes configurables admiten líneas por prefijos de cuentas y fórmulas
   entre líneas, con alcance de período o acumulado. Las fórmulas son estructuras
   validadas con detección de ciclos; nunca SQL suministrado por el usuario.
+- `Contabilidad > Impuestos Perú` prepara el borrador mensual de IGV y renta
+  para NRUS, RER, RMT y Régimen General. Ventas salen de CPE, compras de CxP y
+  los créditos manuales quedan en una versión con corte y conteos de origen.
+- El cálculo aplica IGV, saldos, retenciones y percepciones; NRUS categoriza las
+  cuotas S/ 20 y S/ 50, RER calcula 1,5 %, RMT usa 1 % hasta 300 UIT y luego el
+  mayor entre coeficiente y 1,5 %, y General usa el mayor entre coeficiente y
+  1,5 %. El parámetro 2026 usa UIT S/ 5.500.
+- Este espacio no presenta FV 621 ni FV 1611. El contador contrasta contra
+  RVIE/RCE, presenta en SUNAT y registra la constancia externa; cada corrección
+  crea otra versión y conserva el historial.
 
 Código principal: `apps/erp-api/src/modules/contabilidad`.
 
@@ -191,7 +201,8 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   documentos permanece fail-closed hasta disponer de SOAP WS-Security/XAdES
   homologado; nunca se interpreta una respuesta JSON ficticia como aceptación.
 - ADMIN normal y ADMIN demo tienen contratos de permisos distintos.
-- Demo sólo se habilita en DEV mediante bandera explícita.
+- Las pruebas gratuitas viven en PROD con política explícita y datos aislados;
+  no habilitan transmisiones fiscales reales. DEV está retirado y bloqueado.
 
 Código principal: `apps/erp-api/src/modules/auth`,
 `apps/erp-api/src/modules/tenants`, `apps/erp-api/src/modules/configuracion`.

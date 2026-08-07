@@ -49,7 +49,7 @@ export interface WizardConfiguration {
   umbral_gre_automatico?: number
   // Configuración Fiscal
   regimen_tributario?:
-    | 'GENERAL' | 'MYPE' | 'RER' | 'RUS'
+    | 'GENERAL' | 'MYPE' | 'RER' | 'NRUS'
     | 'RESPONSABLE_INSCRIPTO' | 'MONOTRIBUTO' | 'EXENTO' | 'NO_RESPONSABLE'
   igv_porcentaje?: number
   retencion_renta_porcentaje?: number

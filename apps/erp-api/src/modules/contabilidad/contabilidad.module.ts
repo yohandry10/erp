@@ -40,6 +40,8 @@ import { DiferidosService } from "./services/diferidos.service";
 import { ContabilidadAnaliticaController } from "./controllers/contabilidad-analitica.controller";
 import { ConsolidacionReportesService } from "./services/consolidacion-reportes.service";
 import { ContabilidadConsolidacionController } from "./controllers/contabilidad-consolidacion.controller";
+import { TributosMensualesService } from "./services/tributos-mensuales.service";
+import { ContabilidadTributosController } from "./controllers/contabilidad-tributos.controller";
 
 @Module({
   imports: [
@@ -63,6 +65,7 @@ import { ContabilidadConsolidacionController } from "./controllers/contabilidad-
     ContabilidadConciliacionController,
     ContabilidadAnaliticaController,
     ContabilidadConsolidacionController,
+    ContabilidadTributosController,
   ],
   providers: [
     EstadosFinancierosService,
@@ -86,6 +89,7 @@ import { ContabilidadConsolidacionController } from "./controllers/contabilidad-
     DistribucionAnaliticaService,
     DiferidosService,
     ConsolidacionReportesService,
+    TributosMensualesService,
     {
       provide: "EstadosFinancierosService",
       useExisting: EstadosFinancierosService,
@@ -110,6 +114,7 @@ import { ContabilidadConsolidacionController } from "./controllers/contabilidad-
     DistribucionAnaliticaService,
     DiferidosService,
     ConsolidacionReportesService,
+    TributosMensualesService,
   ],
 })
 export class ContabilidadModule {}
