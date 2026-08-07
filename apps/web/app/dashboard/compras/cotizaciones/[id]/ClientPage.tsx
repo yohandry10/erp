@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import toast from 'react-hot-toast'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 import {
   ArrowLeft,
   Edit,
@@ -106,6 +108,8 @@ export default function CotizacionDetallePage() {
   const router = useRouter()
   const params = useParams()
   const { get, post } = useApi()
+  const { currency, taxIdLabel } = useLocalizedMoney()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const cotizacionId = params.id as string
 
   const [cotizacion, setCotizacion] = useState<CotizacionDetalle | null>(null)
@@ -251,7 +255,7 @@ export default function CotizacionDetallePage() {
   const puedeRechazar = estado === 'ENVIADA'
   const puedeConvertir = estado === 'APROBADA' && !cotizacion.orden_compra_id && !isVencida
   const detalles = Array.isArray(cotizacion.detalles) ? cotizacion.detalles : []
-  const moneda = cotizacion.moneda || 'PEN'
+  const moneda = cotizacion.moneda || currency
 
   return (
     <div className={pageClass}>
@@ -340,7 +344,7 @@ export default function CotizacionDetallePage() {
               <p className={valueClass}>{cotizacion.proveedores?.razon_social || 'N/A'}</p>
             </div>
             <div>
-              <label className={labelClass}>RUC</label>
+              <label className={labelClass}>{taxIdLabel}</label>
               <p className={valueClass}>{cotizacion.proveedores?.ruc || 'N/A'}</p>
             </div>
             {cotizacion.proveedores?.email && (
@@ -396,7 +400,7 @@ export default function CotizacionDetallePage() {
             <span className="font-semibold text-foreground">{moneda} {toNumber(cotizacion.subtotal).toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">IGV (18%):</span>
+            <span className="text-muted-foreground">{nombreImpuesto} ({Math.round(tasaIgv * 100)}%):</span>
             <span className="font-semibold text-foreground">{moneda} {toNumber(cotizacion.igv).toFixed(2)}</span>
           </div>
           <div className="flex justify-between border-t border-blue-400/20 pt-2 text-lg">

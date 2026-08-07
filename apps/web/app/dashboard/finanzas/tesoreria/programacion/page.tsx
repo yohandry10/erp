@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
   Calendar,
   Filter,
@@ -74,6 +75,7 @@ const URGENCIA_CONFIG = {
 }
 
 export default function ProgramacionPagosPage() {
+  const { currency, locale, formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
   const { get } = useApi()
 
@@ -127,16 +129,12 @@ export default function ProgramacionPagosPage() {
     loadProgramacion()
   }, [loadProgramacion])
 
-  const formatCurrency = (amount: number, moneda: string = 'PEN') => {
-    const currency = moneda === 'USD' ? 'USD' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount)
+  const formatCurrency = (amount: number, moneda: string = currency) => {
+    return formatLocalizedCurrency(amount, moneda)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return new Date(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -195,7 +193,7 @@ export default function ProgramacionPagosPage() {
 
   // Estadísticas
   const totalPorPagarPEN = pagos
-    .filter(p => p.moneda === 'PEN')
+    .filter(p => p.moneda === currency)
     .reduce((sum, p) => sum + p.saldo, 0)
 
   const totalPorPagarUSD = pagos
@@ -247,13 +245,13 @@ export default function ProgramacionPagosPage() {
       <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-5 grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]">
         <div className="relative min-h-36 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
           <div className="flex items-start justify-between gap-4 [&_h3]:m-0 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:uppercase [&_h3]:tracking-[0.06em] [&_h3]:text-muted-foreground">
-            <h3>TOTAL POR PAGAR (PEN)</h3>
+            <h3>TOTAL POR PAGAR ({currency})</h3>
           </div>
           <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-2xl text-red-500">
-            {formatCurrency(totalPorPagarPEN, 'PEN')}
+            {formatCurrency(totalPorPagarPEN, currency)}
           </div>
           <div className="mt-2 text-[0.8125rem] text-muted-foreground">
-            {pagos.filter(p => p.moneda === 'PEN').length} pago(s)
+            {pagos.filter(p => p.moneda === currency).length} pago(s)
           </div>
         </div>
 
@@ -445,7 +443,7 @@ export default function ProgramacionPagosPage() {
                             {pago.proveedor?.razon_social || 'N/A'}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            RUC: {pago.proveedor?.ruc || 'N/A'}
+                            {taxIdLabel}: {pago.proveedor?.ruc || 'N/A'}
                           </div>
                         </td>
                         <td className="p-4">

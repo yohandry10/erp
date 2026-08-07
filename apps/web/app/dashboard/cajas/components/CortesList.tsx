@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils'
 import { useApi } from '@/hooks/use-api';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/lib/api-fetch';
+import { useCountryContext } from '@/hooks/use-country-context';
+import { useTaxConfig } from '@/hooks/useTaxConfig';
 
 type Corte = {
   id: string;
@@ -36,6 +38,9 @@ interface Props {
 export function CortesList({ className = '', id }: Props) {
   const { get } = useApi();
   const { session } = useAuth();
+  const country = useCountryContext();
+  const { nombreImpuesto } = useTaxConfig();
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
   const [cortes, setCortes] = useState<Corte[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -208,7 +213,7 @@ export function CortesList({ className = '', id }: Props) {
               <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Fecha</th>
               <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Caja</th>
               <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Ventas</th>
-              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">IGV</th>
+              <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">{nombreImpuesto}</th>
               <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Docs</th>
               <th className="text-left text-xs text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Acciones</th>
             </tr>
@@ -218,8 +223,8 @@ export function CortesList({ className = '', id }: Props) {
               <tr key={corte.id} className="bg-[var(--bg-card,_#fff)]">
                 <td>{formatearFecha(corte.fecha_corte)}</td>
                 <td>{corte.caja_id ?? 'Caja'}</td>
-                <td className="py-3 px-4 text-sm text-[var(--text-primary,_#111827)] border-b">S/ {(corte.total_ventas ?? corte.resumen_fiscal?.total ?? 0).toFixed(2)}</td>
-                <td>S/ {(corte.total_impuestos ?? corte.resumen_fiscal?.igv ?? 0).toFixed(2)}</td>
+                <td className="py-3 px-4 text-sm text-[var(--text-primary,_#111827)] border-b">{currencySymbol} {(corte.total_ventas ?? corte.resumen_fiscal?.total ?? 0).toFixed(2)}</td>
+                <td>{currencySymbol} {(corte.total_impuestos ?? corte.resumen_fiscal?.igv ?? 0).toFixed(2)}</td>
                 <td>{corte.total_documentos ?? corte.resumen_fiscal?.cantidad_boletas ?? 0}</td>
                 <td className="flex gap-2">
                   <button

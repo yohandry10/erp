@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
 import { TransaccionHistorial } from '@/types/ventas'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface HistorialTransaccionesProps {
   transacciones: TransaccionHistorial[]
@@ -15,6 +16,7 @@ export default function HistorialTransacciones({
   transacciones,
   className = ''
 }: HistorialTransaccionesProps) {
+  const country = useCountryContext()
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString)
@@ -25,9 +27,9 @@ export default function HistorialTransacciones({
   }
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN'
+      currency: country.moneda || 'PEN'
     }).format(value)
   }
 

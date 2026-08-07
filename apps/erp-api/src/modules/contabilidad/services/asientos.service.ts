@@ -1,7 +1,25 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { ListarAsientosQueryDto, AsientoResponseDto, DetalleAsientoDto, CreateAsientoManualDto } from '@erp-suite/dtos';
+import {
+  ListarAsientosQueryDto,
+  AsientoResponseDto,
+  DetalleAsientoDto,
+  CreateAsientoManualDto,
+  UpdateAsientoManualDto,
+  ReversarAsientoDto,
+  EstadoAsiento
+} from '@erp-suite/dtos';
 import { PeriodosService } from './periodos.service';
+
+interface CrearAsientoManualOpciones {
+  sourceEventId?: string;
+  origen?: string;
+  tipoAsiento?: string;
+  plantillaId?: string;
+  plantillaPeriodo?: string;
+  plantillaGeneradoPor?: string;
+  plantillaAutomatico?: boolean;
+}
 
 @Injectable()
 export class AsientosService {
@@ -199,8 +217,20 @@ export class AsientosService {
       // Obtener detalles del asiento
       const detalles = await this.obtenerDetallesAsiento(tenantId, asientoId);
 
+      // Trazabilidad en el sentido inverso: si este asiento ya fue reversado,
+      // la ficha debe poder enlazar al contra-asiento sin que el cliente lo
+      // tenga que buscar.
+      const { data: reversion } = await this.supabaseService
+        .getClient()
+        .from('asientos_contables')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('reversion_de_asiento_id', asientoId)
+        .maybeSingle();
+
       return {
         ...asiento,
+        reversado_por_asiento_id: reversion?.id ?? undefined,
         detalles
       } as AsientoResponseDto;
     } catch (error) {
@@ -219,7 +249,8 @@ export class AsientosService {
   async crearAsientoManual(
     tenantId: string,
     userId: string,
-    createAsientoDto: CreateAsientoManualDto
+    createAsientoDto: CreateAsientoManualDto,
+    opciones: CrearAsientoManualOpciones = {}
   ): Promise<AsientoResponseDto> {
     try {
       this.logger.log(`📝 Creando asiento manual para tenant ${tenantId}`);
@@ -228,95 +259,47 @@ export class AsientosService {
       const fecha = new Date(createAsientoDto.fecha);
       await this.periodosService.validarPeriodoAbierto(tenantId, fecha);
 
-      // Validar que el asiento cuadre (debe = haber)
-      const totalDebe = createAsientoDto.detalles.reduce((sum, d) => sum + d.debe, 0);
-      const totalHaber = createAsientoDto.detalles.reduce((sum, d) => sum + d.haber, 0);
-      const totalDebeCents = Math.round(totalDebe * 100);
-      const totalHaberCents = Math.round(totalHaber * 100);
+      const { totalDebe, totalHaber } = await this.validarContenidoAsiento(
+        tenantId,
+        createAsientoDto.detalles
+      );
 
-      if (totalDebeCents !== totalHaberCents) {
-        throw new BadRequestException(
-          `El asiento no cuadra: Debe=${totalDebe.toFixed(2)}, Haber=${totalHaber.toFixed(2)}`
-        );
-      }
+      // BORRADOR permite corregir antes de fijar el asiento en el libro. Se
+      // mantiene CONFIRMADO por defecto para no alterar el comportamiento de
+      // los clientes que ya crean asientos sin declarar estado.
+      const estadoInicial =
+        createAsientoDto.estado === EstadoAsiento.BORRADOR
+          ? EstadoAsiento.BORRADOR
+          : EstadoAsiento.CONFIRMADO;
 
-      // Validar que haya al menos 2 detalles
-      if (createAsientoDto.detalles.length < 2) {
-        throw new BadRequestException('El asiento debe tener al menos 2 movimientos (debe y haber)');
-      }
-
-      // Validar que cada detalle tenga solo debe o haber, no ambos
-      for (const detalle of createAsientoDto.detalles) {
-        if (detalle.debe > 0 && detalle.haber > 0) {
-          throw new BadRequestException('Cada movimiento debe tener solo debe o haber, no ambos');
-        }
-        if (detalle.debe === 0 && detalle.haber === 0) {
-          throw new BadRequestException('Cada movimiento debe tener un monto mayor a cero');
-        }
-      }
-
-      // Validar que las cuentas existan
-      const cuentaIds = createAsientoDto.detalles.map(d => d.cuenta_id);
-      const { data: cuentas, error: cuentasError } = await this.supabaseService
-        .getClient()
-        .from('plan_cuentas')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .in('id', cuentaIds);
-
-      if (cuentasError) {
-        throw new Error(`Error validando cuentas: ${cuentasError.message}`);
-      }
-
-      if (!cuentas || cuentas.length !== cuentaIds.length) {
-        throw new BadRequestException('Una o más cuentas no existen o no pertenecen a su organización');
-      }
-
-      // Crear asiento contable
+      const confirmadoEn =
+        estadoInicial === EstadoAsiento.CONFIRMADO ? new Date().toISOString() : null;
       const { data: asiento, error: asientoError } = await this.supabaseService
         .getClient()
-        .from('asientos_contables')
-        .insert({
-          tenant_id: tenantId,
-          fecha: fecha.toISOString(),
-          concepto: createAsientoDto.concepto,
-          referencia: createAsientoDto.referencia,
-          total_debe: totalDebe,
-          total_haber: totalHaber,
-          estado: 'CONFIRMADO'
-        })
-        .select()
-        .single();
+        .rpc('crear_asiento_con_detalles_tx', {
+          p_tenant_id: tenantId,
+          p_asiento: {
+            fecha: fecha.toISOString(),
+            concepto: createAsientoDto.concepto,
+            referencia: createAsientoDto.referencia ?? null,
+            estado: estadoInicial,
+            source_event_id: opciones.sourceEventId ?? null,
+            origen: opciones.origen ?? null,
+            tipo_asiento: opciones.tipoAsiento ?? null,
+            plantilla_id: opciones.plantillaId ?? null,
+            plantilla_periodo: opciones.plantillaPeriodo ?? null,
+            plantilla_generado_por: opciones.plantillaGeneradoPor ?? null,
+            plantilla_automatico: opciones.plantillaAutomatico ?? false,
+            created_by: userId,
+            confirmado_por: estadoInicial === EstadoAsiento.CONFIRMADO ? userId : null,
+            confirmado_en: confirmadoEn
+          },
+          p_detalles: createAsientoDto.detalles
+        });
 
       if (asientoError) {
         this.logger.error(`❌ Error creando asiento: ${asientoError.message}`);
         throw new Error(`Error creando asiento contable: ${asientoError.message}`);
-      }
-
-      // Crear detalles del asiento
-      const detallesConAsientoId = createAsientoDto.detalles.map(detalle => ({
-        asiento_id: asiento.id,
-        cuenta_id: detalle.cuenta_id,
-        debe: detalle.debe,
-        haber: detalle.haber,
-        concepto: detalle.concepto,
-        centro_costo_id: detalle.centro_costo_id
-      }));
-
-      const { error: detallesError } = await this.supabaseService
-        .getClient()
-        .from('detalle_asientos')
-        .insert(detallesConAsientoId);
-
-      if (detallesError) {
-        this.logger.error(`❌ Error creando detalles: ${detallesError.message}`);
-        // Rollback: eliminar asiento
-        await this.supabaseService
-          .getClient()
-          .from('asientos_contables')
-          .delete()
-          .eq('id', asiento.id);
-        throw new Error(`Error creando detalles del asiento: ${detallesError.message}`);
       }
 
       this.logger.log(
@@ -328,6 +311,334 @@ export class AsientosService {
     } catch (error) {
       this.logger.error(`❌ Error creando asiento manual: ${error.message}`);
       throw error;
+    }
+  }
+
+  /**
+   * Reemplaza el contenido de un asiento en BORRADOR.
+   * Un asiento CONFIRMADO es inmutable: la única corrección válida es reversarlo.
+   */
+  async actualizarAsientoBorrador(
+    tenantId: string,
+    userId: string,
+    asientoId: string,
+    updateDto: UpdateAsientoManualDto
+  ): Promise<AsientoResponseDto> {
+    const asiento = await this.obtenerAsientoEditable(tenantId, asientoId, 'actualizar');
+
+    const fecha = new Date(updateDto.fecha);
+    await this.periodosService.validarPeriodoAbierto(tenantId, fecha);
+
+    const { totalDebe, totalHaber } = await this.validarContenidoAsiento(
+      tenantId,
+      updateDto.detalles
+    );
+
+    const { error: updateError } = await this.supabaseService
+      .getClient()
+      .rpc('actualizar_asiento_borrador_tx', {
+        p_tenant_id: tenantId,
+        p_asiento_id: asiento.id,
+        p_asiento: {
+          fecha: fecha.toISOString(),
+          concepto: updateDto.concepto,
+          referencia: updateDto.referencia ?? null,
+          total_debe: totalDebe,
+          total_haber: totalHaber
+        },
+        p_detalles: updateDto.detalles
+      });
+
+    if (updateError) {
+      throw new Error(`Error actualizando asiento: ${updateError.message}`);
+    }
+
+    this.logger.log(`✏️ Asiento borrador ${asientoId} actualizado por ${userId}`);
+    return await this.obtenerAsientoPorId(tenantId, asiento.id);
+  }
+
+  /**
+   * Elimina un asiento en BORRADOR. Nunca toca asientos que ya están en el libro.
+   */
+  async eliminarAsientoBorrador(tenantId: string, asientoId: string): Promise<void> {
+    const asiento = await this.obtenerAsientoEditable(tenantId, asientoId, 'eliminar');
+
+    const { error } = await this.supabaseService
+      .getClient()
+      .rpc('eliminar_asiento_borrador_tx', {
+        p_tenant_id: tenantId,
+        p_asiento_id: asiento.id
+      });
+
+    if (error) {
+      throw new Error(`Error eliminando asiento borrador: ${error.message}`);
+    }
+
+    this.logger.log(`🗑️ Asiento borrador ${asientoId} eliminado`);
+  }
+
+  /**
+   * BORRADOR → CONFIRMADO. A partir de aquí el asiento entra en los libros y
+   * en los estados financieros.
+   */
+  async confirmarAsiento(
+    tenantId: string,
+    userId: string,
+    asientoId: string
+  ): Promise<AsientoResponseDto> {
+    const asiento = await this.obtenerAsientoEditable(tenantId, asientoId, 'confirmar');
+
+    await this.periodosService.validarPeriodoAbierto(tenantId, new Date(asiento.fecha));
+
+    // Se revalida el cuadre contra los detalles reales, no contra los totales
+    // almacenados: es la última barrera antes de que el asiento sea inmutable.
+    const detalles = await this.obtenerDetallesAsiento(tenantId, asientoId);
+    await this.validarContenidoAsiento(
+      tenantId,
+      detalles.map(d => ({
+        cuenta_id: d.cuenta_id,
+        debe: d.debe,
+        haber: d.haber,
+        concepto: d.concepto,
+        centro_costo_id: d.centro_costo_id
+      }))
+    );
+
+    const { error } = await this.supabaseService
+      .getClient()
+      .rpc('transicionar_asiento_borrador_tx', {
+        p_tenant_id: tenantId,
+        p_asiento_id: asientoId,
+        p_destino: EstadoAsiento.CONFIRMADO,
+        p_actor: userId,
+        p_motivo: null
+      });
+
+    if (error) {
+      throw new Error(`Error confirmando asiento: ${error.message}`);
+    }
+
+    this.logger.log(`✅ Asiento ${asientoId} confirmado por ${userId}`);
+    return await this.obtenerAsientoPorId(tenantId, asientoId);
+  }
+
+  /**
+   * BORRADOR → ANULADO. Descarta un borrador conservando el rastro, para los
+   * casos en que borrarlo perdería información de auditoría.
+   */
+  async anularAsientoBorrador(
+    tenantId: string,
+    userId: string,
+    asientoId: string,
+    motivo: string
+  ): Promise<AsientoResponseDto> {
+    const asiento = await this.obtenerAsientoEditable(tenantId, asientoId, 'anular');
+
+    const { error } = await this.supabaseService
+      .getClient()
+      .rpc('transicionar_asiento_borrador_tx', {
+        p_tenant_id: tenantId,
+        p_asiento_id: asiento.id,
+        p_destino: EstadoAsiento.ANULADO,
+        p_actor: userId,
+        p_motivo: motivo
+      });
+
+    if (error) {
+      throw new Error(`Error anulando asiento: ${error.message}`);
+    }
+
+    this.logger.log(`🚫 Asiento borrador ${asientoId} anulado por ${userId}`);
+    return await this.obtenerAsientoPorId(tenantId, asientoId);
+  }
+
+  /**
+   * Crea el contra-asiento de uno CONFIRMADO. El original permanece intacto en
+   * el libro; la corrección es un asiento nuevo con debe y haber invertidos.
+   */
+  async reversarAsiento(
+    tenantId: string,
+    userId: string,
+    asientoId: string,
+    reversarDto: ReversarAsientoDto = {}
+  ): Promise<AsientoResponseDto> {
+    const original = await this.obtenerAsientoPorId(tenantId, asientoId);
+
+    if (this.normalizarEstado(original.estado) !== EstadoAsiento.CONFIRMADO) {
+      throw new BadRequestException(
+        `Solo se puede reversar un asiento CONFIRMADO. El asiento ${asientoId} está en estado ${original.estado}.`
+      );
+    }
+
+    if (original.reversado_por_asiento_id) {
+      throw new BadRequestException(
+        `El asiento ${asientoId} ya fue reversado por el asiento ${original.reversado_por_asiento_id}.`
+      );
+    }
+
+    const detalles = original.detalles ?? [];
+    if (detalles.length === 0) {
+      throw new BadRequestException(
+        `El asiento ${asientoId} no tiene detalles: no hay nada que reversar.`
+      );
+    }
+
+    // Por defecto se reversa en la fecha del original. Si ese período ya está
+    // cerrado, el contador debe indicar una fecha en un período abierto.
+    const fechaReversion = reversarDto.fecha
+      ? new Date(reversarDto.fecha)
+      : new Date(original.fecha);
+    await this.periodosService.validarPeriodoAbierto(tenantId, fechaReversion);
+
+    const numeroOriginal = original.numero_asiento ?? original.id;
+    const concepto = reversarDto.motivo
+      ? `Reversión de ${numeroOriginal}: ${reversarDto.motivo}`
+      : `Reversión de ${numeroOriginal}: ${original.concepto}`;
+
+    const { data: reversion, error: reversionError } = await this.supabaseService
+      .getClient()
+      .rpc('crear_asiento_con_detalles_tx', {
+        p_tenant_id: tenantId,
+        p_asiento: {
+          fecha: fechaReversion.toISOString(),
+          concepto,
+          referencia: original.referencia ? `REV-${original.referencia}` : `REV-${numeroOriginal}`,
+          estado: EstadoAsiento.CONFIRMADO,
+          reversion_de_asiento_id: original.id,
+          created_by: userId,
+          confirmado_por: userId,
+          confirmado_en: new Date().toISOString()
+        },
+        p_detalles: detalles.map(d => ({
+          cuenta_id: d.cuenta_id,
+          debe: d.haber,
+          haber: d.debe,
+          concepto: `Reversión: ${d.concepto}`,
+          centro_costo_id: d.centro_costo_id
+        }))
+      });
+
+    if (reversionError || !reversion) {
+      // El índice único ux_asientos_contables_reversion_unica es la defensa
+      // real contra dos reversiones simultáneas del mismo asiento.
+      if (reversionError?.code === '23505') {
+        throw new BadRequestException(`El asiento ${asientoId} ya fue reversado.`);
+      }
+      throw new Error(`Error creando asiento de reversión: ${reversionError?.message}`);
+    }
+
+    this.logger.log(
+      `↩️ Asiento ${asientoId} reversado por ${userId} mediante el asiento ${reversion.id}`
+    );
+    return await this.obtenerAsientoPorId(tenantId, reversion.id);
+  }
+
+  /**
+   * Carga un asiento y exige que esté en BORRADOR para la operación pedida.
+   */
+  private async obtenerAsientoEditable(
+    tenantId: string,
+    asientoId: string,
+    operacion: string
+  ): Promise<AsientoResponseDto> {
+    const asiento = await this.obtenerAsientoPorId(tenantId, asientoId);
+    const estado = this.normalizarEstado(asiento.estado);
+
+    if (estado !== EstadoAsiento.BORRADOR) {
+      const salida =
+        estado === EstadoAsiento.CONFIRMADO
+          ? 'Un asiento confirmado es inmutable: use la reversión para corregirlo.'
+          : 'Un asiento anulado es un estado final.';
+      throw new BadRequestException(
+        `No se puede ${operacion} el asiento ${asientoId} porque está en estado ${asiento.estado}. ${salida}`
+      );
+    }
+
+    return asiento;
+  }
+
+  private normalizarEstado(estado?: string): string {
+    return (estado ?? EstadoAsiento.BORRADOR).toString().trim().toUpperCase();
+  }
+
+  /**
+   * Reglas de partida doble comunes a la creación, la edición y la confirmación.
+   * Devuelve los totales ya calculados para no recorrer los detalles dos veces.
+   */
+  private async validarContenidoAsiento(
+    tenantId: string,
+    detalles: Array<{ cuenta_id: string; debe: number; haber: number; centro_costo_id?: string }>
+  ): Promise<{ totalDebe: number; totalHaber: number }> {
+    if (detalles.length < 2) {
+      throw new BadRequestException('El asiento debe tener al menos 2 movimientos (debe y haber)');
+    }
+
+    for (const detalle of detalles) {
+      if (detalle.debe > 0 && detalle.haber > 0) {
+        throw new BadRequestException('Cada movimiento debe tener solo debe o haber, no ambos');
+      }
+      if (detalle.debe === 0 && detalle.haber === 0) {
+        throw new BadRequestException('Cada movimiento debe tener un monto mayor a cero');
+      }
+    }
+
+    const totalDebe = detalles.reduce((sum, d) => sum + d.debe, 0);
+    const totalHaber = detalles.reduce((sum, d) => sum + d.haber, 0);
+
+    if (Math.round(totalDebe * 100) !== Math.round(totalHaber * 100)) {
+      throw new BadRequestException(
+        `El asiento no cuadra: Debe=${totalDebe.toFixed(2)}, Haber=${totalHaber.toFixed(2)}`
+      );
+    }
+
+    const cuentaIds = detalles.map(d => d.cuenta_id);
+    const { data: cuentas, error: cuentasError } = await this.supabaseService
+      .getClient()
+      .from('plan_cuentas')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .in('id', cuentaIds);
+
+    if (cuentasError) {
+      throw new Error(`Error validando cuentas: ${cuentasError.message}`);
+    }
+
+    const cuentasEncontradas = new Set((cuentas || []).map((c: any) => c.id));
+    if (cuentaIds.some(id => !cuentasEncontradas.has(id))) {
+      throw new BadRequestException(
+        'Una o más cuentas no existen o no pertenecen a su organización'
+      );
+    }
+
+    return { totalDebe, totalHaber };
+  }
+
+  private async insertarDetalles(
+    asientoId: string,
+    detalles: Array<{
+      cuenta_id: string;
+      debe: number;
+      haber: number;
+      concepto: string;
+      centro_costo_id?: string;
+    }>
+  ): Promise<void> {
+    const { error } = await this.supabaseService
+      .getClient()
+      .from('detalle_asientos')
+      .insert(
+        detalles.map(detalle => ({
+          asiento_id: asientoId,
+          cuenta_id: detalle.cuenta_id,
+          debe: detalle.debe,
+          haber: detalle.haber,
+          concepto: detalle.concepto,
+          centro_costo_id: detalle.centro_costo_id
+        }))
+      );
+
+    if (error) {
+      throw new Error(`Error creando detalles del asiento: ${error.message}`);
     }
   }
 

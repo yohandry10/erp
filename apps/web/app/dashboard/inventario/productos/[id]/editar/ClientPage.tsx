@@ -20,7 +20,6 @@ export default function EditarProductoPage() {
   const params = useParams();
   const { get, put } = useApi();
   const country = useCountryContext();
-  const impuestoNombre = country.paisCodigo === "AR" || country.paisCodigo === "CO" ? "IVA" : "IGV";
   const productoId = params.id as string | undefined;
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -37,6 +36,8 @@ export default function EditarProductoPage() {
     afectacionIgv: "10",
     activo: true,
   });
+
+  const impuestoNombre = country.paisCodigo === "PE" ? "IGV" : "IVA";
 
   const loadProducto = useCallback(async () => {
     if (!productoId) return;
@@ -55,7 +56,7 @@ export default function EditarProductoPage() {
           precioCompra: p.precio_compra?.toString() || "",
           stockMinimo: p.stock_minimo?.toString() || "",
           codigoBarras: p.codigo_barras || "",
-          impuesto: p.impuesto?.toString() || "18",
+          impuesto: p.impuesto?.toString() || String(Math.round(country.impuestoRate * 10000) / 100),
           afectacionIgv: String(p.afectacion_igv || "10"),
           activo: p.activo !== false,
         });
@@ -66,7 +67,7 @@ export default function EditarProductoPage() {
     } finally {
       setLoading(false);
     }
-  }, [get, productoId]);
+  }, [country.impuestoRate, get, productoId]);
 
   useEffect(() => {
     loadProducto();
@@ -237,7 +238,7 @@ export default function EditarProductoPage() {
           <h2 className="m-0 text-lg font-bold text-foreground">Precios e Impuestos</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label htmlFor="editar-precio-compra">Precio de Compra</label>
+              <label htmlFor="editar-precio-compra">Precio de Compra ({country.moneda || 'PEN'})</label>
               <input id="editar-precio-compra"
                 type="number"
                 name="precioCompra"
@@ -250,7 +251,7 @@ export default function EditarProductoPage() {
             </div>
             <div>
               <label htmlFor="editar-precio-venta">
-                Precio de Venta <span className="text-[var(--red-500)]">*</span>
+                Precio de Venta ({country.moneda || 'PEN'}) <span className="text-[var(--red-500)]">*</span>
               </label>
               <input id="editar-precio-venta"
                 type="number"
@@ -264,7 +265,7 @@ export default function EditarProductoPage() {
               />
             </div>
             <div>
-              <label htmlFor="editar-impuesto">{impuestoNombre} (%)</label>
+              <label htmlFor="editar-impuesto">{country.paisCodigo === 'PE' ? 'IGV' : 'IVA'} (%)</label>
               <input id="editar-impuesto"
                 type="number"
                 name="impuesto"
@@ -273,10 +274,12 @@ export default function EditarProductoPage() {
                 step="0.01"
                 min="0"
                 max="100"
-                placeholder="18"
+                placeholder={String(Math.round(country.impuestoRate * 10000) / 100)}
               />
             </div>
             <div>
+              {/* Sin este campo no habia forma de corregir la afectacion de un
+                  producto ya creado: quedaba gravado para siempre. */}
               <label htmlFor="editar-afectacion">
                 Afectación {impuestoNombre}
               </label>

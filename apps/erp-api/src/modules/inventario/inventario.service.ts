@@ -899,6 +899,17 @@ export class InventarioService {
         throw error;
       }
 
+      const { data: empresaConfig } = await client
+        .from('empresa_config')
+        .select('moneda_defecto')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      const tenantCurrency = String(
+        empresaConfig?.moneda_defecto ||
+        (itemsData ?? []).find((item: any) => item.moneda_detalle)?.moneda_detalle ||
+        'PEN',
+      ).toUpperCase();
+
       const movimientos = (itemsData ?? []).map((item: any) => {
         const cantidad = Number(item.cantidad_recibida ?? 0);
         const costoUnitario = this.round2(Number(item.costo_unitario ?? 0));
@@ -913,7 +924,7 @@ export class InventarioService {
           cantidad,
           costoUnitario,
           valorTotal,
-          moneda: item.moneda_detalle ?? 'PEN',
+          moneda: item.moneda_detalle ?? tenantCurrency,
           producto: {
             id: item.producto_id,
             nombre: item.producto_nombre ?? 'Producto',
@@ -1015,7 +1026,7 @@ export class InventarioService {
           cantidad,
           costoUnitario,
           valorTotal,
-          moneda: 'PEN',
+          moneda: tenantCurrency,
           producto: {
             id: movimiento.producto_id,
             nombre: productoInfo?.nombre ?? 'Producto',

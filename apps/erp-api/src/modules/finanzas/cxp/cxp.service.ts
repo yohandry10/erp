@@ -453,6 +453,10 @@ export class CxpService {
       detraccion_total: ajustesTributarios.detraccion,
       anticipo_total: ajustesTributarios.anticipo,
       moneda: dto.moneda ?? 'PEN',
+      // Cotización con la que se contabiliza el documento. Sin ella la
+      // diferencia de cambio del saldo no es calculable al cierre.
+      tipo_cambio_origen:
+        dto.tipo_cambio && dto.tipo_cambio > 0 ? dto.tipo_cambio : null,
       estado: estadoInicial,
       observaciones: dto.observaciones ?? null,
       created_by: userId ?? null,

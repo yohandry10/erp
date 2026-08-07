@@ -15,6 +15,7 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface Alerta {
   presupuesto_id: string
@@ -85,6 +86,7 @@ const normalizeResumen = (raw: any): ResumenAlertas => ({
 
 export default function AlertasSobregirosPage() {
   const router = useRouter()
+  const country = useCountryContext()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [resumen, setResumen] = useState<ResumenAlertas | null>(null)
@@ -128,9 +130,9 @@ export default function AlertasSobregirosPage() {
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN'
+      currency: country.moneda || 'PEN'
     }).format(toNumber(amount))
   }
 

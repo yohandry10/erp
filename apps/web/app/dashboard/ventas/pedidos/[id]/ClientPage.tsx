@@ -10,6 +10,8 @@ import GenerarFacturaButton from '@/components/ventas/GenerarFacturaButton'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 
 const ESTADO_COLORS: Record<EstadoPedido, { bg: string; text: string }> = {
   [EstadoPedido.PENDIENTE]: { bg: '#fef3c7', text: '#92400e' },
@@ -26,6 +28,8 @@ const ESTADO_COLORS: Record<EstadoPedido, { bg: string; text: string }> = {
 }
 
 export default function PedidoDetailPage() {
+  const { formatCurrency } = useLocalizedMoney()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const router = useRouter()
   const params = useParams()
   const { get, post } = useApi()
@@ -89,13 +93,6 @@ export default function PedidoDetailPage() {
       facturaId: result.facturaId,
       sugerioGre: result.sugerioGre,
     })
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN'
-    }).format(amount)
   }
 
   const formatDate = (dateString: string) => {
@@ -366,7 +363,7 @@ export default function PedidoDetailPage() {
             <span className="font-medium text-[var(--primary-900)]">{formatCurrency(pedido.subtotal)}</span>
           </div>
           <div className="flex justify-between text-[0.875rem]">
-            <span className="text-[var(--primary-600)]">IGV (18%):</span>
+            <span className="text-[var(--primary-600)]">{nombreImpuesto} ({Math.round(tasaIgv * 100)}%):</span>
             <span className="font-medium text-[var(--primary-900)]">{formatCurrency(pedido.igv)}</span>
           </div>
           <div className="flex justify-between text-[1.125rem] font-bold pt-2 mt-2 text-[var(--primary-900)]">
@@ -390,4 +387,3 @@ export default function PedidoDetailPage() {
     </div>
   )
 }
-

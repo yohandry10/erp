@@ -12,9 +12,11 @@ import { AuthModule } from './auth/auth.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { DocumentosModule } from './documentos.module';
 import { AuditModule } from './audit/audit.module';
+import { FiscalModule } from './fiscal/fiscal.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [SupabaseModule, OseModule, CryptoModule, ValidationModule, AuthModule, PermissionsModule, DocumentosModule, AuditModule],
+  imports: [ConfigModule, SupabaseModule, OseModule, CryptoModule, ValidationModule, AuthModule, PermissionsModule, DocumentosModule, AuditModule, FiscalModule],
   controllers: [
     ConfiguracionController,
     ConfigurationController,

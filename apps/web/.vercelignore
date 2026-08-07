@@ -1,0 +1,15 @@
+# Lo que Vercel genera en su propio build no se sube: sin esto el CLI intentaba
+# empaquetar 26.932 ficheros (.next, node_modules, artefactos de pruebas).
+node_modules
+.next
+out
+.turbo
+coverage
+playwright-report
+test-results
+tests
+e2e
+src-tauri
+*.log
+.env.local
+.env.development

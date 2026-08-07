@@ -168,7 +168,7 @@ Write-Host ""
 # 8. Información adicional
 Write-Host "📚 Recursos adicionales:" -ForegroundColor Yellow
 Write-Host "  • Documentación: monitoring/README.md" -ForegroundColor White
-Write-Host "  • Guía de integración: docs/GUIA_INTEGRACION_METRICAS.md" -ForegroundColor White
+Write-Host "  • Guía de integración: docs/OPERATIONS.md" -ForegroundColor White
 Write-Host ""
 Write-Host "🔗 URLs:" -ForegroundColor Yellow
 Write-Host "  • Prometheus: http://localhost:9090" -ForegroundColor White

@@ -1,5 +1,6 @@
 export interface ConfigurationStatus {
   isComplete: boolean;
+  isDemo: boolean;
   completionPercentage: number;
   missingItems: string[];
   certificate: {

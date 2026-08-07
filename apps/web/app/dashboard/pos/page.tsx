@@ -162,6 +162,12 @@ export default function POSPage() {
   const currencySymbol = country.simboloMoneda || 'S/'
   const taxLabel = country.impuesto || 'IGV (18%)'
   const taxRate = country.impuestoRate ?? 0.18
+  const taxName = paisCodigo === 'PE' ? 'IGV' : 'IVA'
+  const locale = country.locale || 'es-PE'
+  const consumerDocumentLabel =
+    paisCodigo === 'AR' ? 'Factura B' : paisCodigo === 'CO' ? 'Factura electrónica' : 'Boleta'
+  const businessDocumentLabel =
+    paisCodigo === 'AR' ? 'Factura A' : paisCodigo === 'CO' ? 'Factura con NIT' : 'Factura'
   const getClienteDocumento = useCallback((cliente?: Cliente | null) => {
     return String(
       cliente?.numero_documento ??
@@ -234,7 +240,9 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
   const formatMoney = (value: any): string => {
     const num = Number(value);
-    return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+    return Number.isFinite(num)
+      ? num.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : '0,00';
   };
   const formatCurrency = (value: any): string => `${currencySymbol} ${formatMoney(value)}`;
 
@@ -1773,16 +1781,17 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   className="gap-2"
                   onClick={() => setModoCajaEnfocado((current) => !current)}
                   aria-pressed={modoCajaEnfocado}
+                  aria-label={modoCajaEnfocado ? 'Salir de modo caja' : 'Modo caja'}
                   title={modoCajaEnfocado ? 'Salir del modo caja (Esc)' : 'Ocultar el resto del ERP y concentrarse en la venta'}
                 >
                   {modoCajaEnfocado ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                   <span className="hidden md:inline">{modoCajaEnfocado ? 'Salir de modo caja' : 'Modo caja'}</span>
                 </Button>
-                <Button type="button" variant="outline" size="sm" className="gap-2" onClick={recargarProductos}>
+                <Button type="button" variant="outline" size="sm" className="gap-2" onClick={recargarProductos} aria-label="Sincronizar">
                   <RefreshCw className="h-4 w-4" />
                   <span className="hidden sm:inline">Sincronizar</span>
                 </Button>
-                <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => setMostrarHistorial(true)}>
+                <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => setMostrarHistorial(true)} aria-label="Ventas del día">
                   <History className="h-4 w-4" />
                   <span className="hidden sm:inline">Ventas del día</span>
                 </Button>
@@ -2031,6 +2040,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   onAgregar={agregarAlCarrito}
                   productoSeleccionado={productoSeleccionado}
                   onSeleccionar={setProductoSeleccionado}
+                  currencySymbol={currencySymbol}
+                  locale={locale}
+                  taxRate={taxRate}
+                  taxName={taxName}
                 />
               </div>
             </div>
@@ -2082,7 +2095,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     onClick={() => setTipoComprobante('03')}
                     className={`min-h-9 rounded-md px-3 text-sm font-medium transition ${tipoComprobante === '03' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                   >
-                    Boleta
+                    {consumerDocumentLabel}
                   </button>
                   <button
                     type="button"
@@ -2091,7 +2104,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     title={!clienteActual || clienteActual.tipo_documento !== documentoFiscal ? `Factura requiere cliente con ${documentoFiscal}` : ''}
                     className={`min-h-9 rounded-md px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${tipoComprobante === '01' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                   >
-                    Factura
+                    {businessDocumentLabel}
                   </button>
                 </div>
               </div>
@@ -2283,7 +2296,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       {clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Cliente'}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {tipoComprobante === '01' ? 'Factura' : 'Boleta'} · {carrito.length} {carrito.length === 1 ? 'producto' : 'productos'}
+                      {tipoComprobante === '01' ? businessDocumentLabel : consumerDocumentLabel} · {carrito.length} {carrito.length === 1 ? 'producto' : 'productos'}
                     </p>
                   </div>
                   <div className="text-right">
@@ -2495,6 +2508,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                         format={formatoDocumentoSeleccionado}
                         currencySymbol={currencySymbol}
                         taxLabel={taxLabel}
+                        taxIdLabel={country.documentoFiscal}
                       />
                     </div>
                   )}

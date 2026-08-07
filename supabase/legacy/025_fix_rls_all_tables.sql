@@ -2182,7 +2182,7 @@ COMMENT ON VIEW v_rls_summary_by_module IS
   ===================
 
   Para preguntas o problemas con esta migración:
-  - Revisar documentación en docs/security/rls-policies.md
+  - Revisar documentación en docs/ARCHITECTURE.md
   - Consultar logs de la migración
   - Ejecutar queries de validación arriba
   - Contactar al equipo de backend/DevOps

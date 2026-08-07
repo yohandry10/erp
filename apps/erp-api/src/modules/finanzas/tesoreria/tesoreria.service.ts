@@ -1,18 +1,110 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { v4 as uuidv4 } from 'uuid';
 import { RegistrarPagoDto, RegistrarPagoLoteDto, ListarPagosQueryDto, ProgramacionPagosQueryDto, FlujoCajaQueryDto } from './dto';
+import { TiposCambioService } from '../../contabilidad/services/tipos-cambio.service';
+import { RevaluacionService } from '../../contabilidad/services/revaluacion.service';
+import { LadoTipoCambio } from '@erp-suite/dtos';
 
 const BANCARIZACION_PEN_MIN = 2000;
 const BANCARIZACION_USD_MIN = 500;
 
+/** Valuación en moneda local de un pago, más la diferencia de cambio realizada. */
+export interface ValuacionPago {
+  /** Importe en moneda local con el que estaba contabilizada la deuda cancelada. */
+  montoContabilizado: number;
+  /** Importe en moneda local efectivamente desembolsado. */
+  montoLiquidacion: number;
+  /** Positivo = ganancia; negativo = pérdida. Cero cuando no hay moneda extranjera. */
+  diferenciaCambio: number;
+  /** Cotización aplicada. 1 cuando el documento ya está en moneda local. */
+  tipoCambio: number;
+}
+
 @Injectable()
 export class TesoreriaService {
+  private readonly logger = new Logger(TesoreriaService.name);
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
+    private readonly tiposCambio: TiposCambioService,
   ) { }
+
+  /**
+   * Valúa un pago en moneda local y calcula la diferencia de cambio realizada.
+   *
+   * Un pago en moneda extranjera cancela una deuda contabilizada a una
+   * cotización y desembolsa efectivo a otra. Esa brecha es un resultado del
+   * ejercicio y hasta ahora no se registraba en ninguna parte: el asiento de
+   * pago tomaba el importe en dólares y lo asentaba como si fueran soles.
+   *
+   * Falla en lugar de inventar una cotización: pagar sin saber el tipo de
+   * cambio produce libros incorrectos, y pedir un dato es preferible a eso.
+   */
+  async valuarPago(params: {
+    tenantId: string;
+    moneda: string;
+    monto: number;
+    fechaPago: string;
+    tipoCambioOrigen?: number | null;
+  }): Promise<ValuacionPago> {
+    const { tenantId, moneda, monto, fechaPago } = params;
+    const monedaLocal = await this.tiposCambio.obtenerMonedaLocal(tenantId);
+
+    if (!moneda || moneda.toUpperCase() === monedaLocal) {
+      return {
+        montoContabilizado: this.round2(monto),
+        montoLiquidacion: this.round2(monto),
+        diferenciaCambio: 0,
+        tipoCambio: 1,
+      };
+    }
+
+    const cotizacion = await this.tiposCambio.exigirVigente(
+      tenantId,
+      moneda,
+      monedaLocal,
+      fechaPago,
+    );
+    // Una cuenta por pagar es un pasivo: se liquida al tipo de cambio venta.
+    const tipoCambioLiquidacion = TiposCambioService.tomarLado(cotizacion, LadoTipoCambio.VENTA);
+
+    // Sin cotización de origen no hay brecha calculable: es el caso de los
+    // documentos anteriores a que se registrara el dato. Se valúa el pago
+    // correctamente en moneda local y no se reconoce diferencia.
+    const tipoCambioOrigen =
+      params.tipoCambioOrigen && params.tipoCambioOrigen > 0
+        ? Number(params.tipoCambioOrigen)
+        : null;
+
+    if (!tipoCambioOrigen) {
+      this.logger.warn(
+        `Pago en ${moneda} sobre un documento sin tipo_cambio_origen: se valúa al ` +
+          `${tipoCambioLiquidacion} sin reconocer diferencia de cambio.`,
+      );
+      const montoLocal = this.round2(monto * tipoCambioLiquidacion);
+      return {
+        montoContabilizado: montoLocal,
+        montoLiquidacion: montoLocal,
+        diferenciaCambio: 0,
+        tipoCambio: tipoCambioLiquidacion,
+      };
+    }
+
+    return {
+      montoContabilizado: this.round2(monto * tipoCambioOrigen),
+      montoLiquidacion: this.round2(monto * tipoCambioLiquidacion),
+      diferenciaCambio: RevaluacionService.calcularDiferenciaRealizada({
+        tipo: 'CXP',
+        importeMonedaOrigen: monto,
+        tipoCambioOrigen,
+        tipoCambioLiquidacion,
+      }),
+      tipoCambio: tipoCambioLiquidacion,
+    };
+  }
 
   async registrarPago(
     tenantId: string,
@@ -86,6 +178,7 @@ export class TesoreriaService {
         saldo,
         total,
         moneda,
+        tipo_cambio_origen,
         proveedor_id,
         numero_documento,
         proveedor:proveedores!cuentas_por_pagar_proveedor_id_fkey(
@@ -129,6 +222,16 @@ export class TesoreriaService {
       metodoPago: dto.metodo_pago,
       cuentaBancariaId: dto.cuenta_bancaria_id,
       referencia: dto.referencia,
+    });
+
+    // Valuación en moneda local antes de tocar nada: si falta la cotización, el
+    // pago se rechaza aquí y no deja escrituras a medias.
+    const valuacion = await this.valuarPago({
+      tenantId,
+      moneda: cxp.moneda,
+      monto: dto.monto,
+      fechaPago: dto.fecha_pago,
+      tipoCambioOrigen: (cxp as any).tipo_cambio_origen,
     });
 
     // Si se especificó cuenta bancaria, validar que existe y tiene saldo suficiente
@@ -337,6 +440,12 @@ export class TesoreriaService {
           numeroDocumento: cxp.numero_documento,
           monto: this.round2(dto.monto),
           moneda: cxp.moneda,
+          // Valuación en moneda local: el asiento se arma con estos importes,
+          // no con el monto en moneda del documento.
+          tipoCambio: valuacion.tipoCambio,
+          montoContabilizado: valuacion.montoContabilizado,
+          montoLiquidacion: valuacion.montoLiquidacion,
+          diferenciaCambio: valuacion.diferenciaCambio,
           fecha: dto.fecha_pago,
           metodoPago: dto.metodo_pago,
           cuentaBancariaId: dto.cuenta_bancaria_id ?? null,

@@ -4,7 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import GreModal from '@/components/modals/GreModal'
 import { useApi } from '@/hooks/use-api'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { ArrowLeft, Loader2, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 type PedidoDetalle = {
@@ -46,9 +47,14 @@ function NuevaGreContent() {
   const pedidoId = searchParams.get('pedido_id')
   const despacho = searchParams.get('despacho')
   const { get } = useApi()
+  const country = useCountryContext()
+  const isPeru = (country.paisCodigo || 'PE').toUpperCase() === 'PE'
+  const [mounted, setMounted] = useState(false)
   const [pedido, setPedido] = useState<PedidoOrigen | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => setMounted(true), [])
 
   const loadPedido = useCallback(async () => {
     if (!pedidoId) {
@@ -73,8 +79,8 @@ function NuevaGreContent() {
   }, [get, pedidoId])
 
   useEffect(() => {
-    loadPedido()
-  }, [loadPedido])
+    if (!country.loading && isPeru) loadPedido()
+  }, [country.loading, isPeru, loadPedido])
 
   const cliente = pedido?.cliente ?? pedido?.clientes ?? null
   const clienteDocumentoTipo = cliente?.documento_tipo || cliente?.tipo_documento || 'RUC'
@@ -94,6 +100,34 @@ function NuevaGreContent() {
   const handleSuccess = (data?: any) => {
     const greId = data?.id ? `?created=${encodeURIComponent(data.id)}` : ''
     router.push(`/dashboard/gre${greId}`)
+  }
+
+  if (!mounted || country.loading) {
+    return (
+      <div className="p-6">
+        <div className="inline-flex items-center gap-3 rounded-xl border border-cyan-300/20 bg-card/70 px-4 py-3 text-sm font-semibold text-primary">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Cargando país del tenant...
+        </div>
+      </div>
+    )
+  }
+
+  if (!isPeru) {
+    return (
+      <div className="grid min-h-[420px] place-items-center p-6">
+        <div className="max-w-2xl rounded-2xl border border-border bg-card p-8 text-center shadow-xl">
+          <ShieldCheck className="mx-auto size-12 text-primary" />
+          <h1 className="mt-4 text-2xl font-bold">Módulo exclusivo de Perú</h1>
+          <p className="mt-2 text-muted-foreground">
+            No se puede crear una GRE SUNAT para una empresa de {country.paisNombre}.
+          </p>
+          <Button onClick={() => router.push('/dashboard/inventario/logistica/listo-despacho')} className="mt-5">
+            Volver a logística
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {

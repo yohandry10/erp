@@ -16,6 +16,12 @@ import {
   tiempoComputableCts,
   tiempoDeServicios,
 } from './liquidacion-peru.util';
+import { calcularLiquidacionArgentina, validarCuilArgentina } from './planillas-argentina.util';
+import { calcularLiquidacionColombia } from './liquidacion-colombia.util';
+import { RrhhCountryService } from './rrhh-country.service';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
+import { decryptText, encryptText } from '../../shared/utils/secure-config.utils';
 
 // Respaldo si normativa_peru_periodos no tiene fila para el periodo consultado.
 const RMV_PERU_FALLBACK = 1130;
@@ -27,7 +33,14 @@ export class RrhhService {
   constructor(
     private readonly supabaseService: SupabaseService,
     @Optional() private readonly eventBus?: EventBusService,
+    @Optional() private readonly countryService?: RrhhCountryService,
+    @Optional() private readonly configService?: ConfigService,
   ) { }
+
+  private async obtenerPaisLaboral(tenantId: string): Promise<'PE' | 'AR' | 'CO'> {
+    if (!this.countryService) return 'PE';
+    return (await this.countryService.obtenerContexto(tenantId)).codigo;
+  }
 
   // ===== EMPLEADOS =====
   async getEmpleados(tenantId?: string) {
@@ -76,6 +89,392 @@ export class RrhhService {
     return data;
   }
 
+  async getConfiguracionLaboral(tenantId: string) {
+    const pais = await this.obtenerPaisLaboral(tenantId);
+    if (pais === 'PE') {
+      const periodo = new Date().toISOString().slice(0, 7);
+      const client = this.supabaseService.getClient();
+      const selectNormativa =
+        'periodo, uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, onp_aporte, essalud_aporte, quinta_deduccion_uit, bancarizacion_pen_min, bancarizacion_usd_min, igv_tasa, fuente';
+      const [{ data: tenantNormativa, error: tenantError }, { data: globalNormativa, error: globalError }] =
+        await Promise.all([
+          client
+            .from('normativa_peru_periodos')
+            .select(selectNormativa)
+            .eq('tenant_id', tenantId)
+            .eq('activo', true)
+            .lte('periodo', periodo)
+            .order('periodo', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          client
+            .from('normativa_peru_periodos')
+            .select(selectNormativa)
+            .is('tenant_id', null)
+            .eq('activo', true)
+            .lte('periodo', periodo)
+            .order('periodo', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+      if (tenantError) throw tenantError;
+      if (globalError) throw globalError;
+      const normativa = tenantNormativa || globalNormativa;
+      return {
+        success: true,
+        data: {
+          pais: 'PE',
+          moneda: 'PEN',
+          documento_laboral: 'DNI',
+          conceptos: ['AFP', 'ONP', 'EsSalud', 'quinta categoría', 'gratificaciones', 'CTS'],
+          normativa,
+          readiness: {
+            ready: Boolean(normativa),
+            periodo: normativa?.periodo || periodo,
+            missing: normativa ? [] : ['normativa peruana vigente por período'],
+          },
+          ready: Boolean(normativa),
+        },
+      };
+    }
+
+    const client = this.supabaseService.getClient();
+    if (pais === 'CO') {
+      const [{ data: configuracion, error }, { data: readiness, error: readinessError }] =
+        await Promise.all([
+          client
+            .from('rrhh_configuracion_colombia')
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .maybeSingle(),
+          client.rpc('validar_rrhh_colombia_readiness', { p_tenant_id: tenantId }),
+        ]);
+      if (error) throw error;
+      if (readinessError) throw readinessError;
+      return {
+        success: true,
+        data: {
+          pais: 'CO',
+          moneda: 'COP',
+          documento_laboral: 'CC',
+          autoridad: 'UGPP / DIAN',
+          configuracion: configuracion
+            ? {
+                ...configuracion,
+                pila_api_token: configuracion.pila_api_token ? 'CONFIGURADO' : null,
+                nomina_software_pin: configuracion.nomina_software_pin ? 'CONFIGURADO' : null,
+              }
+            : null,
+          readiness,
+        },
+      };
+    }
+    const [{ data: configuracion, error }, { data: readiness, error: readinessError }] =
+      await Promise.all([
+        client
+          .from('rrhh_configuracion_argentina')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .maybeSingle(),
+        client.rpc('validar_rrhh_argentina_readiness', { p_tenant_id: tenantId }),
+      ]);
+    if (error) throw error;
+    if (readinessError) throw readinessError;
+    return {
+      success: true,
+      data: {
+        pais: 'AR',
+        moneda: 'ARS',
+        documento_laboral: 'CUIL',
+        autoridad: 'ARCA',
+        configuracion,
+        readiness,
+      },
+    };
+  }
+
+  async updateConfiguracionLaboralArgentina(tenantId: string, input: any) {
+    if ((await this.obtenerPaisLaboral(tenantId)) !== 'AR') {
+      throw new BadRequestException(
+        'La configuración solicitada sólo corresponde a tenants de Argentina.',
+      );
+    }
+    const permitidos = new Set([
+      'tipo_empleador',
+      'jurisdiccion_laboral',
+      'actividad_codigo',
+      'convenio_colectivo_codigo',
+      'convenio_colectivo_descripcion',
+      'categoria_default',
+      'art_cuit',
+      'art_razon_social',
+      'art_tasa',
+      'obra_social_codigo_default',
+      'sindicato_codigo_default',
+      'sindicato_aporte_default',
+      'contribucion_patronal',
+      'seguro_vida_monto',
+      'periodo_prueba_max_meses',
+      'sistema_indemnizacion',
+      'libro_sueldos_digital_habilitado',
+      'simplificacion_registral_habilitada',
+      'formulario_931_habilitado',
+      'siradig_habilitado',
+      'configuracion_confirmada',
+      'metadata',
+    ]);
+    const payload = Object.fromEntries(
+      Object.entries(input || {})
+        .filter(([key]) => permitidos.has(key))
+        .filter(([, value]) => value !== '' && value !== undefined),
+    );
+    if (payload.art_tasa !== undefined && Number(payload.art_tasa) <= 0) {
+      throw new BadRequestException('La alícuota ART debe ser mayor que cero');
+    }
+    if (
+      payload.art_cuit !== undefined &&
+      !validarCuilArgentina(String(payload.art_cuit))
+    ) {
+      throw new BadRequestException(
+        'El CUIT de la ART debe tener 11 dígitos y un dígito verificador válido',
+      );
+    }
+    if (payload.configuracion_confirmada === true) {
+      const convenio = String(payload.convenio_colectivo_codigo || '').trim();
+      const art = Number(payload.art_tasa || 0);
+      if (!convenio || art <= 0) {
+        throw new BadRequestException(
+          'Para confirmar RRHH Argentina debe indicar convenio colectivo y alícuota ART.',
+        );
+      }
+    }
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('rrhh_configuracion_argentina')
+      .upsert(
+        {
+          tenant_id: tenantId,
+          ...payload,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'tenant_id' },
+      )
+      .select()
+      .single();
+    if (error) throw error;
+    return { success: true, data };
+  }
+
+  async updateConfiguracionLaboralColombia(tenantId: string, input: any) {
+    if ((await this.obtenerPaisLaboral(tenantId)) !== 'CO') {
+      throw new BadRequestException(
+        'La configuración solicitada sólo corresponde a tenants de Colombia.',
+      );
+    }
+    const permitidos = new Set([
+      'tipo_aportante',
+      'actividad_economica_ciiu',
+      'operador_pila',
+      'pila_integracion_modo',
+      'pila_operador_codigo',
+      'pila_api_url',
+      'pila_api_usuario',
+      'pila_api_token',
+      'eps_default',
+      'fondo_pension_default',
+      'arl_default',
+      'arl_clase_riesgo',
+      'arl_tasa',
+      'caja_compensacion_default',
+      'sena_habilitado',
+      'icbf_habilitado',
+      'exonerado_salud_sena_icbf',
+      'nomina_electronica_habilitada',
+      'nomina_software_id',
+      'nomina_software_pin',
+      'nomina_test_set_id',
+      'pila_habilitada',
+      'salario_minimo',
+      'auxilio_transporte',
+      'configuracion_confirmada',
+      'metadata',
+    ]);
+    const payload = Object.fromEntries(
+      Object.entries(input || {})
+        .filter(([key]) => permitidos.has(key))
+        .filter(([, value]) => value !== '' && value !== undefined),
+    );
+    const existingPilaToken = input?.pila_api_token === 'CONFIGURADO';
+    const existingNominaPin = input?.nomina_software_pin === 'CONFIGURADO';
+    for (const secretField of ['pila_api_token', 'nomina_software_pin']) {
+      if (payload[secretField] === 'CONFIGURADO') delete payload[secretField];
+      else if (payload[secretField]) {
+        if (!this.configService) throw new BadRequestException('Cifrado de secretos no disponible');
+        payload[secretField] = encryptText(this.configService, String(payload[secretField]));
+      }
+    }
+    if (payload.arl_tasa !== undefined && Number(payload.arl_tasa) <= 0) {
+      throw new BadRequestException('La tasa ARL debe ser mayor que cero');
+    }
+    if (payload.configuracion_confirmada === true) {
+      const required = [
+        'operador_pila',
+        'eps_default',
+        'fondo_pension_default',
+        'arl_default',
+        'caja_compensacion_default',
+      ].filter((field) => !String(payload[field] || '').trim());
+      if (required.length > 0 || Number(payload.arl_tasa || 0) <= 0) {
+        throw new BadRequestException(
+          'Para confirmar RRHH Colombia debe indicar PILA, EPS, fondo de pensión, ARL, tasa ARL y caja de compensación.',
+        );
+      }
+      const pilaMode = String(payload.pila_integracion_modo || 'ARCHIVO_OPERADOR');
+      if (pilaMode === 'API_PROVEEDOR' && (!payload.pila_api_url || (!payload.pila_api_token && !existingPilaToken))) {
+        throw new BadRequestException(
+          'La integración API del operador PILA requiere URL HTTPS y token.',
+        );
+      }
+      if (payload.nomina_electronica_habilitada !== false) {
+        const missingNomina = [
+          !payload.nomina_software_id && 'nomina_software_id',
+          !payload.nomina_test_set_id && 'nomina_test_set_id',
+          !payload.nomina_software_pin && !existingNominaPin && 'nomina_software_pin',
+        ].filter(Boolean);
+        if (missingNomina.length) {
+          throw new BadRequestException(
+            `Nómina electrónica DIAN incompleta: ${missingNomina.join(', ')}.`,
+          );
+        }
+      }
+    }
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('rrhh_configuracion_colombia')
+      .upsert(
+        { tenant_id: tenantId, ...payload, updated_at: new Date().toISOString() },
+        { onConflict: 'tenant_id' },
+      )
+      .select()
+      .single();
+    if (error) throw error;
+    return { success: true, data };
+  }
+
+  async probarIntegracionPilaColombia(tenantId: string) {
+    if ((await this.obtenerPaisLaboral(tenantId)) !== 'CO') {
+      throw new BadRequestException('La prueba PILA sólo corresponde a tenants de Colombia.');
+    }
+    const client = this.supabaseService.getClient();
+    const [{ data: config, error }, { data: empresa, error: empresaError }] = await Promise.all([
+      client.from('rrhh_configuracion_colombia').select('*').eq('tenant_id', tenantId).maybeSingle(),
+      client.from('empresa_config').select('is_demo').eq('tenant_id', tenantId).maybeSingle(),
+    ]);
+    if (error) throw error;
+    if (empresaError) throw empresaError;
+    if (!config) throw new BadRequestException('Configuración colombiana no encontrada.');
+    if (empresa?.is_demo === true) {
+      await client.from('rrhh_configuracion_colombia').update({
+        pila_ultima_prueba_at: new Date().toISOString(),
+        pila_ultima_prueba_estado: 'SIMULADA',
+      }).eq('tenant_id', tenantId);
+      return {
+        success: true,
+        mode: 'SIMULATED_DEMO',
+        transmitted: false,
+        message: 'Operador PILA sintético listo para demostración; no se enviaron datos externos.',
+      };
+    }
+
+    const commonMissing = ['operador_pila', 'eps_default', 'fondo_pension_default', 'arl_default', 'caja_compensacion_default']
+      .filter((field) => !String(config[field] || '').trim());
+    if (commonMissing.length) {
+      await client.from('rrhh_configuracion_colombia').update({
+        pila_ultima_prueba_at: new Date().toISOString(),
+        pila_ultima_prueba_estado: 'INCOMPLETA',
+      }).eq('tenant_id', tenantId);
+      return { success: false, mode: config.pila_integracion_modo, missing: commonMissing };
+    }
+
+    if (config.pila_integracion_modo !== 'API_PROVEEDOR') {
+      await client.from('rrhh_configuracion_colombia').update({
+        pila_ultima_prueba_at: new Date().toISOString(),
+        pila_ultima_prueba_estado: 'CONFIGURADA',
+      }).eq('tenant_id', tenantId);
+      return {
+        success: true,
+        mode: 'ARCHIVO_OPERADOR',
+        transmitted: false,
+        operator: config.operador_pila,
+        message: 'Configuración lista para generar y cargar la planilla mediante el operador autorizado.',
+      };
+    }
+
+    const url = this.assertSafeProviderUrl(config.pila_api_url);
+    if (!config.pila_api_token || !this.configService) {
+      return { success: false, mode: 'API_PROVEEDOR', missing: ['pila_api_token'] };
+    }
+    try {
+      const token = decryptText(this.configService, config.pila_api_token);
+      const response = await axios.get(url, {
+        timeout: 10000,
+        maxRedirects: 0,
+        validateStatus: (status) => status >= 200 && status < 500,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(config.pila_api_usuario ? { 'X-PILA-User': config.pila_api_usuario } : {}),
+        },
+      });
+      const ok = response.status >= 200 && response.status < 400;
+      await client.from('rrhh_configuracion_colombia').update({
+        pila_ultima_prueba_at: new Date().toISOString(),
+        pila_ultima_prueba_estado: ok ? 'CONFIGURADA' : 'ERROR',
+      }).eq('tenant_id', tenantId);
+      return {
+        success: ok,
+        mode: 'API_PROVEEDOR',
+        transmitted: false,
+        status: response.status,
+        message: ok ? 'API del operador PILA accesible.' : 'El operador rechazó la prueba de conectividad.',
+      };
+    } catch (requestError) {
+      await client.from('rrhh_configuracion_colombia').update({
+        pila_ultima_prueba_at: new Date().toISOString(),
+        pila_ultima_prueba_estado: 'ERROR',
+      }).eq('tenant_id', tenantId);
+      return {
+        success: false,
+        mode: 'API_PROVEEDOR',
+        transmitted: false,
+        message: axios.isAxiosError(requestError)
+          ? `No se pudo conectar con el operador (${requestError.code || 'ERROR'}).`
+          : 'No se pudo conectar con el operador.',
+      };
+    }
+  }
+
+  private assertSafeProviderUrl(input: unknown): string {
+    let parsed: URL;
+    try {
+      parsed = new URL(String(input || ''));
+    } catch {
+      throw new BadRequestException('URL de API PILA inválida.');
+    }
+    const hostname = parsed.hostname.toLowerCase();
+    const privateHost = hostname === 'localhost'
+      || hostname === '127.0.0.1'
+      || hostname === '::1'
+      || /^10\./.test(hostname)
+      || /^192\.168\./.test(hostname)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+      || hostname.endsWith('.local');
+    if (parsed.protocol !== 'https:' || privateHost || parsed.username || parsed.password) {
+      throw new BadRequestException('La API PILA debe usar HTTPS público y no incluir credenciales en la URL.');
+    }
+    return parsed.toString();
+  }
+
   // ✅ FIX: Lista de campos permitidos para prevenir inyección de datos
   private readonly CAMPOS_EMPLEADO_PERMITIDOS = [
     'nombres', 'apellidos', 'tipo_documento', 'numero_documento',
@@ -84,6 +483,10 @@ export class RrhhService {
     'nacionalidad', 'ubigeo', 'tiene_hijos', 'cantidad_hijos',
     'asignacion_familiar', 'cuenta_bancaria', 'banco', 'tipo_cuenta',
     'contacto_emergencia', 'telefono_emergencia', 'foto_url',
+    'cuil', 'obra_social_codigo', 'sindicato_codigo',
+    'eps_codigo', 'fondo_pension_codigo', 'arl_codigo', 'caja_compensacion_codigo',
+    'situacion_revista_codigo', 'modalidad_contratacion_codigo',
+    'condicion_codigo', 'actividad_codigo', 'zona_codigo',
   ];
 
   /**
@@ -116,7 +519,11 @@ export class RrhhService {
     );
   }
 
-  private validarEmpleadoData(datos: Record<string, any>, partial = false) {
+  private validarEmpleadoData(
+    datos: Record<string, any>,
+    partial = false,
+    paisLaboral: 'PE' | 'AR' | 'CO' = 'PE',
+  ) {
     const requeridos = ['nombres', 'apellidos', 'numero_documento'];
     if (!partial) {
       const faltantes = requeridos.filter((campo) => !datos[campo]);
@@ -125,12 +532,38 @@ export class RrhhService {
       }
     }
 
-    if (datos.tipo_documento && !['DNI', 'CE', 'Pasaporte'].includes(datos.tipo_documento)) {
+    const tiposPermitidos =
+      paisLaboral === 'AR'
+        ? ['CUIL', 'CUIT', 'DNI', 'PASAPORTE', 'OTRO']
+        : paisLaboral === 'CO'
+          ? ['CC', 'CE', 'TI', 'NIT', 'PASAPORTE', 'OTRO']
+          : ['DNI', 'CE', 'PASAPORTE', 'RUC', 'OTRO'];
+    const tipoDocumento = String(datos.tipo_documento || '').toUpperCase();
+    if (tipoDocumento && !tiposPermitidos.includes(tipoDocumento)) {
       throw new BadRequestException('Tipo de documento inválido');
     }
 
-    if (datos.tipo_documento === 'DNI' && datos.numero_documento && !/^\d{8}$/.test(String(datos.numero_documento))) {
+    if (tipoDocumento === 'DNI' && datos.numero_documento && !/^\d{7,8}$/.test(String(datos.numero_documento))) {
+      if (paisLaboral === 'AR' && /^\d{7,8}$/.test(String(datos.numero_documento))) {
+        // DNI argentino: siete u ocho dígitos.
+      } else {
+        throw new BadRequestException('El DNI debe tener 8 dígitos');
+      }
+    }
+
+    if (
+      paisLaboral === 'AR' &&
+      (tipoDocumento === 'CUIL' || datos.cuil) &&
+      !validarCuilArgentina(String(datos.cuil || datos.numero_documento || ''))
+    ) {
+      throw new BadRequestException('El CUIL debe tener 11 dígitos y dígito verificador válido');
+    }
+
+    if (paisLaboral === 'PE' && tipoDocumento === 'DNI' && datos.numero_documento && !/^\d{8}$/.test(String(datos.numero_documento))) {
       throw new BadRequestException('El DNI debe tener 8 dígitos');
+    }
+    if (paisLaboral === 'CO' && tipoDocumento === 'CC' && datos.numero_documento && !/^\d{6,10}$/.test(String(datos.numero_documento))) {
+      throw new BadRequestException('La cédula de ciudadanía debe contener entre 6 y 10 dígitos');
     }
 
     if (datos.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(datos.email))) {
@@ -176,9 +609,19 @@ export class RrhhService {
       throw new Error('Tenant requerido para RRHH');
     }
     const currentTenantId = tenantId;
+    const paisLaboral = await this.obtenerPaisLaboral(currentTenantId);
 
     const datosLimpios = this.derivarAsignacionFamiliar(this.limpiarEmpleadoData(empleadoData));
-    this.validarEmpleadoData(datosLimpios);
+    this.validarEmpleadoData(datosLimpios, false, paisLaboral);
+    if (paisLaboral === 'AR') {
+      datosLimpios.cuil = String(datosLimpios.cuil || datosLimpios.numero_documento).replace(/\D/g, '');
+      datosLimpios.numero_documento = datosLimpios.cuil;
+      datosLimpios.tipo_documento = 'CUIL';
+      datosLimpios.nacionalidad = datosLimpios.nacionalidad || 'AR';
+    } else if (paisLaboral === 'CO') {
+      datosLimpios.tipo_documento = datosLimpios.tipo_documento || 'CC';
+      datosLimpios.nacionalidad = datosLimpios.nacionalidad || 'CO';
+    }
     await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento));
 
     const { data, error } = await this.supabaseService
@@ -186,7 +629,9 @@ export class RrhhService {
       .from('empleados')
       .insert({
         ...datosLimpios,
-        tipo_documento: datosLimpios.tipo_documento || 'DNI',
+        tipo_documento:
+          datosLimpios.tipo_documento ||
+          (paisLaboral === 'AR' ? 'CUIL' : paisLaboral === 'CO' ? 'CC' : 'DNI'),
         ...this.estadoActivoPatch(datosLimpios.estado || 'activo'),
         tenant_id: currentTenantId, // ✅ Incluir tenant
       })
@@ -202,9 +647,15 @@ export class RrhhService {
       throw new Error('Tenant requerido para RRHH');
     }
     const currentTenantId = tenantId;
+    const paisLaboral = await this.obtenerPaisLaboral(currentTenantId);
 
     const datosLimpios = this.derivarAsignacionFamiliar(this.limpiarEmpleadoData(empleadoData));
-    this.validarEmpleadoData(datosLimpios, true);
+    this.validarEmpleadoData(datosLimpios, true, paisLaboral);
+    if (paisLaboral === 'AR' && (datosLimpios.cuil || datosLimpios.tipo_documento === 'CUIL')) {
+      datosLimpios.cuil = String(datosLimpios.cuil || datosLimpios.numero_documento).replace(/\D/g, '');
+      datosLimpios.numero_documento = datosLimpios.cuil;
+      datosLimpios.tipo_documento = 'CUIL';
+    }
     if (datosLimpios.numero_documento) {
       await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento), id);
     }
@@ -909,6 +1360,147 @@ export class RrhhService {
 
     const contrato = empleado.contratos[0];
     const sueldoMensual = parseFloat(contrato.sueldo_bruto);
+    const paisLaboral = await this.obtenerPaisLaboral(currentTenantId);
+
+    if (paisLaboral === 'AR') {
+      const configMetadata =
+        contrato?.metadata && typeof contrato.metadata === 'object' ? contrato.metadata : {};
+      const calculoArgentina = calcularLiquidacionArgentina({
+        fechaIngreso: empleado.fecha_ingreso,
+        fechaTerminacion,
+        sueldoMensual,
+        mejorRemuneracionNormalHabitual: Number(
+          contrato.mejor_remuneracion_normal_habitual ??
+            configMetadata.mejor_remuneracion_normal_habitual ??
+            sueldoMensual,
+        ),
+        topeConvenio:
+          contrato.tope_indemnizatorio_convenio ??
+          configMetadata.tope_indemnizatorio_convenio ??
+          null,
+        motivoTerminacion,
+        preavisoOmitido: Boolean(
+          contrato.preaviso_omitido ?? configMetadata.preaviso_omitido ?? true,
+        ),
+        fondoCeseReemplazaIndemnizacion: Boolean(
+          contrato.fondo_cese_reemplaza_indemnizacion ??
+            configMetadata.fondo_cese_reemplaza_indemnizacion ??
+            false,
+        ),
+      });
+
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('liquidaciones')
+        .insert({
+          id_empleado: empleadoId,
+          motivo_terminacion: motivoTerminacion,
+          fecha_terminacion: fechaTerminacion,
+          ultimo_dia_trabajado: fechaTerminacion,
+          vacaciones_pendientes: calculoArgentina.diasVacacionesProporcionales,
+          dias_cts: 0,
+          monto_cts: 0,
+          indemnizacion: calculoArgentina.indemnizacionAntiguedad,
+          total_liquidacion: calculoArgentina.total,
+          estado: 'calculada',
+          tenant_id: currentTenantId,
+          pais_codigo: 'AR',
+          moneda: 'ARS',
+          metadata: {
+            normativa: 'LCT_ARGENTINA',
+            version_normativa: '2026-03',
+            base_indemnizacion: calculoArgentina.baseIndemnizacion,
+            anios_indemnizables: calculoArgentina.aniosIndemnizables,
+            vacaciones_no_gozadas: calculoArgentina.vacacionesNoGozadas,
+            sac_proporcional: calculoArgentina.sacProporcional,
+            preaviso: calculoArgentina.preaviso,
+            sac_sobre_preaviso: calculoArgentina.sacSobrePreaviso,
+            integracion_mes_despido: calculoArgentina.integracionMesDespido,
+            sac_sobre_integracion: calculoArgentina.sacSobreIntegracion,
+            fondo_cese_aplicado: calculoArgentina.fondoCeseAplicado,
+          },
+        })
+        .select();
+
+      if (error) throw error;
+
+      await this.supabaseService
+        .getClient()
+        .from('empleados')
+        .update({ estado: 'inactivo' })
+        .eq('id', empleadoId)
+        .eq('tenant_id', currentTenantId);
+      await this.supabaseService
+        .getClient()
+        .from('contratos')
+        .update({ estado: 'terminado', fecha_fin: fechaTerminacion })
+        .eq('id_empleado', empleadoId)
+        .eq('tenant_id', currentTenantId)
+        .eq('estado', 'vigente');
+
+      return { success: true, data: data?.[0] };
+    }
+
+    if (paisLaboral === 'CO') {
+      const metadata =
+        contrato?.metadata && typeof contrato.metadata === 'object' ? contrato.metadata : {};
+      const { data: config } = await this.supabaseService
+        .getClient()
+        .from('rrhh_configuracion_colombia')
+        .select('salario_minimo, auxilio_transporte')
+        .eq('tenant_id', currentTenantId)
+        .maybeSingle();
+      const calculo = calcularLiquidacionColombia({
+        fechaIngreso: empleado.fecha_ingreso,
+        fechaTerminacion,
+        prestacionesPagadasHasta: metadata.prestaciones_pagadas_hasta,
+        sueldoMensual,
+        auxilioTransporteMensual: Number(
+          metadata.recibe_auxilio_transporte === false ? 0 : config?.auxilio_transporte ?? 249_095,
+        ),
+        motivoTerminacion,
+        tipoContrato: contrato.tipo_contrato,
+        fechaFinContrato: contrato.fecha_fin,
+        salarioMinimo: Number(config?.salario_minimo ?? 1_750_905),
+        vacacionesDiasGozados: Number(metadata.vacaciones_dias_gozados ?? 0),
+      });
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('liquidaciones')
+        .insert({
+          id_empleado: empleadoId,
+          motivo_terminacion: motivoTerminacion,
+          fecha_terminacion: fechaTerminacion,
+          ultimo_dia_trabajado: fechaTerminacion,
+          vacaciones_pendientes: calculo.diasVacacionesPendientes,
+          dias_cts: 0,
+          monto_cts: 0,
+          indemnizacion: calculo.indemnizacion,
+          total_liquidacion: calculo.total,
+          estado: 'calculada',
+          tenant_id: currentTenantId,
+          pais_codigo: 'CO',
+          moneda: 'COP',
+          metadata: {
+            normativa: 'CST_COLOMBIA',
+            version_normativa: '2026-01',
+            dias_servicio: calculo.diasServicio,
+            dias_prestaciones_pendientes: calculo.diasPrestaciones,
+            cesantias: calculo.cesantias,
+            intereses_cesantias: calculo.interesesCesantias,
+            prima_servicios: calculo.primaServicios,
+            vacaciones: calculo.vacaciones,
+          },
+        })
+        .select();
+      if (error) throw error;
+      await this.supabaseService.getClient().from('empleados')
+        .update({ estado: 'inactivo' }).eq('id', empleadoId).eq('tenant_id', currentTenantId);
+      await this.supabaseService.getClient().from('contratos')
+        .update({ estado: 'terminado', fecha_fin: fechaTerminacion })
+        .eq('id_empleado', empleadoId).eq('tenant_id', currentTenantId).eq('estado', 'vigente');
+      return { success: true, data: data?.[0] };
+    }
 
     const fechaIngreso = parseFechaLocal(empleado.fecha_ingreso);
     const fechaTerminacionDate = parseFechaLocal(fechaTerminacion);
@@ -961,6 +1553,8 @@ export class RrhhService {
         total_liquidacion: totalLiquidacion,
         estado: 'calculada',
         tenant_id: currentTenantId, // ✅ Incluir tenant
+        pais_codigo: 'PE',
+        moneda: 'PEN',
         // La tabla no tiene columnas para vacaciones truncas ni gratificación
         // trunca; el desglose queda aquí para poder auditar el importe pagado.
         metadata: {
@@ -1328,6 +1922,8 @@ export class RrhhService {
     if (!pago) {
       throw new NotFoundException('Pago de RRHH no encontrado');
     }
+    const pais = await this.obtenerPaisLaboral(tenantId);
+    const moneda = String(pago.moneda || this.monedaLaboralPorPais(pais)).toUpperCase();
 
     let empleado: any = null;
     if (pago.empleado_id) {
@@ -1356,7 +1952,9 @@ export class RrhhService {
       doc.text(`Método: ${pago.metodo_pago || pago.metodo || 'No consignado'}`);
       doc.text(`Estado: ${pago.estado || 'No consignado'}`);
       doc.moveDown();
-      doc.fontSize(14).text(`Monto neto: S/ ${montoNeto.toFixed(2)}`, { align: 'right' });
+      doc.fontSize(14).text(`Monto neto: ${this.formatearMonedaLaboral(montoNeto, moneda)}`, {
+        align: 'right',
+      });
       doc.moveDown(2);
       doc.fontSize(9).fillColor('#555555').text(
         'Documento generado por el ERP a partir del registro persistido del pago.',
@@ -1410,6 +2008,10 @@ export class RrhhService {
           message: `No se encontraron pagos para el empleado en ${mes}`,
         };
       }
+      const pais = await this.obtenerPaisLaboral(currentTenantId);
+      const moneda = String(
+        pagos.find((pago: any) => pago.moneda)?.moneda || this.monedaLaboralPorPais(pais),
+      ).toUpperCase();
 
       // Calcular totales
       const totalBruto = pagos.reduce(
@@ -1431,6 +2033,8 @@ export class RrhhService {
         totalDescuentos,
         totalNeto,
         mes,
+        pais,
+        moneda,
       });
 
       return {
@@ -1454,18 +2058,26 @@ export class RrhhService {
   }
 
   private generarBoletaHTML(empleado: any, pagos: any[], totales: any) {
+    const titulo =
+      totales.pais === 'CO'
+        ? 'Desprendible de Nómina'
+        : totales.pais === 'AR'
+          ? 'Recibo de Sueldo'
+          : 'Boleta de Pago';
+    const locale =
+      totales.pais === 'AR' ? 'es-AR' : totales.pais === 'CO' ? 'es-CO' : 'es-PE';
     return `
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Boleta de Pago - ${empleado.nombres} ${empleado.apellidos}</title>
+        <title>${titulo} - ${empleado.nombres} ${empleado.apellidos}</title>
     </head>
     <body>
         <div class="boleta">
             <div class="header">
                 <div class="company">NEON SYSTEM</div>
-                <div class="title">Boleta de Pago</div>
+                <div class="title">${titulo}</div>
                 <div class="periodo">Período: ${totales.mes}</div>
             </div>
 
@@ -1506,7 +2118,7 @@ export class RrhhService {
         .map((pago) => {
           const fechaPago = pago.fecha_pago
             ? new Date(pago.fecha_pago).toLocaleDateString(
-              'es-PE',
+              locale,
             )
             : 'N/A';
           return `
@@ -1516,15 +2128,15 @@ export class RrhhService {
               ? '💵 Efectivo'
               : '🏦 Transferencia'
             }</td>
-                                <td class="numero">S/ ${parseFloat(
+                                <td class="numero">${this.formatearMonedaLaboral(parseFloat(
               pago.monto_bruto || 0,
-            ).toFixed(2)}</td>
-                                <td class="numero">S/ ${parseFloat(
+            ), totales.moneda)}</td>
+                                <td class="numero">${this.formatearMonedaLaboral(parseFloat(
               pago.descuentos || 0,
-            ).toFixed(2)}</td>
-                                <td class="numero">S/ ${parseFloat(
+            ), totales.moneda)}</td>
+                                <td class="numero">${this.formatearMonedaLaboral(parseFloat(
               pago.monto_neto || 0,
-            ).toFixed(2)}</td>
+            ), totales.moneda)}</td>
                                 <td>${pago.estado}</td>
                             </tr>
                         `;
@@ -1539,20 +2151,23 @@ export class RrhhService {
                 <div class="resumen-grid">
                     <div class="resumen-item">
                         <div class="resumen-label">Total Bruto</div>
-                        <div class="resumen-valor bruto">S/ ${totales.totalBruto.toFixed(
-          2,
+                        <div class="resumen-valor bruto">${this.formatearMonedaLaboral(
+          totales.totalBruto,
+          totales.moneda,
         )}</div>
                     </div>
                     <div class="resumen-item">
                         <div class="resumen-label">Total Descuentos</div>
-                        <div class="resumen-valor descuentos">S/ ${totales.totalDescuentos.toFixed(
-          2,
+                        <div class="resumen-valor descuentos">${this.formatearMonedaLaboral(
+          totales.totalDescuentos,
+          totales.moneda,
         )}</div>
                     </div>
                     <div class="resumen-item">
                         <div class="resumen-label">Total Neto</div>
-                        <div class="resumen-valor neto">S/ ${totales.totalNeto.toFixed(
-          2,
+                        <div class="resumen-valor neto">${this.formatearMonedaLaboral(
+          totales.totalNeto,
+          totales.moneda,
         )}</div>
                     </div>
                 </div>
@@ -1562,7 +2177,7 @@ export class RrhhService {
                 <p>Este documento certifica los pagos realizados al empleado durante el período ${totales.mes
       }</p>
                 <p>Sistema ERP - Generado automáticamente el ${new Date().toLocaleDateString(
-        'es-PE',
+        locale,
       )}</p>
             </div>
         </div>
@@ -1610,6 +2225,11 @@ export class RrhhService {
   async calcularDepositosCts(periodo: string, tenantId: string) {
     if (!tenantId) {
       throw new BadRequestException('Tenant requerido para RRHH');
+    }
+    if ((await this.obtenerPaisLaboral(tenantId)) !== 'PE') {
+      throw new BadRequestException(
+        'CTS es un beneficio exclusivo de la normativa peruana; Colombia usa cesantías y Argentina su liquidación LCT.',
+      );
     }
 
     const semestre = semestreCts(periodo);
@@ -1744,6 +2364,104 @@ export class RrhhService {
     }
   }
 
+  private async validarContratoArgentina(contratoData: any, tenantId: string): Promise<void> {
+    const client = this.supabaseService.getClient();
+    const { data: config, error } = await client
+      .from('rrhh_configuracion_argentina')
+      .select(
+        'convenio_colectivo_codigo, art_tasa, periodo_prueba_max_meses, configuracion_confirmada',
+      )
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error && error.code !== 'PGRST116') throw error;
+
+    const moneda = String(contratoData?.moneda || 'ARS').trim().toUpperCase();
+    if (moneda !== 'ARS') {
+      throw new BadRequestException('Los contratos del tenant argentino deben liquidarse en ARS');
+    }
+
+    const tipo = String(contratoData?.tipo_contrato || '').trim().toLowerCase();
+    const esRelacionDependencia = !['locacion_servicios', 'servicios'].includes(tipo);
+    const convenio = String(
+      contratoData?.convenio_colectivo_codigo || config?.convenio_colectivo_codigo || '',
+    ).trim();
+    const categoria = String(contratoData?.categoria_convenio || '').trim();
+    if (esRelacionDependencia && (!convenio || !categoria)) {
+      throw new BadRequestException(
+        'El contrato argentino requiere convenio colectivo y categoría salarial para liquidar correctamente.',
+      );
+    }
+
+    const periodoPrueba = Number(contratoData?.periodo_prueba_meses ?? 0);
+    const maximo = Math.max(0, Number(config?.periodo_prueba_max_meses ?? 6));
+    if (!Number.isFinite(periodoPrueba) || periodoPrueba < 0 || periodoPrueba > maximo) {
+      throw new BadRequestException(
+        `El período de prueba configurado para este empleador no puede superar ${maximo} meses (LCT art. 92 bis).`,
+      );
+    }
+
+    const artTasa = Number(contratoData?.art_tasa ?? config?.art_tasa ?? 0);
+    if (esRelacionDependencia && (!Number.isFinite(artTasa) || artTasa <= 0)) {
+      throw new BadRequestException(
+        'Debe confirmar una alícuota ART antes de activar un contrato argentino.',
+      );
+    }
+
+    if (config && config.configuracion_confirmada === false) {
+      throw new BadRequestException(
+        'La configuración laboral Argentina debe ser confirmada antes de crear contratos.',
+      );
+    }
+  }
+
+  private async validarContratoColombia(contratoData: any, tenantId: string): Promise<void> {
+    const { data: config, error } = await this.supabaseService
+      .getClient()
+      .from('rrhh_configuracion_colombia')
+      .select(
+        'eps_default, fondo_pension_default, arl_default, arl_tasa, caja_compensacion_default, salario_minimo, configuracion_confirmada',
+      )
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error && error.code !== 'PGRST116') throw error;
+
+    const moneda = String(contratoData?.moneda || 'COP').trim().toUpperCase();
+    if (moneda !== 'COP') {
+      throw new BadRequestException('Los contratos del tenant colombiano deben liquidarse en COP');
+    }
+    const tipo = String(contratoData?.tipo_contrato || '').trim().toLowerCase();
+    const jornada = String(contratoData?.jornada_laboral || '').trim().toLowerCase();
+    const esDependiente = !['prestacion_servicios', 'locacion_servicios', 'servicios'].includes(tipo);
+    const jornadaCompleta = jornada === '' || jornada === 'tiempo_completo';
+    const sueldo = Number(contratoData?.sueldo_bruto ?? contratoData?.salario ?? 0);
+    const salarioMinimo = Number(config?.salario_minimo ?? 1_750_905);
+    if (esDependiente && jornadaCompleta && sueldo > 0 && sueldo < salarioMinimo) {
+      throw new BadRequestException(
+        `El salario de jornada completa no puede ser inferior al SMMLV vigente (COP ${salarioMinimo.toFixed(0)}).`,
+      );
+    }
+    const required = [
+      contratoData?.eps_codigo || config?.eps_default,
+      contratoData?.fondo_pension_codigo || config?.fondo_pension_default,
+      contratoData?.arl_codigo || config?.arl_default,
+      contratoData?.caja_compensacion_codigo || config?.caja_compensacion_default,
+    ];
+    if (esDependiente && required.some((value) => !String(value || '').trim())) {
+      throw new BadRequestException(
+        'El contrato colombiano requiere EPS, fondo de pensión, ARL y caja de compensación.',
+      );
+    }
+    const arlTasa = Number(contratoData?.arl_tasa ?? config?.arl_tasa ?? 0);
+    if (esDependiente && (!Number.isFinite(arlTasa) || arlTasa <= 0)) {
+      throw new BadRequestException('Debe configurar la clase y tasa ARL antes de activar el contrato.');
+    }
+    if (config && config.configuracion_confirmada === false) {
+      throw new BadRequestException(
+        'La configuración laboral Colombia debe ser confirmada antes de crear contratos.',
+      );
+    }
+  }
+
   async createContrato(contratoData: any, tenantId?: string) {
     // ✅ MULTI-TENANT: Agregar tenant_id
     if (!tenantId) {
@@ -1755,7 +2473,29 @@ export class RrhhService {
       throw new BadRequestException('Debe enviar empleado_id para crear contrato');
     }
 
-    await this.validarContratoPeru(contratoData, currentTenantId);
+    const paisLaboral = await this.obtenerPaisLaboral(currentTenantId);
+    if (paisLaboral === 'AR') {
+      contratoData = {
+        ...contratoData,
+        moneda: 'ARS',
+        regimen_pensionario: 'SIN_REGIMEN',
+        regimen_seguridad_social:
+          contratoData?.regimen_seguridad_social || 'SIPA',
+      };
+      await this.validarContratoArgentina(contratoData, currentTenantId);
+    } else if (paisLaboral === 'CO') {
+      contratoData = {
+        ...contratoData,
+        moneda: 'COP',
+        regimen_pensionario:
+          contratoData?.regimen_pensionario || 'PENSION_COLOMBIA',
+        regimen_seguridad_social:
+          contratoData?.regimen_seguridad_social || 'PILA',
+      };
+      await this.validarContratoColombia(contratoData, currentTenantId);
+    } else {
+      await this.validarContratoPeru(contratoData, currentTenantId);
+    }
 
     const metadataBase =
       contratoData?.metadata && typeof contratoData.metadata === 'object' && !Array.isArray(contratoData.metadata)
@@ -1764,6 +2504,14 @@ export class RrhhService {
     const metadata = {
       ...metadataBase,
       ...(contratoData?.cargo ? { cargo: String(contratoData.cargo).trim() } : {}),
+      ...(paisLaboral === 'PE' && contratoData?.regimen_pensionario === 'AFP'
+        ? {
+            afp_codigo: String(contratoData?.afp_codigo || 'INTEGRA').toUpperCase(),
+            tipo_comision_afp: String(contratoData?.tipo_comision_afp || 'FLUJO').toUpperCase(),
+            tasa_comision_afp: Number(contratoData?.tasa_comision_afp ?? 0.0155),
+            tasa_seguro_afp: Number(contratoData?.tasa_seguro_afp ?? 0.0137),
+          }
+        : {}),
     };
     const camposPermitidos = [
       'id',
@@ -1783,6 +2531,25 @@ export class RrhhService {
       'estado',
       'activo',
       'metadata',
+      'regimen_seguridad_social',
+      'convenio_colectivo_codigo',
+      'categoria_convenio',
+      'modalidad_contratacion_codigo',
+      'situacion_revista_codigo',
+      'obra_social_codigo',
+      'sindicato_codigo',
+      'sindicato_aporte_tasa',
+      'art_cuit',
+      'art_tasa',
+      'eps_codigo',
+      'fondo_pension_codigo',
+      'arl_codigo',
+      'caja_compensacion_codigo',
+      'ganancias_retencion_mensual',
+      'seguro_vida_monto',
+      'mejor_remuneracion_normal_habitual',
+      'tope_indemnizatorio_convenio',
+      'fondo_cese_reemplaza_indemnizacion',
     ];
     const datosLimpios = Object.fromEntries(
       Object.entries({
@@ -1904,6 +2671,8 @@ export class RrhhService {
     if (!contrato) {
       throw new NotFoundException('Contrato laboral no encontrado');
     }
+    const pais = await this.obtenerPaisLaboral(tenantId);
+    const moneda = String(contrato.moneda || this.monedaLaboralPorPais(pais)).toUpperCase();
 
     const empleadoId = contrato.empleado_id || contrato.id_empleado;
     let empleado: any = null;
@@ -1935,7 +2704,7 @@ export class RrhhService {
       doc.text(`Inicio: ${contrato.fecha_inicio || 'No consignado'}`);
       doc.text(`Fin: ${contrato.fecha_fin || 'Indefinido'}`);
       doc.text(`Estado: ${contrato.estado || 'No consignado'}`);
-      doc.text(`Remuneración: S/ ${salario.toFixed(2)}`);
+      doc.text(`Remuneración: ${this.formatearMonedaLaboral(salario, moneda)}`);
       if (contrato.observaciones) {
         doc.moveDown();
         doc.text(`Observaciones: ${contrato.observaciones}`);
@@ -2066,5 +2835,21 @@ export class RrhhService {
       if (error) throw error;
       return { success: true, data: data?.[0], message: 'Salida registrada' };
     }
+  }
+
+  private monedaLaboralPorPais(pais: string): 'PEN' | 'ARS' | 'COP' {
+    if (pais === 'AR') return 'ARS';
+    if (pais === 'CO') return 'COP';
+    return 'PEN';
+  }
+
+  private formatearMonedaLaboral(monto: number, moneda: string): string {
+    const codigo = String(moneda || 'PEN').toUpperCase();
+    const locale = codigo === 'ARS' ? 'es-AR' : codigo === 'COP' ? 'es-CO' : 'es-PE';
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: codigo,
+      minimumFractionDigits: 2,
+    }).format(Number(monto || 0));
   }
 }

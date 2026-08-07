@@ -25,6 +25,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 const CandidatosPage = () => {
   const [candidatos, setCandidatos] = useState<any[]>([]);
@@ -415,6 +416,9 @@ const CandidatosPage = () => {
 // Componente de formulario simple dentro del mismo archivo
 function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) {
   const { toast } = useToast();
+  const country = useCountryContext();
+  const isArgentina = country.paisCodigo === 'AR';
+  const isColombia = country.paisCodigo === 'CO';
   const [formData, setFormData] = useState({
     id_vacante: '',
     nombres: '',
@@ -422,7 +426,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
     email: '',
     telefono: '',
     numero_documento: '',
-    tipo_documento: 'DNI',
+    tipo_documento: isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI',
     fecha_nacimiento: '',
     direccion: '',
     nivel_educacion: 'universitario',
@@ -445,7 +449,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
         email: candidato.email || '',
         telefono: candidato.telefono || '',
         numero_documento: candidato.numero_documento || '',
-        tipo_documento: candidato.tipo_documento || 'DNI',
+        tipo_documento: candidato.tipo_documento || (isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI'),
         fecha_nacimiento: candidato.fecha_nacimiento || '',
         direccion: candidato.direccion || '',
         nivel_educacion: candidato.nivel_educacion || 'universitario',
@@ -456,8 +460,13 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
         estado: candidato.estado || 'postulante',
         observaciones: candidato.observaciones || ''
       });
+    } else {
+      setFormData((current) => ({
+        ...current,
+        tipo_documento: isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI',
+      }));
     }
-  }, [candidato]);
+  }, [candidato, isArgentina, isColombia]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -629,7 +638,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
           <div>
             <label htmlFor="candidatos-pretension-salarial" className="block text-[0.875rem] font-semibold mb-2">
-              Pretensión Salarial (S/)
+              Pretensión Salarial ({country.simboloMoneda || 'S/'})
             </label>
             <input id="candidatos-pretension-salarial"
               type="number"

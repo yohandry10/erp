@@ -113,6 +113,28 @@ describe('RrhhAccountingIntegrationService', () => {
     expect(detalles.some((d: any) => d.cuenta_id === `id-plan_cuentas-${inserts.plan_cuentas.indexOf(cuenta621) + 1}` && d.debe === 1000)).toBe(true);
   });
 
+  it('genera el asiento argentino sin etiquetas previsionales peruanas', async () => {
+    await service.generarAsientosPlanilla({
+      tenantId: 'tenant-ar',
+      planillaId: 'plan-ar',
+      periodo: '2026-07',
+      pais: 'AR',
+      moneda: 'ARS',
+      totalIngresos: 1200000,
+      totalDescuentos: 204000,
+      totalAportes: 216000,
+      totalNeto: 996000,
+      empleados: [],
+    });
+
+    const detalles = inserts.detalle_asientos[0];
+    const descripciones = detalles.map((detalle: any) => detalle.concepto).join(' ');
+    expect(descripciones).toContain('SIPA');
+    expect(descripciones).toContain('ART');
+    expect(descripciones).not.toContain('AFP/ONP');
+    expect(descripciones).not.toContain('ESSALUD');
+  });
+
   it('rechaza asiento de planilla descuadrado', async () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
     const planillaData = {
@@ -194,5 +216,30 @@ describe('RrhhAccountingIntegrationService', () => {
     const totalHaber = detalles.reduce((sum, d) => sum + Number(d.haber || 0), 0);
     expect(totalDebe).toBeCloseTo(totalHaber);
     expect(detalles.find((d: any) => d.debe === 1000)).toBeTruthy();
+  });
+
+  it('contabiliza la liquidación argentina completa sin tratarla como CTS', async () => {
+    const liquidacionFixture = {
+      id: 'liq-ar',
+      pais_codigo: 'AR',
+      monto_cts: 0,
+      indemnizacion: 1000000,
+      total_liquidacion: 1450000,
+      tenant_id: 'tenant-ar',
+      empleados: { nombres: 'Ana', apellidos: 'Gómez', numero_documento: '20301234563' }
+    };
+    const { client, inserts: insertStore } = createSupabaseMock({ liquidaciones: liquidacionFixture });
+    inserts = insertStore;
+    supabaseService.getClient.mockReturnValue(client);
+    service = new RrhhAccountingIntegrationService(supabaseService);
+
+    await service.generarAsientoLiquidacion(liquidacionFixture.id);
+
+    const detalles = inserts.detalle_asientos[0];
+    expect(detalles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ debe: 1450000, concepto: expect.stringContaining('argentina') }),
+      expect.objectContaining({ haber: 1450000 }),
+    ]));
+    expect(detalles.map((detalle: any) => detalle.concepto).join(' ')).not.toContain('CTS');
   });
 });

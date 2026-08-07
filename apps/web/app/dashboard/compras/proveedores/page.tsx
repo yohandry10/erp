@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { Proveedor } from '@/types/compras'
 import toast from 'react-hot-toast'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
   Search,
   Plus,
@@ -21,6 +22,7 @@ import {
 export default function ProveedoresPage() {
   const router = useRouter()
   const { get, del } = useApi()
+  const { formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
 
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [loading, setLoading] = useState(true)
@@ -116,10 +118,7 @@ export default function ProveedoresPage() {
 
   const formatCurrency = (amount: number | undefined) => {
     if (!amount) return '-'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(amount)
+    return formatLocalizedCurrency(amount)
   }
 
   return (
@@ -182,7 +181,7 @@ export default function ProveedoresPage() {
             />
             <input
               type="text"
-              placeholder="Buscar por RUC, razón social o nombre comercial..."
+              placeholder={`Buscar por ${taxIdLabel}, razón social o nombre comercial...`}
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)} className="w-[100%] pt-3 pr-4 pb-3 pl-12 rounded-lg border text-[0.875rem]"
             />
@@ -269,7 +268,7 @@ export default function ProveedoresPage() {
                   <thead>
                     <tr>
                       <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
-                        RUC
+                        {taxIdLabel}
                       </th>
                       <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
                         Razón Social

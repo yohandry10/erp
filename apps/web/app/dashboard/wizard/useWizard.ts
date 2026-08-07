@@ -7,6 +7,7 @@ import { useCountryContext } from '@/hooks/use-country-context'
 import { fetchApi } from '@/lib/api-fetch'
 import { isOfflineQueuedResponse } from '@/lib/offline-store'
 import { INITIAL_ACTIVE_COUNTRY_CODE, INITIAL_ACTIVE_COUNTRY_ID } from '@/lib/initial-country'
+import { validateCountryTaxId } from '@/lib/country-tax-id'
 
 export function useWizard() {
   const country = useCountryContext()
@@ -44,7 +45,10 @@ export function useWizard() {
         // VALIDACIÓN ESTRICTA: Solo marcar como completo si TODOS los campos críticos existen
         const isReallyComplete = statusData.success &&
           statusData.data?.isComplete === true &&
-          statusData.data?.certificate?.exists === true &&
+          (
+            statusData.data?.isDemo === true ||
+            statusData.data?.certificate?.exists === true
+          ) &&
           statusData.data?.certificate?.isValid === true &&
           statusData.data?.ruc?.isConfigured === true &&
           (!statusData.data?.ruc?.missingFields || statusData.data.ruc.missingFields.length === 0)
@@ -301,8 +305,12 @@ export function useWizard() {
         isValid = false
       } else {
         const normalized = ruc.replace(/\D/g, '')
-        if (normalized.length !== 11) {
-          errors.push(`El ${documentoFiscal} debe tener 11 dígitos`)
+        if (!validateCountryTaxId(country.paisCodigo || 'PE', normalized)) {
+          errors.push(
+            country.paisCodigo === 'AR'
+              ? 'El CUIT debe tener 11 dígitos y dígito verificador válido'
+              : `El ${documentoFiscal} debe tener 11 dígitos`,
+          )
           isValid = false
         }
       }
@@ -346,8 +354,14 @@ export function useWizard() {
     const showLoader = !options?.silent
     const configuration = {
       ...state.configuration,
-      pais: INITIAL_ACTIVE_COUNTRY_CODE,
-      pais_id: Number(INITIAL_ACTIVE_COUNTRY_ID),
+      pais: (country.paisCodigo || INITIAL_ACTIVE_COUNTRY_CODE) as 'PE' | 'AR' | 'CO',
+      pais_id: country.paisId || Number(INITIAL_ACTIVE_COUNTRY_ID),
+      igv_porcentaje: state.configuration.igv_porcentaje || country.impuestoRate * 100,
+      emision_cpe_modo: country.paisCodigo === 'AR'
+        ? 'ARCA_WSFE'
+        : country.paisCodigo === 'CO'
+          ? 'DIAN_DIRECTO'
+          : state.configuration.emision_cpe_modo,
     }
 
     try {
@@ -384,7 +398,16 @@ export function useWizard() {
         setLoading(false)
       }
     }
-  }, [state.configuration, state.hasPersistedConfiguration, setLoading, setError, setPersistedConfiguration])
+  }, [
+    country.impuestoRate,
+    country.paisCodigo,
+    country.paisId,
+    state.configuration,
+    state.hasPersistedConfiguration,
+    setLoading,
+    setError,
+    setPersistedConfiguration,
+  ])
 
   const resetWizardProcess = useCallback(async () => {
     try {
@@ -453,8 +476,14 @@ export function useWizard() {
       if (!state.configuration.serie_factura) {
         return false
       }
-      if (!state.configuration.serie_boleta) {
+      if (country.paisCodigo === 'PE' && !state.configuration.serie_boleta) {
         return false
+      }
+      if (country.paisCodigo === 'CO') {
+        return !!(
+          state.configuration.dian_tipo_contribuyente &&
+          state.configuration.dian_regimen_fiscal
+        )
       }
       if (!state.configuration.regimen_tributario) {
         return false
@@ -464,6 +493,33 @@ export function useWizard() {
 
     // SUNAT/OSE step
     if (currentStepData.id === 'sunat') {
+      if (country.paisCodigo === 'AR') {
+        return !!(
+          state.configuration.arca_punto_venta &&
+          state.configuration.arca_condicion_iva &&
+          state.configuration.ingresos_brutos &&
+          state.configuration.fecha_inicio_actividades &&
+          state.configuration.provincia_fiscal
+        )
+      }
+      if (country.paisCodigo === 'CO') {
+        const homologacion = (state.configuration.dian_environment || 'HOMOLOGACION') === 'HOMOLOGACION'
+        return !!(
+          state.configuration.dian_activo &&
+          state.configuration.dian_url &&
+          state.configuration.dian_usuario &&
+          state.configuration.dian_password &&
+          state.configuration.dian_software_id &&
+          state.configuration.dian_software_pin &&
+          (!homologacion || state.configuration.dian_test_set_id) &&
+          state.configuration.dian_resolucion_numero &&
+          state.configuration.dian_resolucion_prefijo &&
+          state.configuration.dian_resolucion_desde &&
+          state.configuration.dian_resolucion_hasta &&
+          state.configuration.dian_resolucion_fecha_inicio &&
+          state.configuration.dian_resolucion_fecha_fin
+        )
+      }
       const modo = state.configuration.emision_cpe_modo || 'SUNAT_DIRECTO'
 
       if (modo === 'SUNAT_DIRECTO') {

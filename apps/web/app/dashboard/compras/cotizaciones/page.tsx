@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { CotizacionCompra, Proveedor } from '@/types/compras'
 import toast from 'react-hot-toast'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
   Search,
   Plus,
@@ -23,6 +24,7 @@ import {
 export default function CotizacionesCompraPage() {
   const router = useRouter()
   const { get } = useApi()
+  const { formatCurrency: formatLocalizedCurrency, locale, taxIdLabel } = useLocalizedMoney()
 
   const [cotizaciones, setCotizaciones] = useState<CotizacionCompra[]>([])
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
@@ -140,14 +142,11 @@ export default function CotizacionesCompraPage() {
 
   const formatCurrency = (amount: number | undefined) => {
     if (!amount) return '-'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(amount)
+    return formatLocalizedCurrency(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return new Date(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -384,7 +383,7 @@ export default function CotizacionesCompraPage() {
                           </div>
                           {cotizacion.proveedores?.ruc && (
                             <div className="text-xs text-muted-foreground">
-                              RUC: {cotizacion.proveedores.ruc}
+                              {taxIdLabel}: {cotizacion.proveedores.ruc}
                             </div>
                           )}
                         </td>

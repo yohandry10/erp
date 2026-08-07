@@ -6,7 +6,7 @@ export const configuracionHelp: Record<string, HelpItem> = {
     title: 'Datos de Empresa',
     description: 'Información general de tu empresa.',
     tips: [
-      'RUC y razón social aparecen en comprobantes',
+      'El identificador fiscal y la razón social aparecen en comprobantes',
       'Configura logo para documentos'
     ],
     link: '/dashboard/configuracion/empresa'
@@ -44,7 +44,7 @@ export const configuracionHelp: Record<string, HelpItem> = {
     title: 'Serie de Comprobante',
     description: 'Prefijo para numeración de documentos.',
     tips: [
-      'F001 para facturas, B001 para boletas',
+      'Usa las series o prefijos autorizados por la autoridad fiscal del país',
       'Cada punto de venta puede tener su serie'
     ]
   },
@@ -53,7 +53,7 @@ export const configuracionHelp: Record<string, HelpItem> = {
     title: 'Impuesto',
     description: 'Configuración de tasas impositivas.',
     tips: [
-      'IGV estándar: 18%',
+      'La tasa principal depende del país y del tratamiento del producto',
       'Algunos productos pueden ser exonerados'
     ]
   },
@@ -62,8 +62,8 @@ export const configuracionHelp: Record<string, HelpItem> = {
     title: 'Moneda',
     description: 'Divisa para operaciones.',
     tips: [
-      'PEN: Soles peruanos',
-      'USD: Dólares americanos',
+      'El tenant usa PEN, ARS o COP según el país seleccionado',
+      'USD puede habilitarse como moneda adicional',
       'Configura tipo de cambio diario'
     ]
   },

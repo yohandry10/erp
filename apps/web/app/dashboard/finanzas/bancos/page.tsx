@@ -7,6 +7,7 @@ import { useApi } from '@/hooks/use-api'
 import CuentaBancariaCard from '@/components/finanzas/CuentaBancariaCard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CuentaBancaria {
   id: string
@@ -73,6 +74,7 @@ const normalizeSaldos = (raw: any): SaldosConsolidados => ({
 })
 
 export default function BancosPage() {
+  const country = useCountryContext()
   const router = useRouter()
   const { get } = useApi()
 
@@ -111,9 +113,11 @@ export default function BancosPage() {
     loadSaldosConsolidados()
   }, [loadCuentas, loadSaldosConsolidados])
 
-  const formatCurrency = (amount: number, moneda: string = 'PEN') => {
-    const currency = moneda === 'USD' ? 'USD' : moneda === 'EUR' ? 'EUR' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
+  const formatCurrency = (amount: number, moneda: string = country.moneda || 'PEN') => {
+    const currency = ['USD', 'EUR', 'ARS', 'PEN'].includes(moneda)
+      ? moneda
+      : country.moneda || 'PEN'
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
       currency,
     }).format(toNumber(amount))

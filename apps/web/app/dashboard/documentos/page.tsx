@@ -69,6 +69,8 @@ const estadoClasses: Record<string, string> = {
 
 export default function DocumentosPage() {
   const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
   const { toast } = useToast()
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [stats, setStats] = useState<DocumentoStats | null>(null)
@@ -129,6 +131,14 @@ export default function DocumentosPage() {
 
   const showSuccessToast = (message: string) => toast({ title: 'Operacion completada', description: message })
   const showErrorToast = (message: string) => toast({ title: 'No se pudo completar', description: message, variant: 'destructive' })
+  const openNewDocumentFlow = () => {
+    if (isArgentina) {
+      window.location.assign('/dashboard/cpe/')
+      return
+    }
+    setSelectedDocumento(null)
+    setIsModalOpen(true)
+  }
 
   const enviarFiscal = async (documentoId: string) => {
     const response = await postDocumentoAction(`/api/documentos/${documentoId}/enviar-sunat`)
@@ -220,8 +230,8 @@ export default function DocumentosPage() {
 
   const getTipoDocumentoDisplay = (tipo: string) => {
     const tipos: Record<string, string> = {
-      FACTURA: 'Factura',
-      BOLETA: 'Boleta',
+      FACTURA: isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura',
+      BOLETA: isArgentina ? 'Factura B' : isColombia ? 'Documento equivalente' : 'Boleta',
       NOTA_CREDITO: 'Nota de Credito',
       NOTA_DEBITO: 'Nota de Debito',
       CONTRATO: 'Contrato',
@@ -249,7 +259,7 @@ export default function DocumentosPage() {
   const statCards: StatCard[] = [
     { label: 'Total documentos', value: stats?.totalDocumentos || 0, description: 'Registrados', icon: FileText },
     { label: 'Facturas', value: stats?.facturas || 0, description: 'Emitidas', icon: FileText },
-    { label: 'Boletas', value: stats?.boletas || 0, description: 'Emitidas', icon: FileText },
+    { label: isArgentina ? 'Facturas B' : isColombia ? 'Documentos equivalentes' : 'Boletas', value: stats?.boletas || 0, description: 'Emitidos', icon: FileText },
     { label: 'Notas credito', value: stats?.notasCredito || 0, description: 'Notas emitidas', icon: FileText },
     { label: 'Contratos', value: stats?.contratos || 0, description: 'Registrados', icon: FileText },
     { label: 'Pendientes envio', value: stats?.pendientesEnvio || 0, description: `Por enviar a ${country.servicioFiscal}`, icon: Send },
@@ -277,7 +287,11 @@ export default function DocumentosPage() {
               </div>
               <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">Gestión Documental y Facturación Electrónica</h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                Facturas, boletas, notas y contratos con validacion {country.servicioFiscal}.
+                {isArgentina
+                  ? 'Repositorio de facturas A/B, notas, contratos y documentos emitidos mediante ARCA.'
+                  : isColombia
+                    ? 'Facturas electrónicas, documentos equivalentes, notas y contratos con validación DIAN.'
+                    : `Facturas, boletas, notas y contratos con validación ${country.servicioFiscal}.`}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -285,9 +299,9 @@ export default function DocumentosPage() {
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
-              <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              <Button type="button" onClick={openNewDocumentFlow} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
-                Crear documento
+                {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Crear documento DIAN' : 'Crear documento'}
               </Button>
             </div>
           </div>
@@ -320,7 +334,7 @@ export default function DocumentosPage() {
               <select className={inputClass} value={filters.tipo_documento} onChange={(event) => setFilters((prev) => ({ ...prev, tipo_documento: event.target.value }))}>
                 <option value="">Todos los tipos</option>
                 <option value="FACTURA">Facturas</option>
-                <option value="BOLETA">Boletas</option>
+                <option value="BOLETA">{isArgentina ? 'Facturas B' : isColombia ? 'Documentos equivalentes' : 'Boletas'}</option>
                 <option value="NOTA_CREDITO">Notas de Credito</option>
                 <option value="NOTA_DEBITO">Notas de Debito</option>
                 <option value="CONTRATO">Contratos</option>
@@ -339,12 +353,14 @@ export default function DocumentosPage() {
               </select>
             </label>
             <label className="space-y-2">
-              <span className={labelClass}>RUC/DNI cliente</span>
+              <span className={labelClass}>
+                {isArgentina ? 'CUIT/DNI cliente' : isColombia ? 'NIT/CC cliente' : 'RUC/DNI cliente'}
+              </span>
               <input className={inputClass} type="text" value={filters.receptor_numero_doc} onChange={(event) => setFilters((prev) => ({ ...prev, receptor_numero_doc: event.target.value }))} placeholder="Buscar por documento" />
             </label>
             <label className="space-y-2">
               <span className={labelClass}>Serie</span>
-              <input className={inputClass} type="text" value={filters.serie} onChange={(event) => setFilters((prev) => ({ ...prev, serie: event.target.value }))} placeholder="F001" />
+              <input className={inputClass} type="text" value={filters.serie} onChange={(event) => setFilters((prev) => ({ ...prev, serie: event.target.value }))} placeholder={isArgentina ? '00001' : isColombia ? 'FE' : 'F001'} />
             </label>
             <label className="space-y-2">
               <span className={labelClass}>Desde</span>
@@ -367,9 +383,9 @@ export default function DocumentosPage() {
               <CardTitle className="text-base text-foreground">Lista de documentos</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">{documentos.length} registros cargados</p>
             </div>
-            <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+            <Button type="button" onClick={openNewDocumentFlow} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <Plus className="h-4 w-4" />
-              Nuevo documento
+              {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Nuevo documento DIAN' : 'Nuevo documento'}
             </Button>
           </CardHeader>
           <CardContent className="p-0">
@@ -377,10 +393,16 @@ export default function DocumentosPage() {
               <div className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
                 <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
                 <h3 className="text-lg font-bold text-foreground">No hay documentos registrados</h3>
-                <p className="mt-2 text-sm text-muted-foreground">Comienza creando tu primer documento.</p>
-                <Button type="button" onClick={() => setIsModalOpen(true)} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {isArgentina
+                    ? 'Los comprobantes fiscales se emiten desde el módulo ARCA y aparecen aquí como documentos.'
+                    : isColombia
+                      ? 'Comienza creando tu primer documento electrónico para DIAN.'
+                      : 'Comienza creando tu primer documento.'}
+                </p>
+                <Button type="button" onClick={openNewDocumentFlow} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
                   <Plus className="h-4 w-4" />
-                  Crear primer documento
+                  {isArgentina ? 'Ir a Comprobantes ARCA' : isColombia ? 'Crear documento DIAN' : 'Crear primer documento'}
                 </Button>
               </div>
             ) : (
@@ -402,7 +424,7 @@ export default function DocumentosPage() {
                       <tr key={documento.id} className="bg-card/35 text-foreground/90 transition hover:bg-card/70">
                         <td className="px-4 py-3 font-semibold text-foreground">{getTipoDocumentoDisplay(documento.tipo_documento)}</td>
                         <td className="px-4 py-3 font-mono font-semibold text-foreground">{documento.serie}-{documento.numero}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{parseDateLocal(documento.fecha_emision).toLocaleDateString('es-PE')}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{parseDateLocal(documento.fecha_emision).toLocaleDateString(country.locale || 'es-PE')}</td>
                         <td className="px-4 py-3">
                           <div className="font-semibold text-foreground">{documento.receptor_razon_social}</div>
                           <div className="text-xs text-muted-foreground">{documento.receptor_numero_doc}</div>
@@ -417,10 +439,12 @@ export default function DocumentosPage() {
                           <div className="flex flex-wrap justify-end gap-2">
                             {documento.estado === 'BORRADOR' && (
                               <>
-                                <Button type="button" size="sm" onClick={() => generarXML(documento.id)} className="gap-1 bg-blue-600 text-white hover:bg-blue-500">
-                                  <FileText className="h-4 w-4" />
-                                  XML
-                                </Button>
+                                {!isArgentina && (
+                                  <Button type="button" size="sm" onClick={() => generarXML(documento.id)} className="gap-1 bg-blue-600 text-white hover:bg-blue-500">
+                                    <FileText className="h-4 w-4" />
+                                    XML
+                                  </Button>
+                                )}
                                 <Button
                                   type="button"
                                   size="sm"
@@ -448,10 +472,12 @@ export default function DocumentosPage() {
                                   <Download className="h-4 w-4" />
                                   PDF
                                 </Button>
-                                <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
-                                  <Download className="h-4 w-4" />
-                                  XML
-                                </Button>
+                                {!isArgentina && (
+                                  <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
+                                    <Download className="h-4 w-4" />
+                                    XML
+                                  </Button>
+                                )}
                               </>
                             )}
                             {!['ANULADO'].includes(documento.estado) && (

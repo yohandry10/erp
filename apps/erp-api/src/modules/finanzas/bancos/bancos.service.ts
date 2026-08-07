@@ -39,6 +39,12 @@ export class BancosService {
     userId?: string,
   ): Promise<{ success: boolean; data: any }> {
     const client = this.supabase.getClient();
+    const { data: empresaConfig } = await client
+      .from('empresa_config')
+      .select('moneda_defecto')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    const monedaDefecto = String(empresaConfig?.moneda_defecto || 'PEN').toUpperCase();
 
     // Validar que no exista una cuenta con el mismo número para este tenant
     const { data: existente } = await client
@@ -71,7 +77,7 @@ export class BancosService {
       banco: dto.banco,
       numero_cuenta: dto.numero_cuenta,
       tipo_cuenta: dto.tipo_cuenta ?? 'CORRIENTE',
-      moneda: dto.moneda ?? 'PEN',
+      moneda: dto.moneda ?? monedaDefecto,
       saldo: this.round2(saldoInicial),
       permite_sobregiro: permiteSobregiro,
       activa: dto.activa ?? true,

@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { buildDeterministicUuid } from '../../../common/util/deterministic-uuid.util';
 
 export enum EstadoPeriodo {
   ABIERTO = 'ABIERTO',
@@ -230,6 +231,39 @@ export class PeriodosService {
   }
 
   /**
+   * Cuenta los asientos en BORRADOR dentro del período. Cerrar con borradores
+   * pendientes dejaría movimientos fuera de los libros sin posibilidad de
+   * confirmarlos después, porque el período ya no admitiría escrituras.
+   * @param tenantId - ID del tenant
+   * @param anio - Año del período
+   * @param mes - Mes del período (1-12)
+   */
+  async contarAsientosBorrador(
+    tenantId: string,
+    anio: number,
+    mes: number
+  ): Promise<number> {
+    const fechaInicio = new Date(anio, mes - 1, 1).toISOString();
+    const fechaFin = new Date(anio, mes, 0, 23, 59, 59).toISOString();
+
+    const { count, error } = await this.supabaseService
+      .getClient()
+      .from('asientos_contables')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('estado', 'BORRADOR')
+      .gte('fecha', fechaInicio)
+      .lte('fecha', fechaFin);
+
+    if (error) {
+      console.error('❌ [Periodos] Error contando asientos en borrador:', error);
+      throw new Error(`Error contando asientos en borrador: ${error.message}`);
+    }
+
+    return count || 0;
+  }
+
+  /**
    * Valida que no haya eventos pendientes para el período
    * @param tenantId - ID del tenant
    * @param anio - Año del período
@@ -309,16 +343,22 @@ export class PeriodosService {
       );
     }
 
+    // Validar que no queden asientos en borrador sin confirmar
+    const borradores = await this.contarAsientosBorrador(tenantId, anio, mes);
+    if (borradores > 0) {
+      throw new BadRequestException(
+        `No se puede cerrar el período. Hay ${borradores} asiento(s) en BORRADOR sin confirmar. ` +
+        `Confírmelos o anúlelos antes de cerrar.`
+      );
+    }
+
     // Generar asientos de cierre si es fin de año (diciembre)
     if (mes === 12) {
       console.log(`📊 [Periodos] Generando asientos de cierre de año ${anio} para tenant ${tenantId}`);
-      try {
-        await this.generarAsientosCierreAnual(tenantId, anio, usuarioId);
-      } catch (error) {
-        console.error('❌ [Periodos] Error generando asientos de cierre:', error);
-        // No bloqueamos el cierre si falla la generación de asientos de cierre
-        console.warn('⚠️ [Periodos] Continuando con cierre a pesar del error en asientos de cierre');
-      }
+      // Si esto falla, el ejercicio quedaría cerrado sin asiento de cierre de
+      // resultados y la única señal sería una línea de log. El cierre debe
+      // fallar entero para que se pueda reintentar tras corregir la causa.
+      await this.generarAsientosCierreAnual(tenantId, anio, usuarioId);
     }
 
     // Cerrar el período
@@ -399,20 +439,22 @@ export class PeriodosService {
       .in('codigo', ['59', '89']);
 
     if (cuentaError) {
-      console.warn('⚠️ [Periodos] Error obteniendo cuentas de cierre PCGE, omitiendo asientos de cierre:', cuentaError);
-      return;
+      throw new Error(`Error obteniendo cuentas de cierre PCGE: ${cuentaError.message}`);
     }
 
     const cuentaResultados = (cuentasCierre || []).find((cuenta: any) => cuenta.codigo === '59');
     const cuentaDeterminacion = (cuentasCierre || []).find((cuenta: any) => cuenta.codigo === '89');
     if (!cuentaResultados || !cuentaDeterminacion) {
-      console.warn('⚠️ [Periodos] Faltan cuentas 59/89 para cierre anual PCGE, omitiendo asientos de cierre');
-      return;
+      throw new Error(
+        'No se puede cerrar el ejercicio: faltan las cuentas PCGE 59 y/o 89.'
+      );
     }
 
     // Crear asiento de cierre
     const fechaCierre = new Date(anio, 11, 31); // 31 de diciembre
-    const sourceEventId = `cierre-anual:${anio}`;
+    // source_event_id es uuid con índice único por tenant: la clave lógica del
+    // cierre debe derivarse a un uuid estable, no pasarse como texto.
+    const sourceEventId = buildDeterministicUuid(`cierre-anual:${tenantId}:${anio}`);
 
     const { data: asientoExistente, error: asientoExistenteError } = await this.supabaseService
       .getClient()
@@ -431,44 +473,15 @@ export class PeriodosService {
       return;
     }
 
-    const { data: asiento, error: asientoError } = await this.supabaseService
-      .getClient()
-      .from('asientos_contables')
-      .insert({
-        tenant_id: tenantId,
-        fecha: fechaCierre.toISOString(),
-        concepto: `Asiento de cierre del ejercicio ${anio}`,
-        descripcion: `Asiento de cierre del ejercicio ${anio}`,
-        tipo_asiento: 'CIERRE',
-        origen: 'CIERRE_ANUAL',
-        referencia: `CIERRE-${anio}`,
-        source_event_id: sourceEventId,
-        total_debe: Math.abs(resultadoEjercicio),
-        total_haber: Math.abs(resultadoEjercicio),
-        estado: 'APROBADO',
-        created_by: usuarioId
-      })
-      .select()
-      .single();
-
-    if (asientoError || !asiento) {
-      console.error('❌ [Periodos] Error creando asiento de cierre:', asientoError);
-      throw new Error(`Error creando asiento de cierre: ${asientoError?.message}`);
-    }
-
-    // Crear detalle del asiento (transferir resultado a resultados acumulados)
     const detalles = resultadoEjercicio > 0
       ? [
-          // Utilidad: cerrar cuentas de ingresos y gastos, abonar a resultados acumulados
           {
-            asiento_id: asiento.id,
             cuenta_id: cuentaDeterminacion.id,
             debe: resultadoEjercicio,
             haber: 0,
             concepto: `Determinacion del resultado ${anio}`
           },
           {
-            asiento_id: asiento.id,
             cuenta_id: cuentaResultados.id,
             debe: 0,
             haber: resultadoEjercicio,
@@ -476,16 +489,13 @@ export class PeriodosService {
           }
         ]
       : [
-          // Pérdida: cerrar cuentas de ingresos y gastos, cargar a resultados acumulados
           {
-            asiento_id: asiento.id,
             cuenta_id: cuentaResultados.id,
             debe: Math.abs(resultadoEjercicio),
             haber: 0,
             concepto: `Perdida del ejercicio ${anio}`
           },
           {
-            asiento_id: asiento.id,
             cuenta_id: cuentaDeterminacion.id,
             debe: 0,
             haber: Math.abs(resultadoEjercicio),
@@ -493,14 +503,29 @@ export class PeriodosService {
           }
         ];
 
-    const { error: detalleError } = await this.supabaseService
+    const { error: asientoError } = await this.supabaseService
       .getClient()
-      .from('detalle_asientos')
-      .insert(detalles);
+      .rpc('crear_asiento_con_detalles_tx', {
+        p_tenant_id: tenantId,
+        p_asiento: {
+          fecha: fechaCierre.toISOString(),
+          concepto: `Asiento de cierre del ejercicio ${anio}`,
+          descripcion: `Asiento de cierre del ejercicio ${anio}`,
+        tipo_asiento: 'CIERRE',
+        origen: 'CIERRE_ANUAL',
+          referencia: `CIERRE-${anio}`,
+          source_event_id: sourceEventId,
+          estado: 'CONFIRMADO',
+          created_by: usuarioId,
+          confirmado_por: usuarioId,
+          confirmado_en: new Date().toISOString()
+        },
+        p_detalles: detalles
+      });
 
-    if (detalleError) {
-      console.error('❌ [Periodos] Error creando detalle de asiento de cierre:', detalleError);
-      throw new Error(`Error creando detalle de asiento de cierre: ${detalleError.message}`);
+    if (asientoError) {
+      console.error('❌ [Periodos] Error creando asiento de cierre:', asientoError);
+      throw new Error(`Error creando asiento de cierre: ${asientoError?.message}`);
     }
 
     console.log(`✅ [Periodos] Asiento de cierre anual ${anio} generado exitosamente`);

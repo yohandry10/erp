@@ -22,6 +22,7 @@ import { parseDateLocal } from '@/lib/date-utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import toast from 'react-hot-toast'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface OrdenCompra {
   id: string
@@ -149,6 +150,7 @@ const normalizeOrden = (raw: any): OrdenCompra => ({
 })
 
 export default function OrdenesCompraPage() {
+  const { formatCurrency: formatLocalizedCurrency, locale, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
   const { get } = useApi()
 
@@ -233,17 +235,14 @@ export default function OrdenesCompraPage() {
   }
 
   const formatCurrency = (amount: number | undefined) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(toNumber(amount))
+    return formatLocalizedCurrency(toNumber(amount))
   }
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return '-'
     const parsed = parseDateLocal(dateString)
     if (Number.isNaN(parsed.getTime())) return '-'
-    return parsed.toLocaleDateString('es-PE', {
+    return parsed.toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -290,7 +289,7 @@ export default function OrdenesCompraPage() {
 
       <div className="mt-4 min-h-14">
         <div className="line-clamp-2 text-sm font-semibold text-foreground">{orden.proveedores?.razon_social || 'Proveedor N/A'}</div>
-        {orden.proveedores?.ruc && <div className="mt-1 text-xs text-primary/70">RUC: {orden.proveedores.ruc}</div>}
+        {orden.proveedores?.ruc && <div className="mt-1 text-xs text-primary/70">{taxIdLabel}: {orden.proveedores.ruc}</div>}
       </div>
 
       <div className={`mt-4 rounded-xl border ${config.border} bg-gradient-to-br ${config.panel} p-3`}>
@@ -528,7 +527,7 @@ export default function OrdenesCompraPage() {
                           <td className="px-4 py-3 font-mono font-semibold text-foreground">{orden.numero}</td>
                           <td className="px-4 py-3">
                             <div className="font-semibold text-foreground">{orden.proveedores?.razon_social || 'N/A'}</div>
-                            {orden.proveedores?.ruc && <div className="text-xs text-muted-foreground">RUC: {orden.proveedores.ruc}</div>}
+                            {orden.proveedores?.ruc && <div className="text-xs text-muted-foreground">{taxIdLabel}: {orden.proveedores.ruc}</div>}
                           </td>
                           <td className="px-4 py-3 text-muted-foreground">{formatDate(orden.fecha_orden)}</td>
                           <td className="px-4 py-3 text-muted-foreground">{formatDate(orden.fecha_entrega_esperada)}</td>

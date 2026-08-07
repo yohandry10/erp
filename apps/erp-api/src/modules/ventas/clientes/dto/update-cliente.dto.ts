@@ -13,12 +13,12 @@ export class UpdateClienteDto {
   tipo?: TipoCliente;
 
   @IsOptional()
-  @IsEnum(TipoDocumento, { message: 'El tipo de documento debe ser DNI, RUC, CE o PASAPORTE' })
+  @IsEnum(TipoDocumento, { message: 'El tipo de documento debe ser DNI, RUC, CUIT, NIT, CC, TI, CE o PASAPORTE' })
   documento_tipo?: TipoDocumento;
 
   @IsOptional()
   @IsString({ message: 'El número de documento es requerido' })
-  @Length(8, 20, { message: 'El número de documento debe tener entre 8 y 20 caracteres' })
+  @Length(6, 20, { message: 'El número de documento debe tener entre 6 y 20 caracteres' })
   @Matches(/^[0-9A-Z]+$/, { message: 'El número de documento solo puede contener números y letras mayúsculas' })
   documento_numero?: string;
 

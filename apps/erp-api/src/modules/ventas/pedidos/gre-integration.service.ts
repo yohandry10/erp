@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { GreService } from '../../gre/gre.service';
 import { CreateGuiaRemisionDto } from '../../gre/gre.types';
@@ -40,6 +40,9 @@ export class GREIntegrationService {
     try {
       // Obtener configuración del tenant
       const config = await this.obtenerConfiguracionGRE(tenantId);
+      if (config.pais && config.pais !== 'PE') {
+        return { sugerir: false, obligatorio: false, automatico: false };
+      }
 
       // Verificar si GRE es obligatorio (Requirement 11.3, 22.4)
       if (config.gre_obligatorio) {
@@ -106,6 +109,12 @@ export class GREIntegrationService {
     this.logger.log(`Preparando datos de GRE para pedido ${pedido.id} y factura ${facturaId}`);
 
     try {
+      const config = await this.obtenerConfiguracionGRE(tenantId);
+      if (config.pais && config.pais !== 'PE') {
+        throw new BadRequestException(
+          'La GRE es exclusiva de Perú; el tenant argentino utiliza documentación de traslado local fuera de SUNAT.',
+        );
+      }
       // Obtener datos del cliente (Requirement 22.3)
       const cliente = await this.obtenerCliente(pedido.cliente_id, tenantId);
 
@@ -206,15 +215,25 @@ export class GREIntegrationService {
    * Requirements: 11.1, 11.2, 22.1
    */
   private async obtenerConfiguracionGRE(tenantId: string): Promise<{
+    pais?: string;
+    moneda?: string;
     gre_obligatorio: boolean;
     gre_automatico_habilitado: boolean;
     umbral_gre_automatico: number;
   }> {
-    const { data: config, error } = await this.supabase.getClient()
-      .from('empresa_config')
-      .select('gre_obligatorio, gre_automatico_habilitado, umbral_gre_automatico')
-      .eq('tenant_id', tenantId)
-      .single();
+    let config: any = null;
+    let error: any = null;
+    try {
+      const result = await this.supabase.getClient()
+        .from('empresa_config')
+        .select('pais, moneda_defecto, gre_obligatorio, gre_automatico_habilitado, umbral_gre_automatico')
+        .eq('tenant_id', tenantId)
+        .single();
+      config = result.data;
+      error = result.error;
+    } catch (queryError) {
+      error = queryError;
+    }
 
     if (error) {
       this.logger.warn(`No se pudo obtener configuración de GRE para tenant ${tenantId}, usando valores por defecto`);
@@ -228,6 +247,8 @@ export class GREIntegrationService {
     }
 
     return {
+      pais: String(config.pais || 'PE').toUpperCase(),
+      moneda: String(config.moneda_defecto || 'PEN').toUpperCase(),
       gre_obligatorio: config.gre_obligatorio || false,
       gre_automatico_habilitado: config.gre_automatico_habilitado === true,
       umbral_gre_automatico: config.umbral_gre_automatico || 700.0,

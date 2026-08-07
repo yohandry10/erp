@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { TrendingDown, RefreshCw, AlertTriangle } from 'lucide-react'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface ProveedorDeuda {
   proveedor_id: string
@@ -25,6 +26,7 @@ interface ProveedoresMayorDeudaProps {
 
 export default function ProveedoresMayorDeudaReport({ limite = 20 }: ProveedoresMayorDeudaProps) {
   const { get } = useApi()
+  const { currency, taxIdLabel, formatCurrency } = useLocalizedMoney()
   const [proveedores, setProveedores] = useState<ProveedorDeuda[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -46,13 +48,6 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
   useEffect(() => {
     loadProveedores()
   }, [loadProveedores])
-
-  const formatCurrency = (amount: number, currency: string = 'PEN') => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount)
-  }
 
   const getTotalDeuda = () => {
     return proveedores.reduce((sum, p) => sum + p.deuda_total, 0)
@@ -117,7 +112,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
             Deuda Total
           </div>
           <div className="text-[1.75rem] font-bold mt-2">
-            {formatCurrency(getTotalDeuda())}
+            {formatCurrency(getTotalDeuda(), currency)}
           </div>
           <div className="text-[0.875rem] mt-1 opacity-[0.9]">
             {proveedores.length} proveedor{proveedores.length !== 1 ? 'es' : ''}
@@ -129,7 +124,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
             Deuda Vencida
           </div>
           <div className="text-2xl font-bold mt-2 text-destructive">
-            {formatCurrency(getTotalVencida())}
+            {formatCurrency(getTotalVencida(), currency)}
           </div>
           <div className="text-[0.875rem] mt-1 text-destructive">
             {((getTotalVencida() / getTotalDeuda()) * 100).toFixed(1)}% del total
@@ -164,14 +159,14 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
                         {proveedor.razon_social}
                       </h4>
                       <p className="text-xs text-muted-foreground">
-                        RUC: {proveedor.ruc} • {proveedor.cantidad_cxp} cuenta{proveedor.cantidad_cxp !== 1 ? 's' : ''}
+                        {taxIdLabel}: {proveedor.ruc} • {proveedor.cantidad_cxp} cuenta{proveedor.cantidad_cxp !== 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xl font-bold text-foreground">
-                    {formatCurrency(proveedor.deuda_total)}
+                    {formatCurrency(proveedor.deuda_total, proveedor.monedas?.[0]?.moneda || currency)}
                   </div>
                   {proveedor.monedas.length > 1 && (
                     <div className="text-xs text-muted-foreground mt-1">
@@ -201,7 +196,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
                     Deuda Vencida
                   </div>
                   <div className="text-[0.875rem] font-semibold text-destructive">
-                    {formatCurrency(proveedor.deuda_vencida)}
+                    {formatCurrency(proveedor.deuda_vencida, proveedor.monedas?.[0]?.moneda || currency)}
                   </div>
                   <div className="text-xs text-destructive">
                     {porcentajeVencida.toFixed(1)}% del total
@@ -212,7 +207,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
                     Por Vencer
                   </div>
                   <div className="text-[0.875rem] font-semibold text-amber-500">
-                    {formatCurrency(proveedor.deuda_por_vencer)}
+                    {formatCurrency(proveedor.deuda_por_vencer, proveedor.monedas?.[0]?.moneda || currency)}
                   </div>
                 </div>
                 <div>

@@ -10,6 +10,7 @@ import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { CobroModal, HistorialDrawer, NotaCreditoModal, ReprogramarModal } from '@/components/finanzas'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 type EstadoCxc = 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO'
 
@@ -80,6 +81,7 @@ const inputClass =
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function CuentasPorCobrarPage() {
+  const country = useCountryContext()
   const router = useRouter()
   const { get } = useApi({ showErrorToast: false })
   const { hasPermission: canReadClientes, loading: clientesPermissionLoading } = usePermission('ventas', 'ver', 'clientes')
@@ -197,9 +199,9 @@ export default function CuentasPorCobrarPage() {
     )
   }, [clientes, cuentas])
 
-  const formatCurrency = (value: number | null | undefined, currency: string = 'PEN') => {
+  const formatCurrency = (value: number | null | undefined, currency: string = country.moneda || 'PEN') => {
     if (value === null || value === undefined) return '-'
-    return new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(value)
+    return new Intl.NumberFormat(country.locale || 'es-PE', { style: 'currency', currency }).format(value)
   }
 
   const formatDate = (value: string | null | undefined) => {

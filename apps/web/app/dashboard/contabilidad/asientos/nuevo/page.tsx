@@ -41,6 +41,7 @@ export default function NuevoAsientoPage() {
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [comoBorrador, setComoBorrador] = useState(false)
 
   const loadInitialData = useCallback(async () => {
     try {
@@ -69,10 +70,17 @@ export default function NuevoAsientoPage() {
       setLoading(true)
       setError(null)
 
-      const response = await post('/api/contabilidad/asiento-contable', data)
+      const response = await post('/api/contabilidad/asiento-contable', {
+        ...data,
+        estado: comoBorrador ? 'BORRADOR' : 'CONFIRMADO',
+      })
 
       if (response?.success) {
-        alert('Asiento contable creado exitosamente')
+        alert(
+          comoBorrador
+            ? 'Asiento guardado como borrador. Podra corregirlo antes de confirmarlo.'
+            : 'Asiento contable creado exitosamente'
+        )
         router.push(`/dashboard/contabilidad/asientos/${response.data.id}`)
       } else {
         throw new Error(response?.message || 'Error al crear el asiento')
@@ -154,6 +162,21 @@ export default function NuevoAsientoPage() {
               </p>
             </div>
           </div>
+
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3">
+            <input
+              type="checkbox"
+              checked={comoBorrador}
+              onChange={(event) => setComoBorrador(event.target.checked)}
+              className="mt-0.5 size-4 accent-blue-600"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-foreground">Guardar como borrador</span>
+              <span className="block text-xs text-muted-foreground">
+                El asiento no entra en los libros hasta que lo confirme, y hasta entonces puede corregirlo.
+              </span>
+            </span>
+          </label>
         </section>
 
         <AsientoForm

@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { normalizeTaxId, validateCountryTaxId } from '@/lib/country-tax-id'
 
 interface DocumentoModalProps {
   isOpen: boolean
@@ -36,18 +38,24 @@ const fieldClass =
 const readOnlyClass = 'border-cyan-400/10 bg-card/80 text-muted-foreground'
 
 export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }: DocumentoModalProps) {
-  const { tasaIgv } = useTaxConfig()
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
+  const defaultCurrency = country.moneda || (isArgentina ? 'ARS' : isColombia ? 'COP' : 'PEN')
+  const defaultRecipientType = isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC'
+  const fiscalDocument = country.documentoFiscal || defaultRecipientType
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const [formData, setFormData] = useState({
     tipo_documento: 'FACTURA',
     serie: '',
-    receptor_tipo_doc: 'RUC',
+    receptor_tipo_doc: defaultRecipientType,
     receptor_numero_doc: '',
     receptor_razon_social: '',
     receptor_direccion: '',
     receptor_email: '',
     fecha_emision: new Date().toISOString().slice(0, 10),
     fecha_vencimiento: '',
-    moneda: 'PEN',
+    moneda: defaultCurrency,
     subtotal: 0,
     descuentos: 0,
     impuesto_igv: 0,
@@ -80,14 +88,14 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
       setFormData({
         tipo_documento: documento.tipo_documento || 'FACTURA',
         serie: documento.serie || '',
-        receptor_tipo_doc: documento.receptor_tipo_doc || 'RUC',
+        receptor_tipo_doc: documento.receptor_tipo_doc || defaultRecipientType,
         receptor_numero_doc: documento.receptor_numero_doc || '',
         receptor_razon_social: documento.receptor_razon_social || '',
         receptor_direccion: documento.receptor_direccion || '',
         receptor_email: documento.receptor_email || '',
         fecha_emision: documento.fecha_emision?.slice(0, 10) || new Date().toISOString().slice(0, 10),
         fecha_vencimiento: documento.fecha_vencimiento?.slice(0, 10) || '',
-        moneda: documento.moneda || 'PEN',
+        moneda: documento.moneda || defaultCurrency,
         subtotal: documento.subtotal || 0,
         descuentos: documento.descuentos || 0,
         impuesto_igv: documento.impuesto_igv || 0,
@@ -114,14 +122,14 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
       setFormData({
         tipo_documento: 'FACTURA',
         serie: '',
-        receptor_tipo_doc: 'RUC',
+        receptor_tipo_doc: defaultRecipientType,
         receptor_numero_doc: '',
         receptor_razon_social: '',
         receptor_direccion: '',
         receptor_email: '',
         fecha_emision: new Date().toISOString().slice(0, 10),
         fecha_vencimiento: '',
-        moneda: 'PEN',
+        moneda: defaultCurrency,
         subtotal: 0,
         descuentos: 0,
         impuesto_igv: 0,
@@ -140,32 +148,44 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
         total_item: 0
       }])
     }
-  }, [documento])
+  }, [defaultCurrency, defaultRecipientType, documento])
 
-  // Validar RUC automáticamente
-  const validarRUC = async (ruc: string) => {
-    if (ruc.length === 11 && /^\d+$/.test(ruc)) {
+  // Validar el identificador fiscal del país automáticamente.
+  const validarIdentificacionFiscal = async (value: string) => {
+    const taxId = normalizeTaxId(value)
+    const expectedLength = isColombia ? 10 : 11
+    if (taxId.length === expectedLength && /^\d+$/.test(taxId)) {
+      if (isArgentina && !validateCountryTaxId('AR', taxId)) {
+        showErrorToast('CUIT inválido: revise el dígito verificador')
+        return
+      }
+      if (isColombia && !validateCountryTaxId('CO', taxId)) {
+        showErrorToast('NIT inválido: revise el dígito de verificación')
+        return
+      }
       setValidandoRUC(true)
       try {
-        const response = await api.post('/api/documentos/validar-ruc', { ruc })
+        const response = await api.post('/api/documentos/validar-ruc', { ruc: taxId })
         const responseData: any = api.unwrap(response)
         if (responseData) {
-          if (responseData.consulta_sunat) {
+          if (!isArgentina && !isColombia && responseData.consulta_sunat) {
             setFormData(prev => ({
               ...prev,
               receptor_razon_social: responseData.razon_social || prev.receptor_razon_social,
               receptor_direccion: responseData.direccion || prev.receptor_direccion
             }))
-            showSuccessToast('RUC validado con SUNAT')
+            showSuccessToast(`${isArgentina ? 'CUIT' : 'RUC'} validado${isArgentina ? '' : ' con SUNAT'}`)
           } else {
-            showSuccessToast('Formato y dígito verificador del RUC válidos; complete los datos registrales')
+            showSuccessToast(
+              `${fiscalDocument} válido por formato y dígito verificador; complete los datos registrales`,
+            )
           }
         } else {
-          showErrorToast('RUC no encontrado o inválido')
+          showErrorToast(`${fiscalDocument} no encontrado o inválido`)
         }
       } catch (error) {
-        console.error('Error validando RUC:', error)
-        showErrorToast('Error al validar RUC')
+        console.error(`Error validando ${fiscalDocument}:`, error)
+        showErrorToast(`Error al validar ${fiscalDocument}`)
       } finally {
         setValidandoRUC(false)
       }
@@ -351,8 +371,8 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                   required
                   className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
                 >
-                  <option value="FACTURA">Factura</option>
-                  <option value="BOLETA">Boleta</option>
+                  <option value="FACTURA">{isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura'}</option>
+                  <option value="BOLETA">{isArgentina ? 'Factura B' : isColombia ? 'Documento equivalente' : 'Boleta'}</option>
                   <option value="NOTA_CREDITO">Nota de Crédito</option>
                   <option value="NOTA_DEBITO">Nota de Débito</option>
                   <option value="CONTRATO">Contrato</option>
@@ -364,7 +384,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                   type="text"
                   value={formData.serie}
                   onChange={(e) => setFormData(prev => ({ ...prev, serie: e.target.value }))}
-                  placeholder="Ej: F001, B001"
+                  placeholder={isArgentina ? 'Ej: 00001' : isColombia ? 'Ej: FE' : 'Ej: F001, B001'}
                   className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
                 />
               </Field>
@@ -394,7 +414,13 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                   onChange={(e) => setFormData(prev => ({ ...prev, moneda: e.target.value }))}
                   className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
                 >
-                  <option value="PEN">Soles (PEN)</option>
+                  {isArgentina ? (
+                    <option value="ARS">Pesos argentinos (ARS)</option>
+                  ) : isColombia ? (
+                    <option value="COP">Pesos colombianos (COP)</option>
+                  ) : (
+                    <option value="PEN">Soles (PEN)</option>
+                  )}
                   <option value="USD">Dólares (USD)</option>
                   <option value="EUR">Euros (EUR)</option>
                 </select>
@@ -411,9 +437,27 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                   onChange={(e) => setFormData(prev => ({ ...prev, receptor_tipo_doc: e.target.value }))}
                   className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
                 >
-                  <option value="RUC">RUC</option>
-                  <option value="DNI">DNI</option>
-                  <option value="CE">Carnet de Extranjería</option>
+                  {isArgentina ? (
+                    <>
+                      <option value="CUIT">CUIT</option>
+                      <option value="DNI">DNI argentino</option>
+                      <option value="PASAPORTE">Pasaporte</option>
+                    </>
+                  ) : isColombia ? (
+                    <>
+                      <option value="NIT">NIT</option>
+                      <option value="CC">Cédula de ciudadanía</option>
+                      <option value="TI">Tarjeta de identidad</option>
+                      <option value="CE">Cédula de extranjería</option>
+                      <option value="PASAPORTE">Pasaporte</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="RUC">RUC</option>
+                      <option value="DNI">DNI</option>
+                      <option value="CE">Carnet de Extranjería</option>
+                    </>
+                  )}
                 </select>
               </Field>
 
@@ -424,11 +468,11 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                     value={formData.receptor_numero_doc}
                     onChange={(e) => {
                       setFormData(prev => ({ ...prev, receptor_numero_doc: e.target.value }))
-                      if (formData.receptor_tipo_doc === 'RUC') {
-                        validarRUC(e.target.value)
+                      if (['RUC', 'CUIT', 'NIT'].includes(formData.receptor_tipo_doc)) {
+                        validarIdentificacionFiscal(e.target.value)
                       }
                     }}
-                    placeholder="Ingrese RUC/DNI"
+                    placeholder={isArgentina ? 'Ingrese CUIT/DNI' : isColombia ? 'Ingrese NIT/CC' : 'Ingrese RUC/DNI'}
                     required
                     className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
                   />
@@ -600,7 +644,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                 />
               </Field>
 
-              <Field label="IGV (18%)">
+              <Field label={`${nombreImpuesto} (${Number((tasaIgv * 100).toFixed(2))}%)`}>
                 <input
                   type="number"
                   value={formData.impuesto_igv.toFixed(2)}

@@ -14,7 +14,7 @@ import { DianSignerService } from './colombia/dian-signer.service';
 import { DianApiClientService, DianConfig } from './colombia/dian-api-client.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
-import { normalizeCertificateInput } from '../../shared/utils/certificate.utils';
+import { decryptBuffer, decryptText } from '../../shared/utils/secure-config.utils';
 
 @Injectable()
 export class DianFiscalService extends FiscalServiceAbstract {
@@ -24,7 +24,7 @@ export class DianFiscalService extends FiscalServiceAbstract {
   private currentCertificateBuffer?: Buffer;
 
   constructor(
-    configService: ConfigService,
+    private readonly configService: ConfigService,
     private readonly xmlBuilder: DianXmlBuilderService,
     private readonly signer: DianSignerService,
     private readonly apiClient: DianApiClientService,
@@ -218,27 +218,16 @@ export class DianFiscalService extends FiscalServiceAbstract {
   }
 
   async enviarLibroContable(libro: LibroContableFiscal): Promise<FiscalResponse> {
-    try {
-      this.logOperation('Enviando libro contable a DIAN', { 
-        periodo: libro.periodo, 
-        tipo: libro.tipoLibro 
-      });
-
-      // Implementación específica para libros contables DIAN
-      // Libros como Libro Mayor y de Balances, Libros Societarios
-      return {
-        success: true,
-        codigoRespuesta: '0',
-        descripcionRespuesta: 'Libro contable enviado exitosamente a DIAN'
-      };
-    } catch (error) {
-      this.logError('enviarLibroContable', error);
-      return {
-        success: false,
-        codigoRespuesta: '99',
-        descripcionRespuesta: `Error enviando libro: ${error.message}`
-      };
-    }
+    this.logOperation('Libro contable DIAN no soportado', {
+      periodo: libro.periodo,
+      tipo: libro.tipoLibro,
+    });
+    return {
+      success: false,
+      codigoRespuesta: 'NO_SOPORTADO',
+      descripcionRespuesta: 'DIAN no expone este flujo como envío genérico de libro contable.',
+      errores: ['Operación no implementada: no se simuló una aceptación DIAN.'],
+    };
   }
 
   // ========== MÉTODOS PRIVADOS ==========
@@ -263,7 +252,7 @@ export class DianFiscalService extends FiscalServiceAbstract {
       return resultado.valido;
     } catch (error) {
       this.logger.warn(`No se pudo validar rango autorizado: ${error.message}`);
-      return true; // Permitir continuar si falla la validación
+      return false; // Fallar cerrado: no asumir autorización ante una caída externa.
     }
   }
 
@@ -281,8 +270,88 @@ export class DianFiscalService extends FiscalServiceAbstract {
     }
   }
 
-  private async loadTenantConfig(): Promise<void> {
-    const tenantId = this.tenantContext.getTenantId();
+  async probarConfiguracion(tenantIdOverride?: string): Promise<any> {
+    await this.loadTenantConfig(tenantIdOverride);
+    const tenantId = tenantIdOverride || this.tenantContext.getTenantId();
+    if (!tenantId) {
+      return { ready: false, mode: 'NO_TENANT', missing: ['tenant_id'] };
+    }
+
+    const { data } = await this.supabase.getClient()
+      .from('empresa_config')
+      .select('pais,pais_id,is_demo,dian_activo,dian_environment,dian_usuario,dian_password,dian_software_id,dian_software_pin,dian_test_set_id,dian_resolucion_numero,dian_resolucion_prefijo,certificado_pfx,certificado_password')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    const row = data as any;
+    if (!row) return { ready: false, mode: 'MISSING_CONFIG', missing: ['empresa_config'] };
+    if (String(row.pais || '').toUpperCase() !== 'CO' && Number(row.pais_id) !== 2) {
+      return { ready: false, mode: 'WRONG_COUNTRY', missing: ['tenant_colombia'] };
+    }
+    if (row.is_demo === true) {
+      const connectivity = await this.apiClient.probarConectividad(this.dianConfig);
+      await this.persistirPrueba('SIMULADA', {
+        ...connectivity,
+        syntheticDemo: true,
+        transmitted: false,
+      }, tenantId);
+      return {
+        ready: true,
+        mode: 'SIMULATED_DEMO',
+        transportReachable: connectivity.reachable,
+        credentialsValidated: false,
+        message: connectivity.reachable
+          ? 'Fixture completo y WSDL oficial DIAN accesible; no se transmitieron datos.'
+          : `Fixture completo; no se transmitieron datos. ${connectivity.message}`,
+      };
+    }
+
+    const required: Record<string, unknown> = {
+      usuario: row.dian_usuario,
+      password: row.dian_password,
+      softwareId: row.dian_software_id,
+      softwarePin: row.dian_software_pin,
+      resolucion: row.dian_resolucion_numero,
+      prefijo: row.dian_resolucion_prefijo,
+      certificado: row.certificado_pfx,
+      certificadoPassword: row.certificado_password,
+    };
+    if (String(row.dian_environment || '').toUpperCase() !== 'PRODUCCION') {
+      required.testSetId = row.dian_test_set_id;
+    }
+    const missing = Object.entries(required).filter(([, value]) => !value).map(([key]) => key);
+    if (missing.length) {
+      await this.persistirPrueba('INCOMPLETA', { missing }, tenantId);
+      return { ready: false, mode: 'REAL', missing, transportReachable: false };
+    }
+
+    const connectivity = await this.apiClient.probarConectividad(this.dianConfig);
+    const ready = connectivity.reachable === true;
+    await this.persistirPrueba(ready ? 'TRANSPORTE_OK' : 'ERROR', connectivity, tenantId);
+    return {
+      ready,
+      mode: 'REAL',
+      transportReachable: connectivity.reachable,
+      credentialsPresent: true,
+      credentialsValidated: false,
+      environment: this.dianConfig.environment,
+      message: ready
+        ? 'Servicio DIAN accesible. Las credenciales se validan durante el set de pruebas/homologación.'
+        : connectivity.message,
+    };
+  }
+
+  private async persistirPrueba(estado: string, detalle: any, tenantIdOverride?: string): Promise<void> {
+    const tenantId = tenantIdOverride || this.tenantContext.getTenantId();
+    if (!tenantId) return;
+    await this.supabase.getClient().from('empresa_config').update({
+      dian_ultima_prueba_at: new Date().toISOString(),
+      dian_ultima_prueba_estado: estado,
+      dian_ultima_prueba_detalle: detalle,
+    }).eq('tenant_id', tenantId);
+  }
+
+  private async loadTenantConfig(tenantIdOverride?: string): Promise<void> {
+    const tenantId = tenantIdOverride || this.tenantContext.getTenantId();
     if (!tenantId) {
       this.config = { ...this.defaultConfig };
       this.dianConfig = { ...this.defaultDianConfig };
@@ -330,9 +399,13 @@ export class DianFiscalService extends FiscalServiceAbstract {
       ...this.defaultConfig,
       url: typedData.dian_url || this.defaultConfig.url,
       usuario: typedData.dian_usuario || this.defaultConfig.usuario,
-      password: typedData.dian_password || this.defaultConfig.password,
+      password: typedData.dian_password
+        ? decryptText(this.configService, typedData.dian_password)
+        : this.defaultConfig.password,
       empresaId: typedData.ruc || this.defaultConfig.empresaId,
-      certificatePassword: typedData.certificado_password || this.defaultConfig.certificatePassword,
+      certificatePassword: typedData.certificado_password
+        ? decryptText(this.configService, typedData.certificado_password)
+        : this.defaultConfig.certificatePassword,
       environment: fiscalEnvironment,
       pais: 'CO',
     };
@@ -343,11 +416,13 @@ export class DianFiscalService extends FiscalServiceAbstract {
       environment: apiEnvironment,
       nit: typedData.ruc || this.defaultDianConfig.nit,
       softwareId: typedData.dian_software_id || this.defaultDianConfig.softwareId,
-      softwarePin: typedData.dian_software_pin || this.defaultDianConfig.softwarePin,
+      softwarePin: typedData.dian_software_pin
+        ? decryptText(this.configService, typedData.dian_software_pin)
+        : this.defaultDianConfig.softwarePin,
       testSetId: typedData.dian_test_set_id || this.defaultDianConfig.testSetId,
     };
 
     this.apiClient.configurar(this.dianConfig);
-    this.currentCertificateBuffer = normalizeCertificateInput(typedData.certificado_pfx);
+    this.currentCertificateBuffer = decryptBuffer(this.configService, typedData.certificado_pfx) || undefined;
   }
 }

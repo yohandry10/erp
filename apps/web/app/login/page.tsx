@@ -9,12 +9,18 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { Building2, Loader2, Globe, Lock, Mail } from 'lucide-react'
-import { INITIAL_ACTIVE_COUNTRY, INITIAL_ACTIVE_COUNTRY_ID } from '@/lib/initial-country'
+import {
+  ACTIVE_COUNTRIES,
+  INITIAL_ACTIVE_COUNTRY,
+  INITIAL_ACTIVE_COUNTRY_ID,
+  getActiveCountryById,
+} from '@/lib/initial-country'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [selectedCountryId, setSelectedCountryId] = useState(INITIAL_ACTIVE_COUNTRY_ID)
   const router = useRouter()
   const { toast } = useToast()
   const { signIn, session, loading: authLoading } = useAuth()
@@ -27,9 +33,22 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('selectedCountry', INITIAL_ACTIVE_COUNTRY_ID)
+      const stored = window.localStorage.getItem('selectedCountry')
+      const browserLooksArgentinian =
+        navigator.language.toLowerCase() === 'es-ar' ||
+        Intl.DateTimeFormat().resolvedOptions().timeZone.startsWith('America/Argentina')
+      const browserLooksColombian =
+        navigator.language.toLowerCase() === 'es-co' ||
+        Intl.DateTimeFormat().resolvedOptions().timeZone === 'America/Bogota'
+      const detected = getActiveCountryById(stored)
+        ?? (browserLooksArgentinian ? ACTIVE_COUNTRIES.find((country) => country.codigo_iso === 'AR') : null)
+        ?? (browserLooksColombian ? ACTIVE_COUNTRIES.find((country) => country.codigo_iso === 'CO') : null)
+        ?? INITIAL_ACTIVE_COUNTRY
+      setSelectedCountryId(String(detected.id))
+      window.localStorage.setItem('selectedCountry', String(detected.id))
     }
   }, [])
+  const selectedCountry = getActiveCountryById(selectedCountryId) ?? INITIAL_ACTIVE_COUNTRY
 
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -44,12 +63,12 @@ export default function LoginPage() {
 
       // Persistir país seleccionado en localStorage
       if (typeof window !== 'undefined') {
-        localStorage.setItem('selectedCountry', INITIAL_ACTIVE_COUNTRY_ID)
+        localStorage.setItem('selectedCountry', selectedCountryId)
       }
 
       toast({
         title: 'Bienvenido',
-        description: `Has iniciado sesión correctamente - ${INITIAL_ACTIVE_COUNTRY.nombre}`,
+        description: `Has iniciado sesión correctamente - ${selectedCountry.nombre}`,
       })
 
       console.log('🚀 [LoginPage] Redirigiendo a dashboard...')
@@ -72,13 +91,13 @@ export default function LoginPage() {
     setLoading(true)
 
     if (typeof window !== 'undefined') {
-      localStorage.setItem('selectedCountry', INITIAL_ACTIVE_COUNTRY_ID)
+      localStorage.setItem('selectedCountry', selectedCountryId)
     }
 
     // /demo crea un tenant demo (POST /api/demo/create), autentica con signIn() y
     // setea la cookie HttpOnly. Sin esto el middleware rebota a /login al intentar
     // entrar al dashboard porque no hay access_token.
-    router.push('/demo')
+    router.push(`/demo?country=${selectedCountry.codigo_iso}`)
   }
 
   return (
@@ -115,13 +134,22 @@ export default function LoginPage() {
                   <Globe className="h-4 w-4" aria-hidden="true" />
                   País operativo
                 </Label>
-                <Input
+                <select
                   id="country"
-                  value={`${INITIAL_ACTIVE_COUNTRY.nombre} (${INITIAL_ACTIVE_COUNTRY.nombre_fiscal})`}
-                  readOnly
-                  className="h-12 border-border bg-muted/30 px-4 text-foreground/85"
-                  aria-readonly="true"
-                />
+                  value={selectedCountryId}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setSelectedCountryId(value)
+                    localStorage.setItem('selectedCountry', value)
+                  }}
+                  className="h-12 w-full rounded-md border border-border bg-card px-4 text-foreground/85"
+                >
+                  {ACTIVE_COUNTRIES.map((country) => (
+                    <option key={country.codigo_iso} value={country.id}>
+                      {country.nombre} ({country.nombre_fiscal}) · {country.moneda_codigo}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">

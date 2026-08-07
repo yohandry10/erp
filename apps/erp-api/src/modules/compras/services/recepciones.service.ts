@@ -808,7 +808,11 @@ export class RecepcionesService {
 
       // Totales parciales según lo efectivamente recibido (ignorando ítems rechazados arriba)
       const subtotalParcial = items.reduce((sum: number, i: any) => sum + (i.total || 0), 0);
-      const igvParcial = this.round2(Number(ordenData.igv ?? 0) > 0 ? subtotalParcial * 0.18 : 0); // usa IGV 18% solo si la orden usa IGV
+      const tasaImpuesto =
+        Number(ordenData.subtotal ?? 0) > 0
+          ? Number(ordenData.igv ?? 0) / Number(ordenData.subtotal)
+          : 0;
+      const igvParcial = this.round2(subtotalParcial * Math.max(0, tasaImpuesto));
       const totalParcial = this.round2(subtotalParcial + igvParcial);
 
       const eventData: RecepcionRegistradaEvent = {

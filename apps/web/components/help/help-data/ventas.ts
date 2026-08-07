@@ -6,7 +6,7 @@ export const ventasHelp: Record<string, HelpItem> = {
     title: 'Cliente',
     description: 'Selecciona el cliente para esta operación.',
     tips: [
-      'Busca por RUC, DNI o razón social',
+      'Busca por identificador fiscal, documento personal o razón social',
       'Puedes crear un cliente nuevo desde aquí'
     ],
     link: '/dashboard/ventas/clientes'
@@ -34,17 +34,17 @@ export const ventasHelp: Record<string, HelpItem> = {
     title: 'Factura',
     description: 'Comprobante fiscal para empresas.',
     tips: [
-      'Requiere cliente con RUC válido',
-      'Se envía automáticamente a SUNAT'
+      'Requiere un cliente con identificador fiscal válido',
+      'La emisión usa la autoridad fiscal configurada para el tenant'
     ]
   },
   'ventas.boleta': {
     key: 'ventas.boleta',
-    title: 'Boleta',
-    description: 'Comprobante fiscal para consumidores finales.',
+    title: 'Documento a consumidor final',
+    description: 'Comprobante fiscal o equivalente para consumidores finales.',
     tips: [
       'No requiere datos del cliente',
-      'Se envía a SUNAT en resumen diario'
+      'Su transmisión o consolidación depende de las reglas del país'
     ]
   },
   'ventas.descuento': {

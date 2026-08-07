@@ -22,7 +22,7 @@ interface Props {
   onView: (id: string, tipo: string) => void
   onPdf?: (id: string) => void
   onSend: (id: string) => void
-  onGre: (doc: CpeDocument) => void
+  onGre?: (doc: CpeDocument) => void
   fiscalLabel: string
   canSend: boolean
 }
@@ -85,7 +85,9 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onGre, fis
                 >
                   Enviar {fiscalLabel}
                 </button>
-                <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onGre(doc)}>GRE</button>
+                {onGre && (
+                  <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onGre(doc)}>GRE</button>
+                )}
                 </div>
               </td>
             </tr>

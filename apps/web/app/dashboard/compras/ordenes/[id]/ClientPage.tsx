@@ -26,6 +26,8 @@ import AprobarOrdenModal from '@/components/compras/AprobarOrdenModal'
 import RechazarOrdenModal from '@/components/compras/RechazarOrdenModal'
 import RecepcionesPanel from '@/components/compras/RecepcionesPanel'
 import toast from 'react-hot-toast'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 
 interface OrdenCompraDetalle {
   id: string
@@ -89,6 +91,8 @@ const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase trac
 const tableCellClass = 'px-4 py-3 text-sm text-foreground/90'
 
 export default function OrdenCompraDetallePage() {
+  const { formatCurrency: formatLocalizedCurrency, currency, locale, taxIdLabel } = useLocalizedMoney()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const router = useRouter()
   const params = useParams()
   const { get, post } = useApi()
@@ -128,14 +132,11 @@ export default function OrdenCompraDetallePage() {
 
   const formatCurrency = (amount: number | undefined) => {
     if (!amount) return '-'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(amount)
+    return formatLocalizedCurrency(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return parseDateLocal(dateString).toLocaleDateString('es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -294,7 +295,7 @@ export default function OrdenCompraDetallePage() {
               </div>
 
               <div>
-                <label className={labelClass}>RUC</label>
+                <label className={labelClass}>{taxIdLabel}</label>
                 <p className={valueClass}>{orden.proveedor?.ruc || 'N/A'}</p>
               </div>
 
@@ -370,7 +371,7 @@ export default function OrdenCompraDetallePage() {
                 <span className="font-semibold text-foreground">{formatCurrency(orden.subtotal)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">IGV (18%)</span>
+                <span className="text-muted-foreground">{nombreImpuesto} ({Math.round(tasaIgv * 100)}%)</span>
                 <span className="font-semibold text-foreground">{formatCurrency(orden.igv)}</span>
               </div>
               <div className="flex items-center justify-between border-t border-blue-400/20 pt-4">
@@ -379,7 +380,7 @@ export default function OrdenCompraDetallePage() {
               </div>
               <div className="rounded-lg border border-blue-400/20 bg-blue-500/10 p-3">
                 <div className="mb-1 text-xs text-muted-foreground">Moneda</div>
-                <div className="text-sm font-semibold text-foreground">{orden.moneda || 'PEN'}</div>
+                <div className="text-sm font-semibold text-foreground">{orden.moneda || currency}</div>
               </div>
             </div>
           </div>

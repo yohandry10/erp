@@ -67,6 +67,7 @@ export class CashAuthorizationService {
         codigoAutorizacion?: string,
     ): Promise<{ requiere_autorizacion: boolean; mensaje?: string }> {
         const config = await this.obtenerConfiguracion(tenantId);
+        const moneda = await this.obtenerMonedaTenant(tenantId);
 
         const fueraDeRango =
             monto < config.monto_apertura_min || monto > config.monto_apertura_max;
@@ -79,7 +80,7 @@ export class CashAuthorizationService {
         if (!supervisorId || !codigoAutorizacion) {
             return {
                 requiere_autorizacion: true,
-                mensaje: `Monto fuera de rango (S/.${config.monto_apertura_min} - S/.${config.monto_apertura_max}). Requiere autorización de supervisor.`,
+                mensaje: `Monto fuera de rango (${this.formatearMonto(config.monto_apertura_min, moneda)} - ${this.formatearMonto(config.monto_apertura_max, moneda)}). Requiere autorización de supervisor.`,
             };
         }
 
@@ -92,12 +93,12 @@ export class CashAuthorizationService {
             userId,
             supervisorId,
             monto,
-            `Monto fuera de rango estándar: S/.${monto.toFixed(2)}`,
+            `Monto fuera de rango estándar: ${this.formatearMonto(monto, moneda)}`,
             tenantId,
         );
 
         this.logger.log(
-            `Autorización de apertura atípica aprobada: monto=S/.${monto}, supervisor=${supervisorId}`,
+            `Autorización de apertura atípica aprobada: monto=${this.formatearMonto(monto, moneda)}, supervisor=${supervisorId}`,
         );
 
         return { requiere_autorizacion: false };
@@ -113,6 +114,7 @@ export class CashAuthorizationService {
         codigoAutorizacion?: string,
     ): Promise<{ requiere_autorizacion: boolean; mensaje?: string }> {
         const config = await this.obtenerConfiguracion(tenantId);
+        const moneda = await this.obtenerMonedaTenant(tenantId);
 
         if (monto <= config.retiro_max_sin_autorizacion) {
             return { requiere_autorizacion: false };
@@ -122,14 +124,14 @@ export class CashAuthorizationService {
         if (!supervisorId || !codigoAutorizacion) {
             return {
                 requiere_autorizacion: true,
-                mensaje: `Retiro mayor a S/.${config.retiro_max_sin_autorizacion}. Requiere autorización de supervisor.`,
+                mensaje: `Retiro mayor a ${this.formatearMonto(config.retiro_max_sin_autorizacion, moneda)}. Requiere autorización de supervisor.`,
             };
         }
 
         // Validar código de supervisor
         await this.validarCodigoSupervisor(supervisorId, codigoAutorizacion, tenantId);
 
-        this.logger.log(`Autorización de retiro alto aprobada: monto=S/.${monto}, supervisor=${supervisorId}`);
+        this.logger.log(`Autorización de retiro alto aprobada: monto=${this.formatearMonto(monto, moneda)}, supervisor=${supervisorId}`);
 
         return { requiere_autorizacion: false };
     }
@@ -144,6 +146,7 @@ export class CashAuthorizationService {
         codigoAutorizacion?: string,
     ): Promise<{ requiere_autorizacion: boolean; mensaje?: string }> {
         const config = await this.obtenerConfiguracion(tenantId);
+        const moneda = await this.obtenerMonedaTenant(tenantId);
 
         if (Math.abs(diferencia) <= config.tolerancia_diferencia_cierre) {
             return { requiere_autorizacion: false };
@@ -154,7 +157,7 @@ export class CashAuthorizationService {
             const tipoDiferencia = diferencia > 0 ? 'sobrante' : 'faltante';
             return {
                 requiere_autorizacion: true,
-                mensaje: `Diferencia de S/.${Math.abs(diferencia).toFixed(2)} (${tipoDiferencia}) mayor a tolerancia (S/.${config.tolerancia_diferencia_cierre}). Requiere autorización de supervisor.`,
+                mensaje: `Diferencia de ${this.formatearMonto(Math.abs(diferencia), moneda)} (${tipoDiferencia}) mayor a tolerancia (${this.formatearMonto(config.tolerancia_diferencia_cierre, moneda)}). Requiere autorización de supervisor.`,
             };
         }
 
@@ -162,10 +165,24 @@ export class CashAuthorizationService {
         await this.validarCodigoSupervisor(supervisorId, codigoAutorizacion, tenantId);
 
         this.logger.log(
-            `Autorización de cierre con diferencia aprobada: diferencia=S/.${diferencia}, supervisor=${supervisorId}`,
+            `Autorización de cierre con diferencia aprobada: diferencia=${this.formatearMonto(diferencia, moneda)}, supervisor=${supervisorId}`,
         );
 
         return { requiere_autorizacion: false };
+    }
+
+    async obtenerMonedaTenant(tenantId: string): Promise<string> {
+        const { data } = await this.supabase
+            .getClient()
+            .from('empresa_config')
+            .select('moneda_defecto')
+            .eq('tenant_id', tenantId)
+            .maybeSingle();
+        return String(data?.moneda_defecto || 'PEN').toUpperCase();
+    }
+
+    private formatearMonto(monto: number, moneda: string): string {
+        return `${moneda} ${Number(monto || 0).toFixed(2)}`;
     }
 
     /**

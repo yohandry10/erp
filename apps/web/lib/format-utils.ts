@@ -10,7 +10,7 @@
 /**
  * Formatea un monto como moneda según el código de moneda
  * @param amount - Monto a formatear
- * @param moneda - Código de moneda (PEN, USD, EUR)
+ * @param moneda - Código ISO de moneda (PEN, ARS, COP, USD, EUR)
  * @returns String formateado como moneda
  */
 export function formatCurrency(amount: number | undefined | null, moneda: string = 'PEN'): string {
@@ -18,16 +18,18 @@ export function formatCurrency(amount: number | undefined | null, moneda: string
   
   const currencyMap: Record<string, string> = {
     'PEN': 'PEN',
+    'ARS': 'ARS',
+    'COP': 'COP',
     'USD': 'USD',
     'EUR': 'EUR',
     'S/': 'PEN',
-    '$': 'USD',
     '€': 'EUR'
   }
-  
+
   const currency = currencyMap[moneda] || 'PEN'
-  
-  return new Intl.NumberFormat('es-PE', {
+  const locale = currency === 'ARS' ? 'es-AR' : currency === 'COP' ? 'es-CO' : 'es-PE'
+
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currency,
   }).format(amount)

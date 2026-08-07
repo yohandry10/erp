@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { BarChart3, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface AgingData {
   fecha_reporte: string
@@ -78,6 +79,8 @@ const normalizeAgingData = (raw: any): AgingData => ({
 
 export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
   const { get } = useApi()
+  const country = useCountryContext()
+  const taxIdLabel = country.paisCodigo === 'AR' ? 'CUIT' : country.paisCodigo === 'CO' ? 'NIT' : 'RUC'
   const [agingData, setAgingData] = useState<AgingData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -102,9 +105,9 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
   }, [loadAgingData])
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
     }).format(toNumber(amount))
   }
 
@@ -309,7 +312,7 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
                         {proveedor.proveedor_razon_social}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        RUC: {proveedor.proveedor_ruc} • {proveedor.cantidad_cxp} cuenta{proveedor.cantidad_cxp !== 1 ? 's' : ''}
+                        {taxIdLabel}: {proveedor.proveedor_ruc} • {proveedor.cantidad_cxp} cuenta{proveedor.cantidad_cxp !== 1 ? 's' : ''}
                       </div>
                     </td>
                     <td className="p-3 text-right text-[0.875rem]">

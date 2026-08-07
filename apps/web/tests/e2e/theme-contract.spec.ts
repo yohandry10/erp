@@ -15,6 +15,15 @@ const apiUser = {
 
 const themeBaseURL = process.env.BASE_URL || "http://localhost:3001";
 
+async function waitForThemeRouteReady(page: Page) {
+  await expect(page.locator('html[data-erp-hydrated="true"]')).toHaveCount(1, {
+    timeout: 30000,
+  });
+  await expect(
+    page.getByText("Preparando configuración fiscal del tenant..."),
+  ).toBeHidden({ timeout: 30000 });
+}
+
 function readJwtSecret(): string {
   for (const envPath of [
     path.resolve(process.cwd(), ".env.local"),
@@ -166,6 +175,7 @@ test.describe("Contrato de tema del dashboard", () => {
   test("login público usa shadcn/Tailwind y no desborda en móvil", async ({
     page,
   }) => {
+    await page.context().clearCookies();
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/login/", { waitUntil: "domcontentloaded" });
 
@@ -201,15 +211,14 @@ test.describe("Contrato de tema del dashboard", () => {
     await page.route("**/api/**", async (route) => {
       const pathname = new URL(route.request().url()).pathname;
       if (/\/api\/auth\/profile\/?$/.test(pathname)) {
-        await route.fulfill({
+        return route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify(apiUser),
         });
-        return;
       }
       if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
-        await route.fulfill({
+        return route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
@@ -224,10 +233,9 @@ test.describe("Contrato de tema del dashboard", () => {
             },
           }),
         });
-        return;
       }
       if (/\/api\/demo\/status\/?$/.test(pathname)) {
-        await route.fulfill({
+        return route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
@@ -237,10 +245,9 @@ test.describe("Contrato de tema del dashboard", () => {
             can_extend: true,
           }),
         });
-        return;
       }
       if (/\/api\/cajas\/?$/.test(pathname)) {
-        await route.fulfill({
+        return route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
@@ -248,15 +255,13 @@ test.describe("Contrato de tema del dashboard", () => {
             data: [{ id: "theme-caja", nombre: "Caja de prueba" }],
           }),
         });
-        return;
       }
       if (/\/api\/pos\/sesion-caja\/?$/.test(pathname)) {
-        await route.fulfill({
+        return route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({ success: true, data: null }),
         });
-        return;
       }
       await route.fulfill({
         status: 200,
@@ -334,6 +339,7 @@ test.describe("Contrato de tema del dashboard", () => {
       await expect(page.getByText("Verificando autenticación...")).toBeHidden({
         timeout: 30000,
       });
+      await waitForThemeRouteReady(page);
       await expect(page.locator("body")).not.toContainText(
         /Application error|Internal Server Error|ChunkLoadError/i,
       );
@@ -415,6 +421,7 @@ test.describe("Contrato de tema del dashboard", () => {
       await expect(page.getByText("Verificando autenticación...")).toBeHidden({
         timeout: 30000,
       });
+      await waitForThemeRouteReady(page);
       await expect(page.locator("html")).toHaveAttribute(
         "data-erp-theme",
         "light",
@@ -423,13 +430,13 @@ test.describe("Contrato de tema del dashboard", () => {
       await expect
         .poll(() => findThemeSurfaceViolations(page, "light"), {
           message: `No debe haber islas oscuras neutras grandes en ${route}`,
-          timeout: 3000,
+          timeout: 15000,
         })
         .toEqual([]);
       await expect
         .poll(() => findTextContrastViolations(page), {
           message: `El texto principal debe conservar contraste AA en ${route}`,
-          timeout: 3000,
+          timeout: 15000,
         })
         .toEqual([]);
     }

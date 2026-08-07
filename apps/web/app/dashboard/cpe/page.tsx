@@ -42,7 +42,18 @@ export default function CPEPage() {
   const country = useCountryContext()
   const fiscalLabel = country.servicioFiscal || 'SUNAT'
   const paisCodigo = (country.paisCodigo || 'PE').toUpperCase()
-  const canSendToFiscal = paisCodigo === 'PE'
+  const isArgentina = paisCodigo === 'AR'
+  const isColombia = paisCodigo === 'CO'
+  const canSendToFiscal = paisCodigo === 'PE' || paisCodigo === 'AR' || paisCodigo === 'CO'
+  const documentCenterLabel = isArgentina
+    ? 'Comprobantes electrónicos ARCA'
+    : isColombia
+      ? 'Facturación electrónica DIAN'
+      : 'CPE'
+  const money = new Intl.NumberFormat(country.locale || 'es-PE', {
+    style: 'currency',
+    currency: country.moneda || 'PEN',
+  })
 
   const [documents, setDocuments] = useState<CpeDocument[]>([])
   const [stats, setStats] = useState<CpeStats | null>(null)
@@ -203,7 +214,7 @@ export default function CPEPage() {
       case '01':
         return 'Factura'
       case '03':
-        return 'Boleta'
+        return isArgentina ? 'Factura B' : isColombia ? 'Factura electrónica' : 'Boleta'
       case '07':
         return 'Nota Crédito'
       case '08':
@@ -224,23 +235,27 @@ export default function CPEPage() {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
-                ERP CPE Center
+                ERP {documentCenterLabel}
               </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">Comprobantes de Pago Electrónicos</h1>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Facturas, boletas y notas conectadas a {fiscalLabel}.</p>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">
+                {isArgentina ? 'Comprobantes electrónicos' : isColombia ? 'Facturación electrónica' : 'Comprobantes de Pago Electrónicos'}
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                {isArgentina ? 'Facturas A/B/C' : isColombia ? 'Facturas de venta' : 'Facturas, boletas'} y notas conectadas a {fiscalLabel}.
+              </p>
             </div>
             <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <Plus className="h-4 w-4" />
-              Nuevo CPE
+              {isArgentina ? 'Nuevo comprobante' : isColombia ? 'Nueva factura DIAN' : 'Nuevo CPE'}
             </Button>
           </div>
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ['CPE emitidos hoy', stats?.cpeEmitidosHoy || 0, 'Comprobantes hoy'],
-            ['CPE del mes', stats?.cpeDelMes || 0, 'Total del mes'],
-            ['Monto facturado', `S/ ${stats?.montoFacturado?.toLocaleString() || '0'}`, 'Ingresos del mes'],
+            [isArgentina ? 'Comprobantes hoy' : 'CPE emitidos hoy', stats?.cpeEmitidosHoy || 0, 'Comprobantes hoy'],
+            [isArgentina ? 'Comprobantes del mes' : 'CPE del mes', stats?.cpeDelMes || 0, 'Total del mes'],
+            ['Monto facturado', money.format(stats?.montoFacturado || 0), 'Ingresos del mes'],
             ['Rechazados', stats?.rechazados || 0, 'Requieren correccion'],
           ].map(([label, value, description]) => (
             <Card key={label} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
@@ -285,7 +300,7 @@ export default function CPEPage() {
               onView={viewDocument}
               onPdf={downloadPdf}
               onSend={sendToFiscal}
-              onGre={openGreModal}
+              onGre={paisCodigo === 'PE' ? openGreModal : undefined}
               fiscalLabel={fiscalLabel}
               canSend={canSendToFiscal}
             />
@@ -309,12 +324,14 @@ export default function CPEPage() {
       />
 
       {/* GRE Modal */}
-      <GreModal
-        isOpen={isGreModalOpen}
-        onClose={() => setIsGreModalOpen(false)}
-        onSuccess={handleGreCreated}
-        cpeData={selectedCpeForGre}
-      />
+      {!isArgentina && (
+        <GreModal
+          isOpen={isGreModalOpen}
+          onClose={() => setIsGreModalOpen(false)}
+          onSuccess={handleGreCreated}
+          cpeData={selectedCpeForGre}
+        />
+      )}
 
     </div>
   )

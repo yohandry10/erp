@@ -26,8 +26,14 @@ import {
   WalletCards,
   X,
 } from 'lucide-react';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 const PlanillasPage = () => {
+  const country = useCountryContext();
+  const isArgentina = country.paisCodigo === 'AR';
+  const isColombia = country.paisCodigo === 'CO';
+  const currencySymbol = country.simboloMoneda || 'S/';
+  const locale = country.locale || 'es-PE';
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
   const { get } = useApi();
   const [planillas, setPlanillas] = useState<any[]>([]);
@@ -126,7 +132,7 @@ const PlanillasPage = () => {
 
           if (response.ok) {
             const data = await response.json();
-            alert(`✅ Asientos contables generados correctamente\n\n• Total registros: ${data.registros || 'N/A'}\n• Monto total: S/ ${data.monto_total || '0.00'}`);
+            alert(`✅ Asientos contables generados correctamente\n\n• Total registros: ${data.registros || 'N/A'}\n• Monto total: ${currencySymbol} ${data.monto_total || '0.00'}`);
           } else {
             throw new Error('Error generando asientos contables');
           }
@@ -218,15 +224,15 @@ const PlanillasPage = () => {
         <div class="header">
             <div class="company">NEON SYSTEM</div>
             <div class="title">Reporte de Planilla - Período ${periodo}</div>
-            <div>Generado el: ${new Date().toLocaleDateString('es-PE')}</div>
+            <div>Generado el: ${new Date().toLocaleDateString(locale)}</div>
         </div>
 
         <div class="summary">
             <h3>Resumen Ejecutivo</h3>
             <p><strong>Total Empleados:</strong> ${empleados.length}</p>
-            <p><strong>Total Ingresos:</strong> S/ ${totalIngresos.toFixed(2)}</p>
-            <p><strong>Total Descuentos:</strong> S/ ${totalDescuentos.toFixed(2)}</p>
-            <p><strong>Total Neto a Pagar:</strong> S/ ${totalNeto.toFixed(2)}</p>
+            <p><strong>Total Ingresos:</strong> ${currencySymbol} ${totalIngresos.toFixed(2)}</p>
+            <p><strong>Total Descuentos:</strong> ${currencySymbol} ${totalDescuentos.toFixed(2)}</p>
+            <p><strong>Total Neto a Pagar:</strong> ${currencySymbol} ${totalNeto.toFixed(2)}</p>
         </div>
 
         <table>
@@ -246,16 +252,16 @@ const PlanillasPage = () => {
                         <td>${emp?.empleados?.nombres || 'N/A'} ${emp?.empleados?.apellidos || ''}</td>
                         <td>${emp?.empleados?.numero_documento || 'N/A'}</td>
                         <td class="number">${emp?.dias_trabajados || 0}</td>
-                        <td class="number">S/ ${(parseFloat(emp?.total_ingresos) || 0).toFixed(2)}</td>
-                        <td class="number">S/ ${(parseFloat(emp?.total_descuentos) || 0).toFixed(2)}</td>
-                        <td class="number">S/ ${(parseFloat(emp?.neto_pagar) || 0).toFixed(2)}</td>
+                        <td class="number">${currencySymbol} ${(parseFloat(emp?.total_ingresos) || 0).toFixed(2)}</td>
+                        <td class="number">${currencySymbol} ${(parseFloat(emp?.total_descuentos) || 0).toFixed(2)}</td>
+                        <td class="number">${currencySymbol} ${(parseFloat(emp?.neto_pagar) || 0).toFixed(2)}</td>
                     </tr>
                 `).join('')}
                 <tr class="total-row">
                     <td colspan="3">TOTALES</td>
-                    <td class="number">S/ ${totalIngresos.toFixed(2)}</td>
-                    <td class="number">S/ ${totalDescuentos.toFixed(2)}</td>
-                    <td class="number">S/ ${totalNeto.toFixed(2)}</td>
+                    <td class="number">${currencySymbol} ${totalIngresos.toFixed(2)}</td>
+                    <td class="number">${currencySymbol} ${totalDescuentos.toFixed(2)}</td>
+                    <td class="number">${currencySymbol} ${totalNeto.toFixed(2)}</td>
                 </tr>
             </tbody>
         </table>
@@ -303,7 +309,10 @@ const PlanillasPage = () => {
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", `boleta_${data?.empleados?.nombres}_${data?.empleados?.apellidos}.html`);
+        link.setAttribute(
+          "download",
+          `${isColombia ? 'desprendible_nomina' : isArgentina ? 'recibo_sueldo' : 'boleta'}_${data?.empleados?.nombres}_${data?.empleados?.apellidos}.html`,
+        );
         link.className = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -325,13 +334,13 @@ const PlanillasPage = () => {
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Boleta de Pago</title>
+        <title>${isColombia ? 'Desprendible de nómina' : isArgentina ? 'Recibo de sueldo' : 'Boleta de pago'}</title>
     </head>
     <body>
         <div class="boleta">
             <div class="header">
                 <div class="company">NEON SYSTEM</div>
-                <div class="title">Boleta de Pago</div>
+                <div class="title">${isColombia ? 'Desprendible de nómina' : isArgentina ? 'Recibo de sueldo' : 'Boleta de pago'}</div>
                 <div>Período: ${data?.planillas?.periodo || 'N/A'}</div>
             </div>
 
@@ -339,65 +348,65 @@ const PlanillasPage = () => {
                 <strong>Empleado:</strong> ${data?.empleados?.nombres || 'N/A'} ${data?.empleados?.apellidos || ''}<br>
                 <strong>Documento:</strong> ${data?.empleados?.numero_documento || 'N/A'}<br>
                 <strong>Puesto:</strong> ${data?.empleados?.puesto || 'N/A'}<br>
-                <strong>Fecha de Pago:</strong> ${data?.planillas?.fecha_pago ? parseDateLocal(data.planillas.fecha_pago).toLocaleDateString('es-PE') : 'N/A'}
+                <strong>Fecha de Pago:</strong> ${data?.planillas?.fecha_pago ? parseDateLocal(data.planillas.fecha_pago).toLocaleDateString(locale) : 'N/A'}
             </div>
 
             <div class="section">
                 <div class="section-title">💰 INGRESOS</div>
                 <div class="item">
                     <span>Sueldo Base</span>
-                    <span class="amount positive">S/ ${(parseFloat(data?.sueldo_base) || 0).toFixed(2)}</span>
+                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.sueldo_base) || 0).toFixed(2)}</span>
                 </div>
                 <div class="item">
-                    <span>Horas Extras 25%</span>
-                    <span class="amount positive">S/ ${(parseFloat(data?.horas_extras_25) || 0).toFixed(2)}</span>
+                    <span>Horas Extras ${isArgentina ? '50' : '25'}%</span>
+                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.horas_extras_25) || 0).toFixed(2)}</span>
                 </div>
                 <div class="item">
-                    <span>Horas Extras 35%</span>
-                    <span class="amount positive">S/ ${(parseFloat(data?.horas_extras_35) || 0).toFixed(2)}</span>
+                    <span>Horas Extras ${isArgentina ? '100' : isColombia ? '75' : '35'}%</span>
+                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.horas_extras_35) || 0).toFixed(2)}</span>
                 </div>
                 <div class="item">
-                    <span>Bonos Adicionales</span>
-                    <span class="amount positive">S/ ${(parseFloat(data?.bonos_adicionales) || 0).toFixed(2)}</span>
+                    <span>${isColombia ? 'Otros devengados' : isArgentina ? 'Adicionales' : 'Bonos adicionales'}</span>
+                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.bonos_adicionales) || 0).toFixed(2)}</span>
                 </div>
                 <div class="item total">
                     <span>TOTAL INGRESOS</span>
-                    <span class="amount positive">S/ ${(parseFloat(data?.total_ingresos) || 0).toFixed(2)}</span>
+                    <span class="amount positive">${currencySymbol} ${(parseFloat(data?.total_ingresos) || 0).toFixed(2)}</span>
                 </div>
             </div>
 
             <div class="section">
                 <div class="section-title">📉 DESCUENTOS</div>
                 <div class="item">
-                    <span>AFP/ONP (13%)</span>
-                    <span class="amount negative">S/ ${(parseFloat(data?.descuento_afp) || 0).toFixed(2)}</span>
+                    <span>${isArgentina ? 'SIPA / INSSJP / obra social' : isColombia ? 'Salud / pensión' : 'AFP/ONP'}</span>
+                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.descuento_afp) || 0).toFixed(2)}</span>
                 </div>
                 <div class="item">
-                    <span>ESSALUD (9%)</span>
-                    <span class="amount negative">S/ ${(parseFloat(data?.descuento_essalud) || 0).toFixed(2)}</span>
+                    <span>${isArgentina ? 'Ganancias / sindicato' : isColombia ? 'FSP / retención' : 'ESSALUD (9%)'}</span>
+                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.descuento_essalud) || 0).toFixed(2)}</span>
                 </div>
                 <div class="item">
                     <span>Tardanzas</span>
-                    <span class="amount negative">S/ ${(parseFloat(data?.descuento_tardanzas) || 0).toFixed(2)}</span>
+                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.descuento_tardanzas) || 0).toFixed(2)}</span>
                 </div>
                 <div class="item">
                     <span>Faltas</span>
-                    <span class="amount negative">S/ ${(parseFloat(data?.descuento_faltas) || 0).toFixed(2)}</span>
+                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.descuento_faltas) || 0).toFixed(2)}</span>
                 </div>
                 <div class="item total">
                     <span>TOTAL DESCUENTOS</span>
-                    <span class="amount negative">S/ ${(parseFloat(data?.total_descuentos) || 0).toFixed(2)}</span>
+                    <span class="amount negative">${currencySymbol} ${(parseFloat(data?.total_descuentos) || 0).toFixed(2)}</span>
                 </div>
             </div>
 
             <div class="item total">
                 <span>NETO A PAGAR</span>
-                <span class="amount">S/ ${(parseFloat(data?.neto_pagar) || 0).toFixed(2)}</span>
+                <span class="amount">${currencySymbol} ${(parseFloat(data?.neto_pagar) || 0).toFixed(2)}</span>
             </div>
 
             <div>
                 <p>Este documento es generado automáticamente por NEON SYSTEM</p>
-                <p>Fecha de generación: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</p>
+                <p>Fecha de generación: ${new Date().toLocaleDateString(locale)} ${new Date().toLocaleTimeString(locale)}</p>
             </div>
         </div>
     </body>
@@ -406,22 +415,20 @@ const PlanillasPage = () => {
 
   const formatCurrency = (amount: number) => {
     if (isNaN(amount)) amount = 0;
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency: 'PEN'
+      currency: country.moneda || 'PEN'
     }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
-      // Las fechas llegan a medianoche UTC; interpretarlas en hora local las
-      // retrasa un dia en Lima, asi que se toma solo la parte de la fecha.
       const partes = String(dateString).slice(0, 10).split('-').map(Number);
       if (partes.length === 3 && partes.every((n) => !Number.isNaN(n))) {
-        return new Date(partes[0], partes[1] - 1, partes[2]).toLocaleDateString('es-PE');
+        return new Date(partes[0], partes[1] - 1, partes[2]).toLocaleDateString(locale);
       }
-      return new Date(dateString).toLocaleDateString('es-PE');
+      return new Date(dateString).toLocaleDateString(locale);
     } catch (error: any) {
       return 'N/A';
     }
@@ -721,7 +728,7 @@ const PlanillasPage = () => {
                       <th className="text-right p-3">Ingresos</th>
                       <th className="text-right p-3">Descuentos</th>
                       <th className="text-right p-3">Neto</th>
-                      <th className="text-center p-3">Boleta</th>
+                      <th className="text-center p-3">{isColombia ? 'Desprendible' : isArgentina ? 'Recibo' : 'Boleta'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -749,7 +756,7 @@ const PlanillasPage = () => {
                           <button
                             className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-accent"
                             onClick={() => descargarBoleta(empleado?.id)}
-                            title="Descargar boleta profesional"
+                            title={isColombia ? 'Descargar desprendible de nómina' : isArgentina ? 'Descargar recibo de sueldo' : 'Descargar boleta profesional'}
                           >
                             <FileDown className="h-4 w-4" aria-hidden="true" />
                           </button>

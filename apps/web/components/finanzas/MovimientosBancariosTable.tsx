@@ -1,3 +1,5 @@
+'use client'
+
 import {
   TrendingUp,
   TrendingDown,
@@ -9,6 +11,7 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { formatDate, formatDateTime } from '@/lib/format-utils'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface MovimientoBancario {
   id: string
@@ -51,13 +54,7 @@ export default function MovimientosBancariosTable({
   pagination,
   onPageChange
 }: MovimientosBancariosTableProps) {
-  const formatCurrency = (amount: number, currency: string = 'PEN') => {
-    const curr = currency === 'USD' ? 'USD' : currency === 'EUR' ? 'EUR' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: curr,
-    }).format(amount)
-  }
+  const { taxIdLabel, formatCurrency } = useLocalizedMoney()
 
   if (loading) {
     return (
@@ -164,7 +161,7 @@ export default function MovimientosBancariosTable({
                         {movimiento.proveedores.razon_social}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        RUC: {movimiento.proveedores.ruc}
+                        {taxIdLabel}: {movimiento.proveedores.ruc}
                       </div>
                     </div>
                   ) : (

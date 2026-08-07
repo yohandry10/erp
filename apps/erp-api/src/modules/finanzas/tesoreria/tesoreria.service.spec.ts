@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { TesoreriaService } from './tesoreria.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { TiposCambioService } from '../../contabilidad/services/tipos-cambio.service';
 
 describe('TesoreriaService', () => {
   let service: TesoreriaService;
@@ -46,6 +47,15 @@ describe('TesoreriaService', () => {
           useValue: {
             emitPagoProveedorRegistrado: jest.fn(),
             emitMovimientoBancarioRegistrado: jest.fn(),
+          },
+        },
+        {
+          // Estas pruebas operan en moneda local: la valuación devuelve el
+          // mismo importe y no hay diferencia de cambio.
+          provide: TiposCambioService,
+          useValue: {
+            obtenerMonedaLocal: jest.fn().mockResolvedValue('PEN'),
+            exigirVigente: jest.fn(),
           },
         },
       ],

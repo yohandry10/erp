@@ -13,6 +13,7 @@ import { exportToExcel, formatCurrencyForExcel, formatPercentageForExcel } from 
 import PresupuestoEjecucionIndicator, { getEjecucionColor } from './PresupuestoEjecucionIndicator'
 import PresupuestoEjecucionPorCentroChart from './PresupuestoEjecucionPorCentroChart'
 import { useApi } from '@/hooks/use-api'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface PresupuestoVsRealChartProps {
   periodoId: string
@@ -151,6 +152,7 @@ const normalizeComparacionData = (raw: any): ComparacionData => ({
 })
 
 export default function PresupuestoVsRealChart({ periodoId, centroId }: PresupuestoVsRealChartProps) {
+  const { formatCurrency: formatLocalizedCurrency } = useLocalizedMoney()
   const [data, setData] = useState<ComparacionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -192,11 +194,7 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 2
-    }).format(toNumber(amount))
+    return formatLocalizedCurrency(toNumber(amount))
   }
 
   const getAlertaLabel = (alerta: string) => {

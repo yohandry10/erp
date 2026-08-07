@@ -8,6 +8,7 @@ import { Download, TrendingUp } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface VentaPorCliente {
   cliente_id: string
@@ -34,6 +35,8 @@ interface Props {
 
 export default function VentasPorClienteReport({ filters }: Props) {
   const { get } = useApi()
+  const country = useCountryContext()
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const [data, setData] = useState<VentaPorCliente[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'total' | 'cantidad'>('total')
@@ -168,7 +171,7 @@ export default function VentasPorClienteReport({ filters }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="bg-primary/10 rounded-lg p-4">
                 <p className="text-sm text-primary font-medium">Total Ventas</p>
-                <p className="text-2xl font-bold text-primary">S/ {totalGeneral.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-primary">{currencySymbol} {totalGeneral.toFixed(2)}</p>
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-emerald-400 font-medium">Total Pedidos</p>
@@ -247,7 +250,7 @@ export default function VentasPorClienteReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-medium text-foreground">
-                          S/ {row.total.toFixed(2)}
+                          {currencySymbol} {row.total.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">

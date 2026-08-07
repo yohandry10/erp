@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select'
 import { useApi } from '@/hooks/use-api'
 import { cn } from '@/lib/utils'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface CuentaBancaria {
   id: string
@@ -138,6 +139,7 @@ const normalizeFlujoCajaData = (raw: any): FlujoCajaData => ({
 export default function FlujoCajaPage() {
   const router = useRouter()
   const { get } = useApi()
+  const { currency, locale, formatCurrency: formatLocalizedCurrency } = useLocalizedMoney()
 
   const [flujoCajaData, setFlujoCajaData] = useState<FlujoCajaData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -164,16 +166,12 @@ export default function FlujoCajaPage() {
     loadFlujoCaja()
   }, [loadFlujoCaja])
 
-  const formatCurrency = (amount: number, moneda: string = 'PEN') => {
-    const currency = moneda === 'USD' ? 'USD' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency,
-    }).format(toNumber(amount))
+  const formatCurrency = (amount: number, moneda: string = currency) => {
+    return formatLocalizedCurrency(toNumber(amount), moneda)
   }
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('es-PE', {
+    new Date(dateString).toLocaleDateString(locale, {
       weekday: 'short',
       year: 'numeric',
       month: 'short',

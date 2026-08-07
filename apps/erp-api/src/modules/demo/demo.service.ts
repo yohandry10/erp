@@ -28,6 +28,51 @@ import {
   encryptText,
 } from "../../shared/utils/secure-config.utils";
 import { CacheInvalidationService } from "../../shared/cache/cache-invalidation.service";
+import {
+  ActiveCountryCode,
+  ACTIVE_COUNTRY_PROFILES,
+  ActiveCountryProfile,
+  validateCountryTaxId,
+} from "../paises/initial-country";
+
+type DemoCountryProfile = ActiveCountryProfile & {
+  razonSocial: string;
+  taxId: string;
+  direccion: string;
+  region: string;
+  ciudad: string;
+  codigoPostal: string;
+};
+
+const DEMO_COUNTRY_PROFILES: Record<ActiveCountryCode, DemoCountryProfile> = {
+  PE: {
+    ...ACTIVE_COUNTRY_PROFILES.PE,
+    razonSocial: "DEMO COMERCIAL S.A.C.",
+    taxId: "20123456786",
+    direccion: "Av. Demo 123, Lima",
+    region: "LIMA",
+    ciudad: "LIMA",
+    codigoPostal: "150101",
+  },
+  AR: {
+    ...ACTIVE_COUNTRY_PROFILES.AR,
+    razonSocial: "DEMO COMERCIAL S.A.",
+    taxId: "30710158229",
+    direccion: "Av. Corrientes 1234, Ciudad Autónoma de Buenos Aires",
+    region: "CIUDAD AUTÓNOMA DE BUENOS AIRES",
+    ciudad: "CABA",
+    codigoPostal: "C1043AAZ",
+  },
+  CO: {
+    ...ACTIVE_COUNTRY_PROFILES.CO,
+    razonSocial: "DEMO COMERCIAL S.A.S.",
+    taxId: "900123456-8",
+    direccion: "Carrera 7 # 72-41, Bogotá D.C.",
+    region: "BOGOTÁ D.C.",
+    ciudad: "BOGOTÁ",
+    codigoPostal: "110221",
+  },
+};
 
 const PLANES = {
   basico: {
@@ -78,12 +123,15 @@ export class DemoService {
 
   async createDemoTenant(dto: CreateDemoTenantDto = {}) {
     const diasDuracion = dto.dias_duracion || 14;
-    const nombre = dto.nombre || "DEMO COMERCIAL SAC";
+    const countryCode = (dto.pais || "PE") as ActiveCountryCode;
+    const country = DEMO_COUNTRY_PROFILES[countryCode];
+    const nombre = dto.nombre || country.razonSocial;
 
     try {
       const { data, error } = await this.client.rpc("create_demo_tenant", {
         p_nombre: nombre,
         p_dias_duracion: diasDuracion,
+        p_pais_codigo: countryCode,
       });
 
       if (error) throw new Error(error.message);
@@ -104,7 +152,7 @@ export class DemoService {
           isSuperAdmin: true, // seed system-level
         },
         () =>
-          this.seedDemoOperationalData(data.tenant_id, data.user_id).catch(
+          this.seedDemoOperationalData(data.tenant_id, data.user_id, country).catch(
             (err) => {
               this.logger.warn(
                 `[demo seed] fallo parcial al hidratar tenant ${data.tenant_id}: ${err?.message || err}`,
@@ -142,6 +190,10 @@ export class DemoService {
         token,
         expires_at: data.expires_at,
         dias_restantes: data.dias_restantes,
+        pais: country.codigo,
+        pais_id: country.id,
+        moneda: country.moneda,
+        autoridad_fiscal: country.autoridadFiscal,
         // Segundo user para flujos que requieren segregación de funciones
         // (e.g., aprobar OC que tú no creaste).
         aprobador_user_id: seedResult.aprobadorUserId,
@@ -173,6 +225,7 @@ export class DemoService {
   private async seedDemoOperationalData(
     tenantId: string,
     primerUserId: string,
+    country: DemoCountryProfile = DEMO_COUNTRY_PROFILES.PE,
   ): Promise<{
     aprobadorUserId: string | null;
     aprobadorEmail: string | null;
@@ -190,15 +243,15 @@ export class DemoService {
       this.seedAlmacenDefault(tenantId),
     ]);
     const independentResults = await Promise.allSettled([
-      this.seedPlanContableMinimo(tenantId),
-      this.seedMetodosPago(tenantId),
-      this.seedCajaDefault(tenantId, primerUserId),
-      this.seedCertificadoDemo(tenantId),
-      this.seedProductosDemo(tenantId),
-      this.seedClientesDemo(tenantId),
-      this.seedProveedoresDemo(tenantId),
-      this.seedCuentaBancariaDemo(tenantId),
-      this.seedEmpleadoDemo(tenantId),
+      this.seedPlanContableMinimo(tenantId, country),
+      this.seedMetodosPago(tenantId, country),
+      this.seedCajaDefault(tenantId, primerUserId, country),
+      this.seedFiscalDemo(tenantId, country),
+      this.seedProductosDemo(tenantId, country),
+      this.seedClientesDemo(tenantId, country),
+      this.seedProveedoresDemo(tenantId, country),
+      this.seedCuentaBancariaDemo(tenantId, country),
+      this.seedEmpleadoDemo(tenantId, country),
       this.seedSegundoUserAprobador(tenantId, primerUserId).then((r) => {
         aprobadorResult = r;
       }),
@@ -209,9 +262,12 @@ export class DemoService {
       "plan_cuentas",
       "metodos_pago",
       "caja",
-      "certificado",
+      "configuracion_fiscal",
       "productos",
       "clientes",
+      "proveedores",
+      "cuenta_bancaria",
+      "empleado",
       "aprobador",
     ];
     const failures = results
@@ -342,8 +398,76 @@ export class DemoService {
    * exigen cuentas 10, 12, 20, 40 al menos. Insertamos las 9 raíces para tener
    * estructura completa, todas con activo=true (campo que el e2e filtra).
    */
-  private async seedPlanContableMinimo(tenantId: string): Promise<void> {
-    const cuentas = [
+  private async seedPlanContableMinimo(
+    tenantId: string,
+    country: DemoCountryProfile,
+  ): Promise<void> {
+    const cuentas = country.codigo === "AR" ? [
+      { codigo: "10", nombre: "Caja y Bancos", tipo: "ACTIVO" },
+      { codigo: "101", nombre: "Caja en moneda nacional", tipo: "ACTIVO" },
+      { codigo: "104", nombre: "Bancos cuenta corriente", tipo: "ACTIVO" },
+      { codigo: "12", nombre: "Créditos por Ventas", tipo: "ACTIVO" },
+      { codigo: "20", nombre: "Bienes de Cambio", tipo: "ACTIVO" },
+      { codigo: "40", nombre: "Deudas Fiscales (IVA e Ingresos Brutos)", tipo: "PASIVO" },
+      { codigo: "403", nombre: "Retenciones de seguridad social por pagar", tipo: "PASIVO" },
+      { codigo: "407", nombre: "Contribuciones patronales y ART por pagar", tipo: "PASIVO" },
+      { codigo: "411", nombre: "Sueldos por Pagar", tipo: "PASIVO" },
+      { codigo: "415", nombre: "Indemnizaciones y beneficios laborales por pagar", tipo: "PASIVO" },
+      { codigo: "42", nombre: "Proveedores", tipo: "PASIVO" },
+      { codigo: "50", nombre: "Capital Social", tipo: "PATRIMONIO" },
+      { codigo: "60", nombre: "Compras y Costo de Mercaderías", tipo: "GASTO" },
+      { codigo: "621", nombre: "Sueldos y Jornales", tipo: "GASTO" },
+      { codigo: "627", nombre: "Cargas Sociales, Obra Social y ART", tipo: "GASTO" },
+      { codigo: "629", nombre: "Indemnizaciones laborales", tipo: "GASTO" },
+      { codigo: "70", nombre: "Ventas", tipo: "INGRESO" },
+      { codigo: "94", nombre: "Gastos de Administración", tipo: "GASTO" },
+    ] : country.codigo === "CO" ? [
+      // Catálogo PUC comercial de referencia para la demo colombiana. En una
+      // cuenta real el plan sigue siendo editable según NIIF, sector y política
+      // contable de la empresa.
+      { codigo: "1105", nombre: "Caja", tipo: "ACTIVO" },
+      { codigo: "1110", nombre: "Bancos", tipo: "ACTIVO" },
+      { codigo: "1305", nombre: "Clientes", tipo: "ACTIVO" },
+      { codigo: "1435", nombre: "Mercancías no fabricadas por la empresa", tipo: "ACTIVO" },
+      { codigo: "2205", nombre: "Proveedores nacionales", tipo: "PASIVO" },
+      { codigo: "2365", nombre: "Retención en la fuente", tipo: "PASIVO" },
+      { codigo: "2370", nombre: "Retenciones y aportes de nómina", tipo: "PASIVO" },
+      { codigo: "2380", nombre: "Acreedores varios - PILA y parafiscales", tipo: "PASIVO" },
+      { codigo: "2408", nombre: "Impuesto sobre las ventas por pagar", tipo: "PASIVO" },
+      { codigo: "2505", nombre: "Salarios por pagar", tipo: "PASIVO" },
+      { codigo: "2510", nombre: "Cesantías consolidadas", tipo: "PASIVO" },
+      { codigo: "2515", nombre: "Intereses sobre cesantías", tipo: "PASIVO" },
+      { codigo: "2520", nombre: "Prima de servicios", tipo: "PASIVO" },
+      { codigo: "2525", nombre: "Vacaciones consolidadas", tipo: "PASIVO" },
+      { codigo: "3105", nombre: "Capital suscrito y pagado", tipo: "PATRIMONIO" },
+      { codigo: "4135", nombre: "Comercio al por mayor y al por menor", tipo: "INGRESO" },
+      { codigo: "5105", nombre: "Gastos de personal", tipo: "GASTO" },
+      { codigo: "5135", nombre: "Servicios", tipo: "GASTO" },
+      { codigo: "5195", nombre: "Diversos", tipo: "GASTO" },
+      { codigo: "6135", nombre: "Costo de ventas - comercio", tipo: "GASTO" },
+      // Equivalencias internas temporales usadas por los generadores contables
+      // históricos. La API de plan de cuentas las oculta al usuario colombiano.
+      ...[
+        ["10", "1105", "Caja"], ["101", "1105", "Caja"], ["104", "1110", "Bancos"],
+        ["12", "1305", "Clientes"], ["20", "1435", "Inventarios"], ["39", "5195", "Depreciación acumulada"],
+        ["40", "2408", "IVA por pagar"], ["401", "2365", "Retenciones fiscales"],
+        ["403", "2370", "Aportes de nómina"], ["407", "2380", "PILA y parafiscales"],
+        ["411", "2505", "Salarios por pagar"], ["415", "2510", "Prestaciones sociales"],
+        ["42", "2205", "Proveedores"], ["50", "3105", "Capital"], ["60", "6135", "Costo de ventas"],
+        ["621", "5105", "Sueldos y salarios"], ["627", "5105", "Seguridad social y parafiscales"],
+        ["629", "5105", "Indemnizaciones"], ["68", "5195", "Depreciaciones y provisiones"],
+        ["69", "6135", "Costo de ventas"], ["70", "4135", "Ingresos por ventas"],
+        ["76", "4135", "Otros ingresos"], ["94", "5195", "Gastos de administración"],
+      ].map(([codigo, pucCodigo, nombre]) => ({
+        codigo,
+        nombre: `Equivalencia interna ${nombre}`,
+        tipo: ["10", "101", "104", "12", "20"].includes(codigo) ? "ACTIVO"
+          : ["403", "407", "411", "415", "40", "42"].includes(codigo) ? "PASIVO"
+            : codigo === "50" ? "PATRIMONIO"
+              : codigo === "70" ? "INGRESO" : "GASTO",
+        metadata: { internal_equivalence: true, puc_codigo: pucCodigo },
+      })),
+    ] : [
       // Elementos PCGE peruano + cuentas de detalle que los e2e contables/RRHH
       // consultan explícitamente (621/627 RRHH, 411/403 planillas).
       {
@@ -351,6 +475,8 @@ export class DemoService {
         nombre: "Efectivo y Equivalentes de Efectivo",
         tipo: "ACTIVO",
       },
+      { codigo: "101", nombre: "Caja", tipo: "ACTIVO" },
+      { codigo: "104", nombre: "Cuentas Corrientes en Instituciones Financieras", tipo: "ACTIVO" },
       {
         codigo: "12",
         nombre: "Cuentas por Cobrar Comerciales - Terceros",
@@ -363,7 +489,9 @@ export class DemoService {
         nombre: "Instituciones Públicas (ESSALUD/ONP)",
         tipo: "PASIVO",
       },
+      { codigo: "407", nombre: "Administradoras de Fondos y Aportes Patronales por Pagar", tipo: "PASIVO" },
       { codigo: "411", nombre: "Remuneraciones por Pagar", tipo: "PASIVO" },
+      { codigo: "415", nombre: "Beneficios Sociales de los Trabajadores por Pagar", tipo: "PASIVO" },
       {
         codigo: "42",
         nombre: "Cuentas por Pagar Comerciales - Terceros",
@@ -378,9 +506,10 @@ export class DemoService {
       },
       {
         codigo: "627",
-        nombre: "Servicios Prestados por Terceros",
+        nombre: "Seguridad y Previsión Social",
         tipo: "GASTO",
       },
+      { codigo: "629", nombre: "Beneficios Sociales de los Trabajadores", tipo: "GASTO" },
       { codigo: "70", nombre: "Ventas", tipo: "INGRESO" },
       { codigo: "94", nombre: "Gastos de Administración", tipo: "GASTO" },
     ];
@@ -393,12 +522,25 @@ export class DemoService {
       activo: true,
       acepta_movimiento: true,
       nivel: 2,
+      ...("metadata" in c ? { metadata: c.metadata } : {}),
     }));
-    const { error } = await this.adminClient.from("plan_cuentas").insert(rows);
+    const { data: existentes, error: existentesError } = await this.adminClient
+      .from("plan_cuentas")
+      .select("codigo")
+      .eq("tenant_id", tenantId)
+      .in("codigo", rows.map((row) => row.codigo));
+    if (existentesError) throw new Error(`plan_cuentas select: ${existentesError.message}`);
+    const codigosExistentes = new Set((existentes || []).map((row) => String(row.codigo).trim().toUpperCase()));
+    const faltantes = rows.filter((row) => !codigosExistentes.has(String(row.codigo).trim().toUpperCase()));
+    if (faltantes.length === 0) return;
+    const { error } = await this.adminClient.from("plan_cuentas").insert(faltantes);
     if (error) throw new Error(`plan_cuentas insert: ${error.message}`);
   }
 
-  private async seedMetodosPago(tenantId: string): Promise<void> {
+  private async seedMetodosPago(
+    tenantId: string,
+    country: DemoCountryProfile,
+  ): Promise<void> {
     // `tipo` decide qué entra a la gaveta: sin él, la columna cae a su default
     // 'EFECTIVO' y una venta con tarjeta infla el efectivo esperado al arqueo.
     // La taxonomía es la del catálogo global (migración 024).
@@ -406,7 +548,11 @@ export class DemoService {
       { codigo: "EFECTIVO", nombre: "Efectivo", tipo: "EFECTIVO" },
       { codigo: "TARJETA", nombre: "Tarjeta", tipo: "TARJETA" },
       { codigo: "TRANSFERENCIA", nombre: "Transferencia bancaria", tipo: "TRANSFERENCIA" },
-      { codigo: "YAPE", nombre: "Yape / Plin", tipo: "BILLETERA_DIGITAL" },
+      country.codigo === "AR"
+        ? { codigo: "MERCADO_PAGO", nombre: "Mercado Pago", tipo: "BILLETERA_DIGITAL" }
+        : country.codigo === "CO"
+          ? { codigo: "NEQUI", nombre: "Nequi / Daviplata", tipo: "BILLETERA_DIGITAL" }
+          : { codigo: "YAPE", nombre: "Yape / Plin", tipo: "BILLETERA_DIGITAL" },
     ].map((m) => ({
       tenant_id: tenantId,
       ...m,
@@ -419,7 +565,11 @@ export class DemoService {
     if (error) throw new Error(`metodos_pago insert: ${error.message}`);
   }
 
-  private async seedCajaDefault(tenantId: string, primerUserId?: string): Promise<void> {
+  private async seedCajaDefault(
+    tenantId: string,
+    primerUserId: string | undefined,
+    country: DemoCountryProfile,
+  ): Promise<void> {
     const { data: almacen, error: almacenError } = await this.adminClient
       .from("almacenes")
       .select("id")
@@ -454,8 +604,8 @@ export class DemoService {
           caja_id: caja.id,
           cajero_id: primerUserId,
           abierto_por: primerUserId,
-          monto_inicio: 100,
-          moneda: "PEN",
+          monto_inicio: country.codigo === "CO" ? 100_000 : country.codigo === "AR" ? 100_000 : 100,
+          moneda: country.moneda,
           estado: "ABIERTA",
         });
       if (sesionError) {
@@ -471,14 +621,83 @@ export class DemoService {
    * No usa PFX_PATH/PFX_PASS porque esos pueden apuntar al certificado fiscal
    * real de un contribuyente.
    */
-  private async seedCertificadoDemo(tenantId: string): Promise<void> {
+  private async seedFiscalDemo(
+    tenantId: string,
+    country: DemoCountryProfile,
+  ): Promise<void> {
     // 1) Config fiscal base SIEMPRE, independiente del PFX. Antes vivía en el
     //    mismo update que el certificado: si el PFX fallaba, el demo quedaba
     //    sin dirección fiscal ni SOL secundario y el usuario veía el modal
     //    "Configuración Incompleta" en un tenant que promete datos de ejemplo.
     const { error: baseError } = await this.adminClient
       .from("empresa_config")
-      .update({
+      .update(country.codigo === "AR" ? {
+        ruc: country.taxId,
+        direccion_fiscal: country.direccion,
+        ubigeo: country.codigoPostal,
+        departamento: country.region,
+        provincia: country.ciudad,
+        distrito: country.ciudad,
+        pais: country.codigo,
+        pais_id: country.id,
+        moneda_defecto: country.moneda,
+        configuracion_completa: true,
+        regimen_tributario: "RESPONSABLE_INSCRIPTO",
+        igv_porcentaje: 21,
+        serie_factura: "00001",
+        serie_boleta: "00001",
+        serie_nota_credito: "00001",
+        gre_automatico_habilitado: false,
+        gre_obligatorio: false,
+        usar_flujo_logistica: true,
+        emision_cpe_modo: "ARCA_WSFE",
+        arca_activo: false,
+        arca_environment: "homologacion",
+        arca_cuit_representada: country.taxId,
+        arca_punto_venta: 1,
+        arca_condicion_iva: "RESPONSABLE_INSCRIPTO",
+        ingresos_brutos: "901-000000-1",
+        fecha_inicio_actividades: "2020-01-01",
+        provincia_fiscal: "CABA",
+      } : country.codigo === "CO" ? {
+        ruc: country.taxId,
+        direccion_fiscal: country.direccion,
+        ubigeo: country.codigoPostal,
+        departamento: country.region,
+        provincia: country.ciudad,
+        distrito: country.ciudad,
+        pais: country.codigo,
+        pais_id: country.id,
+        moneda_defecto: country.moneda,
+        configuracion_completa: true,
+        regimen_tributario: "RESPONSABLE_IVA",
+        igv_porcentaje: 19,
+        serie_factura: "FE",
+        serie_boleta: "FE",
+        serie_nota_credito: "NC",
+        gre_automatico_habilitado: false,
+        gre_obligatorio: false,
+        usar_flujo_logistica: true,
+        emision_cpe_modo: "DIAN_DIRECTO",
+        // La demo opera en homologación simulada: debe mostrar DIAN activo
+        // sin intentar envíos reales ni requerir credenciales productivas.
+        dian_activo: true,
+        dian_environment: "HOMOLOGACION",
+        dian_url: "https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc",
+        dian_usuario: "DEMO-DIAN-USUARIO",
+        dian_password: encryptText(this.configService, "DEMO-DIAN-PASSWORD"),
+        dian_regimen_fiscal: "48",
+        dian_tipo_contribuyente: "PERSONA_JURIDICA",
+        dian_resolucion_numero: "18760000001",
+        dian_resolucion_prefijo: "FE",
+        dian_resolucion_desde: 1,
+        dian_resolucion_hasta: 5000000,
+        dian_resolucion_fecha_inicio: "2026-01-01",
+        dian_resolucion_fecha_fin: "2027-12-31",
+        dian_software_id: "DEMO-SOFTWARE-ID",
+        dian_software_pin: encryptText(this.configService, "00000"),
+        dian_test_set_id: "DEMO-TEST-SET",
+      } : {
         // RUC válido SUNAT (módulo 11): prefijo 20 + 8 dígitos + checksum.
         // El sistema valida correctamente en otros endpoints (proveedores,
         // clientes), por eso necesitamos un RUC que cumpla el algoritmo.
@@ -508,6 +727,7 @@ export class DemoService {
         // logistica avanzada, no parte del circuito que se prueba aqui.
         gre_automatico_habilitado: false,
         gre_obligatorio: false,
+        usar_flujo_logistica: true,
         // Regimen general: es el que aplica a una S.A.C. como la del demo y sin
         // el la configuracion fiscal nunca se da por completa.
         regimen_tributario: "GENERAL",
@@ -516,7 +736,11 @@ export class DemoService {
     if (baseError)
       throw new Error(`empresa_config update (config fiscal demo): ${baseError.message}`);
 
-    // 2) Certificado demo para firmar CPE/GRE en modo demo.
+    // Argentina usa certificado X.509 emitido por ARCA. La demo fiscal es
+    // simulada y no debe presentar un PFX SUNAT como si fuera una credencial ARCA.
+    if (country.codigo !== "PE") return;
+
+    // 2) Certificado demo para firmar CPE/GRE en modo demo de Perú.
     const pfxPath = process.env.DEMO_PFX_PATH || "certs/demo.pfx";
     const pfxPass = process.env.DEMO_PFX_PASS || "12345678910";
     const absPath = this.resolveDemoPfxPath(pfxPath);
@@ -574,7 +798,10 @@ export class DemoService {
    * incluidos"). Sin esto el POS/Inventario arrancan vacíos y el usuario no
    * puede probar una venta sin crear productos a mano.
    */
-  private async seedProductosDemo(tenantId: string): Promise<void> {
+  private async seedProductosDemo(
+    tenantId: string,
+    country: DemoCountryProfile = DEMO_COUNTRY_PROFILES.PE,
+  ): Promise<void> {
     const productos = [
       {
         codigo: "DEMO-001",
@@ -630,9 +857,12 @@ export class DemoService {
         afectacion_igv: "20",
       },
     ];
+    const priceMultiplier = country.codigo === "CO" ? 1_000 : 1;
     const rows = productos.map((p) => ({
       tenant_id: tenantId,
       ...p,
+      precio_venta: p.precio_venta * priceMultiplier,
+      precio_compra: p.precio_compra * priceMultiplier,
       // El saldo se inicializa después mediante aplicar_movimiento_inventario_tx.
       stock_actual: 0,
       stock: 0,
@@ -641,7 +871,7 @@ export class DemoService {
       codigo_barras: p.codigo,
       stock_minimo: 5,
       stock_reservado: 0,
-      impuesto: 18,
+      impuesto: country.tasaImpuesto * 100,
       es_servicio: false,
       controla_stock: true,
       afectacion_igv: (p as { afectacion_igv?: string }).afectacion_igv ?? "10",
@@ -702,8 +932,49 @@ export class DemoService {
    * válido (≥8 dígitos) para procesar la venta. Sin esto no se puede vender.
    * RUC 20600000013 pasa la validación módulo 11 de SUNAT.
    */
-  private async seedClientesDemo(tenantId: string): Promise<void> {
-    const clientes = [
+  private async seedClientesDemo(
+    tenantId: string,
+    country: DemoCountryProfile,
+  ): Promise<void> {
+    const clientes = country.codigo === "AR" ? [
+      {
+        tipo: "PERSONA",
+        documento_tipo: "DNI",
+        documento: "30123456",
+        razon_social: "Consumidor Final",
+      },
+      {
+        tipo: "PERSONA",
+        documento_tipo: "DNI",
+        documento: "32123456",
+        razon_social: "Juan Pérez Demo",
+      },
+      {
+        tipo: "EMPRESA",
+        documento_tipo: "CUIT",
+        documento: "30710158229",
+        razon_social: "COMERCIAL PAMPA DEMO S.A.",
+      },
+    ] : country.codigo === "CO" ? [
+      {
+        tipo: "PERSONA",
+        documento_tipo: "CC",
+        documento: "1000000001",
+        razon_social: "Consumidor Final",
+      },
+      {
+        tipo: "PERSONA",
+        documento_tipo: "CC",
+        documento: "1012345678",
+        razon_social: "Juan Pérez Demo",
+      },
+      {
+        tipo: "EMPRESA",
+        documento_tipo: "NIT",
+        documento: "9001234568",
+        razon_social: "COMERCIAL ANDINA DEMO S.A.S.",
+      },
+    ] : [
       // Sin ceros a la izquierda: numero_documento es integer y el POS valida
       // la longitud del documento como string (≥8 dígitos).
       {
@@ -739,7 +1010,7 @@ export class DemoService {
         razon_social: c.razon_social,
         nombre: c.razon_social,
         codigo: c.documento,
-        ruc: c.documento_tipo === "RUC" ? c.documento : null,
+        ruc: ["RUC", "CUIT", "NIT"].includes(c.documento_tipo) ? c.documento : null,
         activo: true,
       };
     });
@@ -752,15 +1023,23 @@ export class DemoService {
    * pantalla de pagos no tiene donde cargar el egreso y la conciliacion no
    * tiene contra que cuadrar. Se siembra una en soles.
    */
-  private async seedCuentaBancariaDemo(tenantId: string): Promise<void> {
+  private async seedCuentaBancariaDemo(
+    tenantId: string,
+    country: DemoCountryProfile,
+  ): Promise<void> {
     const { error } = await this.adminClient.from("cuentas_bancarias").insert({
       tenant_id: tenantId,
-      nombre: "BCP Cuenta Corriente Soles",
-      codigo: "BCP-CTE-PEN",
-      banco: "BCP",
-      numero_cuenta: "194-1234567-0-56",
+      nombre:
+        country.codigo === "AR"
+          ? "Banco Nación Cuenta Corriente Pesos"
+          : country.codigo === "CO"
+            ? "Bancolombia Cuenta Corriente Pesos"
+            : "BCP Cuenta Corriente Soles",
+      codigo: country.codigo === "AR" ? "BNA-CTE-ARS" : country.codigo === "CO" ? "BCO-CTE-COP" : "BCP-CTE-PEN",
+      banco: country.codigo === "AR" ? "Banco Nación" : country.codigo === "CO" ? "Bancolombia" : "BCP",
+      numero_cuenta: country.codigo === "AR" ? "0000-123456/7" : country.codigo === "CO" ? "12345678901" : "194-1234567-0-56",
       tipo_cuenta: "CORRIENTE",
-      moneda: "PEN",
+      moneda: country.moneda,
       // Saldo de apertura: sin fondos el control de sobregiro rechaza -con
       // razon- cualquier pago a proveedor, y el circuito de tesoreria queda sin
       // poder demostrarse.
@@ -784,25 +1063,63 @@ export class DemoService {
    * conciliacion sin cuenta bancaria.
    *
    * Se siembra con hijos a cargo a proposito, porque asi el demo ejercita la
-   * asignacion familiar, el concepto legal que mas facil pasa inadvertido
+   * asignacion familiar, que es el concepto legal que mas facil pasa inadvertido
    * cuando no se calcula.
    */
-  private async seedEmpleadoDemo(tenantId: string): Promise<void> {
+  private async seedEmpleadoDemo(
+    tenantId: string,
+    country: DemoCountryProfile,
+  ): Promise<void> {
+    const esPeru = country.codigo === "PE";
+    const esColombia = country.codigo === "CO";
+    const employeeProfile = esColombia
+      ? {
+          nombres: "Laura Sofía",
+          apellidos: "Gómez Rodríguez",
+          tipo_documento: "CC",
+          numero_documento: "52345678",
+          email: "lgomez@demo.local",
+          sueldo: 2_500_000,
+          regimenPensionario: "COLPENSIONES",
+        }
+      : country.codigo === "AR"
+        ? {
+            nombres: "Sofía",
+            apellidos: "González",
+            tipo_documento: "CUIL",
+            // CUIL válido para el DNI 30.123.456 (prefijo femenino 27).
+            // El trigger de integridad laboral argentino verifica también el
+            // dígito final, por lo que un DNI solo deja la demo sin RR. HH.
+            numero_documento: "27301234568",
+            email: "sgonzalez@demo.local",
+            sueldo: 1_800_000,
+            regimenPensionario: "SIPA",
+          }
+        : {
+            nombres: "María Elena",
+            apellidos: "Quispe Huamán",
+            tipo_documento: "DNI",
+            numero_documento: "44556677",
+            email: "mquispe@demo.local",
+            sueldo: 2500,
+            regimenPensionario: "ONP",
+          };
+
     const { data: empleado, error: empleadoError } = await this.adminClient
       .from("empleados")
       .insert({
         tenant_id: tenantId,
-        nombres: "María Elena",
-        apellidos: "Quispe Huamán",
-        tipo_documento: "DNI",
-        numero_documento: "44556677",
-        email: "mquispe@demo.local",
+        nombres: employeeProfile.nombres,
+        apellidos: employeeProfile.apellidos,
+        tipo_documento: employeeProfile.tipo_documento,
+        numero_documento: employeeProfile.numero_documento,
+        email: employeeProfile.email,
         puesto: "Asistente Administrativo",
         fecha_ingreso: "2024-01-15",
         estado: "activo",
-        tiene_hijos: true,
-        cantidad_hijos: 1,
-        asignacion_familiar: true,
+        tiene_hijos: esPeru,
+        cantidad_hijos: esPeru ? 1 : 0,
+        asignacion_familiar: esPeru,
         activo: true,
       })
       .select("id")
@@ -819,8 +1136,8 @@ export class DemoService {
         empleado_id: empleado.id,
         tipo_contrato: "INDEFINIDO",
         fecha_inicio: "2024-01-15",
-        sueldo_bruto: 2500,
-        regimen_pensionario: "ONP",
+        sueldo_bruto: employeeProfile.sueldo,
+        regimen_pensionario: employeeProfile.regimenPensionario,
         estado: "VIGENTE",
       });
 
@@ -828,8 +1145,49 @@ export class DemoService {
       throw new Error(`contratos insert: ${contratoError.message}`);
   }
 
-  private async seedProveedoresDemo(tenantId: string): Promise<void> {
-    const proveedores = [
+  private async seedProveedoresDemo(
+    tenantId: string,
+    country: DemoCountryProfile,
+  ): Promise<void> {
+    const proveedores = country.codigo === "AR" ? [
+      {
+        ruc: "30712345671",
+        razon_social: "DISTRIBUIDORA DEL PLATA S.A.",
+        contacto: "Ventas Corporativas",
+        email: "ventas@distribuidoradelplata.demo",
+        telefono: "1145678901",
+        direccion: "Av. Belgrano 1500, CABA",
+        dias_credito: 30,
+      },
+      {
+        ruc: "30714025003",
+        razon_social: "INSUMOS PAMPEANOS S.R.L.",
+        contacto: "Mesa de Pedidos",
+        email: "pedidos@insumospampeanos.demo",
+        telefono: "1134567890",
+        direccion: "Calle 50 456, La Plata",
+        dias_credito: 15,
+      },
+    ] : country.codigo === "CO" ? [
+      {
+        ruc: "9003739135",
+        razon_social: "DISTRIBUCIONES CAPITAL S.A.S.",
+        contacto: "Ventas Corporativas",
+        email: "ventas@distribucionescapital.demo",
+        telefono: "6013456789",
+        direccion: "Carrera 30 # 45-20, Bogotá",
+        dias_credito: 30,
+      },
+      {
+        ruc: "8600029645",
+        razon_social: "INSUMOS CAFETEROS S.A.S.",
+        contacto: "Mesa de Pedidos",
+        email: "pedidos@insumoscafeteros.demo",
+        telefono: "6043456789",
+        direccion: "Calle 10 # 35-18, Medellín",
+        dias_credito: 15,
+      },
+    ] : [
       {
         ruc: "20512345671",
         razon_social: "DISTRIBUIDORA ANDINA S.A.C.",
@@ -856,8 +1214,8 @@ export class DemoService {
       nombre: prov.razon_social,
       codigo: prov.ruc,
       ruc: prov.ruc,
-      tipo_documento: "RUC",
-      documento_tipo: "RUC",
+      tipo_documento: country.documentoFiscal,
+      documento_tipo: country.documentoFiscal,
       documento_numero: prov.ruc,
       numero_documento: prov.ruc,
       contacto: prov.contacto,
@@ -877,7 +1235,7 @@ export class DemoService {
     const { data, error } = await this.client
       .from("empresa_config")
       .select(
-        "is_demo, demo_expires_at, demo_created_at, demo_conversion_attempted, plan",
+        "is_demo, demo_expires_at, demo_created_at, demo_conversion_attempted, plan, pais, pais_id, moneda_defecto",
       )
       .eq("tenant_id", tenantId)
       .single();
@@ -885,7 +1243,13 @@ export class DemoService {
     if (error || !data) throw new NotFoundException("Tenant no encontrado");
 
     if (!data.is_demo) {
-      return { is_demo: false, message: "Este no es un tenant demo" };
+      return {
+        is_demo: false,
+        pais: data.pais,
+        pais_id: data.pais_id,
+        moneda: data.moneda_defecto,
+        message: "Este no es un tenant demo",
+      };
     }
 
     const now = new Date();
@@ -903,6 +1267,9 @@ export class DemoService {
       conversion_attempted: data.demo_conversion_attempted,
       planes_disponibles: Object.values(PLANES),
       stripe_enabled: this.stripeService.isConfigured(),
+      pais: data.pais,
+      pais_id: data.pais_id,
+      moneda: data.moneda_defecto,
     };
   }
 
@@ -927,6 +1294,12 @@ export class DemoService {
 
     const plan = PLANES[dto.plan_id || "basico"];
     if (!plan) throw new BadRequestException("Plan no válido");
+
+    const countryCode = String(status.pais || "PE").toUpperCase() as ActiveCountryCode;
+    if (!validateCountryTaxId(countryCode, dto.ruc)) {
+      const documentName = ACTIVE_COUNTRY_PROFILES[countryCode]?.documentoFiscal || "identificación fiscal";
+      throw new BadRequestException(`${documentName} inválido para ${countryCode}`);
+    }
 
     // Validar RUC único
     const { data: existingRuc } = await this.client
@@ -987,9 +1360,9 @@ export class DemoService {
         plan_id: dto.plan_id || "basico",
         periodo: dto.periodo || "mensual",
         monto,
-        // La elección viaja con la conversión pendiente: el webhook
-        // reconstruye el DTO desde aquí, y sin este campo el cliente que
-        // pidió empezar de cero se encontraba la cuenta con todo el demo.
+        // La elección viaja con la conversión pendiente: el webhook reconstruye
+        // el DTO desde aquí, y sin este campo el cliente que pidió empezar de
+        // cero se encontraba la cuenta con todo lo del demo dentro.
         conservar_datos: dto.conservar_datos !== false,
         estado: "PENDIENTE",
       });
@@ -1131,7 +1504,9 @@ export class DemoService {
       .maybeSingle();
 
     if (error || !solicitud) {
-      throw new NotFoundException("La solicitud no existe o ya fue procesada");
+      throw new NotFoundException(
+        "La solicitud no existe o ya fue procesada",
+      );
     }
 
     const resultado = await this.completarConversion(solicitud.tenant_id, {
@@ -1146,9 +1521,9 @@ export class DemoService {
       conservar_datos: solicitud.conservar_datos !== false,
     } as ConvertDemoToRealDto);
 
-    // La solicitud se cierra después de convertir, nunca antes: si se marcara
-    // completada primero y la conversión fallara, quedaría un cliente que pagó
-    // y no aparece en ninguna lista.
+    // Se marca después de convertir: si se marcara antes y la conversión
+    // fallara, la solicitud desaparecería del panel sin que nadie la haya
+    // activado, y el cliente habría pagado.
     await this.adminClient
       .from("demo_conversiones_pendientes")
       .update({
@@ -1159,18 +1534,21 @@ export class DemoService {
       })
       .eq("id", solicitudId);
 
+    this.logger.log(
+      `[demo] solicitud ${solicitudId} aprobada por ${aprobadoPor || "superadmin"}: tenant ${solicitud.tenant_id} activado`,
+    );
+
     return {
       success: true,
-      message: `Cuenta de ${solicitud.razon_social} activada. Ya puede entrar con ${solicitud.email}.`,
       tenant_id: solicitud.tenant_id,
       email: solicitud.email,
-      plan: resultado.plan,
+      razon_social: solicitud.razon_social,
+      message: `Cuenta de ${solicitud.razon_social} activada. Ya puede entrar con ${solicitud.email}.`,
+      conversion: resultado,
     };
   }
 
-  /**
-   * Rechazo con motivo: el cliente tiene que poder saber qué corregir.
-   */
+  /** Rechaza una solicitud sin activar nada, dejando dicho por qué. */
   async rechazarConversionPendiente(solicitudId: string, motivo: string) {
     const { data: solicitud } = await this.adminClient
       .from("demo_conversiones_pendientes")
@@ -1183,6 +1561,9 @@ export class DemoService {
       throw new NotFoundException("La solicitud no existe o ya fue procesada");
     }
 
+    // CANCELADA y no "RECHAZADA": el normalizador de la tabla solo conoce cinco
+    // estados y a los demás les busca uno por los timestamps, así que con
+    // "RECHAZADA" la solicitud se quedaba PENDIENTE y volvía a la lista.
     const { error } = await this.adminClient
       .from("demo_conversiones_pendientes")
       .update({
@@ -1214,6 +1595,20 @@ export class DemoService {
       dto.password_hash || (await bcrypt.hash(dto.password, 10));
 
     try {
+      const countryCode = String((await this.getCountryForTenant(tenantId)) || "PE").toUpperCase();
+      // Prioridad de seguridad: nunca convertir primero y limpiar después. Si
+      // falla este RPC, la cuenta sigue siendo demo y no puede emitir con los
+      // fixtures sintéticos como si fueran credenciales reales.
+      if (countryCode === "CO") {
+        const { data: onboarding, error: onboardingError } = await this.adminClient.rpc(
+          "prepare_colombia_real_onboarding",
+          { p_tenant_id: tenantId },
+        );
+        if (onboardingError || onboarding?.prepared !== true) {
+          throw onboardingError || new Error("No se pudo preparar onboarding real de Colombia");
+        }
+      }
+
       const { error: empresaError } = await authClient
         .from("empresa_config")
         .update({
@@ -1237,21 +1632,21 @@ export class DemoService {
 
       if (empresaError) throw empresaError;
 
-      // El cliente eligió empezar de cero. Se hace después de convertir,
-      // nunca antes: si el borrado va primero y la conversión falla, se
-      // queda sin datos y además sigue siendo demo. Al revés, un fallo aquí
-      // deja la cuenta real con sus datos, que es recuperable.
+      // El cliente eligio empezar de cero. Se hace despues de convertir, nunca
+      // antes: si el borrado va primero y la conversion falla, se queda sin
+      // datos y ademas sigue siendo demo. Al reves, un fallo aqui deja la cuenta
+      // real con sus datos, que es recuperable.
       if (dto.conservar_datos === false) {
-        const { data: reinicio, error: reinicioError } =
-          await this.adminClient.rpc("reiniciar_datos_tenant", {
-            p_tenant: tenantId,
-          });
+        const { data: reinicio, error: reinicioError } = await this.adminClient.rpc(
+          "reiniciar_datos_tenant",
+          { p_tenant: tenantId },
+        );
 
         if (reinicioError || reinicio?.reiniciado !== true) {
           throw new BadRequestException(
-            `La cuenta se activó pero no se pudieron borrar los datos de prueba: ${
-              reinicioError?.message || "el reinicio no confirmó"
-            }. Vuelva a intentarlo desde la configuración.`,
+            `La cuenta se activo pero no se pudieron borrar los datos de prueba: ${
+              reinicioError?.message || "el reinicio no confirmo"
+            }. Vuelva a intentarlo desde la configuracion.`,
           );
         }
 
@@ -1347,6 +1742,16 @@ export class DemoService {
     }
   }
 
+  private async getCountryForTenant(tenantId: string): Promise<string> {
+    const { data, error } = await this.adminClient
+      .from("empresa_config")
+      .select("pais")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.pais || "PE";
+  }
+
   /**
    * Procesa webhook de Stripe cuando el pago es exitoso
    */
@@ -1373,8 +1778,8 @@ export class DemoService {
       telefono: conversion.telefono,
       plan_id: conversion.plan_id,
       periodo: conversion.periodo,
-      // Lo que el cliente eligió antes de pagar; sin esto la decisión se
-      // perdía justo en el paso que la hace efectiva.
+      // Lo que el cliente eligió antes de pagar; sin esto la decisión se perdía
+      // justo en el paso que la hace efectiva.
       conservar_datos: conversion.conservar_datos !== false,
     });
 

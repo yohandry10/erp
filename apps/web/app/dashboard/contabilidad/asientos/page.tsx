@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface AsientoContable {
   id: string
@@ -48,6 +49,7 @@ const inputClass =
 export default function AsientosPage() {
   const router = useRouter()
   const { get } = useApi()
+  const country = useCountryContext()
 
   const [asientos, setAsientos] = useState<AsientoContable[]>([])
   const [loading, setLoading] = useState(true)
@@ -85,13 +87,13 @@ export default function AsientosPage() {
   }, [loadAsientos])
 
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('es-PE', {
+    new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
     }).format(amount)
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('es-PE', {
+    new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

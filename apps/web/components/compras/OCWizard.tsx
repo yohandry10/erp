@@ -7,6 +7,7 @@ import * as z from 'zod'
 import { ChevronLeft, ChevronRight, Check, FileText, Package, Eye, Plus, Trash2, Calendar, Building2 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import { useCountryContext } from '@/hooks/use-country-context'
 import { Proveedor } from '@/types/compras'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { cn } from '@/lib/utils'
@@ -55,6 +56,7 @@ export function OCWizard({
   isLoading = false
 }: OCWizardProps) {
   const { tasaIgv } = useTaxConfig()
+  const country = useCountryContext()
   const [currentStep, setCurrentStep] = useState(1)
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [productos, setProductos] = useState<any[]>([])
@@ -197,9 +199,9 @@ export function OCWizard({
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda,
     }).format(amount)
   }
 
@@ -459,6 +461,7 @@ function Step2AddProducts({
   onRemoveProducto,
   loadingProductos
 }: any) {
+  const country = useCountryContext()
   const [selectedProducto, setSelectedProducto] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [precio, setPrecio] = useState(0)
@@ -487,9 +490,9 @@ function Step2AddProducts({
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda,
     }).format(amount)
   }
 
@@ -633,7 +636,7 @@ function Step2AddProducts({
 
 // Totales Summary Component - Shows real-time totals
 function TotalesSummary({ detalles, formatCurrency }: any) {
-  const { tasaIgv } = useTaxConfig()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const subtotal = detalles.reduce((sum: number, d: ProductoDetalle) => sum + d.subtotal, 0)
   const igv = subtotal * tasaIgv
   const total = subtotal + igv
@@ -648,7 +651,9 @@ function TotalesSummary({ detalles, formatCurrency }: any) {
           </span>
         </div>
         <div className="flex justify-between border-b border-border py-3">
-          <span className="text-sm text-muted-foreground">IGV (18%):</span>
+          <span className="text-sm text-muted-foreground">
+            {nombreImpuesto} ({Math.round(tasaIgv * 100)}%):
+          </span>
           <span className="text-sm font-semibold text-foreground/85">
             {formatCurrency(igv)}
           </span>
@@ -666,13 +671,15 @@ function TotalesSummary({ detalles, formatCurrency }: any) {
 
 // Step 3 Component: Review
 function Step3Review({ formData, detalles, proveedores, almacenes, calculateTotals, formatCurrency }: any) {
+  const country = useCountryContext()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const proveedor = proveedores.find((p: Proveedor) => p.id === formData.proveedor_id)
   const almacen = almacenes.find((a: any) => a.id === formData.almacen_destino_id)
   const { subtotal, igv, total } = calculateTotals()
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'No especificada'
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -720,7 +727,7 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
             </p>
             {proveedor?.ruc && (
               <p className="text-xs text-muted-foreground">
-                RUC: {proveedor.ruc}
+                {country.paisCodigo === 'AR' ? 'CUIT' : country.paisCodigo === 'CO' ? 'NIT' : 'RUC'}: {proveedor.ruc}
               </p>
             )}
           </div>
@@ -831,7 +838,9 @@ function Step3Review({ formData, detalles, proveedores, almacenes, calculateTota
             </span>
           </div>
           <div className="flex justify-between border-b border-border py-3">
-            <span className="text-sm text-muted-foreground">IGV (18%):</span>
+            <span className="text-sm text-muted-foreground">
+              {nombreImpuesto} ({Math.round(tasaIgv * 100)}%):
+            </span>
             <span className="text-sm font-semibold text-foreground/85">
               {formatCurrency(igv)}
             </span>

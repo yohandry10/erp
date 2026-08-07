@@ -8,6 +8,11 @@ import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.
 import { CpeOperationalDocumentService } from './cpe-operational-document.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
 import { fechaHoyEnPeru } from '../../shared/utils/fecha-peru.util';
+import {
+  validateArgentinaCuit,
+  validateColombiaNit,
+  validatePeruRuc,
+} from '../paises/initial-country';
 
 /** Registra XML firmado por el escritorio y normaliza su payload de entrada. */
 export class CpeRegistrationService {
@@ -38,7 +43,7 @@ async getEmpresaEmisorInfoStrict(tenantId: string) {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('empresa_config')
-      .select('ruc, razon_social, direccion_fiscal, ubigeo, departamento, provincia')
+      .select('ruc, razon_social, direccion_fiscal, ubigeo, departamento, provincia, pais, moneda_defecto, dian_regimen_fiscal, dian_tipo_contribuyente')
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
@@ -49,8 +54,18 @@ async getEmpresaEmisorInfoStrict(tenantId: string) {
     const typedData = data as any;
     const ruc = String(typedData?.ruc || '').trim();
     const razonSocial = String(typedData?.razon_social || '').trim();
-    if (!/^\d{11}$/.test(ruc) || !razonSocial) {
-      throw new BadRequestException('No se puede crear el CPE: faltan RUC o razon social reales en empresa_config');
+    const pais = String(typedData?.pais || 'PE').trim().toUpperCase();
+    const identificacionValida =
+      pais === 'AR'
+        ? validateArgentinaCuit(ruc)
+        : pais === 'CO'
+          ? validateColombiaNit(ruc)
+          : validatePeruRuc(ruc);
+    if (!identificacionValida || !razonSocial) {
+      const documento = pais === 'AR' ? 'CUIT' : pais === 'CO' ? 'NIT' : 'RUC';
+      throw new BadRequestException(
+        `No se puede crear el comprobante: faltan ${documento} o razón social válidos en empresa_config`,
+      );
     }
 
     return {
@@ -60,6 +75,10 @@ async getEmpresaEmisorInfoStrict(tenantId: string) {
       ciudad: typedData?.provincia ?? '',
       departamento: typedData?.departamento ?? '',
       codigoUbigeo: typedData?.ubigeo ?? '',
+      pais,
+      moneda: typedData?.moneda_defecto || (pais === 'AR' ? 'ARS' : pais === 'CO' ? 'COP' : 'PEN'),
+      regimenFiscal: typedData?.dian_regimen_fiscal ?? '',
+      tipoContribuyente: typedData?.dian_tipo_contribuyente ?? '',
     };
   }
 
@@ -294,8 +313,24 @@ resolveTipoDocumentoReceptor(
     tipoDocumentoCpe: string,
     provided: any,
     documentoReceptor: string,
+    pais = 'PE',
   ): string {
     const normalized = String(provided || '').trim().toUpperCase();
+    if (pais === 'CO') {
+      const colombiaMap: Record<string, string> = {
+        '13': '13',
+        CC: '13',
+        '31': '31',
+        NIT: '31',
+        '22': '22',
+        CE: '22',
+        '41': '41',
+        PASAPORTE: '41',
+        '12': '12',
+        TI: '12',
+      };
+      return colombiaMap[normalized] || (documentoReceptor.length >= 9 ? '31' : '13');
+    }
     const map: Record<string, string> = {
       '1': '1',
       DNI: '1',

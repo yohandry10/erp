@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsEmail, MinLength, Length, IsIn, IsBoolean } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, IsEmail, MinLength, IsIn, Matches, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDemoTenantDto {
@@ -13,6 +13,16 @@ export class CreateDemoTenantDto {
   @Min(7)
   @Max(30)
   dias_duracion?: number = 14;
+
+  @ApiPropertyOptional({
+    description: 'País operativo de la demo',
+    enum: ['PE', 'AR', 'CO'],
+    default: 'PE',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['PE', 'AR', 'CO'])
+  pais?: 'PE' | 'AR' | 'CO' = 'PE';
 }
 
 export class ConvertDemoToRealDto {
@@ -30,9 +40,11 @@ export class ConvertDemoToRealDto {
   @MinLength(3, { message: 'La razón social debe tener al menos 3 caracteres' })
   razon_social: string;
 
-  @ApiProperty({ description: 'RUC de la empresa (11 dígitos)' })
+  @ApiProperty({ description: 'Identificación fiscal real según país: RUC, CUIT o NIT con DV' })
   @IsString()
-  @Length(11, 11, { message: 'El RUC debe tener exactamente 11 dígitos' })
+  @Matches(/^[0-9-]{9,13}$/, {
+    message: 'La identificación fiscal sólo puede contener dígitos y guion',
+  })
   ruc: string;
 
   @ApiPropertyOptional({ description: 'Teléfono de contacto' })

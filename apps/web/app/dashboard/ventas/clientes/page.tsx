@@ -15,8 +15,12 @@ import {
   Users,
   RefreshCw
 } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 export default function ClientesPage() {
+  const country = useCountryContext()
+  const taxIdLabel =
+    country.paisCodigo === 'AR' ? 'CUIT/DNI' : country.paisCodigo === 'CO' ? 'NIT/CC' : 'RUC/DNI'
   const router = useRouter()
   const { get, del } = useApi()
 
@@ -133,7 +137,7 @@ export default function ClientesPage() {
             />
             <input
               type="text"
-              placeholder="Buscar por RUC, DNI, nombre o razón social..."
+              placeholder={`Buscar por ${taxIdLabel}, nombre o razón social...`}
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)} className="w-[100%] pt-3 pr-4 pb-3 pl-12 rounded-lg border text-[0.875rem]"
             />
@@ -197,7 +201,7 @@ export default function ClientesPage() {
                   <thead>
                     <tr>
                       <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
-                        RUC/DNI
+                        {taxIdLabel}
                       </th>
                       <th className="text-left p-4 font-semibold text-xs text-muted-foreground">
                         Nombre / Razón Social

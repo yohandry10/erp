@@ -9,6 +9,7 @@ import AgingCxpChart from '@/components/finanzas/AgingCxpChart'
 import VencimientosAlert from '@/components/finanzas/VencimientosAlert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface CuentaPorPagar {
   id: string
@@ -44,6 +45,7 @@ const inputClass =
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function CuentasPorPagarPage() {
+  const { currency, locale, formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
   const { get } = useApi()
 
@@ -109,14 +111,13 @@ export default function CuentasPorPagarPage() {
 
   const handleExport = () => alert('Funcionalidad de exportacion proximamente')
 
-  const formatCurrency = (amount: number | undefined, moneda: string = 'PEN') => {
+  const formatCurrency = (amount: number | undefined, moneda: string = currency) => {
     if (!amount) return '-'
-    const currency = moneda === 'USD' ? 'USD' : 'PEN'
-    return new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(amount)
+    return formatLocalizedCurrency(amount, moneda)
   }
 
   const formatDate = (dateString: string) => {
-    return parseDateLocal(dateString).toLocaleDateString('es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -178,9 +179,9 @@ export default function CuentasPorPagarPage() {
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
-              <Button type="button" onClick={() => router.push('/dashboard/finanzas/cxp/nueva')} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              <Button type="button" onClick={() => router.push('/dashboard/compras/recepciones')} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
-                Nueva CxP
+                Ir a recepciones
               </Button>
             </div>
           </div>
@@ -299,7 +300,7 @@ export default function CuentasPorPagarPage() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="font-semibold text-foreground">{cuenta.proveedores?.razon_social || 'N/A'}</div>
-                              {cuenta.proveedores?.ruc && <div className="text-xs text-muted-foreground">RUC: {cuenta.proveedores.ruc}</div>}
+                              {cuenta.proveedores?.ruc && <div className="text-xs text-muted-foreground">{taxIdLabel}: {cuenta.proveedores.ruc}</div>}
                             </td>
                             <td className="px-4 py-3 text-muted-foreground">{formatDate(cuenta.fecha_emision)}</td>
                             <td className="px-4 py-3">

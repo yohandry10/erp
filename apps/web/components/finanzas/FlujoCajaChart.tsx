@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Calendar, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react'
 
 import { useApi } from '@/hooks/use-api'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface FlujoCajaItem {
   tipo: 'INGRESO' | 'EGRESO'
@@ -73,9 +74,10 @@ const tdClass = '!border-cyan-400/10 !bg-transparent px-3 py-3 text-foreground/9
 
 export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }: FlujoCajaChartProps) {
   const { get } = useApi()
+  const { country, currency, formatCurrency } = useLocalizedMoney()
   const [flujoCaja, setFlujoCaja] = useState<FlujoCajaData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedMoneda, setSelectedMoneda] = useState<string>('PEN')
+  const [selectedMoneda, setSelectedMoneda] = useState<string>(currency)
   const [vistaDetallada, setVistaDetallada] = useState(false)
 
   const loadFlujoCaja = useCallback(async () => {
@@ -104,14 +106,12 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
     loadFlujoCaja()
   }, [loadFlujoCaja])
 
-  const formatCurrency = (amount: number, currency: string = 'PEN') =>
-    new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency,
-    }).format(amount)
+  useEffect(() => {
+    if (!flujoCaja?.resumen.length && currency) setSelectedMoneda(currency)
+  }, [currency, flujoCaja?.resumen.length])
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('es-PE', {
+    new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',

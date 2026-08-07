@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { TrendingUp, Eye } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface TopCliente {
   cliente_id: string
@@ -31,6 +32,8 @@ interface Props {
 export default function TopClientesReport({ filters }: Props) {
   const router = useRouter()
   const { get } = useApi()
+  const country = useCountryContext()
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const [data, setData] = useState<TopCliente[]>([])
   const [loading, setLoading] = useState(true)
   const [topN, setTopN] = useState(10)
@@ -122,9 +125,9 @@ export default function TopClientesReport({ filters }: Props) {
             {/* Summary Card */}
             <div className="rounded-lg border border-border/70 bg-muted/40 p-4 mb-6">
               <p className="text-sm text-foreground/80 font-medium">Facturación Total (Top {topN})</p>
-              <p className="text-3xl font-bold text-foreground">S/ {totalFacturacion.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-foreground">{currencySymbol} {totalFacturacion.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Promedio por cliente: S/ {(totalFacturacion / data.length).toFixed(2)}
+                Promedio por cliente: {currencySymbol} {(totalFacturacion / data.length).toFixed(2)}
               </p>
             </div>
 
@@ -143,7 +146,7 @@ export default function TopClientesReport({ filters }: Props) {
                       </span>
                     </div>
                     <span className="text-foreground/80 font-medium ml-2 flex-shrink-0">
-                      S/ {cliente.total_facturacion.toFixed(2)}
+                      {currencySymbol} {cliente.total_facturacion.toFixed(2)}
                     </span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2 overflow-hidden ml-8">
@@ -210,7 +213,7 @@ export default function TopClientesReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-bold text-foreground">
-                          S/ {cliente.total_facturacion.toFixed(2)}
+                          {currencySymbol} {cliente.total_facturacion.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -230,7 +233,7 @@ export default function TopClientesReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm text-foreground">
-                          S/ {cliente.ticket_promedio.toFixed(2)}
+                          {currencySymbol} {cliente.ticket_promedio.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

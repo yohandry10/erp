@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 export interface Denominaciones {
     billetes: { [denominacion: number]: number };
@@ -12,8 +13,20 @@ interface DenominationFormProps {
     className?: string;
 }
 
-const BILLETES = [200, 100, 50, 20, 10];
-const MONEDAS = [5, 2, 1, 0.5, 0.2, 0.1];
+const DENOMINACIONES = {
+    PE: {
+        billetes: [200, 100, 50, 20, 10],
+        monedas: [5, 2, 1, 0.5, 0.2, 0.1],
+    },
+    AR: {
+        billetes: [20000, 10000, 2000, 1000, 500, 200, 100, 50, 20, 10],
+        monedas: [10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05, 0.01],
+    },
+    CO: {
+        billetes: [100000, 50000, 20000, 10000, 5000, 2000],
+        monedas: [1000, 500, 200, 100, 50],
+    },
+} as const;
 
 export function DenominationForm({
     initialValues,
@@ -21,6 +34,10 @@ export function DenominationForm({
     readOnly = false,
     className = '',
 }: DenominationFormProps) {
+    const country = useCountryContext();
+    const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
+    const countryCode = country.paisCodigo === 'AR' ? 'AR' : country.paisCodigo === 'CO' ? 'CO' : 'PE';
+    const denominaciones = DENOMINACIONES[countryCode];
     const [billetes, setBilletes] = useState<{ [key: number]: number }>(
         initialValues?.billetes || {}
     );
@@ -66,10 +83,10 @@ export function DenominationForm({
                         Billetes
                     </h3>
                     <div className="space-y-3">
-                        {BILLETES.map((denom) => (
+                        {denominaciones.billetes.map((denom) => (
                             <div key={`billete-${denom}`} className="flex items-center justify-between">
                                 <label className="text-foreground/85 font-medium w-24">
-                                    S/ {denom}
+                                    {currencySymbol} {denom}
                                 </label>
                                 <div className="flex items-center space-x-3">
                                     <input
@@ -83,7 +100,7 @@ export function DenominationForm({
                                         placeholder="0"
                                     />
                                     <span className="text-muted-foreground w-24 text-right text-sm">
-                                        = S/ {((billetes[denom] || 0) * denom).toFixed(2)}
+                                        = {currencySymbol} {((billetes[denom] || 0) * denom).toFixed(2)}
                                     </span>
                                 </div>
                             </div>
@@ -97,10 +114,10 @@ export function DenominationForm({
                         Monedas
                     </h3>
                     <div className="space-y-3">
-                        {MONEDAS.map((denom) => (
+                        {denominaciones.monedas.map((denom) => (
                             <div key={`moneda-${denom}`} className="flex items-center justify-between">
                                 <label className="text-foreground/85 font-medium w-24">
-                                    S/ {denom.toFixed(2)}
+                                    {currencySymbol} {denom.toFixed(2)}
                                 </label>
                                 <div className="flex items-center space-x-3">
                                     <input
@@ -114,7 +131,7 @@ export function DenominationForm({
                                         placeholder="0"
                                     />
                                     <span className="text-muted-foreground w-24 text-right text-sm">
-                                        = S/ {((monedas[denom] || 0) * denom).toFixed(2)}
+                                        = {currencySymbol} {((monedas[denom] || 0) * denom).toFixed(2)}
                                     </span>
                                 </div>
                             </div>
@@ -127,7 +144,7 @@ export function DenominationForm({
             <div className="bg-muted/30 p-4 rounded-lg border border-border flex justify-between items-center">
                 <span className="text-xl font-bold text-foreground">Total Arqueo:</span>
                 <span className="text-2xl font-bold text-primary">
-                    S/ {total.toFixed(2)}
+                    {currencySymbol} {total.toFixed(2)}
                 </span>
             </div>
 

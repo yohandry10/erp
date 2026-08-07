@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { useToast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { validateArgentinaCuit, validateColombiaNit } from '@/lib/country-tax-id'
 
 interface Proveedor {
   id?: number | string
@@ -57,6 +59,9 @@ export default function ProveedorModal({
   proveedor,
 }: ProveedorModalProps) {
   const { post, put } = useApi()
+  const country = useCountryContext()
+  const taxIdLabel =
+    country.paisCodigo === 'AR' ? 'CUIT' : country.paisCodigo === 'CO' ? 'NIT' : 'RUC'
   const { toast } = useToast()
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [isLoading, setIsLoading] = useState(false)
@@ -87,9 +92,22 @@ export default function ProveedorModal({
     const newErrors: FormErrors = {}
 
     if (!formData.ruc.trim()) {
-      newErrors.ruc = 'RUC es obligatorio'
-    } else if (!/^\d{11}$/.test(formData.ruc)) {
-      newErrors.ruc = 'RUC debe tener 11 dígitos'
+      newErrors.ruc = `${taxIdLabel} es obligatorio`
+    } else if (
+      country.paisCodigo === 'CO'
+        ? !validateColombiaNit(
+            /^\d{10}$/.test(formData.ruc.trim())
+              ? `${formData.ruc.trim().slice(0, 9)}-${formData.ruc.trim().slice(9)}`
+              : formData.ruc.trim(),
+          )
+        : country.paisCodigo === 'AR'
+          ? !validateArgentinaCuit(formData.ruc)
+          : !/^\d{11}$/.test(formData.ruc)
+    ) {
+      newErrors.ruc =
+        country.paisCodigo === 'CO'
+          ? 'NIT inválido: incluya un dígito de verificación válido'
+          : `${taxIdLabel} debe tener 11 dígitos y dígito verificador válido`
     }
 
     if (!formData.razon_social.trim()) {
@@ -114,10 +132,17 @@ export default function ProveedorModal({
 
     setIsLoading(true)
     try {
+      const payload = {
+        ...formData,
+        ruc:
+          country.paisCodigo === 'CO' && /^\d{10}$/.test(formData.ruc.trim())
+            ? `${formData.ruc.trim().slice(0, 9)}-${formData.ruc.trim().slice(9)}`
+            : formData.ruc.trim(),
+      }
       // ✅ Usar useApi en lugar de fetch directo
       const result = proveedor
-        ? await put(`/compras/proveedores/${proveedor.id}`, formData)
-        : await post('/compras/proveedores', formData)
+        ? await put(`/compras/proveedores/${proveedor.id}`, payload)
+        : await post('/compras/proveedores', payload)
 
       if (result?.success) {
         onSuccess()
@@ -180,14 +205,14 @@ export default function ProveedorModal({
               <div>
                 <label htmlFor="proveedor-modal-ruc" className="block text-[0.875rem] font-medium text-foreground/85 mb-2"
                 >
-                  RUC *
+                  {taxIdLabel} *
                 </label>
                 <input id="proveedor-modal-ruc"
                   type="text"
                   value={formData.ruc}
                   onChange={(e) => handleInputChange('ruc', e.target.value)}
-                  maxLength={11} className="w-[100%] p-2 rounded-md bg-card"
-                  placeholder="Ingrese RUC (11 dígitos)"
+                  maxLength={country.paisCodigo === 'CO' ? 12 : 11} className="w-[100%] p-2 rounded-md bg-card"
+                  placeholder={country.paisCodigo === 'CO' ? '900123456-8' : `Ingrese ${taxIdLabel} (11 dígitos)`}
                 />
                 {errors.ruc && (
                   <p className="text-red-500 text-xs mt-1">{errors.ruc}</p>

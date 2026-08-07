@@ -3,13 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { FiscalServiceAbstract } from '../../shared/integration/fiscal-service.abstract';
 import { SunatFiscalService } from './sunat-fiscal.service';
 import { DianFiscalService } from './dian-fiscal.service';
+import { ArcaFiscalService } from './arca-fiscal.service';
 
 @Injectable()
 export class FiscalServiceFactory {
   constructor(
     private readonly configService: ConfigService,
     private readonly sunatService: SunatFiscalService,
-    private readonly dianService: DianFiscalService
+    private readonly dianService: DianFiscalService,
+    private readonly arcaService: ArcaFiscalService,
   ) {}
 
   /**
@@ -22,6 +24,8 @@ export class FiscalServiceFactory {
         return this.sunatService;
       case 2: // Colombia
         return this.dianService;
+      case 5: // Argentina
+        return this.arcaService;
       default:
         throw new Error(`Servicio fiscal no disponible para país ID: ${paisId}`);
     }
@@ -37,6 +41,8 @@ export class FiscalServiceFactory {
         return this.sunatService;
       case 'CO':
         return this.dianService;
+      case 'AR':
+        return this.arcaService;
       default:
         throw new Error(`Servicio fiscal no disponible para país: ${paisCode}`);
     }

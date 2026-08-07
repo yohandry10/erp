@@ -11,6 +11,7 @@ import { toast } from '@/components/ui/use-toast'
 import { format, differenceInDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { EstadoCotizacion } from '@/types/ventas'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CotizacionPendiente {
   id: string
@@ -38,6 +39,8 @@ interface Props {
 export default function CotizacionesPendientesReport({ filters }: Props) {
   const router = useRouter()
   const { get } = useApi()
+  const country = useCountryContext()
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const [data, setData] = useState<CotizacionPendiente[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -148,7 +151,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-emerald-400 font-medium">Monto Total</p>
-                <p className="text-2xl font-bold text-emerald-400">S/ {totalMonto.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-emerald-400">{currencySymbol} {totalMonto.toFixed(2)}</p>
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-amber-400 font-medium">Por Vencer</p>
@@ -245,7 +248,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-medium text-foreground">
-                          S/ {cotizacion.total.toFixed(2)}
+                          {currencySymbol} {cotizacion.total.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">

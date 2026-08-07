@@ -12,5 +12,5 @@
 -- Notas:
 -- 1) Este baseline prioriza reconstruccion operativa y trazabilidad.
 -- 2) Las tablas de dominio en fase 2 son esqueletos; se refinan por modulo.
--- 3) El mapa forense de referencia esta en docs/db_forensic_baseline.md
+-- 3) El mapa forense de referencia esta en artifacts/db-forensics/db_forensic_baseline.md
 

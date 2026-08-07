@@ -9,9 +9,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { validateArgentinaCuit, validateCountryTaxId } from '@/lib/country-tax-id'
 
 // Validation schema with Zod
 const clienteSchema = z.object({
@@ -22,7 +24,7 @@ const clienteSchema = z.object({
     errorMap: () => ({ message: 'Seleccione un tipo de documento' })
   }),
   documento_numero: z.string()
-    .min(8, 'El documento debe tener al menos 8 caracteres')
+    .min(6, 'El documento debe tener al menos 6 caracteres')
     .max(20, 'El documento no puede exceder 20 caracteres')
     .regex(/^[0-9A-Z]+$/, 'Solo se permiten números y letras mayúsculas'),
   razon_social: z.string()
@@ -38,8 +40,14 @@ const clienteSchema = z.object({
     .or(z.literal(''))
 }).refine((data) => {
   // RUC validation: must be 11 digits
-  if (data.documento_tipo === TipoDocumento.RUC) {
+  if ([TipoDocumento.RUC, TipoDocumento.CUIT].includes(data.documento_tipo)) {
     return data.documento_numero.length === 11 && /^\d+$/.test(data.documento_numero)
+  }
+  if (data.documento_tipo === TipoDocumento.NIT) {
+    return data.documento_numero.length === 10 && /^\d+$/.test(data.documento_numero)
+  }
+  if ([TipoDocumento.CC, TipoDocumento.TI].includes(data.documento_tipo)) {
+    return /^[0-9]{6,10}$/.test(data.documento_numero)
   }
   // DNI validation: must be 8 digits
   if (data.documento_tipo === TipoDocumento.DNI) {
@@ -47,7 +55,7 @@ const clienteSchema = z.object({
   }
   return true
 }, {
-  message: 'RUC debe tener 11 dígitos y DNI debe tener 8 dígitos',
+  message: 'El documento no tiene la longitud o formato requerido',
   path: ['documento_numero']
 })
 
@@ -68,6 +76,9 @@ export default function ClienteForm({
   submitLabel = 'Guardar Cliente',
   loading: externalLoading = false
 }: ClienteFormProps) {
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
   const { post, unwrap } = useApi()
   const [validatingRuc, setValidatingRuc] = useState(false)
   const [rucValidated, setRucValidated] = useState(false)
@@ -82,7 +93,7 @@ export default function ClienteForm({
     resolver: zodResolver(clienteSchema),
     defaultValues: {
       tipo: initialData?.tipo || TipoCliente.PERSONA,
-      documento_tipo: initialData?.documento_tipo || TipoDocumento.DNI,
+      documento_tipo: initialData?.documento_tipo || (isColombia ? TipoDocumento.CC : TipoDocumento.DNI),
       documento_numero: initialData?.documento_numero || '',
       razon_social: initialData?.razon_social || '',
       nombre_comercial: initialData?.nombre_comercial || '',
@@ -98,20 +109,35 @@ export default function ClienteForm({
   const documentoNumeroField = register('documento_numero')
   const loading = isSubmitting || externalLoading
 
+  // El país llega de forma asíncrona. No dejes el DNI peruano que se usó
+  // durante el primer render como valor por defecto de un tenant CO/AR.
+  useEffect(() => {
+    if (country.loading || initialData?.documento_tipo) return
+    const expectedDefault = isColombia
+      ? TipoDocumento.CC
+      : isArgentina
+        ? TipoDocumento.DNI
+        : TipoDocumento.DNI
+    setValue('documento_tipo', expectedDefault)
+    setValue('documento_numero', '')
+    setRucValidated(false)
+  }, [country.loading, country.paisCodigo, initialData?.documento_tipo, isArgentina, isColombia, setValue])
+
   const handleValidarRuc = async () => {
-    if (documentoTipo !== TipoDocumento.RUC) {
+    if (![TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.NIT].includes(documentoTipo)) {
       toast({
         title: 'Error',
-        description: 'La validación local solo aplica a RUC',
+        description: 'La validación local solo aplica a RUC/CUIT/NIT',
         variant: 'destructive'
       })
       return
     }
 
-    if (documentoNumero.length !== 11) {
+    const expectedLength = documentoTipo === TipoDocumento.NIT ? 10 : 11
+    if (documentoNumero.length !== expectedLength) {
       toast({
         title: 'Error',
-        description: 'El RUC debe tener 11 dígitos',
+        description: `El ${isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC'} debe tener ${expectedLength} dígitos`,
         variant: 'destructive'
       })
       return
@@ -119,6 +145,28 @@ export default function ClienteForm({
 
     try {
       setValidatingRuc(true)
+      if (documentoTipo === TipoDocumento.CUIT) {
+        if (!validateArgentinaCuit(documentoNumero)) {
+          throw new Error('El dígito verificador del CUIT no es válido')
+        }
+        setRucValidated(true)
+        toast({
+          title: 'CUIT validado',
+          description: 'Formato y dígito verificador válidos. Complete los datos registrales.',
+        })
+        return
+      }
+      if (documentoTipo === TipoDocumento.NIT) {
+        if (!validateCountryTaxId('CO', documentoNumero)) {
+          throw new Error('El dígito de verificación del NIT no es válido')
+        }
+        setRucValidated(true)
+        toast({
+          title: 'NIT validado',
+          description: 'Formato y dígito de verificación válidos. Complete los datos del RUT.',
+        })
+        return
+      }
       const response = await post('/api/ventas/clientes/validar-ruc', {
         ruc: documentoNumero
       })
@@ -211,9 +259,22 @@ export default function ClienteForm({
                 setRucValidated(false)
               }}
             >
-              <option value={TipoDocumento.DNI}>DNI</option>
-              <option value={TipoDocumento.RUC}>RUC</option>
-              <option value={TipoDocumento.CE}>Carné de Extranjería</option>
+              {isColombia ? (
+                <>
+                  <option value={TipoDocumento.CC}>Cédula de ciudadanía</option>
+                  <option value={TipoDocumento.TI}>Tarjeta de identidad</option>
+                </>
+              ) : (
+                <option value={TipoDocumento.DNI}>DNI</option>
+              )}
+              {isArgentina ? (
+                <option value={TipoDocumento.CUIT}>CUIT</option>
+              ) : isColombia ? (
+                <option value={TipoDocumento.NIT}>NIT</option>
+              ) : (
+                <option value={TipoDocumento.RUC}>RUC</option>
+              )}
+              <option value={TipoDocumento.CE}>{isColombia ? 'Cédula de extranjería' : 'Carné de Extranjería'}</option>
               <option value={TipoDocumento.PASAPORTE}>Pasaporte</option>
             </select>
             {errors.documento_tipo && (
@@ -228,7 +289,8 @@ export default function ClienteForm({
         <div className="flex flex-col gap-2">
           <Label htmlFor="documento_numero">
             Número de Documento *
-            {documentoTipo === TipoDocumento.RUC && ' (11 dígitos)'}
+            {[TipoDocumento.RUC, TipoDocumento.CUIT].includes(documentoTipo) && ' (11 dígitos)'}
+            {documentoTipo === TipoDocumento.NIT && ' (10 dígitos, incluido DV)'}
             {documentoTipo === TipoDocumento.DNI && ' (8 dígitos)'}
           </Label>
           <div className="flex gap-2">
@@ -239,6 +301,8 @@ export default function ClienteForm({
                 ref={documentoNumeroField.ref}
                 onBlur={documentoNumeroField.onBlur}
                 placeholder={
+                  documentoTipo === TipoDocumento.CUIT ? '30710158229' :
+                  documentoTipo === TipoDocumento.NIT ? '9001234568' :
                   documentoTipo === TipoDocumento.RUC ? '20123456789' :
                   documentoTipo === TipoDocumento.DNI ? '12345678' :
                   'Número de documento'
@@ -250,12 +314,12 @@ export default function ClienteForm({
                 }}
               />
             </div>
-            {documentoTipo === TipoDocumento.RUC && (
+            {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.NIT].includes(documentoTipo) && (
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleValidarRuc}
-                disabled={loading || validatingRuc || documentoNumero.length !== 11} className="whitespace-nowrap"
+                disabled={loading || validatingRuc || documentoNumero.length !== (documentoTipo === TipoDocumento.NIT ? 10 : 11)} className="whitespace-nowrap"
               >
                 {validatingRuc ? (
                   <>
@@ -268,7 +332,7 @@ export default function ClienteForm({
                     Validado
                   </>
                 ) : (
-                    'Validar RUC'
+                    `Validar ${documentoTipo}`
                 )}
               </Button>
             )}
@@ -278,9 +342,9 @@ export default function ClienteForm({
               {errors.documento_numero.message}
             </p>
           )}
-          {documentoTipo === TipoDocumento.RUC && (
+          {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.NIT].includes(documentoTipo) && (
             <p className="text-xs text-[var(--primary-500)] m-0">
-              Opcional: valida formato y dígito verificador. No consulta datos registrales de SUNAT.
+              Valida formato y dígito verificador. No consulta el padrón de {isArgentina ? 'ARCA' : isColombia ? 'DIAN/RUT' : 'SUNAT'}.
             </p>
           )}
         </div>
@@ -370,7 +434,7 @@ export default function ClienteForm({
             <Input
               id="telefono"
               {...register('telefono')}
-              placeholder="999 999 999"
+              placeholder={isColombia ? '300 123 4567' : isArgentina ? '11 1234 5678' : '999 999 999'}
               disabled={loading}
             />
             {errors.telefono && (

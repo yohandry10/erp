@@ -11,15 +11,18 @@ import {
   Settings,
   ShieldCheck,
   Truck,
+  Users,
   XCircle,
   type LucideIcon,
 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface ConfigurationStatus {
   isComplete: boolean
+  isDemo?: boolean
   completionPercentage: number
   missingItems?: string[]
   certificate?: {
@@ -66,6 +69,22 @@ interface EmpresaConfig {
   serieNotaCredito?: string
   serieNotaDebito?: string
   serieGuiaRemision?: string
+  monedaDefecto?: string
+  arcaActivo?: boolean
+  arcaEnvironment?: string
+  arcaWsaaUrl?: string
+  arcaWsfeUrl?: string
+  arcaCuitRepresentada?: string
+  arcaPuntoVenta?: number
+  arcaCondicionIva?: string
+  ingresosBrutos?: string
+  dianActivo?: boolean
+  dianEnvironment?: string
+  dianSoftwareId?: string
+  dianTestSetId?: string
+  dianResolucionNumero?: string
+  dianResolucionPrefijo?: string
+  dianRegimenFiscal?: string
 }
 
 interface OseStatus {
@@ -89,9 +108,10 @@ interface LoadState {
   status: ConfigurationStatus | null
   empresa: EmpresaConfig | null
   ose: OseStatus | null
+  rrhh: any | null
 }
 
-type Section = 'resumen' | 'empresa' | 'ventas'
+type Section = 'resumen' | 'empresa' | 'ventas' | 'rrhh'
 
 const statusLabel = (ok: boolean) => (ok ? 'Correcto' : 'Requiere atención')
 
@@ -147,11 +167,33 @@ function SectionCard({
 }
 
 export default function ConfigurationOverview({ section = 'resumen' }: { section?: Section }) {
-  const { get } = useApi({ showErrorToast: false, retries: 1, timeoutMs: 20000 })
-  const [data, setData] = useState<LoadState>({ status: null, empresa: null, ose: null })
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
+  const isPeru = country.paisCodigo === 'PE'
+  const documentoFiscal = country.documentoFiscal || 'RUC'
+  const autoridadFiscal = country.servicioFiscal || 'SUNAT'
+  const { get, post } = useApi({ showErrorToast: false, retries: 1, timeoutMs: 20000 })
+  const [data, setData] = useState<LoadState>({ status: null, empresa: null, ose: null, rrhh: null })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dianTestResult, setDianTestResult] = useState<string | null>(null)
+  const [testingDian, setTestingDian] = useState(false)
+
+  const testDian = useCallback(async () => {
+    setTestingDian(true)
+    setDianTestResult(null)
+    try {
+      const response = await post('/configuration/colombia/dian/test', {})
+      const result = response?.data?.data ?? response?.data ?? response
+      setDianTestResult(result?.message || (result?.ready ? 'Configuración DIAN preparada.' : 'DIAN requiere completar datos.'))
+    } catch (err) {
+      setDianTestResult(err instanceof Error ? err.message : 'No se pudo probar DIAN.')
+    } finally {
+      setTestingDian(false)
+    }
+  }, [post])
 
   const loadConfiguration = useCallback(async (isRefresh = false) => {
     try {
@@ -162,10 +204,13 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
       }
       setError(null)
 
-      const [statusResponse, empresaResponse, oseResponse] = await Promise.all([
+      const [statusResponse, empresaResponse, authorityResponse, rrhhResponse] = await Promise.all([
         get('/configuration/status'),
         get('/configuration/empresa'),
-        get('/configuracion/ose'),
+        !isPeru
+          ? Promise.resolve({ success: true, data: null })
+          : get('/configuracion/ose'),
+        get('/rrhh/configuracion-laboral'),
       ])
 
       if (!statusResponse?.success) {
@@ -176,14 +221,15 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         throw new Error(empresaResponse?.message || 'No se pudo leer la configuración de empresa')
       }
 
-      if (!oseResponse?.success) {
-        throw new Error(oseResponse?.message || 'No se pudo leer la configuración OSE/SUNAT')
+      if (!authorityResponse?.success) {
+        throw new Error(authorityResponse?.message || `No se pudo leer la configuración ${autoridadFiscal}`)
       }
 
       setData({
         status: statusResponse.data,
         empresa: empresaResponse.data,
-        ose: oseResponse.data,
+        ose: authorityResponse.data,
+        rrhh: rrhhResponse?.success ? rrhhResponse.data : null,
       })
     } catch (err) {
       console.error('[Configuracion] Error cargando configuración operativa:', err)
@@ -192,7 +238,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
       setLoading(false)
       setRefreshing(false)
     }
-  }, [get])
+  }, [autoridadFiscal, get, isPeru])
 
   useEffect(() => {
     loadConfiguration()
@@ -210,23 +256,52 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
     return {
       complete: status?.isComplete === true,
       ruc: status?.ruc?.isConfigured === true && !!empresa?.ruc,
-      certificate: status?.certificate?.exists === true && status?.certificate?.isValid === true,
-      ose: ose?.verificacion?.valid === true && ose?.configuracion?.certificateExists === true,
-      fiscal: !!empresa?.regimen && empresa?.emisionCpeModo !== '',
-      sales: !!empresa?.serieFactura && !!empresa?.serieBoleta,
-      logistics: !logisticsEnabled || !!empresa?.serieGuiaRemision,
+      certificate:
+        status?.certificate?.isValid === true &&
+        (status?.isDemo === true || status?.certificate?.exists === true),
+      ose: isArgentina
+        ? status?.isDemo === true ||
+          (empresa?.arcaActivo === true &&
+            !!empresa?.arcaWsaaUrl &&
+            !!empresa?.arcaWsfeUrl &&
+            !!empresa?.arcaCuitRepresentada &&
+            !!empresa?.arcaPuntoVenta)
+        : isColombia
+          ? status?.isDemo === true ||
+            (empresa?.dianActivo === true &&
+              !!empresa?.dianSoftwareId &&
+              !!empresa?.dianResolucionNumero &&
+              !!empresa?.dianResolucionPrefijo)
+          : ose?.verificacion?.valid === true && ose?.configuracion?.certificateExists === true,
+      fiscal: isArgentina
+        ? empresa?.monedaDefecto === 'ARS' && !!empresa?.arcaCondicionIva
+        : isColombia
+          ? empresa?.monedaDefecto === 'COP' && !!empresa?.dianRegimenFiscal
+          : !!empresa?.regimen && empresa?.emisionCpeModo !== '',
+      sales: isArgentina
+        ? !!empresa?.arcaPuntoVenta && !!empresa?.arcaCondicionIva
+        : isColombia
+          ? !!empresa?.dianResolucionPrefijo && !!empresa?.dianResolucionNumero
+          : !!empresa?.serieFactura && !!empresa?.serieBoleta,
+      logistics: !isPeru || !logisticsEnabled || !!empresa?.serieGuiaRemision,
+      labor: isArgentina || isColombia ? data.rrhh?.readiness?.ready === true : true,
     }
-  }, [data])
+  }, [data, isArgentina, isColombia, isPeru])
 
   const certificado = data?.status?.certificate
   const certificadoAjeno = certificado?.exists === true && certificado?.rucMatches === false
-  const estadoCertificado = certificadoAjeno
+  const estadoCertificado = data?.status?.isDemo === true
+    ? {
+        titulo: 'Simulado en demo',
+        detalle: `La demo no transmite a ${autoridadFiscal}; una empresa real debe cargar su certificado del ${documentoFiscal}.`,
+      }
+    : certificadoAjeno
     ? { titulo: 'No corresponde', detalle: certificado?.motivoTitularidad }
     : checks.certificate
       ? { titulo: 'Válido', detalle: null as string | null }
       : {
           titulo: 'Pendiente',
-          detalle: 'Súbelo emitido a nombre del RUC con el que vas a facturar.',
+          detalle: `Súbelo emitido a nombre del ${documentoFiscal} con el que vas a facturar.`,
         }
 
   const operationalChecks = [
@@ -236,6 +311,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
     checks.fiscal,
     checks.sales,
     checks.logistics,
+    checks.labor,
   ]
   const operationalReadiness = Math.round(
     (operationalChecks.filter(Boolean).length / operationalChecks.length) * 100,
@@ -292,7 +368,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         <div>
           <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Configuración operativa</h1>
           <p className="mt-2 text-base text-muted-foreground">
-            Estado real de empresa, certificado, emisión fiscal, ventas y logística.
+            Estado real de empresa, certificado, emisión fiscal, ventas, logística y RRHH por país.
           </p>
         </div>
         <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50" onClick={() => loadConfiguration(true)} disabled={refreshing}>
@@ -306,6 +382,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
           ['resumen', '/dashboard/configuracion', 'Resumen'],
           ['empresa', '/dashboard/configuracion/empresa', 'Empresa'],
           ['ventas', '/dashboard/configuracion/ventas', 'Ventas'],
+          ['rrhh', '/dashboard/configuracion/rrhh', 'RRHH'],
         ] as const).map(([name, href, label]) => {
           const active = section === name
           return (
@@ -357,7 +434,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
           </div>
           <div className="stat-content">
             <h3>{checks.ose ? 'Operativo' : 'Revisar'}</h3>
-            <p>SUNAT/OSE</p>
+            <p>{autoridadFiscal}{isArgentina ? ' WSAA/WSFE' : isColombia ? ' UBL/CUFE' : '/OSE'}</p>
           </div>
         </div>
       </div>
@@ -365,11 +442,14 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
       <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-stretch gap-4">
         {!hidden('empresa') && (
           <SectionCard title="Empresa" icon={Building2} ok={checks.ruc}>
-            <FieldRow label="RUC" value={empresa?.ruc} ok={!!empresa?.ruc} />
+            <FieldRow label={documentoFiscal} value={empresa?.ruc} ok={!!empresa?.ruc} />
             <FieldRow label="Razón social" value={empresa?.razonSocial} ok={!!empresa?.razonSocial} />
             <FieldRow label="Nombre comercial" value={empresa?.nombreComercial} />
             <FieldRow label="Dirección fiscal" value={empresa?.direccion} ok={!!empresa?.direccion} />
-            <FieldRow label="Ubigeo" value={empresa?.ubigeo} />
+            <FieldRow
+              label={isArgentina ? 'Provincia fiscal' : isColombia ? 'Código postal' : 'Ubigeo'}
+              value={isArgentina ? (empresa as any)?.provinciaFiscal : empresa?.ubigeo}
+            />
             <FieldRow label="Correo" value={empresa?.email} />
           </SectionCard>
         )}
@@ -378,19 +458,64 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
           <SectionCard title="Fiscal y certificado" icon={ShieldCheck} ok={checks.certificate && checks.ose}>
             <FieldRow label="Certificado existe" value={status?.certificate?.exists} ok={status?.certificate?.exists === true} />
             <FieldRow label="Certificado válido" value={status?.certificate?.isValid} ok={status?.certificate?.isValid === true} />
-            <FieldRow label="Vencimiento" value={status?.certificate?.expiresAt ? new Date(status.certificate.expiresAt).toLocaleDateString('es-PE') : null} ok={status?.certificate?.isValid === true} />
             <FieldRow
-              label="Emitido al RUC que factura"
+              label="Vencimiento"
+              value={
+                status?.certificate?.expiresAt
+                  ? new Date(status.certificate.expiresAt).toLocaleDateString(country.locale || 'es-PE')
+                  : status?.isDemo
+                    ? 'No aplica en demo'
+                    : null
+              }
+              ok={status?.certificate?.isValid === true}
+            />
+            <FieldRow
+              label={`Emitido al ${documentoFiscal} que factura`}
               value={certificado?.rucsEnCertificado?.length ? certificado.rucsEnCertificado.join(', ') : null}
               ok={certificado?.rucMatches === true}
             />
             <p className="mt-auto pt-3 text-xs leading-snug text-muted-foreground">
-              SUNAT rechaza los comprobantes firmados con un certificado que no
-              pertenece al RUC emisor. Debe estar a nombre de la empresa.
+              {autoridadFiscal} exige que el certificado corresponda al {documentoFiscal} emisor.
+              Debe estar a nombre de la empresa o representación autorizada.
             </p>
-            <FieldRow label="OSE/SUNAT válido" value={ose?.verificacion?.valid} ok={ose?.verificacion?.valid === true} />
-            <FieldRow label="Certificado OSE resuelto" value={ose?.configuracion?.certificateExists} ok={ose?.configuracion?.certificateExists === true} />
-            <FieldRow label="Ambiente" value={ose?.configuracion?.environment} />
+            {isArgentina ? (
+              <>
+                <FieldRow label="ARCA activo" value={empresa?.arcaActivo} ok={empresa?.arcaActivo === true} />
+                <FieldRow label="CUIT representada" value={empresa?.arcaCuitRepresentada} ok={!!empresa?.arcaCuitRepresentada} />
+                <FieldRow label="Punto de venta" value={empresa?.arcaPuntoVenta} ok={!!empresa?.arcaPuntoVenta} />
+                <FieldRow label="Condición IVA" value={empresa?.arcaCondicionIva} ok={!!empresa?.arcaCondicionIva} />
+                <FieldRow label="Ambiente" value={empresa?.arcaEnvironment} />
+              </>
+            ) : isColombia ? (
+              <>
+                <FieldRow
+                  label="DIAN activo"
+                  value={status?.isDemo === true ? 'Simulado, sin transmisión' : empresa?.dianActivo}
+                  ok={empresa?.dianActivo === true || status?.isDemo === true}
+                />
+                <FieldRow label="Software ID" value={empresa?.dianSoftwareId} ok={!!empresa?.dianSoftwareId} />
+                <FieldRow label="Test Set ID" value={empresa?.dianTestSetId} ok={!!empresa?.dianTestSetId} />
+                <FieldRow label="Resolución DIAN" value={empresa?.dianResolucionNumero} ok={!!empresa?.dianResolucionNumero} />
+                <FieldRow label="Prefijo autorizado" value={empresa?.dianResolucionPrefijo} ok={!!empresa?.dianResolucionPrefijo} />
+                <FieldRow label="Ambiente" value={empresa?.dianEnvironment} />
+                <button
+                  type="button"
+                  onClick={testDian}
+                  disabled={testingDian}
+                  className="mt-3 inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-60"
+                >
+                  {testingDian ? <RefreshCw className="mr-2 size-4 animate-spin" /> : <ShieldCheck className="mr-2 size-4" />}
+                  Probar conexión DIAN
+                </button>
+                {dianTestResult && <p className="mt-2 text-xs text-muted-foreground">{dianTestResult}</p>}
+              </>
+            ) : (
+              <>
+                <FieldRow label="OSE/SUNAT válido" value={ose?.verificacion?.valid} ok={ose?.verificacion?.valid === true} />
+                <FieldRow label="Certificado OSE resuelto" value={ose?.configuracion?.certificateExists} ok={ose?.configuracion?.certificateExists === true} />
+                <FieldRow label="Ambiente" value={ose?.configuracion?.environment} />
+              </>
+            )}
           </SectionCard>
         )}
 
@@ -398,19 +523,71 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
           <SectionCard title="Ventas y documentos" icon={FileText} ok={checks.sales}>
             <FieldRow label="Modo emisión CPE" value={empresa?.emisionCpeModo} ok={!!empresa?.emisionCpeModo} />
             <FieldRow label="Serie factura" value={empresa?.serieFactura} ok={!!empresa?.serieFactura} />
-            <FieldRow label="Serie boleta" value={empresa?.serieBoleta} ok={!!empresa?.serieBoleta} />
+            <FieldRow
+              label={isColombia ? 'Serie documento equivalente' : 'Serie boleta'}
+              value={empresa?.serieBoleta}
+              ok={!!empresa?.serieBoleta}
+            />
             <FieldRow label="Serie nota crédito" value={empresa?.serieNotaCredito} ok={!!empresa?.serieNotaCredito} />
             <FieldRow label="Serie nota débito" value={empresa?.serieNotaDebito} />
           </SectionCard>
         )}
 
+        {!hidden('rrhh') && (
+          <SectionCard title={`RRHH ${country.paisNombre || ''}`} icon={Users} ok={checks.labor}>
+            <FieldRow
+              label="Moneda de planilla"
+              value={country.moneda}
+              ok={isArgentina ? country.moneda === 'ARS' : isColombia ? country.moneda === 'COP' : country.moneda === 'PEN'}
+            />
+            <FieldRow label="Documento laboral" value={isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI'} />
+            {isArgentina ? (
+              <>
+                <FieldRow label="Convenio colectivo" value={data.rrhh?.configuracion?.convenio_colectivo_codigo} ok={!!data.rrhh?.configuracion?.convenio_colectivo_codigo} />
+                <FieldRow label="ART configurada" value={data.rrhh?.configuracion?.art_razon_social} ok={Number(data.rrhh?.configuracion?.art_tasa || 0) > 0} />
+                <FieldRow label="Libro de Sueldos Digital" value={data.rrhh?.configuracion?.libro_sueldos_digital_habilitado} ok={data.rrhh?.configuracion?.libro_sueldos_digital_habilitado === true} />
+                <FieldRow label="Formulario 931" value={data.rrhh?.configuracion?.formulario_931_habilitado} ok={data.rrhh?.configuracion?.formulario_931_habilitado === true} />
+                <FieldRow label="Configuración confirmada" value={data.rrhh?.configuracion?.configuracion_confirmada} ok={checks.labor} />
+                <Link className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" href="/dashboard/configuracion/rrhh">
+                  Configurar RRHH Argentina
+                </Link>
+              </>
+            ) : isColombia ? (
+              <>
+                <FieldRow label="Operador PILA" value={data.rrhh?.configuracion?.operador_pila} ok={!!data.rrhh?.configuracion?.operador_pila} />
+                <FieldRow label="EPS" value={data.rrhh?.configuracion?.eps_default} ok={!!data.rrhh?.configuracion?.eps_default} />
+                <FieldRow label="Fondo de pensión" value={data.rrhh?.configuracion?.fondo_pension_default} ok={!!data.rrhh?.configuracion?.fondo_pension_default} />
+                <FieldRow label="ARL" value={data.rrhh?.configuracion?.arl_default} ok={Number(data.rrhh?.configuracion?.arl_tasa || 0) > 0} />
+                <FieldRow label="Caja de compensación" value={data.rrhh?.configuracion?.caja_compensacion_default} ok={!!data.rrhh?.configuracion?.caja_compensacion_default} />
+                <FieldRow label="Nómina electrónica" value={data.rrhh?.configuracion?.nomina_electronica_habilitada} ok={data.rrhh?.configuracion?.nomina_electronica_habilitada === true} />
+                <Link className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" href="/dashboard/configuracion/rrhh">
+                  Configurar RRHH Colombia
+                </Link>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                AFP/ONP, EsSalud, gratificaciones, quinta categoría y CTS permanecen configurados para Perú.
+              </p>
+            )}
+          </SectionCard>
+        )}
+
         {!hidden('ventas') && (
-          <SectionCard title="Logística y GRE" icon={Truck} ok={checks.logistics}>
+          <SectionCard title={isPeru ? 'Logística y GRE' : 'Logística y remisiones'} icon={Truck} ok={checks.logistics}>
             <FieldRow label="Flujo logístico" value={empresa?.usar_flujo_logistica} />
-            <FieldRow label="GRE obligatorio" value={empresa?.gre_obligatorio} />
-            <FieldRow label="GRE automático" value={empresa?.gre_automatico_habilitado} />
-            <FieldRow label="Umbral GRE automático" value={empresa?.umbral_gre_automatico} />
-            <FieldRow label="Serie guía remisión" value={empresa?.serieGuiaRemision} ok={!!empresa?.serieGuiaRemision} />
+            {!isPeru ? (
+              <>
+                <FieldRow label="Documento de traslado" value={isArgentina ? 'Remito' : 'Remisión / transporte'} ok />
+                <FieldRow label="Moneda logística" value={country.moneda} ok />
+              </>
+            ) : (
+              <>
+                <FieldRow label="GRE obligatorio" value={empresa?.gre_obligatorio} />
+                <FieldRow label="GRE automático" value={empresa?.gre_automatico_habilitado} />
+                <FieldRow label="Umbral GRE automático" value={empresa?.umbral_gre_automatico} />
+                <FieldRow label="Serie guía remisión" value={empresa?.serieGuiaRemision} ok={!!empresa?.serieGuiaRemision} />
+              </>
+            )}
           </SectionCard>
         )}
       </div>

@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface Empleado {
   id: string
@@ -28,6 +29,10 @@ interface RegistroAsistencia {
 
 export default function AsistenciaComponent() {
   const { get, post } = useApi()
+  const country = useCountryContext()
+  const locale = country.locale || 'es-PE'
+  const documentoLaboral =
+    country.paisCodigo === 'AR' ? 'CUIL' : country.paisCodigo === 'CO' ? 'CC' : 'DNI'
   const [empleados, setEmpleados] = useState<Empleado[]>([])
   const [asistenciaHoy, setAsistenciaHoy] = useState<RegistroAsistencia[]>([])
   const [loading, setLoading] = useState(false)
@@ -138,7 +143,7 @@ export default function AsistenciaComponent() {
   }
 
   const formatearHora = (hora: string) => {
-    return new Date(`2000-01-01T${hora}`).toLocaleTimeString('es-PE', {
+    return new Date(`2000-01-01T${hora}`).toLocaleTimeString(locale, {
       hour: '2-digit',
       minute: '2-digit'
     })
@@ -151,7 +156,7 @@ export default function AsistenciaComponent() {
     return (horaSalida.getTime() - horaEntrada.getTime()) / (1000 * 60 * 60)
   }
 
-  const horaActual = new Date().toLocaleTimeString('es-PE', {
+  const horaActual = new Date().toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit'
@@ -266,7 +271,7 @@ export default function AsistenciaComponent() {
       {/* Lista de empleados con controles */}
       <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
         <div className="bg-muted/30 px-6 py-3 border-b border-border">
-          <h3 className="text-lg font-semibold text-foreground">👥 Estado de Empleados - {new Date(fechaConsulta).toLocaleDateString('es-PE')}</h3>
+          <h3 className="text-lg font-semibold text-foreground">👥 Estado de Empleados - {new Date(fechaConsulta).toLocaleDateString(locale)}</h3>
         </div>
 
         <div className="divide-y divide-gray-100">
@@ -302,7 +307,7 @@ export default function AsistenciaComponent() {
                         {empleado.nombres} {empleado.apellidos}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {empleado.puesto} • DNI: {empleado.numero_documento}
+                        {empleado.puesto} • {documentoLaboral}: {empleado.numero_documento}
                       </div>
                     </div>
 

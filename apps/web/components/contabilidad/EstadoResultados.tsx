@@ -9,6 +9,7 @@ import { exportEstadoResultadosToPDF } from '@/lib/pdf-export'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface EstadoResultadosData {
   ingresos: {
@@ -36,6 +37,7 @@ interface EstadoResultadosProps {
 }
 
 export function EstadoResultados({ anio, mes, showComparison = false }: EstadoResultadosProps) {
+  const { formatCurrency } = useLocalizedMoney()
   const { get } = useApi()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -86,14 +88,6 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 2
-    }).format(amount)
-  }
 
   const formatPercentage = (value: number, total: number) => {
     if (total === 0) return '0.00%'

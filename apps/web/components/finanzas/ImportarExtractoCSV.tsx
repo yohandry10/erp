@@ -15,6 +15,7 @@ import { Badge } from '../ui/badge';
 import { Upload, FileText, AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/format-utils';
 import { fetchApi } from '@/lib/api-fetch';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface MovimientoCSV {
   fecha: string;
@@ -63,6 +64,7 @@ export function ImportarExtractoCSV({
   onImportSuccess,
   onCancel,
 }: ImportarExtractoCSVProps) {
+  const country = useCountryContext();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [csvContent, setCsvContent] = useState('');
   const [bancoTemplate, setBancoTemplate] = useState<BancoTemplate>('GENERICO');
@@ -370,9 +372,9 @@ export function ImportarExtractoCSV({
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
     }).format(amount);
   };
 

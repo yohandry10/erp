@@ -62,8 +62,8 @@ export const posHelp: Record<string, HelpItem> = {
     title: 'Cliente',
     description: 'Selecciona o registra el cliente para la venta.',
     tips: [
-      'Para boleta puedes usar "Cliente General"',
-      'Para factura es obligatorio seleccionar cliente con RUC'
+      'Para venta a consumidor final puedes usar "Cliente General"',
+      'Para factura empresarial se exige el identificador fiscal correspondiente'
     ]
   },
   'pos.tipo_comprobante': {
@@ -71,8 +71,8 @@ export const posHelp: Record<string, HelpItem> = {
     title: 'Tipo de Comprobante',
     description: 'Elige el documento a emitir.',
     tips: [
-      'Boleta: Para consumidores finales',
-      'Factura: Para empresas (requiere RUC)',
+      'Documento a consumidor final: según el catálogo fiscal del país',
+      'Factura: Para empresas con identificador fiscal',
       'Nota de Venta: Sin valor fiscal'
     ]
   }

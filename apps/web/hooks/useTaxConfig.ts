@@ -5,6 +5,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '@/hooks/use-api'
 import { apiSucceeded, unwrapApiData } from '@/lib/api-contract'
+import { useCountryContext } from './use-country-context'
 
 export interface TaxConfig {
   tasa_igv: number
@@ -16,9 +17,9 @@ export interface TaxConfig {
 
 export function useTaxConfig() {
   const api = useApi()
+  const country = useCountryContext()
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['tax-config'],
     queryFn: async () => {
       const response = await api.get('/api/configuracion-fiscal')
       const config = unwrapApiData<TaxConfig | null>(response, null)
@@ -27,13 +28,15 @@ export function useTaxConfig() {
       }
       // Retornar valores por defecto si no hay respuesta
       return {
-        tasa_igv: 0.18,
-        moneda_principal: 'PEN',
-        pais_id: 1,
-        impuesto_principal_nombre: 'IGV',
-        impuesto_principal_porcentaje: 0.18,
+        tasa_igv: country.impuestoRate || 0.18,
+        moneda_principal: country.moneda || 'PEN',
+        pais_id: country.paisId || 1,
+        impuesto_principal_nombre: country.paisCodigo === 'PE' ? 'IGV' : 'IVA',
+        impuesto_principal_porcentaje: country.impuestoRate || 0.18,
       } as TaxConfig
     },
+    enabled: Boolean(country.paisId),
+    queryKey: ['tax-config', country.paisId],
     staleTime: 1000 * 60 * 60, // Cache por 1 hora (la configuración fiscal no cambia frecuentemente)
     gcTime: 1000 * 60 * 60 * 24, // Mantener en cache por 24 horas (antes era cacheTime)
   })
@@ -42,7 +45,7 @@ export function useTaxConfig() {
    * Calcula los impuestos para un subtotal dado
    */
   const calcularImpuestos = (subtotal: number) => {
-    const tasaIgv = data?.impuesto_principal_porcentaje ?? data?.tasa_igv ?? 0.18
+    const tasaIgv = data?.impuesto_principal_porcentaje ?? data?.tasa_igv ?? country.impuestoRate ?? 0.18
     const igv = subtotal * tasaIgv
     const total = subtotal + igv
 
@@ -58,14 +61,14 @@ export function useTaxConfig() {
    * Obtiene solo la tasa de IGV/IVA
    */
   const getTasaIgv = () => {
-    return data?.impuesto_principal_porcentaje ?? data?.tasa_igv ?? 0.18
+    return data?.impuesto_principal_porcentaje ?? data?.tasa_igv ?? country.impuestoRate ?? 0.18
   }
 
   /**
    * Obtiene el nombre del impuesto (IGV, IVA, etc.)
    */
   const getNombreImpuesto = () => {
-    return data?.impuesto_principal_nombre ?? 'IGV'
+    return data?.impuesto_principal_nombre ?? (country.paisCodigo === 'PE' ? 'IGV' : 'IVA')
   }
 
   return {

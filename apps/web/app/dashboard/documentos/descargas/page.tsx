@@ -7,6 +7,7 @@ import { useApi } from '@/hooks/use-api'
 import { fetchApi } from '@/lib/api-fetch'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface Documento {
   id: string
@@ -23,6 +24,12 @@ interface Documento {
 
 export default function DescargasPage() {
   const { get } = useApi()
+  const country = useCountryContext()
+  const formatMoney = (value: number) =>
+    new Intl.NumberFormat(country.locale || 'es-PE', {
+      style: 'currency',
+      currency: country.moneda || 'PEN',
+    }).format(value)
   const [filtros, setFiltros] = useState({
     fecha_desde: format(new Date(new Date().setMonth(new Date().getMonth() - 1)), 'yyyy-MM-dd'),
     fecha_hasta: format(new Date(), 'yyyy-MM-dd'),
@@ -88,11 +95,18 @@ export default function DescargasPage() {
     () => [
       { value: '', label: 'Todos' },
       { value: '01', label: 'Factura' },
-      { value: '03', label: 'Boleta' },
+      {
+        value: '03',
+        label: country.paisCodigo === 'AR'
+          ? 'Factura B'
+          : country.paisCodigo === 'CO'
+            ? 'Documento equivalente'
+            : 'Boleta',
+      },
       { value: '07', label: 'Nota de Crédito' },
       { value: '08', label: 'Nota de Débito' }
     ],
-    []
+    [country.paisCodigo]
   )
 
   return (
@@ -152,7 +166,7 @@ export default function DescargasPage() {
               <input
                 type="text"
                 value={filtros.serie}
-                placeholder="Ejem: F001"
+                placeholder={country.paisCodigo === 'AR' ? 'Ej.: 00001' : country.paisCodigo === 'CO' ? 'Ej.: FE' : 'Ej.: F001'}
                 onChange={(e) => handleFiltro('serie', e.target.value)}
                 className="input"
               />
@@ -215,7 +229,7 @@ export default function DescargasPage() {
                       <div className="text-xs text-muted-foreground">{doc.receptor_numero_doc || ''}</div>
                     </td>
                     <td className="px-4 py-2 text-sm text-right text-foreground/85">
-                      S/ {Number(doc.total || 0).toFixed(2)}
+                      {formatMoney(Number(doc.total || 0))}
                     </td>
                     <td className="px-4 py-2 text-sm text-foreground/85">{doc.estado || '-'}</td>
                     <td className="px-4 py-2 text-sm text-foreground/85">

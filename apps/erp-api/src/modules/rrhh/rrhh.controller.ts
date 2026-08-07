@@ -38,6 +38,32 @@ export class RrhhController {
     return this.rrhhService.getDepartamentos(tenantId);
   }
 
+  @Get('configuracion-laboral')
+  async getConfiguracionLaboral(@CurrentTenant() tenantId: string) {
+    return this.rrhhService.getConfiguracionLaboral(tenantId);
+  }
+
+  @Put('configuracion-laboral/argentina')
+  async updateConfiguracionLaboralArgentina(
+    @CurrentTenant() tenantId: string,
+    @Body() configuracion: any,
+  ) {
+    return this.rrhhService.updateConfiguracionLaboralArgentina(tenantId, configuracion);
+  }
+
+  @Put('configuracion-laboral/colombia')
+  async updateConfiguracionLaboralColombia(
+    @CurrentTenant() tenantId: string,
+    @Body() configuracion: any,
+  ) {
+    return this.rrhhService.updateConfiguracionLaboralColombia(tenantId, configuracion);
+  }
+
+  @Post('configuracion-laboral/colombia/pila/test')
+  async probarIntegracionPilaColombia(@CurrentTenant() tenantId: string) {
+    return this.rrhhService.probarIntegracionPilaColombia(tenantId);
+  }
+
   @Post('empleados')
   async createEmpleado(
     @CurrentTenant() tenantId: string,

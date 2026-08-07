@@ -14,11 +14,13 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ConfirmarDespachoButton } from "@/components/ventas/ConfirmarDespachoButton";
 import { LogisticsDisabledState } from "../LogisticsDisabledState";
+import { useCountryContext } from "@/hooks/use-country-context";
 
 export default function ListoDespachoPage() {
   const router = useRouter();
   const { get } = useApi();
   const { loading: configLoading, isFlujologistica } = useEmpresaConfig();
+  const country = useCountryContext();
 
   const [ordenes, setOrdenes] = useState<PedidoVenta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,10 @@ export default function ListoDespachoPage() {
   };
 
   const formatMonto = (monto: number) => {
-    return `S/ ${monto.toFixed(2)}`;
+    return new Intl.NumberFormat(country.locale || "es-PE", {
+      style: "currency",
+      currency: country.moneda || "PEN",
+    }).format(monto);
   };
 
   if (configLoading) {

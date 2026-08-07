@@ -8,6 +8,7 @@ import {
   Clock, CheckCircle, XCircle, CreditCard, History
 } from 'lucide-react'
 import { PagoProveedorModal } from '@/components/finanzas'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 const toNumber = (value: unknown) => {
   const numeric = Number(value)
@@ -28,6 +29,7 @@ const normalizeCxp = (raw: any) => ({
 })
 
 export default function CxpDetallePage() {
+  const { currency, locale, formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
   const params = useParams()
   const { get } = useApi()
@@ -73,17 +75,14 @@ export default function CxpDetallePage() {
     loadPagos()
   }, [loadCxp, loadPagos])
 
-  const formatCurrency = (amount: number, moneda: string = 'PEN') => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: moneda === 'USD' ? 'USD' : 'PEN',
-    }).format(toNumber(amount))
+  const formatCurrency = (amount: number, moneda: string = currency) => {
+    return formatLocalizedCurrency(toNumber(amount), moneda)
   }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     if (Number.isNaN(date.getTime())) return '-'
-    return date.toLocaleDateString('es-PE', {
+    return date.toLocaleDateString(locale, {
       year: 'numeric', month: 'long', day: 'numeric'
     })
   }
@@ -285,7 +284,7 @@ export default function CxpDetallePage() {
 
                 <div>
                   <div className="text-xs text-muted-foreground mb-1">
-                    RUC
+                    {taxIdLabel}
                   </div>
                   <div className="text-[0.875rem] font-medium">
                     {cxp.proveedor.ruc}

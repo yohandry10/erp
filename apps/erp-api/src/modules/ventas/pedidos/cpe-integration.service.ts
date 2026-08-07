@@ -229,7 +229,7 @@ export class CPEIntegrationService {
       documento_receptor: numeroDocumentoCliente,
       razon_social_receptor: razonSocialCliente,
       direccion_receptor: cliente.direccion || 'DIRECCIÓN NO REGISTRADA',
-      moneda: 'PEN', // Por ahora solo soles
+      moneda: empresaConfig.moneda_defecto || 'PEN',
       items: items,
       // Bases separadas por afectación; el IGV se recalcula sobre lo gravado en
       // lugar de arrastrar el total del pedido, que asumía todo gravado.
@@ -407,7 +407,7 @@ export class CPEIntegrationService {
   private async obtenerEmpresaConfig(tenantId: string): Promise<any> {
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('ruc, razon_social, serie_factura, ultimo_numero_factura')
+      .select('ruc, razon_social, serie_factura, ultimo_numero_factura, moneda_defecto, pais, pais_id')
       .eq('tenant_id', tenantId)
       .single();
 

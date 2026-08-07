@@ -93,8 +93,8 @@ interface RecentActivity {
 const formatNumber = (value: number | undefined) =>
   Number(value ?? 0).toLocaleString('es-PE')
 
-const formatCurrency = (value: number | undefined, currencySymbol: string) =>
-  `${currencySymbol} ${Number(value ?? 0).toLocaleString('es-PE', {
+const formatCurrency = (value: number | undefined, currencySymbol: string, locale: string) =>
+  `${currencySymbol} ${Number(value ?? 0).toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
@@ -329,9 +329,11 @@ function MetricTile({
 function FinancialFlowChart({
   data,
   currencySymbol,
+  locale,
 }: {
   data: Array<{ label: string; value: number; tone: Tone; chart?: boolean }>
   currencySymbol: string
+  locale: string
 }) {
   // El inventario es un valor de STOCK (no flujo) y su magnitud eclipsa a
   // ventas/compras en un eje compartido, dejando las barras de flujo invisibles.
@@ -366,7 +368,7 @@ function FinancialFlowChart({
           >
             <div className={eyebrow}>{d.label}</div>
             <div className={`${tabularNum} mt-0.5 text-sm ${tonePalette[d.tone].text}`}>
-              {formatCurrency(d.value, currencySymbol)}
+              {formatCurrency(d.value, currencySymbol, locale)}
             </div>
           </div>
         ))}
@@ -392,7 +394,7 @@ function FinancialFlowChart({
                 tickLine={false}
                 width={50}
                 tickFormatter={(v: number) =>
-                  v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toLocaleString('es-PE')
+                  v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toLocaleString(locale)
                 }
               />
               <Tooltip
@@ -404,7 +406,7 @@ function FinancialFlowChart({
                   color: '#f8fafc',
                   fontSize: 12,
                 }}
-                formatter={(value: any) => [formatCurrency(Number(value), currencySymbol), 'Valor']}
+                formatter={(value: any) => [formatCurrency(Number(value), currencySymbol, locale), 'Valor']}
               />
               <Bar dataKey="value" radius={[8, 8, 0, 0]} isAnimationActive={false}>
                 {chartData.map((entry, i) => (
@@ -435,15 +437,17 @@ function FiscalDonut({
   gre,
   sire,
   isPeru,
+  fiscalAuthority,
 }: {
   cpe: number
   gre: number
   sire: number
   isPeru: boolean
+  fiscalAuthority: string
 }) {
   const segments = [
     { name: 'CPE', value: cpe, color: tonePalette.cyan.accent },
-    { name: 'GRE', value: gre, color: tonePalette.amber.accent },
+    ...(isPeru ? [{ name: 'GRE', value: gre, color: tonePalette.amber.accent }] : []),
     ...(isPeru ? [{ name: 'SIRE', value: sire, color: tonePalette.violet.accent }] : []),
   ]
   const total = segments.reduce((s, item) => s + item.value, 0)
@@ -508,7 +512,9 @@ function FiscalDonut({
           height={180}
           icon={PieChartIcon}
           title="Sin documentos emitidos"
-          subtitle="El donut se llena al emitir CPE, GRE o reportes SIRE."
+          subtitle={isPeru
+            ? 'El donut se llena al emitir CPE, GRE o reportes SIRE.'
+            : `El donut se llena al autorizar comprobantes electrónicos con ${fiscalAuthority}.`}
         />
       )}
 
@@ -545,9 +551,11 @@ function FiscalDonut({
 function ActivityTimeline({
   activities,
   currencySymbol,
+  locale,
 }: {
   activities: RecentActivity[]
   currencySymbol: string
+  locale: string
 }) {
   return (
     <div className={`${surface} flex h-full flex-col gap-4 p-6`}>
@@ -587,7 +595,7 @@ function ActivityTimeline({
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                     <span className="tabular-nums">
-                      {new Date(activity.date).toLocaleDateString('es-PE', {
+                      {new Date(activity.date).toLocaleDateString(locale, {
                         day: '2-digit',
                         month: '2-digit',
                         hour: '2-digit',
@@ -596,7 +604,7 @@ function ActivityTimeline({
                     </span>
                     {activity.amount ? (
                       <span className={`${tabularNum} text-[0.7rem] ${tonePalette.cyan.text}`}>
-                        {formatCurrency(activity.amount, currencySymbol)}
+                        {formatCurrency(activity.amount, currencySymbol, locale)}
                       </span>
                     ) : null}
                   </div>
@@ -629,12 +637,14 @@ function ExecutiveRadar({
   documentosFiscales,
   alertas,
   isPeru,
+  fiscalAuthority,
   proximaRevision,
 }: {
   conversion: number
   documentosFiscales: number
   alertas: number
   isPeru: boolean
+  fiscalAuthority: string
   proximaRevision: Array<{ label: string; value: string; status: 'ok' | 'warn' | 'alert' }>
 }) {
   const radarItems = [
@@ -650,7 +660,7 @@ function ExecutiveRadar({
       value: formatNumber(documentosFiscales),
       progress: documentosFiscales > 0 ? Math.min((documentosFiscales / 50) * 100, 100) : 5,
       tone: 'violet' as Tone,
-      sub: `CPE, GRE${isPeru ? ' y SIRE' : ''} consolidados`,
+      sub: isPeru ? 'CPE, GRE y SIRE consolidados' : `Comprobantes ${fiscalAuthority} consolidados`,
     },
     {
       label: 'Alertas críticas',
@@ -789,7 +799,9 @@ export default function Dashboard() {
   const { status: configStatus, isLoading: isLoadingConfig } = useConfigurationStatus()
   const country = useCountryContext()
   const isPeru = country.paisCodigo === 'PE'
+  const fiscalAuthority = country.servicioFiscal || (isPeru ? 'SUNAT' : 'Autoridad fiscal')
   const currencySymbol = country.simboloMoneda || 'S/'
+  const locale = country.locale || 'es-PE'
 
   const fetchDashboardData = useCallback(async (showLoading = false) => {
     if (dashboardFetchInFlightRef.current) {
@@ -886,8 +898,8 @@ export default function Dashboard() {
     Number(stats?.productosConStockBajo ?? 0) + Number(stats?.ordenesCompraPendientes ?? 0)
   const crecimiento = Number(stats?.crecimientoVentas ?? 0)
   const saludOperativa = Math.max(0, Math.min(100, 100 - alertasCriticas))
-  const eficienciaFiscal =
-    Number(stats?.totalCpe ?? 0) + Number(stats?.totalGre ?? 0) + Number(stats?.totalSire ?? 0)
+  const eficienciaFiscal = Number(stats?.totalCpe ?? 0) +
+    (isPeru ? Number(stats?.totalGre ?? 0) + Number(stats?.totalSire ?? 0) : 0)
   const financialChartData = [
     { label: 'Ventas mes', value: Number(stats?.ventasMes ?? 0), tone: 'cyan' as Tone },
     { label: 'Ventas hoy', value: Number(stats?.ventasHoy ?? 0), tone: 'emerald' as Tone },
@@ -985,7 +997,7 @@ export default function Dashboard() {
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricTile
             label="Revenue operativo"
-            value={formatCurrency(stats?.ventasMes, currencySymbol)}
+            value={formatCurrency(stats?.ventasMes, currencySymbol, locale)}
             delta={{
               value: `${crecimiento > 0 ? '+' : ''}${crecimiento}%`,
               direction: crecimiento > 0 ? 'up' : crecimiento < 0 ? 'down' : 'neutral',
@@ -996,7 +1008,7 @@ export default function Dashboard() {
           />
           <MetricTile
             label="Compras del periodo"
-            value={formatCurrency(stats?.comprasMes, currencySymbol)}
+            value={formatCurrency(stats?.comprasMes, currencySymbol, locale)}
             delta={{ value: '', direction: 'neutral', description: 'Inversión registrada' }}
             icon={ShoppingCart}
             tone="violet"
@@ -1024,7 +1036,7 @@ export default function Dashboard() {
         {/* ─── HERO ROW: Flujo + Mix fiscal ───────────────────────────── */}
         <section className="grid gap-3 xl:grid-cols-3">
           <div className="xl:col-span-2">
-            <FinancialFlowChart data={financialChartData} currencySymbol={currencySymbol} />
+            <FinancialFlowChart data={financialChartData} currencySymbol={currencySymbol} locale={locale} />
           </div>
           <div>
             <FiscalDonut
@@ -1032,6 +1044,7 @@ export default function Dashboard() {
               gre={Number(stats?.totalGre ?? 0)}
               sire={Number(stats?.totalSire ?? 0)}
               isPeru={isPeru}
+              fiscalAuthority={fiscalAuthority}
             />
           </div>
         </section>
@@ -1039,7 +1052,7 @@ export default function Dashboard() {
         {/* ─── OPERATIONAL ROW: Timeline + Radar ──────────────────────── */}
         <section className="grid gap-3 xl:grid-cols-3">
           <div className="xl:col-span-2">
-            <ActivityTimeline activities={activities} currencySymbol={currencySymbol} />
+            <ActivityTimeline activities={activities} currencySymbol={currencySymbol} locale={locale} />
           </div>
           <div>
             <ExecutiveRadar
@@ -1047,6 +1060,7 @@ export default function Dashboard() {
               documentosFiscales={eficienciaFiscal}
               alertas={alertasCriticas}
               isPeru={isPeru}
+              fiscalAuthority={fiscalAuthority}
               proximaRevision={proximaRevision}
             />
           </div>
@@ -1061,13 +1075,15 @@ export default function Dashboard() {
             tone="cyan"
             hint="Comprobantes electrónicos"
           />
-          <ModuleTile
-            label="GRE"
-            value={formatNumber(stats?.totalGre)}
-            icon={Truck}
-            tone="amber"
-            hint="Guías de remisión"
-          />
+          {isPeru ? (
+            <ModuleTile
+              label="GRE"
+              value={formatNumber(stats?.totalGre)}
+              icon={Truck}
+              tone="amber"
+              hint="Guías de remisión"
+            />
+          ) : null}
           {isPeru ? (
             <ModuleTile
               label="SIRE"

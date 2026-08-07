@@ -2,6 +2,7 @@
 
 import { DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
 import PresupuestoEjecucionIndicator, { getEjecucionColor } from './PresupuestoEjecucionIndicator'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface PresupuestoEjecucionCardProps {
   titulo: string
@@ -22,14 +23,7 @@ export default function PresupuestoEjecucionCard({
   porcentajeEjecutado,
   onClick
 }: PresupuestoEjecucionCardProps) {
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 2
-    }).format(amount)
-  }
+  const { formatCurrency } = useLocalizedMoney()
 
   const isOverBudget = montoDisponible < 0
 

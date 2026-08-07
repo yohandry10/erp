@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Package, ArrowUpDown } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface ProductoVendido {
   producto_id: string
@@ -32,6 +33,8 @@ type SortOrder = 'asc' | 'desc'
 
 export default function ProductosMasVendidosReport({ filters }: Props) {
   const { get } = useApi()
+  const country = useCountryContext()
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const [data, setData] = useState<ProductoVendido[]>([])
   const [loading, setLoading] = useState(true)
   const [sortField, setSortField] = useState<SortField>('unidades')
@@ -121,7 +124,7 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-violet-400 font-medium">Importe Total</p>
-                <p className="text-2xl font-bold text-violet-400">S/ {totalImporte.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-violet-400">{currencySymbol} {totalImporte.toFixed(2)}</p>
               </div>
             </div>
 
@@ -202,7 +205,7 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-medium text-foreground">
-                          S/ {producto.importe_total.toFixed(2)}
+                          {currencySymbol} {producto.importe_total.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -212,7 +215,7 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm text-foreground">
-                          S/ {producto.precio_promedio.toFixed(2)}
+                          {currencySymbol} {producto.precio_promedio.toFixed(2)}
                         </div>
                       </td>
                     </tr>

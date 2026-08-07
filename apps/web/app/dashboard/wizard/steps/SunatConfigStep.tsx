@@ -46,17 +46,18 @@ export function SunatConfigStep() {
   const country = useCountryContext()
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const emisionModo = state.configuration.emision_cpe_modo || 'SUNAT_DIRECTO'
+  const emisionModo = state.configuration.emision_cpe_modo || (country.paisCodigo === 'CO' ? 'DIAN_DIRECTO' : 'SUNAT_DIRECTO')
   const authTipo = state.configuration.ose_auth_tipo || 'BASIC'
   const isOseApi = emisionModo === 'OSE_API'
-  const isColombia: boolean = false
+  const isColombia = country.paisCodigo === 'CO'
   const isPeru = country.paisCodigo === 'PE'
+  const isArgentina = country.paisCodigo === 'AR'
   const oseLabel = 'OSE'
   const dianEnvironment = state.configuration.dian_environment || 'HOMOLOGACION'
   const sunatEnvironment = state.configuration.sunat_environment || 'homologacion'
   const greTransport = state.configuration.sunat_gre_transport || 'soap'
 
-  const handleEmisionModoChange = (value: 'SUNAT_DIRECTO' | 'OSE_API') => {
+  const handleEmisionModoChange = (value: 'SUNAT_DIRECTO' | 'OSE_API' | 'ARCA_WSFE' | 'DIAN_DIRECTO') => {
     updateConfiguration({
       emision_cpe_modo: value,
       ose_activo: value === 'OSE_API',
@@ -75,9 +76,13 @@ export function SunatConfigStep() {
 
   useEffect(() => {
     if (isColombia && !state.configuration.dian_activo) {
-      updateConfiguration({ dian_activo: true })
+      updateConfiguration({
+        dian_activo: true,
+        emision_cpe_modo: 'DIAN_DIRECTO',
+        dian_url: state.configuration.dian_url || 'https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc',
+      })
     }
-  }, [isColombia, state.configuration.dian_activo, updateConfiguration])
+  }, [isColombia, state.configuration.dian_activo, state.configuration.dian_url, updateConfiguration])
 
   useEffect(() => {
     if (isPeru && !state.configuration.sunat_gre_rest_base_url) {
@@ -85,11 +90,38 @@ export function SunatConfigStep() {
     }
   }, [isPeru, state.configuration.sunat_gre_rest_base_url, updateConfiguration])
 
+  useEffect(() => {
+    if (!isArgentina) return
+    const production = state.configuration.arca_environment === 'produccion'
+    updateConfiguration({
+      emision_cpe_modo: 'ARCA_WSFE',
+      arca_wsaa_url: state.configuration.arca_wsaa_url || (production
+        ? 'https://wsaa.afip.gov.ar/ws/services/LoginCms'
+        : 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms'),
+      arca_wsfe_url: state.configuration.arca_wsfe_url || (production
+        ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx'
+        : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx'),
+      arca_cuit_representada: state.configuration.arca_cuit_representada || state.configuration.ruc,
+    })
+  }, [
+    isArgentina,
+    state.configuration.arca_cuit_representada,
+    state.configuration.arca_environment,
+    state.configuration.arca_wsaa_url,
+    state.configuration.arca_wsfe_url,
+    state.configuration.ruc,
+    updateConfiguration,
+  ])
+
   return (
     <div className="space-y-5 py-2 text-foreground">
       <InfoPanel
         title="Autoridad fiscal"
-        description={`Define como se enviaran los comprobantes: ${country.servicioFiscal} directo (SOAP) o API externa (${oseLabel} o propia).`}
+        description={isArgentina
+          ? 'Configura la autenticación WSAA, autorización WSFEv1, punto de venta y datos registrales de ARCA.'
+          : isColombia
+            ? 'Configura el software habilitado, certificado, resolución de numeración y ambiente de facturación electrónica DIAN.'
+            : `Define como se enviaran los comprobantes: ${country.servicioFiscal} directo (SOAP) o API externa (${oseLabel} o propia).`}
       />
 
       <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
@@ -104,13 +136,24 @@ export function SunatConfigStep() {
             <Label htmlFor="emision_modo" className={labelClass}>
               Selecciona el modo de envio
             </Label>
-            <Select value={emisionModo} onValueChange={(value) => handleEmisionModoChange(value as 'SUNAT_DIRECTO' | 'OSE_API')}>
+            <Select
+              value={isArgentina ? 'ARCA_WSFE' : isColombia ? 'DIAN_DIRECTO' : emisionModo}
+              onValueChange={(value) => handleEmisionModoChange(value as 'SUNAT_DIRECTO' | 'OSE_API' | 'ARCA_WSFE' | 'DIAN_DIRECTO')}
+            >
               <SelectTrigger id="emision_modo" className={inputClass}>
                 <SelectValue placeholder="Selecciona un modo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="SUNAT_DIRECTO">{country.servicioFiscal} directo (SOAP)</SelectItem>
-                <SelectItem value="OSE_API">{oseLabel} API (REST)</SelectItem>
+                {isArgentina ? (
+                  <SelectItem value="ARCA_WSFE">ARCA directo (WSAA + WSFEv1)</SelectItem>
+                ) : isColombia ? (
+                  <SelectItem value="DIAN_DIRECTO">DIAN directo (UBL 2.1 + CUFE)</SelectItem>
+                ) : (
+                  <>
+                    <SelectItem value="SUNAT_DIRECTO">{country.servicioFiscal} directo (SOAP)</SelectItem>
+                    <SelectItem value="OSE_API">{oseLabel} API (REST)</SelectItem>
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -123,6 +166,120 @@ export function SunatConfigStep() {
           ) : null}
         </CardContent>
       </Card>
+
+      {isArgentina ? (
+        <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10">
+            <CardTitle className="flex items-center gap-2 text-lg text-white">
+              <KeyRound className="h-5 w-5 text-primary" />
+              Configuración ARCA
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5 p-5">
+            <InfoPanel
+              tone="blue"
+              title="Certificado y relaciones"
+              description="El certificado X.509 cargado en el paso anterior debe estar emitido por ARCA y asociado al servicio wsfe para el CUIT representado."
+            />
+            <div className={fieldGridClass}>
+              <div>
+                <Label htmlFor="arca_environment" className={labelClass}>Ambiente ARCA</Label>
+                <Select
+                  value={state.configuration.arca_environment || 'homologacion'}
+                  onValueChange={(value) => {
+                    const production = value === 'produccion'
+                    updateConfiguration({
+                      arca_environment: value as 'homologacion' | 'produccion',
+                      arca_wsaa_url: production
+                        ? 'https://wsaa.afip.gov.ar/ws/services/LoginCms'
+                        : 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
+                      arca_wsfe_url: production
+                        ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx'
+                        : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
+                    })
+                  }}
+                >
+                  <SelectTrigger id="arca_environment" className={inputClass}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="homologacion">Homologación</SelectItem>
+                    <SelectItem value="produccion">Producción</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="arca_cuit" className={labelClass}>CUIT representada <span className={requiredClass}>*</span></Label>
+                <Input
+                  id="arca_cuit"
+                  inputMode="numeric"
+                  maxLength={11}
+                  value={state.configuration.arca_cuit_representada || state.configuration.ruc}
+                  onChange={(event) => updateConfiguration({
+                    arca_cuit_representada: event.target.value.replace(/\D/g, '').slice(0, 11),
+                  })}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <Label htmlFor="arca_punto_venta" className={labelClass}>Punto de venta electrónico <span className={requiredClass}>*</span></Label>
+                <Input
+                  id="arca_punto_venta"
+                  type="number"
+                  min={1}
+                  max={99999}
+                  value={state.configuration.arca_punto_venta || 1}
+                  onChange={(event) => updateConfiguration({ arca_punto_venta: Number(event.target.value) })}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <Label htmlFor="arca_condicion_iva" className={labelClass}>Condición frente al IVA <span className={requiredClass}>*</span></Label>
+                <Select
+                  value={state.configuration.arca_condicion_iva || 'RESPONSABLE_INSCRIPTO'}
+                  onValueChange={(value) => updateConfiguration({ arca_condicion_iva: value as any })}
+                >
+                  <SelectTrigger id="arca_condicion_iva" className={inputClass}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</SelectItem>
+                    <SelectItem value="MONOTRIBUTO">Monotributista</SelectItem>
+                    <SelectItem value="EXENTO">Exento</SelectItem>
+                    <SelectItem value="CONSUMIDOR_FINAL">Consumidor Final</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="ingresos_brutos" className={labelClass}>Ingresos Brutos / Convenio Multilateral <span className={requiredClass}>*</span></Label>
+                <Input id="ingresos_brutos" value={state.configuration.ingresos_brutos || ''} onChange={(event) => updateConfiguration({ ingresos_brutos: event.target.value })} className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="provincia_fiscal" className={labelClass}>Jurisdicción fiscal <span className={requiredClass}>*</span></Label>
+                <Input id="provincia_fiscal" value={state.configuration.provincia_fiscal || ''} onChange={(event) => updateConfiguration({ provincia_fiscal: event.target.value.toUpperCase() })} placeholder="CABA / BUENOS AIRES / ..." className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="fecha_inicio_actividades" className={labelClass}>Inicio de actividades <span className={requiredClass}>*</span></Label>
+                <Input id="fecha_inicio_actividades" type="date" value={state.configuration.fecha_inicio_actividades || ''} onChange={(event) => updateConfiguration({ fecha_inicio_actividades: event.target.value })} className={inputClass} />
+              </div>
+            </div>
+            <div className={fieldGridClass}>
+              <div>
+                <Label htmlFor="arca_wsaa_url" className={labelClass}>URL WSAA</Label>
+                <Input id="arca_wsaa_url" type="url" value={state.configuration.arca_wsaa_url || ''} onChange={(event) => updateConfiguration({ arca_wsaa_url: event.target.value })} className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="arca_wsfe_url" className={labelClass}>URL WSFEv1</Label>
+                <Input id="arca_wsfe_url" type="url" value={state.configuration.arca_wsfe_url || ''} onChange={(event) => updateConfiguration({ arca_wsfe_url: event.target.value })} className={inputClass} />
+              </div>
+            </div>
+            <label className="flex items-center gap-3 rounded-lg border border-border p-3">
+              <input
+                type="checkbox"
+                checked={state.configuration.arca_activo === true}
+                onChange={(event) => updateConfiguration({ arca_activo: event.target.checked })}
+              />
+              <span className="text-sm">Activar emisión real por WSFEv1 después de validar el certificado y el punto de venta.</span>
+            </label>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {isPeru && !isOseApi ? (
         <>

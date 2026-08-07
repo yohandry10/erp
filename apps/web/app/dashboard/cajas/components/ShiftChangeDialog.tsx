@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { DenominationForm, Denominaciones } from './DenominationForm';
 import { CashDialogFrame } from './CashDialogFrame';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface ShiftChangeDialogProps {
     isOpen: boolean;
@@ -17,6 +18,8 @@ interface User {
 }
 
 export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: ShiftChangeDialogProps) {
+    const country = useCountryContext();
+    const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
     const { get, post } = useApi();
     const [step, setStep] = useState<'USER_SELECT' | 'COUNT' | 'SIGNATURES' | 'CONFIRM'>('USER_SELECT');
     const [users, setUsers] = useState<User[]>([]);
@@ -229,16 +232,16 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
                                     <dl className="grid grid-cols-2 gap-4">
                                         <div>
                                             <dt className="text-sm font-medium text-muted-foreground">Saldo Sistema</dt>
-                                            <dd className="text-lg font-semibold">S/ {saldoSistema.toFixed(2)}</dd>
+                                            <dd className="text-lg font-semibold">{currencySymbol} {saldoSistema.toFixed(2)}</dd>
                                         </div>
                                         <div>
                                             <dt className="text-sm font-medium text-muted-foreground">Saldo Contado</dt>
-                                            <dd className="text-lg font-semibold text-primary">S/ {montoContado.toFixed(2)}</dd>
+                                            <dd className="text-lg font-semibold text-primary">{currencySymbol} {montoContado.toFixed(2)}</dd>
                                         </div>
                                         <div className="col-span-2 border-t pt-2">
                                             <dt className="text-sm font-medium text-muted-foreground">Diferencia</dt>
                                             <dd className={`text-xl font-bold ${diferencia === 0 ? 'text-foreground' : diferencia > 0 ? 'text-emerald-400' : 'text-destructive'}`}>
-                                                {diferencia > 0 ? '+' : ''}S/ {diferencia.toFixed(2)}
+                                                {diferencia > 0 ? '+' : ''}{currencySymbol} {diferencia.toFixed(2)}
                                             </dd>
                                         </div>
                                     </dl>

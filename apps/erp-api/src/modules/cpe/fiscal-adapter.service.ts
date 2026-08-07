@@ -77,7 +77,13 @@ export class FiscalAdapterService {
       const fiscalService = this.fiscalServiceFactory.getServiceByPaisId(paisId);
       
       // 3. Log del país detectado
-      const paisNombre = paisId === 1 ? 'Perú (SUNAT)' : paisId === 2 ? 'Colombia (DIAN)' : `País ${paisId}`;
+      const paisNombre = paisId === 1
+        ? 'Perú (SUNAT)'
+        : paisId === 2
+          ? 'Colombia (DIAN)'
+          : paisId === 5
+            ? 'Argentina (ARCA)'
+            : `País ${paisId}`;
       this.logger.log(`🌍 Enviando documento a ${paisNombre} para tenant ${tenantId}`);
 
       if (paisId === 1) {
@@ -223,6 +229,8 @@ export class FiscalAdapterService {
         return 'SII'; // Chile
       case 4:
         return 'SAT'; // México
+      case 5:
+        return 'ARCA';
       default:
         return 'Servicio Fiscal';
     }

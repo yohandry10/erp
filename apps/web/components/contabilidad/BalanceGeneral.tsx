@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ActivosVsPasivosChart } from './ActivosVsPasivosChart'
 import { exportToExcel, formatCurrencyForExcel } from '@/lib/excel-export'
 import { exportBalanceGeneralToPDF } from '@/lib/pdf-export'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface BalanceGeneralData {
   activos: {
@@ -64,6 +65,7 @@ type LineItem = {
 }
 
 export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGeneralProps) {
+  const { formatCurrency } = useLocalizedMoney()
   const { get } = useApi()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,14 +108,6 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 2,
-    }).format(amount)
-  }
 
   const calculateVariation = (current: number, previous: number) => {
     if (previous === 0) return { absolute: current, percentage: current > 0 ? 100 : 0 }

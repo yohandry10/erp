@@ -2,6 +2,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 import { getEjecucionColor } from './PresupuestoEjecucionIndicator'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface CentroEjecucion {
   centro_costo: {
@@ -22,6 +23,7 @@ interface PresupuestoEjecucionPorCentroChartProps {
 }
 
 export default function PresupuestoEjecucionPorCentroChart({ centros }: PresupuestoEjecucionPorCentroChartProps) {
+  const { formatCurrency, currency } = useLocalizedMoney()
   // Prepare data for the chart
   const chartData = centros.map(centro => ({
     nombre: centro.centro_costo.codigo,
@@ -32,15 +34,6 @@ export default function PresupuestoEjecucionPorCentroChart({ centros }: Presupue
     porcentaje: centro.totales.porcentaje_ejecucion,
     color: getEjecucionColor(centro.totales.porcentaje_ejecucion)
   }))
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value)
-  }
 
   const formatPercentage = (value: number) => {
     return `${value.toFixed(1)}%`
@@ -107,9 +100,9 @@ export default function PresupuestoEjecucionPorCentroChart({ centros }: Presupue
           />
           <YAxis
             tick={{ fill: '#6b7280', fontSize: 11 }}
-            tickFormatter={formatCurrency}
+            tickFormatter={(value) => formatCurrency(value)}
             label={{
-              value: 'Monto (PEN)',
+              value: `Monto (${currency})`,
               angle: -90,
               position: 'insideLeft',
               style: { fill: '#6b7280', fontSize: 12 }

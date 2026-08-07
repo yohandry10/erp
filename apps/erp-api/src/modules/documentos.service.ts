@@ -8,6 +8,8 @@ import { CpeService } from './cpe/cpe.service';
 import { CxcService } from './finanzas/cxc/cxc.service';
 import { PedidoVenta, PedidoDetalle } from './ventas/pedidos/entities';
 import { DocumentoFiscal, DocumentoDetalleFiscal } from './documentos/interfaces/documento-fiscal.interface';
+import { validateArgentinaTaxId } from './fiscal/arca-fiscal.service';
+import { validateColombiaNit } from './paises/initial-country';
 
 interface DocumentoDesdePedidoResult {
   documento: DocumentoFiscal;
@@ -247,10 +249,16 @@ export class DocumentosService {
         throw new BadRequestException('Datos requeridos: tipo_documento, receptor_numero_doc, total');
       }
 
+      const countryContext = await this.obtenerContextoPaisTenant(tenant);
+      const defaultSerie = this.getSerieDefault(
+        documentoData.tipo_documento,
+        countryContext.pais,
+      );
+
       // Obtener siguiente número de serie
       const siguienteNumero = await this.obtenerSiguienteNumero(
         documentoData.tipo_documento, 
-        documentoData.serie || this.getSerieDefault(documentoData.tipo_documento),
+        documentoData.serie || defaultSerie,
         tenant
       );
 
@@ -260,25 +268,27 @@ export class DocumentosService {
       const nuevoDocumento = {
         tenant_id: tenant,
         tipo_documento: documentoData.tipo_documento,
-        serie: documentoData.serie || this.getSerieDefault(documentoData.tipo_documento),
+        serie: documentoData.serie || defaultSerie,
         numero: siguienteNumero,
         fecha_emision: documentoData.fecha_emision || new Date().toISOString(),
         fecha_vencimiento: documentoData.fecha_vencimiento,
         
         // Datos del emisor (empresa)
-        emisor_ruc: empresaConfig.ruc || '20123456789',
+        emisor_ruc: empresaConfig.ruc || countryContext.ruc,
         emisor_razon_social: empresaConfig.razon_social || 'EMPRESA DEMO SAC',
         emisor_direccion: empresaConfig.direccion_fiscal || 'AV. DEMO 123',
         
         // Datos del receptor
-        receptor_tipo_doc: documentoData.receptor_tipo_doc || 'RUC',
+        receptor_tipo_doc:
+          documentoData.receptor_tipo_doc ||
+          (countryContext.pais === 'AR' ? 'CUIT' : countryContext.pais === 'CO' ? 'NIT' : 'RUC'),
         receptor_numero_doc: documentoData.receptor_numero_doc,
         receptor_razon_social: documentoData.receptor_razon_social || 'CLIENTE DEMO',
         receptor_direccion: documentoData.receptor_direccion,
         receptor_email: documentoData.receptor_email,
         
         // Montos
-        moneda: documentoData.moneda || 'PEN',
+        moneda: documentoData.moneda || countryContext.moneda,
         tipo_cambio: documentoData.tipo_cambio || 1.0000,
         subtotal: documentoData.subtotal || 0.00,
         descuentos: documentoData.descuentos || 0.00,
@@ -825,9 +835,52 @@ export class DocumentosService {
   }
 
   // ========== VALIDACIONES ==========
-  async validarRUC(ruc: string) {
+  async validarRUC(ruc: string, tenantId?: string) {
     try {
-      console.log('🔍 Validando RUC:', ruc);
+      const pais = tenantId
+        ? (await this.obtenerContextoPaisTenant(tenantId)).pais
+        : 'PE';
+      const documentoFiscal = pais === 'AR' ? 'CUIT' : pais === 'CO' ? 'NIT' : 'RUC';
+      console.log(`🔍 Validando ${documentoFiscal}:`, ruc);
+
+      if (pais === 'AR') {
+        if (!validateArgentinaTaxId(ruc)) {
+          return {
+            success: false,
+            data: null,
+            error: 'CUIT debe tener 11 dígitos y un dígito verificador válido',
+          };
+        }
+        return {
+          success: true,
+          data: {
+            cuit: ruc,
+            validado_formato: true,
+            consulta_arca: false,
+            fuente: 'VALIDACION_LOCAL',
+          },
+          message: 'CUIT válido por formato y dígito verificador; no se consultó el padrón ARCA',
+        };
+      }
+      if (pais === 'CO') {
+        if (!validateColombiaNit(ruc)) {
+          return {
+            success: false,
+            data: null,
+            error: 'NIT debe tener 9 o 10 dígitos y un dígito de verificación válido',
+          };
+        }
+        return {
+          success: true,
+          data: {
+            nit: ruc,
+            validado_formato: true,
+            consulta_dian: false,
+            fuente: 'VALIDACION_LOCAL',
+          },
+          message: 'NIT válido por formato y dígito verificador; no se consultó el RUT de la DIAN',
+        };
+      }
 
       // Validación básica de formato
       if (!ruc || ruc.length !== 11 || !/^\d+$/.test(ruc)) {
@@ -867,11 +920,16 @@ export class DocumentosService {
     }
   }
 
-  async validarDocumento(documentoData: any) {
+  async validarDocumento(documentoData: any, tenantId?: string) {
     try {
       console.log('✅ Validando documento antes de envío');
 
       const errores = [];
+      const pais = tenantId
+        ? (await this.obtenerContextoPaisTenant(tenantId)).pais
+        : 'PE';
+      const esArgentina = pais === 'AR';
+      const esColombia = pais === 'CO';
 
       // Validaciones obligatorias
       if (!documentoData.tipo_documento) errores.push('Tipo de documento es requerido');
@@ -880,15 +938,21 @@ export class DocumentosService {
       if (!documentoData.total || documentoData.total <= 0) errores.push('Total debe ser mayor a 0');
 
       // Validaciones específicas por tipo
-      if (documentoData.tipo_documento === 'FACTURA' && documentoData.receptor_numero_doc.length !== 11) {
-        errores.push('Las facturas requieren RUC del cliente (11 dígitos)');
+      if (documentoData.tipo_documento === 'FACTURA') {
+        if (esArgentina && !validateArgentinaTaxId(documentoData.receptor_numero_doc)) {
+          errores.push('Las Facturas A requieren CUIT válido del receptor');
+        } else if (esColombia && !validateColombiaNit(documentoData.receptor_numero_doc)) {
+          errores.push('La factura electrónica colombiana requiere NIT válido del adquirente cuando sea empresa');
+        } else if (!esArgentina && !esColombia && documentoData.receptor_numero_doc.length !== 11) {
+          errores.push('Las facturas requieren RUC del cliente (11 dígitos)');
+        }
       }
 
       // SUNAT (Reglamento de Comprobantes de Pago): la boleta cuyo importe total
       // supere S/ 700 debe identificar al adquirente con nombre/razón social y
       // número de documento. Solo se rechaza cuando ESA identificación falta o es
       // el genérico "clientes varios" (99999999); una boleta con DNI real es válida.
-      if (documentoData.tipo_documento === 'BOLETA' && Number(documentoData.total) > 700) {
+      if (pais === 'PE' && documentoData.tipo_documento === 'BOLETA' && Number(documentoData.total) > 700) {
         const documentoReceptor = String(documentoData.receptor_numero_doc ?? '').trim();
         const nombreReceptor = String(documentoData.receptor_razon_social ?? '').trim();
         if (!documentoReceptor || /^9+$/.test(documentoReceptor) || !nombreReceptor) {
@@ -929,7 +993,20 @@ export class DocumentosService {
   }
 
   // ========== MÉTODOS AUXILIARES ==========
-  private getSerieDefault(tipoDocumento: string): string {
+  private getSerieDefault(tipoDocumento: string, pais = 'PE'): string {
+    if (pais === 'AR') {
+      return '00001';
+    }
+    if (pais === 'CO') {
+      const series = {
+        FACTURA: 'FE',
+        BOLETA: 'FE',
+        NOTA_CREDITO: 'NC',
+        NOTA_DEBITO: 'ND',
+        CONTRATO: 'CT',
+      };
+      return series[tipoDocumento] || 'FE';
+    }
     const series = {
       'FACTURA': 'F001',
       'BOLETA': 'B001',
@@ -938,6 +1015,33 @@ export class DocumentosService {
       'CONTRATO': 'C001',
     };
     return series[tipoDocumento] || 'DOC1';
+  }
+
+  private async obtenerContextoPaisTenant(tenantId: string): Promise<{
+    pais: 'PE' | 'AR' | 'CO';
+    moneda: 'PEN' | 'ARS' | 'COP';
+    ruc: string;
+  }> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select('pais, moneda_defecto, ruc')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (error) {
+      throw new BadRequestException(
+        `No se pudo resolver el país fiscal del tenant: ${error.message}`,
+      );
+    }
+
+    const rawPais = String(data?.pais || 'PE').toUpperCase();
+    const pais: 'PE' | 'AR' | 'CO' = rawPais === 'AR' ? 'AR' : rawPais === 'CO' ? 'CO' : 'PE';
+    return {
+      pais,
+      moneda: pais === 'AR' ? 'ARS' : pais === 'CO' ? 'COP' : 'PEN',
+      ruc: String(data?.ruc || (pais === 'AR' ? '00000000000' : pais === 'CO' ? '9000000000' : '20123456789')),
+    };
   }
 
   private async obtenerSiguienteNumero(tipoDocumento: string, serie: string, tenantId: string): Promise<string> {

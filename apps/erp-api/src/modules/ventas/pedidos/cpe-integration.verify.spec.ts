@@ -5,6 +5,7 @@ import { CpeService } from '../../cpe/cpe.service';
 import { FiscalAdapterService } from '../../cpe/fiscal-adapter.service';
 import { SunatFiscalService } from '../../fiscal/sunat-fiscal.service';
 import { DianFiscalService } from '../../fiscal/dian-fiscal.service';
+import { ArcaFiscalService } from '../../fiscal/arca-fiscal.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
 import { EventBusService } from '../../../shared/events/event-bus.service';
@@ -71,6 +72,14 @@ describe('CPE Integration Verification', () => {
                 FiscalServiceFactory,
                 {
                     provide: DianFiscalService,
+                    useValue: {
+                        enviarDocumento: jest.fn(),
+                        consultarEstado: jest.fn(),
+                        validarDocumento: jest.fn(),
+                    },
+                },
+                {
+                    provide: ArcaFiscalService,
                     useValue: {
                         enviarDocumento: jest.fn(),
                         consultarEstado: jest.fn(),

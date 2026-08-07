@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useCountryContext } from '@/hooks/use-country-context'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Pencil, UserRound } from 'lucide-react'
 
@@ -26,6 +27,7 @@ interface UsuarioModalProps {
 }
 
 export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, roles }: UsuarioModalProps) {
+  const country = useCountryContext()
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
@@ -216,7 +218,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
                 inputMode="tel"
                 value={formData.telefono}
                 onChange={(e) => handleInputChange('telefono', e.target.value)}
-                placeholder="987654321"
+                placeholder={country.paisCodigo === 'CO' ? '+57 300 123 4567' : country.paisCodigo === 'AR' ? '+54 9 11 1234 5678' : '+51 987 654 321'}
               />
             </div>
           </div>

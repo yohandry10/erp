@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface EmpleadoModalProps {
   isOpen: boolean
@@ -10,10 +11,10 @@ interface EmpleadoModalProps {
   initialData?: any | null
 }
 
-const createEmptyForm = () => ({
+const createEmptyForm = (countryCode = 'PE') => ({
   nombres: '',
   apellidos: '',
-  tipo_documento: 'DNI',
+  tipo_documento: countryCode === 'AR' ? 'CUIL' : countryCode === 'CO' ? 'CC' : 'DNI',
   numero_documento: '',
   fecha_nacimiento: '',
   direccion: '',
@@ -24,7 +25,15 @@ const createEmptyForm = () => ({
   fecha_ingreso: '',
   estado: 'activo',
   tiene_hijos: false,
-  cantidad_hijos: ''
+  cantidad_hijos: '',
+  obra_social_codigo: '',
+  sindicato_codigo: '',
+  situacion_revista_codigo: countryCode === 'AR' ? '01' : '',
+  modalidad_contratacion_codigo: '',
+  eps_codigo: '',
+  fondo_pension_codigo: '',
+  arl_codigo: '',
+  caja_compensacion_codigo: '',
 })
 
 const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
@@ -34,19 +43,23 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
   departamentos,
   initialData = null
 }) => {
-  const [formData, setFormData] = useState(createEmptyForm)
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
+  const isPeru = country.paisCodigo === 'PE'
+  const [formData, setFormData] = useState(() => createEmptyForm('PE'))
 
   useEffect(() => {
     if (!isOpen) return
     if (!initialData) {
-      setFormData(createEmptyForm())
+      setFormData(createEmptyForm(country.paisCodigo))
       return
     }
 
     setFormData({
       nombres: initialData.nombres || '',
       apellidos: initialData.apellidos || '',
-      tipo_documento: initialData.tipo_documento || 'DNI',
+      tipo_documento: initialData.tipo_documento || (isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI'),
       numero_documento: initialData.numero_documento || '',
       fecha_nacimiento: initialData.fecha_nacimiento || '',
       direccion: initialData.direccion || '',
@@ -60,17 +73,26 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
       cantidad_hijos:
         initialData.cantidad_hijos === null || initialData.cantidad_hijos === undefined
           ? ''
-          : String(initialData.cantidad_hijos)
+          : String(initialData.cantidad_hijos),
+      obra_social_codigo: initialData.obra_social_codigo || '',
+      sindicato_codigo: initialData.sindicato_codigo || '',
+      situacion_revista_codigo: initialData.situacion_revista_codigo || (isArgentina ? '01' : ''),
+      modalidad_contratacion_codigo: initialData.modalidad_contratacion_codigo || '',
+      eps_codigo: initialData.eps_codigo || '',
+      fondo_pension_codigo: initialData.fondo_pension_codigo || '',
+      arl_codigo: initialData.arl_codigo || '',
+      caja_compensacion_codigo: initialData.caja_compensacion_codigo || '',
     })
-  }, [isOpen, initialData])
+  }, [country.paisCodigo, isOpen, initialData, isArgentina, isColombia])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSubmit({
       ...formData,
+      ...(isArgentina ? { cuil: formData.numero_documento.replace(/\D/g, '') } : {}),
       cantidad_hijos: formData.tiene_hijos ? Number(formData.cantidad_hijos) || 0 : 0
     })
-    setFormData(createEmptyForm())
+    setFormData(createEmptyForm(country.paisCodigo))
   }
 
   const handleChange = (field: string, value: string | boolean) => {
@@ -161,16 +183,33 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
                   e.currentTarget.style.boxShadow = 'none'
                 }}
               >
-                <option value="DNI">DNI</option>
-                <option value="CE">Carnet de Extranjería</option>
-                <option value="Pasaporte">Pasaporte</option>
+                {isArgentina ? (
+                  <>
+                    <option value="CUIL">CUIL</option>
+                    <option value="DNI">DNI argentino</option>
+                    <option value="PASAPORTE">Pasaporte</option>
+                  </>
+                ) : isColombia ? (
+                  <>
+                    <option value="CC">Cédula de ciudadanía</option>
+                    <option value="CE">Cédula de extranjería</option>
+                    <option value="TI">Tarjeta de identidad</option>
+                    <option value="PASAPORTE">Pasaporte</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="DNI">DNI</option>
+                    <option value="CE">Carnet de Extranjería</option>
+                    <option value="PASAPORTE">Pasaporte</option>
+                  </>
+                )}
               </select>
             </div>
 
             {/* Número de Documento */}
             <div>
               <label htmlFor="empleado-modal-numero-documento" className="block mb-2 font-semibold text-[var(--primary-700)]">
-                Número de Documento *
+                {isArgentina ? 'CUIL *' : isColombia ? 'Cédula / documento *' : 'Número de Documento *'}
               </label>
               <input id="empleado-modal-numero-documento"
                 type="text"
@@ -187,6 +226,61 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
                 }}
               />
             </div>
+
+            {isArgentina ? (
+              <>
+                <div>
+                  <label htmlFor="empleado-modal-obra-social" className="block mb-2 font-semibold text-[var(--primary-700)]">
+                    Código de obra social
+                  </label>
+                  <input id="empleado-modal-obra-social"
+                    value={formData.obra_social_codigo}
+                    onChange={(e) => handleChange('obra_social_codigo', e.target.value)}
+                    className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
+                    placeholder="Código ARCA"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="empleado-modal-sindicato" className="block mb-2 font-semibold text-[var(--primary-700)]">
+                    Sindicato
+                  </label>
+                  <input id="empleado-modal-sindicato"
+                    value={formData.sindicato_codigo}
+                    onChange={(e) => handleChange('sindicato_codigo', e.target.value)}
+                    className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="empleado-modal-situacion-revista" className="block mb-2 font-semibold text-[var(--primary-700)]">
+                    Situación de revista
+                  </label>
+                  <input id="empleado-modal-situacion-revista"
+                    value={formData.situacion_revista_codigo}
+                    onChange={(e) => handleChange('situacion_revista_codigo', e.target.value)}
+                    className="w-[100%] p-[0.875rem] text-base transition bg-card/80"
+                  />
+                </div>
+              </>
+            ) : isColombia ? (
+              <>
+                <div>
+                  <label htmlFor="empleado-modal-eps" className="block mb-2 font-semibold text-[var(--primary-700)]">EPS</label>
+                  <input id="empleado-modal-eps" value={formData.eps_codigo} onChange={(e) => handleChange('eps_codigo', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80" />
+                </div>
+                <div>
+                  <label htmlFor="empleado-modal-pension-co" className="block mb-2 font-semibold text-[var(--primary-700)]">Fondo de pensión</label>
+                  <input id="empleado-modal-pension-co" value={formData.fondo_pension_codigo} onChange={(e) => handleChange('fondo_pension_codigo', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80" />
+                </div>
+                <div>
+                  <label htmlFor="empleado-modal-arl" className="block mb-2 font-semibold text-[var(--primary-700)]">ARL</label>
+                  <input id="empleado-modal-arl" value={formData.arl_codigo} onChange={(e) => handleChange('arl_codigo', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80" />
+                </div>
+                <div>
+                  <label htmlFor="empleado-modal-caja-co" className="block mb-2 font-semibold text-[var(--primary-700)]">Caja de compensación</label>
+                  <input id="empleado-modal-caja-co" value={formData.caja_compensacion_codigo} onChange={(e) => handleChange('caja_compensacion_codigo', e.target.value)} className="w-[100%] p-[0.875rem] text-base transition bg-card/80" />
+                </div>
+              </>
+            ) : null}
 
             {/* Email */}
             <div>
@@ -351,7 +445,8 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
             />
           </div>
 
-          {/* Carga familiar: habilita la asignación familiar (10% de la RMV) en planilla */}
+          {/* Carga familiar peruana: habilita la asignación familiar (10% de la RMV). */}
+          {isPeru ? (
           <div className="mb-8">
             <label htmlFor="empleado-modal-tiene-hijos" className="flex items-center gap-3 font-semibold text-[var(--primary-700)]">
               <input id="empleado-modal-tiene-hijos"
@@ -382,6 +477,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               </div>
             ) : null}
           </div>
+          ) : null}
 
           {/* Botones */}
           <div className="flex justify-end gap-4 pt-6">

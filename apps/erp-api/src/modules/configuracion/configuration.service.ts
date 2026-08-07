@@ -18,11 +18,13 @@ import { createHash } from 'crypto';
 import { decryptBuffer, decryptText, encryptBuffer, encryptText } from '../../shared/utils/secure-config.utils';
 import {
   INITIAL_ACTIVE_COUNTRY_CODE,
-  INITIAL_ACTIVE_COUNTRY_ID,
-  INITIAL_ACTIVE_COUNTRY_CURRENCY,
   INITIAL_ACTIVE_COUNTRY_MESSAGE,
+  getActiveCountryByCode,
+  getActiveCountryById,
   isInitialActiveCountryCode,
   isInitialActiveCountryId,
+  validateArgentinaCuit,
+  validateColombiaNit,
 } from '../paises/initial-country';
 
 export const TOTAL_WIZARD_STEPS = 7;
@@ -55,6 +57,7 @@ export class ConfigurationService {
           .from('empresa_config')
           .select([
             'pais',
+            'is_demo',
             'emision_cpe_modo',
             'gre_obligatorio',
             'gre_automatico_habilitado',
@@ -89,6 +92,16 @@ export class ConfigurationService {
             'dian_resolucion_hasta',
             'dian_resolucion_fecha_inicio',
             'dian_resolucion_fecha_fin',
+            'arca_activo',
+            'arca_environment',
+            'arca_wsaa_url',
+            'arca_wsfe_url',
+            'arca_cuit_representada',
+            'arca_punto_venta',
+            'arca_condicion_iva',
+            'ingresos_brutos',
+            'fecha_inicio_actividades',
+            'provincia_fiscal',
           ].join(','))
           .eq('tenant_id', tenantId)
           .maybeSingle(),
@@ -105,7 +118,9 @@ export class ConfigurationService {
       // Build missing items list
       const missingItems: string[] = [];
       
-      if (!certificateValidation.isValid) {
+      const typedEmpresaConfig = empresaConfig as any;
+      const isDemo = typedEmpresaConfig?.is_demo === true;
+      if (!certificateValidation.isValid && !isDemo) {
         missingItems.push('Certificado digital');
       }
       
@@ -113,20 +128,22 @@ export class ConfigurationService {
         missingItems.push(...rucValidation.missingFields);
       }
 
-      const typedEmpresaConfig = empresaConfig as any;
       const rawPaisCodigo = (typedEmpresaConfig?.pais || INITIAL_ACTIVE_COUNTRY_CODE).toString().toUpperCase();
       if (!isInitialActiveCountryCode(rawPaisCodigo)) {
         missingItems.push(INITIAL_ACTIVE_COUNTRY_MESSAGE);
       }
-      const paisCodigo = INITIAL_ACTIVE_COUNTRY_CODE;
+      const paisCodigo = isInitialActiveCountryCode(rawPaisCodigo)
+        ? rawPaisCodigo
+        : INITIAL_ACTIVE_COUNTRY_CODE;
       const emisionModo = (typedEmpresaConfig?.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
       const oseAuthTipo = (typedEmpresaConfig?.ose_auth_tipo || 'BASIC').toString().toUpperCase();
       const oseActivo = typedEmpresaConfig?.ose_activo === true;
       const requiereOse = emisionModo === 'OSE_API';
       const dianEnvironment = (typedEmpresaConfig?.dian_environment || 'HOMOLOGACION').toString().toUpperCase();
       const dianActivo = typedEmpresaConfig?.dian_activo === true;
-      const requiereDian: boolean = false;
+      const requiereDian = paisCodigo === 'CO' && !isDemo;
       const requiereSunatDirecto = paisCodigo === 'PE' && emisionModo === 'SUNAT_DIRECTO';
+      const requiereArca = paisCodigo === 'AR' && !isDemo;
       const sunatGreTransport = (typedEmpresaConfig?.sunat_gre_transport || 'soap').toString().toLowerCase();
 
       if (requiereOse) {
@@ -157,6 +174,18 @@ export class ConfigurationService {
         }
       }
 
+      if (requiereArca) {
+        if (!typedEmpresaConfig?.arca_activo) missingItems.push('Activar ARCA WSFE');
+        if (!typedEmpresaConfig?.arca_wsaa_url) missingItems.push('URL WSAA');
+        if (!typedEmpresaConfig?.arca_wsfe_url) missingItems.push('URL WSFEv1');
+        if (!typedEmpresaConfig?.arca_cuit_representada) missingItems.push('CUIT representada');
+        if (!typedEmpresaConfig?.arca_punto_venta) missingItems.push('Punto de venta ARCA');
+        if (!typedEmpresaConfig?.arca_condicion_iva) missingItems.push('Condición frente al IVA');
+        if (!typedEmpresaConfig?.ingresos_brutos) missingItems.push('Inscripción en Ingresos Brutos');
+        if (!typedEmpresaConfig?.fecha_inicio_actividades) missingItems.push('Fecha de inicio de actividades');
+        if (!typedEmpresaConfig?.provincia_fiscal) missingItems.push('Jurisdicción fiscal');
+      }
+
       if (requiereDian) {
         if (!dianActivo) missingItems.push('Activar DIAN');
         if (!typedEmpresaConfig?.dian_url) missingItems.push('URL DIAN');
@@ -182,6 +211,7 @@ export class ConfigurationService {
       let sunatRequirements = 0;
       let oseRequirements = 0;
       let dianRequirements = 0;
+      let arcaRequirements = 0;
       if (requiereSunatDirecto) {
         sunatRequirements += 2; // usuario y clave SOL secundaria
         if (sunatGreTransport === 'rest') {
@@ -212,19 +242,24 @@ export class ConfigurationService {
         dianRequirements += 1; // dian_resolucion_fecha_inicio
         dianRequirements += 1; // dian_resolucion_fecha_fin
       }
-      const totalRequirements = baseRequirements + sunatRequirements + oseRequirements + dianRequirements;
+      if (requiereArca) arcaRequirements = 9;
+      const effectiveBaseRequirements = isDemo ? baseRequirements - 1 : baseRequirements;
+      const totalRequirements =
+        effectiveBaseRequirements + sunatRequirements + oseRequirements + dianRequirements + arcaRequirements;
       const completedRequirements = Math.max(totalRequirements - missingItems.length, 0);
       const completionPercentage = Math.round((completedRequirements / totalRequirements) * 100);
 
-      const isComplete = missingItems.length === 0 && certificateValidation.isValid && rucValidation.isValid;
+      const certificateReady = isDemo || certificateValidation.isValid;
+      const isComplete = missingItems.length === 0 && certificateReady && rucValidation.isValid;
 
       const status: ConfigurationStatus = {
         isComplete,
+        isDemo,
         completionPercentage,
         missingItems,
         certificate: {
           exists: certificateValidation.errors.length === 0 || !certificateValidation.errors.some(e => e.includes('No se ha cargado')),
-          isValid: certificateValidation.isValid,
+          isValid: certificateReady,
           expiresAt: certificateValidation.expiresAt,
           rucMatches: certificateValidation.rucMatches,
           rucsEnCertificado: certificateValidation.rucsEnCertificado,
@@ -341,9 +376,17 @@ export class ConfigurationService {
       if (config.dianActivo !== undefined) updateData.dian_activo = config.dianActivo;
       if (config.dianUrl !== undefined) updateData.dian_url = config.dianUrl;
       if (config.dianUsuario !== undefined) updateData.dian_usuario = config.dianUsuario;
-      if (config.dianPassword !== undefined) updateData.dian_password = config.dianPassword;
+      if (config.dianPassword !== undefined && config.dianPassword !== 'CONFIGURADO') {
+        updateData.dian_password = config.dianPassword
+          ? encryptText(this.configService, config.dianPassword)
+          : null;
+      }
       if (config.dianSoftwareId !== undefined) updateData.dian_software_id = config.dianSoftwareId;
-      if (config.dianSoftwarePin !== undefined) updateData.dian_software_pin = config.dianSoftwarePin;
+      if (config.dianSoftwarePin !== undefined && config.dianSoftwarePin !== 'CONFIGURADO') {
+        updateData.dian_software_pin = config.dianSoftwarePin
+          ? encryptText(this.configService, config.dianSoftwarePin)
+          : null;
+      }
       if (config.dianTestSetId !== undefined) updateData.dian_test_set_id = config.dianTestSetId;
       if (config.dianEnvironment !== undefined) updateData.dian_environment = config.dianEnvironment;
       if (config.dianRegimenFiscal !== undefined) updateData.dian_regimen_fiscal = config.dianRegimenFiscal;
@@ -610,12 +653,28 @@ export class ConfigurationService {
       const { data: empresa } = await this.supabaseService
         .getClient()
         .from('empresa_config')
-        .select('ruc, sunat_cert_expected_ruc')
+        .select('ruc, pais, sunat_cert_expected_ruc, arca_cuit_representada')
         .eq('tenant_id', tenantId)
         .maybeSingle();
 
-      const rucEmisor = empresa?.sunat_cert_expected_ruc || empresa?.ruc || null;
-      const titularidad = verificarTitularidadCertificado(metadata.subject, rucEmisor);
+      const isArgentina = String(empresa?.pais || '').toUpperCase() === 'AR';
+      const rucEmisor = isArgentina
+        ? empresa?.arca_cuit_representada || empresa?.ruc || null
+        : empresa?.sunat_cert_expected_ruc || empresa?.ruc || null;
+      const titularidad = isArgentina
+        ? (() => {
+            const candidatos = metadata.subject.match(/(?<!\d)\d{11}(?!\d)/g) ?? [];
+            const cuits = [...new Set(candidatos.filter(validateArgentinaCuit))];
+            const coincide = Boolean(rucEmisor && cuits.includes(String(rucEmisor).replace(/\D/g, '')));
+            return {
+              coincide,
+              rucsEnCertificado: cuits,
+              error: coincide
+                ? undefined
+                : 'El certificado ARCA debe declarar el CUIT representado en su titular.',
+            };
+          })()
+        : verificarTitularidadCertificado(metadata.subject, rucEmisor);
 
       const now = new Date();
       const daysUntilExpiration = Math.ceil(
@@ -697,11 +756,17 @@ export class ConfigurationService {
         throw new Error(INITIAL_ACTIVE_COUNTRY_MESSAGE);
       }
 
+      const country =
+        getActiveCountryByCode(config.pais) ??
+        getActiveCountryById(config.pais_id) ??
+        getActiveCountryByCode(INITIAL_ACTIVE_COUNTRY_CODE)!;
+      const paisCodigo = country.codigo;
+
       if (!config.certificateBase64) {
         throw new Error('No se encontró el certificado digital en la configuración');
       }
 
-      if (!/^\d{6}$/.test(String(config.ubigeo || '').trim())) {
+      if (paisCodigo === 'PE' && !/^\d{6}$/.test(String(config.ubigeo || '').trim())) {
         throw new Error(
           'La configuración fiscal de Perú requiere un ubigeo de 6 dígitos para emitir GRE',
         );
@@ -716,7 +781,6 @@ export class ConfigurationService {
         certificatePassword: config.certificatePassword,
       });
 
-      const paisCodigo = INITIAL_ACTIVE_COUNTRY_CODE;
       const emisionModo = (config.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
       const sunatGreTransport = (config.sunat_gre_transport || 'soap').toString().toLowerCase();
       if (paisCodigo === 'PE' && emisionModo === 'SUNAT_DIRECTO') {
@@ -725,6 +789,28 @@ export class ConfigurationService {
         }
         if (sunatGreTransport === 'rest' && (!config.sunat_gre_client_id || !config.sunat_gre_client_secret)) {
           throw new Error('GRE REST requiere client_id y client_secret SUNAT');
+        }
+      }
+      if (paisCodigo === 'AR') {
+        if (!validateArgentinaCuit(config.ruc)) {
+          throw new Error('Argentina requiere un CUIT válido de 11 dígitos');
+        }
+        if (!config.arca_punto_venta || Number(config.arca_punto_venta) < 1) {
+          throw new Error('ARCA requiere un punto de venta electrónico habilitado');
+        }
+        if (!config.arca_condicion_iva) {
+          throw new Error('Debes indicar la condición de la empresa frente al IVA');
+        }
+        if (!config.ingresos_brutos || !config.provincia_fiscal) {
+          throw new Error('Debes configurar Ingresos Brutos y la jurisdicción fiscal');
+        }
+      }
+      if (paisCodigo === 'CO') {
+        if (!validateColombiaNit(config.ruc)) {
+          throw new Error('Colombia requiere un NIT válido con dígito de verificación');
+        }
+        if (!config.dian_resolucion_numero || !config.dian_resolucion_prefijo) {
+          throw new Error('DIAN requiere resolución y prefijo de numeración vigentes');
         }
       }
 
@@ -751,9 +837,9 @@ export class ConfigurationService {
           departamento: config.departamento || null,
           provincia: config.provincia || null,
           distrito: config.distrito || null,
-          pais: INITIAL_ACTIVE_COUNTRY_CODE,
-          pais_id: INITIAL_ACTIVE_COUNTRY_ID,
-          moneda_defecto: INITIAL_ACTIVE_COUNTRY_CURRENCY,
+          pais: country.codigo,
+          pais_id: country.id,
+          moneda_defecto: country.moneda,
           certificado_pfx: toPostgresBytea(encryptedCertificate),
           certificado_password: encryptText(this.configService, config.certificatePassword),
           certificado_expira_en: certificateValidation.validTo.toISOString(),
@@ -766,13 +852,18 @@ export class ConfigurationService {
           umbral_gre_automatico: config.umbral_gre_automatico || 700,
           // Configuración fiscal
           regimen_tributario: config.regimen_tributario,
-          igv_porcentaje: config.igv_porcentaje || 18,
+          igv_porcentaje: config.igv_porcentaje || country.tasaImpuesto * 100,
           retencion_renta_porcentaje: config.retencion_renta_porcentaje || 0,
           serie_factura: config.serie_factura,
           serie_boleta: config.serie_boleta,
           serie_nota_credito: config.serie_nota_credito,
           // Configuración OSE (opcional)
-          emision_cpe_modo: config.emision_cpe_modo || 'SUNAT_DIRECTO',
+          emision_cpe_modo:
+            paisCodigo === 'AR'
+              ? 'ARCA_WSFE'
+              : paisCodigo === 'CO'
+                ? 'DIAN_DIRECTO'
+                : config.emision_cpe_modo || 'SUNAT_DIRECTO',
           sunat_environment: config.sunat_environment || 'homologacion',
           sunat_username: config.sunat_username || null,
           sunat_password: config.sunat_password ? encryptText(this.configService, config.sunat_password) : null,
@@ -799,23 +890,42 @@ export class ConfigurationService {
           ose_api_header: config.ose_api_header,
           ose_bearer_token: config.ose_bearer_token,
           ose_activo: config.ose_activo || false,
-          // Colombia/DIAN queda en roadmap: no persistir configuración activa no-PE.
-          dian_activo: false,
-          dian_url: null,
-          dian_usuario: null,
-          dian_password: null,
-          dian_software_id: null,
-          dian_software_pin: null,
-          dian_test_set_id: null,
-          dian_environment: null,
-          dian_regimen_fiscal: null,
-          dian_tipo_contribuyente: null,
-          dian_resolucion_numero: null,
-          dian_resolucion_prefijo: null,
-          dian_resolucion_desde: null,
-          dian_resolucion_hasta: null,
-          dian_resolucion_fecha_inicio: null,
-          dian_resolucion_fecha_fin: null,
+          arca_activo: paisCodigo === 'AR' ? config.arca_activo === true : false,
+          arca_environment: config.arca_environment || 'homologacion',
+          arca_wsaa_url: config.arca_wsaa_url || null,
+          arca_wsfe_url: config.arca_wsfe_url || null,
+          arca_cuit_representada: paisCodigo === 'AR'
+            ? config.arca_cuit_representada || config.ruc
+            : null,
+          arca_punto_venta: paisCodigo === 'AR' ? Number(config.arca_punto_venta) : null,
+          arca_condicion_iva: paisCodigo === 'AR' ? config.arca_condicion_iva : null,
+          ingresos_brutos: paisCodigo === 'AR' ? config.ingresos_brutos : null,
+          fecha_inicio_actividades: paisCodigo === 'AR'
+            ? config.fecha_inicio_actividades || null
+            : null,
+          provincia_fiscal: paisCodigo === 'AR' ? config.provincia_fiscal : null,
+          dian_activo: paisCodigo === 'CO' ? config.dian_activo === true : false,
+          dian_url: paisCodigo === 'CO' ? config.dian_url || null : null,
+          dian_usuario: paisCodigo === 'CO' ? config.dian_usuario || null : null,
+          dian_password:
+            paisCodigo === 'CO' && config.dian_password
+              ? encryptText(this.configService, config.dian_password)
+              : null,
+          dian_software_id: paisCodigo === 'CO' ? config.dian_software_id || null : null,
+          dian_software_pin:
+            paisCodigo === 'CO' && config.dian_software_pin
+              ? encryptText(this.configService, config.dian_software_pin)
+              : null,
+          dian_test_set_id: paisCodigo === 'CO' ? config.dian_test_set_id || null : null,
+          dian_environment: paisCodigo === 'CO' ? config.dian_environment || 'HOMOLOGACION' : null,
+          dian_regimen_fiscal: paisCodigo === 'CO' ? config.dian_regimen_fiscal || null : null,
+          dian_tipo_contribuyente: paisCodigo === 'CO' ? config.dian_tipo_contribuyente || null : null,
+          dian_resolucion_numero: paisCodigo === 'CO' ? config.dian_resolucion_numero || null : null,
+          dian_resolucion_prefijo: paisCodigo === 'CO' ? config.dian_resolucion_prefijo || null : null,
+          dian_resolucion_desde: paisCodigo === 'CO' ? Number(config.dian_resolucion_desde) : null,
+          dian_resolucion_hasta: paisCodigo === 'CO' ? Number(config.dian_resolucion_hasta) : null,
+          dian_resolucion_fecha_inicio: paisCodigo === 'CO' ? config.dian_resolucion_fecha_inicio || null : null,
+          dian_resolucion_fecha_fin: paisCodigo === 'CO' ? config.dian_resolucion_fecha_fin || null : null,
           // Logo de la empresa (multi-tenant)
           logo_url: config.logoUrl || config.logoBase64 || null,
           updated_at: new Date().toISOString(),

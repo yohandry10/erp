@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CandidatoModalProps {
   isOpen: boolean
@@ -71,6 +72,9 @@ interface FormacionAcademica {
 
 export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, vacantes: vacantesProps }: CandidatoModalProps) {
   const { get, post, put } = useApi()
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
   const [loading, setLoading] = useState(false)
   const [vacantes, setVacantes] = useState<Vacante[]>([])
   const [currentStep, setCurrentStep] = useState(1)
@@ -83,7 +87,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     email: '',
     telefono: '',
     numero_documento: '',
-    tipo_documento: 'DNI',
+    tipo_documento: isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI',
     fecha_nacimiento: '',
     direccion: '',
     nivel_educacion: 'universitario',
@@ -118,7 +122,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
 
 
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setFormData({
       id_vacante: '',
       nombres: '',
@@ -126,7 +130,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
       email: '',
       telefono: '',
       numero_documento: '',
-      tipo_documento: 'DNI',
+      tipo_documento: isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI',
       fecha_nacimiento: '',
       direccion: '',
       nivel_educacion: 'universitario',
@@ -147,7 +151,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
       modalidad_trabajo_preferida: 'presencial'
     })
     setCurrentStep(1)
-  }
+  }, [isArgentina, isColombia])
 
   useEffect(() => {
     console.log('🚀 CandidatoModal - isOpen:', isOpen, 'candidato:', candidato)
@@ -172,7 +176,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     return () => {
       document.body.style.overflow = 'unset'
     }
-  }, [candidato, isOpen, loadVacantes, vacantesProps])
+  }, [candidato, isOpen, loadVacantes, resetForm, vacantesProps])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -395,7 +399,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
             <div className="text-[0.875rem] text-[#065f46]">
               <strong>📋 Vacante:</strong> {vacanteSeleccionada.titulo} •
               <strong> 🏢 Depto:</strong> {vacanteSeleccionada.departamento} •
-              <strong> 💰 Salario:</strong> S/ {vacanteSeleccionada.salario_min} - S/ {vacanteSeleccionada.salario_max}
+              <strong> 💰 Salario:</strong> {country.simboloMoneda || 'S/'} {vacanteSeleccionada.salario_min} - {country.simboloMoneda || 'S/'} {vacanteSeleccionada.salario_max}
             </div>
           </div>
         )}
@@ -502,7 +506,16 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                       onChange={(e) => handleInputChange('tipo_documento', e.target.value)}
                       className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="DNI">DNI</option>
+                      {isArgentina ? (
+                        <option value="CUIL">CUIL</option>
+                      ) : isColombia ? (
+                        <>
+                          <option value="CC">Cédula de ciudadanía</option>
+                          <option value="TI">Tarjeta de identidad</option>
+                        </>
+                      ) : (
+                        <option value="DNI">DNI</option>
+                      )}
                       <option value="CE">Carnet de Extranjería</option>
                       <option value="PASAPORTE">Pasaporte</option>
                     </select>
@@ -595,7 +608,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                   </div>
 
                   <div>
-                    <label htmlFor="candidato-modal-pretension-salarial" className="block text-sm font-medium text-foreground/85 mb-2">Pretensión salarial (S/)</label>
+                    <label htmlFor="candidato-modal-pretension-salarial" className="block text-sm font-medium text-foreground/85 mb-2">Pretensión salarial ({country.simboloMoneda || 'S/'})</label>
                     <input id="candidato-modal-pretension-salarial"
                       type="number"
                       value={formData.pretension_salarial}

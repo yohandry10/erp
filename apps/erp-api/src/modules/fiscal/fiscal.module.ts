@@ -6,6 +6,7 @@ import { DianFiscalService } from './dian-fiscal.service';
 import { OseApiFiscalService } from './ose-api-fiscal.service';
 import { FiscalServiceFactory } from './fiscal-service.factory';
 import { ColombiaFiscalModule } from './colombia/colombia-fiscal.module';
+import { ArcaFiscalService } from './arca-fiscal.service';
 
 @Module({
   imports: [
@@ -17,12 +18,14 @@ import { ColombiaFiscalModule } from './colombia/colombia-fiscal.module';
     SunatFiscalService,
     DianFiscalService,
     OseApiFiscalService,
+    ArcaFiscalService,
     FiscalServiceFactory
   ],
   exports: [
     SunatFiscalService,
     DianFiscalService,
     OseApiFiscalService,
+    ArcaFiscalService,
     FiscalServiceFactory
   ]
 })

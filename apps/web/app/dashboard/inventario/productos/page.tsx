@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/use-api";
+import { useCountryContext } from "@/hooks/use-country-context";
 import { Package, Plus, Edit, Trash2, Search, Filter } from "lucide-react";
 
 type Producto = {
@@ -35,6 +36,12 @@ type Filters = {
 export default function ProductosPage() {
   const router = useRouter();
   const { get, del } = useApi();
+  const country = useCountryContext();
+  const formatMoney = (value: number) =>
+    new Intl.NumberFormat(country.locale || "es-PE", {
+      style: "currency",
+      currency: country.moneda || "PEN",
+    }).format(value);
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [filters, setFilters] = useState<Filters>({
@@ -297,10 +304,9 @@ export default function ProductosPage() {
                       </td>
                       <td>{producto.categoria || "—"}</td>
                       <td>
-                        S/ {Number(producto.precio_venta || 0).toFixed(2)}
+                        {formatMoney(Number(producto.precio_venta || 0))}
                         <div className="text-xs text-[var(--primary-500)]">
-                          Compra: S/{" "}
-                          {Number(producto.precio_compra || 0).toFixed(2)}
+                          Compra: {formatMoney(Number(producto.precio_compra || 0))}
                         </div>
                       </td>
                       <td className="text-center">

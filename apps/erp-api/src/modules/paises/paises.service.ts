@@ -16,12 +16,13 @@ import {
   LibroContableDto
 } from './paises.dto';
 import {
-  INITIAL_ACTIVE_COUNTRY_CODE,
-  INITIAL_ACTIVE_COUNTRY_ID,
+  ACTIVE_COUNTRY_CODES,
   INITIAL_ACTIVE_COUNTRY_MESSAGE,
   isInitialActiveCountryCode,
   isInitialActiveCountryId,
   normalizeCountryCode,
+  getActiveCountryById,
+  validateCountryTaxId,
 } from './initial-country';
 
 @Injectable()
@@ -44,7 +45,7 @@ export class PaisesService {
     if (!isInitialActiveCountryId(paisId)) {
       throw new NotFoundException(INITIAL_ACTIVE_COUNTRY_MESSAGE);
     }
-    return INITIAL_ACTIVE_COUNTRY_ID;
+    return Number(paisId);
   }
 
   // ========== GESTIÓN DE PAÍSES ==========
@@ -57,7 +58,7 @@ export class PaisesService {
         .from('paises')
         .select('*')
         .eq('activo', true)
-        .eq('codigo_iso', INITIAL_ACTIVE_COUNTRY_CODE)
+        .in('codigo_iso', ACTIVE_COUNTRY_CODES)
         .order('nombre');
 
       if (error) {
@@ -321,8 +322,8 @@ export class PaisesService {
       if (!/^\d+$/.test(documento)) {
         return false;
       }
-      
-      return true;
+      const country = getActiveCountryById(paisId);
+      return country ? validateCountryTaxId(country.codigo, documento) : false;
     } catch (error) {
       this.logger.error('❌ Error validando documento:', error);
       return false;

@@ -1,7 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/lib/api-fetch';
-import { INITIAL_ACTIVE_COUNTRY_CODE, INITIAL_ACTIVE_COUNTRY_ID } from '@/lib/initial-country';
+import {
+  ACTIVE_COUNTRIES,
+  INITIAL_ACTIVE_COUNTRY_CODE,
+  INITIAL_ACTIVE_COUNTRY_ID,
+} from '@/lib/initial-country';
 
 interface CountryContext {
   paisId: number;
@@ -13,6 +17,7 @@ interface CountryContext {
   simboloMoneda: string;
   impuesto: string; // IGV, IVA, etc.
   impuestoRate: number;
+  locale: string;
   requiresSetup: boolean;
   loading: boolean;
 }
@@ -27,6 +32,7 @@ const EMPTY_CONTEXT: CountryContext = {
   simboloMoneda: '',
   impuesto: '',
   impuestoRate: 0,
+  locale: 'es-PE',
   requiresSetup: true,
   loading: false,
 };
@@ -37,23 +43,32 @@ const INITIAL_CONTEXT: CountryContext = {
   loading: true,
 };
 
-// Scope inicial: Peru/SUNAT. CO/CL/MX/EC quedan en roadmap, no en runtime activo.
 const CONTEXT_MAP: Record<string, Omit<CountryContext, 'paisId' | 'paisCodigo' | 'loading' | 'requiresSetup'>> = {
-  [INITIAL_ACTIVE_COUNTRY_CODE]: {
-    paisNombre: 'Perú',
-    servicioFiscal: 'SUNAT',
-    documentoFiscal: 'RUC',
-    moneda: 'PEN',
-    simboloMoneda: 'S/',
-    impuesto: 'IGV (18%)',
-    impuestoRate: 0.18,
-  },
+  ...Object.fromEntries(ACTIVE_COUNTRIES.map((country) => [
+    country.codigo_iso,
+    {
+      paisNombre: country.nombre,
+      servicioFiscal: country.nombre_fiscal,
+      documentoFiscal: country.documento_fiscal,
+      moneda: country.moneda_codigo,
+      simboloMoneda: country.moneda_simbolo,
+      impuesto: `${country.impuesto_nombre} (${country.impuesto_tasa * 100}%)`,
+      impuestoRate: country.impuesto_tasa,
+      locale: country.locale,
+    },
+  ])),
 };
 
 const resolveCurrencySymbol = (currencyCode: string, fallbackSymbol: string) => {
   const normalized = currencyCode.toUpperCase();
   if (normalized === 'PEN') {
     return 'S/';
+  }
+  if (normalized === 'ARS') {
+    return '$';
+  }
+  if (normalized === 'COP') {
+    return '$';
   }
   return normalized || fallbackSymbol;
 };
@@ -64,11 +79,15 @@ function buildCountryContext(empresaConfig: any): CountryContext {
   if (!empresaConfig) return EMPTY_CONTEXT;
 
   const paisId = empresaConfig.pais_id ? Number(empresaConfig.pais_id) : Number(INITIAL_ACTIVE_COUNTRY_ID);
-  const paisCodigo = typeof empresaConfig.pais === 'string'
-    ? empresaConfig.pais.toUpperCase()
+  const configuredCode = typeof empresaConfig.paisCodigo === 'string'
+    ? empresaConfig.paisCodigo
+    : empresaConfig.pais;
+  const paisCodigo = typeof configuredCode === 'string'
+    ? configuredCode.toUpperCase()
     : INITIAL_ACTIVE_COUNTRY_CODE;
-  const monedaDefecto = typeof empresaConfig.monedaDefecto === 'string'
-    ? empresaConfig.monedaDefecto.toUpperCase()
+  const rawCurrency = empresaConfig.monedaDefecto ?? empresaConfig.moneda;
+  const monedaDefecto = typeof rawCurrency === 'string'
+    ? rawCurrency.toUpperCase()
     : '';
 
   if (!paisId || !paisCodigo) return EMPTY_CONTEXT;
@@ -112,7 +131,10 @@ export function useCountryContext(): CountryContext {
   const { session } = useAuth();
 
   const { data, isLoading } = useQuery({
-    queryKey: COUNTRY_CONTEXT_QUERY_KEY,
+    // El tenant forma parte de la identidad del dato. Sin este segmento, al
+    // cerrar una demo PE y entrar a una AR en la misma pestaña React Query
+    // reutilizaba durante cinco minutos el país del tenant anterior.
+    queryKey: [...COUNTRY_CONTEXT_QUERY_KEY, session?.user?.tenant_id ?? 'anonymous'],
     queryFn: fetchCountryContext,
     select: buildCountryContext,
     enabled: !!session, // no llamar si aún no hay sesión hidratada

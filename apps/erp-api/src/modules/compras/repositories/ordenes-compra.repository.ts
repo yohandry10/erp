@@ -23,6 +23,12 @@ export class OrdenesCompraRepository {
     totales?: { subtotal: number; igv: number; total: number }
   ) {
     const supabase = this.supabaseService.getClient();
+    const { data: empresaConfig } = await supabase
+      .from('empresa_config')
+      .select('moneda_defecto')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    const monedaDefecto = String(empresaConfig?.moneda_defecto || 'PEN').toUpperCase();
 
     // ✅ SRP: Los totales deben venir calculados desde el servicio
     // Si no se proporcionan, calcularlos aquí como fallback (pero el servicio debería enviarlos)
@@ -71,7 +77,7 @@ export class OrdenesCompraRepository {
             : new Date(createDto.fecha_entrega_esperada).toISOString().split('T')[0])
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Default: 30 days from now
       items: items, // JSONB array of items
-      moneda: 'PEN', // Default currency
+      moneda: (createDto as any).moneda || monedaDefecto,
       estado: createDto.estado || 'PENDIENTE',
       subtotal,
       igv,

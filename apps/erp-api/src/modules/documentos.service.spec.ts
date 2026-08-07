@@ -120,6 +120,14 @@ describe('DocumentosService', () => {
             data: '00000001',
             error: null,
         });
+        mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+            data: {
+                pais: 'PE',
+                moneda_defecto: 'PEN',
+                ruc: '20123456789',
+            },
+            error: null,
+        });
 
         mockSupabaseClient.single
             .mockResolvedValueOnce({
@@ -274,6 +282,59 @@ describe('DocumentosService', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('dígito verificador');
+    });
+
+    it('usa CUIT y validación argentina cuando el tenant es AR', async () => {
+      jest.spyOn(service as any, 'obtenerContextoPaisTenant').mockResolvedValue({
+        pais: 'AR',
+        moneda: 'ARS',
+        ruc: '30710158229',
+      });
+
+      const valid = await service.validarRUC('20301234563', 'tenant-ar');
+      const invalid = await service.validarRUC('20301234564', 'tenant-ar');
+
+      expect(valid).toEqual(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          cuit: '20301234563',
+          consulta_arca: false,
+          fuente: 'VALIDACION_LOCAL',
+        }),
+      }));
+      expect(valid.data).not.toHaveProperty('consulta_sunat');
+      expect(invalid.success).toBe(false);
+      expect(invalid.error).toContain('CUIT');
+    });
+  });
+
+  describe('documentos fiscales Argentina', () => {
+    beforeEach(() => {
+      jest.spyOn(service as any, 'obtenerContextoPaisTenant').mockResolvedValue({
+        pais: 'AR',
+        moneda: 'ARS',
+        ruc: '30710158229',
+      });
+    });
+
+    it('exige CUIT válido para factura y no aplica el umbral peruano de boleta', async () => {
+      const factura = await service.validarDocumento({
+        tipo_documento: 'FACTURA',
+        receptor_numero_doc: '20301234564',
+        receptor_razon_social: 'Cliente Argentina',
+        total: 1000,
+      }, 'tenant-ar');
+      const comprobanteB = await service.validarDocumento({
+        tipo_documento: 'BOLETA',
+        receptor_numero_doc: '99999999',
+        receptor_razon_social: 'Consumidor final',
+        total: 1000,
+      }, 'tenant-ar');
+
+      expect(factura.data.valido).toBe(false);
+      expect(factura.data.errores.join(' ')).toContain('CUIT');
+      expect(comprobanteB.data.valido).toBe(true);
+      expect(comprobanteB.data.errores.join(' ')).not.toContain('S/ 700');
     });
   });
 

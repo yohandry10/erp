@@ -18,6 +18,7 @@ import Decimal from 'decimal.js';
 import { PosAuditService, TipoEventoPOS } from './services/pos-audit.service';
 import { ConfigService } from '@nestjs/config';
 import { toPostgresBytea } from '../../shared/utils/certificate.utils';
+import { validateColombiaNit } from '../paises/initial-country';
 
 @Injectable()
 export class PosService {
@@ -716,7 +717,7 @@ export class PosService {
       // Validar config de empresa antes de crear venta (hard-stop CPE)
       const { data: empresaCfg, error: empresaCfgErr } = await this.supabase.getClient()
         .from('empresa_config')
-        .select('ruc, razon_social, moneda_defecto, igv_porcentaje, serie_factura, serie_boleta')
+        .select('ruc, razon_social, moneda_defecto, igv_porcentaje, serie_factura, serie_boleta, pais, pais_id, arca_punto_venta')
         .eq('tenant_id', user.tenant_id)
         .single();
       if (empresaCfgErr) {
@@ -804,7 +805,7 @@ export class PosService {
       // cajero cobraría la venta y recién después descubriría que le falta el DNI,
       // con el cliente ya fuera de la tienda y la venta sin comprobante.
       const tipoComprobanteSolicitado = String(ventaData?.comprobante?.tipo || '03').trim();
-      if (tipoComprobanteSolicitado === '03' && totalCalculado > 700) {
+      if (empresaCfg?.pais === 'PE' && tipoComprobanteSolicitado === '03' && totalCalculado > 700) {
         const documentoCliente = String(ventaData?.cliente_documento ?? '').trim();
         const nombreCliente = String(ventaData?.cliente_nombre ?? '').trim();
         if (!documentoCliente || /^9+$/.test(documentoCliente) || !nombreCliente) {
@@ -820,6 +821,7 @@ export class PosService {
         codigo: string;
         tipo: string;
         monto: number;
+        moneda: string;
         referencia?: string | null;
         metodo_pago_id?: string | null;
       }> | null = null;
@@ -843,6 +845,7 @@ export class PosService {
             codigo: metodoInfo.codigo,
             tipo: metodoInfo.tipo,
             monto: montoPago,
+            moneda: empresaCfg.moneda_defecto || 'PEN',
             referencia: pago?.referencia ?? null,
             metodo_pago_id: metodoInfo.id,
           });
@@ -872,7 +875,13 @@ export class PosService {
       }
 
       // Normalizar datos de comprobante para validaciones SUNAT
-      const serie = ventaData?.comprobante?.serie || 'T001';
+      const serie = ventaData?.comprobante?.serie || (
+        empresaCfg?.pais === 'AR'
+          ? String(empresaCfg.arca_punto_venta || 1).padStart(5, '0')
+          : empresaCfg?.pais === 'CO'
+            ? String(empresaCfg.serie_factura || 'FE')
+            : 'T001'
+      );
       const correlativo = ventaData?.comprobante?.correlativo || String(Date.now()).slice(-8);
       const tipoDocumento = ventaData?.comprobante?.tipo || '03'; // Boleta por defecto
       const numeroComprobante = ventaData?.numero_comprobante
@@ -887,27 +896,36 @@ export class PosService {
         numero: numeroComprobante,
       };
 
-      if (tipoDocumento === '01' && !/^\d{11}$/.test(String(ventaData.cliente_documento || '').trim())) {
+      const documentoClienteFactura = String(ventaData.cliente_documento || '').trim();
+      const documentoFacturaValido =
+        empresaCfg?.pais === 'AR'
+          ? /^\d{11}$/.test(documentoClienteFactura)
+          : empresaCfg?.pais === 'CO'
+            ? validateColombiaNit(documentoClienteFactura)
+            : /^\d{11}$/.test(documentoClienteFactura);
+      if (tipoDocumento === '01' && !documentoFacturaValido) {
+        const documentoFiscal = empresaCfg?.pais === 'AR' ? 'CUIT' : empresaCfg?.pais === 'CO' ? 'NIT' : 'RUC';
         return {
           success: false,
-          message: 'Factura requiere RUC válido de 11 dígitos',
+          message: `Factura requiere ${documentoFiscal} válido`,
           error: {
             tipo: 'VALIDATION_ERROR',
-            codigo: 'FACTURA_REQUIERE_RUC',
-            mensaje: 'Proporcione un RUC válido (11 dígitos) para emitir factura',
+            codigo: `FACTURA_REQUIERE_${documentoFiscal}`,
+            mensaje: `Proporcione un ${documentoFiscal} válido para emitir factura`,
           },
         };
       }
 
       const totalItemsDocumento = recomputed.reduce((sum, item) => sum + Number(item.cantidad ?? 0), 0);
-      if (totalItemsDocumento > 999) {
+      const maxItemsDocumento = empresaCfg?.pais === 'CO' ? 1000 : 999;
+      if (totalItemsDocumento > maxItemsDocumento) {
         return {
           success: false,
-          message: 'No se puede completar la venta: el comprobante supera 999 items',
+          message: `No se puede completar la venta: el comprobante supera ${maxItemsDocumento} items`,
           error: {
             tipo: 'VALIDATION_ERROR',
             codigo: 'DOCUMENT_ITEM_LIMIT',
-            mensaje: 'SUNAT permite como máximo 999 items por comprobante',
+            mensaje: `${empresaCfg?.pais === 'CO' ? 'DIAN' : 'SUNAT'} permite como máximo ${maxItemsDocumento} items por comprobante`,
           }
         };
       }
@@ -1017,6 +1035,7 @@ export class PosService {
             codigo: p.codigo,
             tipo: p.tipo,
             monto: p.monto,
+            moneda: p.moneda,
             referencia: p.referencia,
             metodo_pago_id: p.metodo_pago_id,
           }))
@@ -1369,7 +1388,7 @@ export class PosService {
               subtotal: Number((subtotalCalculado * ratio).toFixed(2)),
               impuestos: Number((impuestosCalculados * ratio).toFixed(2)),
               total: Number(creditoMonto.toFixed(2)),
-              moneda: 'PEN',
+              moneda: empresaCfg.moneda_defecto || 'PEN',
               fechaEmision: fechaEmision.toISOString(),
               fechaVencimiento: fechaVencimiento.toISOString(),
               idempotencyKey: `pos.cxc:${user.tenant_id}:${ventaIdempotencyKey}`,

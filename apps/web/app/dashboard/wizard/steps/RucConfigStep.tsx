@@ -41,13 +41,19 @@ export function RucConfigStep() {
           <Input
             id="ruc"
             type="text"
-            placeholder="Ej: 20123456789"
+            placeholder={country.paisCodigo === 'AR'
+              ? 'Ej: 30710158229'
+              : country.paisCodigo === 'CO'
+                ? 'Ej: 900123456-8'
+                : 'Ej: 20123456789'}
             value={state.configuration.ruc}
             onChange={(e) => handleInputChange('ruc', e.target.value)}
             maxLength={11} className="text-base"
           />
           <p className="text-xs text-[var(--primary-500)] mt-1">
-            Debe tener 11 dígitos.
+            {country.paisCodigo === 'CO'
+              ? 'Ingresa el NIT con su dígito de verificación.'
+              : 'Debe tener 11 dígitos.'}
           </p>
         </div>
 
@@ -58,7 +64,11 @@ export function RucConfigStep() {
           <Input
             id="razonSocial"
             type="text"
-            placeholder="Ej: EMPRESA EJEMPLO S.A.C."
+            placeholder={country.paisCodigo === 'AR'
+              ? 'Ej: EMPRESA EJEMPLO S.A.'
+              : country.paisCodigo === 'CO'
+                ? 'Ej: EMPRESA EJEMPLO S.A.S.'
+                : 'Ej: EMPRESA EJEMPLO S.A.C.'}
             value={state.configuration.razonSocial}
             onChange={(e) => handleInputChange('razonSocial', e.target.value)} className="text-base"
           />
@@ -74,7 +84,11 @@ export function RucConfigStep() {
           <Input
             id="direccion"
             type="text"
-            placeholder="Ej: Av. Principal 123, Lima, Lima"
+            placeholder={country.paisCodigo === 'AR'
+              ? 'Ej: Av. Corrientes 1234, CABA'
+              : country.paisCodigo === 'CO'
+                ? 'Ej: Carrera 7 # 72-41, Bogotá D.C.'
+                : 'Ej: Av. Principal 123, Lima, Lima'}
             value={state.configuration.direccion}
             onChange={(e) => handleInputChange('direccion', e.target.value)} className="text-base"
           />

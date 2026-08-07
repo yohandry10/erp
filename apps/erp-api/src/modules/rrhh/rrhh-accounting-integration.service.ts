@@ -5,6 +5,8 @@ export interface AsientoPlanilla {
   tenantId: string;
   planillaId: string;
   periodo: string;
+  pais?: 'PE' | 'AR' | 'CO';
+  moneda?: 'PEN' | 'ARS' | 'COP';
   totalIngresos: number;
   totalDescuentos: number;
   totalAportes: number;
@@ -101,8 +103,11 @@ export class RrhhAccountingIntegrationService {
       if (detallesError) throw detallesError;
 
       this.logger.debug(`✅ Asiento contable creado: ${asientoCreado.codigo ?? asientoCreado.numero_asiento ?? asientoCreado.id}`);
-      this.logger.debug(`   📊 Total Debe: S/ ${planillaData.totalIngresos + planillaData.totalAportes}`);
-      this.logger.debug(`   📊 Total Haber: S/ ${planillaData.totalIngresos + planillaData.totalAportes}`);
+      const moneda =
+        planillaData.moneda ||
+        (planillaData.pais === 'AR' ? 'ARS' : planillaData.pais === 'CO' ? 'COP' : 'PEN');
+      this.logger.debug(`   📊 Total Debe (${moneda}): ${planillaData.totalIngresos + planillaData.totalAportes}`);
+      this.logger.debug(`   📊 Total Haber (${moneda}): ${planillaData.totalIngresos + planillaData.totalAportes}`);
 
       return asientoCreado.id;
     } catch (error) {
@@ -112,10 +117,12 @@ export class RrhhAccountingIntegrationService {
   }
 
   /**
-   * Genera los detalles del asiento contable según normativa peruana
+   * Genera los detalles del asiento contable con etiquetas del país laboral.
    */
   private generarDetallesAsiento(planillaData: AsientoPlanilla): any[] {
     const detalles = [];
+    const esArgentina = planillaData.pais === 'AR';
+    const esColombia = planillaData.pais === 'CO';
 
     // 1. DEBE: Gasto por Sueldos y Salarios (Cuenta 621)
     if (planillaData.totalIngresos > 0) {
@@ -135,7 +142,11 @@ export class RrhhAccountingIntegrationService {
         cuentaNombre: 'Seguridad y Prevision Social',
         debe: planillaData.totalAportes,
         haber: 0,
-        descripcion: `ESSALUD y aportes empleador ${planillaData.periodo}`
+        descripcion: esArgentina
+          ? `Contribuciones patronales, obra social y ART ${planillaData.periodo}`
+          : esColombia
+            ? `Aportes patronales PILA, parafiscales y provisiones ${planillaData.periodo}`
+          : `ESSALUD y aportes empleador ${planillaData.periodo}`
       });
     }
 
@@ -150,25 +161,33 @@ export class RrhhAccountingIntegrationService {
       });
     }
 
-    // 4. HABER: Tributos por Pagar - AFP/ONP (Cuenta 403)
+    // 4. HABER: aportes y retenciones del trabajador (Cuenta 403)
     if (planillaData.totalDescuentos > 0) {
       detalles.push({
         cuentaCodigo: '403',
         cuentaNombre: 'Instituciones Publicas',
         debe: 0,
         haber: planillaData.totalDescuentos,
-        descripcion: `AFP/ONP descuentos ${planillaData.periodo}`
+        descripcion: esArgentina
+          ? `SIPA, INSSJP, obra social y retenciones ${planillaData.periodo}`
+          : esColombia
+            ? `Salud, pension, solidaridad y retenciones PILA ${planillaData.periodo}`
+          : `AFP/ONP descuentos ${planillaData.periodo}`
       });
     }
 
-    // 5. HABER: ESSALUD por Pagar (Cuenta 407)
+    // 5. HABER: aportes patronales por pagar (Cuenta 407)
     if (planillaData.totalAportes > 0) {
       detalles.push({
         cuentaCodigo: '407',
         cuentaNombre: 'Administradoras de Fondos',
         debe: 0,
         haber: planillaData.totalAportes,
-        descripcion: `ESSALUD por pagar ${planillaData.periodo}`
+        descripcion: esArgentina
+          ? `Contribuciones patronales y ART por pagar ${planillaData.periodo}`
+          : esColombia
+            ? `Salud, pension, ARL, caja y parafiscales por pagar ${planillaData.periodo}`
+          : `ESSALUD por pagar ${planillaData.periodo}`
       });
     }
 
@@ -268,11 +287,21 @@ export class RrhhAccountingIntegrationService {
       const fechaAsiento = new Date().toISOString();
       const tenantId = liquidacion.tenant_id;
 
+      const esArgentina = String(liquidacion.pais_codigo || 'PE').toUpperCase() === 'AR';
+
       // Detalles del asiento de liquidación (sin asiento_id aún)
       const detallesLiquidacion = [];
 
-      // DEBE: Provisiones CTS
-      if (liquidacion.monto_cts > 0) {
+      // Argentina liquida indemnización, preaviso, integración, SAC y vacaciones
+      // como un total normativo ya calculado. Perú conserva el desglose CTS.
+      if (esArgentina && liquidacion.total_liquidacion > 0) {
+        detallesLiquidacion.push({
+          cuenta_id: '629',
+          debe: liquidacion.total_liquidacion,
+          haber: 0,
+          concepto: `Liquidación final argentina ${liquidacion.empleados.nombres}`
+        });
+      } else if (liquidacion.monto_cts > 0) {
         detallesLiquidacion.push({
           cuenta_id: '415', // Beneficios Sociales de los Trabajadores por Pagar
           debe: liquidacion.monto_cts,
@@ -282,7 +311,7 @@ export class RrhhAccountingIntegrationService {
       }
 
       // DEBE: Indemnización
-      if (liquidacion.indemnizacion > 0) {
+      if (!esArgentina && liquidacion.indemnizacion > 0) {
         detallesLiquidacion.push({
           cuenta_id: '629', // Beneficios Sociales de los Trabajadores
           debe: liquidacion.indemnizacion,

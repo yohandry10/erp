@@ -142,28 +142,29 @@ async function ensurePrimaryAuditPermission(): Promise<void> {
     .eq('role_id', role!.id)
     .maybeSingle();
   expect(existingError?.message || '', 'consultar rol AUDITOR del principal CASE19').toBe('');
-  if (existing) return;
-
-  const { error: insertError } = await supabase.from('user_roles').insert({
-    id: crypto.randomUUID(),
-    tenant_id: user!.tenant_id,
-    usuario_sistema_id: user!.id,
-    role_id: role!.id,
-  });
-  expect(insertError?.message || '', 'asignar AUDITOR efímero al principal CASE19').toBe('');
-  ephemeralAuditRoleAssignment = { userId: user!.id, roleId: role!.id };
+  if (!existing) {
+    const { error: insertError } = await supabase.from('user_roles').insert({
+      id: crypto.randomUUID(),
+      tenant_id: user!.tenant_id,
+      usuario_sistema_id: user!.id,
+      role_id: role!.id,
+    });
+    expect(insertError?.message || '', 'asignar AUDITOR efímero al principal CASE19').toBe('');
+    ephemeralAuditRoleAssignment = { userId: user!.id, roleId: role!.id };
+  }
 }
 
 async function restorePrimaryAuditPermission(): Promise<void> {
-  if (!ephemeralAuditRoleAssignment) return;
-  const supabase = getSupabase();
-  const { error } = await supabase
-    .from('user_roles')
-    .delete()
-    .eq('usuario_sistema_id', ephemeralAuditRoleAssignment.userId)
-    .eq('role_id', ephemeralAuditRoleAssignment.roleId);
-  expect(error?.message || '', 'retirar AUDITOR efímero del principal CASE19').toBe('');
-  ephemeralAuditRoleAssignment = null;
+  if (ephemeralAuditRoleAssignment) {
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from('user_roles')
+      .delete()
+      .eq('usuario_sistema_id', ephemeralAuditRoleAssignment.userId)
+      .eq('role_id', ephemeralAuditRoleAssignment.roleId);
+    expect(error?.message || '', 'retirar AUDITOR efímero del principal CASE19').toBe('');
+    ephemeralAuditRoleAssignment = null;
+  }
 }
 
 async function insertRole(supabase: SupabaseClient, tenantId: string) {

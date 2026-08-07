@@ -11,8 +11,21 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContractFormDialog } from './ContractFormDialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 const ContratosPage = () => {
+  const country = useCountryContext();
+  const isArgentina = country.paisCodigo === 'AR';
+  const isColombia = country.paisCodigo === 'CO';
+  const currencySymbol = country.simboloMoneda || 'S/';
+  const locale = country.locale || 'es-PE';
+  const contractTypes = isArgentina
+    ? ['indefinido', 'plazo_fijo', 'temporada', 'eventual']
+    : isColombia
+      ? ['indefinido', 'fijo', 'obra_labor', 'prestacion_servicios']
+      : ['indefinido', 'temporal', 'practicas', 'locacion_servicios'];
+  const isActiveContract = (contrato: any) =>
+    ['activo', 'vigente'].includes(String(contrato?.estado || '').toLowerCase());
   const [contratos, setContratos] = useState<any[]>([]);
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [filtroEstado, setFiltroEstado] = useState('todos');
@@ -67,16 +80,24 @@ const ContratosPage = () => {
       setLoading(true);
 
       // Cargar contratos
-      const contratosData = await get('/api/rrhh/contratos');
-      if (contratosData && Array.isArray(contratosData)) {
-        setContratos(contratosData);
-      }
+      const contratosData = await get('/rrhh/contratos');
+      setContratos(
+        contratosData?.success && Array.isArray(contratosData.data)
+          ? contratosData.data
+          : Array.isArray(contratosData)
+            ? contratosData
+            : [],
+      );
 
       // Cargar empleados
-      const empleadosData = await get('/api/rrhh/empleados');
-      if (empleadosData && Array.isArray(empleadosData)) {
-        setEmpleados(empleadosData);
-      }
+      const empleadosData = await get('/rrhh/empleados');
+      setEmpleados(
+        empleadosData?.success && Array.isArray(empleadosData.data)
+          ? empleadosData.data
+          : Array.isArray(empleadosData)
+            ? empleadosData
+            : [],
+      );
     } catch (error) {
       console.error('Error cargando contratos:', error);
     } finally {
@@ -156,7 +177,9 @@ const ContratosPage = () => {
     let filtrados = contratos;
 
     if (filtroEstado !== 'todos') {
-      filtrados = filtrados.filter(c => c.estado === filtroEstado);
+      filtrados = filtrados.filter(c =>
+        filtroEstado === 'activo' ? isActiveContract(c) : c.estado === filtroEstado,
+      );
     }
 
     if (filtroTipo !== 'todos') {
@@ -181,6 +204,9 @@ const ContratosPage = () => {
     const colores: Record<string, string> = {
       'indefinido': 'bg-primary/10 text-primary',
       'temporal': 'bg-amber-500/10 text-amber-400',
+      'fijo': 'bg-amber-500/10 text-amber-400',
+      'obra_labor': 'bg-violet-500/10 text-violet-400',
+      'prestacion_servicios': 'bg-violet-500/10 text-violet-400',
       'practicas': 'bg-violet-500/10 text-violet-400',
       'locacion_servicios': 'bg-violet-500/10 text-violet-400'
     };
@@ -189,7 +215,7 @@ const ContratosPage = () => {
 
   const calcularEstadisticas = () => {
     const total = contratos.length;
-    const activos = contratos.filter(c => c.estado === 'activo').length;
+    const activos = contratos.filter(isActiveContract).length;
     const vencidos = contratos.filter(c => c.estado === 'vencido').length;
     const porVencer = contratos.filter(c => {
       if (!c.fecha_fin) return false;
@@ -331,10 +357,9 @@ const ContratosPage = () => {
             <SelectTrigger id="filtro-tipo-contratos" aria-label="Filtrar contratos por tipo"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="indefinido">Indefinido</SelectItem>
-              <SelectItem value="temporal">Temporal</SelectItem>
-              <SelectItem value="practicas">Prácticas</SelectItem>
-              <SelectItem value="locacion_servicios">Locación Servicios</SelectItem>
+              {contractTypes.map((tipo) => (
+                <SelectItem key={tipo} value={tipo}>{tipo.replace(/_/g, ' ').toUpperCase()}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -382,9 +407,9 @@ const ContratosPage = () => {
                         {contrato.tipo_contrato?.replace('_', ' ').toUpperCase() || 'N/A'}
                       </span>
                     </td>
-                    <td className="text-right font-medium">S/ {(contrato.salario || 0).toLocaleString()}</td>
-                    <td>{parseDateLocal(contrato.fecha_inicio).toLocaleDateString('es-PE')}</td>
-                    <td>{contrato.fecha_fin ? parseDateLocal(contrato.fecha_fin).toLocaleDateString('es-PE') : 'Indefinido'}</td>
+                    <td className="text-right font-medium">{currencySymbol} {(contrato.salario || 0).toLocaleString(locale)}</td>
+                    <td>{parseDateLocal(contrato.fecha_inicio).toLocaleDateString(locale)}</td>
+                    <td>{contrato.fecha_fin ? parseDateLocal(contrato.fecha_fin).toLocaleDateString(locale) : 'Indefinido'}</td>
                     <td className={alertaVencimiento}>
                       {diasRestantes !== null ? (
                         diasRestantes < 0 ?
@@ -407,7 +432,7 @@ const ContratosPage = () => {
                           📄
                         </button>
 
-                        {contrato.estado === 'activo' && (
+                        {isActiveContract(contrato) && (
                           <>
                             <button
                               onClick={() => renovarContrato(contrato.id)}
@@ -483,9 +508,9 @@ const ContratosPage = () => {
               </tr>
             </thead>
             <tbody>
-              {['indefinido', 'temporal', 'practicas', 'locacion_servicios'].map(tipo => {
+              {contractTypes.map(tipo => {
                 const contratosTipo = contratos.filter(c => c.tipo_contrato === tipo);
-                const activos = contratosTipo.filter(c => c.estado === 'activo').length;
+                const activos = contratosTipo.filter(isActiveContract).length;
                 const vencidos = contratosTipo.filter(c => c.estado === 'vencido').length;
                 const salarioPromedio = contratosTipo.length > 0
                   ? contratosTipo.reduce((sum, c) => sum + (c.salario || 0), 0) / contratosTipo.length
@@ -501,7 +526,7 @@ const ContratosPage = () => {
                     <td className="text-center">{contratosTipo.length}</td>
                     <td className="text-center text-emerald-400">{activos}</td>
                     <td className="text-center text-destructive">{vencidos}</td>
-                    <td className="text-right">S/ {salarioPromedio.toLocaleString()}</td>
+                    <td className="text-right">{currencySymbol} {salarioPromedio.toLocaleString(locale)}</td>
                   </tr>
                 );
               })}
@@ -636,7 +661,7 @@ const ContratosPage = () => {
                       SALARIO MENSUAL
                     </label>
                     <div className="text-2xl font-bold text-emerald-400 dark:text-emerald-400">
-                      S/ {(contratoDetail.salario || 0).toLocaleString('es-PE')}
+                      {currencySymbol} {(contratoDetail.salario || 0).toLocaleString(locale)}
                     </div>
                   </div>
                   <div>

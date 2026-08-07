@@ -1,6 +1,9 @@
+'use client'
+
 import { AlertCircle, Building2, CheckCircle, CreditCard, DollarSign, Edit, Eye, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface CuentaBancaria {
   id: string
@@ -28,13 +31,7 @@ const TIPO_CUENTA_LABELS: Record<string, string> = {
 }
 
 export default function CuentaBancariaCard({ cuenta, onView, onEdit }: CuentaBancariaCardProps) {
-  const formatCurrency = (amount: number, moneda: string = 'PEN') => {
-    const currency = moneda === 'USD' ? 'USD' : moneda === 'EUR' ? 'EUR' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency,
-    }).format(amount)
-  }
+  const { formatCurrency } = useLocalizedMoney()
 
   return (
     <Card className="overflow-hidden border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">

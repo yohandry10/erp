@@ -5,15 +5,16 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { CreateProveedorDto } from '@/types/compras'
 import { Building2, Mail, Phone, MapPin, User, CreditCard, Calendar } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 // Validation schema matching backend DTO
 const proveedorSchema = z.object({
   ruc: z.string()
-    .min(1, 'El RUC es requerido')
-    .regex(/^\d+$/, 'El RUC debe contener solo números')
-    .refine((val) => val.length === 11, {
-      message: 'El RUC debe tener 11 dígitos'
-    }),
+    .min(1, 'El identificador fiscal es requerido')
+    .regex(
+      /^(?:\d{10,11}|\d{9,10}-\d)$/,
+      'Use el formato fiscal correspondiente al país (RUC, CUIT o NIT con dígito de verificación)',
+    ),
   razon_social: z.string()
     .min(3, 'La razón social debe tener al menos 3 caracteres')
     .max(200, 'La razón social debe tener máximo 200 caracteres'),
@@ -65,6 +66,9 @@ export function ProveedorForm({
   isLoading = false,
   submitLabel = 'Guardar Proveedor'
 }: ProveedorFormProps) {
+  const country = useCountryContext()
+  const taxIdLabel =
+    country.paisCodigo === 'AR' ? 'CUIT' : country.paisCodigo === 'CO' ? 'NIT' : 'RUC'
   const {
     register,
     handleSubmit,
@@ -105,12 +109,12 @@ export function ProveedorForm({
           {/* RUC */}
           <div>
             <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
-              RUC <span className="text-red-500">*</span>
+              {taxIdLabel} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               {...register('ruc')}
-              placeholder="20123456789" className="w-[100%] p-3 rounded-lg text-[0.875rem]"
+              placeholder={country.paisCodigo === 'AR' ? '30710158229' : country.paisCodigo === 'CO' ? '900123456-8' : '20123456789'} className="w-[100%] p-3 rounded-lg text-[0.875rem]"
             />
             {errors.ruc && (
               <p className="text-red-500 text-xs mt-1">
@@ -127,7 +131,7 @@ export function ProveedorForm({
             <input
               type="text"
               {...register('razon_social')}
-              placeholder="DISTRIBUIDORA ABC S.A.C." className="w-[100%] p-3 rounded-lg text-[0.875rem]"
+              placeholder={country.paisCodigo === 'CO' ? 'DISTRIBUIDORA ABC S.A.S.' : country.paisCodigo === 'AR' ? 'DISTRIBUIDORA ABC S.A.' : 'DISTRIBUIDORA ABC S.A.C.'} className="w-[100%] p-3 rounded-lg text-[0.875rem]"
             />
             {errors.razon_social && (
               <p className="text-red-500 text-xs mt-1">
@@ -214,7 +218,7 @@ export function ProveedorForm({
               <input
                 type="text"
                 {...register('telefono')}
-                placeholder="+51 999 888 777" className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-lg text-[0.875rem]"
+                placeholder={country.paisCodigo === 'CO' ? '+57 300 123 4567' : country.paisCodigo === 'AR' ? '+54 11 5555 5555' : '+51 999 888 777'} className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-lg text-[0.875rem]"
               />
             </div>
             {errors.telefono && (
@@ -235,7 +239,7 @@ export function ProveedorForm({
               />
               <textarea
                 {...register('direccion')}
-                placeholder="Av. Principal 123, Lima"
+                placeholder={country.paisCodigo === 'CO' ? 'Carrera 7 # 72-41, Bogotá D.C.' : country.paisCodigo === 'AR' ? 'Av. Corrientes 1234, CABA' : 'Av. Principal 123, Lima'}
                 rows={2} className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-lg text-[0.875rem]"
               />
             </div>
@@ -281,7 +285,7 @@ export function ProveedorForm({
           {/* Límite de Crédito */}
           <div>
             <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
-              Límite de Crédito (PEN)
+              Límite de Crédito ({country.moneda})
             </label>
             <input
               type="number"

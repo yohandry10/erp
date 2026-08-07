@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useCountryContext } from "@/hooks/use-country-context";
 
 interface PlanillaCalcularModalProps {
   isOpen: boolean;
@@ -27,6 +28,8 @@ interface EmpleadoPlanilla {
   dias_trabajados: number;
   horas_extras_25: number;
   horas_extras_35: number;
+  horas_recargo_nocturno: number;
+  horas_dominicales_festivas: number;
   tardanzas_minutos: number;
   faltas: number;
   bonos_adicionales: number;
@@ -50,6 +53,10 @@ export default function PlanillaCalcularModal({
   planilla,
 }: PlanillaCalcularModalProps) {
   const { get, post } = useApi();
+  const country = useCountryContext();
+  const isArgentina = country.paisCodigo === "AR";
+  const isColombia = country.paisCodigo === "CO";
+  const currencySymbol = country.simboloMoneda || "S/";
   const [loading, setLoading] = useState(false);
   const [empleados, setEmpleados] = useState<EmpleadoPlanilla[]>([]);
   const [calculando, setCalculando] = useState(false);
@@ -76,6 +83,8 @@ export default function PlanillaCalcularModal({
             dias_trabajados: 30,
             horas_extras_25: 0,
             horas_extras_35: 0,
+            horas_recargo_nocturno: 0,
+            horas_dominicales_festivas: 0,
             tardanzas_minutos: 0,
             faltas: 0,
             bonos_adicionales: 0,
@@ -99,7 +108,11 @@ export default function PlanillaCalcularModal({
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  // calcularEmpleado se ejecuta únicamente al invocar este callback y usa el
+  // país vigente del mismo render; se mantiene aquí para evitar recrear toda
+  // la carga por cada edición manual de una fila.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [get, isArgentina, isColombia]);
 
   useEffect(() => {
     if (isOpen && planilla) {
@@ -116,16 +129,24 @@ export default function PlanillaCalcularModal({
 
   const calcularEmpleado = (empleado: EmpleadoPlanilla): EmpleadoPlanilla => {
     const sueldoDiario = empleado.sueldo_base / 30;
-    const valorHora = empleado.sueldo_base / 30 / 8;
+    const valorHora = isArgentina
+      ? empleado.sueldo_base / 200
+      : isColombia
+        ? empleado.sueldo_base / 210
+        : empleado.sueldo_base / 30 / 8;
 
     // Descuentos
     const descuentoTardanzas = (empleado.tardanzas_minutos * valorHora) / 60;
     const descuentoFaltas = empleado.faltas * sueldoDiario;
 
     // Horas extras
-    const pagoHorasExtras25 = empleado.horas_extras_25 * valorHora * 1.25;
-    const pagoHorasExtras35 = empleado.horas_extras_35 * valorHora * 1.35;
-    const pagoHorasExtras = pagoHorasExtras25 + pagoHorasExtras35;
+    const pagoHorasExtras25 =
+      empleado.horas_extras_25 * valorHora * (isArgentina ? 1.5 : 1.25);
+    const pagoHorasExtras35 =
+      empleado.horas_extras_35 * valorHora * (isArgentina ? 2 : isColombia ? 1.75 : 1.35);
+    const pagoRecargoNocturno = isColombia ? empleado.horas_recargo_nocturno * valorHora * 0.35 : 0;
+    const pagoDominicalFestivo = isColombia ? empleado.horas_dominicales_festivas * valorHora * 0.9 : 0;
+    const pagoHorasExtras = pagoHorasExtras25 + pagoHorasExtras35 + pagoRecargoNocturno + pagoDominicalFestivo;
 
     // Total ingresos
     const totalIngresos =
@@ -136,10 +157,15 @@ export default function PlanillaCalcularModal({
       descuentoFaltas;
 
     // Descuentos legales
-    const afpOnp = totalIngresos * 0.1; // 10% AFP/ONP aproximado
-    const essalud = totalIngresos * 0.09; // 9% EsSalud (empleador, pero se muestra)
-    const impuestoRenta =
-      totalIngresos > 2300 ? (totalIngresos - 2300) * 0.08 : 0; // Impuesto 5ta categoría
+    const afpOnp = totalIngresos * (isArgentina ? 0.17 : isColombia ? 0.08 : 0.1);
+    const essalud = totalIngresos * (isArgentina ? 0.18 : isColombia ? 0.30022 : 0.09);
+    // Ganancias Argentina se toma de SiRADIG/backend; no se inventa una
+    // retención en la vista previa.
+    const impuestoRenta = isArgentina || isColombia
+      ? 0
+      : totalIngresos > 2300
+        ? (totalIngresos - 2300) * 0.08
+        : 0;
 
     const totalDescuentos = afpOnp + impuestoRenta;
     const netoPagar = totalIngresos - totalDescuentos;
@@ -181,10 +207,19 @@ export default function PlanillaCalcularModal({
 
       const datosCalculados = {
         empleados: empleados.map((emp) => ({
+          id: emp.id,
           empleado_id: emp.id,
           dias_trabajados: emp.dias_trabajados,
           horas_extras_25: emp.horas_extras_25,
           horas_extras_35: emp.horas_extras_35,
+          horas_recargo_nocturno: emp.horas_recargo_nocturno,
+          horas_dominicales_festivas: emp.horas_dominicales_festivas,
+          ...(isArgentina
+            ? {
+                horas_extras_50: emp.horas_extras_25,
+                horas_extras_100: emp.horas_extras_35,
+              }
+            : {}),
           tardanzas_minutos: emp.tardanzas_minutos,
           faltas: emp.faltas,
           bonos_adicionales: emp.bonos_adicionales,
@@ -302,7 +337,7 @@ export default function PlanillaCalcularModal({
             </div>
             <div className="bg-[var(--blue-50)] p-4 text-center border">
               <div className="text-2xl font-bold text-[var(--blue-600)]">
-                S/ {totalIngresos.toFixed(2)}
+                {currencySymbol} {totalIngresos.toFixed(2)}
               </div>
               <div className="text-[0.875rem] text-[var(--blue-700)]">
                 Total Ingresos
@@ -310,7 +345,7 @@ export default function PlanillaCalcularModal({
             </div>
             <div className="bg-[var(--red-50)] p-4 text-center border">
               <div className="text-2xl font-bold text-[var(--red-600)]">
-                S/ {totalDescuentos.toFixed(2)}
+                {currencySymbol} {totalDescuentos.toFixed(2)}
               </div>
               <div className="text-[0.875rem] text-[var(--red-700)]">
                 Total Descuentos
@@ -318,7 +353,7 @@ export default function PlanillaCalcularModal({
             </div>
             <div className="bg-[#f0f9ff] p-4 text-center border">
               <div className="text-2xl font-bold text-[#0ea5e9]">
-                S/ {totalNeto.toFixed(2)}
+                {currencySymbol} {totalNeto.toFixed(2)}
               </div>
               <div className="text-[0.875rem] text-[#0c4a6e]">Total Neto</div>
             </div>
@@ -332,17 +367,19 @@ export default function PlanillaCalcularModal({
                   <th className="p-3 border min-w-[200px]">👤 EMPLEADO</th>
                   <th className="p-3 border min-w-[120px]">💰 SUELDO BASE</th>
                   <th className="p-3 border min-w-[80px]">📅 DÍAS</th>
-                  <th className="p-3 border min-w-[80px]">⏰ HE 25%</th>
-                  <th className="p-3 border min-w-[80px]">⏰ HE 35%</th>
+                  <th className="p-3 border min-w-[80px]">⏰ HE {isArgentina ? '50' : '25'}%</th>
+                  <th className="p-3 border min-w-[80px]">⏰ HE {isArgentina ? '100' : isColombia ? '75' : '35'}%</th>
+                  {isColombia && <th className="p-3 border min-w-[95px]">🌙 NOCT. 35%</th>}
+                  {isColombia && <th className="p-3 border min-w-[95px]">📅 DOM/FEST 90%</th>}
                   <th className="p-3 border min-w-[80px]">⏱️ TARDANZAS</th>
                   <th className="p-3 border min-w-[80px]">❌ FALTAS</th>
-                  <th className="p-3 border min-w-[100px]">💵 BONOS</th>
+                  <th className="p-3 border min-w-[100px]">💵 {isArgentina ? 'ADICIONALES' : isColombia ? 'OTROS DEVENGADOS' : 'BONOS'}</th>
                   <th className="p-3 border min-w-[120px]">
                     📈 TOTAL INGRESOS
                   </th>
-                  <th className="p-3 border min-w-[100px]">🏦 AFP/ONP</th>
-                  <th className="p-3 border min-w-[100px]">💊 ESSALUD</th>
-                  <th className="p-3 border min-w-[100px]">📋 IMP. RENTA</th>
+                  <th className="p-3 border min-w-[100px]">🏦 {isArgentina ? 'SIPA/OS' : isColombia ? 'SALUD/PENSIÓN' : 'AFP/ONP'}</th>
+                  <th className="p-3 border min-w-[100px]">💊 {isArgentina ? 'CONTR. PATR.' : isColombia ? 'PILA/PARAF.' : 'ESSALUD'}</th>
+                  <th className="p-3 border min-w-[100px]">📋 {isArgentina ? 'GANANCIAS' : isColombia ? 'RET. FUENTE' : 'IMP. RENTA'}</th>
                   <th className="p-3 border min-w-[120px]">💸 NETO A PAGAR</th>
                 </tr>
               </thead>
@@ -419,6 +456,32 @@ export default function PlanillaCalcularModal({
                         min="0"
                       />
                     </td>
+                    {isColombia && (
+                      <td className="p-2 border">
+                        <input
+                          aria-label={`Horas nocturnas ordinarias de ${empleado.nombres} ${empleado.apellidos}`}
+                          type="number"
+                          value={empleado.horas_recargo_nocturno}
+                          onChange={(e) => actualizarEmpleado(empleado.id, "horas_recargo_nocturno", parseFloat(e.target.value) || 0)}
+                          className="w-[100%] p-1 border rounded-[4px] text-center"
+                          step="0.5"
+                          min="0"
+                        />
+                      </td>
+                    )}
+                    {isColombia && (
+                      <td className="p-2 border">
+                        <input
+                          aria-label={`Horas dominicales o festivas de ${empleado.nombres} ${empleado.apellidos}`}
+                          type="number"
+                          value={empleado.horas_dominicales_festivas}
+                          onChange={(e) => actualizarEmpleado(empleado.id, "horas_dominicales_festivas", parseFloat(e.target.value) || 0)}
+                          className="w-[100%] p-1 border rounded-[4px] text-center"
+                          step="0.5"
+                          min="0"
+                        />
+                      </td>
+                    )}
                     <td className="p-2 border">
                       <input
                         type="number"
@@ -466,19 +529,19 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-3 border text-center font-semibold text-[var(--emerald-600)]">
-                      S/ {empleado.total_ingresos.toFixed(2)}
+                      {currencySymbol} {empleado.total_ingresos.toFixed(2)}
                     </td>
                     <td className="p-3 border text-center text-[var(--amber-600)]">
-                      S/ {empleado.afp_onp.toFixed(2)}
+                      {currencySymbol} {empleado.afp_onp.toFixed(2)}
                     </td>
                     <td className="p-3 border text-center text-[var(--blue-600)]">
-                      S/ {empleado.essalud.toFixed(2)}
+                      {currencySymbol} {empleado.essalud.toFixed(2)}
                     </td>
                     <td className="p-3 border text-center text-[var(--red-600)]">
-                      S/ {empleado.impuesto_renta.toFixed(2)}
+                      {currencySymbol} {empleado.impuesto_renta.toFixed(2)}
                     </td>
                     <td className="p-3 border text-center font-bold text-[var(--blue-700)] text-base">
-                      S/ {empleado.neto_pagar.toFixed(2)}
+                      {currencySymbol} {empleado.neto_pagar.toFixed(2)}
                     </td>
                   </tr>
                 ))}

@@ -79,6 +79,11 @@ export class CotizacionesService {
 
     // Generar número de cotización
     const numero = await this.generarNumero(tenantId);
+    const { data: empresaConfig } = await client
+      .from('empresa_config')
+      .select('moneda_defecto')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
 
     // Obtener información del usuario para el campo vendedor
     let vendedorNombre = 'Sistema';
@@ -120,7 +125,7 @@ export class CotizacionesService {
         total,
         observaciones: createCotizacionDto.notas || null,
         vendedor: vendedorNombre, // Nombre del vendedor
-        moneda: 'PEN', // Moneda por defecto
+        moneda: empresaConfig?.moneda_defecto || 'PEN',
         items: items, // Items en formato JSON
         probabilidad: 50, // Probabilidad por defecto
       })

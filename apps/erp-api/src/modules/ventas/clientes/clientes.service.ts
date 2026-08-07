@@ -4,7 +4,34 @@ import { AuditService } from '../../audit/audit.service';
 import { CreateClienteDto, UpdateClienteDto, ValidarRucDto } from './dto';
 import { Cliente } from './entities/cliente.entity';
 import { validarDocumentoIdentidad, validarRucPeru } from '../../../shared/utils/documento-identidad-peru.util';
+import { validateArgentinaTaxId } from '../../fiscal/arca-fiscal.service';
+import { validateColombiaNit } from '../../paises/initial-country';
 import axios from 'axios';
+
+function validarDocumentoCliente(tipo: string, numero: string) {
+  if (tipo === 'CUIT') {
+    return {
+      valido: validateArgentinaTaxId(numero),
+      error: 'El CUIT debe tener 11 dígitos y un dígito verificador válido',
+    };
+  }
+  if (tipo === 'NIT') {
+    const digits = numero.replace(/\D/g, '');
+    const nitConDv = digits.length >= 10
+      ? `${digits.slice(0, -1)}-${digits.slice(-1)}`
+      : numero;
+    return {
+      valido: validateColombiaNit(nitConDv),
+      error: 'El NIT debe incluir una base válida y su dígito de verificación',
+    };
+  }
+  if (tipo === 'CC' || tipo === 'TI') {
+    return /^[0-9]{6,10}$/.test(numero)
+      ? { valido: true }
+      : { valido: false, error: `La ${tipo} debe tener entre 6 y 10 dígitos` };
+  }
+  return validarDocumentoIdentidad(tipo, numero);
+}
 
 /**
  * ClientesService
@@ -35,7 +62,7 @@ export class ClientesService {
     // El documento del cliente termina en el comprobante: un RUC con dígito
     // verificador incorrecto o un DNI de once dígitos se aceptaban en el alta y
     // hacían que SUNAT rechazara la factura emitida a ese cliente.
-    const validacionDocumento = validarDocumentoIdentidad(
+    const validacionDocumento = validarDocumentoCliente(
       createClienteDto.documento_tipo,
       documentoTexto,
     );
@@ -71,7 +98,7 @@ export class ClientesService {
       codigo: documentoTexto,
       direccion: createClienteDto.direccion || null,
       email: createClienteDto.email || null,
-      ruc: createClienteDto.documento_tipo === 'RUC' ? documentoTexto : null,
+      ruc: ['RUC', 'CUIT', 'NIT'].includes(createClienteDto.documento_tipo) ? documentoTexto : null,
       activo: true,
     };
 
@@ -255,7 +282,7 @@ export class ClientesService {
 
       // Misma validación que en el alta: editar el documento no puede saltarse
       // las reglas del Catálogo 06.
-      const validacionDocumento = validarDocumentoIdentidad(tipoDocumento, documentoTexto);
+      const validacionDocumento = validarDocumentoCliente(tipoDocumento, documentoTexto);
       if (!validacionDocumento.valido) {
         throw new BadRequestException(validacionDocumento.error);
       }
@@ -263,7 +290,7 @@ export class ClientesService {
       updateData.documento_numero = documentoNumero;
       updateData.numero_documento = documentoNumero;
       updateData.codigo = documentoTexto;
-      updateData.ruc = tipoDocumento === 'RUC' ? documentoTexto : null;
+      updateData.ruc = ['RUC', 'CUIT', 'NIT'].includes(tipoDocumento) ? documentoTexto : null;
     }
     if (updateClienteDto.razon_social !== undefined) {
       updateData.razon_social = updateClienteDto.razon_social;

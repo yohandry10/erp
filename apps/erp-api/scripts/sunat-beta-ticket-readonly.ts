@@ -27,7 +27,7 @@ if (!BETA_USER || !BETA_PASSWORD || !BETA_CERTIFICATE_PASSWORD) {
   );
 }
 const SOURCE_ARTIFACT =
-  'docs/audits/artifacts/sunat-beta-ra-rc-gre/2026-06-17T07-04-03-049Z-1489/manifest.json';
+  'artifacts/audit-evidence/sunat-beta-ra-rc-gre/2026-06-17T07-04-03-049Z-1489/manifest.json';
 
 const DEFAULT_TICKETS: TicketInput[] = [
   { type: 'RA', label: 'RA-20260617-34513', ticket: '1781679870729' },

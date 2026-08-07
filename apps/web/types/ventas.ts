@@ -11,6 +11,10 @@ export enum TipoCliente {
 export enum TipoDocumento {
   DNI = 'DNI',
   RUC = 'RUC',
+  CUIT = 'CUIT',
+  NIT = 'NIT',
+  CC = 'CC',
+  TI = 'TI',
   CE = 'CE',
   PASAPORTE = 'PASAPORTE'
 }

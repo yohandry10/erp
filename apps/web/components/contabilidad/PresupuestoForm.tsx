@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { DollarSign, Save, X, AlertCircle } from 'lucide-react'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CentroCosto {
   id: string
@@ -48,6 +50,8 @@ export default function PresupuestoForm({
   onSuccess,
   onCancel
 }: PresupuestoFormProps) {
+  const { symbol } = useLocalizedMoney()
+  const country = useCountryContext()
   const router = useRouter()
   const { get, post, put } = useApi()
 
@@ -305,7 +309,7 @@ export default function PresupuestoForm({
         {/* Monto Presupuestado */}
         <div>
           <label htmlFor="presupuesto-form-monto-presupuestado" className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
-            Monto Presupuestado (S/) <span className="text-destructive">*</span>
+            Monto Presupuestado ({country.moneda || symbol}) <span className="text-destructive">*</span>
           </label>
           <input id="presupuesto-form-monto-presupuestado"
             type="number"

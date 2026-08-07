@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useApi } from "@/hooks/use-api";
 import { AlertTriangle, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { useLocalizedMoney } from "@/hooks/use-localized-money";
 
 interface VencimientoItem {
   id: string;
@@ -26,6 +27,7 @@ export default function VencimientosAlert({
   onCuentaClick,
 }: VencimientosAlertProps) {
   const { get } = useApi();
+  const { country, formatCurrency } = useLocalizedMoney();
   const [vencimientos, setVencimientos] = useState<VencimientoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -77,16 +79,8 @@ export default function VencimientosAlert({
     loadVencimientos();
   }, [loadVencimientos]);
 
-  const formatCurrency = (amount: number, moneda: string = "PEN") => {
-    const currency = moneda === "USD" ? "USD" : "PEN";
-    return new Intl.NumberFormat("es-PE", {
-      style: "currency",
-      currency: currency,
-    }).format(amount);
-  };
-
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-PE", {
+    return new Date(dateString).toLocaleDateString(country.locale || "es-PE", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

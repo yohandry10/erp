@@ -12,6 +12,8 @@ import { toast } from '@/components/ui/use-toast'
 import { ArrowLeft, Edit, FileText, Eye } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 
 const ESTADO_COLORS: Record<EstadoCotizacion, { bg: string; text: string }> = {
   [EstadoCotizacion.BORRADOR]: { bg: '#f3f4f6', text: '#1f2937' },
@@ -28,6 +30,8 @@ const toNumber = (value: unknown) => {
 }
 
 export default function CotizacionDetailPage() {
+  const { formatCurrency: formatLocalizedCurrency } = useLocalizedMoney()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const router = useRouter()
   const params = useParams()
   const { get, put } = useApi()
@@ -111,10 +115,7 @@ export default function CotizacionDetailPage() {
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN'
-    }).format(toNumber(amount))
+    return formatLocalizedCurrency(toNumber(amount))
   }
 
   const formatDate = (dateString: string) => {
@@ -353,7 +354,7 @@ export default function CotizacionDetailPage() {
                 <span className="font-semibold">{formatCurrency(cotizacion.subtotal)}</span>
               </div>
               <div className="flex justify-between text-[0.875rem]">
-                <span className="text-[var(--primary-600)]">IGV (18%):</span>
+                <span className="text-[var(--primary-600)]">{nombreImpuesto} ({Math.round(tasaIgv * 100)}%):</span>
                 <span className="font-semibold">{formatCurrency(cotizacion.igv)}</span>
               </div>
               <div className="flex justify-between text-[1.125rem] font-bold pt-2 mt-2">

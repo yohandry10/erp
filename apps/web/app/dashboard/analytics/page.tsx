@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PageShell } from '@/components/erp/page-shell'
+import { useCountryContext } from '@/hooks/use-country-context'
 import {
   AreaChart,
   Area,
@@ -325,6 +326,12 @@ function SalesEvolutionChart({
   data?: { labels?: string[]; datasets?: any[] }
   totales?: any
 }) {
+  const country = useCountryContext()
+  const money = (value: number) =>
+    new Intl.NumberFormat(country.locale || 'es-PE', {
+      style: 'currency',
+      currency: country.moneda || 'PEN',
+    }).format(value)
   const labels = data?.labels || []
   const values: number[] = data?.datasets?.[0]?.data || []
   const hasReal = values.length > 0 && values.some((v) => Number(v) > 0)
@@ -352,12 +359,12 @@ function SalesEvolutionChart({
       <div className="grid gap-3 sm:grid-cols-3">
         <StatChip
           label="Ventas actuales"
-          value={`S/ ${ventasActuales.toLocaleString('es-PE')}`}
+          value={money(ventasActuales)}
           tone="cyan"
         />
         <StatChip
           label="Periodo anterior"
-          value={`S/ ${ventasAnterior.toLocaleString('es-PE')}`}
+          value={money(ventasAnterior)}
           tone="violet"
         />
         <StatChip
@@ -404,7 +411,7 @@ function SalesEvolutionChart({
                   color: '#f8fafc',
                   fontSize: 12,
                 }}
-                formatter={(value: any) => [`S/ ${Number(value).toLocaleString('es-PE')}`, 'Ventas']}
+                formatter={(value: any) => [money(Number(value)), 'Ventas']}
               />
               <Area
                 type="monotone"
@@ -480,6 +487,12 @@ function StatChip({
 // ============================================================================
 
 function CategoryRankList({ data }: { data?: { labels?: string[]; data?: number[] } }) {
+  const country = useCountryContext()
+  const money = (value: number) =>
+    new Intl.NumberFormat(country.locale || 'es-PE', {
+      style: 'currency',
+      currency: country.moneda || 'PEN',
+    }).format(value)
   const rawLabels = data?.labels || []
   const rawValues = (data?.data || []).map((v: any) => Number(v) || 0)
   const total = rawValues.reduce((s: number, v: number) => s + v, 0)
@@ -536,7 +549,7 @@ function CategoryRankList({ data }: { data?: { labels?: string[]; data?: number[
                   }}
                   formatter={(value: any, name: any) => {
                     const pct = total > 0 ? ((Number(value) / total) * 100).toFixed(1) : '0.0'
-                    return [`S/ ${Number(value).toLocaleString('es-PE')} · ${pct}%`, name]
+                    return [`${money(Number(value))} · ${pct}%`, name]
                   }}
                 />
               </RPieChart>
@@ -546,7 +559,7 @@ function CategoryRankList({ data }: { data?: { labels?: string[]; data?: number[
               <span
                 className={`${tabularNum} mt-0.5 text-2xl text-foreground group-data-[erp-theme=light]/dashboard:text-foreground`}
               >
-                S/ {total.toLocaleString('es-PE')}
+                {money(total)}
               </span>
             </div>
           </div>
@@ -574,7 +587,7 @@ function CategoryRankList({ data }: { data?: { labels?: string[]; data?: number[
                     {item.pct.toFixed(1)}%
                   </span>
                   <span className="text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
-                    S/ {item.value.toLocaleString('es-PE')}
+                    {money(item.value)}
                   </span>
                 </span>
               </li>
@@ -604,6 +617,12 @@ function AgingComposite({
   deudasClientes?: any
   deudasProveedores?: any
 }) {
+  const country = useCountryContext()
+  const money = (value: number) =>
+    new Intl.NumberFormat(country.locale || 'es-PE', {
+      style: 'currency',
+      currency: country.moneda || 'PEN',
+    }).format(value)
   const arData = deudasClientes?.graficoEdadSaldos
   const apData = deudasProveedores?.graficoEdadSaldos
   const labels: string[] = (arData?.labels?.length
@@ -655,19 +674,19 @@ function AgingComposite({
       <div className="grid gap-3 sm:grid-cols-3">
         <SummaryStat
           label="Por cobrar (total)"
-          value={`S/ ${totalAR.toLocaleString('es-PE')}`}
-          sublabel={`Vencido: S/ ${venAR.toLocaleString('es-PE')} (${pctVenAR.toFixed(1)}%)`}
+          value={money(totalAR)}
+          sublabel={`Vencido: ${money(venAR)} (${pctVenAR.toFixed(1)}%)`}
           tone="cyan"
         />
         <SummaryStat
           label="Por pagar (total)"
-          value={`S/ ${totalAP.toLocaleString('es-PE')}`}
-          sublabel={`Vencido: S/ ${venAP.toLocaleString('es-PE')} (${pctVenAP.toFixed(1)}%)`}
+          value={money(totalAP)}
+          sublabel={`Vencido: ${money(venAP)} (${pctVenAP.toFixed(1)}%)`}
           tone="rose"
         />
         <SummaryStat
           label="Diferencial neto"
-          value={`${cashGap >= 0 ? '+' : '−'}S/ ${Math.abs(cashGap).toLocaleString('es-PE')}`}
+          value={`${cashGap >= 0 ? '+' : '−'}${money(Math.abs(cashGap))}`}
           sublabel={cashGap >= 0 ? 'Posición favorable' : 'Posición deficitaria'}
           tone={cashGap >= 0 ? 'emerald' : 'amber'}
           icon={cashGap >= 0 ? ArrowUpRight : ArrowDownRight}
@@ -717,7 +736,7 @@ function AgingComposite({
                 }}
                 formatter={(value: any, name: any) => {
                   const lbl = name === 'cobrar' ? 'Por cobrar' : 'Por pagar'
-                  return [`S/ ${Number(value).toLocaleString('es-PE')}`, lbl]
+                  return [money(Number(value)), lbl]
                 }}
               />
               <Bar dataKey="cobrar" fill="url(#bar-ar)" radius={[6, 6, 0, 0]} />

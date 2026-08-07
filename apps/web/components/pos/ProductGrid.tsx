@@ -35,29 +35,41 @@ type Props = {
   onAgregar: (producto: ProductoPOS) => void;
   productoSeleccionado?: string | null;
   onSeleccionar?: (productoId: string) => void;
+  currencySymbol: string;
+  locale: string;
+  taxRate: number;
+  taxName: string;
 };
 
-/** Tasa por defecto del IGV; el calculo real de la venta vive en el backend. */
-const TASA_IGV = 0.18;
-
 /**
- * El catalogo guarda el precio sin IGV, pero al consumidor hay que exhibirle el
+ * El catálogo guarda el precio sin impuesto, pero al consumidor hay que exhibirle el
  * precio final que va a pagar. Solo se recarga lo gravado: exonerado, inafecto y
  * exportacion se muestran tal cual. Si falta la afectacion se asume gravado, que
  * es lo que hace el calculo de la venta, para que lo exhibido y lo cobrado no
  * difieran.
  */
-const precioAlPublico = (producto: ProductoPOS): number => {
+const precioAlPublico = (producto: ProductoPOS, taxRate: number): number => {
   const afectacion = String(producto.afectacion_igv ?? '10').trim();
-  return afectacion === '10' ? producto.precio_venta * (1 + TASA_IGV) : producto.precio_venta;
+  return afectacion === '10' ? producto.precio_venta * (1 + taxRate) : producto.precio_venta;
 };
 
-const formatMoney = (value: any): string => {
+const formatMoney = (value: any, locale: string): string => {
   const num = Number(value);
-  return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+  return Number.isFinite(num)
+    ? num.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '0,00';
 };
 
-export const ProductGrid: React.FC<Props> = ({ productos, onAgregar, productoSeleccionado, onSeleccionar }) => {
+export const ProductGrid: React.FC<Props> = ({
+  productos,
+  onAgregar,
+  productoSeleccionado,
+  onSeleccionar,
+  currencySymbol,
+  locale,
+  taxRate,
+  taxName,
+}) => {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(145px,1fr))]">
       {productos.map((producto) => {
@@ -99,9 +111,13 @@ export const ProductGrid: React.FC<Props> = ({ productos, onAgregar, productoSel
               </div>
             </div>
             <div className="mt-3">
-              <div className="text-lg font-bold tracking-tight">S/ {formatMoney(precioAlPublico(producto))}</div>
+              <div className="text-lg font-bold tracking-tight">
+                {currencySymbol} {formatMoney(precioAlPublico(producto, taxRate), locale)}
+              </div>
               <div className="text-[11px] text-muted-foreground">
-                {String(producto.afectacion_igv ?? '10').trim() === '10' ? 'IGV incluido' : 'Exonerado de IGV'}
+                {String(producto.afectacion_igv ?? '10').trim() === '10'
+                  ? `${taxName} incluido`
+                  : `Exento de ${taxName}`}
               </div>
               {!esServicio && (
                 <div className={cn('mt-1 text-xs text-muted-foreground', stockBajo && 'font-medium text-destructive')}>
@@ -113,6 +129,7 @@ export const ProductGrid: React.FC<Props> = ({ productos, onAgregar, productoSel
             <Button
               type="button"
               size="sm"
+              aria-label={`Agregar ${producto.nombre}`}
               className="mt-3 min-h-10 w-full gap-2"
               onClick={(event) => {
                 event.stopPropagation();

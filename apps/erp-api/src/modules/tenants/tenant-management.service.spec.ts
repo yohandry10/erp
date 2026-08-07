@@ -152,14 +152,32 @@ describe('TenantManagementService', () => {
             expect(result).toBeDefined();
         });
 
-        it('should reject non-Peru country changes while countries are roadmap', async () => {
+        it('should update an active Colombia tenant country consistently', async () => {
+            const updatedTenant = { ...mockTenant, pais_id: 2, pais: 'CO', moneda_defecto: 'COP' };
+            mockClient.single
+                .mockResolvedValueOnce({ data: mockTenant, error: null })
+                .mockResolvedValueOnce({ data: { id: 2, codigo_iso: 'CO' }, error: null })
+                .mockResolvedValueOnce({ data: updatedTenant, error: null });
+
+            const result = await service.updateTenant('tenant-123', {
+                pais_id: 2,
+                pais: 'CO',
+            } as any);
+
+            expect(result).toEqual(updatedTenant);
+            expect(mockClient.update).toHaveBeenCalledWith(expect.objectContaining({
+                pais_id: 2,
+                pais: 'CO',
+            }));
+        });
+
+        it('should reject a country outside the active PE/AR/CO catalog', async () => {
             mockClient.single.mockResolvedValueOnce({ data: mockTenant, error: null });
 
             await expect(service.updateTenant('tenant-123', {
-                pais_id: 2,
-                pais: 'CO',
-            } as any))
-                .rejects.toThrow(BadRequestException);
+                pais_id: 99,
+                pais: 'XX',
+            } as any)).rejects.toThrow(BadRequestException);
         });
 
         it('should throw NotFoundException when tenant not found', async () => {
@@ -271,17 +289,59 @@ describe('TenantManagementService', () => {
                 .rejects.toThrow(ConflictException);
         });
 
-        it('should reject non-Peru country creation while countries are roadmap', async () => {
+        it('should create a Colombia tenant with COP and operational RBAC', async () => {
             const createDto = {
                 razon_social: 'Colombia Company',
-                ruc: '900123456',
+                ruc: '900123456-8',
                 email: 'co@company.com',
                 pais_id: 2,
                 pais: 'CO',
             };
 
-            await expect(service.createTenant(createDto as any))
-                .rejects.toThrow(BadRequestException);
+            const colombiaTenant = {
+                ...mockTenant,
+                tenant_id: 'tenant-co',
+                razon_social: createDto.razon_social,
+                ruc: createDto.ruc,
+                pais: 'CO',
+                pais_id: 2,
+                moneda_defecto: 'COP',
+            };
+
+            mockClient.single
+                .mockResolvedValueOnce({ data: { id: 2, codigo_iso: 'CO', moneda_codigo: 'COP' }, error: null })
+                .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } })
+                .mockResolvedValueOnce({ data: colombiaTenant, error: null })
+                .mockResolvedValueOnce({ data: { id: 'role-admin' }, error: null });
+            mockClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+            mockClient.insert
+                .mockReturnValueOnce({ error: null })
+                .mockReturnValueOnce(mockClient);
+            mockClient.rpc.mockResolvedValueOnce({
+                data: [{ permisos_seeded: 195, roles_seeded: 10, role_permissions_seeded: 465 }],
+                error: null,
+            });
+
+            const result = await service.createTenant(createDto as any);
+
+            expect(result.success).toBe(true);
+            expect(result.data.tenant).toEqual(colombiaTenant);
+            expect(mockClient.from).toHaveBeenCalledWith('paises');
+            expect(mockClient.rpc).toHaveBeenCalledWith('seed_operational_rbac_for_tenant', {
+                p_tenant_id: expect.any(String),
+            });
+        });
+
+        it('should reject a country outside the active PE/AR/CO catalog', async () => {
+            const createDto = {
+                razon_social: 'Unsupported Company',
+                ruc: '123456789',
+                email: 'xx@company.com',
+                pais_id: 99,
+                pais: 'XX',
+            };
+
+            await expect(service.createTenant(createDto as any)).rejects.toThrow(BadRequestException);
             expect(mockClient.from).not.toHaveBeenCalledWith('paises');
         });
 

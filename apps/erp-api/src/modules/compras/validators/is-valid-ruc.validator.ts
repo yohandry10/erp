@@ -15,17 +15,13 @@ export class IsValidRucConstraint implements ValidatorConstraintInterface {
 
     const cleanRuc = ruc.trim();
 
-    // Validar que solo contenga números
-    if (!/^\d+$/.test(cleanRuc)) {
-      return false;
-    }
-
-    // Scope inicial: Peru/SUNAT. Otros paises quedan en roadmap.
-    return cleanRuc.length === 11;
+    // El DTO no conoce aún el país del tenant. Admite la forma estructural de
+    // RUC/CUIT y NIT; el checksum específico se valida luego en el servicio.
+    return /^\d{11}$/.test(cleanRuc) || /^\d{10}$/.test(cleanRuc) || /^\d{9,10}-\d$/.test(cleanRuc);
   }
 
   defaultMessage(args: ValidationArguments): string {
-    return 'El RUC debe tener 11 dígitos y contener solo números';
+    return 'La identificación fiscal debe tener formato RUC, CUIT o NIT válido';
   }
 }
 

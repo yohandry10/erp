@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface PlanillaModalProps {
   isOpen: boolean
@@ -46,6 +47,10 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
   console.log('🔥 PlanillaModal RENDERED - isOpen:', isOpen)
 
   const { get, post } = useApi()
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
+  const currencySymbol = country.simboloMoneda || 'S/'
   const [loading, setLoading] = useState(false)
   const [empleados, setEmpleados] = useState<EmpleadoPlanilla[]>([])
 
@@ -149,7 +154,11 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
 
   const calcularValoresEmpleado = (empleado: EmpleadoPlanilla) => {
     const sueldoDiario = empleado.sueldo_base / DIAS_LABORABLES_MES
-    const valorHoraNormal = empleado.sueldo_base / DIAS_LABORABLES_MES / HORAS_DIA
+    const valorHoraNormal = isArgentina
+      ? empleado.sueldo_base / 200
+      : isColombia
+        ? empleado.sueldo_base / 210
+        : empleado.sueldo_base / DIAS_LABORABLES_MES / HORAS_DIA
 
     // Descuentos por tardanzas (proporcional por minuto)
     const descuentoTardanzas = (empleado.tardanzas_minutos * valorHoraNormal) / 60
@@ -158,8 +167,8 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     const descuentoFaltas = empleado.faltas * sueldoDiario
 
     // Pago por horas extras
-    const pagoHorasExtras25 = empleado.horas_extras_25 * valorHoraNormal * 1.25
-    const pagoHorasExtras35 = empleado.horas_extras_35 * valorHoraNormal * 1.35
+    const pagoHorasExtras25 = empleado.horas_extras_25 * valorHoraNormal * (isArgentina ? 1.5 : 1.25)
+    const pagoHorasExtras35 = empleado.horas_extras_35 * valorHoraNormal * (isArgentina ? 2 : isColombia ? 1.75 : 1.35)
     const pagoHorasExtras = pagoHorasExtras25 + pagoHorasExtras35
 
     // Sueldo bruto total
@@ -232,7 +241,15 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
       console.log('🔥 Calculando planilla personalizada...')
       // Calcular con empleados personalizados
       const calcResponse = await post(`/api/rrhh/planillas/${createResponse.id}/calcular-personalizada`, {
-        empleados: empleadosSeleccionados
+        empleados: empleadosSeleccionados.map((empleado) => ({
+          ...empleado,
+          ...(isArgentina
+            ? {
+                horas_extras_50: empleado.horas_extras_25,
+                horas_extras_100: empleado.horas_extras_35,
+              }
+            : {}),
+        }))
       })
       console.log('🔥 Respuesta calcular:', calcResponse)
 
@@ -285,11 +302,11 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
   const modalContent = (
     <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center p-4 z-[99999]"
     >
-      <div className="bg-card rounded-xl shadow w-[100%] max-w-[1280px] overflow-hidden z-[100000]"
+      <div className="bg-card rounded-xl shadow w-[100%] max-w-[1280px] max-h-[calc(100vh-2rem)] overflow-hidden z-[100000] flex flex-col"
       >
 
         {/* Header */}
-        <div className="p-6 border-b">
+        <div className="p-6 border-b shrink-0">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold text-foreground flex items-center gap-2 m-0">
@@ -309,7 +326,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto">
+        <div className="p-6 overflow-y-auto flex-1 min-h-0">
           <form id="planilla-form" onSubmit={handleSubmit} className="flex flex-col gap-6">
             {/* Configuración de Planilla */}
             <div className="bg-muted p-4 rounded-lg">
@@ -371,13 +388,13 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                 <div className="bg-muted py-3 px-4 grid grid-cols-[40px_200px_120px_80px_80px_80px_80px_80px_120px] gap-2 text-xs font-semibold text-foreground/85 border-b">
                   <div>✓</div>
                   <div>👤 EMPLEADO</div>
-                  <div>💰 SUELDO BASE<br/><span className="text-[0.625rem] text-muted-foreground">Mensual S/</span></div>
+                  <div>💰 SUELDO BASE<br/><span className="text-[0.625rem] text-muted-foreground">Mensual {currencySymbol}</span></div>
                   <div>📅 DÍAS<br/><span className="text-[0.625rem] text-muted-foreground">Trabajados</span></div>
-                  <div>⏰ HE 25%<br/><span className="text-[0.625rem] text-muted-foreground">Primeras 2h</span></div>
-                  <div>⏰ HE 35%<br/><span className="text-[0.625rem] text-muted-foreground">Siguientes</span></div>
+                  <div>⏰ HE {isArgentina ? '50' : '25'}%<br/><span className="text-[0.625rem] text-muted-foreground">{isArgentina ? 'Días hábiles' : isColombia ? 'Diurnas' : 'Primeras 2h'}</span></div>
+                  <div>⏰ HE {isArgentina ? '100' : isColombia ? '75' : '35'}%<br/><span className="text-[0.625rem] text-muted-foreground">{isArgentina ? 'Domingos/feriados' : isColombia ? 'Nocturnas' : 'Siguientes'}</span></div>
                   <div>⏱️ TARDANZAS<br/><span className="text-[0.625rem] text-muted-foreground">Minutos</span></div>
                   <div>❌ FALTAS<br/><span className="text-[0.625rem] text-muted-foreground">Días</span></div>
-                  <div>💵 BONOS<br/><span className="text-[0.625rem] text-muted-foreground">Adicionales S/</span></div>
+                  <div>💵 ADICIONALES<br/><span className="text-[0.625rem] text-muted-foreground">{isArgentina ? 'Convenio' : isColombia ? 'Otros devengados' : 'Bonos'} {currencySymbol}</span></div>
                 </div>
 
                 {/* Filas de empleados con explicaciones */}
@@ -403,7 +420,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                           {empleado.nombres} {empleado.apellidos}
                         </div>
                         <div className="text-[11px] text-muted-foreground">
-                          {empleado.puesto} • DNI: {empleado.numero_documento}
+                          {empleado.puesto} • {isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI'}: {empleado.numero_documento}
                         </div>
                       </div>
                       {/* Sueldo Base */}
@@ -418,7 +435,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                           placeholder="0.00"
                         />
                         <div className="text-[0.625rem] text-emerald-400 font-semibold mt-[2px]">
-                          S/ {empleado.sueldo_base.toFixed(0)}
+                          {currencySymbol} {empleado.sueldo_base.toFixed(0)}
                         </div>
                       </div>
 
@@ -448,7 +465,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                           step="0.5"
                         />
                         <div className="text-[0.625rem] text-destructive font-semibold mt-[2px]">
-                          +25%
+                          +{isArgentina ? '50' : '25'}%
                         </div>
                       </div>
 
@@ -463,7 +480,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                           step="0.5"
                         />
                         <div className="text-[0.625rem] text-destructive font-semibold mt-[2px]">
-                          +35%
+                          +{isArgentina ? '100' : isColombia ? '75' : '35'}%
                         </div>
                       </div>
 
@@ -477,7 +494,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                           min="0"
                         />
                         <div className="text-[0.625rem] text-amber-500 font-semibold mt-[2px]">
-                          -S/ {(empleado.tardanzas_minutos * (empleado.sueldo_base / 30 / 8) / 60).toFixed(0)}
+                          -{currencySymbol} {(empleado.tardanzas_minutos * (isArgentina ? empleado.sueldo_base / 200 : isColombia ? empleado.sueldo_base / 210 : empleado.sueldo_base / 30 / 8) / 60).toFixed(0)}
                         </div>
                       </div>
 
@@ -491,7 +508,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                           min="0"
                         />
                         <div className="text-[0.625rem] text-red-500 font-semibold mt-[2px]">
-                          -S/ {(empleado.faltas * (empleado.sueldo_base / 30)).toFixed(0)}
+                          -{currencySymbol} {(empleado.faltas * (empleado.sueldo_base / 30)).toFixed(0)}
                         </div>
                       </div>
 
@@ -506,7 +523,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                           step="0.01"
                         />
                         <div className="text-[0.625rem] text-emerald-400 font-semibold mt-[2px]">
-                          Total: S/ {valores.sueldo_bruto_total.toFixed(0)}
+                          Total: {currencySymbol} {valores.sueldo_bruto_total.toFixed(0)}
                         </div>
                       </div>
                     </div>
@@ -529,7 +546,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
 
                   <div>
                     <div className="text-2xl font-bold text-emerald-400">
-                      S/ {totalPlanilla.toFixed(0)}
+                      {currencySymbol} {totalPlanilla.toFixed(0)}
                     </div>
                     <div className="text-xs text-emerald-400 font-medium">
                       TOTAL BRUTO PLANILLA
@@ -538,7 +555,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
 
                   <div>
                     <div className="text-2xl font-bold text-violet-400">
-                      S/ {empleadosSeleccionados.length > 0 ? (totalPlanilla / empleadosSeleccionados.length).toFixed(0) : '0'}
+                      {currencySymbol} {empleadosSeleccionados.length > 0 ? (totalPlanilla / empleadosSeleccionados.length).toFixed(0) : '0'}
                     </div>
                     <div className="text-xs text-violet-400 font-medium">
                       PROMEDIO POR EMPLEADO
@@ -558,7 +575,11 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
                 {empleadosSeleccionados.length > 0 && (
                   <div className="mt-3 py-2 px-3 bg-[#dcfce7] rounded-[6px] text-[13px] text-[#166534] text-center font-medium">
                     ✅ Planilla lista para procesar con {empleadosSeleccionados.length} empleados
-                    • Se calcularán automáticamente: AFP/ONP, ESSALUD, Impuesto 5ta categoría
+                    • Se calcularán automáticamente: {isArgentina
+                      ? 'SIPA, INSSJP, obra social, SAC, contribuciones y ART'
+                      : isColombia
+                        ? 'salud, pensión, PILA, ARL, parafiscales, prestaciones y auxilio de transporte'
+                        : 'AFP/ONP, EsSalud, impuesto de quinta categoría'}
                   </div>
                 )}
               </div>
@@ -567,7 +588,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
         </div>
 
         {/* Footer */}
-        <div className="py-4 px-6 border-t bg-muted flex justify-end items-center gap-3">
+        <div className="py-4 px-6 border-t bg-muted flex justify-end items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={handleClose}

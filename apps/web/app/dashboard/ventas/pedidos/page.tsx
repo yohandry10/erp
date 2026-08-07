@@ -8,6 +8,7 @@ import { Plus, Search, Filter, Eye, FileText, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { parseDateLocal } from '@/lib/date-utils'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 const ESTADO_COLORS: Record<EstadoPedido, { bg: string, text: string }> = {
   [EstadoPedido.PENDIENTE]: { bg: 'rgba(234, 179, 8, 0.1)', text: '#ca8a04' },
@@ -38,6 +39,7 @@ const ESTADO_LABELS: Record<EstadoPedido, string> = {
 }
 
 export default function PedidosPage() {
+  const { formatCurrency } = useLocalizedMoney()
   const router = useRouter()
   const { get } = useApi()
 
@@ -110,7 +112,7 @@ export default function PedidosPage() {
   }
 
   const formatMonto = (monto: number) => {
-    return `S/ ${monto.toFixed(2)}`
+    return formatCurrency(monto)
   }
 
   const renderEstadoCredito = (estado?: string, requiere?: boolean) => {
