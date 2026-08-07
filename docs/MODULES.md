@@ -137,6 +137,14 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - Este espacio no presenta FV 621 ni FV 1611. El contador contrasta contra
   RVIE/RCE, presenta en SUNAT y registra la constancia externa; cada corrección
   crea otra versión y conserva el historial.
+- `Contabilidad > Renta anual e ITAN` toma el resultado y los activos del cierre
+  contable y prepara la conciliación del FV 710 para Régimen General/RMT. General
+  aplica 29,5 %; RMT aplica 10 % hasta 15 UIT y 29,5 % al exceso. Selecciona el
+  formulario Completo al superar 1.700 UIT y calcula ITAN al 0,4 % sobre el
+  exceso de activos netos ajustados sobre S/ 1.000.000.
+- Adiciones, deducciones, pérdidas, créditos y exclusiones ITAN son entradas
+  explícitas con papel de trabajo. Un ejercicio abierto o balance descuadrado
+  bloquea registrar la constancia. El ERP no presenta FV 710 ni ITAN.
 
 Código principal: `apps/erp-api/src/modules/contabilidad`.
 
