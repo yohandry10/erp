@@ -615,6 +615,7 @@ export default function ContabilidadPage() {
     { title: 'Centros de costo', description: 'Asignación operativa por unidad.', href: '/dashboard/contabilidad/centros-costo', icon: Calculator },
     { title: 'Presupuestos', description: 'Ejecución y alertas del periodo.', href: '/dashboard/contabilidad/presupuestos', icon: Landmark },
     { title: 'Consolidación', description: 'Grupos empresariales y reportes configurables.', href: '/dashboard/contabilidad/consolidacion', icon: Building2 },
+    { title: 'Impuestos Perú', description: 'Borrador mensual IGV/Renta y constancias SUNAT.', href: '/dashboard/contabilidad/impuestos', icon: Receipt },
   ]
 
   const barMetrics = connectedMetrics.map(([label, value]) => {
