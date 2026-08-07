@@ -17,6 +17,7 @@ import { verificarTitularidadCertificado } from '../../shared/utils/certificado-
 import * as crypto from 'crypto';
 import { ApiPeruService } from './apiperu.service';
 import { ConfigService } from '@nestjs/config';
+import { validateArgentinaCuit } from '../paises/initial-country';
 
 @Injectable()
 export class ValidationService {
@@ -46,7 +47,7 @@ export class ValidationService {
       const { data: empresa, error } = await this.supabaseService
         .getClient()
         .from('empresa_config')
-        .select('certificado_pfx, certificado_password, certificado_expira_en, ruc, sunat_cert_expected_ruc, sunat_environment')
+        .select('certificado_pfx, certificado_password, certificado_expira_en, ruc, pais, sunat_cert_expected_ruc, sunat_environment, arca_cuit_representada, arca_environment')
         .eq('tenant_id', tenantId)
         .single();
 
@@ -80,8 +81,26 @@ export class ValidationService {
         // Que cargue y no este vencido no basta: SUNAT solo acepta el
         // certificado del contribuyente que emite. Sin esta comprobacion el
         // estado daba "valido" a un certificado de otro titular.
-        const rucEmisor = empresa.sunat_cert_expected_ruc || empresa.ruc || null;
-        const titularidad = verificarTitularidadCertificado(metadata.subject, rucEmisor);
+        const esArgentina = String(empresa.pais || '').toUpperCase() === 'AR';
+        const rucEmisor = esArgentina
+          ? empresa.arca_cuit_representada || empresa.ruc || null
+          : empresa.sunat_cert_expected_ruc || empresa.ruc || null;
+        const titularidad = esArgentina
+          ? (() => {
+              const candidates = metadata.subject.match(/(?<!\d)\d{11}(?!\d)/g) ?? [];
+              const ids = [...new Set(candidates.filter(validateArgentinaCuit))];
+              const coincide = Boolean(
+                rucEmisor && ids.includes(String(rucEmisor).replace(/\D/g, '')),
+              );
+              return {
+                coincide,
+                rucsEnCertificado: ids,
+                error: coincide
+                  ? undefined
+                  : 'El certificado no declara el CUIT representado ante ARCA.',
+              };
+            })()
+          : verificarTitularidadCertificado(metadata.subject, rucEmisor);
         rucMatches = titularidad.coincide;
         rucsEnCertificado = titularidad.rucsEnCertificado;
 
@@ -89,7 +108,9 @@ export class ValidationService {
           // Misma politica que el preflight de emision: en homologacion se
           // avisa y se deja seguir probando, porque no se emite nada real;
           // en produccion es requisito duro y bloquea.
-          const enProduccion = String(empresa.sunat_environment ?? '').trim().toLowerCase() === 'produccion';
+          const enProduccion = String(
+            esArgentina ? empresa.arca_environment : empresa.sunat_environment,
+          ).trim().toLowerCase() === 'produccion';
 
           if (enProduccion) {
             errors.push(titularidad.error as string);
@@ -252,7 +273,9 @@ export class ValidationService {
 
       // Check required fields
       if (!empresa.ruc || empresa.ruc.trim() === '') {
-        missingFields.push(paisCodigo === 'PE' ? 'RUC' : 'NIT');
+        missingFields.push(
+          paisCodigo === 'PE' ? 'RUC' : paisCodigo === 'AR' ? 'CUIT' : 'NIT',
+        );
         isValid = false;
       } else {
         // Validate RUC/NIT format based on country
@@ -313,6 +336,11 @@ export class ValidationService {
 
       case 'CO': // Colombia - NIT (use dedicated service)
         return this.colombiaValidationService.validateNIT(taxId);
+
+      case 'AR':
+        return validateArgentinaCuit(taxId)
+          ? { isValid: true }
+          : { isValid: false, error: 'El CUIT debe tener 11 dígitos y dígito verificador válido' };
 
       case 'CL': // Chile - RUT
         const rutPattern = /^\d{7,8}-[\dkK]$/;
@@ -380,7 +408,12 @@ export class ValidationService {
             .eq('id', empresa.pais_id)
             .single();
 
-          fiscalAuthority = pais?.codigo_iso === 'CO' ? 'DIAN' : 'SUNAT';
+          fiscalAuthority =
+            pais?.codigo_iso === 'CO'
+              ? 'DIAN'
+              : pais?.codigo_iso === 'AR'
+                ? 'ARCA'
+                : 'SUNAT';
         }
       }
 

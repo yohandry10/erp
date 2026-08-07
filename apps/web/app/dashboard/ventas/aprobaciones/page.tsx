@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { CheckCircle2, AlertCircle, RefreshCw, XCircle, DollarSign, Clock, FileText } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface ClienteResumen {
   razon_social?: string
@@ -42,10 +43,6 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-function formatCurrency(value?: number) {
-  return `S/ ${toNumber(value).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
 const normalizePedidos = (raw: unknown): PedidoPendiente[] =>
   (Array.isArray(raw) ? raw : []).map((pedido: any) => ({
     ...pedido,
@@ -63,6 +60,12 @@ const normalizePedidos = (raw: unknown): PedidoPendiente[] =>
   }))
 
 export default function AprobacionesPage() {
+  const country = useCountryContext()
+  const formatCurrency = (value?: number) =>
+    new Intl.NumberFormat(country.locale || 'es-PE', {
+      style: 'currency',
+      currency: country.moneda || 'PEN',
+    }).format(toNumber(value))
   const { get, post } = useApi()
   const [loading, setLoading] = useState(true)
   const [decidingId, setDecidingId] = useState<string | null>(null)

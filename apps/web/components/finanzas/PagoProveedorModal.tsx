@@ -13,6 +13,7 @@ import { ProtectedComponent } from '@/components/auth/ProtectedComponent';
 import { Button } from '@/components/ui/button';
 import { DollarSign, Calendar, CreditCard, Building2, FileText } from 'lucide-react';
 import { useApi } from '@/hooks/use-api';
+import { useLocalizedMoney } from '@/hooks/use-localized-money';
 
 interface CuentaBancaria {
   id: string;
@@ -45,6 +46,7 @@ export default function PagoProveedorModal({
   onPagoSuccess,
 }: PagoProveedorModalProps) {
   const { get, post } = useApi({ showSuccessToast: true, throwOnError: true, retries: 1, timeoutMs: 12000 });
+  const { formatCurrency: formatLocalizedCurrency } = useLocalizedMoney();
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -172,10 +174,7 @@ export default function PagoProveedorModal({
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: moneda === 'USD' ? 'USD' : 'PEN',
-    }).format(amount);
+    return formatLocalizedCurrency(amount, moneda || 'PEN');
   };
 
   const handleMontoChange = (value: string) => {

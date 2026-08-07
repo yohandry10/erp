@@ -44,10 +44,12 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
   const country = useCountryContext()
   const documentoFiscal = country.documentoFiscal || 'RUC'
   const taxLabel = country.impuesto || 'IGV (18%)'
+  const locale = country.locale || 'es-PE'
+  const fiscalAuthority = country.servicioFiscal || 'SUNAT'
   const currencySymbol = country.simboloMoneda || 'S/'
   const documentoLabel = getDocumentoLabel(country.paisCodigo, ventaData.tipo_comprobante)
-  const fiscalLegend = getFiscalLegend(ventaData)
-  const receiverDocLabel = getReceiverDocLabel(ventaData.cliente_tipo_documento)
+  const fiscalLegend = getFiscalLegend(ventaData, documentoLabel, fiscalAuthority)
+  const receiverDocLabel = getReceiverDocLabel(ventaData.cliente_tipo_documento, documentoFiscal)
   const qrUrl = safeImageUrl(ventaData.sunat_qr_data_url)
   const hashValue = ventaData.hash_firma || ventaData.hash
 
@@ -95,10 +97,13 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
     return () => clearTimeout(timer)
   }, [handlePrint])
 
-  const formatMoney = (value: number) => `${currencySymbol} ${value.toFixed(2)}`
+  const formatMoney = (value: number) => `${currencySymbol} ${value.toLocaleString(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
   const formatDate = (dateStr?: string) => {
-    if (!dateStr) return new Date().toLocaleString('es-PE')
-    return new Date(dateStr).toLocaleString('es-PE')
+    if (!dateStr) return new Date().toLocaleString(locale)
+    return new Date(dateStr).toLocaleString(locale)
   }
 
   return (
@@ -160,11 +165,11 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
         <div className="footer">
           {qrUrl && (
             <div className="qr">
-              <img src={qrUrl} alt="Código QR SUNAT" />
+              <img src={qrUrl} alt={`Código QR ${fiscalAuthority}`} />
             </div>
           )}
           {hashValue && <div className="hash">Valor resumen/Hash: {hashValue}</div>}
-          {ventaData.estado_sunat && <div className="fiscal-status">Estado SUNAT: {ventaData.estado_sunat}</div>}
+          {ventaData.estado_sunat && <div className="fiscal-status">Estado {fiscalAuthority}: {ventaData.estado_sunat}</div>}
           <div className="fiscal-note">{fiscalLegend}</div>
           <div>¡Gracias por su compra!</div>
           <div>Conserve este ticket</div>
@@ -183,19 +188,26 @@ export function printTicket(
     taxLabel?: string
     documentoFiscal?: string
     documentoLabel?: string
+    locale?: string
+    fiscalAuthority?: string
   }
 ) {
   const currencySymbol = context?.currencySymbol ?? 'S/'
   const taxLabel = context?.taxLabel ?? 'IGV (18%)'
   const documentoFiscal = context?.documentoFiscal ?? 'RUC'
   const documentoLabel = context?.documentoLabel ?? getDocumentoLabel('PE', ventaData.tipo_comprobante)
-  const fiscalLegend = getFiscalLegend(ventaData)
-  const receiverDocLabel = getReceiverDocLabel(ventaData.cliente_tipo_documento)
+  const locale = context?.locale ?? 'es-PE'
+  const fiscalAuthority = context?.fiscalAuthority ?? 'SUNAT'
+  const fiscalLegend = getFiscalLegend(ventaData, documentoLabel, fiscalAuthority)
+  const receiverDocLabel = getReceiverDocLabel(ventaData.cliente_tipo_documento, documentoFiscal)
   const hashValue = ventaData.hash_firma || ventaData.hash
-  const formatMoney = (value: number) => `${currencySymbol} ${value.toFixed(2)}`
+  const formatMoney = (value: number) => `${currencySymbol} ${value.toLocaleString(context?.locale ?? 'es-PE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
   const formatDate = (dateStr?: string) => {
-    if (!dateStr) return new Date().toLocaleString('es-PE')
-    return new Date(dateStr).toLocaleString('es-PE')
+    if (!dateStr) return new Date().toLocaleString(locale)
+    return new Date(dateStr).toLocaleString(locale)
   }
 
   const itemsHtml = ventaData.items && ventaData.items.length > 0
@@ -224,7 +236,7 @@ export function printTicket(
     : ''
   const qrUrl = safeImageUrl(ventaData.sunat_qr_data_url)
   const qrHtml = qrUrl
-    ? `<div class="qr"><img src="${escapeHtml(qrUrl)}" alt="Código QR SUNAT" /></div>`
+    ? `<div class="qr"><img src="${escapeHtml(qrUrl)}" alt="Código QR ${escapeHtml(fiscalAuthority)}" /></div>`
     : ''
   const receiverDocHtml = ventaData.cliente_documento
     ? `<div>${escapeHtml(receiverDocLabel)}: ${escapeHtml(ventaData.cliente_documento)}</div>`
@@ -236,7 +248,7 @@ export function printTicket(
     ? `<div class="qr-content">${escapeHtml(ventaData.sunat_qr_content)}</div>`
     : ''
   const estadoSunatHtml = ventaData.estado_sunat
-    ? `<div class="fiscal-status">Estado SUNAT: ${escapeHtml(ventaData.estado_sunat)}</div>`
+    ? `<div class="fiscal-status">Estado ${escapeHtml(fiscalAuthority)}: ${escapeHtml(ventaData.estado_sunat)}</div>`
     : ''
 
   printWindow.document.write(`
@@ -283,21 +295,29 @@ export function printTicket(
 }
 
 function getDocumentoLabel(countryCode?: string, tipoComprobante?: string): string {
+  if (countryCode === 'AR') {
+    if (['1', '6', '11', '19', '51', '01'].includes(String(tipoComprobante))) return 'FACTURA'
+    if (['3', '8', '13', '21', '53'].includes(String(tipoComprobante))) return 'NOTA DE CRÉDITO'
+    if (['2', '7', '12', '20', '52'].includes(String(tipoComprobante))) return 'NOTA DE DÉBITO'
+    return 'TICKET'
+  }
   if (countryCode !== 'PE') return 'TICKET'
   if (tipoComprobante === '01') return 'FACTURA'
   if (tipoComprobante === '03') return 'BOLETA'
   return 'TICKET'
 }
 
-function getFiscalLegend(ventaData: TicketPrintProps['ventaData']): string {
+function getFiscalLegend(
+  ventaData: TicketPrintProps['ventaData'],
+  documentoLabel: string,
+  fiscalAuthority: string,
+): string {
   if (ventaData.representacion_fiscal && ventaData.sunat_qr_data_url) {
-    if (ventaData.tipo_comprobante === '01') return 'Representación impresa de la Factura Electrónica'
-    if (ventaData.tipo_comprobante === '03') return 'Representación impresa de la Boleta de Venta Electrónica'
-    return 'Representación impresa del comprobante electrónico'
+    return `Representación impresa de ${documentoLabel}`
   }
 
   if (ventaData.cpe_emitido) {
-    return 'CPE generado. QR SUNAT no disponible para impresión fiscal.'
+    return `Comprobante fiscal generado. QR ${fiscalAuthority} no disponible para impresión.`
   }
 
   if (ventaData.tipo_comprobante === '01' || ventaData.tipo_comprobante === '03') {
@@ -307,8 +327,10 @@ function getFiscalLegend(ventaData: TicketPrintProps['ventaData']): string {
   return 'Comprobante interno de caja'
 }
 
-function getReceiverDocLabel(tipoDocumento?: string): string {
-  if (tipoDocumento === '6') return 'RUC'
+function getReceiverDocLabel(tipoDocumento: string | undefined, documentoFiscal: string): string {
+  if (tipoDocumento === '6' || tipoDocumento === 'CUIT' || tipoDocumento === 'RUC') {
+    return documentoFiscal
+  }
   if (tipoDocumento === '1') return 'DNI'
   if (tipoDocumento === '4') return 'Carné de extranjería'
   if (tipoDocumento === '7') return 'Pasaporte'

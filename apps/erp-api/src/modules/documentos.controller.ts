@@ -222,10 +222,13 @@ export class DocumentosController {
   @RequirePermission('documentos.validations.run') // HARDENING: validaciones externas requieren permiso.
   @ApiOperation({ summary: 'Validate RUC with SUNAT' })
   @ApiResponse({ status: 200, description: 'RUC validated successfully' })
-  async validarRUC(@Body() data: { ruc: string }) {
+  async validarRUC(
+    @Body() data: { ruc: string },
+    @CurrentTenant() tenantId: string,
+  ) {
     try {
       console.log('🔍 Validando RUC:', data.ruc);
-      return await this.documentosService.validarRUC(data.ruc);
+      return await this.documentosService.validarRUC(data.ruc, tenantId);
     } catch (error) {
       console.error('❌ Error validando RUC:', error);
       return {
@@ -240,10 +243,13 @@ export class DocumentosController {
   @RequirePermission('documentos.validations.run') // HARDENING: validación previa protegida.
   @ApiOperation({ summary: 'Validate document data before sending' })
   @ApiResponse({ status: 200, description: 'Document validated successfully' })
-  async validarDocumento(@Body() documentoData: any) {
+  async validarDocumento(
+    @Body() documentoData: any,
+    @CurrentTenant() tenantId: string,
+  ) {
     try {
       console.log('✅ Validando documento antes de envío');
-      return await this.documentosService.validarDocumento(documentoData);
+      return await this.documentosService.validarDocumento(documentoData, tenantId);
     } catch (error) {
       console.error('❌ Error validando documento:', error);
       return {

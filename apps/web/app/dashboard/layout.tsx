@@ -100,6 +100,23 @@ export default function DashboardLayout({
     return null;
   }
 
+  // No renderizar módulos con los valores fiscales por defecto mientras se
+  // resuelve el país del tenant. Esto evita que una demo AR/CO muestre por un
+  // instante moneda PEN o etiquetas SUNAT antes de hidratar su configuración.
+  if (authLoading || (session && country.loading)) {
+    return (
+      <div
+        data-erp-theme={dashboardTheme}
+        className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground"
+      >
+        <div className="rounded-2xl border border-border bg-card px-6 py-5 text-center shadow-xl">
+          <p className="text-sm font-semibold">Preparando configuración fiscal del tenant…</p>
+          <p className="mt-1 text-xs text-muted-foreground">País, moneda y reglas tributarias</p>
+        </div>
+      </div>
+    );
+  }
+
   const isWizardRoute = pathname?.startsWith("/dashboard/wizard");
   if (
     !authLoading &&

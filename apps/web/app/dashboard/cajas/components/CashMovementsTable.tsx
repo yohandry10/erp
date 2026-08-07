@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface MovimientoCaja {
     id: string;
@@ -24,6 +25,8 @@ interface CashMovementsTableProps {
 }
 
 export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTableProps) {
+    const country = useCountryContext();
+    const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
     const { get } = useApi();
     const [movimientos, setMovimientos] = useState<MovimientoCaja[]>([]);
     const [loading, setLoading] = useState(true);
@@ -140,10 +143,10 @@ export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTa
                                 {mov.motivo && <span className="text-muted-foreground italic">{mov.motivo}</span>}
                             </td>
                             <td className={`whitespace-nowrap px-3 py-4 text-sm text-right font-medium ${mov.monto >= 0 ? 'text-emerald-400' : 'text-destructive'}`}>
-                                {mov.monto >= 0 ? '+' : ''}S/ {mov.monto.toFixed(2)}
+                                {mov.monto >= 0 ? '+' : ''}{currencySymbol} {mov.monto.toFixed(2)}
                             </td>
                             <td className="whitespace-nowrap px-3 py-4 text-sm text-right text-foreground font-medium">
-                                S/ {mov.saldo_nuevo.toFixed(2)}
+                                {currencySymbol} {mov.saldo_nuevo.toFixed(2)}
                             </td>
                             <td className="whitespace-nowrap px-3 py-4 text-sm text-muted-foreground">
                                 {mov.usuario?.nombres}

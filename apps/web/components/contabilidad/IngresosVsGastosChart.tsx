@@ -1,6 +1,7 @@
 'use client'
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface IngresosVsGastosChartProps {
   ingresos: number
@@ -9,6 +10,7 @@ interface IngresosVsGastosChartProps {
 }
 
 export function IngresosVsGastosChart({ ingresos, costos, gastos }: IngresosVsGastosChartProps) {
+  const { formatCurrency } = useLocalizedMoney()
   const data = [
     {
       name: 'Ingresos',
@@ -27,15 +29,6 @@ export function IngresosVsGastosChart({ ingresos, costos, gastos }: IngresosVsGa
     }
   ]
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value)
-  }
-
   return (
     <div className="w-[100%] h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
@@ -50,7 +43,7 @@ export function IngresosVsGastosChart({ ingresos, costos, gastos }: IngresosVsGa
           />
           <YAxis 
             tick={{ fill: 'var(--primary-700)', fontSize: 12 }}
-            tickFormatter={formatCurrency}
+            tickFormatter={(value) => formatCurrency(value)}
           />
           <Tooltip 
             formatter={(value: number) => formatCurrency(value)}

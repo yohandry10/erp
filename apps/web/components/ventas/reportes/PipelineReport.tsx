@@ -5,6 +5,7 @@ import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { ArrowDownRight, ArrowRight, ArrowUpRight, BarChart2, Loader2 } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface PipelineStage {
   cantidad: number
@@ -41,14 +42,13 @@ interface Props {
   filters: ReportFilters
 }
 
-const currencyFormatter = new Intl.NumberFormat('es-PE', {
-  style: 'currency',
-  currency: 'PEN',
-  maximumFractionDigits: 2
-})
-
 export default function PipelineReport({ filters }: Props) {
   const { get } = useApi()
+  const country = useCountryContext()
+  const currencyFormatter = useMemo(() => new Intl.NumberFormat(
+    country.locale || 'es-PE',
+    { style: 'currency', currency: country.moneda, maximumFractionDigits: 2 }
+  ), [country.locale, country.moneda])
   const [data, setData] = useState<PipelineResponse | null>(null)
   const [loading, setLoading] = useState(true)
 

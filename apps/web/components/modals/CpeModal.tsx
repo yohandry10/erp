@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CpeModalProps {
   isOpen: boolean
@@ -11,11 +12,20 @@ interface CpeModalProps {
 }
 
 export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) {
-  const { tasaIgv } = useTaxConfig()
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const taxPercent = Math.round(tasaIgv * 10000) / 100
+  const formatMoney = (value: number) =>
+    new Intl.NumberFormat(country.locale || 'es-PE', {
+      style: 'currency',
+      currency: country.moneda || 'PEN',
+    }).format(value)
   const [formData, setFormData] = useState({
     tipoComprobante: '01', // Factura por defecto
     serie: 'F001',
+    clienteTipoDocumento: 'RUC',
     clienteRuc: '',
     clienteRazonSocial: '',
     clienteDireccion: '',
@@ -41,6 +51,16 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
   const api = useApiCall()
 
+  useEffect(() => {
+    if (!country.moneda) return
+    setFormData((current) => ({
+      ...current,
+      moneda: country.moneda,
+      serie: isArgentina ? '00001' : isColombia ? 'FE' : current.serie,
+      clienteTipoDocumento: isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC',
+    }))
+  }, [country.moneda, isArgentina, isColombia])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -64,13 +84,14 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       // Reset form
       setFormData({
         tipoComprobante: '01',
-        serie: 'F001',
+        serie: isArgentina ? '00001' : isColombia ? 'FE' : 'F001',
+        clienteTipoDocumento: isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC',
         clienteRuc: '',
         clienteRazonSocial: '',
         clienteDireccion: '',
         fechaEmision: new Date().toISOString().split('T')[0],
         fechaVencimiento: '',
-        moneda: 'PEN',
+        moneda: country.moneda || 'PEN',
         tipoOperacion: '0101',
         observaciones: '',
         items: [
@@ -99,7 +120,11 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
     // Auto-update serie based on tipo comprobante
     if (name === 'tipoComprobante') {
-      let newSerie = 'F001'
+      let newSerie = isArgentina ? '00001' : isColombia ? 'FE' : 'F001'
+      if (isArgentina || isColombia) {
+        setFormData(prev => ({ ...prev, serie: newSerie }))
+        return
+      }
       switch (value) {
         case '01': newSerie = 'F001'; break
         case '03': newSerie = 'B001'; break
@@ -166,8 +191,8 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   const total = subtotal + totalIgv
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1100]">
-      <div className="bg-card rounded-xl p-8 w-[95%] max-w-[900px] overflow-auto">
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center overflow-y-auto bg-[rgba(0,_0,_0,_0.5)] p-4">
+      <div className="max-h-[calc(100dvh-2rem)] w-[95%] max-w-[900px] overflow-y-auto rounded-xl bg-card p-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-foreground">Nuevo Comprobante Electrónico</h2>
           <button
@@ -194,8 +219,8 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   onChange={handleChange}
                   required className="w-[100%] p-3 border rounded-[6px] text-sm"
                 >
-                  <option value="01">01 - Factura</option>
-                  <option value="03">03 - Boleta de Venta</option>
+                  <option value="01">01 - {isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura'}</option>
+                  <option value="03">03 - {isArgentina ? 'Factura B' : isColombia ? 'Documento equivalente' : 'Boleta de Venta'}</option>
                   <option value="07">07 - Nota de Crédito</option>
                   <option value="08">08 - Nota de Débito</option>
                 </select>
@@ -236,7 +261,13 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   value={formData.moneda}
                   onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
                 >
-                  <option value="PEN">PEN - Soles</option>
+                  {isArgentina ? (
+                    <option value="ARS">ARS - Pesos argentinos</option>
+                  ) : isColombia ? (
+                    <option value="COP">COP - Pesos colombianos</option>
+                  ) : (
+                    <option value="PEN">PEN - Soles</option>
+                  )}
                   <option value="USD">USD - Dólares</option>
                 </select>
               </div>
@@ -250,8 +281,41 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             </h3>
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4">
               <div>
+                <label htmlFor="cpe-modal-cliente-tipo-documento" className="block mb-2 font-semibold text-foreground/85">
+                  Tipo de identificación *
+                </label>
+                <select
+                  id="cpe-modal-cliente-tipo-documento"
+                  name="clienteTipoDocumento"
+                  value={formData.clienteTipoDocumento}
+                  onChange={handleChange}
+                  required
+                  className="w-[100%] p-3 border rounded-[6px] text-sm"
+                >
+                  {isArgentina ? (
+                    <>
+                      <option value="CUIT">CUIT</option>
+                      <option value="DNI">DNI</option>
+                    </>
+                  ) : isColombia ? (
+                    <>
+                      <option value="NIT">NIT</option>
+                      <option value="CC">Cédula de ciudadanía</option>
+                      <option value="CE">Cédula de extranjería</option>
+                      <option value="TI">Tarjeta de identidad</option>
+                      <option value="PASAPORTE">Pasaporte</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="RUC">RUC</option>
+                      <option value="DNI">DNI</option>
+                    </>
+                  )}
+                </select>
+              </div>
+              <div>
                 <label htmlFor="cpe-modal-cliente-ruc" className="block mb-2 font-semibold text-foreground/85">
-                  RUC/DNI *
+                  {isArgentina ? 'CUIT/DNI' : isColombia ? 'NIT/CC' : 'RUC/DNI'} *
                 </label>
                 <input id="cpe-modal-cliente-ruc"
                   type="text"
@@ -373,7 +437,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
                   <div>
                     <label className="block mb-2 font-semibold text-foreground/85">
-                      IGV
+                      {nombreImpuesto}
                     </label>
                     <input
                       type="number"
@@ -405,15 +469,15 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             <div className="grid grid-cols-[repeat(3,_1fr)] gap-4 text-right">
               <div>
                 <div className="font-semibold text-muted-foreground">Subtotal:</div>
-                <div className="text-base font-semibold">S/ {subtotal.toFixed(2)}</div>
+                <div className="text-base font-semibold">{formatMoney(subtotal)}</div>
               </div>
               <div>
-                <div className="font-semibold text-muted-foreground">IGV ({taxPercent}%):</div>
-                <div className="text-base font-semibold">S/ {totalIgv.toFixed(2)}</div>
+                <div className="font-semibold text-muted-foreground">{nombreImpuesto} ({taxPercent}%):</div>
+                <div className="text-base font-semibold">{formatMoney(totalIgv)}</div>
               </div>
               <div>
                 <div className="font-semibold text-muted-foreground">Total:</div>
-                <div className="text-[1.3rem] font-bold text-emerald-400">S/ {total.toFixed(2)}</div>
+                <div className="text-[1.3rem] font-bold text-emerald-400">{formatMoney(total)}</div>
               </div>
             </div>
           </div>

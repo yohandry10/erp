@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, Plus, X, ChevronDown } from 'lucide-react'
 import ClienteQuickCreate from './ClienteQuickCreate'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface ClienteSelectorProps {
   value?: string
@@ -24,6 +25,7 @@ export default function ClienteSelector({
   error
 }: ClienteSelectorProps) {
   const { get } = useApi()
+  const country = useCountryContext()
   const [searchTerm, setSearchTerm] = useState('')
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null)
@@ -219,7 +221,7 @@ export default function ClienteSelector({
             <Search className="absolute left-4 top-[50%] -translate-y-1/2 text-[var(--primary-400)] w-5 h-5" />
             <input
               type="text"
-              placeholder="Buscar por RUC, DNI o nombre..."
+              placeholder={`Buscar por ${country.paisCodigo === 'AR' ? 'CUIT/DNI' : country.paisCodigo === 'CO' ? 'NIT/CC' : 'RUC/DNI'} o nombre...`}
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
               disabled={disabled} className="w-[100%] pt-4 pr-12 pb-4 pl-12 text-base transition bg-card/90 text-[var(--primary-800)]"

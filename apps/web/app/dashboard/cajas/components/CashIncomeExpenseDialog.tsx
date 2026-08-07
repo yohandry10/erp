@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { CashDialogFrame } from './CashDialogFrame';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface CashIncomeExpenseDialogProps {
     isOpen: boolean;
@@ -15,6 +16,8 @@ export function CashIncomeExpenseDialog({
     onSuccess,
     sesionId,
 }: CashIncomeExpenseDialogProps) {
+    const country = useCountryContext();
+    const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
     const { post } = useApi();
     const [tipo, setTipo] = useState<'INGRESO' | 'GASTO'>('INGRESO');
     const [monto, setMonto] = useState('');
@@ -90,7 +93,7 @@ export function CashIncomeExpenseDialog({
                                         <label className="block text-sm font-medium text-foreground/85">Monto</label>
                                         <div className="mt-1 relative rounded-md shadow-sm">
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <span className="text-muted-foreground sm:text-sm">S/</span>
+                                                <span className="text-muted-foreground sm:text-sm">{currencySymbol}</span>
                                             </div>
                                             <input
                                                 type="number"

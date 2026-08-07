@@ -166,7 +166,7 @@ Write-Host "  • Contraseña:     admin" -ForegroundColor White
 Write-Host ""
 Write-Host "📚 Documentación:" -ForegroundColor Yellow
 Write-Host "  • Ver: monitoring/README.md" -ForegroundColor White
-Write-Host "  • Guía: docs/GUIA_INTEGRACION_METRICAS.md" -ForegroundColor White
+Write-Host "  • Guía: docs/OPERATIONS.md" -ForegroundColor White
 Write-Host ""
 Write-Host "🔍 Comandos Útiles:" -ForegroundColor Yellow
 Write-Host "  • Ver logs:       docker-compose logs -f" -ForegroundColor White

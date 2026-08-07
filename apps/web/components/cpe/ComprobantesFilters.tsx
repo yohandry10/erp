@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface Props {
   filters: {
@@ -17,6 +18,9 @@ interface Props {
 }
 
 export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
   const [local, setLocal] = useState(filters)
 
   const handleChange = (field: keyof typeof local, value: string) => {
@@ -29,7 +33,7 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
     <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
       <input
         className="rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
-        placeholder="Cliente / RUC"
+        placeholder={`Cliente / ${isArgentina ? 'CUIT' : isColombia ? 'NIT/CC' : 'RUC'}`}
         value={local.cliente}
         onChange={(e) => handleChange('cliente', e.target.value)}
       />
@@ -39,8 +43,8 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
         onChange={(e) => handleChange('tipoComprobante', e.target.value)}
       >
         <option value="">Todos los tipos</option>
-        <option value="01">Factura</option>
-        <option value="03">Boleta</option>
+        <option value="01">{isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura'}</option>
+        <option value="03">{isArgentina ? 'Factura B' : isColombia ? 'Documento equivalente' : 'Boleta'}</option>
         <option value="07">Nota Crédito</option>
         <option value="08">Nota Débito</option>
       </select>

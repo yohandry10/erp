@@ -6,14 +6,24 @@ interface RolesSectionProps {
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 export default function RolesSection({ roles }: RolesSectionProps) {
+  const country = useCountryContext()
+  const visiblePermissions = (permissions: unknown): string[] => {
+    if (!Array.isArray(permissions)) return []
+    const normalized = permissions.map(String)
+    if (country.paisCodigo === 'PE') return normalized
+    return normalized.filter((permission) => !/^(gre|sire)\b/i.test(permission.trim()))
+  }
+
   return (
     <section className="space-y-4">
       <h2 className="text-xl font-bold text-white group-data-[erp-theme=light]/dashboard:text-foreground">Roles y Permisos</h2>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {roles.map((rol: any, index) => (
-          <Card key={index} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
+        {roles.map((rol: any, index) => {
+          const permisos = visiblePermissions(rol.permisos)
+          return <Card key={index} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
                 <CardTitle className="mb-2 text-base text-white group-data-[erp-theme=light]/dashboard:text-foreground">{rol.nombre}</CardTitle>
@@ -31,8 +41,8 @@ export default function RolesSection({ roles }: RolesSectionProps) {
                 Permisos:
               </p>
               <div className="flex flex-wrap gap-2 mb-4">
-                {Array.isArray(rol.permisos) && rol.permisos.length > 0 ? (
-                  rol.permisos.map((permiso: string, pIndex: number) => (
+                {permisos.length > 0 ? (
+                  permisos.map((permiso: string, pIndex: number) => (
                     <Badge key={pIndex} className="border-cyan-300/25 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
                       {permiso}
                     </Badge>
@@ -45,7 +55,7 @@ export default function RolesSection({ roles }: RolesSectionProps) {
               </div>
             </CardContent>
           </Card>
-        ))}
+        })}
       </div>
     </section>
   )

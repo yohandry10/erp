@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { exportToExcel, formatCurrencyForExcel } from '@/lib/excel-export'
 import { exportBalanceComprobacionToPDF } from '@/lib/pdf-export'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface BalanceComprobacionItem {
   cuenta: string
@@ -25,6 +26,7 @@ interface BalanceComprobacionProps {
 
 export function BalanceComprobacion({ anio, mes, showComparison = false }: BalanceComprobacionProps) {
   const { get } = useApi()
+  const { formatCurrency } = useLocalizedMoney()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<BalanceComprobacionItem[]>([])
@@ -74,14 +76,6 @@ export function BalanceComprobacion({ anio, mes, showComparison = false }: Balan
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 2,
-    }).format(amount)
-  }
 
   const getPreviousItemValue = (cuenta: string): number => {
     const prevItem = previousData.find((item) => item.cuenta === cuenta)

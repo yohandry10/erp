@@ -19,6 +19,7 @@ import {
   Calendar
 } from 'lucide-react'
 import MovimientosBancariosTable from '@/components/finanzas/MovimientosBancariosTable'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CuentaBancaria {
   id: string
@@ -90,6 +91,7 @@ export default function CuentaBancariaDetallePage() {
   const router = useRouter()
   const params = useParams()
   const { get } = useApi()
+  const country = useCountryContext()
   const cuentaId = params?.id as string
 
   const [cuenta, setCuenta] = useState<CuentaBancaria | null>(null)
@@ -182,9 +184,11 @@ export default function CuentaBancariaDetallePage() {
     setFilters({})
   }
 
-  const formatCurrency = (amount: number, moneda: string = 'PEN') => {
-    const currency = moneda === 'USD' ? 'USD' : moneda === 'EUR' ? 'EUR' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
+  const formatCurrency = (amount: number, moneda: string = country.moneda || 'PEN') => {
+    const currency = ['USD', 'EUR', 'PEN', 'ARS', 'COP'].includes(moneda)
+      ? moneda
+      : country.moneda || 'PEN'
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
       currency: currency,
     }).format(toNumber(amount))
@@ -193,7 +197,7 @@ export default function CuentaBancariaDetallePage() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     if (Number.isNaN(date.getTime())) return '-'
-    return date.toLocaleDateString('es-PE', {
+    return date.toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'

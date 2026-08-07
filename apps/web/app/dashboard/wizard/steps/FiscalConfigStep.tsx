@@ -10,7 +10,8 @@ export function FiscalConfigStep() {
   const { state, updateConfiguration } = useWizardContext()
   const country = useCountryContext()
   const isPeru = country.paisCodigo === 'PE'
-  const isColombia: boolean = false
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   return (
@@ -59,6 +60,29 @@ export function FiscalConfigStep() {
               </div>
             )}
 
+            {isArgentina && (
+              <div>
+                <Label htmlFor="regimen_tributario_ar" className="mb-2 block">
+                  Condición tributaria <span className="text-red-500">*</span>
+                </Label>
+                <select
+                  id="regimen_tributario_ar"
+                  value={state.configuration.regimen_tributario || ''}
+                  onChange={(event) => updateConfiguration({
+                    regimen_tributario: event.target.value as any,
+                    arca_condicion_iva: event.target.value as any,
+                  })}
+                  className="h-10 w-full rounded-md border bg-card px-3"
+                >
+                  <option value="">Seleccione condición</option>
+                  <option value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</option>
+                  <option value="MONOTRIBUTO">Monotributo</option>
+                  <option value="EXENTO">Exento en IVA</option>
+                  <option value="NO_RESPONSABLE">No Responsable</option>
+                </select>
+              </div>
+            )}
+
             {isColombia && (
               <div>
                 <Label htmlFor="dian_tipo_contribuyente" className="mb-2 block">
@@ -95,7 +119,11 @@ export function FiscalConfigStep() {
                   id="dian_regimen_fiscal"
                   value={state.configuration.dian_regimen_fiscal || ''}
                   onChange={(e) => {
-                    updateConfiguration({ dian_regimen_fiscal: e.target.value.toUpperCase() })
+                    const value = e.target.value.toUpperCase()
+                    updateConfiguration({
+                      dian_regimen_fiscal: value,
+                      regimen_tributario: value as any,
+                    })
                     setErrors({ ...errors, dian_regimen_fiscal: '' })
                   }}
                   placeholder="O-13" className="text-base"
@@ -114,9 +142,9 @@ export function FiscalConfigStep() {
                 id="igv_porcentaje"
                 type="number"
                 step="0.01"
-                value={state.configuration.igv_porcentaje || 18}
+                value={state.configuration.igv_porcentaje || country.impuestoRate * 100 || 18}
                 onChange={(e) => updateConfiguration({ igv_porcentaje: parseFloat(e.target.value) })}
-                placeholder="18" className="text-base"
+                placeholder={String(country.impuestoRate * 100)} className="text-base"
               />
             </div>
 
@@ -147,17 +175,27 @@ export function FiscalConfigStep() {
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
             <div>
               <Label htmlFor="serie_factura" className="mb-2 block">
-                {isPeru ? 'Serie Facturas' : 'Prefijo Factura'} <span className="text-red-500">*</span>
+                {isArgentina ? 'Punto de venta' : isPeru ? 'Serie Facturas' : 'Prefijo Factura'} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="serie_factura"
                 value={state.configuration.serie_factura || ''}
                 onChange={(e) => {
-                  updateConfiguration({ serie_factura: e.target.value.toUpperCase() })
+                  const value = isArgentina
+                    ? e.target.value.replace(/\D/g, '').slice(0, 5)
+                    : e.target.value.toUpperCase()
+                  updateConfiguration(isArgentina
+                    ? {
+                        serie_factura: value,
+                        serie_boleta: value,
+                        serie_nota_credito: value,
+                        arca_punto_venta: Number(value || 0),
+                      }
+                    : { serie_factura: value })
                   setErrors({ ...errors, serie_factura: '' })
                 }}
-                placeholder="F001"
-                maxLength={4} className="text-base"
+                placeholder={isArgentina ? '00001' : isColombia ? 'FE' : 'F001'}
+                maxLength={isArgentina ? 5 : 4} className="text-base"
               />
               {errors.serie_factura && (
                 <p className="text-xs text-red-500 mt-1">
@@ -189,7 +227,7 @@ export function FiscalConfigStep() {
               </div>
             )}
 
-            <div>
+            {!isArgentina && <div>
               <Label htmlFor="serie_nota_credito" className="mb-2 block">
                 Serie Notas de Crédito
               </Label>
@@ -200,7 +238,7 @@ export function FiscalConfigStep() {
                 placeholder="NC01"
                 maxLength={4} className="text-base"
               />
-            </div>
+            </div>}
           </div>
         </div>
       </div>

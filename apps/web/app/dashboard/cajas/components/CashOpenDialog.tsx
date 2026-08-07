@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { DenominationForm, Denominaciones } from './DenominationForm';
 import { CashDialogFrame } from './CashDialogFrame';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface CashOpenDialogProps {
     isOpen: boolean;
@@ -17,6 +18,8 @@ interface Caja {
 }
 
 export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogProps) {
+    const country = useCountryContext();
+    const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
     const { get, post } = useApi();
     const [step, setStep] = useState<'SELECT_CAJA' | 'AMOUNT' | 'CONFIRM'>('SELECT_CAJA');
     const [cajas, setCajas] = useState<Caja[]>([]);
@@ -78,6 +81,7 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
             // URL y el arqueo en `denominaciones_apertura`.
             const payload = {
                 monto_inicio: montoInicio,
+                moneda: country.moneda || (country.paisCodigo === 'AR' ? 'ARS' : country.paisCodigo === 'CO' ? 'COP' : 'PEN'),
                 denominaciones_apertura: denominaciones,
             };
 
@@ -180,7 +184,7 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
                                                 <div className="sm:col-span-1">
                                                     <dt className="text-sm font-medium text-muted-foreground">Monto Inicial</dt>
                                                     <dd className="mt-1 text-2xl font-bold text-primary">
-                                                        S/ {montoInicio.toFixed(2)}
+                                                        {currencySymbol} {montoInicio.toFixed(2)}
                                                     </dd>
                                                 </div>
                                             </dl>

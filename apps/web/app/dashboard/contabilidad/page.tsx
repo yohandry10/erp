@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDashboardTheme } from '@/hooks/use-dashboard-theme'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 type VistaContable =
   | 'estado-resultados'
@@ -106,7 +107,21 @@ export default function ContabilidadPage() {
   const [vistaActual, setVistaActual] = useState<VistaContable>('registro-compras')
   const [loading, setLoading] = useState(false)
   const { theme } = useDashboardTheme()
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
   const darkMode = theme === 'dark'
+  const vistasLocalizadas = vistas.map((vista) =>
+    vista.id === 'libros-electronicos-sunat' && (isArgentina || isColombia)
+      ? {
+          ...vista,
+          title: isArgentina ? 'Libros IVA y contables' : 'Libros contables y reportes DIAN',
+          description: isArgentina
+            ? 'Libro IVA Ventas, IVA Compras, Diario y Mayor para Argentina.'
+            : 'Diario, Mayor, Inventarios y Balances, auxiliares y soporte para información exógena.',
+        }
+      : vista,
+  )
 
   const [registroCompras, setRegistroCompras] = useState<any>(null)
   const [balanceComprobacion, setBalanceComprobacion] = useState<any>(null)
@@ -186,10 +201,80 @@ export default function ContabilidadPage() {
     }
   }
 
+  const renderDescargasPle = () => (
+    <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-card/70 text-foreground shadow-2xl shadow-blue-950/20')}>
+      <CardHeader className={cn('border-b', darkMode ? 'border-cyan-400/10 bg-card/45' : 'border-border bg-card')}>
+        <CardTitle className={cn('text-lg', darkMode && 'text-foreground')}>
+          Descargar libros electrónicos (PLE)
+        </CardTitle>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          Archivos TXT con la estructura de SUNAT, listos para el validador PVS.
+          El nombre lo arma el sistema con el RUC y el período.
+        </p>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="ple-anio" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Año
+            </label>
+            <input
+              id="ple-anio"
+              type="number"
+              min="2000"
+              max="2100"
+              value={pleAnio}
+              onChange={(event) => setPleAnio(event.target.value)}
+              className="w-28 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="ple-mes" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Mes
+            </label>
+            <select
+              id="ple-mes"
+              value={pleMes}
+              onChange={(event) => setPleMes(event.target.value)}
+              className="w-32 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            >
+              {Array.from({ length: 12 }, (_, indice) => String(indice + 1).padStart(2, '0')).map((mes) => (
+                <option key={mes} value={mes}>
+                  {mes}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {LIBROS_PLE.map((libro) => (
+            <Button
+              key={libro.id}
+              type="button"
+              variant={libro.id === 'todos' ? 'default' : 'outline'}
+              size="sm"
+              disabled={pleLibroEnCurso !== null}
+              onClick={() => descargarPle(libro.id)}
+            >
+              {pleLibroEnCurso === libro.id ? 'Generando…' : libro.etiqueta}
+            </Button>
+          ))}
+        </div>
+
+        {pleError && (
+          <p role="alert" className="mt-4 text-sm text-destructive">
+            {pleError}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  )
+
   const formatearMoneda = (valor: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
     }).format(valor)
   }
 
@@ -290,6 +375,15 @@ export default function ContabilidadPage() {
   }, [get])
 
   const cargarLibrosElectronicosSunat = useCallback(async () => {
+    if (isArgentina || isColombia) {
+      setLibrosElectronicosSunat({
+        librosConfigurados: 4,
+        archivosGenerados: 0,
+        ultimoEnvio: isColombia ? 'Sin generar' : 'Sin presentar',
+        estadoPLE: 'Libro IVA Ventas / Compras',
+      })
+      return
+    }
     setLoading(true)
     try {
       const response = await get('/api/contabilidad/libros-electronicos-sunat')
@@ -299,7 +393,7 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }, [get])
+  }, [get, isArgentina, isColombia])
 
   const cargarDatos = useCallback(async () => {
     if (vistaActual === 'registro-compras') await cargarRegistroCompras()
@@ -341,7 +435,8 @@ export default function ContabilidadPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const currentVista = vistas.find((vista) => vista.id === vistaActual) ?? vistas[0]
+  const currentVista =
+    vistasLocalizadas.find((vista) => vista.id === vistaActual) ?? vistasLocalizadas[0]
   const CurrentIcon = currentVista.icon
 
   const metricClass = cn(
@@ -470,83 +565,30 @@ export default function ContabilidadPage() {
       ])
     }
 
-    const panelLibros = renderPanel('Libros Electrónicos SUNAT', 'Preparación para PLE y control de archivos electrónicos.', [
+    const panelLibros = renderPanel(
+      isArgentina ? 'Libros IVA y contables' : isColombia ? 'Libros contables y reportes DIAN' : 'Libros Electrónicos SUNAT',
+      isArgentina
+        ? 'Libro IVA Ventas, Libro IVA Compras, Diario y Mayor del tenant argentino.'
+        : isColombia
+          ? 'Libros contables obligatorios y preparación de información tributaria para DIAN.'
+          : 'Preparación para PLE y control de archivos electrónicos.',
+      [
       { label: 'Libros configurados', value: librosElectronicosSunat?.librosConfigurados || 0 },
       { label: 'Archivos generados', value: librosElectronicosSunat?.archivosGenerados || 0 },
       { label: 'Último envío', value: librosElectronicosSunat?.ultimoEnvio || 'Pendiente' },
-      { label: 'Estado PLE', value: librosElectronicosSunat?.estadoPLE || 'Configurado' },
+      {
+        label: isArgentina ? 'Estado registral' : 'Estado PLE',
+        value: librosElectronicosSunat?.estadoPLE || 'Configurado',
+      },
     ])
+
+    // El PLE es de SUNAT: Argentina y Colombia tienen sus propios formatos.
+    if (isArgentina || isColombia) return panelLibros
 
     return (
       <div className="space-y-6">
         {panelLibros}
-        <Card className={cn('overflow-hidden', darkMode && 'border-cyan-400/20 bg-card/70 text-foreground shadow-2xl shadow-blue-950/20')}>
-          <CardHeader className={cn('border-b', darkMode ? 'border-cyan-400/10 bg-card/45' : 'border-border bg-card')}>
-            <CardTitle className={cn('text-lg', darkMode && 'text-foreground')}>
-              Descargar libros electrónicos (PLE)
-            </CardTitle>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Archivos TXT con la estructura de SUNAT, listos para el validador PVS.
-              El nombre lo arma el sistema con el RUC y el período.
-            </p>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label htmlFor="ple-anio" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Año
-                </label>
-                <input
-                  id="ple-anio"
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  value={pleAnio}
-                  onChange={(event) => setPleAnio(event.target.value)}
-                  className="w-28 rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="ple-mes" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Mes
-                </label>
-                <select
-                  id="ple-mes"
-                  value={pleMes}
-                  onChange={(event) => setPleMes(event.target.value)}
-                  className="w-32 rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {Array.from({ length: 12 }, (_, indice) => String(indice + 1).padStart(2, '0')).map((mes) => (
-                    <option key={mes} value={mes}>
-                      {mes}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {LIBROS_PLE.map((libro) => (
-                <Button
-                  key={libro.id}
-                  type="button"
-                  variant={libro.id === 'todos' ? 'default' : 'outline'}
-                  size="sm"
-                  disabled={pleLibroEnCurso !== null}
-                  onClick={() => descargarPle(libro.id)}
-                >
-                  {pleLibroEnCurso === libro.id ? 'Generando…' : libro.etiqueta}
-                </Button>
-              ))}
-            </div>
-
-            {pleError && (
-              <p role="alert" className="mt-4 text-sm text-destructive">
-                {pleError}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        {renderDescargasPle()}
       </div>
     )
   }
@@ -572,6 +614,7 @@ export default function ContabilidadPage() {
     { title: 'Periodos', description: 'Control de apertura y cierre.', href: '/dashboard/contabilidad/periodos', icon: Calendar },
     { title: 'Centros de costo', description: 'Asignación operativa por unidad.', href: '/dashboard/contabilidad/centros-costo', icon: Calculator },
     { title: 'Presupuestos', description: 'Ejecución y alertas del periodo.', href: '/dashboard/contabilidad/presupuestos', icon: Landmark },
+    { title: 'Consolidación', description: 'Grupos empresariales y reportes configurables.', href: '/dashboard/contabilidad/consolidacion', icon: Building2 },
   ]
 
   const barMetrics = connectedMetrics.map(([label, value]) => {
@@ -625,7 +668,7 @@ export default function ContabilidadPage() {
           </CardHeader>
           <CardContent className="p-3">
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-              {vistas.map((vista) => {
+              {vistasLocalizadas.map((vista) => {
                 const Icon = vista.icon
                 const active = vistaActual === vista.id
 

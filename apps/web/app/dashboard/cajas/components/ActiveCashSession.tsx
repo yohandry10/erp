@@ -2,6 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils'
 import { CashOperationsPanel } from './CashOperationsPanel';
 import { CashMovementsTable } from './CashMovementsTable';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface SesionCaja {
     id: string;
@@ -25,6 +26,8 @@ interface ActiveCashSessionProps {
 }
 
 export function ActiveCashSession({ sesion, onCloseSession, className = '' }: ActiveCashSessionProps) {
+    const country = useCountryContext();
+    const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
     return (
         <div className={cn(className, "flex flex-col gap-6")}>
             {/* Header */}
@@ -51,7 +54,7 @@ export function ActiveCashSession({ sesion, onCloseSession, className = '' }: Ac
                             Hora apertura: <span className="font-semibold text-foreground">{new Date(sesion.hora_apertura).toLocaleString('es-PE')}</span>
                         </p>
                         <p className="m-0">
-                            Monto inicial: <span className="font-bold text-emerald-400">S/ {sesion.monto_inicio.toFixed(2)}</span>
+                            Monto inicial: <span className="font-bold text-emerald-400">{currencySymbol} {sesion.monto_inicio.toFixed(2)}</span>
                         </p>
                     </div>
                 </div>

@@ -43,4 +43,44 @@ describe('AccountingBooksService', () => {
     const eqCalls = chain.eq.mock.calls;
     expect(eqCalls.some((args: any[]) => args[0] === 'tenant_id' && args[1] === 'tenant-1')).toBe(true);
   });
+
+  it('oculta equivalencias contables internas del plan visible', async () => {
+    const { supabase, chain } = buildSupabaseMock();
+    chain.order.mockReturnValue({
+      data: [
+        { codigo: '1105', nombre: 'Caja', metadata: {} },
+        { codigo: '10', nombre: 'Equivalencia interna Caja', metadata: { internal_equivalence: true } },
+      ],
+      error: null,
+    });
+    const service = new AccountingBooksService(
+      supabase as any,
+      { getTenantId: jest.fn(() => 'tenant-co') } as any,
+    );
+
+    await expect(service.getPlanCuentas()).resolves.toEqual([
+      expect.objectContaining({ codigo: '1105', nombre: 'Caja' }),
+    ]);
+  });
+
+  it('expone un solo registro por código contable aunque existan históricos duplicados', async () => {
+    const { supabase, chain } = buildSupabaseMock();
+    chain.order.mockReturnValue({
+      data: [
+        { id: '407-a', codigo: '407', nombre: 'AFP por pagar' },
+        { id: '407-b', codigo: '407', nombre: 'Aportes patronales por pagar' },
+        { id: '627', codigo: '627', nombre: 'Seguridad social' },
+      ],
+      error: null,
+    });
+    const service = new AccountingBooksService(
+      supabase as any,
+      { getTenantId: jest.fn(() => 'tenant-pe') } as any,
+    );
+
+    await expect(service.getPlanCuentas()).resolves.toEqual([
+      { id: '407-a', codigo: '407', nombre: 'AFP por pagar' },
+      { id: '627', codigo: '627', nombre: 'Seguridad social' },
+    ]);
+  });
 });

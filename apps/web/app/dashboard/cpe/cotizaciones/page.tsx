@@ -5,6 +5,7 @@ import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
 import CotizacionModal from '@/components/modals/CotizacionModal'
 import CotizacionViewModal from '@/components/modals/CotizacionViewModal'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface Cotizacion {
   id: string
@@ -53,6 +54,8 @@ interface Stats {
 
 export default function CotizacionesPage() {
   const { get } = useApi()
+  const country = useCountryContext()
+  const taxIdLabel = country.paisCodigo === 'AR' ? 'CUIT' : country.paisCodigo === 'CO' ? 'NIT' : 'RUC'
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([])
   const [clientesTop, setClientesTop] = useState<ClienteTop[]>([])
   const [stats, setStats] = useState<Stats>({
@@ -242,14 +245,14 @@ export default function CotizacionesPage() {
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN'
+      currency: country.moneda || 'PEN'
     }).format(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE')
+    return new Date(dateString).toLocaleDateString(country.locale || 'es-PE')
   }
 
   if (loading) {
@@ -537,7 +540,7 @@ export default function CotizacionesPage() {
                       {cliente.nombre}
                     </h3>
                     <div className="text-muted-foreground text-[0.875rem]">
-                      RUC: {cliente.ruc}
+                      {taxIdLabel}: {cliente.ruc}
                     </div>
                 </div>
                 <div className="w-[60px] h-[60px] rounded-full flex items-center justify-center text-white font-semibold text-[0.875rem]">

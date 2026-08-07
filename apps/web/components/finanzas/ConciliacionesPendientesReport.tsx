@@ -5,6 +5,7 @@ import { useApi } from '@/hooks/use-api'
 import { Calendar, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/format-utils'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface ConciliacionPendiente {
   id: string
@@ -29,6 +30,7 @@ interface ConciliacionPendiente {
 
 export default function ConciliacionesPendientesReport() {
   const { get } = useApi()
+  const { formatCurrency } = useLocalizedMoney()
   const router = useRouter()
   const [conciliaciones, setConciliaciones] = useState<ConciliacionPendiente[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,13 +53,6 @@ export default function ConciliacionesPendientesReport() {
   useEffect(() => {
     loadConciliaciones()
   }, [loadConciliaciones])
-
-  const formatCurrency = (amount: number, currency: string = 'PEN') => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount)
-  }
 
   const getEstadoColor = (estado: string) => {
     switch (estado) {

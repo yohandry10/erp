@@ -225,6 +225,14 @@ export class CashShiftChangesService {
         if (cambio.estado !== EstadoCambioTurno.EN_PROCESO) {
             throw new BadRequestException(`El cambio de turno ya fue ${cambio.estado.toLowerCase()}`);
         }
+        const { data: sesionCaja } = await this.supabase
+            .getClient()
+            .from('sesiones_caja')
+            .select('moneda')
+            .eq('id', cambio.sesion_caja_id)
+            .eq('tenant_id', tenantId)
+            .maybeSingle();
+        const moneda = String(sesionCaja?.moneda || 'PEN').toUpperCase();
 
         // Validación 2: Saldo contado positivo
         if (saldoContado < 0) {
@@ -234,6 +242,7 @@ export class CashShiftChangesService {
         // Validación 3: Denominaciones válidas
         const validacionDenom = this.reconciliationService.validarDenominacionesValidas(
             denominaciones,
+            moneda,
         );
         if (!validacionDenom.valido) {
             throw new BadRequestException(
@@ -248,9 +257,9 @@ export class CashShiftChangesService {
 
         if (Math.abs(totalDenominaciones - saldoContado) > 0.01) {
             throw new BadRequestException(
-                `El saldo contado (S/.${saldoContado.toFixed(
+                `El saldo contado (${moneda} ${saldoContado.toFixed(
                     2,
-                )}) no coincide con las denominaciones (S/.${totalDenominaciones.toFixed(2)})`,
+                )}) no coincide con las denominaciones (${moneda} ${totalDenominaciones.toFixed(2)})`,
             );
         }
 
@@ -280,9 +289,9 @@ export class CashShiftChangesService {
         // Alertar si diferencia > tolerancia
         if (Math.abs(diferencia) > tolerancia) {
             this.logger.warn(
-                `Diferencia en cambio de turno mayor a tolerancia: S/.${diferencia.toFixed(
+                `Diferencia en cambio de turno mayor a tolerancia: ${moneda} ${diferencia.toFixed(
                     2,
-                )} (tolerancia: S/.${tolerancia})`,
+                )} (tolerancia: ${moneda} ${tolerancia})`,
             );
 
             // Registrar alerta en auditoría
@@ -312,7 +321,7 @@ export class CashShiftChangesService {
                 diferencia, // Positivo si sobrante, negativo si faltante
                 {
                     usuario_id: cambio.usuario_saliente_id,
-                    motivo: `Diferencia en cambio de turno: S/.${diferencia.toFixed(
+                    motivo: `Diferencia en cambio de turno: ${moneda} ${diferencia.toFixed(
                         2,
                     )} (${diferencia > 0 ? 'SOBRANTE' : 'FALTANTE'})`,
                     referencia_documento: cambioId,
@@ -420,7 +429,7 @@ export class CashShiftChangesService {
         }
 
         this.logger.log(
-            `Cambio de turno completado: ID=${cambioId}, diferencia=S/.${diferencia.toFixed(2)}`,
+            `Cambio de turno completado: ID=${cambioId}, diferencia=${moneda} ${diferencia.toFixed(2)}`,
         );
 
         return cambioActualizado as CambioTurno;

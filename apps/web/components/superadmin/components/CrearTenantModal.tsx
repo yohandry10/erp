@@ -6,7 +6,8 @@ import { useApiCall } from '@/hooks/use-api'
 import { usePaises } from '@/hooks/use-paises'
 import { Building2, Mail, Phone, MapPin, Settings, FileText, X, AlertCircle, Eye, EyeOff, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { INITIAL_ACTIVE_COUNTRY, INITIAL_ACTIVE_COUNTRY_CODE } from '@/lib/initial-country'
+import { INITIAL_ACTIVE_COUNTRY } from '@/lib/initial-country'
+import { validateCountryTaxId } from '@/lib/country-tax-id'
 
 const sectionClass = 'mb-8'
 const sectionHeaderClass = 'mb-5 flex items-center gap-3 border-b-2 border-border pb-3'
@@ -114,6 +115,20 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
       maxLength: 11,
       helper: 'Debe tener 11 dígitos',
     },
+    AR: {
+      label: 'CUIT',
+      placeholder: '30710158229',
+      pattern: '^[0-9]{11}$',
+      maxLength: 11,
+      helper: 'Debe tener 11 dígitos y dígito verificador válido',
+    },
+    CO: {
+      label: 'NIT',
+      placeholder: '900123456-8',
+      pattern: '^[0-9]{9,10}(-?[0-9])?$',
+      maxLength: 12,
+      helper: 'Use 9 o 10 dígitos y, opcionalmente, el dígito de verificación',
+    },
   }
 
   const documentoConfig = documentoConfigMap[formData.pais] || documentoConfigMap.PE
@@ -126,7 +141,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
   // Cargar datos del tenant si estamos editando
   useEffect(() => {
     if (tenant) {
-      const paisMatch = paises.find((pais) => pais.codigo_iso === INITIAL_ACTIVE_COUNTRY_CODE) ?? INITIAL_ACTIVE_COUNTRY
+      const paisMatch = paises.find((pais) => pais.codigo_iso === tenant.pais) ?? INITIAL_ACTIVE_COUNTRY
       const resolvedPaisId = paisMatch.id
       const resolvedMoneda = paisMatch.moneda_codigo
 
@@ -137,7 +152,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
         direccion: tenant.direccion || '',
         email: tenant.email || '',
         telefono: tenant.telefono || '',
-        pais: INITIAL_ACTIVE_COUNTRY_CODE,
+        pais: paisMatch.codigo_iso,
         pais_id: resolvedPaisId,
         moneda: resolvedMoneda,
         tipo_empresa: tenant.tipo_empresa || 'MICRO',
@@ -149,7 +164,9 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
         admin_nombre: '',
       })
     } else {
-      const paisMatch = paises.find((pais) => pais.codigo_iso === INITIAL_ACTIVE_COUNTRY_CODE) ?? INITIAL_ACTIVE_COUNTRY
+      const paisMatch =
+        paises.find((pais) => pais.codigo_iso === INITIAL_ACTIVE_COUNTRY.codigo_iso) ??
+        INITIAL_ACTIVE_COUNTRY
       setFormData((prev) => ({
         ...prev,
         pais: paisMatch.codigo_iso,
@@ -176,8 +193,8 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
         return
       }
 
-      if (formData.ruc && !/^\d{11}$/.test(formData.ruc)) {
-        setError('El RUC debe tener exactamente 11 dígitos numéricos')
+      if (formData.ruc && !validateCountryTaxId(formData.pais, formData.ruc)) {
+        setError(`${documentoConfig.label} inválido para el país seleccionado`)
         setIsLoading(false)
         return
       }
@@ -330,12 +347,13 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       value={formData.pais}
                       onChange={handleChange}
                       required
-                      disabled
                       className={inputClass}
                     >
-                      <option value={INITIAL_ACTIVE_COUNTRY.codigo_iso}>
-                        {INITIAL_ACTIVE_COUNTRY.nombre} ({INITIAL_ACTIVE_COUNTRY.codigo_iso})
-                      </option>
+                      {paises.map((pais) => (
+                        <option key={pais.codigo_iso} value={pais.codigo_iso}>
+                          {pais.nombre} ({pais.codigo_iso}) · {pais.moneda_codigo}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

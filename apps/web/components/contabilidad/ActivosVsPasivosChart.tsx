@@ -1,6 +1,7 @@
 'use client'
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface ActivosVsPasivosChartProps {
   activos: number
@@ -9,6 +10,7 @@ interface ActivosVsPasivosChartProps {
 }
 
 export function ActivosVsPasivosChart({ activos, pasivos, patrimonio }: ActivosVsPasivosChartProps) {
+  const { formatCurrency } = useLocalizedMoney()
   const data = [
     {
       name: 'Activos',
@@ -26,15 +28,6 @@ export function ActivosVsPasivosChart({ activos, pasivos, patrimonio }: ActivosV
       color: 'var(--blue-600)'
     }
   ]
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value)
-  }
 
   const renderCustomLabel = (entry: any) => {
     const percent = ((entry.value / (activos + pasivos + patrimonio)) * 100).toFixed(1)

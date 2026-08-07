@@ -5,9 +5,9 @@ import { useApi } from './use-api'
 import { apiSucceeded, unwrapApiArray, unwrapApiData } from '@/lib/api-contract'
 import { fetchApi } from '@/lib/api-fetch'
 import {
-  INITIAL_ACTIVE_COUNTRY,
+  ACTIVE_COUNTRIES,
   INITIAL_ACTIVE_COUNTRY_ID,
-  isInitialActiveCountryId,
+  isActiveCountryId,
   keepInitialActiveCountry,
 } from '@/lib/initial-country'
 
@@ -86,8 +86,8 @@ export function usePaises() {
         console.info('[usePaises] Usando fallback local de países:', detail)
       }
 
-      // Fallback local limitado al alcance inicial: Peru/SUNAT.
-      setPaises([INITIAL_ACTIVE_COUNTRY])
+      // Fallback local del alcance activo: Perú/SUNAT y Argentina/ARCA.
+      setPaises([...ACTIVE_COUNTRIES] as Pais[])
     } finally {
       window.clearTimeout(timeoutId)
       signal?.removeEventListener('abort', abortFromParent)
@@ -114,7 +114,7 @@ export function usePaises() {
       let countryId: string | null = INITIAL_ACTIVE_COUNTRY_ID
       if (typeof window !== 'undefined') {
         const storedCountryId = window.localStorage.getItem('selectedCountry')
-        countryId = isInitialActiveCountryId(storedCountryId) ? storedCountryId : INITIAL_ACTIVE_COUNTRY_ID
+        countryId = isActiveCountryId(storedCountryId) ? storedCountryId : INITIAL_ACTIVE_COUNTRY_ID
       }
 
       const headers: Record<string, string> = {}
@@ -139,7 +139,10 @@ export function usePaises() {
     try {
       const response = await put('/api/paises/usuario/configuracion', {
         ...configuracion,
-        pais_preferido_id: Number(INITIAL_ACTIVE_COUNTRY_ID),
+        pais_preferido_id: configuracion.pais_preferido_id &&
+          isActiveCountryId(configuracion.pais_preferido_id)
+          ? Number(configuracion.pais_preferido_id)
+          : Number(INITIAL_ACTIVE_COUNTRY_ID),
       })
       return apiSucceeded(response)
     } catch (err) {

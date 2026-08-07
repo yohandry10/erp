@@ -225,6 +225,18 @@ describe('PeriodosService', () => {
       };
       mockSupabaseClient.from.mockReturnValueOnce(mockEventosChain as any);
 
+      // Mock contarAsientosBorrador - no hay borradores pendientes
+      const mockBorradoresChain = {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        gte: jest.fn().mockReturnThis(),
+        lte: jest.fn().mockResolvedValueOnce({
+          count: 0,
+          error: null
+        })
+      };
+      mockSupabaseClient.from.mockReturnValueOnce(mockBorradoresChain as any);
+
       // Mock update period
       const mockUpdateChain = {
         update: jest.fn().mockReturnThis(),
@@ -250,6 +262,48 @@ describe('PeriodosService', () => {
       expect(result).toBeDefined();
       expect(result.estado).toBe(EstadoPeriodo.CERRADO);
       expect(result.cerrado_por).toBe(usuarioId);
+    });
+
+    it('no cierra el período si quedan asientos en BORRADOR', async () => {
+      const tenantId = 'tenant-123';
+      const anio = 2024;
+      const mes = 1;
+      const usuarioId = 'user-123';
+
+      mockSupabaseClient.from.mockReturnValueOnce({
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValueOnce({
+          data: { id: 'periodo-123', tenant_id: tenantId, anio, mes, estado: EstadoPeriodo.ABIERTO },
+          error: null
+        })
+      } as any);
+
+      mockSupabaseClient.from.mockReturnValueOnce({
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        gte: jest.fn().mockReturnThis(),
+        lte: jest.fn().mockResolvedValueOnce({ data: [], error: null })
+      } as any);
+
+      mockSupabaseClient.from.mockReturnValueOnce({
+        select: jest.fn().mockReturnThis(),
+        is: jest.fn().mockReturnThis(),
+        gte: jest.fn().mockReturnThis(),
+        lte: jest.fn().mockResolvedValueOnce({ count: 0, error: null })
+      } as any);
+
+      // Dos borradores sin confirmar dentro del período.
+      mockSupabaseClient.from.mockReturnValueOnce({
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        gte: jest.fn().mockReturnThis(),
+        lte: jest.fn().mockResolvedValueOnce({ count: 2, error: null })
+      } as any);
+
+      await expect(
+        service.cerrarPeriodo(tenantId, anio, mes, usuarioId)
+      ).rejects.toThrow(/2 asiento\(s\) en BORRADOR/);
     });
 
     it('should throw error if period does not exist', async () => {

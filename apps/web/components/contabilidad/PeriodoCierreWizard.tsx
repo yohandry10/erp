@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { CheckCircle, XCircle, AlertTriangle, Lock, Loader2 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface PeriodoCierreWizardProps {
   periodoId: string
@@ -30,6 +31,7 @@ export default function PeriodoCierreWizard({
   onClose,
   onSuccess
 }: PeriodoCierreWizardProps) {
+  const { formatCurrency } = useLocalizedMoney()
   const [step, setStep] = useState<'validating' | 'results' | 'confirming' | 'processing'>('validating')
   const [validationResults, setValidationResults] = useState<ValidationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -161,7 +163,7 @@ export default function PeriodoCierreWizard({
                   <ul className="m-0 pl-5 text-[0.875rem] text-destructive">
                     {validationResults.asientos.asientosDescuadrados.slice(0, 5).map((asiento: any) => (
                       <li key={asiento.id}>
-                        {asiento.numero_asiento} - Diferencia: S/ {Math.abs(asiento.total_debe - asiento.total_haber).toFixed(2)}
+                        {asiento.numero_asiento} - Diferencia: {formatCurrency(Math.abs(asiento.total_debe - asiento.total_haber))}
                       </li>
                     ))}
                     {validationResults.asientos.asientosDescuadrados.length > 5 && (

@@ -36,7 +36,15 @@ export class AccountingBooksService {
         .order('codigo');
 
       if (error) throw error;
-      return cuentas || [];
+      const visibles = (cuentas || []).filter(
+        (cuenta: any) => cuenta?.metadata?.internal_equivalence !== true,
+      );
+      const unicas = new Map<string, any>();
+      for (const cuenta of visibles) {
+        const codigo = String(cuenta?.codigo || '').trim().toUpperCase();
+        if (!unicas.has(codigo)) unicas.set(codigo, cuenta);
+      }
+      return [...unicas.values()];
     } catch (error) {
       console.error('Error obteniendo plan de cuentas:', error);
       throw error;
@@ -511,11 +519,64 @@ export class AccountingBooksService {
     }
   }
 
+  /**
+   * Registro de activos fijos (SUNAT 7.1).
+   *
+   * Antes esto devolvía los movimientos de las cuentas del elemento 3, que es un
+   * reporte de cuentas y no un registro de activos: no traía vida útil, ni
+   * depreciación acumulada, ni valor neto. Ahora lee el registro real.
+   *
+   * Si el tenant no tiene activos registrados —o la tabla aún no existe en ese
+   * entorno— se conserva la consulta anterior como respaldo, para no dejar el
+   * libro vacío en instalaciones que todavía no usan el módulo.
+   */
   async getRegistroActivosFijos(filtros: FiltrosContables = {}) {
-    try {
-      const tenantId = this.resolveTenantId();
-      const { fechaDesde, fechaHasta } = filtros;
+    const tenantId = this.resolveTenantId();
+    const { fechaDesde, fechaHasta } = filtros;
 
+    try {
+      let query = this.supabase
+        .getClient()
+        .from('activos_fijos')
+        .select(
+          `id, codigo, nombre, descripcion, fecha_adquisicion, valor_adquisicion,
+           valor_residual, vida_util_meses, metodo_depreciacion, depreciacion_acumulada,
+           situacion, fecha_baja, centro_costo_id`,
+        )
+        .eq('tenant_id', tenantId)
+        .order('codigo', { ascending: true });
+
+      if (fechaDesde) query = query.gte('fecha_adquisicion', fechaDesde);
+      if (fechaHasta) query = query.lte('fecha_adquisicion', fechaHasta);
+
+      const { data: activos, error } = await query;
+
+      if (!error && activos && activos.length > 0) {
+        return activos.map((activo: any) => ({
+          ...activo,
+          valor_neto:
+            Math.round(
+              (Number(activo.valor_adquisicion ?? 0) -
+                Number(activo.depreciacion_acumulada ?? 0)) *
+                100,
+            ) / 100,
+        }));
+      }
+
+      if (error && error.code !== '42P01') {
+        console.warn(
+          'Registro de activos fijos: no se pudo leer activos_fijos, se usa el respaldo por cuentas:',
+          error.message,
+        );
+      }
+    } catch (error: any) {
+      console.warn(
+        'Registro de activos fijos: fallo leyendo activos_fijos, se usa el respaldo por cuentas:',
+        error?.message,
+      );
+    }
+
+    try {
       let query = this.supabase
         .getClient()
         .from('detalle_asientos')

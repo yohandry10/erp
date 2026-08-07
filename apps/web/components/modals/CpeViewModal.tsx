@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CpeViewModalProps {
   isOpen: boolean
@@ -64,6 +65,13 @@ export default function CpeViewModal({
   documentId,
   documentType,
 }: CpeViewModalProps) {
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
+  const fiscalDocument = country.documentoFiscal || (isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC')
+  const fiscalAuthority = country.servicioFiscal || (isArgentina ? 'ARCA' : isColombia ? 'DIAN' : 'SUNAT')
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
+  const locale = country.locale || 'es-PE'
   const [cpeData, setCpeData] = useState<CpeData | null>(null)
   const [loading, setLoading] = useState(false)
   const api = useApi()
@@ -99,8 +107,12 @@ export default function CpeViewModal({
     // Generar ticket térmico de 80mm en lugar de imprimir el modal completo
     if (!cpeData) return
 
-    const formatMoney = (value: number) => `${cpeData.moneda} ${value.toFixed(2)}`
-    const formatDate = (dateStr?: string) => new Date(dateStr || Date.now()).toLocaleDateString('es-PE')
+    const formatMoney = (value: number) =>
+      `${currencySymbol} ${Number(value || 0).toLocaleString(locale, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
+    const formatDate = (dateStr?: string) => new Date(dateStr || Date.now()).toLocaleDateString(locale)
     const taxLabel = getTaxLabel(cpeData)
     const hashValue = cpeData.valor_resumen || cpeData.hash_firma || cpeData.hash || ''
 
@@ -134,7 +146,7 @@ export default function CpeViewModal({
       : ''
     const qrUrl = safeImageUrl(cpeData.sunat_qr_data_url)
     const qrHtml = qrUrl
-      ? `<div class="qr"><img src="${escapeHtml(qrUrl)}" alt="Código QR SUNAT" /></div>`
+      ? `<div class="qr"><img src="${escapeHtml(qrUrl)}" alt="Código QR ${escapeHtml(fiscalAuthority)}" /></div>`
       : ''
     const qrContentHtml = cpeData.sunat_qr_content
       ? `<div class="qr-content">${escapeHtml(cpeData.sunat_qr_content)}</div>`
@@ -152,7 +164,7 @@ export default function CpeViewModal({
         <div class="header">
           ${logoHtml ? `<div class="logo">${logoHtml}</div>` : ''}
           <div class="empresa">${escapeHtml(cpeData.razon_social_emisor || 'NEON SYSTEM')}</div>
-          <div class="ruc">RUC: ${escapeHtml(cpeData.ruc_emisor || '20000000001')}</div>
+          <div class="ruc">${escapeHtml(fiscalDocument)}: ${escapeHtml(cpeData.ruc_emisor || '-')}</div>
           <div class="tipo-doc">${escapeHtml(documentTypeName)}</div>
           <div class="numero">${escapeHtml(numeroFormateado)}</div>
           <div class="fecha">${escapeHtml(formatDate(cpeData.fecha_emision || cpeData.created_at))}</div>
@@ -161,7 +173,7 @@ export default function CpeViewModal({
         <div class="seccion">
           <div class="label">CLIENTE:</div>
           <div class="valor">${escapeHtml(cpeData.razon_social_receptor || 'Cliente General')}</div>
-          <div class="valor">${cpeData.tipo_documento_receptor === '6' ? 'RUC' : 'DNI'}: ${escapeHtml(cpeData.documento_receptor || '-')}</div>
+          <div class="valor">${escapeHtml(getReceiverDocumentLabel(cpeData.tipo_documento_receptor))}: ${escapeHtml(cpeData.documento_receptor || '-')}</div>
         </div>
 
         <div class="items">
@@ -197,6 +209,20 @@ export default function CpeViewModal({
   }
 
   const getDocumentTypeName = () => {
+    if (isArgentina) {
+      switch (documentType) {
+        case '01':
+          return 'FACTURA A'
+        case '03':
+          return 'FACTURA B'
+        case '07':
+          return 'NOTA DE CRÉDITO'
+        case '08':
+          return 'NOTA DE DÉBITO'
+        default:
+          return 'COMPROBANTE ARCA'
+      }
+    }
     switch (documentType) {
       case '01':
         return 'FACTURA ELECTRÓNICA'
@@ -215,11 +241,17 @@ export default function CpeViewModal({
     const explicitRate = Number(data.tasa_igv ?? data.tasa_impuesto)
     const derivedRate = Number(data.total_gravadas) > 0
       ? (Number(data.total_igv || 0) / Number(data.total_gravadas)) * 100
-      : 18
+      : country.impuestoRate * 100 || (isArgentina ? 21 : 18)
     const rate = Number.isFinite(explicitRate) && explicitRate > 0
       ? (explicitRate <= 1 ? explicitRate * 100 : explicitRate)
       : derivedRate
-    return `IGV (${Number(rate.toFixed(2))}%)`
+    return `${country.paisCodigo === 'PE' ? 'IGV' : 'IVA'} (${Number(rate.toFixed(2))}%)`
+  }
+
+  const getReceiverDocumentLabel = (tipo: string) => {
+    if (tipo === '6' || tipo === '31') return isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC'
+    if (tipo === '1') return 'DNI'
+    return 'Documento'
   }
 
   const getThermalPrintStyles = () => `
@@ -271,7 +303,7 @@ export default function CpeViewModal({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-primary">
-                Vista CPE
+                {isArgentina ? 'Vista ARCA' : isColombia ? 'Vista DIAN' : 'Vista CPE'}
               </Badge>
               <h2 className="text-xl font-semibold tracking-normal text-foreground">{getDocumentTypeName()}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -319,9 +351,11 @@ export default function CpeViewModal({
                   <h1 className="text-2xl font-semibold text-foreground">NEON SYSTEM</h1>
                   <p className="mt-1 text-sm text-muted-foreground">Sistema Empresarial Integrado</p>
                   <div className="mt-4 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
-                    <p><strong>RUC:</strong> {cpeData.ruc_emisor}</p>
+                    <p><strong>{fiscalDocument}:</strong> {cpeData.ruc_emisor}</p>
                     <p><strong>Razón social:</strong> {cpeData.razon_social_emisor}</p>
-                    <p className="md:col-span-2">Dirección: Lima, Perú</p>
+                    <p className="md:col-span-2">
+                      Dirección: {isArgentina ? 'Buenos Aires, Argentina' : isColombia ? 'Bogotá D.C., Colombia' : 'Lima, Perú'}
+                    </p>
                   </div>
                 </div>
 
@@ -339,7 +373,7 @@ export default function CpeViewModal({
                     </p>
                   </div>
                   <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                    <p><strong>Fecha:</strong> {new Date(cpeData.created_at).toLocaleDateString('es-PE')}</p>
+                    <p><strong>Fecha:</strong> {new Date(cpeData.created_at).toLocaleDateString(locale)}</p>
                     <p><strong>Estado:</strong> {cpeData.estado}</p>
                     <p><strong>Moneda:</strong> {cpeData.moneda}</p>
                   </div>
@@ -353,11 +387,7 @@ export default function CpeViewModal({
                   <p><strong>Documento:</strong> {cpeData.documento_receptor}</p>
                   <p>
                     <strong>Tipo de documento:</strong>{' '}
-                    {cpeData.tipo_documento_receptor === '1'
-                      ? 'DNI'
-                      : cpeData.tipo_documento_receptor === '6'
-                        ? 'RUC'
-                        : 'Otro'}
+                    {getReceiverDocumentLabel(cpeData.tipo_documento_receptor)}
                   </p>
                 </div>
               </section>
@@ -420,7 +450,7 @@ export default function CpeViewModal({
                   </p>
                   {cpeData.sunat_qr_content && (
                     <>
-                      <p className="mt-4 text-sm font-semibold text-foreground/90">Contenido QR SUNAT:</p>
+                      <p className="mt-4 text-sm font-semibold text-foreground/90">Contenido QR {fiscalAuthority}:</p>
                       <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{cpeData.sunat_qr_content}</p>
                     </>
                   )}

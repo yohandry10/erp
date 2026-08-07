@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils'
 import { useApi } from '@/hooks/use-api';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface SesionCaja {
     id: string;
@@ -29,6 +30,8 @@ interface CashSessionSelectorProps {
 }
 
 export function CashSessionSelector({ onSelect, className = '' }: CashSessionSelectorProps) {
+    const country = useCountryContext();
+    const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
     const { get } = useApi();
     const [sesiones, setSesiones] = useState<SesionCaja[]>([]);
     const [loading, setLoading] = useState(true);
@@ -57,7 +60,7 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
     }, [cargarSesiones]);
 
     const formatearFecha = (fecha: string) => {
-        return new Date(fecha).toLocaleString('es-PE', {
+        return new Date(fecha).toLocaleString(country.locale || 'es-PE', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -81,7 +84,12 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
 
     const formatMonto = (valor: number | null | undefined) => {
         const num = Number(valor ?? 0);
-        return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+        return Number.isFinite(num)
+            ? new Intl.NumberFormat(country.locale || 'es-PE', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(num)
+            : '0,00';
     };
 
     if (loading) {
@@ -229,11 +237,11 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
 
                         <div className="text-right min-w-[120px]">
                             <div className="text-[0.95rem] font-semibold text-[var(--text-primary,_#111827)]">
-                                Ini: S/ {formatMonto(sesion.monto_inicio)}
+                                Ini: {currencySymbol} {formatMonto(sesion.monto_inicio)}
                             </div>
                             {sesion.monto_cierre !== undefined && (
                                 <div className="text-sm">
-                                    Fin: S/ {formatMonto(sesion.monto_cierre)}
+                                    Fin: {currencySymbol} {formatMonto(sesion.monto_cierre)}
                                 </div>
                             )}
                             {sesion.diferencia !== undefined && sesion.diferencia !== 0 && (

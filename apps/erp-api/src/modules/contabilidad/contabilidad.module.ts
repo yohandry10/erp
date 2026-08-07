@@ -25,6 +25,21 @@ import { AuthModule } from "../auth/auth.module";
 import { PermissionsModule } from "../permissions/permissions.module";
 import { CashflowService } from "./services/cashflow.service";
 import { PleExportService } from "./services/ple-export.service";
+import { TiposCambioService } from "./services/tipos-cambio.service";
+import { RevaluacionService } from "./services/revaluacion.service";
+import { ContabilidadMultimonedaController } from "./controllers/contabilidad-multimoneda.controller";
+import { PlantillasAsientosService } from "./services/plantillas-asientos.service";
+import { PlantillasSchedulerService } from "./services/plantillas-scheduler.service";
+import { ContabilidadPlantillasController } from "./controllers/contabilidad-plantillas.controller";
+import { ActivosFijosService } from "./services/activos-fijos.service";
+import { ContabilidadActivosController } from "./controllers/contabilidad-activos.controller";
+import { ConciliacionPartidasService } from "./services/conciliacion-partidas.service";
+import { ContabilidadConciliacionController } from "./controllers/contabilidad-conciliacion.controller";
+import { DistribucionAnaliticaService } from "./services/distribucion-analitica.service";
+import { DiferidosService } from "./services/diferidos.service";
+import { ContabilidadAnaliticaController } from "./controllers/contabilidad-analitica.controller";
+import { ConsolidacionReportesService } from "./services/consolidacion-reportes.service";
+import { ContabilidadConsolidacionController } from "./controllers/contabilidad-consolidacion.controller";
 
 @Module({
   imports: [
@@ -42,6 +57,12 @@ import { PleExportService } from "./services/ple-export.service";
     ContabilidadLibrosController,
     ContabilidadEventosController,
     ContabilidadAsientosController,
+    ContabilidadMultimonedaController,
+    ContabilidadPlantillasController,
+    ContabilidadActivosController,
+    ContabilidadConciliacionController,
+    ContabilidadAnaliticaController,
+    ContabilidadConsolidacionController,
   ],
   providers: [
     EstadosFinancierosService,
@@ -56,6 +77,15 @@ import { PleExportService } from "./services/ple-export.service";
     PleExportService,
     DepreciacionSchedulerService,
     ContabilidadEventsListener,
+    TiposCambioService,
+    RevaluacionService,
+    PlantillasAsientosService,
+    PlantillasSchedulerService,
+    ActivosFijosService,
+    ConciliacionPartidasService,
+    DistribucionAnaliticaService,
+    DiferidosService,
+    ConsolidacionReportesService,
     {
       provide: "EstadosFinancierosService",
       useExisting: EstadosFinancierosService,
@@ -72,6 +102,14 @@ import { PleExportService } from "./services/ple-export.service";
     CentrosCostoService,
     CashflowService,
     PleExportService,
+    TiposCambioService,
+    RevaluacionService,
+    PlantillasAsientosService,
+    ActivosFijosService,
+    ConciliacionPartidasService,
+    DistribucionAnaliticaService,
+    DiferidosService,
+    ConsolidacionReportesService,
   ],
 })
 export class ContabilidadModule {}

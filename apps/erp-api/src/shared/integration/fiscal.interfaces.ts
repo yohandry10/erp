@@ -3,11 +3,11 @@ export interface FiscalConfig {
   url: string;
   usuario: string;
   password: string;
-  empresaId: string; // RUC para Perú, NIT para Colombia
+  empresaId: string; // RUC para Perú, NIT para Colombia, CUIT para Argentina
   certificatePath: string;
   certificatePassword: string;
   environment: 'homologacion' | 'produccion';
-  pais: 'PE' | 'CO';
+  pais: 'PE' | 'CO' | 'AR';
 }
 
 export interface FiscalResponse {

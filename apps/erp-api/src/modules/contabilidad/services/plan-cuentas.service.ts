@@ -41,10 +41,34 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
+  '33': {
+    codigo: '33',
+    nombre: 'Inmuebles, maquinaria y equipo',
+    tipo: 'ACTIVO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
   '39': {
     codigo: '39',
     nombre: 'Depreciacion y amortizacion acumuladas',
     tipo: 'ACTIVO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '65': {
+    codigo: '65',
+    nombre: 'Otros gastos de gestion',
+    tipo: 'GASTO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '75': {
+    codigo: '75',
+    nombre: 'Otros ingresos de gestion',
+    tipo: 'INGRESO',
     nivel: 2,
     acepta_movimiento: true,
     estado: 'ACTIVO',
@@ -73,6 +97,14 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
+  '676': {
+    codigo: '676',
+    nombre: 'Diferencia de cambio',
+    tipo: 'GASTO',
+    nivel: 3,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
   '69': {
     codigo: '69',
     nombre: 'Costo de ventas',
@@ -94,6 +126,14 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
     nombre: 'Ganancia por medicion de activos no financieros',
     tipo: 'INGRESO',
     nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '776': {
+    codigo: '776',
+    nombre: 'Diferencia de cambio',
+    tipo: 'INGRESO',
+    nivel: 3,
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
@@ -137,6 +177,28 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
+};
+
+const NOMBRES_CUENTAS_ARGENTINA: Record<string, string> = {
+  '10': 'Caja y bancos',
+  '12': 'Créditos por ventas',
+  '20': 'Bienes de cambio',
+  '40': 'Deudas fiscales (IVA e Ingresos Brutos)',
+  '42': 'Proveedores',
+  '403': 'Retenciones de seguridad social por pagar',
+  '407': 'Contribuciones patronales y ART por pagar',
+  '411': 'Sueldos por pagar',
+  '621': 'Sueldos y jornales',
+  '627': 'Cargas sociales, obra social y ART',
+  '68': 'Depreciaciones y previsiones',
+  '69': 'Costo de mercaderías vendidas',
+  '70': 'Ventas',
+  '676': 'Diferencia de cambio (pérdida)',
+  '776': 'Diferencia de cambio (ganancia)',
+  '33': 'Bienes de uso',
+  '39': 'Amortizaciones acumuladas',
+  '65': 'Otros egresos',
+  '75': 'Otros ingresos',
 };
 
 @Injectable()
@@ -259,10 +321,20 @@ export class PlanCuentasService {
       return null;
     }
 
+    const { data: empresa } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select('pais')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    const esArgentina = String(empresa?.pais || 'PE').toUpperCase() === 'AR';
+
     const payload = {
       tenant_id: tenantId,
       codigo: cuentaBase.codigo,
-      nombre: cuentaBase.nombre,
+      nombre: esArgentina
+        ? NOMBRES_CUENTAS_ARGENTINA[codigo] || cuentaBase.nombre
+        : cuentaBase.nombre,
       tipo: cuentaBase.tipo,
       tipo_cuenta: cuentaBase.tipo,
       nivel: cuentaBase.nivel,
@@ -271,6 +343,7 @@ export class PlanCuentasService {
       estado: cuentaBase.estado,
       metadata: {
         source: 'runtime_accounting_standard_account',
+        pais_codigo: esArgentina ? 'AR' : 'PE',
       },
     };
 
@@ -404,7 +477,12 @@ export class PlanCuentasService {
       throw new Error('Error obteniendo cuentas del plan de cuentas');
     }
 
-    return (data || []) as PlanCuenta[];
+    const unicas = new Map<string, PlanCuenta>();
+    for (const cuenta of (data || []) as PlanCuenta[]) {
+      const codigo = String(cuenta.codigo || '').trim().toUpperCase();
+      if (!unicas.has(codigo)) unicas.set(codigo, cuenta);
+    }
+    return [...unicas.values()];
   }
 
   /**
@@ -466,6 +544,11 @@ export class PlanCuentasService {
       throw new Error('Error buscando cuentas');
     }
 
-    return (data || []) as PlanCuenta[];
+    const unicas = new Map<string, PlanCuenta>();
+    for (const cuenta of (data || []) as PlanCuenta[]) {
+      const codigo = String(cuenta.codigo || '').trim().toUpperCase();
+      if (!unicas.has(codigo)) unicas.set(codigo, cuenta);
+    }
+    return [...unicas.values()];
   }
 }

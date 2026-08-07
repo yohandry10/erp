@@ -7,11 +7,11 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { sanitizePostgrestSearch } from '../../common/util/postgrest.util';
 import {
-  INITIAL_ACTIVE_COUNTRY_CODE,
-  INITIAL_ACTIVE_COUNTRY_ID,
   INITIAL_ACTIVE_COUNTRY_MESSAGE,
+  getActiveCountryById,
   isInitialActiveCountryCode,
   isInitialActiveCountryId,
+  validateCountryTaxId,
 } from '../paises/initial-country';
 
 @Injectable()
@@ -70,7 +70,7 @@ export class TenantManagementService {
     const { data: paisData, error: paisError } = await client
       .from('paises')
       .select('id, codigo_iso, moneda_codigo')
-      .eq('id', INITIAL_ACTIVE_COUNTRY_ID)
+      .eq('id', paisIdInput)
       .single();
 
     if (paisError || !paisData?.id) {
@@ -81,10 +81,15 @@ export class TenantManagementService {
     if (!pais) {
       throw new BadRequestException('El país seleccionado no tiene código ISO válido');
     }
+    const profile = getActiveCountryById(paisData.id);
     this.assertInitialActiveCountry(paisData.id, pais);
 
     if (tenantData.pais && tenantData.pais.toUpperCase() !== pais) {
       throw new BadRequestException('pais_id no coincide con el país enviado');
+    }
+    if (!validateCountryTaxId(pais, tenantData.ruc)) {
+      const label = profile?.documentoFiscal || 'documento fiscal';
+      throw new BadRequestException(`${label} inválido para ${profile?.nombre || pais}`);
     }
 
     // ✅ F2: Validar unicidad de RUC por país
@@ -116,10 +121,10 @@ export class TenantManagementService {
     const tenantId = crypto.randomUUID();
 
     // Set default values
-    const moneda = tenantData.moneda || paisData.moneda_codigo || 'PEN';
+    const moneda = tenantData.moneda || paisData.moneda_codigo || profile?.moneda || 'PEN';
     const adminEmail = tenantData.admin_email || tenantData.email;
     const adminNombre = tenantData.admin_nombre || 'Administrador';
-    const paisId = INITIAL_ACTIVE_COUNTRY_ID;
+    const paisId = Number(paisData.id);
 
     const { error: canonicalTenantError } = await client
       .from('tenants')
@@ -266,7 +271,7 @@ export class TenantManagementService {
       const { data: paisData, error: paisError } = await client
         .from('paises')
         .select('id, codigo_iso')
-        .eq('id', INITIAL_ACTIVE_COUNTRY_ID)
+        .eq('id', resolvedPaisId)
         .single();
 
       if (paisError || !paisData?.id) {
@@ -288,7 +293,7 @@ export class TenantManagementService {
       const { data: paisData, error: paisError } = await client
         .from('paises')
         .select('id, codigo_iso')
-        .eq('codigo_iso', INITIAL_ACTIVE_COUNTRY_CODE)
+        .eq('codigo_iso', resolvedPaisCodigo)
         .maybeSingle();
 
       if (paisError || !paisData?.id) {

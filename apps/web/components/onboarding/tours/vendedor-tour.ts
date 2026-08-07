@@ -24,7 +24,7 @@ export const vendedorTour: OnboardingTour = {
       tipo: 'spotlight',
       selector: '[data-tour="menu-clientes"]',
       titulo: 'Gestión de Clientes',
-      descripcion: 'Registra y administra tus clientes. El sistema valida RUC/DNI automáticamente.',
+      descripcion: 'Registra y administra tus clientes con los documentos fiscales y personales del país.',
       posicion: 'right',
     },
     {
@@ -48,7 +48,7 @@ export const vendedorTour: OnboardingTour = {
       tipo: 'spotlight',
       selector: '[data-tour="menu-facturas"]',
       titulo: 'Facturación',
-      descripcion: 'Genera facturas y boletas electrónicas. Se envían automáticamente a SUNAT.',
+      descripcion: 'Genera los comprobantes electrónicos habilitados y procésalos con la autoridad fiscal del tenant.',
       posicion: 'right',
     },
     {

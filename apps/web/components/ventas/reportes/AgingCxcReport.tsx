@@ -5,6 +5,7 @@ import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { AlertTriangle, Loader2, PiggyBank, TrendingDown } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface BucketItem {
   nombre: string
@@ -52,14 +53,13 @@ interface Props {
   filters: ReportFilters
 }
 
-const currencyFormatter = new Intl.NumberFormat('es-PE', {
-  style: 'currency',
-  currency: 'PEN',
-  maximumFractionDigits: 2
-})
-
 export default function AgingCxcReport({ filters }: Props) {
   const { get } = useApi()
+  const country = useCountryContext()
+  const currencyFormatter = useMemo(() => new Intl.NumberFormat(
+    country.locale || 'es-PE',
+    { style: 'currency', currency: country.moneda, maximumFractionDigits: 2 }
+  ), [country.locale, country.moneda])
   const [data, setData] = useState<AgingResponse | null>(null)
   const [loading, setLoading] = useState(true)
 

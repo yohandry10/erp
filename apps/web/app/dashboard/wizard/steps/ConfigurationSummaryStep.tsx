@@ -19,6 +19,8 @@ interface EmpresaConfig {
   email?: string
   tipo_empresa?: string
   usar_flujo_logistica?: boolean
+  isDemo?: boolean
+  certificateConfigured?: boolean
   regimen?: string
   igvPorcentaje?: number
   retencionRentaPorcentaje?: number
@@ -53,6 +55,16 @@ interface EmpresaConfig {
   gre_obligatorio?: boolean
   gre_automatico_habilitado?: boolean
   umbral_gre_automatico?: number
+  arcaActivo?: boolean
+  arcaEnvironment?: string
+  arcaWsaaUrl?: string
+  arcaWsfeUrl?: string
+  arcaCuitRepresentada?: string
+  arcaPuntoVenta?: number
+  arcaCondicionIva?: string
+  ingresosBrutos?: string
+  fechaInicioActividades?: string
+  provinciaFiscal?: string
 }
 
 export function ConfigurationSummaryStep() {
@@ -126,8 +138,9 @@ export function ConfigurationSummaryStep() {
     }
   }
 
-  const isColombia: boolean = false
+  const isColombia = country.paisCodigo === 'CO'
   const isPeru = country.paisCodigo === 'PE'
+  const isArgentina = country.paisCodigo === 'AR'
   const oseLabel = 'OSE'
   const autoridadLabel = country.servicioFiscal || 'SUNAT'
   const dianTipoContribuyenteLabel = (() => {
@@ -276,12 +289,14 @@ export function ConfigurationSummaryStep() {
             {empresaConfig?.serieNotaCredito || 'Pendiente'}
           </span>
         </div>
-        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
-          <span className="text-muted-foreground">Serie Guía Remisión:</span>
-          <span>
-            {empresaConfig?.serieGuiaRemision || 'Pendiente'}
-          </span>
-        </div>
+        {isPeru && (
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-muted-foreground">Serie Guía Remisión:</span>
+            <span>
+              {empresaConfig?.serieGuiaRemision || 'Pendiente'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Certificado Digital */}
@@ -290,7 +305,11 @@ export function ConfigurationSummaryStep() {
         <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
           <span className="text-muted-foreground">Estado:</span>
           <span>
-            {state.validationResults.certificate?.isValid ? '✓ Válido' : 'Pendiente'}
+            {empresaConfig?.isDemo
+              ? '✓ Simulado en modo demo'
+              : empresaConfig?.certificateConfigured || state.validationResults.certificate?.isValid
+                ? '✓ Configurado'
+                : 'Pendiente'}
           </span>
         </div>
         {state.validationResults.certificate?.expiresAt && (
@@ -334,6 +353,34 @@ export function ConfigurationSummaryStep() {
             )}
           </>
         )}
+        {isArgentina && (
+          <>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-muted-foreground">Ambiente ARCA:</span>
+              <span>{empresaConfig?.arcaEnvironment || 'homologacion'}</span>
+            </div>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-muted-foreground">CUIT representada:</span>
+              <span>{empresaConfig?.arcaCuitRepresentada || empresaConfig?.ruc || 'Pendiente'}</span>
+            </div>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-muted-foreground">Punto de venta:</span>
+              <span>{empresaConfig?.arcaPuntoVenta || 'Pendiente'}</span>
+            </div>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-muted-foreground">Condición frente al IVA:</span>
+              <span>{empresaConfig?.arcaCondicionIva || 'Pendiente'}</span>
+            </div>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-muted-foreground">Ingresos Brutos:</span>
+              <span>{empresaConfig?.ingresosBrutos || 'Pendiente'}</span>
+            </div>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-muted-foreground">Jurisdicción fiscal:</span>
+              <span>{empresaConfig?.provinciaFiscal || 'Pendiente'}</span>
+            </div>
+          </>
+        )}
         {isColombia && (
           <>
             <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
@@ -374,12 +421,14 @@ export function ConfigurationSummaryStep() {
             )}
           </>
         )}
-        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
-          <span className="text-muted-foreground">{oseLabel} Activo:</span>
-          <span>
-            {empresaConfig?.oseActivo ? '✓ Sí' : 'No'}
-          </span>
-        </div>
+        {isPeru && (
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-muted-foreground">{oseLabel} Activo:</span>
+            <span>
+              {empresaConfig?.oseActivo ? '✓ Sí' : 'No'}
+            </span>
+          </div>
+        )}
         {empresaConfig?.oseActivo && empresaConfig?.oseUrl && (
           <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
             <span className="text-muted-foreground">URL {oseLabel}:</span>
@@ -398,12 +447,16 @@ export function ConfigurationSummaryStep() {
             <span className="text-foreground">{empresaConfig.oseAuthTipo}</span>
           </div>
         )}
-        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
-          <span className="text-muted-foreground">GRE Automático:</span>
-          <span className="text-foreground">
-            {empresaConfig?.gre_automatico_habilitado ? `Sí (umbral: S/ ${empresaConfig?.umbral_gre_automatico || 700})` : 'No'}
-          </span>
-        </div>
+        {isPeru && (
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-muted-foreground">GRE Automático:</span>
+            <span className="text-foreground">
+              {empresaConfig?.gre_automatico_habilitado
+                ? `Sí (umbral: S/ ${empresaConfig?.umbral_gre_automatico || 700})`
+                : 'No'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Logo de la Empresa */}

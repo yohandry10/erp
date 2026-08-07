@@ -1,13 +1,7 @@
 # AUDITORÍA TÉCNICA (REVERSIÓN CORREGIDA) – MÓDULO DE VENTAS
 
 <!-- DOC-NAV:START -->
-> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
->
-> Rol de este archivo: `frontend_tests`.
->
-> Leer tambien: `docs/START_HERE.md`, `docs/README.md`.
->
-> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+> Documentación canónica: `docs/README.md`. Estado vigente: `docs/CURRENT_STATE.md`.
 <!-- DOC-NAV:END -->
 
 ## Sistema ERP Multi-Tenant
@@ -115,7 +109,8 @@ La presente versión reemplaza el contenido anterior y establece el estado real.
 **P2 (Alto, completar MVP extendido):**
 1. ✅ Publicar reportes de fill-rate/backorder y aging CxC usando los nuevos datos parciales (API y dashboard actualizados).
 2. ✅ Exponer UI para reprogramar backorders y generar múltiples GRE por pedido (`supabase/migrations/014_pedido_gres.sql`, `apps/erp-api/src/modules/gre/gre.service.ts:309-386`, `apps/web/app/dashboard/ventas/pedidos/[id]/page.tsx:683-842`).
-3. ✅ Documentar el flujo de credenciales/headers (`docs/multi-tenant-headers.md`) y definir entregables de soporte (`docs/p3-roadmap.md`).
+3. ✅ Mantener el contrato de credenciales/headers en `docs/ARCHITECTURE.md`
+   y los pendientes funcionales en `docs/CURRENT_STATE.md`.
 
 **P3 (Medio, roadmap):**
 1. ✅ Implementar RMA y notas de crédito con retorno físico a inventario.
@@ -130,4 +125,6 @@ La presente versión reemplaza el contenido anterior y establece el estado real.
    - `supabase/migrations/016_p3_rma_multialmacen_dashboards.sql`
    - `apps/erp-api/src/modules/ventas/reportes/reportes.service.ts:560`
    - `apps/erp-api/src/modules/ventas/reportes/reportes.service.ts:980`
-> Configuración multi-tenant disponible en `supabase/migrations/015_configuracion_p3_ventas.sql` y `supabase/migrations/016_p3_rma_multialmacen_dashboards.sql`. Plan detallado de dependencias y milestones en `docs/p3-roadmap.md`.
+> Configuración multi-tenant disponible en `supabase/migrations/015_configuracion_p3_ventas.sql`
+> y `supabase/migrations/016_p3_rma_multialmacen_dashboards.sql`. El estado
+> vigente se resume en `docs/CURRENT_STATE.md`.

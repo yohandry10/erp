@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Edit, Trash2, Building2, Mail, Phone, MapPin, User, CreditCard, Calendar } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import toast from 'react-hot-toast'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface Proveedor {
   id: string
@@ -42,6 +43,7 @@ export default function ProveedorDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { get, del } = useApi()
+  const { currency, taxIdLabel } = useLocalizedMoney()
   const [proveedor, setProveedor] = useState<Proveedor | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -145,7 +147,7 @@ export default function ProveedorDetailPage() {
               {proveedor.razon_social}
             </h1>
             <p className="text-muted-foreground text-[0.875rem]">
-              RUC: {proveedor.ruc}
+              {taxIdLabel}: {proveedor.ruc}
             </p>
           </div>
 
@@ -184,7 +186,7 @@ export default function ProveedorDetailPage() {
 
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-6">
           <div>
-            <p className="text-xs text-muted-foreground mb-1">RUC</p>
+            <p className="text-xs text-muted-foreground mb-1">{taxIdLabel}</p>
             <p className="text-[0.875rem] font-medium">{proveedor.ruc}</p>
           </div>
 
@@ -257,7 +259,7 @@ export default function ProveedorDetailPage() {
           <div>
             <p className="text-xs text-muted-foreground mb-1">Límite de Crédito</p>
             <p className="text-[0.875rem] font-medium">
-              PEN {formatMoney(proveedor.limite_credito)}
+              {currency} {formatMoney(proveedor.limite_credito)}
             </p>
           </div>
 

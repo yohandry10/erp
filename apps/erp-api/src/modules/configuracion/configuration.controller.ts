@@ -24,6 +24,9 @@ import {
   ValidateWizardCertificateDto,
 } from './configuration.types';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { ConfigService } from '@nestjs/config';
+import { encryptText } from '../../shared/utils/secure-config.utils';
+import { DianFiscalService } from '../fiscal/dian-fiscal.service';
 import {
   INITIAL_ACTIVE_COUNTRY_CODE,
   INITIAL_ACTIVE_COUNTRY_ID,
@@ -44,7 +47,22 @@ export class ConfigurationController {
     private readonly configurationService: ConfigurationService,
     private readonly supabaseService: SupabaseService,
     private readonly auditService: AuditService,
+    private readonly configService: ConfigService,
+    private readonly dianFiscalService: DianFiscalService,
   ) {}
+
+  @Post('colombia/dian/test')
+  @RequirePermission('configuracion.write')
+  @ApiOperation({ summary: 'Verificar readiness y transporte oficial DIAN del tenant colombiano' })
+  async testColombiaDian(@CurrentTenant() tenantId?: string) {
+    if (!tenantId) {
+      throw new HttpException(
+        { success: false, message: 'Tenant requerido' },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    return { success: true, data: await this.dianFiscalService.probarConfiguracion(tenantId) };
+  }
 
   private assertInitialActiveCountry(paisId?: number | null, paisCodigo?: string | null): void {
     if (paisId !== undefined && paisId !== null && !isInitialActiveCountryId(paisId)) {
@@ -591,6 +609,8 @@ export class ConfigurationController {
           monedaDefecto: data.moneda_defecto,
           logoUrl: data.logo_url,
           tipo_empresa: data.tipo_empresa,
+          isDemo: data.is_demo === true,
+          certificateConfigured: Boolean(data.certificado_pfx),
           usar_flujo_logistica: data.usar_flujo_logistica,
           gre_obligatorio: data.gre_obligatorio,
           gre_automatico_habilitado: data.gre_automatico_habilitado,
@@ -599,8 +619,15 @@ export class ConfigurationController {
           serieFactura: data.serie_factura,
           serieBoleta: data.serie_boleta,
           serieNotaCredito: data.serie_nota_credito,
-          serieNotaDebito: data.serie_nota_debito,
-          serieGuiaRemision: data.serie_guia_remision,
+          // La tabla histórica no posee una columna dedicada para ND. El
+          // emisor sí usa la serie canónica por país; exponerla aquí evita
+          // mostrar una configuración incompleta que no existe en runtime.
+          serieNotaDebito: data.serie_nota_debito
+            || (data.pais === 'CO' ? 'ND' : data.pais === 'AR' ? '00001' : 'FD01'),
+          // GRE usa T001 como serie canónica peruana cuando la tabla histórica
+          // no dispone de una columna dedicada para configurarla.
+          serieGuiaRemision: data.serie_guia_remision
+            || (data.pais === 'PE' ? 'T001' : null),
           // OSE
           oseActivo: data.ose_activo,
           oseUrl: data.ose_url,
@@ -614,23 +641,33 @@ export class ConfigurationController {
           sunatUsernameConfigured: !!data.sunat_username,
           sunatGreTransport: data.sunat_gre_transport,
           sunatGreClientConfigured: !!data.sunat_gre_client_id && !!data.sunat_gre_client_secret,
-          // DIAN/otros paises quedan en roadmap; no exponerlos como runtime activo.
-          dianActivo: false,
-          dianUrl: null,
-          dianUsuario: null,
+          // ARCA / Argentina
+          arcaActivo: data.arca_activo,
+          arcaEnvironment: data.arca_environment,
+          arcaWsaaUrl: data.arca_wsaa_url,
+          arcaWsfeUrl: data.arca_wsfe_url,
+          arcaCuitRepresentada: data.arca_cuit_representada,
+          arcaPuntoVenta: data.arca_punto_venta,
+          arcaCondicionIva: data.arca_condicion_iva,
+          ingresosBrutos: data.ingresos_brutos,
+          fechaInicioActividades: data.fecha_inicio_actividades,
+          provinciaFiscal: data.provincia_fiscal,
+          dianActivo: data.dian_activo,
+          dianUrl: data.dian_url,
+          dianUsuario: data.dian_usuario,
           dianPassword: null,
-          dianSoftwareId: null,
-          dianSoftwarePin: null,
-          dianTestSetId: null,
-          dianEnvironment: null,
-          dianRegimenFiscal: null,
-          dianTipoContribuyente: null,
-          dianResolucionNumero: null,
-          dianResolucionPrefijo: null,
-          dianResolucionDesde: null,
-          dianResolucionHasta: null,
-          dianResolucionFechaInicio: null,
-          dianResolucionFechaFin: null,
+          dianSoftwareId: data.dian_software_id,
+          dianSoftwarePin: data.dian_software_pin ? 'CONFIGURADO' : null,
+          dianTestSetId: data.dian_test_set_id,
+          dianEnvironment: data.dian_environment,
+          dianRegimenFiscal: data.dian_regimen_fiscal,
+          dianTipoContribuyente: data.dian_tipo_contribuyente,
+          dianResolucionNumero: data.dian_resolucion_numero,
+          dianResolucionPrefijo: data.dian_resolucion_prefijo,
+          dianResolucionDesde: data.dian_resolucion_desde,
+          dianResolucionHasta: data.dian_resolucion_hasta,
+          dianResolucionFechaInicio: data.dian_resolucion_fecha_inicio,
+          dianResolucionFechaFin: data.dian_resolucion_fecha_fin,
         },
       };
     } catch (error) {
@@ -697,7 +734,7 @@ export class ConfigurationController {
           .getClient()
           .from('paises')
           .select('id')
-          .eq('codigo_iso', INITIAL_ACTIVE_COUNTRY_CODE)
+          .eq('codigo_iso', resolvedPaisCodigo)
           .maybeSingle();
 
         if (paisError || !paisData?.id) {
@@ -715,7 +752,7 @@ export class ConfigurationController {
           .getClient()
           .from('paises')
           .select('codigo_iso')
-          .eq('id', INITIAL_ACTIVE_COUNTRY_ID)
+          .eq('id', resolvedPaisId)
           .maybeSingle();
 
         if (paisError || !paisData?.codigo_iso) {
@@ -766,7 +803,7 @@ export class ConfigurationController {
         'dian_regimen_fiscal',
         'dian_tipo_contribuyente',
       ];
-      if (dianPayloadFields.some((field) => {
+      if (resolvedPaisCodigo !== 'CO' && dianPayloadFields.some((field) => {
         const value = datosEmpresa[field];
         return value !== undefined && value !== null && value !== '' && value !== false;
       })) {
@@ -774,6 +811,16 @@ export class ConfigurationController {
           { success: false, message: INITIAL_ACTIVE_COUNTRY_MESSAGE },
           HttpStatus.BAD_REQUEST,
         );
+      }
+
+      if (resolvedPaisCodigo === 'AR') {
+        updateData.moneda_defecto = 'ARS';
+        updateData.emision_cpe_modo = 'ARCA_WSFE';
+      } else if (resolvedPaisCodigo === 'CO') {
+        updateData.moneda_defecto = 'COP';
+        updateData.emision_cpe_modo = 'DIAN_DIRECTO';
+      } else if (resolvedPaisCodigo === 'PE') {
+        updateData.moneda_defecto = 'PEN';
       }
 
       // Mapear campos camelCase a snake_case
@@ -793,6 +840,24 @@ export class ConfigurationController {
       if (datosEmpresa.representanteLegal) updateData.representante_legal = datosEmpresa.representanteLegal;
       if (datosEmpresa.dniRepresentante) updateData.dni_representante = datosEmpresa.dniRepresentante;
       if (datosEmpresa.regimen) updateData.regimen_tributario = datosEmpresa.regimen;
+      if (resolvedPaisCodigo === 'AR') {
+        if (datosEmpresa.arca_activo !== undefined) updateData.arca_activo = datosEmpresa.arca_activo === true;
+        if (datosEmpresa.arca_environment) updateData.arca_environment = datosEmpresa.arca_environment;
+        if (datosEmpresa.arca_wsaa_url) updateData.arca_wsaa_url = datosEmpresa.arca_wsaa_url;
+        if (datosEmpresa.arca_wsfe_url) updateData.arca_wsfe_url = datosEmpresa.arca_wsfe_url;
+        if (datosEmpresa.arca_cuit_representada) {
+          updateData.arca_cuit_representada = datosEmpresa.arca_cuit_representada;
+        }
+        if (datosEmpresa.arca_punto_venta !== undefined) {
+          updateData.arca_punto_venta = Number(datosEmpresa.arca_punto_venta);
+        }
+        if (datosEmpresa.arca_condicion_iva) updateData.arca_condicion_iva = datosEmpresa.arca_condicion_iva;
+        if (datosEmpresa.ingresos_brutos) updateData.ingresos_brutos = datosEmpresa.ingresos_brutos;
+        if (datosEmpresa.fecha_inicio_actividades) {
+          updateData.fecha_inicio_actividades = datosEmpresa.fecha_inicio_actividades;
+        }
+        if (datosEmpresa.provincia_fiscal) updateData.provincia_fiscal = datosEmpresa.provincia_fiscal;
+      }
       if (datosEmpresa.actividadEconomica) updateData.actividad_economica = datosEmpresa.actividadEconomica;
       if (datosEmpresa.igvPorcentaje !== undefined) updateData.igv_porcentaje = datosEmpresa.igvPorcentaje;
       if (datosEmpresa.logoUrl) updateData.logo_url = datosEmpresa.logoUrl;
@@ -814,9 +879,17 @@ export class ConfigurationController {
       if (datosEmpresa.dianActivo !== undefined) updateData.dian_activo = datosEmpresa.dianActivo;
       if (datosEmpresa.dianUrl !== undefined) updateData.dian_url = datosEmpresa.dianUrl;
       if (datosEmpresa.dianUsuario !== undefined) updateData.dian_usuario = datosEmpresa.dianUsuario;
-      if (datosEmpresa.dianPassword !== undefined) updateData.dian_password = datosEmpresa.dianPassword;
+      if (datosEmpresa.dianPassword !== undefined && datosEmpresa.dianPassword !== 'CONFIGURADO') {
+        updateData.dian_password = datosEmpresa.dianPassword
+          ? encryptText(this.configService, datosEmpresa.dianPassword)
+          : null;
+      }
       if (datosEmpresa.dianSoftwareId !== undefined) updateData.dian_software_id = datosEmpresa.dianSoftwareId;
-      if (datosEmpresa.dianSoftwarePin !== undefined) updateData.dian_software_pin = datosEmpresa.dianSoftwarePin;
+      if (datosEmpresa.dianSoftwarePin !== undefined && datosEmpresa.dianSoftwarePin !== 'CONFIGURADO') {
+        updateData.dian_software_pin = datosEmpresa.dianSoftwarePin
+          ? encryptText(this.configService, datosEmpresa.dianSoftwarePin)
+          : null;
+      }
       if (datosEmpresa.dianTestSetId !== undefined) updateData.dian_test_set_id = datosEmpresa.dianTestSetId;
       if (datosEmpresa.dianEnvironment !== undefined) updateData.dian_environment = datosEmpresa.dianEnvironment;
       if (datosEmpresa.dianRegimenFiscal !== undefined) updateData.dian_regimen_fiscal = datosEmpresa.dianRegimenFiscal;

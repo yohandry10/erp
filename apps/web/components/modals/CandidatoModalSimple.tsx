@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Phone, MapPin, Briefcase, GraduationCap, Star } from 'lucide-react';
 import { fetchApi } from '@/lib/api-fetch';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface CandidatoModalProps {
   isOpen: boolean;
@@ -19,6 +20,9 @@ export default function CandidatoModalSimple({
   candidato,
   vacantes
 }: CandidatoModalProps) {
+  const country = useCountryContext();
+  const isArgentina = country.paisCodigo === 'AR';
+  const isColombia = country.paisCodigo === 'CO';
   const [formData, setFormData] = useState({
     id_vacante: '',
     nombres: '',
@@ -26,7 +30,7 @@ export default function CandidatoModalSimple({
     email: '',
     telefono: '',
     numero_documento: '',
-    tipo_documento: 'DNI',
+    tipo_documento: isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI',
     fecha_nacimiento: '',
     direccion: '',
     nivel_educacion: 'universitario',
@@ -52,7 +56,7 @@ export default function CandidatoModalSimple({
         email: '',
         telefono: '',
         numero_documento: '',
-        tipo_documento: 'DNI',
+        tipo_documento: isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI',
         fecha_nacimiento: '',
         direccion: '',
         nivel_educacion: 'universitario',
@@ -72,7 +76,7 @@ export default function CandidatoModalSimple({
         email: candidato.email || '',
         telefono: candidato.telefono || '',
         numero_documento: candidato.numero_documento || '',
-        tipo_documento: candidato.tipo_documento || 'DNI',
+        tipo_documento: candidato.tipo_documento || (isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI'),
         fecha_nacimiento: candidato.fecha_nacimiento || '',
         direccion: candidato.direccion || '',
         nivel_educacion: candidato.nivel_educacion || 'universitario',
@@ -83,8 +87,13 @@ export default function CandidatoModalSimple({
         estado: candidato.estado || 'postulante',
         observaciones: candidato.observaciones || ''
       });
+    } else {
+      setFormData((current) => ({
+        ...current,
+        tipo_documento: isArgentina ? 'CUIL' : isColombia ? 'CC' : 'DNI',
+      }));
     }
-  }, [isOpen, candidato]);
+  }, [isOpen, candidato, isArgentina, isColombia]);
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -301,7 +310,16 @@ export default function CandidatoModalSimple({
                   value={formData.tipo_documento}
                   onChange={handleInputChange} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-card"
                 >
-                  <option value="DNI">DNI</option>
+                  {isArgentina ? (
+                    <option value="CUIL">CUIL</option>
+                  ) : isColombia ? (
+                    <>
+                      <option value="CC">CC</option>
+                      <option value="TI">TI</option>
+                    </>
+                  ) : (
+                    <option value="DNI">DNI</option>
+                  )}
                   <option value="CE">CE</option>
                   <option value="PASAPORTE">Pasaporte</option>
                 </select>
@@ -389,7 +407,7 @@ export default function CandidatoModalSimple({
 
               <div>
                 <label htmlFor="candidato-modal-simple-pretension-salarial" className="block text-[0.875rem] font-semibold text-foreground/85 mb-2">
-                  Pretensión Salarial (S/)
+                  Pretensión Salarial ({country.simboloMoneda || 'S/'})
                 </label>
                 <input id="candidato-modal-simple-pretension-salarial"
                   type="number"

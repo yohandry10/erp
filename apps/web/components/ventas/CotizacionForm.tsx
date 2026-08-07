@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import { useCountryContext } from '@/hooks/use-country-context'
 import { Cotizacion, CotizacionDetalle } from '@/types/ventas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,7 +57,9 @@ export default function CotizacionForm({
   disabled = false
 }: CotizacionFormProps) {
   const { get } = useApi()
-  const { tasaIgv } = useTaxConfig()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
+  const country = useCountryContext()
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
 
   const [clienteId, setClienteId] = useState(cotizacion?.cliente_id || '')
   const [fechaVencimiento, setFechaVencimiento] = useState(cotizacion?.fecha_vencimiento || '')
@@ -422,7 +425,7 @@ export default function CotizacionForm({
                     </label>
                     <Input
                       type="text"
-                      value={`S/ ${item.subtotal.toFixed(2)}`}
+                      value={`${currencySymbol} ${item.subtotal.toFixed(2)}`}
                       disabled className="bg-[var(--primary-50)]"
                     />
                   </div>
@@ -460,15 +463,15 @@ export default function CotizacionForm({
         <div className="flex flex-col gap-2 max-w-[28rem] ml-auto">
           <div className="flex justify-between text-[0.875rem]">
             <span className="text-[var(--primary-600)]">Subtotal:</span>
-            <span className="font-medium">S/ {subtotal.toFixed(2)}</span>
+            <span className="font-medium">{currencySymbol} {subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-[0.875rem]">
-            <span className="text-[var(--primary-600)]">IGV (18%):</span>
-            <span className="font-medium">S/ {igv.toFixed(2)}</span>
+            <span className="text-[var(--primary-600)]">{nombreImpuesto} ({Math.round(tasaIgv * 100)}%):</span>
+            <span className="font-medium">{currencySymbol} {igv.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-[1.125rem] font-bold border-t pt-2">
             <span>Total:</span>
-            <span>S/ {total.toFixed(2)}</span>
+            <span>{currencySymbol} {total.toFixed(2)}</span>
           </div>
         </div>
       </div>

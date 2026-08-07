@@ -81,8 +81,10 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
   const currencySymbol = country.simboloMoneda || 'S/'
   const taxLabel = country.impuesto || 'IGV (18%)'
   const documentoFiscal = country.documentoFiscal || 'RUC'
-  const documentoLabel = country.paisCodigo !== 'PE'
-    ? 'TICKET'
+  const documentoLabel = country.paisCodigo === 'AR'
+    ? 'FACTURA'
+    : country.paisCodigo !== 'PE'
+      ? 'TICKET'
     : ventaData?.tipo_comprobante === '01'
       ? 'FACTURA'
       : ventaData?.tipo_comprobante === '03'
@@ -190,6 +192,8 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
       taxLabel,
       documentoFiscal,
       documentoLabel: fiscalData ? getDocumentoLabelFromCpe(fiscalData.tipo_documento) : documentoLabel,
+      locale: country.locale,
+      fiscalAuthority: country.servicioFiscal,
     })
   }
 

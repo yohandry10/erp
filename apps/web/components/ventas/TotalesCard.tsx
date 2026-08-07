@@ -3,6 +3,7 @@
 import { Calculator } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface TotalesCardProps {
   subtotal?: number
@@ -24,6 +25,7 @@ export default function TotalesCard({
   className = ''
 }: TotalesCardProps) {
   const { tasaIgv: defaultTasaIgv } = useTaxConfig()
+  const country = useCountryContext()
   const effectiveIgvRate = igvRate ?? defaultTasaIgv
   const [calculatedSubtotal, setCalculatedSubtotal] = useState(0)
   const [calculatedIgv, setCalculatedIgv] = useState(0)
@@ -49,9 +51,9 @@ export default function TotalesCard({
   const total = autoCalculate ? calculatedTotal : (propTotal ?? 0)
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(value)
@@ -74,7 +76,7 @@ export default function TotalesCard({
 
         <div className="flex items-center justify-between text-sm">
           <span className="text-foreground/80">
-            IGV ({Math.round(effectiveIgvRate * 100)}%):
+            {(country.paisCodigo === 'PE' ? 'IGV' : 'IVA')} ({Math.round(effectiveIgvRate * 100)}%):
           </span>
           <span className="font-medium text-foreground">
             {formatCurrency(igv)}

@@ -31,6 +31,7 @@ export class ReportesService {
         fecha,
         estado,
         total,
+        moneda,
         clientes!pedidos_venta_cliente_id_fkey!inner (
           id,
           razon_social,
@@ -65,7 +66,7 @@ export class ReportesService {
           cliente_nombre: (pedido.clientes as any).razon_social,
           cliente_documento: (pedido.clientes as any).documento_numero,
           periodo: `${fechaDesde || 'Inicio'} - ${fechaHasta || 'Hoy'}`,
-          moneda: 'PEN',
+          moneda: String((pedido as any).moneda || 'PEN').toUpperCase(),
           estado: estadoFiltro || 'Todos',
           total: 0,
           cantidad_pedidos: 0,

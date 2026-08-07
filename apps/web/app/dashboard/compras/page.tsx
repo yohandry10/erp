@@ -12,6 +12,7 @@ import { useApi } from '@/hooks/use-api'
 import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 type AnyRecord = Record<string, any>
 
@@ -27,6 +28,9 @@ const inputClass =
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function ComprasPage() {
+  const country = useCountryContext()
+  const taxIdLabel =
+    country.paisCodigo === 'AR' ? 'CUIT' : country.paisCodigo === 'CO' ? 'NIT' : 'RUC'
   const { toast } = useToast()
   // throwOnError deja llegar el motivo real del backend al catch; sin esto el
   // hook devuelve null y solo se puede mostrar un texto generico.
@@ -202,7 +206,10 @@ export default function ComprasPage() {
   }
 
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
+    new Intl.NumberFormat(country.locale || 'es-PE', {
+      style: 'currency',
+      currency: country.moneda || 'PEN',
+    }).format(amount)
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-'
@@ -378,7 +385,7 @@ export default function ComprasPage() {
                             <td className="px-4 py-3 font-mono font-semibold text-foreground">{orden.numero}</td>
                             <td className="px-4 py-3">
                               <div className="font-semibold text-foreground">{prov.razon_social || prov.nombre || 'N/A'}</div>
-                              <div className="mt-1 text-xs text-muted-foreground">RUC: {prov.ruc || 'N/A'}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">{taxIdLabel}: {prov.ruc || 'N/A'}</div>
                             </td>
                             <td className="px-4 py-3">{formatDate(orden.fecha_orden)}</td>
                             <td className="px-4 py-3">{formatDate(orden.fecha_entrega)}</td>
@@ -449,7 +456,7 @@ export default function ComprasPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold text-foreground">{proveedor.razon_social || proveedor.nombre_comercial || proveedor.nombre || 'Sin nombre'}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">RUC: {proveedor.ruc || 'N/A'}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{taxIdLabel}: {proveedor.ruc || 'N/A'}</div>
                       </div>
                       {statusBadge('Activo')}
                     </div>

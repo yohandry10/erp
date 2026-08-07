@@ -26,7 +26,7 @@ export class DemoRestrictionsInterceptor implements NestInterceptor {
     // Verificar si es demo (usar cliente público para evitar validación de contexto)
     const { data } = await this.supabase.getPublicClient()
       .from('empresa_config')
-      .select('is_demo')
+      .select('is_demo, pais')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -40,9 +40,16 @@ export class DemoRestrictionsInterceptor implements NestInterceptor {
     // RESTRICCIONES PARA DEMOS
 
     // 1. Bloquear envío real a SUNAT
-    if (path.includes('/cpe/enviar-sunat') || path.includes('/ose/enviar')) {
+    const autoridadFiscal =
+      data?.pais === 'AR' ? 'ARCA' : data?.pais === 'CO' ? 'DIAN' : 'SUNAT';
+    if (
+      path.includes('enviar-sunat') ||
+      path.includes('enviar-arca') ||
+      path.includes('/fiscal/enviar') ||
+      path.includes('/ose/enviar')
+    ) {
       throw new BadRequestException({
-        message: 'En modo demo no se envían documentos a SUNAT real',
+        message: `En modo demo no se envían documentos a ${autoridadFiscal} real`,
         suggestion: 'Los documentos se marcan como "ACEPTADO" automáticamente para demostración',
         is_demo_restriction: true,
       });
@@ -77,7 +84,7 @@ export class DemoRestrictionsInterceptor implements NestInterceptor {
             return {
               ...data,
               cpe_estado: 'ACEPTADO',
-              cpe_respuesta_sunat: 'Documento aceptado (SIMULADO - MODO DEMO)',
+              cpe_respuesta_sunat: `Documento aceptado por ${autoridadFiscal} (SIMULADO - MODO DEMO)`,
               cpe_codigo_respuesta: '0',
               is_demo_simulation: true,
             };

@@ -16,6 +16,7 @@ import {
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { parseDateLocal } from '@/lib/date-utils'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 const ESTADO_COLORS: Record<EstadoCotizacion, { bg: string, text: string }> = {
   [EstadoCotizacion.BORRADOR]: { bg: 'rgba(156, 163, 175, 0.1)', text: '#6b7280' },
@@ -27,6 +28,7 @@ const ESTADO_COLORS: Record<EstadoCotizacion, { bg: string, text: string }> = {
 }
 
 export default function CotizacionesPage() {
+  const { formatCurrency } = useLocalizedMoney()
   const router = useRouter()
   const { get, delete: del } = useApi()
 
@@ -89,13 +91,6 @@ export default function CotizacionesPage() {
     } catch (error: any) {
       alert(`❌ Error: ${error.message || 'No se pudo eliminar la cotización'}`)
     }
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN'
-    }).format(amount)
   }
 
   const formatDate = (dateString: string) => {

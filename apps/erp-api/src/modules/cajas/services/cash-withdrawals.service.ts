@@ -86,8 +86,9 @@ export class CashWithdrawalsService {
         supervisorId?: string,
         codigoAutorizacion?: string,
     ): Promise<RetiroCaja> {
+        const monedaTenant = await this.authService.obtenerMonedaTenant?.(tenantId) || 'PEN';
         this.logger.log(
-            `Solicitando retiro: sesión=${sesionId}, monto=S/.${monto}, motivo=${motivo}`,
+            `Solicitando retiro: sesión=${sesionId}, monto=${monedaTenant} ${monto}, motivo=${motivo}`,
         );
 
         // Validación 1: Monto positivo
@@ -99,7 +100,7 @@ export class CashWithdrawalsService {
         const { data: sesion, error: sesionError } = await this.supabase
             .getClient()
             .from('sesiones_caja')
-            .select('id, estado, monto_inicio, congelada, tenant_id')
+            .select('id, estado, monto_inicio, congelada, tenant_id, moneda')
             .eq('id', sesionId)
             .eq('tenant_id', tenantId)
             .single();
@@ -115,6 +116,7 @@ export class CashWithdrawalsService {
         if (sesion.congelada) {
             throw new BadRequestException('La caja está congelada (cambio de turno en proceso)');
         }
+        const moneda = String(sesion.moneda || monedaTenant).toUpperCase();
 
         // Validación 3: Requiere autorización de supervisor para montos altos
         const validacionAuth = await this.authService.validarMontoRetiro(
@@ -145,7 +147,7 @@ export class CashWithdrawalsService {
 
         if (saldoActual < monto) {
             throw new BadRequestException(
-                `Saldo insuficiente para retiro. Saldo actual: S/.${saldoActual.toFixed(2)}, Solicitado: S/.${monto.toFixed(2)}`,
+                `Saldo insuficiente para retiro. Saldo actual: ${moneda} ${saldoActual.toFixed(2)}, Solicitado: ${moneda} ${monto.toFixed(2)}`,
             );
         }
 
@@ -155,7 +157,7 @@ export class CashWithdrawalsService {
 
         if (saldoDespuesRetiro < config.saldo_minimo_operativo) {
             throw new BadRequestException(
-                `El retiro dejaría el saldo (S/.${saldoDespuesRetiro.toFixed(2)}) por debajo del mínimo operativo (S/.${config.saldo_minimo_operativo}).`,
+                `El retiro dejaría el saldo (${moneda} ${saldoDespuesRetiro.toFixed(2)}) por debajo del mínimo operativo (${moneda} ${Number(config.saldo_minimo_operativo).toFixed(2)}).`,
             );
         }
 
@@ -233,7 +235,7 @@ export class CashWithdrawalsService {
         );
 
         this.logger.log(
-            `Retiro creado exitosamente: ID=${retiro.id}, monto=S/.${monto}, nuevo saldo=S/.${saldoDespuesRetiro.toFixed(2)}`,
+            `Retiro creado exitosamente: ID=${retiro.id}, monto=${moneda} ${monto}, nuevo saldo=${moneda} ${saldoDespuesRetiro.toFixed(2)}`,
         );
 
         return retiro as RetiroCaja;

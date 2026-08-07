@@ -25,6 +25,8 @@ export interface RucValidationResult {
 }
 
 export interface WizardConfiguration {
+  pais?: 'PE' | 'AR' | 'CO'
+  pais_id?: number
   ruc: string
   razonSocial: string
   direccion: string
@@ -46,7 +48,9 @@ export interface WizardConfiguration {
   gre_automatico_habilitado?: boolean
   umbral_gre_automatico?: number
   // Configuración Fiscal
-  regimen_tributario?: 'GENERAL' | 'MYPE' | 'RER' | 'RUS'
+  regimen_tributario?:
+    | 'GENERAL' | 'MYPE' | 'RER' | 'RUS'
+    | 'RESPONSABLE_INSCRIPTO' | 'MONOTRIBUTO' | 'EXENTO' | 'NO_RESPONSABLE'
   igv_porcentaje?: number
   retencion_renta_porcentaje?: number
   // Numeración de comprobantes
@@ -54,7 +58,7 @@ export interface WizardConfiguration {
   serie_boleta?: string
   serie_nota_credito?: string
   // Configuración SUNAT/OSE
-  emision_cpe_modo?: 'SUNAT_DIRECTO' | 'OSE_API'
+  emision_cpe_modo?: 'SUNAT_DIRECTO' | 'OSE_API' | 'ARCA_WSFE' | 'DIAN_DIRECTO'
   sunat_environment?: 'homologacion' | 'produccion'
   sunat_username?: string
   sunat_password?: string
@@ -95,6 +99,17 @@ export interface WizardConfiguration {
   dian_resolucion_hasta?: number
   dian_resolucion_fecha_inicio?: string
   dian_resolucion_fecha_fin?: string
+  arca_activo?: boolean
+  arca_environment?: 'homologacion' | 'produccion'
+  arca_wsaa_url?: string
+  arca_wsfe_url?: string
+  arca_cuit_representada?: string
+  arca_punto_venta?: number
+  arca_condicion_iva?:
+    | 'RESPONSABLE_INSCRIPTO' | 'MONOTRIBUTO' | 'EXENTO' | 'CONSUMIDOR_FINAL'
+  ingresos_brutos?: string
+  fecha_inicio_actividades?: string
+  provincia_fiscal?: string
 }
 
 export interface WizardValidationResults {

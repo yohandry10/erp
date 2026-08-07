@@ -7,6 +7,7 @@ import { formatDate as formatDateOnly } from "@/lib/format-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLocalizedMoney } from "@/hooks/use-localized-money";
 import {
   Select,
   SelectContent,
@@ -83,6 +84,7 @@ const ESTADOS_CONFIG: Record<
 export default function ConciliacionPage() {
   const router = useRouter();
   const { get } = useApi();
+  const { currency, formatCurrency: formatLocalizedCurrency } = useLocalizedMoney();
 
   const [conciliaciones, setConciliaciones] = useState<Conciliacion[]>([]);
   const [cuentasBancarias, setCuentasBancarias] = useState<any[]>([]);
@@ -141,13 +143,9 @@ export default function ConciliacionPage() {
     setCuentaFilter("");
   };
 
-  const formatCurrency = (amount: number, moneda: string = "PEN") => {
+  const formatCurrency = (amount: number, moneda: string = currency) => {
     if (amount === undefined || amount === null) return "-";
-    const currency = moneda === "USD" ? "USD" : "PEN";
-    return new Intl.NumberFormat("es-PE", {
-      style: "currency",
-      currency: currency,
-    }).format(amount);
+    return formatLocalizedCurrency(amount, moneda);
   };
 
   const isFilterActive = estadoFilter || cuentaFilter;

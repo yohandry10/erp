@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import toast from 'react-hot-toast'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
   Plus,
   RefreshCw,
@@ -51,6 +52,7 @@ interface Devolucion {
 export default function DevolucionesPage() {
   const router = useRouter()
   const { get } = useApi()
+  const { formatCurrency: formatLocalizedCurrency, locale, taxIdLabel } = useLocalizedMoney()
 
   const [devoluciones, setDevoluciones] = useState<Devolucion[]>([])
   const [loading, setLoading] = useState(true)
@@ -95,14 +97,11 @@ export default function DevolucionesPage() {
 
   const formatCurrency = (amount: number | undefined) => {
     if (!amount) return '-'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(amount)
+    return formatLocalizedCurrency(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return new Date(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -365,7 +364,7 @@ export default function DevolucionesPage() {
                     <div>
                       <div className="font-medium">{devolucion.proveedor?.razon_social || '-'}</div>
                       <div className="text-xs text-[var(--text-secondary)]">
-                        RUC: {devolucion.proveedor?.ruc || '-'}
+                        {taxIdLabel}: {devolucion.proveedor?.ruc || '-'}
                       </div>
                     </div>
                   </td>

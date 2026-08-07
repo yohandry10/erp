@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DynamicField } from '@/components/ui/dynamic-field';
@@ -37,11 +37,17 @@ const DynamicInvoiceForm: React.FC = () => {
     tipoDocumentoReceptor: '',
     documentoReceptor: '',
     razonSocialReceptor: '',
-    moneda: country?.paisCodigo === 'PE' ? 'PEN' : 'COP',
+    moneda: country?.moneda || 'PEN',
     totalGravadas: 0,
     totalImpuestos: 0,
     importeTotal: 0
   });
+
+  useEffect(() => {
+    if (country?.moneda) {
+      setFormData((previous) => ({ ...previous, moneda: country.moneda }));
+    }
+  }, [country?.moneda]);
 
   const updateField = (field: keyof InvoiceData, value: any) => {
     setFormData(prev => ({
@@ -51,7 +57,7 @@ const DynamicInvoiceForm: React.FC = () => {
   };
 
   const calculateTotals = () => {
-    const impuestos = formData.totalGravadas * (country?.paisCodigo === 'PE' ? 0.18 : 0.19);
+    const impuestos = formData.totalGravadas * (country?.impuestoRate || 0);
     const total = formData.totalGravadas + impuestos;
 
     setFormData(prev => ({
@@ -126,7 +132,13 @@ const DynamicInvoiceForm: React.FC = () => {
               name="documentoReceptor"
               value={formData.documentoReceptor}
               onChange={(value) => updateField('documentoReceptor', value)}
-              placeholder={country?.paisCodigo === 'PE' ? 'RUC/DNI' : 'NIT/CC'}
+              placeholder={
+                country?.paisCodigo === 'AR'
+                  ? 'CUIT/DNI'
+                  : country?.paisCodigo === 'CO'
+                    ? 'NIT/CC'
+                    : 'RUC/DNI'
+              }
             />
             <DynamicField
               name="razonSocialReceptor"

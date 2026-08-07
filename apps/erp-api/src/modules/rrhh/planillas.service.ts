@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService, PlanillaCalculadaEvent, PlanillaPagadaEvent } from '../../shared/events/event-bus.service';
 import Decimal from 'decimal.js';
@@ -11,6 +11,17 @@ import {
   mesesGratificablesDelPeriodo,
   parseFechaLocal,
 } from './liquidacion-peru.util';
+import {
+  calcularPlanillaArgentina,
+  NORMATIVA_ARGENTINA_2026_DEFAULT,
+  NormativaArgentinaPeriodo,
+} from './planillas-argentina.util';
+import {
+  calcularPlanillaColombia,
+  NORMATIVA_COLOMBIA_2026_DEFAULT,
+  NormativaColombiaPeriodo,
+} from './planillas-colombia.util';
+import { RrhhCountryService } from './rrhh-country.service';
 
 const CONCEPTOS_PLANILLA_BASE = [
   { codigo: '001', nombre: 'Sueldo basico', tipo: 'ingreso' },
@@ -29,6 +40,47 @@ const CONCEPTOS_PLANILLA_BASE = [
   { codigo: '106', nombre: 'Tardanzas', tipo: 'descuento' },
   { codigo: '107', nombre: 'Faltas', tipo: 'descuento' },
   { codigo: '201', nombre: 'Aporte EsSalud', tipo: 'aporte_empleador' },
+];
+
+const CONCEPTOS_PLANILLA_ARGENTINA = [
+  { codigo: 'AR001', nombre: 'Sueldo básico', tipo: 'ingreso' },
+  { codigo: 'AR002', nombre: 'Vacaciones', tipo: 'ingreso' },
+  { codigo: 'AR003', nombre: 'Sueldo anual complementario (SAC)', tipo: 'ingreso' },
+  { codigo: 'AR004', nombre: 'Horas extras 50%', tipo: 'ingreso' },
+  { codigo: 'AR005', nombre: 'Horas extras 100%', tipo: 'ingreso' },
+  { codigo: 'AR006', nombre: 'Adicional remunerativo', tipo: 'ingreso' },
+  { codigo: 'AR101', nombre: 'Aporte jubilatorio SIPA', tipo: 'descuento' },
+  { codigo: 'AR102', nombre: 'Aporte INSSJP', tipo: 'descuento' },
+  { codigo: 'AR103', nombre: 'Aporte de obra social', tipo: 'descuento' },
+  { codigo: 'AR104', nombre: 'Aporte sindical', tipo: 'descuento' },
+  { codigo: 'AR105', nombre: 'Retención de Ganancias', tipo: 'descuento' },
+  { codigo: 'AR201', nombre: 'Contribuciones patronales', tipo: 'aporte_empleador' },
+  { codigo: 'AR202', nombre: 'Aseguradora de Riesgos del Trabajo (ART)', tipo: 'aporte_empleador' },
+  { codigo: 'AR203', nombre: 'Seguro colectivo de vida obligatorio', tipo: 'aporte_empleador' },
+];
+
+const CONCEPTOS_PLANILLA_COLOMBIA = [
+  { codigo: 'CO001', nombre: 'Salario básico', tipo: 'ingreso' },
+  { codigo: 'CO002', nombre: 'Auxilio de transporte', tipo: 'ingreso' },
+  { codigo: 'CO003', nombre: 'Horas extra diurnas', tipo: 'ingreso' },
+  { codigo: 'CO004', nombre: 'Horas extra nocturnas', tipo: 'ingreso' },
+  { codigo: 'CO005', nombre: 'Recargo nocturno', tipo: 'ingreso' },
+  { codigo: 'CO006', nombre: 'Otros devengados', tipo: 'ingreso' },
+  { codigo: 'CO101', nombre: 'Aporte trabajador a salud', tipo: 'descuento' },
+  { codigo: 'CO102', nombre: 'Aporte trabajador a pensión', tipo: 'descuento' },
+  { codigo: 'CO103', nombre: 'Fondo de Solidaridad Pensional', tipo: 'descuento' },
+  { codigo: 'CO104', nombre: 'Retención en la fuente', tipo: 'descuento' },
+  { codigo: 'CO105', nombre: 'Otras deducciones', tipo: 'descuento' },
+  { codigo: 'CO201', nombre: 'Aporte empleador a salud', tipo: 'aporte_empleador' },
+  { codigo: 'CO202', nombre: 'Aporte empleador a pensión', tipo: 'aporte_empleador' },
+  { codigo: 'CO203', nombre: 'Riesgos laborales ARL', tipo: 'aporte_empleador' },
+  { codigo: 'CO204', nombre: 'Caja de compensación familiar', tipo: 'aporte_empleador' },
+  { codigo: 'CO205', nombre: 'Aporte SENA', tipo: 'aporte_empleador' },
+  { codigo: 'CO206', nombre: 'Aporte ICBF', tipo: 'aporte_empleador' },
+  { codigo: 'CO207', nombre: 'Provisión prima de servicios', tipo: 'aporte_empleador' },
+  { codigo: 'CO208', nombre: 'Provisión cesantías', tipo: 'aporte_empleador' },
+  { codigo: 'CO209', nombre: 'Provisión intereses de cesantías', tipo: 'aporte_empleador' },
+  { codigo: 'CO210', nombre: 'Provisión vacaciones', tipo: 'aporte_empleador' },
 ];
 
 type NormativaPeruPeriodo = {
@@ -96,8 +148,18 @@ export class PlanillasService {
 
   constructor(
     private readonly supabaseService: SupabaseService,
-    private readonly eventBus: EventBusService
+    private readonly eventBus: EventBusService,
+    @Optional() private readonly countryService?: RrhhCountryService,
   ) { }
+
+  private async obtenerPaisLaboral(tenantId?: string): Promise<'PE' | 'AR' | 'CO'> {
+    if (!tenantId || !this.countryService) return 'PE';
+    return (await this.countryService.obtenerContexto(tenantId)).codigo;
+  }
+
+  private monedaPais(pais: 'PE' | 'AR' | 'CO'): 'PEN' | 'ARS' | 'COP' {
+    return pais === 'AR' ? 'ARS' : pais === 'CO' ? 'COP' : 'PEN';
+  }
 
   // Obtener todas las planillas
   // ✅ FIX: Agregar soporte multi-tenant
@@ -163,8 +225,14 @@ export class PlanillasService {
       datosLimpios.metadata = metadata;
     }
 
+    const paisLaboral = await this.obtenerPaisLaboral(tenantId);
     const dataToInsert = tenantId 
-      ? { ...datosLimpios, tenant_id: tenantId }
+      ? {
+          ...datosLimpios,
+          tenant_id: tenantId,
+          pais_codigo: paisLaboral,
+          moneda: this.monedaPais(paisLaboral),
+        }
       : datosLimpios;
       
     const { data, error } = await this.supabaseService.getClient()
@@ -224,6 +292,7 @@ export class PlanillasService {
       throw new BadRequestException('No se encontraron empleados activos para procesar');
     }
 
+    const paisLaboral = await this.obtenerPaisLaboral(tenantId);
     const conceptosResult = await this.getConceptos(tenantId);
     const conceptos = conceptosResult.data;
 
@@ -237,7 +306,18 @@ export class PlanillasService {
       throw new BadRequestException('Planilla sin periodo; no se puede resolver normativa laboral/tributaria');
     }
 
-    const normativa = await this.obtenerNormativaPeruPeriodo(planillaEstado.periodo, tenantId);
+    const normativaPeru =
+      paisLaboral === 'PE'
+        ? await this.obtenerNormativaPeruPeriodo(planillaEstado.periodo, tenantId)
+        : null;
+    const normativaArgentina =
+      paisLaboral === 'AR'
+        ? await this.obtenerNormativaArgentinaPeriodo(planillaEstado.periodo, tenantId)
+        : null;
+    const normativaColombia =
+      paisLaboral === 'CO'
+        ? await this.obtenerNormativaColombiaPeriodo(planillaEstado.periodo, tenantId)
+        : null;
 
     let totalIngresos = 0;
     let totalDescuentos = 0;
@@ -264,14 +344,31 @@ export class PlanillasService {
       const sueldoBasico = parseFloat(contratoActual.sueldo_bruto) || 0;
       this.logger.debug(`Procesando empleado ID=${empleado.id}`);
 
-      const calculoEmpleado = this.calcularEmpleado(
-        empleado,
-        sueldoBasico,
-        conceptos,
-        normativa,
-        planillaEstado.periodo,
-        vacacionesPorEmpleado.get(empleado.id) ?? 0,
-      );
+      const calculoEmpleado =
+        paisLaboral === 'AR'
+          ? this.calcularEmpleadoArgentina(
+              empleado,
+              sueldoBasico,
+              conceptos,
+              normativaArgentina ?? NORMATIVA_ARGENTINA_2026_DEFAULT,
+              planillaEstado.periodo,
+              vacacionesPorEmpleado.get(empleado.id) ?? 0,
+            )
+          : paisLaboral === 'CO'
+            ? this.calcularEmpleadoColombia(
+                empleado,
+                sueldoBasico,
+                conceptos,
+                normativaColombia ?? NORMATIVA_COLOMBIA_2026_DEFAULT,
+              )
+            : this.calcularEmpleado(
+              empleado,
+              sueldoBasico,
+              conceptos,
+              normativaPeru ?? NORMATIVA_PERU_2026_DEFAULT,
+              planillaEstado.periodo,
+              vacacionesPorEmpleado.get(empleado.id) ?? 0,
+            );
 
       // Insertar empleado en planilla
       const { data: empleadoPlanilla, error: empError } = await client
@@ -429,6 +526,7 @@ export class PlanillasService {
         .is('tenant_id', null)
         .eq('periodo', periodoNormalizado)
         .eq('activo', true)
+        .limit(1)
         .maybeSingle();
 
       if (!error && data) {
@@ -443,6 +541,123 @@ export class PlanillasService {
     }
 
     return { ...NORMATIVA_PERU_2026_DEFAULT };
+  }
+
+  private async obtenerNormativaArgentinaPeriodo(
+    periodo?: string,
+    tenantId?: string,
+  ): Promise<NormativaArgentinaPeriodo> {
+    const periodoNormalizado = /^\d{4}-\d{2}$/.test(String(periodo || ''))
+      ? String(periodo)
+      : '2026-01';
+    const client = this.supabaseService.getClient();
+    const fields =
+      'jubilacion_aporte, inssjp_aporte, obra_social_aporte, contribucion_patronal, art_tasa, sindicato_aporte_default, seguro_vida_monto, vacaciones_divisor, horas_mensuales';
+    const mapNormativa = (row: any): NormativaArgentinaPeriodo => ({
+      jubilacionAporte: Number(row?.jubilacion_aporte ?? NORMATIVA_ARGENTINA_2026_DEFAULT.jubilacionAporte),
+      inssjpAporte: Number(row?.inssjp_aporte ?? NORMATIVA_ARGENTINA_2026_DEFAULT.inssjpAporte),
+      obraSocialAporte: Number(row?.obra_social_aporte ?? NORMATIVA_ARGENTINA_2026_DEFAULT.obraSocialAporte),
+      contribucionPatronal: Number(
+        row?.contribucion_patronal ?? NORMATIVA_ARGENTINA_2026_DEFAULT.contribucionPatronal,
+      ),
+      artTasa: Number(row?.art_tasa ?? NORMATIVA_ARGENTINA_2026_DEFAULT.artTasa),
+      sindicatoAporteDefault: Number(
+        row?.sindicato_aporte_default ?? NORMATIVA_ARGENTINA_2026_DEFAULT.sindicatoAporteDefault,
+      ),
+      seguroVidaMonto: Number(
+        row?.seguro_vida_monto ?? NORMATIVA_ARGENTINA_2026_DEFAULT.seguroVidaMonto,
+      ),
+      vacacionesDivisor: Number(
+        row?.vacaciones_divisor ?? NORMATIVA_ARGENTINA_2026_DEFAULT.vacacionesDivisor,
+      ),
+      horasMensuales: Number(
+        row?.horas_mensuales ?? NORMATIVA_ARGENTINA_2026_DEFAULT.horasMensuales,
+      ),
+    });
+
+    try {
+      const base = () =>
+        client
+          .from('normativa_argentina_periodos')
+          .select(fields)
+          .eq('activo', true)
+          .lte('periodo', periodoNormalizado)
+          .order('periodo', { ascending: false })
+          .limit(1);
+
+      if (tenantId) {
+        const { data } = await base().eq('tenant_id', tenantId).maybeSingle();
+        if (data) return mapNormativa(data);
+      }
+
+      const { data, error } = await base().is('tenant_id', null).maybeSingle();
+      if (!error && data) return mapNormativa(data);
+      if (error) {
+        this.logger.warn(`No se pudo cargar normativa Argentina ${periodoNormalizado}: ${error.message}`);
+      }
+    } catch (error: any) {
+      this.logger.warn(
+        `Normativa Argentina no disponible para ${periodoNormalizado}; usando base segura: ${error?.message ?? error}`,
+      );
+    }
+
+    return { ...NORMATIVA_ARGENTINA_2026_DEFAULT };
+  }
+
+  private async obtenerNormativaColombiaPeriodo(
+    periodo?: string,
+    tenantId?: string,
+  ): Promise<NormativaColombiaPeriodo> {
+    const periodoNormalizado = /^\d{4}-\d{2}$/.test(String(periodo || ''))
+      ? String(periodo)
+      : '2026-01';
+    const client = this.supabaseService.getClient();
+    const fields =
+      'salario_minimo, auxilio_transporte, salud_empleado, pension_empleado, salud_empleador, pension_empleador, caja_compensacion, sena, icbf, arl_clase_i, prima_servicios_provision, cesantias_provision, intereses_cesantias_provision, vacaciones_provision, horas_mensuales, jornada_semanal, recargo_dominical_festivo, recargo_nocturno, hora_inicio_nocturna, uvt, tope_ibc_smmlv';
+    const map = (row: any): NormativaColombiaPeriodo => ({
+      salarioMinimo: Number(row?.salario_minimo ?? NORMATIVA_COLOMBIA_2026_DEFAULT.salarioMinimo),
+      auxilioTransporte: Number(row?.auxilio_transporte ?? NORMATIVA_COLOMBIA_2026_DEFAULT.auxilioTransporte),
+      saludEmpleado: Number(row?.salud_empleado ?? NORMATIVA_COLOMBIA_2026_DEFAULT.saludEmpleado),
+      pensionEmpleado: Number(row?.pension_empleado ?? NORMATIVA_COLOMBIA_2026_DEFAULT.pensionEmpleado),
+      saludEmpleador: Number(row?.salud_empleador ?? NORMATIVA_COLOMBIA_2026_DEFAULT.saludEmpleador),
+      pensionEmpleador: Number(row?.pension_empleador ?? NORMATIVA_COLOMBIA_2026_DEFAULT.pensionEmpleador),
+      cajaCompensacion: Number(row?.caja_compensacion ?? NORMATIVA_COLOMBIA_2026_DEFAULT.cajaCompensacion),
+      sena: Number(row?.sena ?? NORMATIVA_COLOMBIA_2026_DEFAULT.sena),
+      icbf: Number(row?.icbf ?? NORMATIVA_COLOMBIA_2026_DEFAULT.icbf),
+      arlClaseI: Number(row?.arl_clase_i ?? NORMATIVA_COLOMBIA_2026_DEFAULT.arlClaseI),
+      primaServiciosProvision: Number(row?.prima_servicios_provision ?? NORMATIVA_COLOMBIA_2026_DEFAULT.primaServiciosProvision),
+      cesantiasProvision: Number(row?.cesantias_provision ?? NORMATIVA_COLOMBIA_2026_DEFAULT.cesantiasProvision),
+      interesesCesantiasProvision: Number(row?.intereses_cesantias_provision ?? NORMATIVA_COLOMBIA_2026_DEFAULT.interesesCesantiasProvision),
+      vacacionesProvision: Number(row?.vacaciones_provision ?? NORMATIVA_COLOMBIA_2026_DEFAULT.vacacionesProvision),
+      horasMensuales: Number(row?.horas_mensuales ?? NORMATIVA_COLOMBIA_2026_DEFAULT.horasMensuales),
+      jornadaSemanal: Number(row?.jornada_semanal ?? NORMATIVA_COLOMBIA_2026_DEFAULT.jornadaSemanal),
+      recargoDominicalFestivo: Number(row?.recargo_dominical_festivo ?? NORMATIVA_COLOMBIA_2026_DEFAULT.recargoDominicalFestivo),
+      recargoNocturno: Number(row?.recargo_nocturno ?? NORMATIVA_COLOMBIA_2026_DEFAULT.recargoNocturno),
+      horaInicioNocturna: Number(row?.hora_inicio_nocturna ?? NORMATIVA_COLOMBIA_2026_DEFAULT.horaInicioNocturna),
+      uvt: Number(row?.uvt ?? NORMATIVA_COLOMBIA_2026_DEFAULT.uvt),
+      topeIbcSmmlv: Number(row?.tope_ibc_smmlv ?? NORMATIVA_COLOMBIA_2026_DEFAULT.topeIbcSmmlv),
+    });
+
+    try {
+      const base = () =>
+        client
+          .from('normativa_colombia_periodos')
+          .select(fields)
+          .eq('activo', true)
+          .lte('periodo', periodoNormalizado)
+          .order('periodo', { ascending: false })
+          .limit(1);
+      if (tenantId) {
+        const { data } = await base().eq('tenant_id', tenantId).maybeSingle();
+        if (data) return map(data);
+      }
+      const { data, error } = await base().is('tenant_id', null).maybeSingle();
+      if (!error && data) return map(data);
+      if (error) this.logger.warn(`No se pudo cargar normativa Colombia ${periodoNormalizado}: ${error.message}`);
+    } catch (error: any) {
+      this.logger.warn(`Normativa Colombia no disponible para ${periodoNormalizado}; usando base 2026: ${error?.message ?? error}`);
+    }
+    return { ...NORMATIVA_COLOMBIA_2026_DEFAULT };
   }
 
   // Lógica de cálculo por empleado
@@ -607,7 +822,9 @@ export class PlanillasService {
       // AFP - Comisión (varía por AFP — usar tasas vigentes SBS)
       // TODO: Estas tasas deben ser configurables por tenant y AFP del empleado
       // Tasa por defecto: AFP Integra comisión flujo 1.55% (vigente 2024-2025)
-      const tasaComisionAFP = contratoActual?.tasa_comision_afp ?? normativa.afpComisionFlujoDefault;
+      const tasaComisionAFP = contratoActual?.tasa_comision_afp ??
+        contratoActual?.metadata?.tasa_comision_afp ??
+        normativa.afpComisionFlujoDefault;
       const comisionAFP = new Decimal(baseAsegurable).times(tasaComisionAFP).toDecimalPlaces(2).toNumber();
       const conceptoComisionAFP = conceptos.find(c => c.codigo === '102');
       if (conceptoComisionAFP) {
@@ -620,7 +837,9 @@ export class PlanillasService {
       }
 
       // AFP - Seguro de invalidez vigente SBS 2026: 1.37%.
-      const tasaSeguroAFP = contratoActual?.tasa_seguro_afp ?? normativa.afpPrimaSeguro;
+      const tasaSeguroAFP = contratoActual?.tasa_seguro_afp ??
+        contratoActual?.metadata?.tasa_seguro_afp ??
+        normativa.afpPrimaSeguro;
       const seguroAFP = new Decimal(baseAsegurable).times(tasaSeguroAFP).toDecimalPlaces(2).toNumber();
       const conceptoSeguroAFP = conceptos.find(c => c.codigo === '103');
       if (conceptoSeguroAFP) {
@@ -681,6 +900,111 @@ export class PlanillasService {
       totalAportes,
       netoPagar,
       conceptosDetalle
+    };
+  }
+
+  private calcularEmpleadoArgentina(
+    empleado: any,
+    sueldoBasico: number,
+    conceptos: any[],
+    normativa: NormativaArgentinaPeriodo,
+    periodo: string,
+    diasVacaciones = 0,
+  ) {
+    const contrato = contratoVigenteDe(empleado) ?? {};
+    const metadata = {
+      ...(empleado?.metadata && typeof empleado.metadata === 'object' ? empleado.metadata : {}),
+      ...(contrato?.metadata && typeof contrato.metadata === 'object' ? contrato.metadata : {}),
+    };
+    const calculo = calcularPlanillaArgentina({
+      sueldoMensual: sueldoBasico,
+      periodo,
+      fechaIngreso: empleado?.fecha_ingreso,
+      diasVacaciones,
+      horasExtras50: Number(metadata.horas_extras_50 ?? empleado?.horas_extras_50 ?? 0),
+      horasExtras100: Number(metadata.horas_extras_100 ?? empleado?.horas_extras_100 ?? 0),
+      mejorRemuneracionSemestre: Number(metadata.mejor_remuneracion_semestre ?? sueldoBasico),
+      sindicatoAporteTasa: Number(
+        contrato?.sindicato_aporte_tasa ?? metadata.sindicato_aporte_tasa ?? normativa.sindicatoAporteDefault,
+      ),
+      gananciasRetencion: Number(
+        contrato?.ganancias_retencion_mensual ?? metadata.ganancias_retencion_mensual ?? 0,
+      ),
+      aporteAdicional: Number(metadata.adicional_remunerativo ?? 0),
+      artTasa: Number(contrato?.art_tasa ?? metadata.art_tasa ?? normativa.artTasa),
+      seguroVidaMonto: Number(
+        contrato?.seguro_vida_monto ?? metadata.seguro_vida_monto ?? normativa.seguroVidaMonto,
+      ),
+      normativa,
+    });
+
+    return {
+      totalIngresos: calculo.totalIngresos,
+      totalDescuentos: calculo.totalDescuentos,
+      totalAportes: calculo.totalAportes,
+      netoPagar: calculo.netoPagar,
+      conceptosDetalle: calculo.conceptos
+        .map((calculado) => {
+          const concepto = conceptos.find((item) => item.codigo === calculado.codigo);
+          return concepto
+            ? {
+                id: concepto.id,
+                monto: calculado.monto,
+                observaciones: calculado.observaciones,
+              }
+            : null;
+        })
+        .filter(Boolean),
+    };
+  }
+
+  private calcularEmpleadoColombia(
+    empleado: any,
+    sueldoBasico: number,
+    conceptos: any[],
+    normativa: NormativaColombiaPeriodo,
+  ) {
+    const contrato = contratoVigenteDe(empleado) ?? {};
+    const metadata = {
+      ...(empleado?.metadata && typeof empleado.metadata === 'object' ? empleado.metadata : {}),
+      ...(contrato?.metadata && typeof contrato.metadata === 'object' ? contrato.metadata : {}),
+    };
+    const calculo = calcularPlanillaColombia({
+      sueldoMensual: sueldoBasico,
+      diasTrabajados: Number(metadata.dias_trabajados ?? 30),
+      horasExtrasDiurnas: Number(metadata.horas_extras_diurnas ?? empleado?.horas_extras_25 ?? 0),
+      horasExtrasNocturnas: Number(metadata.horas_extras_nocturnas ?? empleado?.horas_extras_35 ?? 0),
+      horasRecargoNocturno: Number(metadata.horas_recargo_nocturno ?? 0),
+      horasDominicalesFestivas: Number(metadata.horas_dominicales_festivas ?? 0),
+      horasExtrasDiurnasDominicales: Number(metadata.horas_extras_diurnas_dominicales ?? 0),
+      horasExtrasNocturnasDominicales: Number(metadata.horas_extras_nocturnas_dominicales ?? 0),
+      retencionFuente: Number(metadata.retencion_fuente_mensual ?? 0),
+      fondoSolidaridadTasa: Number(metadata.fondo_solidaridad_tasa ?? 0),
+      arlTasa: Number(contrato?.arl_tasa ?? metadata.arl_tasa ?? normativa.arlClaseI),
+      exoneradoSaludSenaIcbf: Boolean(metadata.exonerado_salud_sena_icbf),
+      recibeAuxilioTransporte: metadata.recibe_auxilio_transporte !== false,
+      otrosDevengados: Number(metadata.otros_devengados ?? 0),
+      otrasDeducciones: Number(metadata.otras_deducciones ?? 0),
+      normativa,
+    });
+
+    return {
+      totalIngresos: calculo.totalIngresos,
+      totalDescuentos: calculo.totalDescuentos,
+      totalAportes: calculo.totalAportes,
+      netoPagar: calculo.netoPagar,
+      conceptosDetalle: calculo.conceptos
+        .map((calculado) => {
+          const concepto = conceptos.find((item) => item.codigo === calculado.codigo);
+          return concepto
+            ? {
+                id: concepto.id,
+                monto: calculado.monto,
+                observaciones: calculado.observaciones,
+              }
+            : null;
+        })
+        .filter(Boolean),
     };
   }
 
@@ -881,8 +1205,15 @@ export class PlanillasService {
   // ✅ FIX: Agregar soporte multi-tenant
   async getConceptos(tenantId?: string) {
     const client = this.supabaseService.getClient();
+    const paisLaboral = await this.obtenerPaisLaboral(tenantId);
+    const conceptosPais =
+      paisLaboral === 'AR'
+        ? CONCEPTOS_PLANILLA_ARGENTINA
+        : paisLaboral === 'CO'
+          ? CONCEPTOS_PLANILLA_COLOMBIA
+          : CONCEPTOS_PLANILLA_BASE;
     const buildConceptosBase = (existingCodes: Set<string> = new Set<string>()) =>
-      CONCEPTOS_PLANILLA_BASE
+      conceptosPais
         .filter((concepto) => !existingCodes.has(concepto.codigo))
         .map((concepto) => ({
           tenant_id: tenantId,
@@ -937,7 +1268,7 @@ export class PlanillasService {
     if (!tenantId && (!data || data.length === 0)) {
       return {
         success: true,
-        data: CONCEPTOS_PLANILLA_BASE.map((concepto) => ({
+        data: conceptosPais.map((concepto) => ({
           ...concepto,
           activo: true,
           estado: 'ACTIVO',
@@ -954,7 +1285,14 @@ export class PlanillasService {
 
   async seedConceptosPlanillaTenant(tenantId: string) {
     const client = this.supabaseService.getClient();
-    const conceptosBase = CONCEPTOS_PLANILLA_BASE.map((concepto) => ({
+    const paisLaboral = await this.obtenerPaisLaboral(tenantId);
+    const conceptosPais =
+      paisLaboral === 'AR'
+        ? CONCEPTOS_PLANILLA_ARGENTINA
+        : paisLaboral === 'CO'
+          ? CONCEPTOS_PLANILLA_COLOMBIA
+          : CONCEPTOS_PLANILLA_BASE;
+    const conceptosBase = conceptosPais.map((concepto) => ({
       tenant_id: tenantId,
       codigo: concepto.codigo,
       nombre: concepto.nombre,
@@ -993,7 +1331,19 @@ export class PlanillasService {
     if (planillaError) {
       throw planillaError;
     }
-    const normativa = await this.obtenerNormativaPeruPeriodo(planillaInfo?.periodo, tenantId);
+    const paisLaboral = await this.obtenerPaisLaboral(tenantId);
+    const normativa =
+      paisLaboral === 'PE'
+        ? await this.obtenerNormativaPeruPeriodo(planillaInfo?.periodo, tenantId)
+        : null;
+    const normativaArgentina =
+      paisLaboral === 'AR'
+        ? await this.obtenerNormativaArgentinaPeriodo(planillaInfo?.periodo, tenantId)
+        : null;
+    const normativaColombia =
+      paisLaboral === 'CO'
+        ? await this.obtenerNormativaColombiaPeriodo(planillaInfo?.periodo, tenantId)
+        : null;
 
     const conceptosResult = await this.getConceptos(tenantId);
     const conceptos = conceptosResult.data;
@@ -1013,7 +1363,25 @@ export class PlanillasService {
     for (const empleado of empleadosPersonalizados) {
       this.logger.debug(`Procesando empleado personalizado ID=${empleado.id}`);
 
-      const calculoEmpleado = this.calcularEmpleadoPersonalizado(empleado, conceptos, normativa);
+      const calculoEmpleado =
+        paisLaboral === 'AR'
+          ? this.calcularEmpleadoArgentinaPersonalizado(
+              empleado,
+              conceptos,
+              normativaArgentina ?? NORMATIVA_ARGENTINA_2026_DEFAULT,
+              planillaInfo?.periodo,
+            )
+          : paisLaboral === 'CO'
+            ? this.calcularEmpleadoColombiaPersonalizado(
+                empleado,
+                conceptos,
+                normativaColombia ?? NORMATIVA_COLOMBIA_2026_DEFAULT,
+              )
+            : this.calcularEmpleadoPersonalizado(
+              empleado,
+              conceptos,
+              normativa ?? NORMATIVA_PERU_2026_DEFAULT,
+            );
 
       // Insertar empleado en planilla
       const { data: empleadoPlanilla, error: empError } = await client
@@ -1088,9 +1456,10 @@ export class PlanillasService {
 
     this.logger.debug(`✅ Planilla personalizada calculada exitosamente:`);
     this.logger.debug(`   - Empleados procesados: ${empleadosPersonalizados.length}`);
-    this.logger.debug(`   - Total ingresos: S/ ${totalIngresos.toFixed(2)}`);
-    this.logger.debug(`   - Total descuentos: S/ ${totalDescuentos.toFixed(2)}`);
-    this.logger.debug(`   - Total neto: S/ ${totalNeto.toFixed(2)}`);
+    const monedaLog = this.monedaPais(paisLaboral);
+    this.logger.debug(`   - Total ingresos: ${monedaLog} ${totalIngresos.toFixed(2)}`);
+    this.logger.debug(`   - Total descuentos: ${monedaLog} ${totalDescuentos.toFixed(2)}`);
+    this.logger.debug(`   - Total neto: ${monedaLog} ${totalNeto.toFixed(2)}`);
 
     return {
       success: true,
@@ -1102,6 +1471,113 @@ export class PlanillasService {
   }
 
   // Lógica de cálculo personalizada por empleado
+  private calcularEmpleadoArgentinaPersonalizado(
+    empleado: any,
+    conceptos: any[],
+    normativa: NormativaArgentinaPeriodo,
+    periodo?: string,
+  ) {
+    if (!empleado) {
+      throw new BadRequestException('Datos del empleado requeridos');
+    }
+    const sueldoBasico = Number(empleado.sueldo_base ?? empleado.sueldo_bruto ?? 0);
+    if (sueldoBasico <= 0) {
+      return {
+        conceptosDetalle: [],
+        totalIngresos: 0,
+        totalDescuentos: 0,
+        totalAportes: 0,
+        netoPagar: 0,
+      };
+    }
+
+    const calculo = calcularPlanillaArgentina({
+      sueldoMensual: sueldoBasico,
+      periodo: String(periodo || ''),
+      fechaIngreso: empleado.fecha_ingreso ?? `${String(periodo || '2026-01')}-01`,
+      diasTrabajados: Number(empleado.dias_trabajados ?? 30),
+      diasVacaciones: Number(empleado.dias_vacaciones ?? 0),
+      horasExtras50: Number(empleado.horas_extras_50 ?? empleado.horas_extras_25 ?? 0),
+      horasExtras100: Number(empleado.horas_extras_100 ?? empleado.horas_extras_35 ?? 0),
+      mejorRemuneracionSemestre: Number(empleado.mejor_remuneracion_semestre ?? sueldoBasico),
+      sindicatoAporteTasa: Number(empleado.sindicato_aporte_tasa ?? normativa.sindicatoAporteDefault),
+      gananciasRetencion: Number(empleado.ganancias_retencion ?? 0),
+      aporteAdicional: Number(empleado.bonos_adicionales ?? empleado.adicional_remunerativo ?? 0),
+      artTasa: Number(empleado.art_tasa ?? normativa.artTasa),
+      seguroVidaMonto: Number(empleado.seguro_vida_monto ?? normativa.seguroVidaMonto),
+      normativa,
+    });
+
+    return {
+      conceptosDetalle: calculo.conceptos
+        .map((calculado) => {
+          const concepto = conceptos.find((item) => item.codigo === calculado.codigo);
+          return concepto
+            ? {
+                id: concepto.id,
+                monto: calculado.monto,
+                observaciones: calculado.observaciones,
+              }
+            : null;
+        })
+        .filter(Boolean),
+      totalIngresos: calculo.totalIngresos,
+      totalDescuentos: calculo.totalDescuentos,
+      totalAportes: calculo.totalAportes,
+      netoPagar: calculo.netoPagar,
+    };
+  }
+
+  private calcularEmpleadoColombiaPersonalizado(
+    empleado: any,
+    conceptos: any[],
+    normativa: NormativaColombiaPeriodo,
+  ) {
+    if (!empleado) throw new BadRequestException('Datos del empleado requeridos');
+    const sueldoBasico = Number(empleado.sueldo_base ?? empleado.sueldo_bruto ?? 0);
+    if (sueldoBasico <= 0) {
+      return {
+        conceptosDetalle: [],
+        totalIngresos: 0,
+        totalDescuentos: 0,
+        totalAportes: 0,
+        netoPagar: 0,
+      };
+    }
+    const calculo = calcularPlanillaColombia({
+      sueldoMensual: sueldoBasico,
+      diasTrabajados: Number(empleado.dias_trabajados ?? 30),
+      horasExtrasDiurnas: Number(empleado.horas_extras_diurnas ?? empleado.horas_extras_25 ?? 0),
+      horasExtrasNocturnas: Number(empleado.horas_extras_nocturnas ?? empleado.horas_extras_35 ?? 0),
+      horasRecargoNocturno: Number(empleado.horas_recargo_nocturno ?? 0),
+      horasDominicalesFestivas: Number(empleado.horas_dominicales_festivas ?? 0),
+      horasExtrasDiurnasDominicales: Number(empleado.horas_extras_diurnas_dominicales ?? 0),
+      horasExtrasNocturnasDominicales: Number(empleado.horas_extras_nocturnas_dominicales ?? 0),
+      retencionFuente: Number(empleado.retencion_fuente ?? 0),
+      fondoSolidaridadTasa: Number(empleado.fondo_solidaridad_tasa ?? 0),
+      arlTasa: Number(empleado.arl_tasa ?? normativa.arlClaseI),
+      exoneradoSaludSenaIcbf: Boolean(empleado.exonerado_salud_sena_icbf),
+      recibeAuxilioTransporte: empleado.recibe_auxilio_transporte !== false,
+      otrosDevengados: Number(empleado.bonos_adicionales ?? empleado.otros_devengados ?? 0),
+      otrasDeducciones: Number(empleado.otras_deducciones ?? 0),
+      normativa,
+    });
+    return {
+      conceptosDetalle: calculo.conceptos
+        .map((calculado) => {
+          const concepto = conceptos.find((item) => item.codigo === calculado.codigo);
+          return concepto
+            ? { id: concepto.id, monto: calculado.monto, observaciones: calculado.observaciones }
+            : null;
+        })
+        .filter(Boolean),
+      totalIngresos: calculo.totalIngresos,
+      totalDescuentos: calculo.totalDescuentos,
+      totalAportes: calculo.totalAportes,
+      netoPagar: calculo.netoPagar,
+    };
+  }
+
   private calcularEmpleadoPersonalizado(
     empleado: any,
     conceptos: any[],
@@ -1255,8 +1731,12 @@ export class PlanillasService {
     if (regimenPensionario === 'AFP') {
       // TODO: Tasas AFP deben ser configurables por tenant y AFP del empleado
       const contratoEmpleado = contratoVigente;
-      const tasaComisionAFP2 = contratoEmpleado?.tasa_comision_afp ?? normativa.afpComisionFlujoDefault;
-      const tasaSeguroAFP2 = contratoEmpleado?.tasa_seguro_afp ?? normativa.afpPrimaSeguro;
+      const tasaComisionAFP2 = contratoEmpleado?.tasa_comision_afp ??
+        contratoEmpleado?.metadata?.tasa_comision_afp ??
+        normativa.afpComisionFlujoDefault;
+      const tasaSeguroAFP2 = contratoEmpleado?.tasa_seguro_afp ??
+        contratoEmpleado?.metadata?.tasa_seguro_afp ??
+        normativa.afpPrimaSeguro;
       const aporteAFP = new Decimal(totalIngresos).times(normativa.afpAporte).toDecimalPlaces(2).toNumber();
       const comisionAFP = new Decimal(totalIngresos).times(tasaComisionAFP2).toDecimalPlaces(2).toNumber();
       const seguroAFP = new Decimal(totalIngresos).times(tasaSeguroAFP2).toDecimalPlaces(2).toNumber();
@@ -1648,6 +2128,7 @@ export class PlanillasService {
         .eq('tenant_id', tenantId)
         .eq('codigo', codigo)
         .eq('activo', true)
+        .limit(1)
         .maybeSingle();
 
       if (error || !data) {
@@ -1687,6 +2168,7 @@ export class PlanillasService {
             .eq('tenant_id', tenantId)
             .eq('codigo', codigo)
             .eq('activo', true)
+            .limit(1)
             .maybeSingle();
 
           if (!existenteError && existente?.id) {
@@ -1734,6 +2216,9 @@ export class PlanillasService {
       if (!tenantIdPlanilla) {
         throw new BadRequestException('La planilla no tiene tenant_id; no se puede generar asiento contable');
       }
+      const paisPlanilla = await this.obtenerPaisLaboral(tenantIdPlanilla);
+      const esArgentina = paisPlanilla === 'AR';
+      const esColombia = paisPlanilla === 'CO';
 
       const referenciaPlanilla = `PLANILLA-${planillaId}`;
       const sourceEventId = planillaId;
@@ -1845,6 +2330,8 @@ export class PlanillasService {
               totalDescuentos,
               totalNeto,
               centro_costo_id: planilla.centro_costo_id,
+              paisCodigo: paisPlanilla,
+              moneda: this.monedaPais(paisPlanilla),
               eventId,
             },
           });
@@ -1891,7 +2378,17 @@ export class PlanillasService {
       this.logger.debug(`   - Remuneraciones (411): ${cuentaRemuneraciones}`);
       this.logger.debug(`   - Instituciones (403): ${cuentaInstituciones}`);
       if (cuentaSeguridadSocial) this.logger.debug(`   - Seguridad Social (627): ${cuentaSeguridadSocial}`);
-      if (cuentaEssalud) this.logger.debug(`   - ESSALUD (407): ${cuentaEssalud}`);
+      if (cuentaEssalud) {
+        this.logger.debug(
+          `   - ${
+            esArgentina
+              ? 'Contribuciones patronales/ART'
+              : esColombia
+                ? 'Seguridad social, PILA y prestaciones'
+                : 'ESSALUD'
+          } (407): ${cuentaEssalud}`,
+        );
+      }
 
       // 2. Crear cabecera del asiento en tabla principal. La BD asigna numero_asiento/codigo.
       this.logger.debug(`📊 [RRHH] Creando cabecera del asiento de planilla ${planilla.periodo}`);
@@ -1952,7 +2449,8 @@ export class PlanillasService {
         }
       ];
 
-      // ESSALUD patronal (9%): DEBE 627, HABER 407
+      // Aportes patronales: DEBE 627, HABER 407. El cálculo proviene del
+      // motor normativo del país (ESSALUD en PE; SIPA/obra social/ART en AR).
       if (totalAportes > 0 && cuentaSeguridadSocial && cuentaEssalud) {
         detallesAsiento.push(
           {
@@ -1962,7 +2460,13 @@ export class PlanillasService {
             debe: totalAportes,
             haber: 0,
             fecha: fechaAsiento,
-            nombre: `ESSALUD patronal ${planilla.periodo}`
+            nombre: `${
+              esArgentina
+                ? 'Contribuciones patronales, obra social y ART'
+                : esColombia
+                  ? 'Seguridad social, parafiscales y prestaciones'
+                  : 'ESSALUD patronal'
+            } ${planilla.periodo}`
           },
           {
             tenant_id: tenantIdPlanilla,
@@ -1971,7 +2475,13 @@ export class PlanillasService {
             debe: 0,
             haber: totalAportes,
             fecha: fechaAsiento,
-            nombre: `ESSALUD por pagar ${planilla.periodo}`
+            nombre: `${
+              esArgentina
+                ? 'Cargas sociales y ART por pagar'
+                : esColombia
+                  ? 'PILA, parafiscales y prestaciones por pagar'
+                  : 'ESSALUD por pagar'
+            } ${planilla.periodo}`
           }
         );
       }

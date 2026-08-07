@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/format-utils';
 import { fetchApi } from '@/lib/api-fetch';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface MovimientoBancario {
   id: string;
@@ -37,6 +38,7 @@ export default function MatchManualModal({
   conciliacionId,
   onMatchSuccess,
 }: MatchManualModalProps) {
+  const country = useCountryContext();
   const [movimientosSistema, setMovimientosSistema] = useState<MovimientoBancario[]>([]);
   const [movimientosExtracto, setMovimientosExtracto] = useState<MovimientoBancario[]>([]);
   const [selectedSistema, setSelectedSistema] = useState<string | null>(null);
@@ -167,9 +169,9 @@ export default function MatchManualModal({
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
     }).format(amount);
   };
 

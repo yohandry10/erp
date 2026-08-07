@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface DetalleAsiento {
   cuenta_id: string
@@ -40,6 +41,9 @@ interface AsientoFormProps {
   cuentas: Cuenta[]
   centrosCosto: CentroCosto[]
   loading?: boolean
+  /** Valores de partida al editar un asiento en borrador. */
+  initialData?: AsientoFormData
+  submitLabel?: string
 }
 
 const inputClass =
@@ -53,16 +57,21 @@ export default function AsientoForm({
   cuentas,
   centrosCosto,
   loading = false,
+  initialData,
+  submitLabel = 'Guardar asiento',
 }: AsientoFormProps) {
-  const [formData, setFormData] = useState<AsientoFormData>({
-    fecha: new Date().toISOString().split('T')[0],
-    concepto: '',
-    referencia: '',
-    detalles: [
-      { cuenta_id: '', debe: 0, haber: 0, concepto: '', centro_costo_id: '' },
-      { cuenta_id: '', debe: 0, haber: 0, concepto: '', centro_costo_id: '' },
-    ],
-  })
+  const { formatCurrency } = useLocalizedMoney()
+  const [formData, setFormData] = useState<AsientoFormData>(
+    initialData ?? {
+      fecha: new Date().toISOString().split('T')[0],
+      concepto: '',
+      referencia: '',
+      detalles: [
+        { cuenta_id: '', debe: 0, haber: 0, concepto: '', centro_costo_id: '' },
+        { cuenta_id: '', debe: 0, haber: 0, concepto: '', centro_costo_id: '' },
+      ],
+    }
+  )
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -118,7 +127,7 @@ export default function AsientoForm({
       if (detalle.debe > 0 && detalle.haber > 0) newErrors[`detalle_${index}_monto`] = 'Use debe o haber, no ambos'
     })
 
-    if (!isBalanced) newErrors.balance = `El asiento no cuadra. Diferencia: S/ ${diferencia.toFixed(2)}`
+    if (!isBalanced) newErrors.balance = `El asiento no cuadra. Diferencia: ${formatCurrency(diferencia)}`
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -134,12 +143,6 @@ export default function AsientoForm({
       console.error('Error submitting form:', error)
     }
   }
-
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(amount)
 
   const fieldError = (key: string) =>
     errors[key] ? <p className="mt-1 text-xs font-medium text-primary">{errors[key]}</p> : null
@@ -355,7 +358,7 @@ export default function AsientoForm({
                 disabled={loading || !isBalanced}
                 className="w-full bg-blue-600 text-white hover:bg-blue-500 disabled:bg-muted"
               >
-                {loading ? 'Guardando...' : 'Guardar asiento'}
+                {loading ? 'Guardando...' : submitLabel}
               </Button>
               <Button
                 type="button"

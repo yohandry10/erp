@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -11,28 +11,36 @@ import { Label } from '@/components/ui/label'
 import { X, CheckCircle2, Loader2 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { validateCountryTaxId } from '@/lib/country-tax-id'
 
 // Simplified validation schema for quick create
 const quickClienteSchema = z.object({
   tipo: z.nativeEnum(TipoCliente),
   documento_tipo: z.nativeEnum(TipoDocumento),
   documento_numero: z.string()
-    .min(8, 'Mínimo 8 caracteres')
+    .min(6, 'Mínimo 6 caracteres')
     .max(20, 'Máximo 20 caracteres')
     .regex(/^[0-9A-Z]+$/, 'Solo números y letras mayúsculas'),
   razon_social: z.string()
     .min(3, 'Mínimo 3 caracteres')
     .max(255, 'Máximo 255 caracteres')
 }).refine((data) => {
-  if (data.documento_tipo === TipoDocumento.RUC) {
+  if ([TipoDocumento.RUC, TipoDocumento.CUIT].includes(data.documento_tipo)) {
     return data.documento_numero.length === 11 && /^\d+$/.test(data.documento_numero)
+  }
+  if (data.documento_tipo === TipoDocumento.NIT) {
+    return data.documento_numero.length === 10 && /^\d+$/.test(data.documento_numero)
+  }
+  if ([TipoDocumento.CC, TipoDocumento.TI].includes(data.documento_tipo)) {
+    return /^[0-9]{6,10}$/.test(data.documento_numero)
   }
   if (data.documento_tipo === TipoDocumento.DNI) {
     return data.documento_numero.length === 8 && /^\d+$/.test(data.documento_numero)
   }
   return true
 }, {
-  message: 'RUC debe tener 11 dígitos y DNI debe tener 8 dígitos',
+  message: 'El documento no tiene la longitud o formato requerido',
   path: ['documento_numero']
 })
 
@@ -50,6 +58,12 @@ export default function ClienteQuickCreate({
   onSuccess
 }: ClienteQuickCreateProps) {
   const { post, unwrap } = useApi()
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
+  const taxIdType = isArgentina ? TipoDocumento.CUIT : isColombia ? TipoDocumento.NIT : TipoDocumento.RUC
+  const taxIdLabel = isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC'
+  const taxIdLength = isColombia ? 10 : 11
   const [validatingRuc, setValidatingRuc] = useState(false)
   const [rucValidated, setRucValidated] = useState(false)
 
@@ -64,7 +78,7 @@ export default function ClienteQuickCreate({
     resolver: zodResolver(quickClienteSchema),
     defaultValues: {
       tipo: TipoCliente.PERSONA,
-      documento_tipo: TipoDocumento.DNI,
+      documento_tipo: isColombia ? TipoDocumento.CC : TipoDocumento.DNI,
       documento_numero: '',
       razon_social: ''
     }
@@ -73,11 +87,18 @@ export default function ClienteQuickCreate({
   const documentoTipo = watch('documento_tipo')
   const documentoNumero = watch('documento_numero')
 
+  useEffect(() => {
+    if (country.loading) return
+    setValue('documento_tipo', isColombia ? TipoDocumento.CC : TipoDocumento.DNI)
+    setValue('documento_numero', '')
+    setRucValidated(false)
+  }, [country.loading, country.paisCodigo, isColombia, setValue])
+
   const handleValidarRuc = async () => {
-    if (documentoTipo !== TipoDocumento.RUC || documentoNumero.length !== 11) {
+    if (documentoTipo !== taxIdType || documentoNumero.length !== taxIdLength) {
       toast({
         title: 'Error',
-        description: 'El RUC debe tener 11 dígitos',
+        description: `El ${taxIdLabel} debe tener ${taxIdLength} dígitos`,
         variant: 'destructive'
       })
       return
@@ -85,6 +106,17 @@ export default function ClienteQuickCreate({
 
     try {
       setValidatingRuc(true)
+      if (isColombia) {
+        if (!validateCountryTaxId('CO', documentoNumero)) {
+          throw new Error('El dígito de verificación del NIT no es válido')
+        }
+        setRucValidated(true)
+        toast({
+          title: 'NIT validado',
+          description: 'Formato y dígito de verificación válidos. Complete los datos del RUT.',
+        })
+        return
+      }
       const response = await post('/api/ventas/clientes/validar-ruc', {
         ruc: documentoNumero
       })
@@ -96,16 +128,16 @@ export default function ClienteQuickCreate({
         }
         setRucValidated(true)
         toast({
-          title: 'RUC Validado',
+          title: `${taxIdLabel} validado`,
           description: responseData.consulta_sunat
-            ? 'Datos obtenidos de SUNAT'
+            ? `Datos obtenidos de ${isArgentina ? 'ARCA' : 'SUNAT'}`
             : 'Formato y dígito verificador válidos. Complete la razón social manualmente.'
         })
       }
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo validar el RUC',
+        description: error.message || `No se pudo validar el ${taxIdLabel}`,
         variant: 'destructive'
       })
     } finally {
@@ -196,14 +228,20 @@ export default function ClienteQuickCreate({
             <Label htmlFor="quick-documento-tipo">Tipo de Documento *</Label>
             <select
               id="quick-documento-tipo"
-              {...register('documento_tipo')}
+              {...register('documento_tipo', { onChange: () => setRucValidated(false) })}
               className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={isSubmitting}
-              onChange={() => setRucValidated(false)}
             >
-              <option value={TipoDocumento.DNI}>DNI</option>
-              <option value={TipoDocumento.RUC}>RUC</option>
-              <option value={TipoDocumento.CE}>Carné de Extranjería</option>
+              {isColombia ? (
+                <>
+                  <option value={TipoDocumento.CC}>Cédula de ciudadanía</option>
+                  <option value={TipoDocumento.TI}>Tarjeta de identidad</option>
+                </>
+              ) : (
+                <option value={TipoDocumento.DNI}>DNI</option>
+              )}
+              <option value={taxIdType}>{taxIdLabel}</option>
+              <option value={TipoDocumento.CE}>{isColombia ? 'Cédula de extranjería' : 'Carné de Extranjería'}</option>
               <option value={TipoDocumento.PASAPORTE}>Pasaporte</option>
             </select>
             {errors.documento_tipo && (
@@ -215,27 +253,26 @@ export default function ClienteQuickCreate({
           <div className="space-y-2">
             <Label htmlFor="quick-documento-numero">
               Número de Documento *
-              {documentoTipo === TipoDocumento.RUC && ' (11 dígitos)'}
+              {documentoTipo === taxIdType && ` (${taxIdLength} dígitos)`}
               {documentoTipo === TipoDocumento.DNI && ' (8 dígitos)'}
             </Label>
             <div className="flex gap-2">
               <Input
                 id="quick-documento-numero"
-                {...register('documento_numero')}
+                {...register('documento_numero', { onChange: () => setRucValidated(false) })}
                 placeholder={
-                  documentoTipo === TipoDocumento.RUC ? '20123456789' :
+                  documentoTipo === taxIdType ? (isArgentina ? '20301234563' : isColombia ? '9001234568' : '20123456789') :
                   documentoTipo === TipoDocumento.DNI ? '12345678' :
                   'Número de documento'
                 }
                 disabled={isSubmitting}
-                onChange={() => setRucValidated(false)}
               />
-              {documentoTipo === TipoDocumento.RUC && (
+              {documentoTipo === taxIdType && (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleValidarRuc}
-                  disabled={isSubmitting || validatingRuc || documentoNumero.length !== 11}
+                  disabled={isSubmitting || validatingRuc || documentoNumero.length !== taxIdLength}
                   className="whitespace-nowrap"
                 >
                   {validatingRuc ? (

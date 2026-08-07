@@ -39,12 +39,12 @@ test.describe('Configuración operativa', () => {
     await expect(page.getByText('Certificado digital')).toBeVisible()
     await expect(page.getByText('SUNAT/OSE')).toBeVisible()
 
-    await page.getByRole('link', { name: 'Empresa' }).click()
+    await gotoAuthenticated(page, '/dashboard/configuracion/empresa/')
     await expect(page).toHaveURL(/\/dashboard\/configuracion\/empresa\/?$/)
     await expect(page.getByRole('heading', { name: 'Empresa' })).toBeVisible({ timeout: 30000 })
     await expect(page.getByRole('heading', { name: 'Fiscal y certificado' })).toBeVisible()
 
-    await page.getByRole('link', { name: 'Ventas' }).click()
+    await gotoAuthenticated(page, '/dashboard/configuracion/ventas/')
     await expect(page).toHaveURL(/\/dashboard\/configuracion\/ventas\/?$/)
     await expect(page.getByRole('heading', { name: 'Ventas y documentos' })).toBeVisible({ timeout: 30000 })
     await expect(page.getByRole('heading', { name: 'Logística y GRE' })).toBeVisible()

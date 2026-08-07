@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { FileText, RefreshCw, Download, Filter } from 'lucide-react'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface MovimientoBancario {
   id: string
@@ -26,6 +27,7 @@ interface MovimientosReportProps {
 
 export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: MovimientosReportProps) {
   const { get } = useApi()
+  const { country, formatCurrency } = useLocalizedMoney()
   const [movimientos, setMovimientos] = useState<MovimientoBancario[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ABONO' | 'CARGO'>('TODOS')
@@ -54,15 +56,8 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
     loadMovimientos()
   }, [loadMovimientos])
 
-  const formatCurrency = (amount: number, currency: string = 'PEN') => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount)
-  }
-
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
       day: '2-digit',
       month: 'short',
       year: 'numeric'

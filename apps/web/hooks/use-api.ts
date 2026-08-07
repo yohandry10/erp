@@ -7,7 +7,7 @@ import { customAuth } from '@/lib/auth-service'
 import { apiSucceeded, getApiErrorMessage, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
 import { buildApiUrl, normalizeApiEndpoint, withTrailingSlash } from '@/lib/api-url'
 import { fetchWithOfflineSupport, isOfflineCachedResponse, isOfflineQueuedResponse } from '@/lib/offline-store'
-import { INITIAL_ACTIVE_COUNTRY_ID, isInitialActiveCountryId } from '@/lib/initial-country'
+import { INITIAL_ACTIVE_COUNTRY_ID, isActiveCountryId } from '@/lib/initial-country'
 
 interface ApiResponse<T> {
   data?: T
@@ -148,7 +148,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       try {
         if (typeof window !== 'undefined') {
           const storedCountryId = window.localStorage.getItem('selectedCountry')
-          const countryId = isInitialActiveCountryId(storedCountryId)
+          const countryId = isActiveCountryId(storedCountryId)
             ? storedCountryId || INITIAL_ACTIVE_COUNTRY_ID
             : INITIAL_ACTIVE_COUNTRY_ID
 

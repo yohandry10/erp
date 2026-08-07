@@ -20,7 +20,14 @@ export * from './sire/sire-response.dto';
 export * from './contabilidad/periodo.dto';
 export * from './contabilidad/presupuesto.dto';
 export * from './contabilidad/asiento.dto';
+export * from './contabilidad/tipo-cambio.dto';
+export * from './contabilidad/revaluacion.dto';
+export * from './contabilidad/plantilla-asiento.dto';
+export * from './contabilidad/activo-fijo.dto';
+export * from './contabilidad/conciliacion-partidas.dto';
+export * from './contabilidad/analitica-diferidos.dto';
+export * from './contabilidad/consolidacion-reportes.dto';
 
 // Common DTOs
 export * from './common/pagination.dto';
-export * from './common/response.dto'; 
+export * from './common/response.dto';

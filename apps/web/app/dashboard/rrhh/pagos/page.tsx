@@ -8,8 +8,14 @@ import { fetchApi } from '@/lib/api-fetch';
 import { Banknote, CheckCircle2, Clock3, Receipt, RefreshCw } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 const PagosPage = () => {
+  const country = useCountryContext();
+  const isArgentina = country.paisCodigo === 'AR';
+  const isColombia = country.paisCodigo === 'CO';
+  const currencySymbol = country.simboloMoneda || 'S/';
+  const locale = country.locale || 'es-PE';
   const [pagos, setPagos] = useState<any[]>([]);
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [planillas, setPlanillas] = useState<any[]>([]);
@@ -249,7 +255,7 @@ const PagosPage = () => {
             <h3>Monto Total</h3>
             <div className="inline-flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Banknote className="size-5" aria-hidden="true" /></div>
           </div>
-          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-violet-400">S/ {stats.montoTotal.toLocaleString()}</div>
+          <div className="mt-4 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold leading-none text-violet-400">{currencySymbol} {stats.montoTotal.toLocaleString(locale)}</div>
           <div className="mt-2 text-[0.8125rem] text-muted-foreground">Pagos procesados</div>
         </div>
       </div>
@@ -313,10 +319,10 @@ const PagosPage = () => {
                     </div>
                   </td>
                   <td>{pago.periodo}</td>
-                  <td className="text-right">S/ {(pago.monto_bruto || 0).toLocaleString()}</td>
-                  <td className="text-right text-destructive">S/ {(pago.total_descuentos || 0).toLocaleString()}</td>
-                  <td className="text-right font-bold text-emerald-400">S/ {(pago.monto_neto || 0).toLocaleString()}</td>
-                  <td>{pago.fecha_pago ? parseDateLocal(pago.fecha_pago).toLocaleDateString('es-PE') : '-'}</td>
+                  <td className="text-right">{currencySymbol} {(pago.monto_bruto || 0).toLocaleString(locale)}</td>
+                  <td className="text-right text-destructive">{currencySymbol} {(pago.total_descuentos || 0).toLocaleString(locale)}</td>
+                  <td className="text-right font-bold text-emerald-400">{currencySymbol} {(pago.monto_neto || 0).toLocaleString(locale)}</td>
+                  <td>{pago.fecha_pago ? parseDateLocal(pago.fecha_pago).toLocaleDateString(locale) : '-'}</td>
                   <td>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoColor(pago.estado)}`}>
                       {pago.estado?.toUpperCase() || 'PENDIENTE'}
@@ -348,12 +354,12 @@ const PagosPage = () => {
 DETALLE DEL PAGO
 Empleado: ${getEmpleadoNombre(pago.empleado_id)}
 Período: ${pago.periodo}
-Sueldo Bruto: S/ ${(pago.monto_bruto || 0).toLocaleString()}
-AFP/ONP: S/ ${(pago.descuento_afp || 0).toLocaleString()}
-Renta 5ta: S/ ${(pago.descuento_renta || 0).toLocaleString()}
-Otros Desc.: S/ ${((pago.total_descuentos || 0) - (pago.descuento_afp || 0) - (pago.descuento_renta || 0)).toLocaleString()}
-Total Descuentos: S/ ${(pago.total_descuentos || 0).toLocaleString()}
-MONTO NETO: S/ ${(pago.monto_neto || 0).toLocaleString()}
+Sueldo Bruto: ${currencySymbol} ${(pago.monto_bruto || 0).toLocaleString(locale)}
+${isArgentina ? 'SIPA/INSSJP/obra social' : isColombia ? 'Salud/pensión/FSP' : 'AFP/ONP'}: ${currencySymbol} ${(pago.descuento_afp || 0).toLocaleString(locale)}
+${isArgentina ? 'Ganancias' : isColombia ? 'Retención en la fuente' : 'Renta 5ta'}: ${currencySymbol} ${(pago.descuento_renta || 0).toLocaleString(locale)}
+Otros Desc.: ${currencySymbol} ${((pago.total_descuentos || 0) - (pago.descuento_afp || 0) - (pago.descuento_renta || 0)).toLocaleString(locale)}
+Total Descuentos: ${currencySymbol} ${(pago.total_descuentos || 0).toLocaleString(locale)}
+MONTO NETO: ${currencySymbol} ${(pago.monto_neto || 0).toLocaleString(locale)}
                           `;
                           alert(detalles);
                         }}
@@ -417,8 +423,8 @@ MONTO NETO: S/ ${(pago.monto_neto || 0).toLocaleString()}
                         </span>
                       )}
                     </td>
-                    <td className="text-right font-bold">S/ {totalPagado.toLocaleString()}</td>
-                    <td className="text-right">S/ {promedioMensual.toLocaleString()}</td>
+                    <td className="text-right font-bold">{currencySymbol} {totalPagado.toLocaleString(locale)}</td>
+                    <td className="text-right">{currencySymbol} {promedioMensual.toLocaleString(locale)}</td>
                   </tr>
                 );
               })}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { DenominationForm, Denominaciones } from './DenominationForm';
 import { CashDialogFrame } from './CashDialogFrame';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface CashClosingDialogProps {
     isOpen: boolean;
@@ -17,6 +18,8 @@ interface PreCloseValidation {
 }
 
 export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: CashClosingDialogProps) {
+    const country = useCountryContext();
+    const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
     const { get, post } = useApi();
     const [step, setStep] = useState<'VALIDATING' | 'COUNT' | 'REVIEW' | 'JUSTIFICATION' | 'CONFIRM'>('VALIDATING');
     const [validation, setValidation] = useState<PreCloseValidation | null>(null);
@@ -199,10 +202,10 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
                                         <div className="bg-amber-500/10 p-4 rounded-md border border-yellow-200">
                                             <h4 className="text-lg font-medium text-amber-400 mb-2">Diferencia Detectada</h4>
                                             <p className="text-amber-400 mb-2">
-                                                El monto contado (S/ {montoContado.toFixed(2)}) difiere del saldo esperado en el sistema.
+                                                El monto contado ({currencySymbol} {montoContado.toFixed(2)}) difiere del saldo esperado en el sistema.
                                             </p>
                                             <p className={`text-xl font-bold ${diferencia > 0 ? 'text-emerald-400' : 'text-destructive'}`}>
-                                                Diferencia: {diferencia > 0 ? '+' : ''}S/ {diferencia.toFixed(2)}
+                                                Diferencia: {diferencia > 0 ? '+' : ''}{currencySymbol} {diferencia.toFixed(2)}
                                             </p>
                                         </div>
 
@@ -245,20 +248,20 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
                                                 <div className="sm:col-span-1">
                                                     <dt className="text-sm font-medium text-muted-foreground">Saldo Sistema</dt>
                                                     <dd className="mt-1 text-lg font-semibold text-foreground">
-                                                        S/ {montoEsperado.toFixed(2)}
+                                                        {currencySymbol} {montoEsperado.toFixed(2)}
                                                     </dd>
                                                 </div>
                                                 <div className="sm:col-span-1">
                                                     <dt className="text-sm font-medium text-muted-foreground">Saldo Contado</dt>
                                                     <dd className="mt-1 text-lg font-bold text-primary">
-                                                        S/ {montoContado.toFixed(2)}
+                                                        {currencySymbol} {montoContado.toFixed(2)}
                                                     </dd>
                                                 </div>
 
                                                 <div className="sm:col-span-2 border-t border-border pt-4 mt-2">
                                                     <dt className="text-sm font-medium text-muted-foreground">Diferencia Final</dt>
                                                     <dd className={`mt-1 text-2xl font-bold ${diferencia === 0 ? 'text-foreground' : diferencia > 0 ? 'text-emerald-400' : 'text-destructive'}`}>
-                                                        {diferencia > 0 ? '+' : ''}S/ {diferencia.toFixed(2)}
+                                                        {diferencia > 0 ? '+' : ''}{currencySymbol} {diferencia.toFixed(2)}
                                                     </dd>
                                                 </div>
 

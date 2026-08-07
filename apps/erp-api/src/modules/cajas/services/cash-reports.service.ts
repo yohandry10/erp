@@ -68,6 +68,16 @@ export class CashReportsService {
         private readonly reconciliationService: CashReconciliationService,
     ) { }
 
+    private currencyContext(moneda: unknown) {
+        const currency = String(moneda || 'PEN').toUpperCase();
+        return {
+            currency,
+            locale: currency === 'ARS' ? 'es-AR' : currency === 'COP' ? 'es-CO' : 'es-PE',
+            taxLabel: currency === 'PEN' ? 'IGV (18%)' : currency === 'COP' ? 'IVA (19%)' : 'IVA',
+            documentLabel: currency === 'PEN' ? 'Boletas' : currency === 'COP' ? 'Documentos equivalentes' : 'Comprobantes',
+        };
+    }
+
     private buildDeterministicUuid(input: string): string {
         const hash = crypto.createHash('sha256').update(input).digest('hex');
         const bytes = hash.slice(0, 32).split('');
@@ -333,6 +343,7 @@ export class CashReportsService {
     async generarReporteCierreTexto(sesionId: string, tenantId: string): Promise<string> {
         const datos = await this.obtenerDatosReporteCierre(sesionId, tenantId);
         const lineas: string[] = [];
+        const fiscal = this.currencyContext(datos.sesion.moneda);
 
         // Encabezado
         lineas.push('='.repeat(48));
@@ -348,9 +359,9 @@ export class CashReportsService {
         lineas.push('');
 
         // Fechas
-        lineas.push(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString('es-PE')}`);
+        lineas.push(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString(fiscal.locale)}`);
         if (datos.sesion.hora_cierre) {
-            lineas.push(`Cierre: ${new Date(datos.sesion.hora_cierre).toLocaleString('es-PE')}`);
+            lineas.push(`Cierre: ${new Date(datos.sesion.hora_cierre).toLocaleString(fiscal.locale)}`);
         }
         lineas.push('');
 
@@ -358,11 +369,11 @@ export class CashReportsService {
         lineas.push('-'.repeat(48));
         lineas.push('1. APERTURA');
         lineas.push('-'.repeat(48));
-        lineas.push(`Monto inicial: S/ ${datos.sesion.monto_inicio.toFixed(2)}`);
+        lineas.push(`Monto inicial: ${fiscal.currency} ${datos.sesion.monto_inicio.toFixed(2)}`);
         if (datos.sesion.denominaciones_apertura) {
             lineas.push('');
             lineas.push('Denominaciones de apertura:');
-            lineas.push(this.reconciliationService.generarResumenDenominaciones(datos.sesion.denominaciones_apertura));
+            lineas.push(this.reconciliationService.generarResumenDenominaciones(datos.sesion.denominaciones_apertura, fiscal.currency));
         }
         lineas.push('');
 
@@ -372,7 +383,7 @@ export class CashReportsService {
         lineas.push('-'.repeat(48));
         Object.entries(datos.totales_por_tipo).forEach(([tipo, total]) => {
             const cantidad = datos.movimientos.filter((m) => m.tipo_movimiento === tipo).length;
-            lineas.push(`${tipo}: S/ ${total.toFixed(2)} (${cantidad} mov.)`);
+            lineas.push(`${tipo}: ${fiscal.currency} ${total.toFixed(2)} (${cantidad} mov.)`);
         });
         lineas.push('');
         lineas.push(`Total movimientos: ${datos.movimientos.length}`);
@@ -383,11 +394,11 @@ export class CashReportsService {
         lineas.push('3. VENTAS POR MÉTODO DE PAGO');
         lineas.push('-'.repeat(48));
         const mp = datos.resumen_metodos_pago;
-        lineas.push(`Efectivo: S/ ${mp.efectivo.toFixed(2)} (${mp.cantidad_efectivo} ventas)`);
-        lineas.push(`Tarjeta: S/ ${mp.tarjeta.toFixed(2)} (${mp.cantidad_tarjeta} ventas)`);
-        lineas.push(`Transferencia: S/ ${mp.transferencia.toFixed(2)} (${mp.cantidad_transferencia} ventas)`);
+        lineas.push(`Efectivo: ${fiscal.currency} ${mp.efectivo.toFixed(2)} (${mp.cantidad_efectivo} ventas)`);
+        lineas.push(`Tarjeta: ${fiscal.currency} ${mp.tarjeta.toFixed(2)} (${mp.cantidad_tarjeta} ventas)`);
+        lineas.push(`Transferencia: ${fiscal.currency} ${mp.transferencia.toFixed(2)} (${mp.cantidad_transferencia} ventas)`);
         if (mp.otros > 0) {
-            lineas.push(`Otros: S/ ${mp.otros.toFixed(2)} (${mp.cantidad_otros} ventas)`);
+            lineas.push(`Otros: ${fiscal.currency} ${mp.otros.toFixed(2)} (${mp.cantidad_otros} ventas)`);
         }
         lineas.push('');
 
@@ -397,13 +408,13 @@ export class CashReportsService {
             lineas.push('4. RETIROS DE EFECTIVO');
             lineas.push('-'.repeat(48));
             datos.retiros.forEach((r, i) => {
-                lineas.push(`${i + 1}. S/ ${r.monto.toFixed(2)} - ${r.motivo}`);
+                lineas.push(`${i + 1}. ${fiscal.currency} ${r.monto.toFixed(2)} - ${r.motivo}`);
                 if (r.numero_operacion) {
                     lineas.push(`   Op. ${r.numero_operacion} - ${r.estado_conciliacion}`);
                 }
             });
             const totalRetiros = datos.retiros.reduce((sum, r) => sum + r.monto, 0);
-            lineas.push(`Total retiros: S/ ${totalRetiros.toFixed(2)}`);
+            lineas.push(`Total retiros: ${fiscal.currency} ${totalRetiros.toFixed(2)}`);
             lineas.push('');
         }
 
@@ -412,7 +423,7 @@ export class CashReportsService {
             lineas.push('-'.repeat(48));
             lineas.push('5. ARQUEO FINAL');
             lineas.push('-'.repeat(48));
-            lineas.push(`Saldo teórico: S/ ${Number(datos.sesion.monto_esperado ?? 0).toFixed(2)}`);
+            lineas.push(`Saldo teórico: ${fiscal.currency} ${Number(datos.sesion.monto_esperado ?? 0).toFixed(2)}`);
 
             // Un cierre administrativo no cuenta el efectivo. El trigger de
             // normalización guarda contado 0 y deriva la diferencia, así que
@@ -424,14 +435,14 @@ export class CashReportsService {
                     lineas.push(`Motivo: ${datos.sesion.razon_cierre_administrativo}`);
                 }
             } else {
-                lineas.push(`Saldo contado: S/ ${Number(datos.sesion.monto_contado ?? 0).toFixed(2)}`);
-                lineas.push(`Diferencia: S/ ${Number(datos.sesion.diferencia ?? 0).toFixed(2)}`);
+                lineas.push(`Saldo contado: ${fiscal.currency} ${Number(datos.sesion.monto_contado ?? 0).toFixed(2)}`);
+                lineas.push(`Diferencia: ${fiscal.currency} ${Number(datos.sesion.diferencia ?? 0).toFixed(2)}`);
             }
 
             if (datos.sesion.denominaciones_cierre) {
                 lineas.push('');
                 lineas.push('Denominaciones de cierre:');
-                lineas.push(this.reconciliationService.generarResumenDenominaciones(datos.sesion.denominaciones_cierre));
+                lineas.push(this.reconciliationService.generarResumenDenominaciones(datos.sesion.denominaciones_cierre, fiscal.currency));
             }
             lineas.push('');
         }
@@ -441,11 +452,11 @@ export class CashReportsService {
         lineas.push('6. RESUMEN FISCAL');
         lineas.push('-'.repeat(48));
         const rf = datos.resumen_fiscal;
-        lineas.push(`Base imponible: S/ ${rf.base_imponible.toFixed(2)}`);
-        lineas.push(`IGV (18%): S/ ${rf.igv.toFixed(2)}`);
-        lineas.push(`Total: S/ ${rf.total.toFixed(2)}`);
+        lineas.push(`Base imponible: ${fiscal.currency} ${rf.base_imponible.toFixed(2)}`);
+        lineas.push(`${fiscal.taxLabel}: ${fiscal.currency} ${rf.igv.toFixed(2)}`);
+        lineas.push(`Total: ${fiscal.currency} ${rf.total.toFixed(2)}`);
         lineas.push('');
-        lineas.push(`Boletas emitidas: ${rf.cantidad_boletas}`);
+        lineas.push(`${fiscal.documentLabel} emitidos: ${rf.cantidad_boletas}`);
         lineas.push(`Facturas emitidas: ${rf.cantidad_facturas}`);
         if (rf.cantidad_notas_credito > 0) {
             lineas.push(`Notas de crédito: ${rf.cantidad_notas_credito}`);
@@ -530,6 +541,7 @@ export class CashReportsService {
         this.logger.log(`📄 Generando PDF de cierre para sesión: ${sesionId}`);
 
         const datos = await this.obtenerDatosReporteCierre(sesionId, tenantId);
+        const fiscal = this.currencyContext(datos.sesion.moneda);
 
         return new Promise((resolve, reject) => {
             try {
@@ -579,12 +591,12 @@ export class CashReportsService {
                 doc.fontSize(10).fillColor(colorSecundario);
 
                 // Columna izquierda
-                doc.text(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString('es-PE')}`, 50, infoY);
+                doc.text(`Apertura: ${new Date(datos.sesion.hora_apertura).toLocaleString(fiscal.locale)}`, 50, infoY);
                 doc.text(`Cajero apertura: ${datos.sesion.abierto_por || 'N/A'}`, 50);
-                doc.text(`Monto inicial: S/ ${datos.sesion.monto_inicio?.toFixed(2) || '0.00'}`, 50);
+                doc.text(`Monto inicial: ${fiscal.currency} ${datos.sesion.monto_inicio?.toFixed(2) || '0.00'}`, 50);
 
                 // Columna derecha
-                doc.text(`Cierre: ${datos.sesion.hora_cierre ? new Date(datos.sesion.hora_cierre).toLocaleString('es-PE') : 'En curso'}`, 300, infoY);
+                doc.text(`Cierre: ${datos.sesion.hora_cierre ? new Date(datos.sesion.hora_cierre).toLocaleString(fiscal.locale) : 'En curso'}`, 300, infoY);
                 doc.text(`Cajero cierre: ${datos.sesion.cerrado_por || 'N/A'}`, 300);
                 doc.text(`Dispositivo: ${datos.sesion.dispositivo || 'N/A'}`, 300);
 
@@ -598,7 +610,7 @@ export class CashReportsService {
                         ['Tipo', 'Cantidad', 'Monto'],
                         tiposMovimiento.map(([tipo, total]) => {
                             const cantidad = datos.movimientos.filter((m) => m.tipo_movimiento === tipo).length;
-                            return [tipo, cantidad.toString(), `S/ ${(total as number).toFixed(2)}`];
+                            return [tipo, cantidad.toString(), `${fiscal.currency} ${(total as number).toFixed(2)}`];
                         }),
                         colorAccento
                     );
@@ -614,10 +626,10 @@ export class CashReportsService {
                 this.addTable(doc,
                     ['Método', 'Cantidad', 'Monto'],
                     [
-                        ['Efectivo', mp.cantidad_efectivo.toString(), `S/ ${mp.efectivo.toFixed(2)}`],
-                        ['Tarjeta', mp.cantidad_tarjeta.toString(), `S/ ${mp.tarjeta.toFixed(2)}`],
-                        ['Transferencia', mp.cantidad_transferencia.toString(), `S/ ${mp.transferencia.toFixed(2)}`],
-                        ['Otros', mp.cantidad_otros.toString(), `S/ ${mp.otros.toFixed(2)}`],
+                        ['Efectivo', mp.cantidad_efectivo.toString(), `${fiscal.currency} ${mp.efectivo.toFixed(2)}`],
+                        ['Tarjeta', mp.cantidad_tarjeta.toString(), `${fiscal.currency} ${mp.tarjeta.toFixed(2)}`],
+                        ['Transferencia', mp.cantidad_transferencia.toString(), `${fiscal.currency} ${mp.transferencia.toFixed(2)}`],
+                        ['Otros', mp.cantidad_otros.toString(), `${fiscal.currency} ${mp.otros.toFixed(2)}`],
                     ],
                     colorAccento
                 );
@@ -630,7 +642,7 @@ export class CashReportsService {
                     this.addTable(doc,
                         ['Monto', 'Motivo', 'Estado', 'Operación'],
                         datos.retiros.map((r) => [
-                            `S/ ${r.monto.toFixed(2)}`,
+                            `${fiscal.currency} ${r.monto.toFixed(2)}`,
                             r.motivo,
                             r.estado_conciliacion,
                             r.numero_operacion || '-',
@@ -645,13 +657,13 @@ export class CashReportsService {
                     this.addSectionTitle(doc, '5. ARQUEO FINAL', colorPrimario);
 
                     doc.fontSize(11).fillColor(colorSecundario);
-                    doc.text(`Saldo teórico: S/ ${datos.sesion.monto_esperado?.toFixed(2) || '0.00'}`);
-                    doc.text(`Saldo contado: S/ ${datos.sesion.monto_contado?.toFixed(2) || '0.00'}`);
+                    doc.text(`Saldo teórico: ${fiscal.currency} ${datos.sesion.monto_esperado?.toFixed(2) || '0.00'}`);
+                    doc.text(`Saldo contado: ${fiscal.currency} ${datos.sesion.monto_contado?.toFixed(2) || '0.00'}`);
 
                     const diferencia = datos.sesion.diferencia || 0;
                     const colorDiferencia = diferencia === 0 ? '#38a169' : (diferencia > 0 ? '#3182ce' : '#e53e3e');
                     doc.fillColor(colorDiferencia)
-                        .text(`Diferencia: S/ ${diferencia.toFixed(2)} ${diferencia > 0 ? '(Sobrante)' : diferencia < 0 ? '(Faltante)' : '(Cuadrado)'}`);
+                        .text(`Diferencia: ${fiscal.currency} ${diferencia.toFixed(2)} ${diferencia > 0 ? '(Sobrante)' : diferencia < 0 ? '(Faltante)' : '(Cuadrado)'}`);
                 }
 
                 // ========== RESUMEN FISCAL ==========
@@ -660,14 +672,14 @@ export class CashReportsService {
 
                 const rf = datos.resumen_fiscal;
                 doc.fontSize(10).fillColor(colorSecundario);
-                doc.text(`Base imponible: S/ ${rf.base_imponible.toFixed(2)}`);
-                doc.text(`IGV (18%): S/ ${rf.igv.toFixed(2)}`);
+                doc.text(`Base imponible: ${fiscal.currency} ${rf.base_imponible.toFixed(2)}`);
+                doc.text(`${fiscal.taxLabel}: ${fiscal.currency} ${rf.igv.toFixed(2)}`);
                 doc.fontSize(12).fillColor(colorPrimario)
-                    .text(`TOTAL: S/ ${rf.total.toFixed(2)}`);
+                    .text(`TOTAL: ${fiscal.currency} ${rf.total.toFixed(2)}`);
 
                 doc.moveDown(0.5);
                 doc.fontSize(10).fillColor(colorSecundario);
-                doc.text(`Boletas: ${rf.cantidad_boletas} | Facturas: ${rf.cantidad_facturas} | NC: ${rf.cantidad_notas_credito}`);
+                doc.text(`${fiscal.documentLabel}: ${rf.cantidad_boletas} | Facturas: ${rf.cantidad_facturas} | NC: ${rf.cantidad_notas_credito}`);
 
                 // ========== FIRMAS ==========
                 doc.moveDown(2);

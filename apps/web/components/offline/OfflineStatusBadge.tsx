@@ -16,7 +16,8 @@ export function OfflineStatusBadge() {
     if (typeof navigator !== 'undefined') {
       setOnline(navigator.onLine)
     }
-    setStatus(await getOfflineStatus().catch(() => null))
+    const tenantId = customAuth.getCachedSession().session?.user?.tenant_id
+    setStatus(await getOfflineStatus(tenantId).catch(() => null))
   }, [])
 
   useEffect(() => {
@@ -58,7 +59,8 @@ export function OfflineStatusBadge() {
   const synchronize = async () => {
     setSyncing(true)
     try {
-      await syncOfflineQueue(customAuth.getCachedSession().accessToken)
+      const { session, accessToken } = customAuth.getCachedSession()
+      await syncOfflineQueue(accessToken, session?.user?.tenant_id)
       await refresh()
     } finally {
       setSyncing(false)

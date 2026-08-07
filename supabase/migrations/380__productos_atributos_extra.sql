@@ -38,6 +38,11 @@ COMMENT ON COLUMN public.categorias_producto.campos_extra IS
 -- RLS
 ALTER TABLE public.categorias_producto ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS categorias_producto_tenant_isolation ON public.categorias_producto;
+DROP POLICY IF EXISTS categorias_producto_insert ON public.categorias_producto;
+DROP POLICY IF EXISTS categorias_producto_update ON public.categorias_producto;
+DROP POLICY IF EXISTS categorias_producto_delete ON public.categorias_producto;
+
 CREATE POLICY categorias_producto_tenant_isolation ON public.categorias_producto
   USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
 

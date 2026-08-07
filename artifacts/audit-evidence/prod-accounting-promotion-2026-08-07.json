@@ -1,0 +1,61 @@
+{
+  "environment": "PROD",
+  "project_ref": "wypnbcptofqdmoynlonq",
+  "preflight_ok": true,
+  "scope": {
+    "migrations": [
+      "383",
+      "384",
+      "385",
+      "386",
+      "387",
+      "388",
+      "389",
+      "390",
+      "391",
+      "392",
+      "393",
+      "394"
+    ],
+    "seeds": false,
+    "roles": false
+  },
+  "backup": {
+    "path": "artifacts/db-backups/prod-pre-347-394-20260807T063508.dump",
+    "format": "PostgreSQL custom",
+    "pg_dump_major": 17,
+    "bytes": 6403010,
+    "restore_catalog_entries": 4380,
+    "sha256": "667E5772F19CCE5675456737A51B87E6479A55C602AF3CE3AB9D5010B55ACC3D"
+  },
+  "verification": {
+    "transactional_dry_run_rolled_back": true,
+    "migration_history_rows": 12,
+    "remote_up_to_date": true,
+    "new_tables": 12,
+    "new_tables_with_rls": 12,
+    "new_business_rows": 0,
+    "atomic_rpcs_service_role_only": 14,
+    "authenticated_rls_query_ok": true,
+    "existing_constraint_violations": 0,
+    "before_after_counts": {
+      "tenants": [31, 31],
+      "usuarios": [60, 60],
+      "productos": [163, 163],
+      "producto_existencias": [163, 163],
+      "movimientos_inventario": [279, 279],
+      "documentos": [20, 20],
+      "asientos_contables": [75, 75],
+      "detalle_asientos": [337, 337]
+    }
+  },
+  "preexisting_out_of_scope_drift": {
+    "function_definitions": 13,
+    "policies": 2,
+    "relations": 0,
+    "columns": 0,
+    "constraints": 0,
+    "indexes": 0,
+    "note": "La deriva precede a 383 y debe reconciliarse separadamente; no se reaplicaron 347..382."
+  }
+}

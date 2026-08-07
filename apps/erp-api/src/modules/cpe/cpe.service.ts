@@ -20,6 +20,7 @@ import { CpeDeliveryService } from './cpe-delivery.service';
 import { CpeOperationalDocumentService } from './cpe-operational-document.service';
 import { CpeRegistrationService } from './cpe-registration.service';
 import { DocumentoFiscal } from '../documentos/interfaces/documento-fiscal.interface';
+import { validateColombiaNit } from '../paises/initial-country';
 
 @Injectable()
 export class CpeService {
@@ -179,13 +180,23 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
     }
   }
 
-  private assertReceptorValido(dto: CreateFacturaDto) {
+  private assertReceptorValido(dto: CreateFacturaDto, paisCodigo = 'PE') {
     const tipo = String((dto as any).tipo_documento_receptor ?? '').trim();
     const documento = String((dto as any).documento_receptor ?? '').trim();
     const tipoDocumento = String((dto as any).tipo_documento ?? '').trim();
 
     if (!tipo || !documento) {
       throw new BadRequestException('El receptor del CPE requiere tipo y número de documento');
+    }
+
+    if (paisCodigo === 'CO') {
+      if (tipo === '31' && !validateColombiaNit(documento)) {
+        throw new BadRequestException('El NIT del adquirente debe incluir un dígito de verificación válido');
+      }
+      if (tipo === '13' && !/^\d{6,10}$/.test(documento)) {
+        throw new BadRequestException('La cédula de ciudadanía debe tener entre 6 y 10 dígitos');
+      }
+      return;
     }
 
     if (tipo === '6' && !/^\d{11}$/.test(documento)) {
@@ -224,9 +235,16 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
    * letra corresponda al tipo de comprobante: F para facturas y B para boletas.
    * Las notas de crédito/débito conservan el prefijo del documento que modifican.
    */
-  private assertSerieCoherenteConTipo(dto: CreateFacturaDto) {
+  private assertSerieCoherenteConTipo(dto: CreateFacturaDto, paisCodigo = 'PE') {
     const serie = String((dto as any).serie ?? '').trim().toUpperCase();
     const tipoDocumento = String((dto as any).tipo_documento ?? '').trim();
+
+    if (paisCodigo === 'CO') {
+      if (!/^[A-Z0-9]{1,4}$/.test(serie)) {
+        throw new BadRequestException('El prefijo DIAN debe tener entre 1 y 4 caracteres alfanuméricos');
+      }
+      return;
+    }
 
     if (!/^[A-Z0-9]{4}$/.test(serie)) {
       throw new BadRequestException(
@@ -255,16 +273,22 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
    * La comparación se hace en horario de Perú para no rechazar emisiones válidas
    * por el desfase entre UTC y America/Lima.
    */
-  private assertFechaEmisionNoFutura(emissionDate: string) {
+  private assertFechaEmisionNoFutura(emissionDate: string, paisCodigo = 'PE') {
     const fechaEmision = String(emissionDate ?? '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaEmision)) {
       return;
     }
 
-    const hoyEnPeru = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
-    if (fechaEmision > hoyEnPeru) {
+    const timeZone =
+      paisCodigo === 'AR'
+        ? 'America/Argentina/Buenos_Aires'
+        : paisCodigo === 'CO'
+          ? 'America/Bogota'
+          : 'America/Lima';
+    const hoyLocal = new Date().toLocaleDateString('en-CA', { timeZone });
+    if (fechaEmision > hoyLocal) {
       throw new BadRequestException(
-        `La fecha de emisión (${fechaEmision}) no puede ser futura; hoy en Perú es ${hoyEnPeru}`,
+        `La fecha de emisión (${fechaEmision}) no puede ser futura; la fecha local es ${hoyLocal}`,
       );
     }
   }
@@ -305,6 +329,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
   async create(createFacturaDto: CreateFacturaDto, tenantId: string, userId?: string): Promise<FacturaDto> {
     try {
       const supabaseClient = this.supabaseService.getClient();
+      const paisCodigo = (await this.fiscalAdapter.obtenerCodigoPais(tenantId)).toUpperCase();
       const eventId = randomUUID();
       const emissionDate = this.resolveEmissionDate((createFacturaDto as any).fecha_emision);
       const issueTime = this.resolveIssueTime((createFacturaDto as any).fecha_emision);
@@ -312,9 +337,9 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       const totalesCalculados = this.recalculateTotals(createFacturaDto);
       const { totalIgv, total, gravadas, exoneradas, inafectas, exportacion } = totalesCalculados;
       this.assertProvidedTotalsMatch(createFacturaDto, totalesCalculados);
-      this.assertReceptorValido(createFacturaDto);
-      this.assertSerieCoherenteConTipo(createFacturaDto);
-      this.assertFechaEmisionNoFutura(emissionDate);
+      this.assertReceptorValido(createFacturaDto, paisCodigo);
+      this.assertSerieCoherenteConTipo(createFacturaDto, paisCodigo);
+      this.assertFechaEmisionNoFutura(emissionDate, paisCodigo);
       const idempotencyKey = this.resolveIdempotencyKey(createFacturaDto, tenantId);
 
       // Reemplazar totales con cálculo servidor. Las bases van separadas por
@@ -499,7 +524,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       console.log('ℹ️ CPE creado y firmado. Estado: FIRMADO (listo para envío manual a SUNAT)');
 
       // Emitir evento de comprobante creado para finanzas
-      const requiereTransporte = this.evaluarSiRequiereTransporte(createFacturaDto);
+      const requiereTransporte = this.evaluarSiRequiereTransporte(createFacturaDto, paisCodigo);
       const cpeId = (createdCpe as any).id;
       const documentoReferenciaId = (createdCpe as any).documento_id ?? documentoId ?? null;
 
@@ -556,7 +581,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
 
       // Evaluar si necesita guía de remisión automática
       if (requiereTransporte) {
-        console.log(`🚚 [CPE] CPE ${cpeId} requiere transporte (Total: S/ ${createFacturaDto.total_venta}), emitiendo evento...`);
+        console.log(`🚚 [CPE] CPE ${cpeId} requiere transporte (Total: ${createFacturaDto.moneda} ${createFacturaDto.total_venta}), emitiendo evento...`);
         
         const eventData = {
           cpeId: cpeId,
@@ -573,7 +598,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         
         console.log(`✅ [CPE] Evento cpe.requiere_transporte emitido para CPE ${cpeId}`);
       } else {
-        console.log(`ℹ️ [CPE] CPE ${cpeId} no requiere transporte (Total: S/ ${createFacturaDto.total_venta})`);
+        console.log(`ℹ️ [CPE] CPE ${cpeId} no requiere transporte (Total: ${createFacturaDto.moneda} ${createFacturaDto.total_venta})`);
       }
 
       // Registrar auditoría (el userId se podría obtener del contexto si está disponible)
@@ -667,6 +692,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       tipoDocumento,
       payload?.tipo_documento_receptor ?? payload?.clienteTipoDocumento,
       documentoReceptor,
+      emisor.pais,
     );
     const razonSocialReceptor = String(
       payload?.razon_social_receptor ?? payload?.clienteRazonSocial ?? payload?.clienteNombre ?? '',
@@ -694,7 +720,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       documento_receptor: documentoReceptor,
       razon_social_receptor: razonSocialReceptor,
       direccion_receptor: payload?.direccion_receptor ?? payload?.clienteDireccion ?? '',
-      moneda: payload?.moneda || 'PEN',
+      moneda: payload?.moneda || emisor.moneda,
       items,
       total_gravadas: totalGravadas,
       total_igv: totalIgv,
@@ -991,7 +1017,10 @@ async retrySendToOse(
 
 
 
-  private evaluarSiRequiereTransporte(createFacturaDto: CreateFacturaDto): boolean {
+  private evaluarSiRequiereTransporte(createFacturaDto: CreateFacturaDto, paisCodigo = 'PE'): boolean {
+    if (paisCodigo !== 'PE') {
+      return false;
+    }
     // Lógica para determinar si el comprobante requiere transporte
     
     // 1. Si el total es mayor a S/ 1000, probablemente requiere transporte
@@ -1045,9 +1074,9 @@ private resolveNumeroCpe(tenantId: string, tipoDocumento: string, serie: string,
     return this.registrationService.resolveNumeroCpe(tenantId, tipoDocumento, serie, provided);
   }
 
-private resolveTipoDocumentoReceptor(tipoDocumento: string, provided: any, documento: string): string {
-    return this.registrationService.resolveTipoDocumentoReceptor(tipoDocumento, provided, documento);
-  }
+private resolveTipoDocumentoReceptor(tipoDocumento: string, provided: any, documento: string, pais = 'PE'): string {
+    return this.registrationService.resolveTipoDocumentoReceptor(tipoDocumento, provided, documento, pais);
+}
 
 private normalizeComprobanteItems(itemsInput: any): any[] {
     return this.registrationService.normalizeComprobanteItems(itemsInput);

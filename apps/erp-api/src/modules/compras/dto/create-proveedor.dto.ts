@@ -12,9 +12,9 @@ export enum CondicionesPago {
 }
 
 export class CreateProveedorDto {
-  @ApiProperty({ description: 'RUC del proveedor peruano (11 dígitos)', example: '20123456789' })
+  @ApiProperty({ description: 'RUC, CUIT o NIT del proveedor según el país del tenant', example: '900123456-8' })
   @IsString()
-  @IsValidRuc({ message: 'El RUC debe tener 11 dígitos y contener solo números' })
+  @IsValidRuc({ message: 'La identificación fiscal debe tener formato RUC, CUIT o NIT válido' })
   ruc: string;
 
   @ApiProperty({ description: 'Razón social del proveedor', example: 'DISTRIBUIDORA ABC S.A.C.' })

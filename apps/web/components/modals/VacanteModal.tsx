@@ -5,6 +5,7 @@ import { Briefcase, Loader2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api-fetch';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface VacanteModalProps {
   isOpen: boolean;
@@ -19,6 +20,13 @@ export default function VacanteModal({
   onSuccess,
   departamentos
 }: VacanteModalProps) {
+  const country = useCountryContext();
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
+  const locationPlaceholder = country.paisCodigo === 'AR'
+    ? 'Buenos Aires, Argentina / Remoto'
+    : country.paisCodigo === 'CO'
+      ? 'Bogotá D.C., Colombia / Remoto'
+      : 'Lima, Perú / Remoto';
   const [formData, setFormData] = useState({
     titulo: '',
     descripcion: '',
@@ -186,7 +194,7 @@ export default function VacanteModal({
                 name="ubicacion"
                 value={formData.ubicacion}
                 onChange={handleInputChange} className="w-[100%] p-3 border rounded-[4px]"
-                placeholder="Lima, Perú / Remoto"
+                placeholder={locationPlaceholder}
               />
             </div>
 
@@ -210,7 +218,7 @@ export default function VacanteModal({
           <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="vacante-modal-salario-minimo" className="block mb-2 font-semibold">
-                Salario Mín (S/)
+                Salario Mín ({currencySymbol})
               </label>
               <input id="vacante-modal-salario-minimo"
                 type="number"
@@ -225,7 +233,7 @@ export default function VacanteModal({
 
             <div>
               <label htmlFor="vacante-modal-salario-maximo" className="block mb-2 font-semibold">
-                Salario Máx (S/)
+                Salario Máx ({currencySymbol})
               </label>
               <input id="vacante-modal-salario-maximo"
                 type="number"

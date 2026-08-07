@@ -9,24 +9,29 @@ import { EventBusService } from '../../shared/events/event-bus.service';
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { RrhhCountryService } from './rrhh-country.service';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
     SupabaseModule,
+    ConfigModule,
     AuthModule,
     PermissionsModule,
   ],
   controllers: [RrhhController],
   providers: [
-    RrhhService, 
+    RrhhService,
     PlanillasService,
     RrhhAccountingIntegrationService,
-    FeatureFlagGuard
+    RrhhCountryService,
+    FeatureFlagGuard,
   ],
   exports: [
-    RrhhService, 
+    RrhhService,
     PlanillasService,
-    RrhhAccountingIntegrationService
-  ]
+    RrhhAccountingIntegrationService,
+    RrhhCountryService,
+  ],
 })
 export class RrhhModule {} 

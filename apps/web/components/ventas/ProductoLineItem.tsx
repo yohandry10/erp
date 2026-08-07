@@ -1,6 +1,7 @@
 'use client'
 
 import { Package } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface ProductoLineItemProps {
   descripcion: string
@@ -19,10 +20,11 @@ export default function ProductoLineItem({
   producto_codigo,
   showBorder = true
 }: ProductoLineItemProps) {
+  const country = useCountryContext()
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN'
+      currency: country.moneda
     }).format(value)
   }
 

@@ -43,9 +43,10 @@ export default function OfflinePage() {
     setLoading(true)
     try {
       setOnline(typeof navigator !== 'undefined' ? navigator.onLine : true)
+      const tenantId = customAuth.getCachedSession().session?.user?.tenant_id
       const [nextStatus, nextQueue, nextMappings] = await Promise.all([
-        getOfflineStatus(),
-        listOfflineRequests(),
+        getOfflineStatus(tenantId),
+        listOfflineRequests(tenantId),
         listLocalIdMappings(),
       ])
       setStatus(nextStatus)
@@ -86,7 +87,8 @@ export default function OfflinePage() {
   const synchronize = async () => {
     setSyncing(true)
     try {
-      await syncOfflineQueue(customAuth.getCachedSession().accessToken)
+      const { session, accessToken } = customAuth.getCachedSession()
+      await syncOfflineQueue(accessToken, session?.user?.tenant_id)
       await load()
     } finally {
       setSyncing(false)

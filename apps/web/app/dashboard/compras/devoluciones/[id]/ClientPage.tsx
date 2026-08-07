@@ -14,6 +14,8 @@ import {
   Calendar,
   AlertCircle
 } from 'lucide-react'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 
 interface DevolucionItem {
   id: string
@@ -89,6 +91,8 @@ export default function DevolucionDetallePage() {
   const router = useRouter()
   const params = useParams()
   const { get, post } = useApi()
+  const { formatCurrency: formatLocalizedCurrency, locale, taxIdLabel } = useLocalizedMoney()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
 
   const [devolucion, setDevolucion] = useState<Devolucion | null>(null)
   const [loading, setLoading] = useState(true)
@@ -147,14 +151,11 @@ export default function DevolucionDetallePage() {
 
   const formatCurrency = (amount: number | undefined) => {
     if (!amount) return '-'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(amount)
+    return formatLocalizedCurrency(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return new Date(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -345,7 +346,7 @@ export default function DevolucionDetallePage() {
                 <span className="font-semibold text-foreground">{formatCurrency(devolucion.subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">IGV (18%):</span>
+                <span className="text-muted-foreground">{nombreImpuesto} ({Math.round(tasaIgv * 100)}%):</span>
                 <span className="font-semibold text-foreground">{formatCurrency(devolucion.igv)}</span>
               </div>
               <div className="flex justify-between border-t border-blue-400/20 pt-2 text-lg">
@@ -365,7 +366,7 @@ export default function DevolucionDetallePage() {
             <div className="grid gap-4">
               <div>
                 <p className={valueClass}>{devolucion.proveedor?.razon_social || 'N/A'}</p>
-                <p className="mt-1 text-xs text-muted-foreground">RUC: {devolucion.proveedor?.ruc || 'N/A'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{taxIdLabel}: {devolucion.proveedor?.ruc || 'N/A'}</p>
               </div>
               {devolucion.proveedor?.direccion && (
                 <div>

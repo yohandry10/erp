@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { toast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CotizacionModalProps {
   isOpen: boolean
@@ -31,7 +32,11 @@ interface DetalleCotizacion {
 }
 
 export default function CotizacionModal({ isOpen, onClose, onSuccess }: CotizacionModalProps) {
-  const { tasaIgv } = useTaxConfig()
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const defaultCurrency = country.moneda || (isArgentina ? 'ARS' : country.paisCodigo === 'CO' ? 'COP' : 'PEN')
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   console.log('🎯 CotizacionModal recibido props:', { isOpen })
   console.log('🎯 Modal renderizando con isOpen:', isOpen)
   console.log('🎯 Elemento Dialog debe estar visible:', isOpen ? 'SÍ' : 'NO')
@@ -45,7 +50,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
     fecha_cotizacion: new Date().toISOString().split('T')[0],
     fecha_vencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     vendedor: '',
-    moneda: 'PEN',
+    moneda: defaultCurrency,
     subtotal: 0,
     igv: 0,
     total: 0,
@@ -75,40 +80,18 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
         throw new Error('No se pudieron cargar clientes desde API')
       }
     } catch (error) {
-      console.error('⚠️ Error cargando clientes desde API, usando datos de ejemplo:', error)
-      // Usar UUIDs válidos para datos de ejemplo
-      setClientes([
-        {
-          id: '550e8400-e29b-41d4-a716-446655440010',
-          razon_social: 'Juan Carlos García López',
-          nombre_comercial: 'Juan García',
-          numero_documento: '12345678',
-          tipo_documento: 'DNI'
-        },
-        {
-          id: '550e8400-e29b-41d4-a716-446655440011',
-          razon_social: 'María Elena Rodríguez Silva',
-          nombre_comercial: 'María Rodríguez',
-          numero_documento: '87654321',
-          tipo_documento: 'DNI'
-        },
-        {
-          id: '550e8400-e29b-41d4-a716-446655440012',
-          razon_social: 'Empresa Demo S.A.C.',
-          nombre_comercial: 'Empresa Demo',
-          numero_documento: '20123456789',
-          tipo_documento: 'RUC'
-        }
-      ])
+      console.error('⚠️ Error cargando clientes desde API:', error)
+      setClientes([])
     }
   }, [get])
 
   useEffect(() => {
     console.log('🔥 [COTIZACION MODAL] useEffect triggered - isOpen:', isOpen)
     if (isOpen) {
+      setFormData(prev => ({ ...prev, moneda: defaultCurrency }))
       loadClientes()
     }
-  }, [isOpen, loadClientes])
+  }, [defaultCurrency, isOpen, loadClientes])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -227,7 +210,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
       fecha_cotizacion: new Date().toISOString().split('T')[0],
       fecha_vencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       vendedor: '',
-      moneda: 'PEN',
+      moneda: defaultCurrency,
       subtotal: 0,
       igv: 0,
       total: 0,
@@ -319,7 +302,11 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                     value={formData.moneda}
                     onChange={(e) => handleInputChange('moneda', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
                   >
-                    <option value="PEN">PEN - Soles</option>
+                    {isArgentina ? (
+                      <option value="ARS">ARS - Pesos argentinos</option>
+                    ) : (
+                      <option value="PEN">PEN - Soles</option>
+                    )}
                     <option value="USD">USD - Dólares</option>
                   </select>
                 </div>
@@ -381,7 +368,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                   <div>Descripción *</div>
                   <div>Cantidad *</div>
                   <div>Precio Unit. *</div>
-                  <div>IGV</div>
+                  <div>{nombreImpuesto}</div>
                   <div>Total</div>
                   <div></div>
                 </div>
@@ -416,7 +403,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                       onChange={(e) => handleDetalleChange(index, 'precio_unitario', parseFloat(e.target.value))} className="w-[100%] p-[4px] border rounded-[2px] text-xs text-right"
                       required
                     />
-                    <div className="text-center text-xs">18%</div>
+                    <div className="text-center text-xs">{Number((tasaIgv * 100).toFixed(2))}%</div>
                     <div className="text-right text-xs font-medium">
                       {detalle.total.toFixed(2)}
                     </div>
@@ -457,16 +444,16 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
                   <div className="flex flex-col gap-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Subtotal:</span>
-                      <span className="font-medium">S/ {formData.subtotal.toFixed(2)}</span>
+                      <span className="font-medium">{currencySymbol} {formData.subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">IGV (18%):</span>
-                      <span className="font-medium">S/ {formData.igv.toFixed(2)}</span>
+                      <span className="text-muted-foreground">{nombreImpuesto} ({Number((tasaIgv * 100).toFixed(2))}%):</span>
+                      <span className="font-medium">{currencySymbol} {formData.igv.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between pt-2 border-t">
                       <span className="font-semibold text-foreground/85">Total:</span>
                       <span className="font-bold text-[18px] text-emerald-400">
-                        S/ {formData.total.toFixed(2)}
+                        {currencySymbol} {formData.total.toFixed(2)}
                       </span>
                     </div>
                   </div>

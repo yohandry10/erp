@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useCountryContext } from "@/hooks/use-country-context";
 
 interface PlanillaPagarModalProps {
   isOpen: boolean;
@@ -49,6 +50,9 @@ export default function PlanillaPagarModal({
   planilla,
 }: PlanillaPagarModalProps) {
   const { get, post } = useApi();
+  const country = useCountryContext();
+  const currencySymbol = country.simboloMoneda || "S/";
+  const locale = country.locale || "es-PE";
   const [loading, setLoading] = useState(false);
   const [empleados, setEmpleados] = useState<EmpleadoPago[]>([]);
   const [historialPagos, setHistorialPagos] = useState<HistorialPago[]>([]);
@@ -247,21 +251,21 @@ export default function PlanillaPagarModal({
             <div class="company">NEON SYSTEM</div>
             <div class="title">Comprobante de Pago de Planilla</div>
             <div>Período: ${planilla.periodo}</div>
-            <div>Generado: ${new Date().toLocaleDateString("es-PE")} ${new Date().toLocaleTimeString("es-PE")}</div>
+            <div>Generado: ${new Date().toLocaleDateString(locale)} ${new Date().toLocaleTimeString(locale)}</div>
         </div>
 
         <div class="info-grid">
             <div class="info-box">
                 <h3>Información del Pago</h3>
                 <p><strong>Método:</strong> ${metodoPago === "efectivo" ? "Efectivo" : "Transferencia Bancaria"}</p>
-                <p><strong>Fecha:</strong> ${new Date().toLocaleDateString("es-PE")}</p>
+                <p><strong>Fecha:</strong> ${new Date().toLocaleDateString(locale)}</p>
                 ${numeroOperacion ? `<p><strong>N° Operación:</strong> ${numeroOperacion}</p>` : ""}
                 ${observaciones ? `<p><strong>Observaciones:</strong> ${observaciones}</p>` : ""}
             </div>
             <div class="info-box">
                 <h3>Resumen</h3>
                 <p><strong>Total Empleados:</strong> ${empleadosPago.length}</p>
-                <p><strong>Monto Total:</strong> S/ ${totalPago.toFixed(2)}</p>
+                <p><strong>Monto Total:</strong> ${currencySymbol} ${totalPago.toFixed(2)}</p>
                 <p><strong>Estado:</strong> Pagado</p>
             </div>
         </div>
@@ -285,16 +289,16 @@ export default function PlanillaPagarModal({
                         <td>${emp.empleado_nombre}</td>
                         <td>${emp.empleado_documento}</td>
                         <td class="number">${emp.dias_trabajados}</td>
-                        <td class="number">S/ ${emp.total_ingresos.toFixed(2)}</td>
-                        <td class="number">S/ ${emp.total_descuentos.toFixed(2)}</td>
-                        <td class="number">S/ ${emp.neto_pagar.toFixed(2)}</td>
+                        <td class="number">${currencySymbol} ${emp.total_ingresos.toFixed(2)}</td>
+                        <td class="number">${currencySymbol} ${emp.total_descuentos.toFixed(2)}</td>
+                        <td class="number">${currencySymbol} ${emp.neto_pagar.toFixed(2)}</td>
                     </tr>
                 `,
                   )
                   .join("")}
                 <tr class="total-row">
                     <td colspan="5">TOTAL PAGADO</td>
-                    <td class="number">S/ ${totalPago.toFixed(2)}</td>
+                    <td class="number">${currencySymbol} ${totalPago.toFixed(2)}</td>
                 </tr>
             </tbody>
         </table>
@@ -359,7 +363,7 @@ export default function PlanillaPagarModal({
             </div>
             <div className="bg-[var(--blue-50)] p-4 text-center border">
               <div className="text-2xl font-bold text-[var(--blue-600)]">
-                S/ {totalASerPagado.toFixed(2)}
+                {currencySymbol} {totalASerPagado.toFixed(2)}
               </div>
               <div className="text-[0.875rem] text-[var(--blue-700)]">
                 A Pagar Ahora
@@ -367,7 +371,7 @@ export default function PlanillaPagarModal({
             </div>
             <div className="bg-[#f0f9ff] p-4 text-center border">
               <div className="text-2xl font-bold text-[#0ea5e9]">
-                S/ {totalYaPagado.toFixed(2)}
+                {currencySymbol} {totalYaPagado.toFixed(2)}
               </div>
               <div className="text-[0.875rem] text-[#0c4a6e]">Ya Pagado</div>
             </div>
@@ -480,13 +484,13 @@ export default function PlanillaPagarModal({
                       {empleado.dias_trabajados}
                     </td>
                     <td className="p-3 border text-right text-[var(--emerald-600)] font-semibold">
-                      S/ {empleado.total_ingresos.toFixed(2)}
+                      {currencySymbol} {empleado.total_ingresos.toFixed(2)}
                     </td>
                     <td className="p-3 border text-right text-[var(--red-600)] font-semibold">
-                      S/ {empleado.total_descuentos.toFixed(2)}
+                      {currencySymbol} {empleado.total_descuentos.toFixed(2)}
                     </td>
                     <td className="p-3 border text-right text-[var(--blue-700)] font-bold text-base">
-                      S/ {empleado.neto_pagar.toFixed(2)}
+                      {currencySymbol} {empleado.neto_pagar.toFixed(2)}
                     </td>
                     <td className="p-3 border text-center">
                       <span
@@ -504,7 +508,7 @@ export default function PlanillaPagarModal({
                     <td className="p-3 border text-center text-[0.8rem] text-[var(--primary-600)]">
                       {empleado.fecha_pago
                         ? new Date(empleado.fecha_pago).toLocaleDateString(
-                            "es-PE",
+                            locale,
                           )
                         : "-"}
                     </td>
@@ -535,7 +539,7 @@ export default function PlanillaPagarModal({
                     {historialPagos.map((pago, index) => (
                       <tr key={pago.id}>
                         <td className="p-2 border">
-                          {new Date(pago.fecha).toLocaleDateString("es-PE")}
+                          {new Date(pago.fecha).toLocaleDateString(locale)}
                         </td>
                         <td className="p-2 border">
                           {pago.metodo === "efectivo"
@@ -546,7 +550,7 @@ export default function PlanillaPagarModal({
                           {pago.empleados_count}
                         </td>
                         <td className="p-2 border text-right font-semibold">
-                          S/ {pago.monto.toFixed(2)}
+                          {currencySymbol} {pago.monto.toFixed(2)}
                         </td>
                         <td className="p-2 border">
                           {pago.numero_operacion || "-"}

@@ -50,6 +50,15 @@ apps/web/playwright-report/
 apps/web/test-results/
 apps/web/tests/e2e/artifacts/
 
+# Respaldos PostgreSQL locales: pueden contener datos reales de PROD.
+artifacts/db-backups/*.dump
+backups/*.dump
+
+# Cobertura y accesos directos locales generados.
+coverage/
+apps/**/coverage/
+*.lnk
+
 # Local validation databases and tool caches
 .codex_pg_rebuild/
 .codex-local-logs/

@@ -7,6 +7,7 @@ import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CentroCosto {
   id: string
@@ -71,6 +72,7 @@ export default function CentroCostoDetailPage() {
   const router = useRouter()
   const params = useParams()
   const { get } = useApi()
+  const country = useCountryContext()
   const [centroId, setCentroId] = useState<string>('')
   const [centro, setCentro] = useState<CentroCosto | null>(null)
   const [periodos, setPeriodos] = useState<Periodo[]>([])
@@ -185,9 +187,9 @@ export default function CentroCostoDetailPage() {
   }, [activeTab, centro, loadPresupuestos, loadReporteGastos, selectedPeriodoId])
 
   const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('es-PE', {
+    new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
     }).format(value)
 
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`

@@ -489,7 +489,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
               {orden.numero}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {orden.proveedor?.razon_social || 'Proveedor N/A'} - RUC: {orden.proveedor?.ruc || '-'}
+              {orden.proveedor?.razon_social || 'Proveedor N/A'} - Documento fiscal: {orden.proveedor?.ruc || '-'}
             </p>
           </div>
           <div className="rounded-md bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">

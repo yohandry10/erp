@@ -45,6 +45,7 @@ export default function ConvertDemoPage() {
   // solo estuvo trasteando y quiere entrar limpio.
   const [mostrarEleccionDatos, setMostrarEleccionDatos] = useState(false);
   const [eleccionDatos, setEleccionDatos] = useState<'conservar' | 'reiniciar'>('conservar');
+  const [countryCode, setCountryCode] = useState<'PE' | 'AR' | 'CO'>('PE');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -52,6 +53,31 @@ export default function ConvertDemoPage() {
     ruc: '',
     telefono: '',
   });
+
+  useEffect(() => {
+    void fetchApi('/api/demo/status')
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((status) => {
+        const code = String(status?.pais || '').toUpperCase();
+        if (code === 'AR' || code === 'CO' || code === 'PE') setCountryCode(code);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const taxDocument = countryCode === 'AR' ? 'CUIT' : countryCode === 'CO' ? 'NIT' : 'RUC';
+  const fiscalAuthority = countryCode === 'AR' ? 'ARCA' : countryCode === 'CO' ? 'DIAN' : 'SUNAT';
+  const taxPlaceholder = countryCode === 'AR' ? '30712345671' : countryCode === 'CO' ? '900373913-5' : '20123456786';
+  const companyPlaceholder = countryCode === 'AR'
+    ? 'Ej: MI EMPRESA S.A.'
+    : countryCode === 'CO'
+      ? 'Ej: MI EMPRESA S.A.S.'
+      : 'Ej: MI EMPRESA S.A.C.';
+  const phonePlaceholder = countryCode === 'AR'
+    ? '+54 11 1234 5678'
+    : countryCode === 'CO'
+      ? '+57 300 123 4567'
+      : '+51 999 999 999';
+  const countryName = countryCode === 'AR' ? 'Argentina' : countryCode === 'CO' ? 'Colombia' : 'Perú';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,24 +319,24 @@ export default function ConvertDemoPage() {
                 name="razon_social"
                 value={formData.razon_social}
                 onChange={handleChange}
-                placeholder="Ej: MI EMPRESA SAC"
+                placeholder={companyPlaceholder}
                 required className="w-[100%] py-[0.875rem] px-4 rounded-xl text-base bg-card text-foreground border border-border outline-none transition focus:border-primary"
               />
             </div>
 
             <div className="mb-5">
-              <label htmlFor="convert-ruc" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">RUC *</label>
+              <label htmlFor="convert-ruc" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">{taxDocument} *</label>
               <input id="convert-ruc"
                 type="text"
                 name="ruc"
                 value={formData.ruc}
                 onChange={handleChange}
-                placeholder="20123456789"
-                maxLength={11}
+                placeholder={taxPlaceholder}
+                maxLength={13}
                 required className="w-[100%] py-[0.875rem] px-4 rounded-xl text-base bg-card text-foreground border border-border outline-none transition focus:border-primary"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Ingresa el RUC real de tu empresa
+                Ingresa el {taxDocument} real de tu empresa. Se validará según {countryName}.
               </p>
             </div>
 
@@ -349,7 +375,7 @@ export default function ConvertDemoPage() {
                 name="telefono"
                 value={formData.telefono}
                 onChange={handleChange}
-                placeholder="+51 999 999 999" className="w-[100%] py-[0.875rem] px-4 rounded-xl text-base bg-card text-foreground border border-border outline-none transition focus:border-primary"
+                placeholder={phonePlaceholder} className="w-[100%] py-[0.875rem] px-4 rounded-xl text-base bg-card text-foreground border border-border outline-none transition focus:border-primary"
               />
             </div>
 
@@ -359,10 +385,10 @@ export default function ConvertDemoPage() {
               </h4>
               <ul className="text-[0.875rem] text-foreground/85 list-none p-0 m-0">
                 <li className="mb-1">✓ Acceso ilimitado sin expiración</li>
-                <li className="mb-1">✓ Facturación electrónica real a SUNAT</li>
+                <li className="mb-1">✓ Onboarding de facturación electrónica real ante {fiscalAuthority}</li>
                 <li className="mb-1">✓ Soporte técnico prioritario</li>
                 <li className="mb-1">✓ Eliges si conservas lo que probaste o empiezas de cero</li>
-                <li>✓ Certificado digital propio</li>
+                <li>✓ Flujo para certificado y credenciales propias, sin reutilizar fixtures demo</li>
               </ul>
             </div>
 

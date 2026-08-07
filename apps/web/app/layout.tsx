@@ -12,8 +12,8 @@ import { ErrorBoundary } from '@/components/error'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'ERP Suite - Sistema Tributario Peruano',
-  description: 'Sistema completo para gestión tributaria con CPE, GRE y SIRE',
+  title: 'ERP Suite - Gestión empresarial multi-país',
+  description: 'ERP con configuración fiscal y operativa contextual para Perú y Argentina',
 }
 
 export default function RootLayout({

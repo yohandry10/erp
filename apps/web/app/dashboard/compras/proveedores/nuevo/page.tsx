@@ -7,10 +7,12 @@ import { CreateProveedorDto } from '@/types/compras'
 import { ProveedorForm } from '@/components/compras/ProveedorForm'
 import { ArrowLeft, Building2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 export default function NuevoProveedorPage() {
   const router = useRouter()
   const { post } = useApi()
+  const { taxIdLabel } = useLocalizedMoney()
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (data: CreateProveedorDto) => {
@@ -62,7 +64,8 @@ export default function NuevoProveedorPage() {
           <h3 className="font-semibold mb-1">Información Importante</h3>
           <p className="text-[0.875rem] opacity-[0.95]">
             Los campos marcados con <span className="text-[#fbbf24]">*</span> son obligatorios.
-            Asegúrese de ingresar un RUC peruano válido de 11 dígitos y un email válido.
+            Asegúrese de ingresar un {taxIdLabel} válido
+            {taxIdLabel === 'NIT' ? ' con dígito de verificación' : ' de 11 dígitos'} y un email válido.
           </p>
         </div>
       </div>

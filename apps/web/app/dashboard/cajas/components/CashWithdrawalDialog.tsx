@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { CashDialogFrame } from './CashDialogFrame';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 interface CashWithdrawalDialogProps {
     isOpen: boolean;
@@ -10,6 +11,8 @@ interface CashWithdrawalDialogProps {
 }
 
 export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: CashWithdrawalDialogProps) {
+    const country = useCountryContext();
+    const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
     const { post } = useApi();
     const [monto, setMonto] = useState<string>('');
     const [motivo, setMotivo] = useState<string>('DEPOSITO_BANCARIO');
@@ -91,7 +94,7 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
                                         <label className="block text-sm font-medium text-foreground/85">Monto a Retirar</label>
                                         <div className="mt-1 relative rounded-md shadow-sm">
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <span className="text-muted-foreground sm:text-sm">S/</span>
+                                                <span className="text-muted-foreground sm:text-sm">{currencySymbol}</span>
                                             </div>
                                             <input
                                                 type="number"

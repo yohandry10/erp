@@ -113,23 +113,28 @@ export class AsientosGeneratorService {
         }
       }
 
-      // Crear asiento contable
+      // Cabecera y detalles forman un solo agregado contable. Una compensación
+      // posterior no equivale a rollback si el proceso cae entre llamadas.
       const { data: asiento, error: asientoError } = await this.supabaseService
         .getClient()
-        .from('asientos_contables')
-        .insert({
-          tenant_id: tenantId,
-          fecha: fecha.toISOString(),
-          concepto,
-          descripcion: concepto,
-          referencia,
-          total_debe: totalDebe,
-          total_haber: totalHaber,
-          estado: 'CONFIRMADO',
-          source_event_id: sourceEventId
-        })
-        .select()
-        .single();
+        .rpc('crear_asiento_con_detalles_tx', {
+          p_tenant_id: tenantId,
+          p_asiento: {
+            fecha: fecha.toISOString(),
+            concepto,
+            descripcion: concepto,
+            referencia: referencia ?? null,
+            estado: 'CONFIRMADO',
+            source_event_id: sourceEventId ?? null
+          },
+          p_detalles: detalles.map(detalle => ({
+            cuenta_id: detalle.cuenta_id,
+            debe: detalle.debe,
+            haber: detalle.haber,
+            concepto: detalle.concepto,
+            centro_costo_id: detalle.centro_costo_id ?? null
+          }))
+        });
 
       if (asientoError) {
         if (sourceEventId && this.isSourceEventUniqueViolation(asientoError)) {
@@ -148,34 +153,6 @@ export class AsientosGeneratorService {
 
         console.error('❌ [Asientos] Error creando asiento:', asientoError);
         throw new Error(`Error creando asiento contable: ${asientoError.message}`);
-      }
-
-      // Crear detalles del asiento
-      const detallesConAsientoId = detalles.map(detalle => ({
-        tenant_id: tenantId,
-        asiento_id: asiento.id,
-        cuenta_id: detalle.cuenta_id,
-        debe: detalle.debe,
-        haber: detalle.haber,
-        nombre: detalle.concepto,
-        centro_costo_id: detalle.centro_costo_id
-      }));
-
-      const { error: detallesError } = await this.supabaseService
-        .getClient()
-        .from('detalle_asientos')
-        .insert(detallesConAsientoId);
-
-      if (detallesError) {
-        console.error('❌ [Asientos] Error creando detalles:', detallesError);
-        // Rollback: eliminar asiento
-        await this.supabaseService
-          .getClient()
-          .from('asientos_contables')
-          .delete()
-          .eq('id', asiento.id)
-          .eq('tenant_id', tenantId);
-        throw new Error(`Error creando detalles del asiento: ${detallesError.message}`);
       }
 
       console.log(
@@ -1057,16 +1034,55 @@ export class AsientosGeneratorService {
     try {
       const { tenant_id, fecha, monto, centro_costo_id } = evento;
 
-      // Obtener cuentas del plan
-      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
-        tenant_id,
-        ['42', '10']
+      // `monto` viene en la moneda del documento. Tesorería lo valúa y adjunta
+      // los importes en moneda local; si no vienen (pago en moneda local, o
+      // eventos anteriores a la valuación), ambos coinciden con el monto.
+      const montoContabilizado = this.round2(
+        Number(evento.montoContabilizado ?? evento.monto_contabilizado ?? monto)
+      );
+      const montoLiquidacion = this.round2(
+        Number(evento.montoLiquidacion ?? evento.monto_liquidacion ?? monto)
+      );
+      const diferenciaCambio = this.round2(
+        Number(evento.diferenciaCambio ?? evento.diferencia_cambio ?? 0)
       );
 
+      // Solo se piden las cuentas de resultado si hay diferencia que registrar:
+      // pedirlas siempre las crearía en tenants que nunca operan en divisa.
+      const codigos = ['42', '10'];
+      if (diferenciaCambio < 0) codigos.push('676');
+      if (diferenciaCambio > 0) codigos.push('776');
+
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenant_id,
+        codigos
+      );
+
+      // Se cancela el pasivo por su valor contabilizado y se acredita el banco
+      // por lo efectivamente desembolsado. La brecha entre ambos es el
+      // resultado por diferencia de cambio.
       const detalles: DetalleAsiento[] = [
-        { cuenta_id: cuentas.get('42')!.id, debe: monto, haber: 0, concepto: 'Proveedores', centro_costo_id },
-        { cuenta_id: cuentas.get('10')!.id, debe: 0, haber: monto, concepto: 'Bancos', centro_costo_id }
+        { cuenta_id: cuentas.get('42')!.id, debe: montoContabilizado, haber: 0, concepto: 'Proveedores', centro_costo_id },
+        { cuenta_id: cuentas.get('10')!.id, debe: 0, haber: montoLiquidacion, concepto: 'Bancos', centro_costo_id }
       ];
+
+      if (diferenciaCambio < 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('676')!.id,
+          debe: this.round2(-diferenciaCambio),
+          haber: 0,
+          concepto: 'Pérdida por diferencia de cambio',
+          centro_costo_id
+        });
+      } else if (diferenciaCambio > 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('776')!.id,
+          debe: 0,
+          haber: diferenciaCambio,
+          concepto: 'Ganancia por diferencia de cambio',
+          centro_costo_id
+        });
+      }
 
       return await this.generarAsiento(
         tenant_id,

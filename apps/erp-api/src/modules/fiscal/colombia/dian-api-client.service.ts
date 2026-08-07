@@ -10,7 +10,6 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
-import * as FormData from 'form-data';
 
 export interface DianConfig {
   url: string;
@@ -71,153 +70,85 @@ export class DianApiClientService {
   }
 
   /**
+   * Prueba únicamente el transporte/WSDL oficial. No afirma que credenciales,
+   * software o certificado estén homologados: eso sólo lo determina DIAN al
+   * procesar el set de pruebas firmado.
+   */
+  async probarConectividad(config: DianConfig): Promise<{
+    reachable: boolean;
+    endpoint: string;
+    serviceDetected: boolean;
+    message: string;
+  }> {
+    this.configurar(config);
+    const endpoint = String(this.axiosInstance.defaults.baseURL || '');
+    try {
+      const wsdlUrl = `${endpoint}${endpoint.includes('?') ? '&' : '?'}singleWsdl`;
+      const response = await this.axiosInstance.get(wsdlUrl, {
+        timeout: 15000,
+        headers: { Accept: 'application/xml,text/xml,*/*' },
+        responseType: 'text',
+      });
+      const body = String(response.data || '');
+      const serviceDetected = /WcfDianCustomerServices|wsdl:definitions|<definitions/i.test(body);
+      return {
+        reachable: response.status >= 200 && response.status < 400 && serviceDetected,
+        endpoint,
+        serviceDetected,
+        message: serviceDetected
+          ? 'WSDL oficial DIAN disponible.'
+          : 'El endpoint respondió, pero no publicó el contrato DIAN esperado.',
+      };
+    } catch (error) {
+      return {
+        reachable: false,
+        endpoint,
+        serviceDetected: false,
+        message: axios.isAxiosError(error)
+          ? `No se pudo alcanzar el servicio DIAN (${error.code || error.response?.status || 'ERROR'}).`
+          : 'No se pudo alcanzar el servicio DIAN.',
+      };
+    }
+  }
+
+  /**
    * Envía documento electrónico a DIAN
    */
   async enviarDocumento(
-    xmlContent: string,
-    attachedDocument: string,
+    _xmlContent: string,
+    _attachedDocument: string,
     config: DianConfig
   ): Promise<DianEnvioResponse> {
-    try {
-      this.logger.log(`📤 Enviando documento a DIAN...`);
-
-      // Preparar payload según especificaciones DIAN
-      const payload = {
-        NIT: config.nit,
-        InvoiceAuthorization: {
-          Prefix: '',
-          From: '',
-          To: '',
-          AuthorizationNumber: '',
-          StartDate: new Date().toISOString(),
-          EndDate: new Date().toISOString()
-        },
-        Invoice: {
-          UBLVersionID: '2.1',
-          CustomizationID: '10',
-          ProfileID: 'DIAN 2.1',
-          ID: '',
-          IssueDate: new Date().toISOString().split('T')[0],
-          InvoiceTypeCode: '01'
-        },
-        ApplicationResponse: attachedDocument,
-        ContentFile: Buffer.from(xmlContent).toString('base64')
-      };
-
-      const response = await this.axiosInstance.post('/SendBillSync', payload);
-
-      if (response.data.IsValid) {
-        this.logger.log(`✅ Documento aceptado por DIAN`);
-        return {
-          success: true,
-          statusCode: response.data.StatusCode || '00',
-          statusDescription: response.data.StatusDescription || 'Aceptado',
-          cufe: response.data.CUFE,
-          qrCode: response.data.QRCode,
-          xmlResponse: response.data.XmlBase64Bytes
-        };
-      } else {
-        this.logger.warn(`⚠️ Documento rechazado por DIAN`);
-        return {
-          success: false,
-          statusCode: response.data.StatusCode || '99',
-          statusDescription: response.data.StatusDescription || 'Rechazado',
-          errors: response.data.ErrorMessage ? [response.data.ErrorMessage] : []
-        };
-      }
-    } catch (error) {
-      this.logger.error(`❌ Error enviando documento a DIAN:`, error);
-      
-      if (axios.isAxiosError(error)) {
-        return {
-          success: false,
-          statusCode: '99',
-          statusDescription: `Error de comunicación: ${error.message}`,
-          errors: [error.response?.data?.message || error.message]
-        };
-      }
-
-      return {
-        success: false,
-        statusCode: '99',
-        statusDescription: `Error técnico: ${error.message}`,
-        errors: [error.message]
-      };
-    }
+    this.configurar(config);
+    this.logger.error('Transmisión DIAN bloqueada: el adaptador SOAP WS-Security/XAdES aún no está homologado.');
+    return this.transporteNoHomologado();
   }
 
   /**
    * Consulta estado de documento en DIAN
    */
   async consultarEstado(
-    cufe: string,
+    _cufe: string,
     config: DianConfig
   ): Promise<DianConsultaResponse> {
-    try {
-      this.logger.log(`🔍 Consultando estado en DIAN: ${cufe}`);
-
-      const payload = {
-        NIT: config.nit,
-        CUFE: cufe
-      };
-
-      const response = await this.axiosInstance.post('/GetStatus', payload);
-
-      if (response.data.IsValid) {
-        return {
-          success: true,
-          estado: this.mapearEstado(response.data.StatusCode),
-          descripcion: response.data.StatusDescription,
-          cufe: response.data.CUFE,
-          fechaProcesamiento: response.data.ProcessDate ? new Date(response.data.ProcessDate) : undefined
-        };
-      } else {
-        return {
-          success: false,
-          estado: 'NO_ENCONTRADO',
-          descripcion: response.data.StatusDescription || 'Documento no encontrado'
-        };
-      }
-    } catch (error) {
-      this.logger.error(`❌ Error consultando estado en DIAN:`, error);
-      return {
-        success: false,
-        estado: 'NO_ENCONTRADO',
-        descripcion: `Error: ${error.message}`
-      };
-    }
+    this.configurar(config);
+    return {
+      success: false,
+      estado: 'NO_ENCONTRADO',
+      descripcion: this.mensajeTransporteNoHomologado(),
+    };
   }
 
   /**
    * Valida numeración autorizada por DIAN
    */
   async validarNumeracion(
-    prefijo: string,
-    numero: number,
+    _prefijo: string,
+    _numero: number,
     config: DianConfig
   ): Promise<{ valido: boolean; mensaje: string }> {
-    try {
-      this.logger.log(`🔢 Validando numeración: ${prefijo}-${numero}`);
-
-      const payload = {
-        NIT: config.nit,
-        Prefix: prefijo,
-        Number: numero
-      };
-
-      const response = await this.axiosInstance.post('/ValidateNumbering', payload);
-
-      return {
-        valido: response.data.IsValid,
-        mensaje: response.data.Message || 'Numeración válida'
-      };
-    } catch (error) {
-      this.logger.error(`❌ Error validando numeración:`, error);
-      return {
-        valido: false,
-        mensaje: `Error: ${error.message}`
-      };
-    }
+    this.configurar(config);
+    return { valido: false, mensaje: this.mensajeTransporteNoHomologado() };
   }
 
   /**
@@ -233,69 +164,22 @@ export class DianApiClientService {
       fechaFin: Date;
     }>;
   }> {
-    try {
-      this.logger.log(`📋 Consultando rangos autorizados`);
-
-      const payload = {
-        NIT: config.nit
-      };
-
-      const response = await this.axiosInstance.post('/GetNumberingRanges', payload);
-
-      const rangos = (response.data.Ranges || []).map((rango: any) => ({
-        prefijo: rango.Prefix,
-        desde: rango.From,
-        hasta: rango.To,
-        resolucion: rango.Resolution,
-        fechaInicio: new Date(rango.StartDate),
-        fechaFin: new Date(rango.EndDate)
-      }));
-
-      this.logger.log(`✅ ${rangos.length} rangos encontrados`);
-      return { rangos };
-    } catch (error) {
-      this.logger.error(`❌ Error consultando rangos:`, error);
-      return { rangos: [] };
-    }
+    this.configurar(config);
+    this.logger.error(this.mensajeTransporteNoHomologado());
+    return { rangos: [] };
   }
 
   /**
    * Envía evento de documento (acuse de recibo, aceptación, rechazo)
    */
   async enviarEvento(
-    cufe: string,
-    tipoEvento: 'ACUSE' | 'ACEPTACION' | 'RECHAZO',
-    motivoRechazo: string | null,
+    _cufe: string,
+    _tipoEvento: 'ACUSE' | 'ACEPTACION' | 'RECHAZO',
+    _motivoRechazo: string | null,
     config: DianConfig
   ): Promise<DianEnvioResponse> {
-    try {
-      this.logger.log(`📨 Enviando evento ${tipoEvento} para CUFE: ${cufe}`);
-
-      const payload = {
-        NIT: config.nit,
-        CUFE: cufe,
-        EventType: tipoEvento,
-        RejectReason: motivoRechazo,
-        EventDate: new Date().toISOString()
-      };
-
-      const response = await this.axiosInstance.post('/SendEvent', payload);
-
-      return {
-        success: response.data.IsValid,
-        statusCode: response.data.StatusCode || '00',
-        statusDescription: response.data.StatusDescription || 'Evento enviado',
-        errors: response.data.ErrorMessage ? [response.data.ErrorMessage] : []
-      };
-    } catch (error) {
-      this.logger.error(`❌ Error enviando evento:`, error);
-      return {
-        success: false,
-        statusCode: '99',
-        statusDescription: `Error: ${error.message}`,
-        errors: [error.message]
-      };
-    }
+    this.configurar(config);
+    return this.transporteNoHomologado();
   }
 
   /**
@@ -333,20 +217,17 @@ export class DianApiClientService {
     return hash.digest('hex');
   }
 
-  // ========== MÉTODOS PRIVADOS ==========
+  private mensajeTransporteNoHomologado(): string {
+    return 'La conectividad WSDL puede verificarse, pero la transmisión requiere un adaptador SOAP WS-Security/XAdES homologado con las credenciales reales de la empresa.';
+  }
 
-  private mapearEstado(statusCode: string): 'ACEPTADO' | 'RECHAZADO' | 'PENDIENTE' | 'NO_ENCONTRADO' {
-    switch (statusCode) {
-      case '00':
-      case '0':
-        return 'ACEPTADO';
-      case '01':
-      case '02':
-        return 'RECHAZADO';
-      case '99':
-        return 'PENDIENTE';
-      default:
-        return 'NO_ENCONTRADO';
-    }
+  private transporteNoHomologado(): DianEnvioResponse {
+    const message = this.mensajeTransporteNoHomologado();
+    return {
+      success: false,
+      statusCode: 'DIAN_SOAP_NO_HOMOLOGADO',
+      statusDescription: message,
+      errors: [message],
+    };
   }
 }

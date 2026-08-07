@@ -90,6 +90,7 @@ export interface LocalIdMapping {
 interface ApiCacheEntry {
   url: string
   endpoint: string
+  tenant_id?: string | null
   status: number
   statusText: string
   headers: HeaderPair[]
@@ -315,6 +316,14 @@ function isDeferredValidationEndpoint(endpoint: string) {
   return normalized.startsWith('/api/validations/')
     || normalized.includes('/validar-')
     || normalized.includes('/validate-')
+}
+
+function isLiveConnectivityTestEndpoint(endpoint: string) {
+  const normalized = localFirstEndpoint(endpoint)
+  return normalized === '/api/configuration/colombia/dian/test'
+    || normalized === '/configuration/colombia/dian/test'
+    || normalized === '/api/rrhh/configuracion-laboral/colombia/pila/test'
+    || normalized === '/rrhh/configuracion-laboral/colombia/pila/test'
 }
 
 async function deferredValidationResponse(
@@ -606,19 +615,21 @@ export async function enqueueOfflineRequest(input: OfflineRequestInput): Promise
   return item
 }
 
-export async function listOfflineRequests(): Promise<OfflineQueueItem[]> {
+export async function listOfflineRequests(tenantId?: string | null): Promise<OfflineQueueItem[]> {
+  let queue: OfflineQueueItem[]
   if (isDesktopRuntime()) {
-    return invoke<OfflineQueueItem[]>('list_offline_requests')
+    queue = await invoke<OfflineQueueItem[]>('list_offline_requests')
+  } else {
+    queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
   }
-  const queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
   let changed = false
   const sanitized = queue.map((item) => {
     const headers = sanitizePersistedHeaders(item.headers || [])
     changed ||= headers.length !== (item.headers || []).length
     return { ...item, headers }
   })
-  if (changed) writeJson(OUTBOX_KEY, sanitized)
-  return sanitized
+  if (changed && !isDesktopRuntime()) writeJson(OUTBOX_KEY, sanitized)
+  return tenantId ? sanitized.filter((item) => item.tenant_id === tenantId) : sanitized
 }
 
 export async function listLocalIdMappings(): Promise<LocalIdMapping[]> {
@@ -693,12 +704,23 @@ export async function deleteOfflineRequest(id: string) {
   }
 }
 
-export async function getOfflineStatus(): Promise<OfflineStatus> {
+export async function getOfflineStatus(tenantId?: string | null): Promise<OfflineStatus> {
   if (isDesktopRuntime()) {
-    return invoke<OfflineStatus>('get_offline_status')
+    const rawStatus = await invoke<OfflineStatus>('get_offline_status')
+    if (!tenantId) return rawStatus
+    const queue = await listOfflineRequests(tenantId)
+    return {
+      offline_mode: rawStatus.offline_mode,
+      total: queue.length,
+      pending: queue.filter((item) => item.status === 'pending').length,
+      failed: queue.filter((item) => item.status === 'failed').length,
+      synced: queue.filter((item) => item.status === 'synced').length,
+    }
   }
 
-  const queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
+  const queue = tenantId
+    ? readJson<OfflineQueueItem[]>(OUTBOX_KEY, []).filter((item) => item.tenant_id === tenantId)
+    : readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
   return {
     offline_mode: typeof navigator !== 'undefined' ? !navigator.onLine : false,
     total: queue.length,
@@ -708,7 +730,12 @@ export async function getOfflineStatus(): Promise<OfflineStatus> {
   }
 }
 
-export async function cacheApiResponse(url: string, endpoint: string, response: Response) {
+export async function cacheApiResponse(
+  url: string,
+  endpoint: string,
+  response: Response,
+  tenantId?: string | null,
+) {
   if (response.status === 204) return
   const contentType = response.headers.get('Content-Type') || ''
   if (!/application\/json|text\//i.test(contentType)) return
@@ -721,6 +748,7 @@ export async function cacheApiResponse(url: string, endpoint: string, response: 
   const entry: ApiCacheEntry = {
     url,
     endpoint,
+    tenant_id: tenantId ?? null,
     status: response.status,
     statusText: response.statusText,
     headers: headersToPairs(response.headers),
@@ -728,12 +756,21 @@ export async function cacheApiResponse(url: string, endpoint: string, response: 
     cached_at: now(),
   }
 
-  const next = [entry, ...cache.filter((item) => item.url !== url)].slice(0, CACHE_LIMIT)
+  const next = [
+    entry,
+    ...cache.filter((item) => item.url !== url || item.tenant_id !== entry.tenant_id),
+  ].slice(0, CACHE_LIMIT)
   writeJson(CACHE_KEY, next)
 }
 
-export async function readCachedApiResponse(url: string): Promise<Response | null> {
-  const entry = readJson<ApiCacheEntry[]>(CACHE_KEY, []).find((item) => item.url === url)
+export async function readCachedApiResponse(
+  url: string,
+  tenantId?: string | null,
+): Promise<Response | null> {
+  const normalizedTenantId = tenantId ?? null
+  const entry = readJson<ApiCacheEntry[]>(CACHE_KEY, []).find(
+    (item) => item.url === url && (item.tenant_id ?? null) === normalizedTenantId,
+  )
   if (!entry) return null
 
   const headers = pairsToHeaders(entry.headers)
@@ -906,7 +943,7 @@ export async function fetchWithOfflineSupport(
       const binary = await readBinaryResponse(meta.endpoint, url, meta.tenantId)
       if (binary) return binary
 
-      const cached = await readCachedApiResponse(url)
+      const cached = await readCachedApiResponse(url, meta.tenantId)
       if (cached) return cached
     }
 
@@ -935,10 +972,14 @@ export async function fetchWithOfflineSupport(
     if (method === 'GET' && response.ok) {
       await hydrateLocalFirstResponse(url, meta.endpoint, response.clone(), meta.tenantId)
       await hydrateBinaryResponse(url, meta.endpoint, response.clone(), meta.tenantId)
-      await cacheApiResponse(url, meta.endpoint, response.clone())
+      await cacheApiResponse(url, meta.endpoint, response.clone(), meta.tenantId)
     }
     return response
   } catch (error) {
+    // Una prueba de conectividad debe informar el fallo en vivo. Encolarla
+    // produciría un falso positivo y podría repetir una operación diagnóstica.
+    if (isLiveConnectivityTestEndpoint(meta.endpoint)) throw error
+
     if (isDeferredValidationEndpoint(meta.endpoint)) {
       return deferredValidationResponse(meta.endpoint, init, meta, url, method)
     }
@@ -950,7 +991,7 @@ export async function fetchWithOfflineSupport(
       const binary = await readBinaryResponse(meta.endpoint, url, meta.tenantId)
       if (binary) return binary
 
-      const cached = await readCachedApiResponse(url)
+      const cached = await readCachedApiResponse(url, meta.tenantId)
       if (cached) return cached
     }
 
@@ -975,8 +1016,11 @@ export async function fetchWithOfflineSupport(
   }
 }
 
-export async function syncOfflineQueue(accessToken: string | null = null) {
-  const queue = await listOfflineRequests()
+export async function syncOfflineQueue(
+  accessToken: string | null = null,
+  tenantId?: string | null,
+) {
+  const queue = await listOfflineRequests(tenantId)
   const candidates = queue.filter((item) => item.status === 'pending' || item.status === 'failed')
   const results: Array<{ id: string; ok: boolean; status?: number; error?: string }> = []
   let idReplacements = buildLocalIdReplacementMap(await listLocalIdMappings())
@@ -1056,7 +1100,7 @@ export async function refreshLocalFirstSnapshots(
       if (response.ok) {
         await hydrateLocalFirstResponse(url, endpoint, response.clone(), tenantId)
         await hydrateBinaryResponse(url, endpoint, response.clone(), tenantId)
-        await cacheApiResponse(url, endpoint, response.clone())
+        await cacheApiResponse(url, endpoint, response.clone(), tenantId)
       }
       results.push({ endpoint, ok: response.ok, status: response.status })
     } catch (error) {

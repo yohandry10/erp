@@ -19,6 +19,10 @@ describe('PlanCuentasService', () => {
     mockSupabaseClient.order = jest.fn().mockReturnValue(mockSupabaseClient);
     mockSupabaseClient.limit = jest.fn().mockReturnValue(mockSupabaseClient);
     mockSupabaseClient.single = jest.fn();
+    mockSupabaseClient.maybeSingle = jest.fn().mockResolvedValue({
+      data: { pais: 'PE' },
+      error: null,
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -209,6 +213,44 @@ describe('PlanCuentasService', () => {
       expect(result.get('12')).toEqual(cuentaClientes);
     });
 
+    it('debe crear la cuenta operativa con nomenclatura argentina para un tenant AR', async () => {
+      const cuentaArgentina = {
+        id: '12-ar-id',
+        tenant_id: 'tenant-ar',
+        codigo: '12',
+        nombre: 'Créditos por ventas',
+        tipo: 'ACTIVO',
+        nivel: 2,
+        acepta_movimiento: true,
+        estado: 'ACTIVO',
+      };
+
+      mockSupabaseClient.in.mockResolvedValueOnce({
+        data: [],
+        error: null,
+      });
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: { pais: 'AR' },
+        error: null,
+      });
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: cuentaArgentina,
+        error: null,
+      });
+
+      const result = await service.obtenerCuentasPorCodigos('tenant-ar', ['12']);
+
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-ar',
+          codigo: '12',
+          nombre: 'Créditos por ventas',
+          metadata: expect.objectContaining({ pais_codigo: 'AR' }),
+        }),
+      );
+      expect(result.get('12')).toEqual(cuentaArgentina);
+    });
+
     it('debe lanzar error si alguna cuenta no acepta movimientos', async () => {
       const mockCuentas = [
         {
@@ -300,6 +342,22 @@ describe('PlanCuentasService', () => {
 
       expect(result).toEqual(mockCuentas);
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tipo', 'ACTIVO');
+    });
+
+    it('no expone códigos contables duplicados en formularios', async () => {
+      const duplicadas = [
+        { id: 'old', tenant_id: 'tenant-1', codigo: '407', nombre: 'AFP por pagar', tipo: 'PASIVO', nivel: 3, acepta_movimiento: true, estado: 'ACTIVO' },
+        { id: 'new', tenant_id: 'tenant-1', codigo: '407', nombre: 'Aportes por pagar', tipo: 'PASIVO', nivel: 3, acepta_movimiento: true, estado: 'ACTIVO' },
+        { id: 'other', tenant_id: 'tenant-1', codigo: '627', nombre: 'Seguridad social', tipo: 'GASTO', nivel: 3, acepta_movimiento: true, estado: 'ACTIVO' },
+      ];
+      mockSupabaseClient.eq.mockReturnValueOnce(mockSupabaseClient);
+      mockSupabaseClient.order.mockReturnValueOnce(mockSupabaseClient);
+      mockSupabaseClient.eq.mockResolvedValueOnce({ data: duplicadas, error: null });
+
+      const result = await service.obtenerCuentas('tenant-1');
+
+      expect(result.map((cuenta) => cuenta.codigo)).toEqual(['407', '627']);
+      expect(result[0].id).toBe('old');
     });
   });
 

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useApi } from '@/hooks/use-api'
 import { useToast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface OrdenCompraModalProps {
   isOpen: boolean
@@ -30,7 +31,11 @@ export default function OrdenCompraModal({
   onSuccess,
   orden
 }: OrdenCompraModalProps) {
-  const { tasaIgv } = useTaxConfig()
+  const country = useCountryContext()
+  const isArgentina = country.paisCodigo === 'AR'
+  const defaultCurrency = country.moneda || (isArgentina ? 'ARS' : country.paisCodigo === 'CO' ? 'COP' : 'PEN')
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const { get, post, put } = useApi()
   const { toast } = useToast()
 
@@ -44,7 +49,7 @@ export default function OrdenCompraModal({
     proveedor_id: '',
     fecha_orden: new Date().toISOString().split('T')[0],
     fecha_entrega: '',
-    moneda: 'PEN',
+    moneda: defaultCurrency,
     subtotal: 0,
     igv: 0,
     total: 0,
@@ -190,10 +195,11 @@ export default function OrdenCompraModal({
       if (orden) {
         loadOrdenData()
       } else {
+        setFormData(prev => ({ ...prev, moneda: defaultCurrency }))
         addItem() // Agregar un item por defecto
       }
     }
-  }, [addItem, generateNumeroOrden, isOpen, loadOrdenData, loadProductos, loadProveedores, orden])
+  }, [addItem, defaultCurrency, generateNumeroOrden, isOpen, loadOrdenData, loadProductos, loadProveedores, orden])
 
   // Calcular totales cuando cambien los items
   useEffect(() => {
@@ -287,7 +293,7 @@ export default function OrdenCompraModal({
       proveedor_id: '',
       fecha_orden: new Date().toISOString().split('T')[0],
       fecha_entrega: '',
-      moneda: 'PEN',
+      moneda: defaultCurrency,
       subtotal: 0,
       igv: 0,
       total: 0,
@@ -346,7 +352,7 @@ export default function OrdenCompraModal({
                   <option value="">Seleccionar proveedor</option>
                   {proveedores.map((proveedor: any) => (
                     <option key={proveedor.id} value={proveedor.id}>
-                      {proveedor.nombre} - {proveedor.ruc}
+                      {proveedor.nombre} - {proveedor.cuit || proveedor.ruc}
                     </option>
                   ))}
                 </select>
@@ -371,7 +377,11 @@ export default function OrdenCompraModal({
                 value={formData.moneda}
                 onChange={(e) => setFormData({...formData, moneda: e.target.value})} className="w-[100%] p-2 border rounded-md bg-card"
               >
-                <option value="PEN">PEN - Soles</option>
+                {isArgentina ? (
+                  <option value="ARS">ARS - Pesos argentinos</option>
+                ) : (
+                  <option value="PEN">PEN - Soles</option>
+                )}
                 <option value="USD">USD - Dólares</option>
               </select>
             </div>
@@ -489,7 +499,7 @@ export default function OrdenCompraModal({
                         />
                       </td>
                       <td className="p-3 text-right font-medium">
-                        S/ {Number(item.subtotal || 0).toFixed(2)}
+                        {currencySymbol} {Number(item.subtotal || 0).toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
                         <button
@@ -511,14 +521,14 @@ export default function OrdenCompraModal({
                 <div className="text-right">
                   <div className="mb-2 text-[0.875rem]">
                     <span className="font-medium">Subtotal: </span>
-                    <span>S/ {Number(totales.subtotal || 0).toFixed(2)}</span>
+                    <span>{currencySymbol} {Number(totales.subtotal || 0).toFixed(2)}</span>
                   </div>
                   <div className="mb-2 text-[0.875rem]">
-                    <span className="font-medium">IGV (18%): </span>
-                    <span>S/ {Number(totales.igv || 0).toFixed(2)}</span>
+                    <span className="font-medium">{nombreImpuesto} ({Number((tasaIgv * 100).toFixed(2))}%): </span>
+                    <span>{currencySymbol} {Number(totales.igv || 0).toFixed(2)}</span>
                   </div>
                   <div className="text-[1.125rem] font-semibold border-t pt-2">
-                    <span>Total: S/ {Number(totales.total || 0).toFixed(2)}</span>
+                    <span>Total: {currencySymbol} {Number(totales.total || 0).toFixed(2)}</span>
                   </div>
                 </div>
               </div>

@@ -404,6 +404,11 @@ export class CxcService {
           fecha_emision: this.toISODate(fechaEmision),
           fecha_vencimiento: this.toISODate(fechaVencimiento),
           moneda: evento.moneda ?? 'PEN',
+          // Cotización con la que se contabiliza el documento. Si el emisor no
+          // la informa, la posición queda fuera de la revaluación con motivo
+          // explícito en lugar de valuarse con un tipo de cambio inventado.
+          tipo_cambio_origen:
+            evento.tipoCambio && evento.tipoCambio > 0 ? evento.tipoCambio : null,
           monto_total: this.round2(evento.total),
           monto_original: this.round2(evento.total),
           monto_pendiente: montoPendiente,

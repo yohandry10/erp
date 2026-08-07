@@ -1,5 +1,7 @@
 import React from 'react'
 import { fetchApi } from '@/lib/api-fetch'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 
 interface Cotizacion {
   id: string
@@ -33,18 +35,20 @@ interface CotizacionViewModalProps {
 
 export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onActionsComplete }: CotizacionViewModalProps) {
   const [loading, setLoading] = React.useState(false)
+  const country = useCountryContext()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
 
   if (!isOpen || !cotizacion) return null
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN'
+      currency: cotizacion.moneda || country.moneda
     }).format(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -263,7 +267,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
             </div>
             <div>
               <strong>Moneda:</strong><br/>
-              <span className="text-muted-foreground">{cotizacion.moneda || 'PEN'}</span>
+              <span className="text-muted-foreground">{cotizacion.moneda || country.moneda}</span>
             </div>
           </div>
 
@@ -307,7 +311,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
               <span>{formatCurrency(cotizacion.subtotal)}</span>
             </div>
             <div className="flex justify-between mb-2">
-              <span>IGV (18%):</span>
+              <span>{nombreImpuesto} ({Math.round(tasaIgv * 100)}%):</span>
               <span>{formatCurrency(cotizacion.igv)}</span>
             </div>
             <hr className="my-2 mx-0 border-0 border-t" />

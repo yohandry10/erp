@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface ConfigurationStatusWidgetProps {
   isComplete: boolean
@@ -37,6 +38,7 @@ export function ConfigurationStatusWidget({
   ruc,
 }: ConfigurationStatusWidgetProps) {
   const router = useRouter()
+  const country = useCountryContext()
 
   const handleCompleteSetup = () => {
     router.push('/dashboard/wizard')
@@ -142,13 +144,13 @@ export function ConfigurationStatusWidget({
             </div>
           )}
 
-          {/* RUC Status */}
+          {/* Identificador fiscal */}
           {ruc && (
             <div className="flex items-center justify-between p-3 bg-[var(--primary-50)] rounded-[6px]">
               <div className="flex items-center gap-2">
                 <Building2 size={16} />
                 <span className="text-[0.875rem] text-[var(--primary-700)]">
-                  Configuración RUC
+                  Configuración {country.paisCodigo === 'AR' ? 'CUIT' : country.paisCodigo === 'CO' ? 'NIT' : 'RUC'}
                 </span>
               </div>
               <span className="text-xs font-semibold">

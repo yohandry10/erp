@@ -9,6 +9,7 @@ import GreViewModal from '@/components/modals/GreViewModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useApiCall } from '@/hooks/use-api'
+import { useCountryContext } from '@/hooks/use-country-context'
 import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
 
 interface GreDocument {
@@ -57,6 +58,9 @@ const getStatusClass = (estado: string) => {
 }
 
 export default function GREPage() {
+  const country = useCountryContext()
+  const isPeru = (country.paisCodigo || 'PE').toUpperCase() === 'PE'
+  const [mounted, setMounted] = useState(false)
   const [documents, setDocuments] = useState<GreDocument[]>([])
   const [stats, setStats] = useState<GreStats | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -71,6 +75,8 @@ export default function GREPage() {
 
   const { get, loading } = useApiCall<GreDocument[]>({ timeoutMs: 6000, retries: 1 })
   const { get: getStats } = useApiCall<GreStats>({ timeoutMs: 6000, retries: 1 })
+
+  useEffect(() => setMounted(true), [])
 
   const loadDocuments = useCallback(async () => {
     const queryParams = new URLSearchParams()
@@ -120,8 +126,8 @@ export default function GREPage() {
   }, [loadDocuments, loadStats])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    if (!country.loading && isPeru) loadData()
+  }, [country.loading, isPeru, loadData])
 
   const generateReport = async () => {
     const data = await get('/api/gre/reporte')
@@ -167,6 +173,32 @@ export default function GREPage() {
     console.log(`Abriendo vista de GRE: ${documentId}`)
     setSelectedDocumentId(documentId)
     setIsViewModalOpen(true)
+  }
+
+  if (!mounted || country.loading) {
+    return (
+      <div className="min-h-screen bg-background p-5 text-foreground">
+        <div className="mx-auto flex min-h-[420px] max-w-[1600px] flex-col items-center justify-center gap-3">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Cargando guías de remisión...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isPeru) {
+    return (
+      <div className="min-h-screen bg-background p-5 text-foreground">
+        <div className="mx-auto flex min-h-[420px] max-w-4xl flex-col items-center justify-center gap-4 rounded-3xl border border-border bg-card p-8 text-center shadow-xl">
+          <ShieldCheck className="size-12 text-primary" />
+          <h1 className="text-2xl font-bold">Módulo exclusivo de Perú</h1>
+          <p className="max-w-2xl text-muted-foreground">
+            Las Guías de Remisión Electrónica (GRE) corresponden a SUNAT Perú. Para {country.paisNombre},
+            el ERP mantiene logística, despachos y remisiones comerciales sin exponer formatos fiscales peruanos.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (loading && documents.length === 0) {

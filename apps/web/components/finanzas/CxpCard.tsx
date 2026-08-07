@@ -1,6 +1,7 @@
 'use client'
 
 import { Clock, CheckCircle, XCircle, AlertCircle, Eye, DollarSign } from 'lucide-react'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { getDaysUntilDue, getVencimientoText, parseDateLocal } from '@/lib/date-utils'
 
 interface CxpCardProps {
@@ -65,19 +66,12 @@ const ESTADOS_CONFIG: Record<EstadoCxp, {
 }
 
 export function CxpCard({ cuenta, onClick }: CxpCardProps) {
+  const { country, taxIdLabel, formatCurrency } = useLocalizedMoney()
   const config = ESTADOS_CONFIG[cuenta.estado as EstadoCxp]
   const Icon = config?.icon || Clock
 
-  const formatCurrency = (amount: number, moneda: string = 'PEN') => {
-    const currency = moneda === 'USD' ? 'USD' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount)
-  }
-
   const formatDate = (dateString: string) => {
-    return parseDateLocal(dateString).toLocaleDateString('es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -125,7 +119,7 @@ export function CxpCard({ cuenta, onClick }: CxpCardProps) {
         </div>
         {cuenta.proveedores?.ruc && (
           <div className="text-xs text-[var(--primary-500)]">
-            RUC: {cuenta.proveedores.ruc}
+            {taxIdLabel}: {cuenta.proveedores.ruc}
           </div>
         )}
       </div>

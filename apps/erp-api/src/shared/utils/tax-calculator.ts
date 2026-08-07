@@ -190,7 +190,7 @@ export class TaxCalculatorService {
           .eq('tenant_id', tenantId)
           .single();
 
-        paisIdToUse = empresaConfig?.pais_id || 'PE'; // Default Perú
+        paisIdToUse = String(empresaConfig?.pais_id || 1); // Perú sólo para datos históricos sin país
       }
 
       // Consultar configuración fiscal con las columnas correctas
@@ -206,7 +206,9 @@ export class TaxCalculatorService {
         `)
         .eq('pais_id', paisIdToUse)
         .eq('activo', true)
-        .single();
+        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         this.logger.warn(

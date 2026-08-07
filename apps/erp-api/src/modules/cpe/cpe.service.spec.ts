@@ -130,7 +130,12 @@ describe('CpeService', () => {
                 },
                 {
                     provide: FiscalAdapterService,
-                    useValue: {},
+                    useValue: {
+                        // Estas pruebas ejercitan el contrato SUNAT. El servicio
+                        // resuelve el país antes de validar/idempotencia, por lo que
+                        // el doble debe representar explícitamente un tenant PE.
+                        obtenerCodigoPais: jest.fn().mockResolvedValue('PE'),
+                    },
                 },
             ],
         }).compile();

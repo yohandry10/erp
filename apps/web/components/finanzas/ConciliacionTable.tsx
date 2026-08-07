@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { formatDate } from '@/lib/format-utils';
 import { cn } from '@/lib/utils';
+import { useCountryContext } from '@/hooks/use-country-context';
 
 const thClass = 'px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground';
 const tdClass = 'px-3 py-3 text-sm text-foreground/85';
@@ -56,6 +57,7 @@ export default function ConciliacionTable({
   readOnly = false,
   onDragMatch,
 }: ConciliacionTableProps) {
+  const country = useCountryContext();
   const [hoveredSistemaId, setHoveredSistemaId] = useState<string | null>(null);
   const [hoveredExtractoId, setHoveredExtractoId] = useState<string | null>(null);
   const [hoveredMatchId, setHoveredMatchId] = useState<string | null>(null);
@@ -63,9 +65,9 @@ export default function ConciliacionTable({
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
     }).format(amount);
   };
 

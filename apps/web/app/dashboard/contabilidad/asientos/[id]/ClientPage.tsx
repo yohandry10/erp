@@ -3,9 +3,10 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { AlertCircle, ArrowLeft, Calendar, CheckCircle, Download, FileText, Loader2, RefreshCw, XCircle } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Calendar, CheckCircle, Download, FileText, Loader2, Pencil, RefreshCw, Trash2, Undo2, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface DetalleAsiento {
   id: string
@@ -34,7 +35,13 @@ interface AsientoContable {
   created_at: string
   updated_at: string
   detalles?: DetalleAsiento[]
+  reversion_de_asiento_id?: string
+  reversado_por_asiento_id?: string
+  motivo_anulacion?: string
 }
+
+/** Acción que pide un texto al contador antes de ejecutarse. */
+type AccionConMotivo = 'anular' | 'reversar'
 
 type EstadoAsiento = 'BORRADOR' | 'CONFIRMADO' | 'ANULADO'
 
@@ -47,12 +54,18 @@ const ESTADOS_CONFIG: Record<EstadoAsiento, { label: string; icon: typeof FileTe
 export default function AsientoDetallePage() {
   const router = useRouter()
   const params = useParams()
-  const { get } = useApi()
+  const { get, post, del } = useApi()
+  const country = useCountryContext()
   const asientoId = params.id as string | undefined
 
   const [asiento, setAsiento] = useState<AsientoContable | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [accionEnCurso, setAccionEnCurso] = useState<string | null>(null)
+  const [accionPendiente, setAccionPendiente] = useState<AccionConMotivo | null>(null)
+  const [motivo, setMotivo] = useState('')
+  const [fechaReversion, setFechaReversion] = useState('')
+  const [accionError, setAccionError] = useState<string | null>(null)
 
   const loadAsiento = useCallback(async () => {
     if (!asientoId) return
@@ -80,13 +93,13 @@ export default function AsientoDetallePage() {
   }, [loadAsiento])
 
   const formatCurrency = (amount: number | undefined) =>
-    new Intl.NumberFormat('es-PE', {
+    new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
     }).format(amount || 0)
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('es-PE', {
+    new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -108,6 +121,81 @@ export default function AsientoDetallePage() {
   const isBalanced = () => {
     if (!asiento) return false
     return Math.abs(asiento.total_debe - asiento.total_haber) < 0.01
+  }
+
+  const cerrarPanelAccion = () => {
+    setAccionPendiente(null)
+    setMotivo('')
+    setFechaReversion('')
+    setAccionError(null)
+  }
+
+  const confirmarAsiento = async () => {
+    if (!asientoId) return
+    try {
+      setAccionEnCurso('confirmar')
+      setAccionError(null)
+      const response = await post(`/api/contabilidad/asientos/${asientoId}/confirmar`)
+      if (!response?.success) throw new Error(response?.message || 'No se pudo confirmar el asiento')
+      await loadAsiento()
+    } catch (err: any) {
+      setAccionError(err.message || 'No se pudo confirmar el asiento')
+    } finally {
+      setAccionEnCurso(null)
+    }
+  }
+
+  const eliminarBorrador = async () => {
+    if (!asientoId) return
+    if (!confirm('¿Eliminar definitivamente este borrador? No quedará rastro del asiento.')) return
+    try {
+      setAccionEnCurso('eliminar')
+      setAccionError(null)
+      const response = await del(`/api/contabilidad/asientos/${asientoId}`)
+      if (!response?.success) throw new Error(response?.message || 'No se pudo eliminar el borrador')
+      router.push('/dashboard/contabilidad/asientos')
+    } catch (err: any) {
+      setAccionError(err.message || 'No se pudo eliminar el borrador')
+      setAccionEnCurso(null)
+    }
+  }
+
+  const ejecutarAccionConMotivo = async () => {
+    if (!asientoId || !accionPendiente) return
+
+    if (accionPendiente === 'anular' && !motivo.trim()) {
+      setAccionError('El motivo de la anulación es obligatorio.')
+      return
+    }
+
+    try {
+      setAccionEnCurso(accionPendiente)
+      setAccionError(null)
+
+      if (accionPendiente === 'anular') {
+        const response = await post(`/api/contabilidad/asientos/${asientoId}/anular`, {
+          motivo: motivo.trim(),
+        })
+        if (!response?.success) throw new Error(response?.message || 'No se pudo anular el asiento')
+        cerrarPanelAccion()
+        await loadAsiento()
+        return
+      }
+
+      const response = await post(`/api/contabilidad/asientos/${asientoId}/reversar`, {
+        ...(motivo.trim() ? { motivo: motivo.trim() } : {}),
+        ...(fechaReversion ? { fecha: fechaReversion } : {}),
+      })
+      if (!response?.success) throw new Error(response?.message || 'No se pudo reversar el asiento')
+      cerrarPanelAccion()
+      // La reversión es un asiento nuevo: se navega a él, que es lo que el
+      // contador necesita revisar a continuación.
+      router.push(`/dashboard/contabilidad/asientos/${response.data.id}`)
+    } catch (err: any) {
+      setAccionError(err.message || 'No se pudo completar la operación')
+    } finally {
+      setAccionEnCurso(null)
+    }
   }
 
   if (loading) {
@@ -187,6 +275,71 @@ export default function AsientoDetallePage() {
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
+
+              {asiento.estado === 'BORRADOR' && (
+                <>
+                  <Button
+                    type="button"
+                    onClick={() => router.push(`/dashboard/contabilidad/asientos/${asiento.id}/editar`)}
+                    variant="outline"
+                    className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Editar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      cerrarPanelAccion()
+                      setAccionPendiente('anular')
+                    }}
+                    variant="outline"
+                    className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Anular
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={eliminarBorrador}
+                    disabled={accionEnCurso !== null}
+                    variant="outline"
+                    className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Eliminar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={confirmarAsiento}
+                    disabled={accionEnCurso !== null || !isBalanced()}
+                    className="gap-2 bg-blue-600 text-white hover:bg-blue-500 disabled:bg-muted"
+                  >
+                    {accionEnCurso === 'confirmar' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4" />
+                    )}
+                    Confirmar
+                  </Button>
+                </>
+              )}
+
+              {asiento.estado === 'CONFIRMADO' && !asiento.reversado_por_asiento_id && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    cerrarPanelAccion()
+                    setAccionPendiente('reversar')
+                  }}
+                  variant="outline"
+                  className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
+                >
+                  <Undo2 className="h-4 w-4" />
+                  Reversar
+                </Button>
+              )}
+
               <Button
                 type="button"
                 onClick={() => alert('Funcionalidad de descarga proximamente')}
@@ -197,6 +350,82 @@ export default function AsientoDetallePage() {
               </Button>
             </div>
           </div>
+
+          {accionPendiente && (
+            <div className="mt-4 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-4">
+              <h3 className="text-sm font-semibold text-foreground">
+                {accionPendiente === 'anular'
+                  ? 'Anular el borrador'
+                  : 'Reversar el asiento confirmado'}
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {accionPendiente === 'anular'
+                  ? 'El borrador se marca como anulado y conserva el rastro. No entra en los libros.'
+                  : 'Se creará un asiento nuevo con debe y haber invertidos, enlazado a este. El asiento original permanece en el libro.'}
+              </p>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
+                    Motivo {accionPendiente === 'anular' ? '(obligatorio)' : '(opcional)'}
+                  </label>
+                  <textarea
+                    value={motivo}
+                    onChange={(event) => setMotivo(event.target.value)}
+                    rows={2}
+                    className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm text-foreground outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
+                    placeholder="Ej. Error en la cuenta de destino"
+                  />
+                </div>
+
+                {accionPendiente === 'reversar' && (
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
+                      Fecha de reversión
+                    </label>
+                    <input
+                      type="date"
+                      value={fechaReversion}
+                      onChange={(event) => setFechaReversion(event.target.value)}
+                      className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm text-foreground outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Si se deja vacío se usa la fecha del asiento original. Debe caer en un período abierto.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {accionError && (
+                <p className="mt-3 text-sm font-semibold text-primary">{accionError}</p>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={ejecutarAccionConMotivo}
+                  disabled={accionEnCurso !== null}
+                  className="gap-2 bg-blue-600 text-white hover:bg-blue-500 disabled:bg-muted"
+                >
+                  {accionEnCurso === accionPendiente && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {accionPendiente === 'anular' ? 'Anular asiento' : 'Crear reversión'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={cerrarPanelAccion}
+                  disabled={accionEnCurso !== null}
+                  variant="outline"
+                  className="border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {accionError && !accionPendiente && (
+            <p className="mt-4 text-sm font-semibold text-primary">{accionError}</p>
+          )}
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -353,6 +582,40 @@ export default function AsientoDetallePage() {
                   <div className="rounded-xl border border-cyan-400/15 bg-card/70 p-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Evento origen</div>
                     <div className="mt-2 break-all font-mono text-xs text-foreground/90">{asiento.source_event_id}</div>
+                  </div>
+                )}
+                {asiento.motivo_anulacion && (
+                  <div className="rounded-xl border border-cyan-400/15 bg-card/70 p-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Motivo de anulacion</div>
+                    <p className="mt-2 text-sm leading-6 text-foreground/90">{asiento.motivo_anulacion}</p>
+                  </div>
+                )}
+                {asiento.reversion_de_asiento_id && (
+                  <div className="rounded-xl border border-cyan-400/15 bg-card/70 p-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Reversa al asiento</div>
+                    <Button
+                      type="button"
+                      onClick={() => router.push(`/dashboard/contabilidad/asientos/${asiento.reversion_de_asiento_id}`)}
+                      variant="outline"
+                      className="mt-2 w-full gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
+                    >
+                      <Undo2 className="h-4 w-4" />
+                      Ver asiento original
+                    </Button>
+                  </div>
+                )}
+                {asiento.reversado_por_asiento_id && (
+                  <div className="rounded-xl border border-cyan-400/15 bg-card/70 p-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">Reversado por</div>
+                    <Button
+                      type="button"
+                      onClick={() => router.push(`/dashboard/contabilidad/asientos/${asiento.reversado_por_asiento_id}`)}
+                      variant="outline"
+                      className="mt-2 w-full gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10 hover:text-foreground"
+                    >
+                      <Undo2 className="h-4 w-4" />
+                      Ver asiento de reversion
+                    </Button>
                   </div>
                 )}
               </CardContent>

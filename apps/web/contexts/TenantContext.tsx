@@ -29,7 +29,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const fetchTenantDetails = async (tenantId: string) => {
     try {
-      const response = await fetchApi(`/api/tenants/${tenantId}`)
+      const response = await fetchApi('/api/tenants/me')
 
       if (!response.ok) {
         setTenant({
@@ -98,11 +98,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     const minimalTenant = buildMinimalTenantFromUser(currentUser)
     setTenant(minimalTenant)
 
-    if (currentUser.is_super_admin) {
-      fetchTenantDetails(currentUser.tenant_id).catch((fetchError) => {
-        console.warn('⚠️ [TenantContext] No se pudo obtener detalles completos del tenant:', fetchError)
-      })
-    }
+    fetchTenantDetails(currentUser.tenant_id).catch((fetchError) => {
+      console.warn('⚠️ [TenantContext] No se pudo obtener detalles completos del tenant:', fetchError)
+    })
 
     setError(null)
     setLoading(false)

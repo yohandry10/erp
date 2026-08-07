@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Package, Filter, Search, RefreshCcw } from 'lucide-react'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { useApi } from '@/hooks/use-api'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 type RecepcionEstado = 'BORRADOR' | 'PENDIENTE' | 'CONFIRMADA' | 'PARCIAL' | 'COMPLETADA' | 'ANULADA'
 
@@ -74,8 +75,8 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-const formatCurrency = (value: number, currency: string = 'PEN') =>
-  new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(toNumber(value))
+const formatCurrency = (value: number, currency: string = 'PEN', locale: string = 'es-PE') =>
+  new Intl.NumberFormat(locale, { style: 'currency', currency }).format(toNumber(value))
 
 const formatDate = (value?: string | null) => {
   if (!value) return '—'
@@ -97,6 +98,9 @@ function NoPermission() {
 }
 
 function RecepcionesContent() {
+  const country = useCountryContext()
+  const formatTenantCurrency = (value: number, currency?: string) =>
+    formatCurrency(value, currency || country.moneda || 'PEN', country.locale || 'es-PE')
   const router = useRouter()
   const searchParams = useSearchParams()
   const { get } = useApi()
@@ -233,7 +237,7 @@ function RecepcionesContent() {
               </span>
             </div>
             <div className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
-              Valor total filtrado: <strong className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">{formatCurrency(totalValorizado)}</strong>
+              Valor total filtrado: <strong className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">{formatTenantCurrency(totalValorizado)}</strong>
             </div>
             <button
               type="button"
@@ -339,7 +343,7 @@ function RecepcionesContent() {
                       {recepcion.orden && (
                         <span className="text-sm text-muted-foreground group-data-[erp-theme=light]/dashboard:text-foreground/80">
                           Orden: {recepcion.orden.numero} ·{' '}
-                          {formatCurrency(recepcion.orden.total, recepcion.orden.moneda)}
+                          {formatTenantCurrency(recepcion.orden.total, recepcion.orden.moneda)}
                         </span>
                       )}
                     </div>
@@ -361,7 +365,7 @@ function RecepcionesContent() {
                     <span>
                       Valor NI:{' '}
                       <strong className="text-white group-data-[erp-theme=light]/dashboard:text-foreground">
-                        {formatCurrency(recepcion.totalValorizado, recepcion.orden?.moneda ?? 'PEN')}
+                        {formatTenantCurrency(recepcion.totalValorizado, recepcion.orden?.moneda)}
                       </strong>
                     </span>
                     {recepcion.proveedor && (
@@ -406,11 +410,11 @@ function RecepcionesContent() {
                                   maximumFractionDigits: 2,
                                 })}
                                 {' × '}
-                                {formatCurrency(item.costoUnitario, recepcion.orden?.moneda ?? 'PEN')}
+                                {formatTenantCurrency(item.costoUnitario, recepcion.orden?.moneda)}
                               </span>
                             </div>
                             <div className="text-right font-semibold text-white group-data-[erp-theme=light]/dashboard:text-foreground">
-                              {formatCurrency(item.valorTotal, recepcion.orden?.moneda ?? 'PEN')}
+                              {formatTenantCurrency(item.valorTotal, recepcion.orden?.moneda)}
                               <div className="text-xs text-muted-foreground">
                                 {item.almacen?.nombre ?? 'Sin almacén'}
                               </div>

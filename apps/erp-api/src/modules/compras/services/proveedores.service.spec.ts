@@ -5,10 +5,12 @@ import { ProveedoresRepository } from '../repositories/proveedores.repository';
 import { CreateProveedorDto, CondicionesPago } from '../dto/create-proveedor.dto';
 import { UpdateProveedorDto } from '../dto/update-proveedor.dto';
 import { AuditService } from '../../audit/audit.service';
+import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 describe('ProveedoresService', () => {
   let service: ProveedoresService;
   let repository: jest.Mocked<ProveedoresRepository>;
+  let countryCode: 'PE' | 'AR' | 'CO';
 
   const mockProveedor = {
     id: 'test-id-123',
@@ -30,6 +32,7 @@ describe('ProveedoresService', () => {
   };
 
   beforeEach(async () => {
+    countryCode = 'PE';
     const mockRepository = {
       findAll: jest.fn(),
       findById: jest.fn(),
@@ -50,6 +53,20 @@ describe('ProveedoresService', () => {
           provide: AuditService,
           useValue: {
             registrarCambio: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: SupabaseService,
+          useValue: {
+            getClient: () => ({
+              from: () => ({
+                select: () => ({
+                  eq: () => ({
+                    maybeSingle: async () => ({ data: { pais: countryCode }, error: null }),
+                  }),
+                }),
+              }),
+            }),
           },
         },
       ]
@@ -164,12 +181,28 @@ describe('ProveedoresService', () => {
       expect(repository.create).toHaveBeenCalled();
     });
 
-    it('should reject Colombia NIT length while country is roadmap', async () => {
+    it('should reject an incomplete tax identifier', async () => {
       const colombiaDto = { ...validDto, ruc: '123456789' };
       repository.findByRuc.mockResolvedValue(null);
 
       await expect(service.create(colombiaDto, 'tenant-123'))
         .rejects.toThrow(BadRequestException);
+    });
+
+    it('should validate and persist a Colombia NIT with verification digit', async () => {
+      countryCode = 'CO';
+      repository.findByRuc.mockResolvedValue(null);
+      repository.create.mockImplementation(async (dto: any) => ({ ...mockProveedor, ...dto }));
+
+      const result = await service.create({ ...validDto, ruc: '9001234568' }, 'tenant-123');
+
+      expect(repository.findByRuc).toHaveBeenCalledWith('900123456-8', 'tenant-123');
+      expect(repository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ ruc: '900123456-8' }),
+        'tenant-123',
+        undefined,
+      );
+      expect(result.ruc).toBe('900123456-8');
     });
 
     it('should throw BadRequestException for invalid email', async () => {

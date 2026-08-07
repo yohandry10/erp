@@ -7,6 +7,7 @@ import * as z from 'zod'
 import { ChevronLeft, ChevronRight, Check, FileText, Package, Eye, Plus, Trash2, Calendar } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import { useCountryContext } from '@/hooks/use-country-context'
 import { Proveedor } from '@/types/compras'
 import { cn } from '@/lib/utils'
 
@@ -51,6 +52,7 @@ export function CotizacionCompraWizard({
   isLoading = false
 }: CotizacionWizardProps) {
   const { tasaIgv } = useTaxConfig()
+  const country = useCountryContext()
   const [currentStep, setCurrentStep] = useState(1)
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [productos, setProductos] = useState<any[]>([])
@@ -172,9 +174,9 @@ export function CotizacionCompraWizard({
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda,
     }).format(amount)
   }
 
@@ -378,6 +380,7 @@ function Step2AddProducts({
   onRemoveProducto,
   loadingProductos
 }: any) {
+  const country = useCountryContext()
   const [selectedProducto, setSelectedProducto] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [precio, setPrecio] = useState(0)
@@ -406,9 +409,9 @@ function Step2AddProducts({
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda,
     }).format(amount)
   }
 
@@ -552,7 +555,7 @@ function Step2AddProducts({
 
 // Totales Summary Component - Shows real-time totals
 function TotalesSummary({ detalles, formatCurrency }: any) {
-  const { tasaIgv } = useTaxConfig()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const subtotal = detalles.reduce((sum: number, d: ProductoDetalle) => sum + d.subtotal, 0)
   const igv = subtotal * tasaIgv
   const total = subtotal + igv
@@ -567,7 +570,9 @@ function TotalesSummary({ detalles, formatCurrency }: any) {
           </span>
         </div>
         <div className="flex justify-between border-b border-border py-3">
-          <span className="text-sm text-muted-foreground">IGV (18%):</span>
+          <span className="text-sm text-muted-foreground">
+            {nombreImpuesto} ({Math.round(tasaIgv * 100)}%):
+          </span>
           <span className="text-sm font-semibold text-foreground/85">
             {formatCurrency(igv)}
           </span>
@@ -585,13 +590,15 @@ function TotalesSummary({ detalles, formatCurrency }: any) {
 
 // Step 3 Component: Review
 function Step3Review({ formData, detalles, proveedores, calculateTotals, formatCurrency }: any) {
+  const country = useCountryContext()
+  const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const proveedor = proveedores.find((p: Proveedor) => p.id === formData.proveedor_id)
   const { subtotal, igv, total } = calculateTotals()
 
   const calcularFechaVencimiento = () => {
     const fecha = new Date(formData.fecha_cotizacion)
     fecha.setDate(fecha.getDate() + formData.validez_dias)
-    return fecha.toLocaleDateString('es-PE', {
+    return fecha.toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -627,7 +634,7 @@ function Step3Review({ formData, detalles, proveedores, calculateTotals, formatC
             </p>
             {proveedor?.ruc && (
               <p className="text-xs text-muted-foreground">
-                RUC: {proveedor.ruc}
+                {country.paisCodigo === 'AR' ? 'CUIT' : country.paisCodigo === 'CO' ? 'NIT' : 'RUC'}: {proveedor.ruc}
               </p>
             )}
           </div>
@@ -636,7 +643,7 @@ function Step3Review({ formData, detalles, proveedores, calculateTotals, formatC
               Fecha Cotización
             </span>
             <p className={summaryValueClass}>
-              {new Date(formData.fecha_cotizacion).toLocaleDateString('es-PE')}
+              {new Date(formData.fecha_cotizacion).toLocaleDateString(country.locale || 'es-PE')}
             </p>
           </div>
           <div>
@@ -718,7 +725,9 @@ function Step3Review({ formData, detalles, proveedores, calculateTotals, formatC
             </span>
           </div>
           <div className="flex justify-between border-b border-border py-3">
-            <span className="text-sm text-muted-foreground">IGV (18%):</span>
+            <span className="text-sm text-muted-foreground">
+              {nombreImpuesto} ({Math.round(tasaIgv * 100)}%):
+            </span>
             <span className="text-sm font-semibold text-foreground/85">
               {formatCurrency(igv)}
             </span>

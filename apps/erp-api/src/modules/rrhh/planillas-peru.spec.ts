@@ -148,6 +148,38 @@ describe('calcularEmpleado — base asegurable peruana', () => {
     expect(montoDe(r, '101')).toBe(200); // aporte 10%
     expect(montoDe(r, '104')).toBeUndefined(); // no debe haber ONP
   });
+
+  it('usa la comisión AFP individual guardada en el contrato', () => {
+    const empleado = {
+      tiene_hijos: false,
+      contratos: [{
+        estado: 'vigente',
+        regimen_pensionario: 'AFP',
+        metadata: { afp_codigo: 'HABITAT', tipo_comision_afp: 'FLUJO', tasa_comision_afp: 0.0147, tasa_seguro_afp: 0.0137 },
+      }],
+    };
+
+    const r = calcular(empleado, 2000);
+
+    expect(montoDe(r, '102')).toBe(29.4);
+    expect(montoDe(r, '103')).toBe(27.4);
+  });
+
+  it('no descuenta comisión de la remuneración cuando el afiliado usa comisión sobre saldo', () => {
+    const empleado = {
+      tiene_hijos: false,
+      contratos: [{
+        estado: 'vigente',
+        regimen_pensionario: 'AFP',
+        metadata: { afp_codigo: 'INTEGRA', tipo_comision_afp: 'SALDO', tasa_comision_afp: 0, tasa_seguro_afp: 0.0137 },
+      }],
+    };
+
+    const r = calcular(empleado, 2000);
+
+    expect(montoDe(r, '102')).toBe(0);
+    expect(montoDe(r, '103')).toBe(27.4);
+  });
 });
 
 // Ley 27735: la gratificacion se paga en julio y diciembre. Ley 30334: esta

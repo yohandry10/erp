@@ -53,6 +53,7 @@ interface PosDocumentPreviewProps {
   format: PosDocumentFormat
   currencySymbol?: string
   taxLabel?: string
+  taxIdLabel?: string
 }
 
 export function PosDocumentPreview({
@@ -61,6 +62,7 @@ export function PosDocumentPreview({
   format,
   currencySymbol = 'S/',
   taxLabel = 'IGV (18%)',
+  taxIdLabel = 'RUC',
 }: PosDocumentPreviewProps) {
   const tieneDesglose =
     (data.exoneradas ?? 0) > 0 || (data.inafectas ?? 0) > 0 || (data.exportacion ?? 0) > 0
@@ -77,7 +79,7 @@ export function PosDocumentPreview({
           <div className="pos-doc-company">
             {company.logoUrl ? <img src={company.logoUrl} alt={`Logo de ${company.nombre}`} /> : null}
             <strong>{company.nombre}</strong>
-            <span>RUC: {company.ruc}</span>
+            <span>{taxIdLabel}: {company.ruc}</span>
             {company.direccion ? <span>{company.direccion}</span> : null}
             {format === 'a4' && company.email ? <span>{company.email}</span> : null}
             {format === 'a4' && company.telefono ? <span>Tel. {company.telefono}</span> : null}

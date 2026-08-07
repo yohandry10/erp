@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
   Query,
   Param,
@@ -16,6 +18,9 @@ import {
   ListarAsientosQueryDto,
   AsientoResponseDto,
   CreateAsientoManualDto,
+  UpdateAsientoManualDto,
+  AnularAsientoDto,
+  ReversarAsientoDto,
 } from "@erp-suite/dtos";
 import { AsientosService } from "../services/asientos.service";
 
@@ -323,5 +328,157 @@ export class ContabilidadAsientosController {
       console.error("❌ [Contabilidad] Error obteniendo asiento:", error);
       throw error;
     }
+  }
+
+  @Put("asientos/:id")
+  @RequirePermission("contabilidad.asientos.actualizar")
+  @ApiOperation({
+    summary: "Actualizar un asiento en BORRADOR",
+    description:
+      "Reemplaza el contenido del asiento. Solo aplica a asientos en BORRADOR: " +
+      "un asiento CONFIRMADO es inmutable y se corrige mediante reversión.",
+  })
+  @ApiResponse({ status: 200, type: AsientoResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: "El asiento no está en BORRADOR, no cuadra, o el período está cerrado",
+  })
+  async actualizarAsiento(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
+    @Param("id") asientoId: string,
+    @Body() updateDto: UpdateAsientoManualDto,
+  ): Promise<{ success: boolean; data: AsientoResponseDto; message: string }> {
+    const asiento = await this.asientosService.actualizarAsientoBorrador(
+      tenantId,
+      userId,
+      asientoId,
+      updateDto,
+    );
+
+    return {
+      success: true,
+      data: asiento,
+      message: `Asiento ${asiento.numero_asiento ?? asiento.id} actualizado`,
+    };
+  }
+
+  @Delete("asientos/:id")
+  @RequirePermission("contabilidad.asientos.eliminar")
+  @ApiOperation({
+    summary: "Eliminar un asiento en BORRADOR",
+    description:
+      "Solo elimina borradores. Un asiento que ya está en el libro nunca se borra.",
+  })
+  @ApiResponse({ status: 200, description: "Asiento borrador eliminado" })
+  @ApiResponse({ status: 400, description: "El asiento no está en BORRADOR" })
+  async eliminarAsiento(
+    @CurrentTenant() tenantId: string,
+    @Param("id") asientoId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    await this.asientosService.eliminarAsientoBorrador(tenantId, asientoId);
+
+    return {
+      success: true,
+      message: "Asiento borrador eliminado",
+    };
+  }
+
+  @Post("asientos/:id/confirmar")
+  @RequirePermission("contabilidad.asientos.confirmar")
+  @ApiOperation({
+    summary: "Confirmar un asiento en BORRADOR",
+    description:
+      "Publica el asiento en los libros y estados financieros. A partir de aquí es inmutable.",
+  })
+  @ApiResponse({ status: 200, type: AsientoResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: "El asiento no está en BORRADOR, no cuadra, o el período está cerrado",
+  })
+  async confirmarAsiento(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
+    @Param("id") asientoId: string,
+  ): Promise<{ success: boolean; data: AsientoResponseDto; message: string }> {
+    const asiento = await this.asientosService.confirmarAsiento(
+      tenantId,
+      userId,
+      asientoId,
+    );
+
+    return {
+      success: true,
+      data: asiento,
+      message: `Asiento ${asiento.numero_asiento ?? asiento.id} confirmado`,
+    };
+  }
+
+  @Post("asientos/:id/anular")
+  @RequirePermission("contabilidad.asientos.anular")
+  @ApiOperation({
+    summary: "Anular un asiento en BORRADOR",
+    description:
+      "Descarta un borrador conservando el rastro y el motivo. Para un asiento " +
+      "confirmado la operación correcta es la reversión, no la anulación.",
+  })
+  @ApiResponse({ status: 200, type: AsientoResponseDto })
+  @ApiResponse({ status: 400, description: "El asiento no está en BORRADOR" })
+  async anularAsiento(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
+    @Param("id") asientoId: string,
+    @Body() anularDto: AnularAsientoDto,
+  ): Promise<{ success: boolean; data: AsientoResponseDto; message: string }> {
+    const asiento = await this.asientosService.anularAsientoBorrador(
+      tenantId,
+      userId,
+      asientoId,
+      anularDto.motivo,
+    );
+
+    return {
+      success: true,
+      data: asiento,
+      message: `Asiento ${asiento.numero_asiento ?? asiento.id} anulado`,
+    };
+  }
+
+  @Post("asientos/:id/reversar")
+  @RequirePermission("contabilidad.asientos.reversar")
+  @ApiOperation({
+    summary: "Reversar un asiento CONFIRMADO",
+    description:
+      "Crea el contra-asiento con debe y haber invertidos, enlazado al original. " +
+      "El asiento original permanece intacto en el libro.",
+  })
+  @ApiResponse({
+    status: 201,
+    description: "Asiento de reversión creado",
+    type: AsientoResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      "El asiento no está CONFIRMADO, ya fue reversado, o el período de la fecha de reversión está cerrado",
+  })
+  async reversarAsiento(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
+    @Param("id") asientoId: string,
+    @Body() reversarDto: ReversarAsientoDto,
+  ): Promise<{ success: boolean; data: AsientoResponseDto; message: string }> {
+    const reversion = await this.asientosService.reversarAsiento(
+      tenantId,
+      userId,
+      asientoId,
+      reversarDto,
+    );
+
+    return {
+      success: true,
+      data: reversion,
+      message: `Asiento de reversión ${reversion.numero_asiento ?? reversion.id} creado`,
+    };
   }
 }

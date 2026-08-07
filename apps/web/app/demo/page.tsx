@@ -19,6 +19,12 @@ import {
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import {
+  ACTIVE_COUNTRIES,
+  INITIAL_ACTIVE_COUNTRY,
+  getActiveCountryByCode,
+} from '@/lib/initial-country';
+import type { ActiveCountryCode } from '@/lib/initial-country';
 
 type DemoCredentials = {
   email: string;
@@ -77,12 +83,17 @@ export default function DemoPage() {
   // decirlo, la pantalla parece congelada y la gente vuelve a pulsar.
   const [pasoActual, setPasoActual] = useState(0);
   const [segundos, setSegundos] = useState(0);
+  const [countryCode, setCountryCode] = useState<ActiveCountryCode>('PE');
   // window.location tras montar (no useSearchParams) para no requerir un
   // boundary de Suspense en el prerender ni causar mismatch de hidratación.
   const [demoExpirada, setDemoExpirada] = useState(false);
   useEffect(() => {
-    setDemoExpirada(new URLSearchParams(window.location.search).get('expired') === '1');
+    const params = new URLSearchParams(window.location.search);
+    setDemoExpirada(params.get('expired') === '1');
+    const requested = getActiveCountryByCode(params.get('country'));
+    if (requested) setCountryCode(requested.codigo_iso as ActiveCountryCode);
   }, []);
+  const selectedCountry = getActiveCountryByCode(countryCode) ?? INITIAL_ACTIVE_COUNTRY;
 
   useEffect(() => {
     if (!loading) {
@@ -113,7 +124,16 @@ export default function DemoPage() {
       const response = await fetchApi('/api/demo/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dias_duracion: 14 }),
+        body: JSON.stringify({
+          dias_duracion: 14,
+          pais: countryCode,
+          nombre:
+            countryCode === 'AR'
+              ? 'DEMO COMERCIAL S.A.'
+              : countryCode === 'CO'
+                ? 'DEMO COMERCIAL S.A.S.'
+                : 'DEMO COMERCIAL S.A.C.',
+        }),
       });
 
       if (!response.ok) {
@@ -131,6 +151,7 @@ export default function DemoPage() {
       const data = await response.json();
 
       await signIn(data.email, data.password);
+      localStorage.setItem('selectedCountry', String(selectedCountry.id));
       setCredentials({ email: data.email, password: data.password });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear la demo');
@@ -172,7 +193,7 @@ export default function DemoPage() {
               onClick={handleContinue}
               className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-blue-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800"
             >
-              Configurar mi empresa
+              Entrar al dashboard de {selectedCountry.nombre}
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -269,8 +290,26 @@ export default function DemoPage() {
           )}
           <h2 className="text-2xl font-bold tracking-normal">Listo para explorar</h2>
           <p className="mt-2 text-sm leading-6 text-foreground/80">
-            Crearemos una empresa demo con credenciales temporales y dejaremos la sesion iniciada.
+            Crearemos una empresa demo de {selectedCountry.nombre}, con {selectedCountry.moneda_codigo},
+            reglas de {selectedCountry.nombre_fiscal} y credenciales temporales.
           </p>
+
+          <label htmlFor="demo-country" className="mt-5 block text-sm font-semibold text-foreground">
+            País de la demo
+          </label>
+          <select
+            id="demo-country"
+            value={countryCode}
+            onChange={(event) => setCountryCode(event.target.value as ActiveCountryCode)}
+            disabled={loading}
+            className="mt-2 h-11 w-full rounded-md border border-border bg-card px-3 text-sm"
+          >
+            {ACTIVE_COUNTRIES.map((country) => (
+              <option key={country.codigo_iso} value={country.codigo_iso}>
+                {country.nombre} · {country.nombre_fiscal} · {country.moneda_codigo}
+              </option>
+            ))}
+          </select>
 
           {error && (
             <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">

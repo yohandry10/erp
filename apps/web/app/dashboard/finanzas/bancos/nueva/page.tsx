@@ -1,26 +1,36 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, Save, Building2, CreditCard, DollarSign, Hash, FileText } from 'lucide-react'
-
-const TIPOS_CUENTA = [
-  { value: 'CORRIENTE', label: 'Cuenta Corriente' },
-  { value: 'AHORROS', label: 'Cuenta de Ahorros' },
-  { value: 'DETRACCION', label: 'Cuenta de Detracción' },
-  { value: 'PLAZO_FIJO', label: 'Plazo Fijo' },
-]
-
-const MONEDAS = [
-  { value: 'PEN', label: 'Soles (PEN)' },
-  { value: 'USD', label: 'Dólares (USD)' },
-  { value: 'EUR', label: 'Euros (EUR)' },
-]
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 export default function NuevaCuentaBancariaPage() {
   const router = useRouter()
   const { post } = useApi()
+  const { country, currency } = useLocalizedMoney()
+  const isArgentina = country.paisCodigo === 'AR'
+  const isColombia = country.paisCodigo === 'CO'
+  const isPeru = country.paisCodigo === 'PE'
+  const tiposCuenta = [
+    { value: 'CORRIENTE', label: 'Cuenta Corriente' },
+    { value: 'AHORROS', label: isArgentina ? 'Caja de Ahorro' : 'Cuenta de Ahorros' },
+    ...(isPeru ? [{ value: 'DETRACCION', label: 'Cuenta de Detracción' }] : []),
+    { value: 'PLAZO_FIJO', label: 'Plazo Fijo' },
+  ]
+  const monedas = [
+    {
+      value: currency,
+      label: isArgentina
+        ? 'Pesos argentinos (ARS)'
+        : isColombia
+          ? 'Pesos colombianos (COP)'
+          : 'Soles (PEN)',
+    },
+    { value: 'USD', label: 'Dólares (USD)' },
+    { value: 'EUR', label: 'Euros (EUR)' },
+  ]
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,10 +41,20 @@ export default function NuevaCuentaBancariaPage() {
   const [banco, setBanco] = useState('')
   const [numeroCuenta, setNumeroCuenta] = useState('')
   const [tipoCuenta, setTipoCuenta] = useState('CORRIENTE')
-  const [moneda, setMoneda] = useState('PEN')
+  const [moneda, setMoneda] = useState(currency)
   const [saldo, setSaldo] = useState('0.00')
   const [permiteSobregiro, setPermiteSobregiro] = useState(false)
   const [activa, setActiva] = useState(true)
+
+  useEffect(() => {
+    if (!country.loading && currency) setMoneda(currency)
+  }, [country.loading, currency])
+
+  const bankExamples = isColombia
+    ? { account: 'Ej: Cuenta Operaciones Bancolombia', bank: 'Ej: Bancolombia', number: 'Ej: 12345678901' }
+    : isArgentina
+      ? { account: 'Ej: Cuenta Operaciones Nación', bank: 'Ej: Banco Nación', number: 'Ej: 0110599520000000000017' }
+      : { account: 'Ej: Cuenta Operaciones BCP', bank: 'Ej: Banco de Crédito del Perú', number: 'Ej: 191-1234567-0-89' }
 
   const clearFieldError = (field: string) => {
     if (!fieldErrors[field]) return
@@ -157,7 +177,7 @@ export default function NuevaCuentaBancariaPage() {
                       setNombre(e.target.value)
                       clearFieldError('nombre')
                     }}
-                    placeholder="Ej: Cuenta Operaciones BCP"
+                    placeholder={bankExamples.account}
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     aria-invalid={Boolean(fieldErrors.nombre)}
                     aria-describedby={fieldErrors.nombre ? 'cuenta-nombre-error' : undefined}
@@ -185,7 +205,7 @@ export default function NuevaCuentaBancariaPage() {
                       setBanco(e.target.value)
                       clearFieldError('banco')
                     }}
-                    placeholder="Ej: Banco de Crédito del Perú"
+                    placeholder={bankExamples.bank}
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     aria-invalid={Boolean(fieldErrors.banco)}
                     aria-describedby={fieldErrors.banco ? 'cuenta-banco-error' : undefined}
@@ -210,7 +230,7 @@ export default function NuevaCuentaBancariaPage() {
                       setNumeroCuenta(e.target.value)
                       clearFieldError('numeroCuenta')
                     }}
-                    placeholder="Ej: 191-1234567-0-89"
+                    placeholder={bankExamples.number}
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     aria-invalid={Boolean(fieldErrors.numeroCuenta)}
                     aria-describedby={fieldErrors.numeroCuenta ? 'cuenta-numero-error' : undefined}
@@ -234,7 +254,7 @@ export default function NuevaCuentaBancariaPage() {
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
-                    {TIPOS_CUENTA.map((tipo) => (
+                    {tiposCuenta.map((tipo) => (
                       <option key={tipo.value} value={tipo.value}>
                         {tipo.label}
                       </option>
@@ -264,7 +284,7 @@ export default function NuevaCuentaBancariaPage() {
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
-                    {MONEDAS.map((mon) => (
+                    {monedas.map((mon) => (
                       <option key={mon.value} value={mon.value}>
                         {mon.label}
                       </option>

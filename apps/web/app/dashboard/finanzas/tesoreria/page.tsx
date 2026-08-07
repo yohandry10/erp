@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/table'
 import { useApi } from '@/hooks/use-api'
 import { cn } from '@/lib/utils'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 interface CuentaBancaria {
   id: string
@@ -87,6 +88,7 @@ const URGENCIA_CONFIG = {
 }
 
 export default function TesoreriaPage() {
+  const { currency, locale, formatCurrency: formatLocalizedCurrency } = useLocalizedMoney()
   const router = useRouter()
   const { get } = useApi({ retries: 1, timeoutMs: 8000 })
 
@@ -130,19 +132,15 @@ export default function TesoreriaPage() {
     loadDashboardData()
   }, [loadDashboardData])
 
-  const formatCurrency = (amount: number, moneda: string = 'PEN') => {
-    const currency = moneda === 'USD' ? 'USD' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency,
-    }).format(amount)
+  const formatCurrency = (amount: number, moneda: string = currency) => {
+    return formatLocalizedCurrency(amount, moneda || currency)
   }
 
   // Una fecha sin hora se interpreta como UTC y en Lima retrocede un dia: el
   // vencimiento del 20/04 se mostraba como 19/04 aunque los dias de mora
   // estuvieran bien calculados.
   const formatDate = (dateString: string) =>
-    parseDateLocal(dateString).toLocaleDateString('es-PE', {
+    parseDateLocal(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -159,9 +157,9 @@ export default function TesoreriaPage() {
     )
   }
 
-  const totalSaldoPEN = cuentas.filter((c) => c.moneda === 'PEN').reduce((sum, c) => sum + c.saldo, 0)
+  const totalSaldoPEN = cuentas.filter((c) => c.moneda === currency).reduce((sum, c) => sum + c.saldo, 0)
   const totalSaldoUSD = cuentas.filter((c) => c.moneda === 'USD').reduce((sum, c) => sum + c.saldo, 0)
-  const totalPorPagarPEN = proximosPagos.filter((p) => p.moneda === 'PEN').reduce((sum, p) => sum + p.saldo, 0)
+  const totalPorPagarPEN = proximosPagos.filter((p) => p.moneda === currency).reduce((sum, p) => sum + p.saldo, 0)
   const totalPorPagarUSD = proximosPagos.filter((p) => p.moneda === 'USD').reduce((sum, p) => sum + p.saldo, 0)
   const pagosVencidos = proximosPagos.filter((p) => p.urgencia === 'VENCIDA').length
   const pagosUrgentes = proximosPagos.filter((p) => p.urgencia === 'HOY' || p.urgencia === 'URGENTE').length
@@ -203,9 +201,9 @@ export default function TesoreriaPage() {
         </Card>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={DollarSign} label="Saldo PEN" value={formatCurrency(totalSaldoPEN, 'PEN')} detail={`${cuentas.filter((c) => c.moneda === 'PEN').length} cuenta(s)`} />
+          <MetricCard icon={DollarSign} label={`Saldo ${currency}`} value={formatCurrency(totalSaldoPEN, currency)} detail={`${cuentas.filter((c) => c.moneda === currency).length} cuenta(s)`} />
           <MetricCard icon={DollarSign} label="Saldo USD" value={formatCurrency(totalSaldoUSD, 'USD')} detail={`${cuentas.filter((c) => c.moneda === 'USD').length} cuenta(s)`} />
-          <MetricCard icon={TrendingDown} label="Por pagar 15 días" value={formatCurrency(totalPorPagarPEN, 'PEN')} detail={`${formatCurrency(totalPorPagarUSD, 'USD')} en USD`} />
+          <MetricCard icon={TrendingDown} label="Por pagar 15 días" value={formatCurrency(totalPorPagarPEN, currency)} detail={`${formatCurrency(totalPorPagarUSD, 'USD')} en USD`} />
           <MetricCard icon={AlertCircle} label="Alertas" value={(pagosVencidos + pagosUrgentes).toString()} detail={`${pagosVencidos} vencidos, ${pagosUrgentes} urgentes`} />
         </div>
 

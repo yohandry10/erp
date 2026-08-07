@@ -72,6 +72,7 @@ export class CashClosingService {
 
         const errores: string[] = [];
         const warnings: string[] = [];
+        const moneda = await this.authService.obtenerMonedaTenant?.(tenantId) || 'PEN';
 
         // Validación 1: Sesión existe y está abierta
         const { data: sesion, error: sesionError } = await this.supabase
@@ -164,7 +165,7 @@ export class CashClosingService {
         if (retirosPendientes && retirosPendientes.length > 0) {
             const totalPendiente = retirosPendientes.reduce((sum, r) => sum + r.monto, 0);
             warnings.push(
-                `Hay ${retirosPendientes.length} retiros pendientes de conciliación (Total: S/.${totalPendiente.toFixed(2)})`,
+                `Hay ${retirosPendientes.length} retiros pendientes de conciliación (Total: ${moneda} ${totalPendiente.toFixed(2)})`,
             );
         }
 
@@ -188,7 +189,8 @@ export class CashClosingService {
         supervisorId?: string,
         codigoAutorizacion?: string,
     ): Promise<SesionCajaCerrada> {
-        this.logger.log(`Cerrando caja: sesión=${sesionId}, monto contado=S/.${datos.monto_contado}`);
+        const moneda = await this.authService.obtenerMonedaTenant?.(tenantId) || 'PEN';
+        this.logger.log(`Cerrando caja: sesión=${sesionId}, monto contado=${moneda} ${datos.monto_contado}`);
 
         // Validación 1: Pre-cierre
         const validacionPrecierre = await this.validarPrecierre(sesionId, tenantId);
@@ -266,7 +268,7 @@ export class CashClosingService {
             denominaciones_cierre: datos.denominaciones,
             supervisor_cierre_id: supervisorId || null,
             razon_autorizacion: resultadoCierre.requiere_supervisor
-                ? `Diferencia de S/.${Math.abs(resultadoCierre.diferencia).toFixed(2)} (${resultadoCierre.tipo_diferencia})`
+                ? `Diferencia de ${moneda} ${Math.abs(resultadoCierre.diferencia).toFixed(2)} (${resultadoCierre.tipo_diferencia})`
                 : null,
             hash_integridad: hashIntegridad,
             notas: datos.notas || null,
@@ -308,7 +310,7 @@ export class CashClosingService {
         );
 
         this.logger.log(
-            `Caja cerrada exitosamente: sesión=${sesionId}, diferencia=S/.${resultadoCierre.diferencia.toFixed(2)}, hash=${hashIntegridad.substring(0, 16)}...`,
+            `Caja cerrada exitosamente: sesión=${sesionId}, diferencia=${moneda} ${resultadoCierre.diferencia.toFixed(2)}, hash=${hashIntegridad.substring(0, 16)}...`,
         );
 
         return sesionCerrada as SesionCajaCerrada;

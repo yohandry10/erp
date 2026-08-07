@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, Save, Building2, CreditCard, DollarSign, Hash, FileText, AlertCircle } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
-const TIPOS_CUENTA = [
+const TIPOS_CUENTA_BASE = [
   { value: 'CORRIENTE', label: 'Cuenta Corriente' },
   { value: 'AHORROS', label: 'Cuenta de Ahorros' },
-  { value: 'DETRACCION', label: 'Cuenta de Detracción' },
   { value: 'PLAZO_FIJO', label: 'Plazo Fijo' },
 ]
 
@@ -28,6 +28,10 @@ export default function EditarCuentaBancariaPage() {
   const router = useRouter()
   const params = useParams()
   const { get, put } = useApi()
+  const country = useCountryContext()
+  const tiposCuenta = country.paisCodigo === 'PE'
+    ? [...TIPOS_CUENTA_BASE, { value: 'DETRACCION', label: 'Cuenta de Detracción' }]
+    : TIPOS_CUENTA_BASE
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -124,9 +128,11 @@ export default function EditarCuentaBancariaPage() {
     }
   }
 
-  const formatCurrency = (amount: number, moneda: string = 'PEN') => {
-    const currency = moneda === 'USD' ? 'USD' : moneda === 'EUR' ? 'EUR' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
+  const formatCurrency = (amount: number, moneda: string = country.moneda || 'PEN') => {
+    const currency = ['USD', 'EUR', 'PEN', 'ARS', 'COP'].includes(moneda)
+      ? moneda
+      : country.moneda || 'PEN'
+    return new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
       currency: currency,
     }).format(amount)
@@ -280,7 +286,7 @@ export default function EditarCuentaBancariaPage() {
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
-                    {TIPOS_CUENTA.map((tipo) => (
+                    {tiposCuenta.map((tipo) => (
                       <option key={tipo.value} value={tipo.value}>
                         {tipo.label}
                       </option>

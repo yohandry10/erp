@@ -37,9 +37,20 @@ export interface ResultadoCierre {
 export class CashReconciliationService {
     private readonly logger = new Logger(CashReconciliationService.name);
 
-    // Denominaciones válidas en PEN (Perú)
-    private readonly BILLETES_VALIDOS = [200, 100, 50, 20, 10];
-    private readonly MONEDAS_VALIDAS = [5, 2, 1, 0.5, 0.2, 0.1];
+    private readonly DENOMINACIONES_VALIDAS: Record<string, Denominaciones> = {
+        PEN: {
+            billetes: { 200: 0, 100: 0, 50: 0, 20: 0, 10: 0 },
+            monedas: { 5: 0, 2: 0, 1: 0, 0.5: 0, 0.2: 0, 0.1: 0 },
+        },
+        ARS: {
+            billetes: { 20000: 0, 10000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0 },
+            monedas: { 10: 0, 5: 0, 2: 0, 1: 0, 0.5: 0, 0.25: 0, 0.1: 0, 0.05: 0, 0.01: 0 },
+        },
+        COP: {
+            billetes: { 100000: 0, 50000: 0, 20000: 0, 10000: 0, 5000: 0, 2000: 0 },
+            monedas: { 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0 },
+        },
+    };
 
     constructor(private readonly supabase: SupabaseService) { }
 
@@ -72,15 +83,22 @@ export class CashReconciliationService {
     /**
      * Valida que las denominaciones ingresadas sean correctas
      */
-    validarDenominacionesValidas(denominaciones: Denominaciones): { valido: boolean; errores: string[] } {
+    validarDenominacionesValidas(
+        denominaciones: Denominaciones,
+        moneda = 'PEN',
+    ): { valido: boolean; errores: string[] } {
         const errores: string[] = [];
+        const currency = String(moneda || 'PEN').toUpperCase();
+        const catalogo = this.DENOMINACIONES_VALIDAS[currency] || this.DENOMINACIONES_VALIDAS.PEN;
+        const billetesValidos = Object.keys(catalogo.billetes).map(Number);
+        const monedasValidas = Object.keys(catalogo.monedas).map(Number);
 
         // Validar billetes
         if (denominaciones.billetes) {
             for (const [denom, cantidad] of Object.entries(denominaciones.billetes)) {
                 const valorDenom = parseFloat(denom);
 
-                if (!this.BILLETES_VALIDOS.includes(valorDenom)) {
+                if (!billetesValidos.includes(valorDenom)) {
                     errores.push(`Billete de ${denom} no es válido`);
                 }
 
@@ -99,7 +117,7 @@ export class CashReconciliationService {
             for (const [denom, cantidad] of Object.entries(denominaciones.monedas)) {
                 const valorDenom = parseFloat(denom);
 
-                if (!this.MONEDAS_VALIDAS.includes(valorDenom)) {
+                if (!monedasValidas.includes(valorDenom)) {
                     errores.push(`Moneda de ${denom} no es válida`);
                 }
 
@@ -125,11 +143,12 @@ export class CashReconciliationService {
     validarApertura(
         montoDeclarado: number,
         denominaciones: Denominaciones,
+        moneda = 'PEN',
     ): ResultadoValidacion {
         this.logger.log(`Validando apertura: monto declarado=${montoDeclarado}`);
 
         // Validar que las denominaciones sean correctas
-        const validacion = this.validarDenominacionesValidas(denominaciones);
+        const validacion = this.validarDenominacionesValidas(denominaciones, moneda);
         if (!validacion.valido) {
             return {
                 valido: false,
@@ -151,7 +170,7 @@ export class CashReconciliationService {
             diferencia,
             mensaje: valido
                 ? 'Las denominaciones cuadran con el monto declarado'
-                : `El arqueo (S/.${totalCalculado.toFixed(2)}) no coincide con el monto declarado (S/.${montoDeclarado.toFixed(2)}). Diferencia: S/.${diferencia.toFixed(2)}`,
+                : `El arqueo (${moneda} ${totalCalculado.toFixed(2)}) no coincide con el monto declarado (${moneda} ${montoDeclarado.toFixed(2)}). Diferencia: ${moneda} ${diferencia.toFixed(2)}`,
         };
     }
 
@@ -166,8 +185,21 @@ export class CashReconciliationService {
     ): Promise<ResultadoCierre> {
         this.logger.log(`Validando cierre: sesión=${sesionId}, monto contado=${montoContado}`);
 
+        const { data: sesion, error: sesionError } = await this.supabase
+            .getClient()
+            .from('sesiones_caja')
+            .select('monto_inicio, monto_esperado, tenant_id, moneda')
+            .eq('id', sesionId)
+            .eq('tenant_id', tenantId)
+            .single();
+
+        if (sesionError || !sesion) {
+            throw new BadRequestException('Sesión de caja no encontrada');
+        }
+        const moneda = String(sesion.moneda || 'PEN').toUpperCase();
+
         // Validar denominaciones
-        const validacion = this.validarDenominacionesValidas(denominaciones);
+        const validacion = this.validarDenominacionesValidas(denominaciones, moneda);
         if (!validacion.valido) {
             throw new BadRequestException(`Denominaciones inválidas: ${validacion.errores.join(', ')}`);
         }
@@ -178,21 +210,8 @@ export class CashReconciliationService {
         // Validar que monto contado coincida con denominaciones
         if (Math.abs(totalDenominaciones - montoContado) > 0.01) {
             throw new BadRequestException(
-                `El monto contado (S/.${montoContado.toFixed(2)}) no coincide con las denominaciones (S/.${totalDenominaciones.toFixed(2)})`,
+                `El monto contado (${moneda} ${montoContado.toFixed(2)}) no coincide con las denominaciones (${moneda} ${totalDenominaciones.toFixed(2)})`,
             );
-        }
-
-        // Obtener sesión y calcular saldo teórico
-        const { data: sesion, error: sesionError } = await this.supabase
-            .getClient()
-            .from('sesiones_caja')
-            .select('monto_inicio, monto_esperado, tenant_id')
-            .eq('id', sesionId)
-            .eq('tenant_id', tenantId)
-            .single();
-
-        if (sesionError || !sesion) {
-            throw new BadRequestException('Sesión de caja no encontrada');
         }
 
         // Si no hay monto_esperado calculado, calcularlo desde movimientos
@@ -238,7 +257,7 @@ export class CashReconciliationService {
         const requiereJustificacion = requiereSupervisor;
 
         this.logger.log(
-            `Resultado cierre: teórico=S/.${saldoTeorico.toFixed(2)}, real=S/.${saldoReal.toFixed(2)}, diferencia=S/.${diferencia.toFixed(2)} (${tipoDiferencia}), requiere supervisor=${requiereSupervisor}`,
+            `Resultado cierre: teórico=${moneda} ${saldoTeorico.toFixed(2)}, real=${moneda} ${saldoReal.toFixed(2)}, diferencia=${moneda} ${diferencia.toFixed(2)} (${tipoDiferencia}), requiere supervisor=${requiereSupervisor}`,
         );
 
         return {
@@ -255,33 +274,37 @@ export class CashReconciliationService {
     /**
      * Genera un resumen de denominaciones para mostrar en reportes
      */
-    generarResumenDenominaciones(denominaciones: Denominaciones): string {
+    generarResumenDenominaciones(denominaciones: Denominaciones, moneda = 'PEN'): string {
         const lineas: string[] = [];
+        const currency = String(moneda || 'PEN').toUpperCase();
+        const catalogo = this.DENOMINACIONES_VALIDAS[currency] || this.DENOMINACIONES_VALIDAS.PEN;
+        const billetesValidos = Object.keys(catalogo.billetes).map(Number).sort((a, b) => b - a);
+        const monedasValidas = Object.keys(catalogo.monedas).map(Number).sort((a, b) => b - a);
 
         lineas.push('BILLETES:');
         if (denominaciones.billetes) {
-            for (const denom of this.BILLETES_VALIDOS) {
+            for (const denom of billetesValidos) {
                 const cantidad = denominaciones.billetes[denom] || 0;
                 if (cantidad > 0) {
                     const total = denom * cantidad;
-                    lineas.push(`  S/.${denom} x ${cantidad} = S/.${total.toFixed(2)}`);
+                    lineas.push(`  ${currency} ${denom} x ${cantidad} = ${currency} ${total.toFixed(2)}`);
                 }
             }
         }
 
         lineas.push('MONEDAS:');
         if (denominaciones.monedas) {
-            for (const denom of this.MONEDAS_VALIDAS) {
+            for (const denom of monedasValidas) {
                 const cantidad = denominaciones.monedas[denom] || 0;
                 if (cantidad > 0) {
                     const total = denom * cantidad;
-                    lineas.push(`  S/.${denom.toFixed(2)} x ${cantidad} = S/.${total.toFixed(2)}`);
+                    lineas.push(`  ${currency} ${denom.toFixed(2)} x ${cantidad} = ${currency} ${total.toFixed(2)}`);
                 }
             }
         }
 
         const totalGeneral = this.calcularTotalDenominaciones(denominaciones);
-        lineas.push(`TOTAL: S/.${totalGeneral.toFixed(2)}`);
+        lineas.push(`TOTAL: ${currency} ${totalGeneral.toFixed(2)}`);
 
         return lineas.join('\n');
     }
@@ -289,18 +312,12 @@ export class CashReconciliationService {
     /**
      * Crea un objeto de denominaciones vacío con estructura correcta
      */
-    crearDenominacionesVacias(): Denominaciones {
-        const billetes: { [key: number]: number } = {};
-        const monedas: { [key: number]: number } = {};
-
-        this.BILLETES_VALIDOS.forEach((denom) => {
-            billetes[denom] = 0;
-        });
-
-        this.MONEDAS_VALIDAS.forEach((denom) => {
-            monedas[denom] = 0;
-        });
-
-        return { billetes, monedas };
+    crearDenominacionesVacias(moneda = 'PEN'): Denominaciones {
+        const currency = String(moneda || 'PEN').toUpperCase();
+        const catalogo = this.DENOMINACIONES_VALIDAS[currency] || this.DENOMINACIONES_VALIDAS.PEN;
+        return {
+            billetes: { ...catalogo.billetes },
+            monedas: { ...catalogo.monedas },
+        };
     }
 }

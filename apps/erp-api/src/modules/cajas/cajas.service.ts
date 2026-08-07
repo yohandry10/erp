@@ -427,6 +427,7 @@ export class CajasService {
       const validacionDenom = this.reconciliationService.validarApertura(
         dto.monto_inicio,
         dto.denominaciones_apertura as Denominaciones,
+        dto.moneda ?? 'PEN',
       );
 
       if (!validacionDenom.valido) {

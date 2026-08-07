@@ -18,7 +18,7 @@ import { EventEmitterService } from '../../../shared/events/event-emitter.servic
  *
  * Por eso la verificación de stock/existencias real ya NO se hace con mocks
  * aquí (sería un mock probando un mock): se valida con smoke SQL contra una BD
- * real (ver `docs/audits/2026-05-26-forensic-audit-pre-prod.md`). Estos tests
+ * real (ver `docs/CURRENT_STATE.md`). Estos tests
  * cubren el CONTRATO de integración del lado del backend: que la RPC se invoque
  * correctamente y que sus movimientos se propaguen a los eventos contables.
  */

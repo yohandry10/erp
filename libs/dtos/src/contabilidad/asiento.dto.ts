@@ -108,6 +108,31 @@ export class AsientoResponseDto {
   @IsUUID()
   source_event_id?: string;
 
+  @ApiPropertyOptional({ description: 'Si está poblado, este asiento reversa al asiento indicado' })
+  @IsOptional()
+  @IsUUID()
+  reversion_de_asiento_id?: string;
+
+  @ApiPropertyOptional({ description: 'Asiento de reversión que anula contablemente a este, si existe' })
+  @IsOptional()
+  @IsUUID()
+  reversado_por_asiento_id?: string;
+
+  @ApiPropertyOptional({ description: 'Fecha de confirmación del asiento' })
+  @IsOptional()
+  @IsDateString()
+  confirmado_en?: string;
+
+  @ApiPropertyOptional({ description: 'Fecha de anulación del asiento' })
+  @IsOptional()
+  @IsDateString()
+  anulado_en?: string;
+
+  @ApiPropertyOptional({ description: 'Motivo de la anulación' })
+  @IsOptional()
+  @IsString()
+  motivo_anulacion?: string;
+
   @ApiProperty({ description: 'Fecha de creación' })
   @IsDateString()
   created_at: string;
@@ -163,6 +188,64 @@ export class CreateAsientoManualDto {
   @ValidateNested({ each: true })
   @Type(() => CreateDetalleAsientoDto)
   detalles: CreateDetalleAsientoDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'Estado inicial. BORRADOR permite corregir el asiento antes de confirmarlo. ' +
+      'Por omisión se crea CONFIRMADO.',
+    enum: [EstadoAsiento.BORRADOR, EstadoAsiento.CONFIRMADO],
+    default: EstadoAsiento.CONFIRMADO
+  })
+  @IsOptional()
+  @IsEnum(EstadoAsiento)
+  estado?: EstadoAsiento;
+}
+
+/**
+ * Reemplaza por completo el contenido de un asiento en BORRADOR.
+ * El estado no se cambia por esta vía: para eso están confirmar/anular.
+ */
+export class UpdateAsientoManualDto {
+  @ApiProperty({ description: 'Fecha del asiento (YYYY-MM-DD)' })
+  @IsDateString()
+  fecha: string;
+
+  @ApiProperty({ description: 'Concepto del asiento' })
+  @IsString()
+  concepto: string;
+
+  @ApiPropertyOptional({ description: 'Referencia (factura, recibo, etc.)' })
+  @IsOptional()
+  @IsString()
+  referencia?: string;
+
+  @ApiProperty({ description: 'Detalles del asiento (debe/haber)', type: [CreateDetalleAsientoDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateDetalleAsientoDto)
+  detalles: CreateDetalleAsientoDto[];
+}
+
+export class AnularAsientoDto {
+  @ApiProperty({ description: 'Motivo de la anulación (queda en la trazabilidad del asiento)' })
+  @IsString()
+  motivo: string;
+}
+
+export class ReversarAsientoDto {
+  @ApiPropertyOptional({
+    description:
+      'Fecha del asiento de reversión (YYYY-MM-DD). Por omisión, la fecha del asiento original. ' +
+      'Debe caer en un período contable abierto.'
+  })
+  @IsOptional()
+  @IsDateString()
+  fecha?: string;
+
+  @ApiPropertyOptional({ description: 'Motivo de la reversión' })
+  @IsOptional()
+  @IsString()
+  motivo?: string;
 }
 
 export class ListarAsientosQueryDto {

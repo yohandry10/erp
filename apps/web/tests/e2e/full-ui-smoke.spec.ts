@@ -22,7 +22,6 @@ const authenticatedRoutes = [
   '/dashboard/contabilidad/presupuestos/lista',
   '/dashboard/contabilidad/presupuestos/nuevo',
   '/dashboard/analytics',
-  '/dashboard/audit-logs',
   '/dashboard/ayuda',
   '/dashboard/cajas',
   '/dashboard/compras',
@@ -114,7 +113,6 @@ const routeTitles: Record<(typeof authenticatedRoutes)[number], RegExp> = {
   '/dashboard/contabilidad/presupuestos/lista': /Presupuestos|Lista/i,
   '/dashboard/contabilidad/presupuestos/nuevo': /Presupuesto|Nuevo/i,
   '/dashboard/analytics': /Analytics|Analítica|Analitica/i,
-  '/dashboard/audit-logs': /Auditor[ií]a|Audit/i,
   '/dashboard/ayuda': /Ayuda/i,
   '/dashboard/cajas': /Cajas|Caja/i,
   '/dashboard/compras': /Compras/i,
@@ -213,8 +211,18 @@ const legitimatelyDisableableButtonNames = [
 const stateDisabledButtonRules = [
   {
     route: '/dashboard/pos',
-    name: '📋 Factura',
+    name: 'Factura',
     titlePattern: /Factura requiere cliente con RUC/i,
+  },
+  {
+    route: '/dashboard/pos',
+    name: 'Factura A',
+    titlePattern: /Factura requiere cliente con CUIT/i,
+  },
+  {
+    route: '/dashboard/pos',
+    name: 'Factura con NIT',
+    titlePattern: /Factura requiere cliente con NIT/i,
   },
   {
     route: '/dashboard/gre',

@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/table'
 import { useApi } from '@/hooks/use-api'
 import { cn } from '@/lib/utils'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface Presupuesto {
   id: string
@@ -132,6 +133,7 @@ function AlertBadge({ porcentaje }: { porcentaje: number }) {
 export default function PresupuestosListaPage() {
   const router = useRouter()
   const { get, del } = useApi()
+  const country = useCountryContext()
 
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
   const [centrosCosto, setCentrosCosto] = useState<CentroCosto[]>([])
@@ -195,9 +197,9 @@ export default function PresupuestosListaPage() {
   }
 
   const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('es-PE', {
+    new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
-      currency: 'PEN',
+      currency: country.moneda || 'PEN',
     }).format(toNumber(amount))
 
   const formatPeriodo = (periodo?: { anio: number; mes: number }) => {

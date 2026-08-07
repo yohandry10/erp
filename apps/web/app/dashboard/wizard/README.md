@@ -1,13 +1,7 @@
 # Configuration Wizard
 
 <!-- DOC-NAV:START -->
-> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
->
-> Rol de este archivo: `frontend_local`.
->
-> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
->
-> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+> Documentación canónica: `docs/README.md`. Estado vigente: `docs/CURRENT_STATE.md`.
 <!-- DOC-NAV:END -->
 
 This directory contains the implementation of the Configuration Wizard for the SUNAT validations and GRE automation feature.
@@ -22,7 +16,7 @@ The Configuration Wizard guides new users through the initial setup process, inc
 
 ## Initial Country Scope
 
-The initial operational scope is Peru/SUNAT only. The wizard persists `pais=PE`, `pais_id=1` and `PEN`; DIAN/other country fields remain roadmap scaffolding and must not be exposed or accepted as active runtime until there is a country-specific legal, fiscal and E2E validation.
+The operational scope is Peru/SUNAT, Argentina/ARCA and Colombia/DIAN. The wizard resolves the tenant country, currency and fiscal adapter at runtime; Colombia persists `CO`, `COP`, `DIAN_DIRECTO`, UBL 2.1/CUFE data and DIAN numbering configuration.
 
 ## Structure
 

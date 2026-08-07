@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { PdfFormatHelperService } from './pdf-format-helper.service';
 import { buildSunatQrDataUrl } from './sunat-qr.util';
+import { validateCountryTaxId } from '../paises/initial-country';
 
 /**
  * Servicio para generar PDFs de comprobantes electrónicos con formato oficial
@@ -33,11 +34,9 @@ export class PdfGeneratorService {
       // 1. Obtener datos del CPE
       const cpeData = await this.getCpeData(cpeId, tenantId);
       
-      // 2. Obtener configuración de la empresa (incluye país)
-      const empresaConfig = await this.getEmpresaConfig(tenantId);
-
-      // 3. Obtener código de país
+      // 2. Obtener código de país y validar la empresa con su documento fiscal.
       const countryCode = await this.getCountryCode(tenantId);
+      const empresaConfig = await this.getEmpresaConfig(tenantId, countryCode);
       const fiscalAuthority = this.pdfFormatHelper.getFiscalAuthorityName(countryCode);
 
       this.logger.log(`📄 Generando PDF con formato ${fiscalAuthority} (${countryCode})`);
@@ -111,7 +110,7 @@ export class PdfGeneratorService {
   /**
    * Obtiene la configuración de la empresa
    */
-  private async getEmpresaConfig(tenantId: string): Promise<any> {
+  private async getEmpresaConfig(tenantId: string, countryCode: string): Promise<any> {
     const { data, error } = await this.supabaseService.getClient()
       .from('empresa_config')
       .select('*')
@@ -123,8 +122,14 @@ export class PdfGeneratorService {
     }
 
     const typedData = data as any;
-    if (!/^\d{11}$/.test(String(typedData.ruc || '').trim()) || !String(typedData.razon_social || '').trim()) {
-      throw new Error('Configuracion de empresa incompleta para PDF CPE: RUC y razon social son obligatorios');
+    if (
+      !validateCountryTaxId(countryCode, typedData.ruc) ||
+      !String(typedData.razon_social || '').trim()
+    ) {
+      const taxIdLabel = countryCode === 'AR' ? 'CUIT' : countryCode === 'CO' ? 'NIT' : 'RUC';
+      throw new Error(
+        `Configuracion de empresa incompleta para PDF CPE: ${taxIdLabel} válido y razón social son obligatorios`,
+      );
     }
 
     return data;
@@ -173,7 +178,7 @@ export class PdfGeneratorService {
     cpeData: any,
     empresaConfig: any,
     qrCode: string,
-    _countryCode?: string,
+    countryCode: string = 'PE',
   ): Promise<Buffer> {
     const PDFDocument = (await import('pdfkit')).default;
     const chunks: Buffer[] = [];
@@ -192,28 +197,28 @@ export class PdfGeneratorService {
         doc.on('error', reject);
 
         // ===== ENCABEZADO =====
-        this.addHeader(doc, empresaConfig, cpeData, logoBuffer);
+        this.addHeader(doc, empresaConfig, cpeData, countryCode, logoBuffer);
 
         // ===== INFORMACIÓN DEL COMPROBANTE =====
-        this.addComprobanteInfo(doc, cpeData);
+        this.addComprobanteInfo(doc, cpeData, countryCode);
 
         // ===== DATOS DEL CLIENTE =====
-        this.addClienteInfo(doc, cpeData);
+        this.addClienteInfo(doc, cpeData, countryCode);
 
         // ===== DETALLE DE ITEMS =====
         this.addItemsTable(doc, cpeData);
 
         // ===== TOTALES =====
-        this.addTotales(doc, cpeData);
+        this.addTotales(doc, cpeData, countryCode);
 
         // ===== CÓDIGO QR =====
         this.addQRCode(doc, qrCode);
 
         // ===== LEYENDAS OBLIGATORIAS =====
-        this.addLeyendasObligatorias(doc, cpeData);
+        this.addLeyendasObligatorias(doc, cpeData, countryCode);
 
         // ===== PIE DE PÁGINA =====
-        this.addFooter(doc, cpeData);
+        this.addFooter(doc, cpeData, countryCode);
 
         doc.end();
 
@@ -226,8 +231,15 @@ export class PdfGeneratorService {
   /**
    * Agrega el encabezado del documento
    */
-  private addHeader(doc: any, empresaConfig: any, cpeData: any, logoBuffer?: Buffer | null): void {
+  private addHeader(
+    doc: any,
+    empresaConfig: any,
+    cpeData: any,
+    countryCode: string,
+    logoBuffer?: Buffer | null,
+  ): void {
     const startY = 50;
+    const taxIdLabel = countryCode === 'AR' ? 'CUIT' : countryCode === 'CO' ? 'NIT' : 'RUC';
 
     // Logo (si existe)
     if (logoBuffer) {
@@ -243,7 +255,7 @@ export class PdfGeneratorService {
       .text(empresaConfig.razon_social, 50, startY);
 
     doc.fontSize(9).font('Helvetica')
-      .text(`RUC: ${empresaConfig.ruc}`, 50, startY + 15)
+      .text(`${taxIdLabel}: ${empresaConfig.ruc}`, 50, startY + 15)
       .text(empresaConfig.direccion_fiscal || empresaConfig.direccion || 'Dirección no especificada', 50, startY + 28)
       .text(`Tel: ${empresaConfig.telefono || 'N/A'}`, 50, startY + 41)
       .text(`Email: ${empresaConfig.email || 'N/A'}`, 50, startY + 54);
@@ -265,9 +277,9 @@ export class PdfGeneratorService {
         align: 'center'
       });
 
-    // RUC
+    // Identificador fiscal del emisor
     doc.fontSize(10).font('Helvetica')
-      .text(`RUC: ${cpeData.ruc_emisor}`, boxX, boxY + 30, {
+      .text(`${taxIdLabel}: ${cpeData.ruc_emisor}`, boxX, boxY + 30, {
         width: boxWidth,
         align: 'center'
       });
@@ -285,12 +297,12 @@ export class PdfGeneratorService {
   /**
    * Agrega información del comprobante
    */
-  private addComprobanteInfo(doc: any, cpeData: any): void {
+  private addComprobanteInfo(doc: any, cpeData: any, countryCode: string): void {
     const y = doc.y + 10;
 
     doc.fontSize(9).font('Helvetica')
-      .text(`Fecha de Emisión: ${this.formatDate(cpeData.fecha_emision)}`, 50, y)
-      .text(`Fecha de Vencimiento: ${this.formatDate(cpeData.fecha_vencimiento)}`, 300, y)
+      .text(`Fecha de Emisión: ${this.formatDate(cpeData.fecha_emision, countryCode)}`, 50, y)
+      .text(`Fecha de Vencimiento: ${this.formatDate(cpeData.fecha_vencimiento, countryCode)}`, 300, y)
       .text(`Moneda: ${cpeData.moneda || 'PEN'}`, 50, y + 15);
 
     doc.moveDown(2);
@@ -299,7 +311,7 @@ export class PdfGeneratorService {
   /**
    * Agrega información del cliente
    */
-  private addClienteInfo(doc: any, cpeData: any): void {
+  private addClienteInfo(doc: any, cpeData: any, countryCode: string): void {
     const y = doc.y + 5;
 
     // Título
@@ -309,7 +321,7 @@ export class PdfGeneratorService {
     // Datos
     doc.fontSize(9).font('Helvetica')
       .text(`Señor(es): ${cpeData.razon_social_receptor || 'Cliente General'}`, 50, y + 15)
-      .text(`${this.getTipoDocumentoReceptorText(cpeData.tipo_documento_receptor)}: ${cpeData.documento_receptor || 'N/A'}`, 50, y + 28)
+      .text(`${this.getTipoDocumentoReceptorText(cpeData.tipo_documento_receptor, countryCode)}: ${cpeData.documento_receptor || 'N/A'}`, 50, y + 28)
       .text(`Dirección: ${cpeData.direccion_receptor || 'No especificada'}`, 50, y + 41);
 
     doc.moveDown(3);
@@ -374,7 +386,7 @@ export class PdfGeneratorService {
   /**
    * Agrega los totales del comprobante
    */
-  private addTotales(doc: any, cpeData: any): void {
+  private addTotales(doc: any, cpeData: any, countryCode: string): void {
     const startY = doc.y + 10;
     const labelX = 380;
     const valueX = 480;
@@ -385,7 +397,7 @@ export class PdfGeneratorService {
     doc.text('Op. Gravadas:', labelX, startY)
       .text(`${cpeData.moneda || 'PEN'} ${this.formatMoney(cpeData.total_gravadas)}`, valueX, startY, { align: 'right' });
 
-    const taxLabel = this.getTaxLabel(cpeData);
+    const taxLabel = this.getTaxLabel(cpeData, countryCode);
 
     // Impuesto principal
     doc.text(`${taxLabel}:`, labelX, startY + 15)
@@ -428,7 +440,7 @@ export class PdfGeneratorService {
   /**
    * Agrega leyendas obligatorias según SUNAT
    */
-  private addLeyendasObligatorias(doc: any, cpeData: any): void {
+  private addLeyendasObligatorias(doc: any, cpeData: any, countryCode: string): void {
     const y = doc.y + 10;
 
     doc.fontSize(7).font('Helvetica');
@@ -441,8 +453,14 @@ export class PdfGeneratorService {
     );
 
     // Leyenda de consulta
+    const consultaUrl =
+      countryCode === 'CO'
+        ? 'catalogo-vpfe.dian.gov.co'
+        : countryCode === 'AR'
+          ? 'www.afip.gob.ar/fe/qr'
+          : 'www.sunat.gob.pe';
     doc.text(
-      'Consulte su comprobante en: www.sunat.gob.pe',
+      `Consulte su comprobante en: ${consultaUrl}`,
       50, y + 12,
       { width: 495, align: 'center' }
     );
@@ -474,14 +492,22 @@ export class PdfGeneratorService {
   /**
    * Agrega pie de página
    */
-  private addFooter(doc: any, cpeData: any): void {
+  private addFooter(doc: any, cpeData: any, countryCode: string): void {
     const pageHeight = doc.page.height;
     const footerY = pageHeight - 50;
 
+    const authority = countryCode === 'AR' ? 'ARCA' : countryCode === 'CO' ? 'DIAN' : 'SUNAT';
+    const locale = countryCode === 'AR' ? 'es-AR' : countryCode === 'CO' ? 'es-CO' : 'es-PE';
+    const status =
+      cpeData.dian_status ||
+      cpeData.arca_status ||
+      cpeData.sunat_status ||
+      cpeData.estado ||
+      'PENDIENTE';
     doc.fontSize(7).font('Helvetica')
       .text(
-        `Estado SUNAT: ${cpeData.sunat_status || 'PENDIENTE'} | ` +
-        `Generado: ${new Date().toLocaleString('es-PE')}`,
+        `Estado ${authority}: ${status} | ` +
+        `Generado: ${new Date().toLocaleString(locale)}`,
         50, footerY,
         { width: 495, align: 'center' }
       );
@@ -499,22 +525,39 @@ export class PdfGeneratorService {
     return tipos[tipo] || 'COMPROBANTE ELECTRÓNICO';
   }
 
-  private getTipoDocumentoReceptorText(tipo: string): string {
+  private getTipoDocumentoReceptorText(tipo: string, countryCode: string = 'PE'): string {
+    const normalized = String(tipo || '').toUpperCase();
+    if (countryCode === 'CO') {
+      const colombia: Record<string, string> = {
+        '13': 'CC',
+        '12': 'TI',
+        '31': 'NIT',
+        CC: 'CC',
+        TI: 'TI',
+        NIT: 'NIT',
+      };
+      return colombia[normalized] || 'DOCUMENTO';
+    }
+    if (countryCode === 'AR') {
+      return normalized === 'CUIT' || normalized === '80' ? 'CUIT' : normalized === 'DNI' ? 'DNI' : 'DOCUMENTO';
+    }
     const tipos: Record<string, string> = {
       '1': 'DNI',
       '4': 'CARNET DE EXTRANJERÍA',
       '6': 'RUC',
       '7': 'PASAPORTE'
     };
-    return tipos[tipo] || 'DOCUMENTO';
+    return tipos[normalized] || 'DOCUMENTO';
   }
 
-  private getTaxLabel(cpeData: any): string {
-    const taxName = cpeData.impuesto_nombre || cpeData.tax_name || 'IGV';
+  private getTaxLabel(cpeData: any, countryCode: string = 'PE'): string {
+    const defaultTaxName = countryCode === 'PE' ? 'IGV' : 'IVA';
+    const defaultRate = countryCode === 'AR' ? 21 : countryCode === 'CO' ? 19 : 18;
+    const taxName = cpeData.impuesto_nombre || cpeData.tax_name || defaultTaxName;
     const explicitRate = Number(cpeData.tasa_igv ?? cpeData.tasa_impuesto ?? cpeData.tax_rate);
     const derivedRate = Number(cpeData.total_gravadas) > 0
       ? (Number(cpeData.total_igv || 0) / Number(cpeData.total_gravadas)) * 100
-      : 18;
+      : defaultRate;
     const rate = Number.isFinite(explicitRate) && explicitRate > 0
       ? (explicitRate <= 1 ? explicitRate * 100 : explicitRate)
       : derivedRate;
@@ -522,10 +565,11 @@ export class PdfGeneratorService {
     return `${taxName} (${Number(rate.toFixed(2))}%)`;
   }
 
-  private formatDate(dateString: string): string {
+  private formatDate(dateString: string, countryCode: string = 'PE'): string {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-PE', {
+    const locale = countryCode === 'AR' ? 'es-AR' : countryCode === 'CO' ? 'es-CO' : 'es-PE';
+    return date.toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -537,10 +581,19 @@ export class PdfGeneratorService {
   }
 
   /**
-   * Convierte un número a letras (español - Perú)
+   * Convierte un número a letras en la moneda fiscal del comprobante.
    */
   private numeroALetras(numero: number, moneda: string = 'PEN'): string {
-    const monedaTexto = moneda === 'USD' ? 'DÓLARES AMERICANOS' : 'SOLES';
+    const monedas: Record<string, string> = {
+      PEN: 'SOLES',
+      ARS: 'PESOS ARGENTINOS',
+      COP: 'PESOS COLOMBIANOS',
+      USD: 'DÓLARES AMERICANOS',
+      EUR: 'EUROS',
+    };
+    const monedaTexto =
+      monedas[String(moneda || 'PEN').toUpperCase()] ||
+      String(moneda || 'PEN').toUpperCase();
     
     const unidades = ['CERO','UNO','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE','VEINTE'];
     const decenas = ['VEINTE','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];

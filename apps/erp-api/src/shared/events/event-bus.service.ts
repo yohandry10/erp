@@ -179,6 +179,9 @@ export interface FacturaEmitidaEvent {
   impuestos: number;
   total: number;
   moneda: string;
+  // Cotización con la que se contabiliza el documento. Necesaria para calcular
+  // la diferencia de cambio del saldo cuando la moneda no es la local.
+  tipoCambio?: number | null;
   fechaEmision: string;
   fechaVencimiento: string;
   idempotencyKey: string;
@@ -381,8 +384,17 @@ export interface PagoProveedorRegistradoEvent {
   proveedorId?: string;
   proveedorNombre?: string;
   numeroDocumento?: string;
+  /** Importe pagado en la moneda del documento. */
   monto: number;
   moneda: string;
+  /** Cotización aplicada al liquidar. 1 si el documento ya está en moneda local. */
+  tipoCambio?: number;
+  /** Importe en moneda local con el que estaba contabilizada la deuda cancelada. */
+  montoContabilizado?: number;
+  /** Importe en moneda local efectivamente desembolsado. */
+  montoLiquidacion?: number;
+  /** Diferencia de cambio realizada. Positivo = ganancia, negativo = pérdida. */
+  diferenciaCambio?: number;
   fecha: string;
   metodoPago: string;
   cuentaBancariaId?: string | null;

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { BarChart3 } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { EstadoPedido } from '@/types/ventas'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface PedidoPorEstado {
   estado: EstadoPedido
@@ -53,6 +54,8 @@ const ESTADO_LABELS: Record<EstadoPedido, string> = {
 }
 
 export default function PedidosPorEstadoReport({ filters }: Props) {
+  const country = useCountryContext()
+  const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$')
   const { get } = useApi()
   const [data, setData] = useState<PedidoPorEstado[]>([])
   const [loading, setLoading] = useState(true)
@@ -119,7 +122,7 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 p-4">
                 <p className="text-sm text-emerald-400 font-medium">Monto Total</p>
-                <p className="text-2xl font-bold text-emerald-400">S/ {totalMonto.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-emerald-400">{currencySymbol} {totalMonto.toFixed(2)}</p>
               </div>
             </div>
 
@@ -192,12 +195,12 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-medium text-foreground">
-                          S/ {item.total.toFixed(2)}
+                          {currencySymbol} {item.total.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm text-foreground">
-                          S/ {(item.total / item.cantidad).toFixed(2)}
+                          {currencySymbol} {(item.total / item.cantidad).toFixed(2)}
                         </div>
                       </td>
                     </tr>

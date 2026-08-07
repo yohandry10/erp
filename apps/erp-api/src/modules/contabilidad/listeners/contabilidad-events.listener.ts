@@ -1387,6 +1387,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
         tenant_id: tenantId,
         fecha: eventData.fechaPago || eventData.fecha || new Date().toISOString(),
         monto: eventData.monto,
+        // Valuación en moneda local calculada por tesorería. Ausente en pagos
+        // en moneda local y en eventos anteriores a la Fase 2.
+        montoContabilizado: eventData.montoContabilizado,
+        montoLiquidacion: eventData.montoLiquidacion,
+        diferenciaCambio: eventData.diferenciaCambio,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroDocumento || eventData.referencia,
         event_id: evento.event_id || eventData.eventId

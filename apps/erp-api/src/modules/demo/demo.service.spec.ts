@@ -64,4 +64,82 @@ describe('DemoService operational seed', () => {
 
     expect((service as any).resolveDemoPfxPath('certs/demo.pfx')).toMatch(/[\\/]certs[\\/]demo\.pfx$/);
   });
+
+  it('siembra el catálogo demo colombiano en escala COP', async () => {
+    let productos: any[] = [];
+    const from = jest.fn((table: string) => {
+      const builder: any = {
+        insert: jest.fn((payload: any[]) => {
+          if (table === 'productos') productos = payload;
+          return builder;
+        }),
+        select: jest.fn(() => table === 'productos'
+          ? Promise.resolve({ data: [], error: null })
+          : builder),
+        eq: jest.fn(() => builder),
+        maybeSingle: jest.fn().mockResolvedValue({ data: { id: 'almacen-co' }, error: null }),
+      };
+      return builder;
+    });
+    const service = new DemoService(
+      { getClient: () => ({ from }) } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { get: () => 'demo-encryption-key-that-is-long-enough' } as any,
+      {} as any,
+    );
+
+    await (service as any).seedProductosDemo('tenant-co', {
+      codigo: 'CO', moneda: 'COP', tasaImpuesto: 0.19,
+    });
+
+    expect(productos).toEqual(expect.arrayContaining([
+      expect.objectContaining({ codigo: 'DEMO-001', precio_venta: 25_000, precio_compra: 18_000 }),
+      expect.objectContaining({ codigo: 'DEMO-004', precio_venta: 89_900, precio_compra: 60_000 }),
+    ]));
+  });
+
+  it('siembra RR. HH. argentino con un CUIL válido y contrato SIPA', async () => {
+    const insertedByTable = new Map<string, any>();
+    const from = jest.fn((table: string) => {
+      const builder: any = {
+        insert: jest.fn((payload: any) => {
+          insertedByTable.set(table, payload);
+          return table === 'empleados'
+            ? {
+                select: () => ({
+                  single: () => Promise.resolve({ data: { id: 'empleado-ar' }, error: null }),
+                }),
+              }
+            : Promise.resolve({ data: null, error: null });
+        }),
+      };
+      return builder;
+    });
+    const service = new DemoService(
+      { getClient: () => ({ from }) } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { get: () => 'demo-encryption-key-that-is-long-enough' } as any,
+      {} as any,
+    );
+
+    await (service as any).seedEmpleadoDemo('tenant-ar', {
+      codigo: 'AR',
+      moneda: 'ARS',
+    });
+
+    expect(insertedByTable.get('empleados')).toEqual(expect.objectContaining({
+      tipo_documento: 'CUIL',
+      numero_documento: '27301234568',
+    }));
+    expect(insertedByTable.get('contratos')).toEqual(expect.objectContaining({
+      id_empleado: 'empleado-ar',
+      sueldo_bruto: 1_800_000,
+      regimen_pensionario: 'SIPA',
+      estado: 'VIGENTE',
+    }));
+  });
 });
