@@ -8,6 +8,8 @@ import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PlanillaElectronicaPeruService } from './planilla-electronica-peru.service';
 
 /**
  * ✅ MULTI-TENANT: Controlador de RRHH con soporte multi-tenant
@@ -22,7 +24,8 @@ export class RrhhController {
 
   constructor(
     private readonly rrhhService: RrhhService,
-    private readonly planillasService: PlanillasService
+    private readonly planillasService: PlanillasService,
+    private readonly planillaElectronicaPeru: PlanillaElectronicaPeruService,
   ) { }
 
   // ===== EMPLEADOS BÁSICOS =====
@@ -223,6 +226,74 @@ export class RrhhController {
   ) {
     this.logger.debug(`📊 [RRHH] Generando asientos para planilla ${planillaId}, tenant: ${tenantId}`);
     return this.planillasService.generarAsientosContables(planillaId, tenantId);
+  }
+
+  // ===== PLANILLA ELECTRÓNICA PERÚ: PLAME / T-REGISTRO =====
+  @Get('peru/planilla-electronica/:planillaId/preview')
+  async previsualizarPlanillaElectronicaPeru(
+    @CurrentTenant() tenantId: string,
+    @Param('planillaId') planillaId: string,
+  ) {
+    return { success: true, data: await this.planillaElectronicaPeru.previsualizar(tenantId, planillaId) };
+  }
+
+  @Put('peru/planilla-electronica/empleados/:empleadoId/ficha')
+  async guardarFichaLaboralPeru(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Param('empleadoId') empleadoId: string,
+    @Body() payload: any,
+  ) {
+    return { success: true, data: await this.planillaElectronicaPeru.guardarFicha(tenantId, userId, empleadoId, payload) };
+  }
+
+  @Put('peru/planilla-electronica/detalles/:detalleId/jornada')
+  async guardarJornadaPlamePeru(
+    @CurrentTenant() tenantId: string,
+    @Param('detalleId') detalleId: string,
+    @Body() payload: { horas_ordinarias: number; dias_no_laborados: number },
+  ) {
+    return { success: true, data: await this.planillaElectronicaPeru.guardarJornada(tenantId, detalleId, payload) };
+  }
+
+  @Post('peru/planilla-electronica/:planillaId/paquetes')
+  async guardarPaquetePlanillaElectronicaPeru(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Param('planillaId') planillaId: string,
+    @Body() payload: { notas?: string },
+  ) {
+    return { success: true, data: await this.planillaElectronicaPeru.guardarPaquete(tenantId, userId, planillaId, payload?.notas) };
+  }
+
+  @Get('peru/planilla-electronica/paquetes/historial')
+  async historialPlanillaElectronicaPeru(
+    @CurrentTenant() tenantId: string,
+    @Query('limite') limite?: string,
+  ) {
+    return { success: true, data: await this.planillaElectronicaPeru.historial(tenantId, Number(limite || 36)) };
+  }
+
+  @Post('peru/planilla-electronica/paquetes/:id/evidencia')
+  async registrarEvidenciaPlanillaElectronicaPeru(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() payload: any,
+  ) {
+    return { success: true, data: await this.planillaElectronicaPeru.registrarEvidencia(tenantId, userId, id, payload) };
+  }
+
+  @Get('peru/planilla-electronica/paquetes/:id/descargar')
+  async descargarPaquetePlanillaElectronicaPeru(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const paquete = await this.planillaElectronicaPeru.descargar(tenantId, id);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${paquete.nombre}"`);
+    return res.send(paquete.buffer);
   }
 
   @Get('planillas/:id/historial-pagos')

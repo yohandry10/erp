@@ -14,8 +14,8 @@ migraciones verificados, prevalece la implementación actual.
   `COP`, DIAN).
 - PROD `wypnbcptofqdmoynlonq` es el único proyecto remoto operativo. El antiguo
   DEV está retirado y bloqueado por runtime, scripts y CI.
-- El cierre más reciente del backend reporta 163/163 suites y 1533/1533 pruebas.
-- El cierre Web del 2026-08-07 reporta type-check limpio y build Next 122/122
+- El cierre más reciente del backend reporta 165/165 suites y 1546/1546 pruebas.
+- El cierre Web del 2026-08-07 reporta type-check limpio y build Next 123/123
   rutas; 73 rutas se verificaron en escritorio y móvil (146 casos) y el
   recorrido visible de demos nuevas PE/AR/CO no presentó errores de consola.
 - Los cálculos de nómina PE/AR/CO conservan cobertura automatizada sin depender
@@ -71,6 +71,20 @@ prueba.
   respaldo PostgreSQL 17 verificable y ensayo con `ROLLBACK`. Añade conciliación
   anual FV 710/ITAN versionada y corrige el momento en que una constancia
   anterior pasa a `RECTIFICADA`; la validación confirmó cero declaraciones.
+- `398`: aplicada y registrada en PROD el 2026-08-07 después de preflight,
+  respaldo PostgreSQL 17 verificable y ensayo con `ROLLBACK`. Añade fichas
+  laborales SUNAT y paquetes versionados PLAME/T-Registro con fuentes PVS,
+  huellas, ticket y CIR; la validación confirmó RLS/FORCE en ambas tablas y
+  cero fichas o presentaciones creadas por la migración.
+- `399`: aplicada y registrada en PROD el 2026-08-07 después de preflight,
+  respaldo PostgreSQL 17 verificable y ensayo con `ROLLBACK`. Evita reenviar
+  altas T-Registro sin cambios: ticket, CIR y huella por trabajador se confirman
+  en la misma transacción; la validación confirmó cero datos creados.
+- `400`: aplicada y registrada en PROD el 2026-08-07 después de preflight,
+  respaldo PostgreSQL 17 verificable y ensayo con `ROLLBACK`. Separa la
+  constancia PLAME del ticket/CIR de T-Registro y sólo exige estos últimos cuando
+  el paquete contiene novedades registrales; la validación confirmó la nueva
+  firma transaccional, la columna CIR y cero datos creados.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -113,6 +127,13 @@ Cambios recientes principales:
   server-side, advertencias, versionado y constancia SUNAT externa.
 - `397`: Renta Anual/ITAN Perú para RMT y General, conciliación manual
   sustentable, bloqueo por ejercicio abierto/descuadre y constancia externa.
+- `398`: planilla electrónica Perú con papeles de trabajo PLAME, fuentes
+  T-Registro E04/E05/E11/E17 bloqueadas ante datos incompletos, versionado y
+  evidencia externa de PVS/SOL.
+- `399`: detección de novedades T-Registro por huella aceptada; una ficha sin
+  cambios no vuelve a proponerse y cualquier cambio reactiva la fuente PVS.
+- `400`: evidencia PLAME y evidencia T-Registro independientes, preservadas en
+  una sola transacción con las huellas de los trabajadores aceptados.
 
 ## Flujos cerrados técnicamente
 
@@ -137,6 +158,12 @@ Cambios recientes principales:
   pensión, ARL, caja de compensación, parafiscales, auxilio de transporte,
   horas extra/recargo nocturno, prima, cesantías, intereses, vacaciones,
   liquidación final y nómina electrónica.
+- Planilla electrónica Perú prepara papeles de trabajo PLAME de quinta y cuarta
+  categoría, usa jornada verificada por asistencia o captura manual explícita y
+  genera fuentes `RP_<RUC>.ide/.tra/.per/.est` sólo ante novedades T-Registro.
+  Nunca marca PLAME presentado sin constancia SUNAT ni acepta una novedad
+  T-Registro sin ticket y CIR. PVS y SOL siguen siendo los validadores/canales
+  oficiales externos.
 - Tema dark/light, shell responsive, Analytics y navegación por roles.
 - Offline desktop: SQLite local, outbox durable y caché por tenant.
 
@@ -206,8 +233,9 @@ productivo autorizado.
 - Convertir la anulación fiscal completa en una única transacción; actualmente
   encadena mutaciones con validaciones previas.
 - Resolver etiquetas de formulario ambiguas restantes sin codemod automático.
-- Completar PLAME/T-Registro y validación legal externa antes de declararlos
-  productivos.
+- Ejecutar PVS con datos reales de cada empleador, corregir su reporte y cargar
+  en SOL el ZIP generado por PVS antes de considerar presentada una planilla;
+  el ERP ya prepara/versiona las fuentes, pero no suplanta esa validación legal.
 - GRE SOAP beta continúa rechazando con `2112`; la ruta prevista es GRE REST.
 - La paridad contable con Odoo 19 no es total: quedan fuera la sincronización
   bancaria automática y sus modelos de matching, importación masiva de mapeos
@@ -218,7 +246,7 @@ productivo autorizado.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `397` en PROD.
+1. Código y migraciones actuales; estado remoto verificado hasta `400` en PROD.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.

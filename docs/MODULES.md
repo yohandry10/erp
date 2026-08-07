@@ -166,6 +166,24 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
   divisor 25 y liquidación final bajo parámetros argentinos versionados.
 - Ganancias argentina no se inventa en la interfaz: se recibe como retención
   parametrizada/SiRADIG. LSD y F.931 forman parte del readiness del tenant.
+- `RRHH > PLAME / T-Registro` valida cada planilla peruana calculada contra RUC,
+  identidad, contrato y códigos paramétricos de la ficha SUNAT. Si falta un dato
+  obligatorio muestra un bloqueo y no genera archivos que aparenten estar
+  listos para PVS.
+- Una versión sin bloqueos contiene papeles de trabajo PLAME y fuentes
+  `RP_<RUC>.ide`, `.tra`, `.per` y `.est` para las estructuras 04, 05, 11 y 17,
+  con delimitador final y huella SHA-256. El ZIP del ERP no es el ZIP de carga:
+  PVS valida las fuentes y produce el ZIP que el usuario carga en SOL.
+- Los papeles de trabajo incluyen quinta categoría y recibos por honorarios de
+  cuarta categoría. La jornada ordinaria procede de asistencia real o de una
+  corrección manual explícita y auditable; si falta, el paquete queda bloqueado.
+- Cada trabajador conserva la huella de la última fuente asociada a un CIR. Si
+  no cambió, no se repite como alta/modificación; si cambia la identidad, ficha
+  o contrato, reaparece automáticamente como novedad pendiente de PVS.
+- La constancia PLAME y el ticket/CIR de T-Registro son evidencias distintas. El
+  estado sólo pasa a presentado con constancia PLAME real y, si existen
+  novedades registrales, con ticket y CIR reales de T-Registro. Las
+  rectificatorias preservan versiones y no reescriben evidencia histórica.
 - Colombia valida CC/TI/NIT y la configuración de EPS, pensión, ARL, clase de
   riesgo, caja de compensación y exoneraciones; calcula salud y pensión del
   trabajador, aportes patronales, parafiscales, auxilio de transporte,
@@ -174,9 +192,9 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
   2026 aplica SMMLV 1.750.905, auxilio 249.095, UVT 52.374, tope IBC 25 SMMLV,
   jornada máxima de 42 horas/divisor mensual 210 desde julio, jornada nocturna
   desde las 19:00 y recargo dominical/festivo de 90 % desde julio.
-- PLAME/T-Registro (PE), Simplificación Registral/LSD/F.931 (AR) y PILA/nómina
-  electrónica (CO) reales requieren credenciales, datos patronales y validación
-  legal-operativa externa.
+- PLAME/T-Registro (PE) requiere ejecutar PVS/SOL con datos reales; la
+  Simplificación Registral/LSD/F.931 (AR) y PILA/nómina electrónica (CO) reales
+  requieren credenciales, datos patronales y validación legal-operativa externa.
 - Colombia expone configuración y prueba de integración PILA por tenant. En
   demo la prueba es local y marcada como simulada; en una cuenta real se elige
   portal del operador o API privada HTTPS, se cifran token y PIN, y se bloquean
