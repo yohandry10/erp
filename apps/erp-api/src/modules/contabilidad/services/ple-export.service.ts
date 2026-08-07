@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../../shared/supabase/supabase.service";
 import { TenantContextService } from "../../../shared/tenant/tenant-context.service";
 
@@ -637,7 +637,7 @@ export class PleExportService {
       .select(
         `
         id, numero_documento, tipo_documento, fecha_emision, fecha_vencimiento,
-        subtotal, igv, total, moneda, estado,
+        subtotal, igv, total, moneda, tipo_cambio_origen, estado, fiscal_metadata,
         proveedores!cuentas_por_pagar_proveedor_id_fkey(ruc, numero_documento, razon_social, tipo_documento)
       `,
       )
@@ -669,12 +669,26 @@ export class PleExportService {
         proveedor.ruc || proveedor.numero_documento || "",
       ).trim();
       const { serie, numero } = this.partirSerieNumero(doc.numero_documento);
-      const igv = Number(doc.igv || 0);
-      const base = Number(doc.subtotal || 0);
+      const fiscal = doc.fiscal_metadata || {};
+      const esNotaCredito = String(doc.tipo_documento || "").toUpperCase() === "NOTA_CREDITO";
+      const signo = esNotaCredito ? -1 : 1;
+      const igv = signo * Math.abs(Number(doc.igv || 0));
+      const base = signo * Math.abs(Number(doc.subtotal || 0));
+      const total = signo * Math.abs(Number(doc.total || 0));
+      const moneda = String(doc.moneda || "PEN").toUpperCase();
+      const tipoCambio = moneda === "PEN"
+        ? 1
+        : Number(fiscal.tipo_cambio ?? doc.tipo_cambio_origen);
+      if (!Number.isFinite(tipoCambio) || tipoCambio <= 0) {
+        throw new BadRequestException(
+          `Tipo de cambio requerido para ${doc.numero_documento}`,
+        );
+      }
       // Sin IGV en el comprobante no hay credito fiscal que sustentar: la base
       // se declara como adquisicion no gravada, no como gravada con IGV cero.
-      const baseGravada = igv > 0 ? base : 0;
-      const baseNoGravada = igv > 0 ? 0 : base;
+      const tieneIgv = Math.abs(igv) > 0;
+      const baseGravada = tieneIgv ? base : 0;
+      const baseNoGravada = tieneIgv ? 0 : base;
 
       lineas.push(
         this.toPleLine([
@@ -703,14 +717,16 @@ export class PleExportService {
           this.formatPleAmount(baseNoGravada), // 20 Valor de las adquisiciones no gravadas
           "0.00", // 21 ISC
           "0.00", // 22 Otros tributos y cargos
-          this.formatPleAmount(doc.total), // 23 Importe total de la adquisicion
-          this.sanitizePleText(doc.moneda || "PEN", 3), // 24 Codigo de moneda (cat. 02)
-          "1.000", // 25 Tipo de cambio
-          "", // 26 Fecha del comprobante modificado
-          "", // 27 Tipo del comprobante modificado
-          "", // 28 Serie del comprobante modificado
+          this.formatPleAmount(total), // 23 Importe total de la adquisicion
+          this.sanitizePleText(moneda, 3), // 24 Codigo de moneda (cat. 02)
+          tipoCambio.toFixed(3), // 25 Tipo de cambio
+          this.formatPleDate(fiscal.documento_referencia_fecha), // 26 Fecha del comprobante modificado
+          fiscal.documento_referencia_tipo
+            ? this.codigoTipoComprobante(fiscal.documento_referencia_tipo)
+            : "", // 27 Tipo del comprobante modificado
+          this.sanitizePleText(fiscal.documento_referencia_serie, 20), // 28 Serie del comprobante modificado
           "", // 29 Codigo de la dependencia aduanera
-          "", // 30 Numero del comprobante modificado
+          this.sanitizePleText(fiscal.documento_referencia_numero, 20), // 30 Numero del comprobante modificado
           "", // 31 Fecha de emision de la constancia de detraccion
           "", // 32 Numero de la constancia de detraccion
           "", // 33 Marca del comprobante sujeto a retencion

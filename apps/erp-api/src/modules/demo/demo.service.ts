@@ -6,7 +6,6 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { SupabaseService } from "../../shared/supabase/supabase.service";
-import { camposALimpiarEnConversionReal } from "./demo-conversion-cleanup";
 import { obtenerDatosDePago } from "./datos-de-pago";
 import { TenantContextService } from "../../shared/tenant/tenant-context.service";
 import { AuthService } from "../auth/auth.service";
@@ -74,6 +73,24 @@ const DEMO_COUNTRY_PROFILES: Record<ActiveCountryCode, DemoCountryProfile> = {
   },
 };
 
+export const DEMO_PCGE_ACCOUNTS = [
+  { codigo: "10", nombre: "Efectivo y Equivalentes de Efectivo", tipo: "ACTIVO" },
+  { codigo: "12", nombre: "Cuentas por Cobrar Comerciales - Terceros", tipo: "ACTIVO" },
+  { codigo: "20", nombre: "Mercaderías", tipo: "ACTIVO" },
+  { codigo: "40", nombre: "Tributos por Pagar", tipo: "PASIVO" },
+  { codigo: "403", nombre: "Instituciones Públicas (ESSALUD/ONP)", tipo: "PASIVO" },
+  { codigo: "411", nombre: "Remuneraciones por Pagar", tipo: "PASIVO" },
+  { codigo: "42", nombre: "Cuentas por Pagar Comerciales - Terceros", tipo: "PASIVO" },
+  { codigo: "4699", nombre: "Mercaderías recibidas por facturar", tipo: "PASIVO" },
+  { codigo: "50", nombre: "Capital", tipo: "PATRIMONIO" },
+  { codigo: "60", nombre: "Compras", tipo: "GASTO" },
+  { codigo: "621", nombre: "Remuneraciones - Sueldos y Salarios", tipo: "GASTO" },
+  { codigo: "627", nombre: "Seguridad, previsión social y otras contribuciones", tipo: "GASTO" },
+  { codigo: "69", nombre: "Costo de Ventas", tipo: "GASTO" },
+  { codigo: "70", nombre: "Ventas", tipo: "INGRESO" },
+  { codigo: "94", nombre: "Gastos de Administración", tipo: "GASTO" },
+] as const;
+
 const PLANES = {
   basico: {
     id: "basico",
@@ -104,6 +121,12 @@ const PLANES = {
   },
 };
 
+interface ConversionCompletionContext {
+  solicitudId?: string;
+  aprobadoPor?: string;
+  stripeSessionId?: string;
+}
+
 @Injectable()
 export class DemoService {
   private readonly logger = new Logger(DemoService.name);
@@ -126,6 +149,7 @@ export class DemoService {
     const countryCode = (dto.pais || "PE") as ActiveCountryCode;
     const country = DEMO_COUNTRY_PROFILES[countryCode];
     const nombre = dto.nombre || country.razonSocial;
+    let createdTenantId: string | null = null;
 
     try {
       const { data, error } = await this.client.rpc("create_demo_tenant", {
@@ -137,11 +161,11 @@ export class DemoService {
       if (error) throw new Error(error.message);
       if (!data || !data.success)
         throw new Error("No se pudo crear el tenant demo");
+      createdTenantId = data.tenant_id;
 
-      // Seed operacional best-effort: el RPC crea tenant + empresa + admin pero
-      // deja el tenant "esqueleto". Agregamos datos mínimos para que el demo sea
-      // realmente usable (POS, CPE, Inventario, Contabilidad). Una falla aquí
-      // NO debe romper el flujo de creación de demo.
+      // La demo es una empresa lista para explorar, no un onboarding. El RPC
+      // crea tenant + empresa + admin y esta fase exige la semilla completa. Si
+      // algo requerido falla, no se entregan credenciales de una demo parcial.
       // Como /api/demo/create es Public (sin auth), no hay tenant context en
       // AsyncLocalStorage. Lo seteamos explícitamente para que el guard de
       // tablas multi-tenant deje pasar los inserts.
@@ -151,19 +175,7 @@ export class DemoService {
           userId: data.user_id,
           isSuperAdmin: true, // seed system-level
         },
-        () =>
-          this.seedDemoOperationalData(data.tenant_id, data.user_id, country).catch(
-            (err) => {
-              this.logger.warn(
-                `[demo seed] fallo parcial al hidratar tenant ${data.tenant_id}: ${err?.message || err}`,
-              );
-              return {
-                aprobadorUserId: null,
-                aprobadorEmail: null,
-                aprobadorPassword: null,
-              };
-            },
-          ),
+        () => this.seedDemoOperationalData(data.tenant_id, data.user_id, country),
       );
 
       // El dashboard puede consultar sus métricas apenas inicia la sesión. Si
@@ -201,6 +213,18 @@ export class DemoService {
         aprobador_password: seedResult.aprobadorPassword,
       };
     } catch (error) {
+      if (createdTenantId) {
+        const { error: rollbackError } = await this.supabase
+          .getAdminClient()
+          .rpc("rollback_failed_demo_tenant", {
+            p_tenant_id: createdTenantId,
+          });
+        if (rollbackError) {
+          this.logger.error(
+            `[demo seed] no se pudo revertir tenant fallido ${createdTenantId}: ${rollbackError.message}`,
+          );
+        }
+      }
       throw new BadRequestException(
         `Error creando tenant demo: ${error.message}`,
       );
@@ -214,9 +238,10 @@ export class DemoService {
   /**
    * Hidrata el tenant demo con datos operativos mínimos: almacén, plan contable
    * básico, métodos de pago, caja y certificado de prueba.
-   * Cada paso es independiente (allSettled) para que una falla parcial no rompa
-   * los demás. Sin esto los e2e/flujos cross-module fallan por gaps de setup
-   * (no por bugs).
+   * Los pasos de base se intentan todos para obtener un diagnóstico completo.
+   * Después se exige que los requeridos hayan funcionado y un único RPC
+   * transaccional crea ventas, compras, finanzas, contabilidad, logística y
+   * RR. HH. Nunca se considera exitosa una demo parcialmente hidratada.
    */
   /**
    * Resultado del seed operacional. Incluye datos del segundo user "aprobador"
@@ -273,20 +298,54 @@ export class DemoService {
     const failures = results
       .map((r, i) => ({ r, step: stepNames[i] }))
       .filter((x) => x.r.status === "rejected");
-    if (failures.length) {
+    const optionalFailures = failures.filter((failure) => failure.step === "certificado");
+    const requiredFailures = failures.filter((failure) => failure.step !== "certificado");
+    if (optionalFailures.length) {
       this.logger.warn(
-        `[demo seed] ${failures.length}/${results.length} pasos fallaron para tenant ${tenantId}: ${failures
+        `[demo seed] certificado PFX opcional no disponible para tenant ${tenantId}: ${optionalFailures
           .map(
             (f) =>
               `${f.step}=${(f.r as PromiseRejectedResult).reason?.message || "unknown"}`,
           )
           .join(", ")}`,
       );
-    } else {
-      this.logger.log(
-        `[demo seed] tenant ${tenantId} hidratado con datos operativos completos`,
+    }
+    if (requiredFailures.length) {
+      throw new Error(
+        `fallaron ${requiredFailures.length} pasos requeridos: ${requiredFailures
+          .map(
+            (f) =>
+              `${f.step}=${(f.r as PromiseRejectedResult).reason?.message || "unknown"}`,
+          )
+          .join(", ")}`,
       );
     }
+
+    const { data: baseReadiness, error: businessSeedError } = await this.adminClient.rpc(
+      "hydrate_demo_business_sample_tx",
+      { p_tenant_id: tenantId, p_user_id: primerUserId },
+    );
+    if (businessSeedError) {
+      throw new Error(`semilla empresarial transaccional: ${businessSeedError.message}`);
+    }
+    if (baseReadiness?.ready !== true) {
+      throw new Error(`contrato base de demo incompleto: ${JSON.stringify(baseReadiness)}`);
+    }
+
+    const { data: readiness, error: hrSeedError } = await this.adminClient.rpc(
+      "hydrate_demo_hr_sample_tx",
+      { p_tenant_id: tenantId },
+    );
+    if (hrSeedError) {
+      throw new Error(`semilla RRHH transaccional: ${hrSeedError.message}`);
+    }
+    if (readiness?.ready !== true) {
+      throw new Error(`contrato de demo incompleto: ${JSON.stringify(readiness)}`);
+    }
+
+    this.logger.log(
+      `[demo seed] tenant ${tenantId} listo: inventario, ventas, compras, finanzas, contabilidad y RRHH`,
+    );
     return {
       aprobadorUserId: aprobadorResult?.userId ?? null,
       aprobadorEmail: aprobadorResult?.email ?? null,
@@ -1509,30 +1568,21 @@ export class DemoService {
       );
     }
 
-    const resultado = await this.completarConversion(solicitud.tenant_id, {
-      razon_social: solicitud.razon_social,
-      ruc: solicitud.ruc,
-      email: solicitud.email,
-      password: "", // No se usa: la contraseña ya viaja hasheada.
-      password_hash: solicitud.password_hash,
-      telefono: solicitud.telefono,
-      plan_id: solicitud.plan_id,
-      periodo: solicitud.periodo,
-      conservar_datos: solicitud.conservar_datos !== false,
-    } as ConvertDemoToRealDto);
-
-    // Se marca después de convertir: si se marcara antes y la conversión
-    // fallara, la solicitud desaparecería del panel sin que nadie la haya
-    // activado, y el cliente habría pagado.
-    await this.adminClient
-      .from("demo_conversiones_pendientes")
-      .update({
-        estado: "COMPLETADA",
-        completed_at: new Date().toISOString(),
-        aprobado_por: aprobadoPor || null,
-        aprobado_at: new Date().toISOString(),
-      })
-      .eq("id", solicitudId);
+    const resultado = await this.completarConversion(
+      solicitud.tenant_id,
+      {
+        razon_social: solicitud.razon_social,
+        ruc: solicitud.ruc,
+        email: solicitud.email,
+        password: "", // No se usa: la contraseña ya viaja hasheada.
+        password_hash: solicitud.password_hash,
+        telefono: solicitud.telefono,
+        plan_id: solicitud.plan_id,
+        periodo: solicitud.periodo,
+        conservar_datos: solicitud.conservar_datos !== false,
+      } as ConvertDemoToRealDto,
+      { solicitudId, aprobadoPor },
+    );
 
     this.logger.log(
       `[demo] solicitud ${solicitudId} aprobada por ${aprobadoPor || "superadmin"}: tenant ${solicitud.tenant_id} activado`,
@@ -1589,8 +1639,11 @@ export class DemoService {
   /**
    * Completa la conversión después del pago (llamado por webhook)
    */
-  async completarConversion(tenantId: string, dto: ConvertDemoToRealDto) {
-    const authClient = this.supabase.getClient();
+  async completarConversion(
+    tenantId: string,
+    dto: ConvertDemoToRealDto,
+    context: ConversionCompletionContext = {},
+  ) {
     const passwordHash =
       dto.password_hash || (await bcrypt.hash(dto.password, 10));
 
@@ -1609,109 +1662,39 @@ export class DemoService {
         }
       }
 
-      const { error: empresaError } = await authClient
-        .from("empresa_config")
-        .update({
-          razon_social: dto.razon_social,
-          ruc: dto.ruc,
-          telefono: dto.telefono,
-          is_demo: false,
-          demo_expires_at: null,
-          demo_conversion_attempted: true,
-          estado: "ACTIVO",
-          plan: (dto.plan_id || "basico").toUpperCase(),
-          // Los fixtures del demo —certificado de demostración y credenciales
-          // SOL de pruebas— no pueden sobrevivir a la conversión: con el RUC
-          // real del cliente, SUNAT los rechaza y nadie sabría por qué. Van en
-          // la misma sentencia para que no exista un instante con la cuenta ya
-          // marcada como real y las credenciales del demo todavía puestas.
-          ...camposALimpiarEnConversionReal(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("tenant_id", tenantId);
+      // Todo ocurre en una única transacción PostgreSQL: limpieza de semillas,
+      // empresa real, credenciales y cierre de solicitud. Antes eran varias
+      // llamadas HTTP independientes y un fallo dejaba el tenant medio convertido.
+      const { data: conversion, error: conversionError } =
+        await this.adminClient.rpc("completar_conversion_demo", {
+          p_tenant: tenantId,
+          p_razon_social: dto.razon_social,
+          p_ruc: dto.ruc,
+          p_telefono: dto.telefono || null,
+          p_plan: dto.plan_id || "basico",
+          p_email: dto.email,
+          p_password_hash: passwordHash,
+          p_conservar_datos: dto.conservar_datos !== false,
+          p_solicitud_id: context.solicitudId || null,
+          p_aprobado_por: context.aprobadoPor || null,
+          p_stripe_session_id: context.stripeSessionId || null,
+        });
 
-      if (empresaError) throw empresaError;
-
-      // El cliente eligio empezar de cero. Se hace despues de convertir, nunca
-      // antes: si el borrado va primero y la conversion falla, se queda sin
-      // datos y ademas sigue siendo demo. Al reves, un fallo aqui deja la cuenta
-      // real con sus datos, que es recuperable.
-      if (dto.conservar_datos === false) {
-        const { data: reinicio, error: reinicioError } = await this.adminClient.rpc(
-          "reiniciar_datos_tenant",
-          { p_tenant: tenantId },
+      if (conversionError || conversion?.success !== true) {
+        throw new Error(
+          conversionError?.message || "La conversión atómica no confirmó su finalización",
         );
+      }
 
-        if (reinicioError || reinicio?.reiniciado !== true) {
-          throw new BadRequestException(
-            `La cuenta se activo pero no se pudieron borrar los datos de prueba: ${
-              reinicioError?.message || "el reinicio no confirmo"
-            }. Vuelva a intentarlo desde la configuracion.`,
-          );
-        }
+      // El reset cambia decenas de fuentes del dashboard en una sola operación.
+      // Sin invalidar, Redis seguía mostrando productos, ventas y compras del
+      // demo aunque PostgreSQL ya estuviera limpio.
+      await this.cacheInvalidation.invalidateAllTenantCache(tenantId);
 
+      if (conversion.reinicio?.reiniciado === true) {
         this.logger.log(
-          `[demo] tenant ${tenantId} convertido empezando de cero: ${reinicio.filas_borradas} filas borradas`,
+          `[demo] tenant ${tenantId} convertido empezando de cero: ${conversion.reinicio.filas_borradas} filas borradas`,
         );
-      }
-
-      // El demo no tiene un solo usuario: además del principal se siembra un
-      // "Aprobador" para que las OC puedan aprobarse sin autoaprobación. Poner
-      // el correo del cliente en todos a la vez rompía la conversión con
-      // "usuarios_sistema_email_key". El correo va al principal —el que crea el
-      // RPC, siempre el primero— y el resto solo deja de ser demo.
-      const { data: usuariosDemo, error: usuariosDemoError } = await authClient
-        .from("usuarios_sistema")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("is_demo_user", true)
-        .order("created_at", { ascending: true });
-
-      if (usuariosDemoError) throw usuariosDemoError;
-      if (!usuariosDemo?.length) {
-        throw new Error("La cuenta demo no tiene usuario que convertir");
-      }
-
-      const [principal, ...acompanantes] = usuariosDemo;
-
-      const { error: usuarioError } = await authClient
-        .from("usuarios_sistema")
-        .update({
-          email: dto.email,
-          password_hash: passwordHash,
-          is_demo_user: false,
-          demo_email_temp: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", principal.id);
-
-      if (usuarioError) throw usuarioError;
-
-      if (acompanantes.length) {
-        const { error: acompanantesError } = await authClient
-          .from("usuarios_sistema")
-          .update({
-            is_demo_user: false,
-            demo_email_temp: null,
-            updated_at: new Date().toISOString(),
-          })
-          .in(
-            "id",
-            acompanantes.map((u) => u.id),
-          );
-
-        if (acompanantesError) throw acompanantesError;
-      }
-
-      const { data: usuario } = await authClient
-        .from("usuarios_sistema")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("email", dto.email)
-        .single();
-
-      if (!usuario?.id) {
-        throw new Error("Usuario convertido no encontrado");
       }
 
       // Solo se devuelve sesión iniciada si tenemos la contraseña en claro, que
@@ -1769,25 +1752,23 @@ export class DemoService {
     }
 
     // Completar la conversión
-    const result = await this.completarConversion(conversion.tenant_id, {
-      razon_social: conversion.razon_social,
-      ruc: conversion.ruc,
-      email: conversion.email,
-      password: "", // No se usa, usamos password_hash
-      password_hash: conversion.password_hash,
-      telefono: conversion.telefono,
-      plan_id: conversion.plan_id,
-      periodo: conversion.periodo,
-      // Lo que el cliente eligió antes de pagar; sin esto la decisión se perdía
-      // justo en el paso que la hace efectiva.
-      conservar_datos: conversion.conservar_datos !== false,
-    });
-
-    // Marcar como completada
-    await this.client
-      .from("demo_conversiones_pendientes")
-      .update({ estado: "COMPLETADA", completed_at: new Date().toISOString() })
-      .eq("stripe_session_id", sessionId);
+    const result = await this.completarConversion(
+      conversion.tenant_id,
+      {
+        razon_social: conversion.razon_social,
+        ruc: conversion.ruc,
+        email: conversion.email,
+        password: "", // No se usa, usamos password_hash
+        password_hash: conversion.password_hash,
+        telefono: conversion.telefono,
+        plan_id: conversion.plan_id,
+        periodo: conversion.periodo,
+        // Lo que el cliente eligió antes de pagar; sin esto la decisión se
+        // perdía justo en el paso que la hace efectiva.
+        conservar_datos: conversion.conservar_datos !== false,
+      },
+      { stripeSessionId: sessionId },
+    );
 
     return result;
   }

@@ -98,8 +98,11 @@ describe('CotizacionesService.update', () => {
 
     jest.spyOn(service as any, 'calcularTotales').mockResolvedValue({ subtotal: 10, igv: 1.8, total: 11.8 });
 
-    // Simular delete error: la cadena termina en eq('cotizacion_id', id) retornando error.
-    mockClient.eq.mockImplementationOnce(() => ({ error: { message: 'delete failed' } }));
+    // Simular delete error después de aplicar ambos límites de aislamiento:
+    // cotización y tenant.
+    mockClient.eq.mockImplementationOnce(() => ({
+      eq: jest.fn().mockResolvedValue({ error: { message: 'delete failed' } }),
+    }));
 
     await expect(
       service.update(
@@ -110,4 +113,3 @@ describe('CotizacionesService.update', () => {
     ).rejects.toThrow(BadRequestException);
   });
 });
-

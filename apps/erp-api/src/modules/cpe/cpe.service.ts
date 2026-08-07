@@ -565,6 +565,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         subtotal: createFacturaDto.total_gravadas,
         impuestos: createFacturaDto.total_igv,
         total: createFacturaDto.total_venta,
+        costoVentas: Number((createFacturaDto as any).costo_ventas ?? 0),
         moneda: createFacturaDto.moneda,
         fechaEmision: emissionDate,
         fechaVencimiento: dueDate,
@@ -918,7 +919,9 @@ async getSignedXml(id: string, tenantId: string): Promise<string> {
   }
 
 async resendToOse(id: string, tenantId: string, options?: { idempotencyKey?: string }) {
-    return this.deliveryService.resendToOse(id, tenantId, options);
+    const result = await this.deliveryService.resendToOse(id, tenantId, options);
+    const anulacion = await this.cancellationService.finalizarAnulacionAceptada(id, tenantId);
+    return anulacion ? { ...result, anulacion } : result;
   }
 
   /**
@@ -929,12 +932,16 @@ async sendToOseManual(
     xmlFirmado: string,
     fileName: string,
     options?: { idempotencyKey?: string },
+    tenantId?: string,
   ): Promise<void> {
-    return this.deliveryService.sendToOseManual(id, xmlFirmado, fileName, options);
+    await this.deliveryService.sendToOseManual(id, xmlFirmado, fileName, options);
+    if (tenantId) await this.cancellationService.finalizarAnulacionAceptada(id, tenantId);
   }
 
 async checkOseStatus(id: string, tenantId: string) {
-    return this.deliveryService.checkOseStatus(id, tenantId);
+    const result = await this.deliveryService.checkOseStatus(id, tenantId);
+    const anulacion = await this.cancellationService.finalizarAnulacionAceptada(id, tenantId);
+    return anulacion ? { ...result, anulacion } : result;
   }
 
   private buildXmlFromDocumentoFiscal(documento: DocumentoFiscal): string {

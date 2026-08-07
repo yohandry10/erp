@@ -10,6 +10,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PlanillaElectronicaPeruService } from './planilla-electronica-peru.service';
+import { CalcularPlanillaPersonalizadaDto } from './dto/calcular-planilla-personalizada.dto';
 
 /**
  * ✅ MULTI-TENANT: Controlador de RRHH con soporte multi-tenant
@@ -176,7 +177,7 @@ export class RrhhController {
   async calcularPlanillaPersonalizada(
     @CurrentTenant() tenantId: string,
     @Param('id') planillaId: string,
-    @Body() empleadosData: any
+    @Body() empleadosData: CalcularPlanillaPersonalizadaDto
   ) {
     this.logger.debug('🧮 Calculando planilla personalizada:', planillaId);
     return this.planillasService.calcularPlanillaPersonalizada(planillaId, empleadosData.empleados, tenantId);
@@ -614,6 +615,16 @@ export class RrhhController {
   ) {
     this.logger.debug(`💼 [RRHH] Calculando liquidación para empleado ${empleadoId}, tenant: ${tenantId}`);
     return this.rrhhService.calcularLiquidacion(empleadoId, data.motivo_terminacion, data.fecha_terminacion, tenantId);
+  }
+
+  @Post('liquidaciones/:id/confirmar')
+  async confirmarLiquidacion(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') usuarioId: string,
+    @Param('id') liquidacionId: string,
+  ) {
+    this.logger.debug(`✅ [RRHH] Confirmando liquidación ${liquidacionId}, tenant: ${tenantId}`);
+    return this.rrhhService.confirmarLiquidacion(liquidacionId, tenantId, usuarioId);
   }
 
   // ===== CTS =====

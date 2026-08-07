@@ -8,6 +8,7 @@ import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interfac
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { v4 as uuidv4 } from 'uuid';
 import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
+import { ACCOUNTING_EVENT_TYPES } from '../../../shared/outbox/accounting-event-types';
 
 /**
  * Listener que procesa eventos de la tabla outbox_events
@@ -19,42 +20,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private readonly cronLockKey = 'worker:outbox:contabilidad';
   private readonly cronLockTtlSeconds = 240;
   private static isProcessing = false;
-  private readonly accountingEventTypes = new Set([
-    'venta.procesada',
-    'VentaFacturada',
-    'pos.venta.registrada',
-    'cobro.registrado',
-    'CobroRegistrado',
-    'recepcion.registrada',
-    'RecepcionRegistrada',
-    'devolucion.proveedor.registrada',
-    'DevolucionProveedorEmitida',
-    'cxc.creada',
-    'CuentaPorCobrarCreada',
-    'pago.proveedor.registrado',
-    'PagoProveedorRegistrado',
-    'ajuste.inventario.aplicado',
-    'AjusteInventarioAplicado',
-    'planilla.liquidada',
-    'PlanillaLiquidada',
-    'planilla.pagada',
-    'PlanillaPagada',
-    'depreciacion.generada',
-    'DepreciacionGenerada',
-    'cpe.anulado',
-    'CPEAnulado',
-    // BUG-001 fix: garantiza que POST /api/cpe directo (sin pasar por
-    // /ventas/pedidos/:id/facturar) genere asiento contable. El handler tiene
-    // idempotencia por (tenant + referencia serie-numero) para evitar doble
-    // asiento cuando el flujo /ventas tambien emite venta.procesada.
-    'factura.emitida',
-    'FacturaEmitida',
-    'producto.stock_bajo',
-    'producto.stock.bajo',
-    'ProductoStockBajo',
-    'stock.movimiento',
-    'StockMovimiento',
-  ]);
+  private readonly accountingEventTypes = new Set<string>(ACCOUNTING_EVENT_TYPES);
 
   constructor(
     private readonly asientosGenerator: AsientosGeneratorService,
@@ -100,6 +66,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
       await this.persistirEventoEnOutbox('recepcion.registrada', 'recepcion', event.data);
     });
 
+    this.eventBus.on('factura.proveedor.registrada', async (event: ERPEvent) => {
+      await this.persistirEventoEnOutbox('factura.proveedor.registrada', 'factura_proveedor', event.data);
+    });
+
 
     // Evento de cuenta por cobrar creada
     this.eventBus.onCuentaPorCobrarCreadaEvent(async (event: ERPEvent) => {
@@ -142,6 +112,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         eventData.ventaId ||
         eventData.cobroId ||
         eventData.recepcionId ||
+        eventData.facturaProvId ||
         eventData.pagoId ||
         eventData.cuentaId ||
         eventData.facturaId ||
@@ -499,6 +470,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
           case 'recepcion.registrada':
           case 'RecepcionRegistrada':
             await this.handleRecepcionRegistrada(evento);
+            break;
+
+          case 'factura.proveedor.registrada':
+          case 'FacturaProveedorRegistrada':
+            await this.handleFacturaProveedorRegistrada(evento);
             break;
 
           case 'devolucion.proveedor.registrada':
@@ -1137,7 +1113,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         total,
         base_imponible: baseImponible,
         igv,
-        costo_ventas: Number(eventData.costo_ventas ?? 0),
+        costo_ventas: Number(eventData.costoVentas ?? eventData.costo_ventas ?? 0),
         centro_costo_id: eventData.centro_costo_id,
         referencia,
         event_id: evento.event_id || eventData.eventId,
@@ -1325,17 +1301,13 @@ export class ContabilidadEventsListener implements OnModuleInit {
     try {
       const eventData = evento.event_data;
       const tenantId = this.ensureEventTenant(eventData, 'recepcion.registrada');
-      const totalRecepcion = eventData.totalParcial ?? eventData.total;
       const costoRecepcion =
         eventData.subtotalParcial ?? eventData.subtotal ?? eventData.costo;
-      const igvRecepcion = eventData.igvParcial ?? eventData.igv;
       
       const compraData = {
         tenant_id: tenantId,
         fecha: eventData.fechaRecepcion || eventData.fecha || new Date().toISOString(),
-        total: totalRecepcion,
         costo: costoRecepcion,
-        igv: igvRecepcion,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroRecepcion || eventData.numeroOrden,
         event_id: evento.event_id || eventData.eventId
@@ -1343,7 +1315,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
       const eventId = compraData.event_id;
 
-      const asientoCreado = await this.asientosGenerator.generarAsientoCompra(compraData);
+      const asientoCreado = await this.asientosGenerator.generarAsientoRecepcion(compraData);
 
       // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
       if (eventId) {
@@ -1369,9 +1341,27 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handleFacturaProveedorRegistrada(evento: OutboxEvent): Promise<void> {
     const eventData = evento.event_data;
     const tenantId = this.ensureEventTenant(eventData, 'factura.proveedor.registrada');
-    this.logger.log(
-      `📄 [Contabilidad] Factura proveedor registrada recibida (evento ${evento.event_id}) tenant=${tenantId} documento=${eventData?.numeroDocumento ?? eventData?.facturaProvId ?? 'sin-documento'}`
-    );
+    const eventId = evento.event_id || eventData.eventId;
+    const asiento = await this.asientosGenerator.generarAsientoFacturaProveedor({
+      tenant_id: tenantId,
+      fecha: eventData.fechaEmision,
+      subtotal: eventData.subtotal,
+      igv: eventData.igv,
+      total: eventData.total,
+      recepcion_id: eventData.recepcionId ?? null,
+      referencia: eventData.numeroDocumento ?? eventData.facturaProvId,
+      event_id: eventId,
+    });
+    if (eventId) {
+      const verificado = await this.verificarAsientoCreado(
+        tenantId,
+        eventId,
+        eventData.numeroDocumento ?? eventData.facturaProvId,
+      );
+      if (!verificado) throw new Error(`No se pudo verificar el asiento de factura proveedor ${eventId}`);
+    } else if (!asiento?.id) {
+      throw new Error('El asiento de factura proveedor no retornó un ID válido');
+    }
   }
 
   /**

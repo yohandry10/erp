@@ -975,9 +975,9 @@ export class SireService {
         .gte('fecha_emision', start)
         .lt('fecha_emision', end);
 
-      if (!incluirAnulados) {
-        query = query.not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")');
-      }
+      query = incluirAnulados
+        ? query.in('estado', ['ACEPTADO', 'ANULADO'])
+        : query.eq('estado', 'ACEPTADO');
 
       const { data: ventas, error } = await query;
       if (error) {
@@ -1006,8 +1006,9 @@ export class SireService {
     if (tipo === 'REG_COM') {
       let query = client
         .from('cuentas_por_pagar')
-        .select('fecha_emision, numero_documento, proveedor_id, subtotal, igv, total, moneda, estado')
+        .select('fecha_emision, numero_documento, tipo_documento, subtotal, igv, total, moneda, estado, fiscal_metadata, proveedores!cuentas_por_pagar_proveedor_id_fkey(ruc,numero_documento,razon_social,tipo_documento)')
         .eq('tenant_id', tenantId)
+        .in('tipo_documento', ['FACTURA', 'NOTA_CREDITO', 'NOTA_DEBITO', 'RECIBO_HONORARIOS'])
         .gte('fecha_emision', start)
         .lt('fecha_emision', end);
 
@@ -1020,19 +1021,30 @@ export class SireService {
         throw new BadRequestException('Error generando registro de compras SIRE: ' + error.message);
       }
 
-      const header = 'PERIODO|FECHA_EMISION|NUMERO|PROVEEDOR|VALOR_ADQUISICIONES|IGV|TOTAL|MONEDA';
-      const rows = (compras || []).map(c =>
-        [
+      const header = 'PERIODO|FECHA_EMISION|TIPO_DOCUMENTO|NUMERO|RUC_PROVEEDOR|PROVEEDOR|VALOR_ADQUISICIONES|IGV|TOTAL|MONEDA|TIPO_CAMBIO|DOC_MODIFICADO';
+      const rows = (compras || []).map(c => {
+        const proveedor = Array.isArray(c.proveedores) ? c.proveedores[0] : c.proveedores;
+        const fiscal = c.fiscal_metadata || {};
+        const signo = String(c.tipo_documento).toUpperCase() === 'NOTA_CREDITO' ? -1 : 1;
+        const tipoCambio = String(c.moneda || 'PEN').toUpperCase() === 'PEN' ? 1 : Number(fiscal.tipo_cambio);
+        if (!Number.isFinite(tipoCambio) || tipoCambio <= 0) {
+          throw new BadRequestException(`Tipo de cambio faltante para ${c.numero_documento}`);
+        }
+        return [
           periodo,
           (c.fecha_emision || '').toString().slice(0, 10),
+          c.tipo_documento || '',
           c.numero_documento || '',
-          c.proveedor_id || '',
-          Number(c.subtotal || 0),
-          Number(c.igv || 0),
-          Number(c.total || 0),
+          proveedor?.ruc || proveedor?.numero_documento || '',
+          (proveedor?.razon_social || '').replace(/\|/g, ' '),
+          signo * Number(c.subtotal || 0),
+          signo * Number(c.igv || 0),
+          signo * Number(c.total || 0),
           c.moneda || 'PEN',
-        ].join('|')
-      );
+          tipoCambio,
+          [fiscal.documento_referencia_tipo, fiscal.documento_referencia_serie, fiscal.documento_referencia_numero].filter(Boolean).join('-'),
+        ].join('|');
+      });
       return [header, ...rows].join('\n');
     }
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Query, Param, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Body, Query, Param, UseGuards, ForbiddenException, GoneException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SupabaseService } from '../shared/supabase/supabase.service';
@@ -295,6 +295,13 @@ export class ComprasController {
   @Put(':id/recibir')
   @RequirePermission('compras.ordenes.actualizar')
   async recibirMercancia(@Param('id') ordenId: string, @Body() recepcionData: any) {
+    void ordenId;
+    void recepcionData;
+    throw new GoneException(
+      'Ruta de recepción obsoleta. Use POST /compras/recepciones/ordenes/:ordenId y luego POST /compras/recepciones/:id/cerrar.',
+    );
+
+    /* istanbul ignore next -- código histórico inaccesible, conservado temporalmente para trazabilidad */
     try {
       const tenantId = this.resolveTenant(); // HARDENING: tenant proviene del contexto.
       recepcionData.tenant_id = tenantId;
@@ -872,4 +879,3 @@ export class ComprasController {
     }
   }
 }
-

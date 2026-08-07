@@ -154,6 +154,7 @@ describe('ClientesService', () => {
         documento_tipo: createDto.documento_tipo,
         codigo: createDto.documento_numero,
         ruc: createDto.documento_numero,
+        telefono: '+51999999999',
       });
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', tenantA);
     });
@@ -211,7 +212,7 @@ describe('ClientesService', () => {
       expect(mockSupabaseClient.eq).not.toHaveBeenCalledWith('tenant_id', tenantB);
     });
 
-    it('update debe persistir nombre comercial y no enviar telefono inexistente', async () => {
+    it('update debe persistir nombre comercial y teléfono', async () => {
       const tenantA = 'tenant-a';
       const dto: UpdateClienteDto = {
         razon_social: 'Cliente editado',
@@ -250,8 +251,8 @@ describe('ClientesService', () => {
         nombre: 'Cliente editado',
         nombre_comercial: 'Marca Cliente',
         direccion: 'Av. Runtime 123',
+        telefono: '+51999990000',
       });
-      expect(updatePayload).not.toHaveProperty('telefono');
     });
 
     it('validarRUC solo confirma el dígito verificador y no inventa datos SUNAT', async () => {

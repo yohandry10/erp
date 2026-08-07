@@ -239,6 +239,29 @@ export function FiscalConfigStep() {
                 maxLength={4} className="text-base"
               />
             </div>}
+
+            {isPeru && (
+              <div>
+                <Label htmlFor="serie_guia_remision" className="mb-2 block">
+                  Serie Guías de Remisión <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="serie_guia_remision"
+                  value={state.configuration.serie_guia_remision || ''}
+                  onChange={(e) => {
+                    updateConfiguration({ serie_guia_remision: e.target.value.toUpperCase() })
+                    setErrors({ ...errors, serie_guia_remision: '' })
+                  }}
+                  placeholder="T001"
+                  maxLength={4} className="text-base"
+                />
+                {errors.serie_guia_remision && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {errors.serie_guia_remision}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

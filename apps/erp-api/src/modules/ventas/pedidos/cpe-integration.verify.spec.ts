@@ -228,11 +228,8 @@ describe('CPE Integration Verification', () => {
             error: null,
         });
 
-        // 4. Update correlativo (optimistic concurrency → .select().single())
-        mockSupabaseClient.single.mockResolvedValueOnce({
-            data: { ultimo_numero_factura: 101 },
-            error: null,
-        });
+        // 4. Reserva atómica del correlativo fiscal vía RPC
+        mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 101, error: null });
 
         // 5. CpeService: getXmlSigner -> empresa_config (certificado)
         mockSupabaseClient.single.mockResolvedValueOnce({

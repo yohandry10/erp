@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { Response as ExpressResponse } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { AuthService, LoginDto } from './auth.service';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { AuthRateLimitGuard } from '../../shared/security/guards/auth-rate-limit.guard';
@@ -102,6 +102,7 @@ export class AuthController {
   }
 
   @Get('profile')
+  @SkipThrottle()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener perfil del usuario autenticado' })
   @ApiResponse({ status: 200, description: 'Perfil del usuario' })

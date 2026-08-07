@@ -4,7 +4,7 @@ import { CpeService } from '../../cpe/cpe.service';
 import { ValidationService } from '../../validations/validation.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { AFECTACION_IGV, calcularDesgloseIgv, esGravado } from '../../../shared/utils/igv-afectacion.util';
-import { CreateFacturaDto, TipoDocumento, ItemFacturaDto } from '@erp-suite/dtos';
+import { CondicionPago, CreateFacturaDto, TipoDocumento, ItemFacturaDto } from '@erp-suite/dtos';
 import { PedidoVenta, PedidoDetalle } from './entities';
 import { IntegrationAlertsService } from '../../notifications/integration-alerts.service';
 
@@ -159,10 +159,11 @@ export class CPEIntegrationService {
 
     // La afectación del IGV vive en el producto (SUNAT Catálogo 07): sin ella,
     // una factura con bienes exonerados cobraría IGV que no corresponde.
-    const afectacionPorProducto = await this.obtenerAfectacionPorProducto(
-      pedido.tenant_id,
-      pedido.detalle.map((item) => item.producto_id),
-    );
+    const productoIds = pedido.detalle.map((item) => item.producto_id);
+    const [afectacionPorProducto, costoPorProducto] = await Promise.all([
+      this.obtenerAfectacionPorProducto(pedido.tenant_id, productoIds),
+      this.obtenerCostoPorProducto(pedido.tenant_id, productoIds),
+    ]);
 
     // Mapear items del pedido a items de factura
     const items: ItemFacturaDto[] = pedido.detalle.map((item) => {
@@ -255,7 +256,19 @@ export class CPEIntegrationService {
       total_exportacion: desgloseIgv.exportacion,
       total_igv: desgloseIgv.igv,
       total_venta: desgloseIgv.total,
+      condicion_pago: CondicionPago.CREDITO,
     };
+
+    (facturaDto as any).costo_ventas = Number(
+      pedido.detalle
+        .reduce(
+          (sum, item) =>
+            sum + Number(costoPorProducto.get(item.producto_id) ?? 0) * Number(item.cantidad ?? 0),
+          0,
+        )
+        .toFixed(2),
+    );
+    (facturaDto as any).cliente_id = pedido.cliente_id;
 
     return facturaDto;
   }
@@ -299,6 +312,46 @@ export class CPEIntegrationService {
     }
 
     return afectaciones;
+  }
+
+  /**
+   * Resuelve el costo real desde el catálogo porque pedidos_venta_detalle no
+   * persiste costo_unitario. `costo` puede venir en cero en datos migrados, por
+   * lo que precio_compra es el fallback operativo usado también por POS.
+   */
+  private async obtenerCostoPorProducto(
+    tenantId: string,
+    productoIds: string[],
+  ): Promise<Map<string, number>> {
+    const ids = Array.from(new Set((productoIds ?? []).filter(Boolean)));
+    const costos = new Map<string, number>();
+    if (ids.length === 0) return costos;
+
+    try {
+      const { data, error } = await this.supabase
+        .getClient()
+        .from('productos')
+        .select('id, costo, precio_compra')
+        .eq('tenant_id', tenantId)
+        .in('id', ids);
+
+      if (error) {
+        this.logger.warn(`No se pudo leer el costo de los productos del pedido: ${error.message}`);
+        return costos;
+      }
+
+      for (const producto of data ?? []) {
+        const costo = Number(producto.costo ?? 0);
+        const precioCompra = Number(producto.precio_compra ?? 0);
+        costos.set(producto.id, costo > 0 ? costo : Math.max(precioCompra, 0));
+      }
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo leer el costo de los productos del pedido: ${(error as Error)?.message}`,
+      );
+    }
+
+    return costos;
   }
 
   /**
@@ -423,7 +476,7 @@ export class CPEIntegrationService {
   private async obtenerEmpresaConfig(tenantId: string): Promise<any> {
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('ruc, razon_social, serie_factura, ultimo_numero_factura, moneda_defecto, pais, pais_id')
+      .select('ruc, razon_social, serie_factura, serie_boleta, moneda_defecto, pais, pais_id')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -452,41 +505,13 @@ export class CPEIntegrationService {
    */
   private async obtenerSerieYNumero(
     tenantId: string,
-    tipoDocumento: TipoDocumento = TipoDocumento.FACTURA,
+    tipoDocumento: TipoDocumento.FACTURA | TipoDocumento.BOLETA = TipoDocumento.FACTURA,
   ): Promise<{ serie: string; numero: number }> {
-    if (tipoDocumento === TipoDocumento.BOLETA) {
-      const client = this.supabase.getClient();
-      const { data: config, error } = await client
-        .from('empresa_config')
-        .select('serie_boleta')
-        .eq('tenant_id', tenantId)
-        .single();
-
-      if (error || !config) {
-        throw new BadRequestException('No se pudo obtener la serie de boleta');
-      }
-
-      const serie = config.serie_boleta || 'B001';
-      const { data: numeroReservado, error: numeroError } = await client.rpc(
-        'obtener_siguiente_numero_documento',
-        {
-          p_tenant_id: tenantId,
-          p_tipo_documento: 'BOLETA',
-          p_serie: serie,
-        },
-      );
-
-      const numero = Number.parseInt(String(numeroReservado ?? ''), 10);
-      if (numeroError || !Number.isFinite(numero) || numero <= 0) {
-        throw new BadRequestException('Error reservando correlativo de boleta');
-      }
-
-      return { serie, numero };
-    }
-
+    const esBoleta = tipoDocumento === TipoDocumento.BOLETA;
+    const serieField = esBoleta ? 'serie_boleta' : 'serie_factura';
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('serie_factura, ultimo_numero_factura')
+      .select('serie_factura, serie_boleta')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -494,29 +519,29 @@ export class CPEIntegrationService {
       throw new BadRequestException('No se pudo obtener la serie de factura');
     }
 
-    const serie = config.serie_factura || 'F001';
-    const ultimoNumero = config.ultimo_numero_factura || 0;
-    const numero = ultimoNumero + 1;
+    const serie = config[serieField] || (esBoleta ? 'B001' : 'F001');
+    const { data: correlativoData, error: correlativoError } = await this.supabase
+      .getClient()
+      .rpc('obtener_siguiente_numero_documento', {
+        p_tenant_id: tenantId,
+        p_tipo_documento: tipoDocumento,
+        p_serie: serie,
+      });
 
-    // Actualizar correlativo con optimistic concurrency control
-    const { data: updateResult, error: updateError } = await this.supabase.getClient()
-      .from('empresa_config')
-      .update({ ultimo_numero_factura: numero, updated_at: new Date().toISOString() })
-      .eq('tenant_id', tenantId)
-      .eq('ultimo_numero_factura', ultimoNumero)
-      .select('ultimo_numero_factura')
-      .single();
-
-    if (updateError) {
-      if (updateError.code === 'PGRST116') {
-        throw new BadRequestException(
-          'Conflicto de concurrencia en numeración de factura. Otro proceso actualizó el correlativo. Reintente la operación.',
-        );
-      }
-      throw new BadRequestException('Error actualizando correlativo de factura');
+    if (correlativoError) {
+      throw new BadRequestException(
+        `No se pudo obtener el correlativo de ${esBoleta ? 'boleta' : 'factura'}: ${correlativoError.message}`,
+      );
     }
 
-    return { serie, numero };
+    const numero = Number(Array.isArray(correlativoData) ? correlativoData[0] : correlativoData);
+    if (!Number.isFinite(numero) || numero <= 0) {
+      throw new BadRequestException(
+        `Correlativo fiscal inválido para ${tipoDocumento}-${serie}: ${JSON.stringify(correlativoData)}`,
+      );
+    }
+
+    return { serie, numero: Math.trunc(numero) };
   }
 
   private async registrarExitoIntegracion(options: {

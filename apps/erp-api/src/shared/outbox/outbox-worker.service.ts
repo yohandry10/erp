@@ -4,6 +4,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { EventBusService, ERPEvent } from '../events/event-bus.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
+import { ACCOUNTING_EVENT_TYPES } from './accounting-event-types';
 
 /**
  * Worker que procesa eventos pendientes de la tabla outbox
@@ -15,38 +16,7 @@ export class OutboxWorker implements OnModuleInit {
   private readonly cronLockKey = 'worker:outbox:shared';
   private readonly cronLockTtlSeconds = 240;
   private isProcessing = false;
-  private readonly accountingOwnedEvents = new Set([
-    'venta.procesada',
-    'VentaFacturada',
-    'pos.venta.registrada',
-    'cobro.registrado',
-    'CobroRegistrado',
-    'recepcion.registrada',
-    'RecepcionRegistrada',
-    'devolucion.proveedor.registrada',
-    'DevolucionProveedorEmitida',
-    'cxc.creada',
-    'CuentaPorCobrarCreada',
-    'pago.proveedor.registrado',
-    'PagoProveedorRegistrado',
-    'ajuste.inventario.aplicado',
-    'AjusteInventarioAplicado',
-    'planilla.liquidada',
-    'PlanillaLiquidada',
-    'planilla.pagada',
-    'PlanillaPagada',
-    'depreciacion.generada',
-    'DepreciacionGenerada',
-    'cpe.anulado',
-    'CPEAnulado',
-    'factura.emitida',
-    'FacturaEmitida',
-    'producto.stock_bajo',
-    'producto.stock.bajo',
-    'ProductoStockBajo',
-    'stock.movimiento',
-    'StockMovimiento',
-  ]);
+  private readonly accountingOwnedEvents = new Set<string>(ACCOUNTING_EVENT_TYPES);
 
   constructor(
     private readonly supabase: SupabaseService,
@@ -288,6 +258,10 @@ export class OutboxWorker implements OnModuleInit {
         let failed = 0;
 
         for (const event of pendingEvents) {
+          if (this.accountingOwnedEvents.has(event.event_type)) {
+            continue;
+          }
+
           try {
             await this.outboxService.markEventProcessing(event.id);
 
@@ -298,7 +272,7 @@ export class OutboxWorker implements OnModuleInit {
               module: 'outbox-worker',
             };
 
-            this.eventBus.emit(event.event_type, erpEvent.data, 'outbox-worker');
+            await this.eventBus.emitAndAwait(event.event_type, erpEvent.data, 'outbox-worker');
             await this.outboxService.markEventCompleted(event.id);
             processed++;
           } catch (error) {

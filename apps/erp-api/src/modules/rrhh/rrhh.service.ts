@@ -14,6 +14,7 @@ import {
   parseFechaLocal,
   semestreCts,
   tiempoComputableCts,
+  tiempoCtsTrunca,
   tiempoDeServicios,
 } from './liquidacion-peru.util';
 import { calcularLiquidacionArgentina, validarCuilArgentina } from './planillas-argentina.util';
@@ -1522,8 +1523,33 @@ export class RrhhService {
     const montoVacaciones = calcularVacacionesTruncas(sueldoMensual, tiempoTotal, vacacionesUsadas);
 
     const remuneracionCts = remuneracionComputableCts(sueldoMensual);
-    const montoCts = calcularCts(remuneracionCts, tiempoTotal);
-    const diasCts = tiempoTotal.meses * 30 + tiempoTotal.dias;
+    const tiempoCtsPendiente = tiempoCtsTrunca(fechaIngreso, fechaTerminacionDate);
+    const ctsTrunca = calcularCts(remuneracionCts, tiempoCtsPendiente);
+
+    // Un depósito semestral calculado pero aún no depositado también se incluye
+    // en la liquidación. Los ya DEPOSITADOS jamás se vuelven a pagar.
+    const { data: depositosPendientes, error: depositosError } = await this.supabaseService
+      .getClient()
+      .from('depositos_cts')
+      .select('id,periodo,monto,meses_computables,dias_computables')
+      .eq('tenant_id', currentTenantId)
+      .eq('empleado_id', empleadoId)
+      .eq('estado', 'CALCULADO')
+      .lt('semestre_fin', fechaTerminacion);
+    if (depositosError) throw depositosError;
+
+    const ctsSemestresPendientes = (depositosPendientes || []).reduce(
+      (total: number, deposito: any) => total + Number(deposito.monto || 0),
+      0,
+    );
+    const montoCts = Number((ctsTrunca + ctsSemestresPendientes).toFixed(2));
+    const diasCts = tiempoCtsPendiente.meses * 30 + tiempoCtsPendiente.dias
+      + (depositosPendientes || []).reduce(
+        (total: number, deposito: any) => total
+          + Number(deposito.meses_computables || 0) * 30
+          + Number(deposito.dias_computables || 0),
+        0,
+      );
 
     const gratificacionTrunca = calcularGratificacionTrunca(
       sueldoMensual,
@@ -1561,6 +1587,10 @@ export class RrhhService {
           remuneracion_mensual: sueldoMensual,
           tiempo_servicios: tiempoTotal,
           remuneracion_computable_cts: remuneracionCts,
+          tiempo_cts_trunca: tiempoCtsPendiente,
+          monto_cts_trunca: ctsTrunca,
+          depositos_cts_pendientes: depositosPendientes || [],
+          monto_cts_semestres_pendientes: Number(ctsSemestresPendientes.toFixed(2)),
           monto_vacaciones_truncas: montoVacaciones,
           gratificacion_trunca: gratificacionTrunca.gratificacion,
           bonificacion_extraordinaria_9: gratificacionTrunca.bonificacionExtraordinaria,
@@ -1571,24 +1601,27 @@ export class RrhhService {
 
     if (error) throw error;
 
-    // Actualizar estado del empleado
-    await this.supabaseService
-      .getClient()
-      .from('empleados')
-      .update({ estado: 'inactivo' })
-      .eq('id', empleadoId)
-      .eq('tenant_id', currentTenantId);
-
-    // Terminar contrato
-    await this.supabaseService
-      .getClient()
-      .from('contratos')
-      .update({ estado: 'terminado', fecha_fin: fechaTerminacion })
-      .eq('id_empleado', empleadoId)
-      .eq('tenant_id', currentTenantId)
-      .eq('estado', 'vigente');
-
     return { success: true, data: data?.[0] };
+  }
+
+  async confirmarLiquidacion(liquidacionId: string, tenantId: string, usuarioId?: string) {
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'confirmar_liquidacion_tx',
+      {
+        p_tenant_id: tenantId,
+        p_liquidacion_id: liquidacionId,
+        p_usuario_id: usuarioId || null,
+      },
+    );
+
+    if (error) {
+      if (error.code === 'P0002') throw new NotFoundException(error.message);
+      if (['22023', '23514'].includes(error.code)) throw new BadRequestException(error.message);
+      throw error;
+    }
+    return data;
   }
 
   private async calcularVacacionesUsadas(

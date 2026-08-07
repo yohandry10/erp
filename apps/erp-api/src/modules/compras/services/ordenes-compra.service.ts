@@ -412,7 +412,7 @@ export class OrdenesCompraService {
           .single();
 
         if (usuario) {
-          aprobadorNombre = `${usuario.nombre} ${usuario.apellido}`.trim();
+          aprobadorNombre = [usuario.nombre, usuario.apellido].filter(Boolean).join(' ');
         }
       } catch (error) {
         // Si no se puede obtener el nombre, usar el ID
@@ -579,7 +579,7 @@ export class OrdenesCompraService {
           .single();
 
         if (usuario) {
-          rechazadorNombre = `${usuario.nombre} ${usuario.apellido}`.trim();
+          rechazadorNombre = [usuario.nombre, usuario.apellido].filter(Boolean).join(' ');
         }
       } catch (error) {
         // Si no se puede obtener el nombre, usar el ID
@@ -1029,11 +1029,11 @@ export class OrdenesCompraService {
             orden_id: ordenId,
             nivel: 1,
             aprobador_id: usuario.id,
-            aprobador_nombre: `${usuario.nombre} ${usuario.apellido}`.trim(),
+            aprobador_nombre: [usuario.nombre, usuario.apellido].filter(Boolean).join(' '),
             estado: 'PENDIENTE',
             tenant_id: tenantId,
           });
-          console.log(`✅ Aprobación pendiente creada para ${usuario.nombre} ${usuario.apellido}`);
+          console.log(`✅ Aprobación pendiente creada para ${[usuario.nombre, usuario.apellido].filter(Boolean).join(' ')}`);
         } catch (error) {
           console.error(`Error al crear aprobación pendiente para usuario ${usuario.id}:`, error);
         }

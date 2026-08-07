@@ -25,7 +25,7 @@ const API_BASE_URL = (process.env.API_BASE_URL || 'http://localhost:3002/api').r
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || 'admin@erp.local';
-const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+const TEST_USER_PASSWORD = requiredEnv('TEST_USER_PASSWORD', process.env.TEST_USER_PASSWORD);
 // SEC-001: aprobador requiere JWT propio para segregación de funciones.
 const TEST_APROBADOR_EMAIL = process.env.TEST_APROBADOR_EMAIL;
 const TEST_APROBADOR_PASSWORD = process.env.TEST_APROBADOR_PASSWORD;

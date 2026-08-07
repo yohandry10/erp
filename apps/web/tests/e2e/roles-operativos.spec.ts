@@ -33,13 +33,10 @@ type LoginResponse = {
 };
 
 function getOperationalPassword(): string {
-  // Prioridad: TEST_USER_PASSWORD explícito > DATABASE_URL > default seed.
-  // Antes priorizaba DATABASE_URL, lo que rompía cuando el e2e corre con un
-  // demo tenant (TEST_USER_EMAIL=demo-X@temp.local) pero DATABASE_URL apunta
-  // a Supabase con otro password — el login fallaba con 401 y luego rate-limit.
-  if (process.env.TEST_USER_PASSWORD) return process.env.TEST_USER_PASSWORD;
-  if (process.env.DATABASE_URL) return decodeURIComponent(new URL(process.env.DATABASE_URL).password);
-  return 'AdminProd2026!';
+  if (!process.env.TEST_USER_PASSWORD) {
+    throw new Error('TEST_USER_PASSWORD es obligatorio para E2E local efímero');
+  }
+  return process.env.TEST_USER_PASSWORD;
 }
 
 type RoleCase = {

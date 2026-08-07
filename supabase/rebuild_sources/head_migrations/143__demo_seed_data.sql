@@ -52,7 +52,6 @@ BEGIN
     serie_nota_debito = 'FD01',
     serie_guia_remision = 'T001',
     ultimo_numero_factura = 15,
-    ultimo_numero_boleta = 25,
     ultimo_numero_nota_credito = 2,
     ultimo_numero_nota_debito = 1,
     ultimo_numero_guia_remision = 5,

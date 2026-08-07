@@ -67,8 +67,10 @@ const features = [
 // Lo que ocurre de verdad al crear la demo, en el orden en que ocurre.
 const PASOS_DEMO = [
   'Creando tu empresa',
-  'Sembrando productos, clientes y almacen',
-  'Configurando roles, permisos y plan de cuentas',
+  'Cargando inventario, clientes y proveedores',
+  'Cargando ventas, compras, caja y contabilidad',
+  'Cargando empleados, asistencia y planilla',
+  'Validando que todos los modulos esten listos',
   'Abriendo tu sesion',
 ];
 

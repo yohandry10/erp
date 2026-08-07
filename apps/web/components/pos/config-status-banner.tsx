@@ -26,7 +26,7 @@ export function ConfigStatusBanner({ onOpenWizard, configurationStatus }: Config
   }
 
   // Si hay configurationStatus del API y está completo, no mostrar el banner
-  if (configurationStatus && configurationStatus.isComplete) {
+  if (configurationStatus && (configurationStatus.isDemo || configurationStatus.isComplete)) {
     console.log('✅ Banner oculto: configuración completa según API');
     return null;
   }

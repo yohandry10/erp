@@ -19,6 +19,9 @@ export interface Presupuesto {
   updated_at: string;
   created_by?: string;
   updated_by?: string;
+  centro_costo?: { id: string; codigo: string; nombre: string };
+  cuenta?: { id: string; codigo: string; nombre: string };
+  periodo?: { id: string; anio: number; mes: number; estado: string };
 }
 
 @Injectable()
@@ -176,7 +179,12 @@ export class PresupuestosService {
     let query = this.supabaseService
       .getClient()
       .from('presupuestos')
-      .select('*')
+      .select(`
+        *,
+        centro_costo:centros_costo!fk_presupuestos_centro_costo_id(id,codigo,nombre),
+        cuenta:plan_cuentas!fk_presupuestos_cuenta_id(id,codigo,nombre),
+        periodo:periodos_contables!fk_presupuestos_periodo_contable_id(id,anio,mes,estado)
+      `)
       .eq('tenant_id', tenantId);
 
     // Aplicar filtros si existen

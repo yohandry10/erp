@@ -7,6 +7,7 @@ import { fetchApi } from '@/lib/api-fetch'
 
 export interface ConfigurationStatus {
   isComplete: boolean
+  isDemo: boolean
   completionPercentage: number
   missingItems: string[]
   certificate: {
@@ -22,6 +23,7 @@ export interface ConfigurationStatus {
 
 const SUPER_ADMIN_STATUS: ConfigurationStatus = {
   isComplete: true,
+  isDemo: false,
   completionPercentage: 100,
   missingItems: [],
   certificate: { exists: true, isValid: true },
@@ -30,6 +32,7 @@ const SUPER_ADMIN_STATUS: ConfigurationStatus = {
 
 const EMPTY_STATUS: ConfigurationStatus = {
   isComplete: false,
+  isDemo: false,
   completionPercentage: 0,
   missingItems: ['Certificado digital', 'RUC', 'Razón Social', 'Dirección'],
   certificate: { exists: false, isValid: false },
@@ -52,7 +55,22 @@ async function fetchConfigurationStatus(): Promise<ConfigurationStatus> {
   }
 
   const data = await response.json()
-  return data?.success ? (data.data as ConfigurationStatus) : EMPTY_STATUS
+  if (!data?.success) return EMPTY_STATUS
+
+  const status = data.data as ConfigurationStatus
+  // Defensa adicional durante despliegues escalonados: aunque un backend viejo
+  // devolviera un certificado faltante, una demo nunca debe abrir onboarding.
+  if (status.isDemo === true) {
+    return {
+      ...status,
+      isComplete: true,
+      completionPercentage: 100,
+      missingItems: [],
+      certificate: { ...status.certificate, isValid: true },
+    }
+  }
+
+  return status
 }
 
 export const CONFIGURATION_STATUS_QUERY_KEY = ['configuration', 'context', 'status'] as const
