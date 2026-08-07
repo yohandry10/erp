@@ -7,6 +7,8 @@ class QueryMock {
   filters: Array<{ op: string; column: string; value?: unknown; operator?: string }> = [];
   selected = '';
   orderedBy = '';
+  inserted: unknown;
+  updated: unknown;
 
   constructor(
     readonly table: string,
@@ -16,6 +18,20 @@ class QueryMock {
 
   select(columns = '*') {
     this.selected = String(columns);
+    return this;
+  }
+
+  insert(payload: unknown) {
+    this.inserted = payload;
+    return this;
+  }
+
+  update(payload: unknown) {
+    this.updated = payload;
+    return this;
+  }
+
+  limit() {
     return this;
   }
 
@@ -93,6 +109,7 @@ function createService(rowsByTable: Record<string, any[]> = {}) {
       sireApiClient as any,
     ),
     queries,
+    sireApiClient,
   };
 }
 
@@ -130,7 +147,7 @@ describe('SireService', () => {
       { op: 'eq', column: 'tenant_id', value: tenantId },
       { op: 'gte', column: 'fecha_emision', value: '2026-05-01T00:00:00.000Z' },
       { op: 'lt', column: 'fecha_emision', value: '2026-06-01T00:00:00.000Z' },
-      { op: 'not', column: 'estado', operator: 'in', value: '("ANULADO","ANULADA","CANCELADO","CANCELADA")' },
+      { op: 'eq', column: 'estado', value: 'ACEPTADO' },
     ]));
   });
 
@@ -139,23 +156,65 @@ describe('SireService', () => {
       cuentas_por_pagar: [{
         fecha_emision: '2026-05-11T00:00:00.000Z',
         numero_documento: 'FC01-55',
-        proveedor_id: '22222222-2222-4222-8222-222222222222',
+        tipo_documento: 'FACTURA',
         subtotal: 200,
         igv: 36,
         total: 236,
         moneda: 'PEN',
+        fiscal_metadata: { tipo_cambio: 1 },
+        proveedores: {
+          ruc: '20512345671',
+          razon_social: 'Proveedor SIRE SAC',
+        },
       }],
     });
 
     const contenido = await service.generarContenidoSire({ periodo: '2026-05', tipo: 'REG_COM', metadata: {} }, tenantId);
     const comprasQuery = queries.find((query) => query.table === 'cuentas_por_pagar');
 
-    expect(contenido).toContain('2026-05|2026-05-11|FC01-55');
+    expect(contenido).toContain('2026-05|2026-05-11|FACTURA|FC01-55|20512345671|Proveedor SIRE SAC');
     expect(comprasQuery?.filters).toEqual(expect.arrayContaining([
       { op: 'eq', column: 'tenant_id', value: tenantId },
       { op: 'gte', column: 'fecha_emision', value: '2026-05-01T00:00:00.000Z' },
       { op: 'lt', column: 'fecha_emision', value: '2026-06-01T00:00:00.000Z' },
+      { op: 'in', column: 'tipo_documento', value: ['FACTURA', 'NOTA_CREDITO', 'NOTA_DEBITO', 'RECIBO_HONORARIOS'] },
     ]));
+  });
+
+  it('solo anuncia recepción SIRE cuando SUNAT devuelve un ticket persistible', async () => {
+    const { service, queries, sireApiClient } = createService({
+      sire_files: [{
+        id: 'report-1',
+        tenant_id: tenantId,
+        estado: 'GENERADO',
+        tipo: 'REG_VEN',
+        periodo: '2026-05',
+      }],
+      sire_operaciones: [{ id: 'operation-1' }],
+    });
+    sireApiClient.aceptarPropuesta.mockResolvedValue({
+      ticket: 'ticket-sunat-1',
+      httpStatus: 200,
+      responseSummary: { accepted: true },
+    });
+
+    await expect(service.enviarSunat('report-1', tenantId)).resolves.toEqual(
+      expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          ticket: 'ticket-sunat-1',
+          estado: 'PENDIENTE',
+        }),
+      }),
+    );
+    expect(sireApiClient.aceptarPropuesta).toHaveBeenCalledWith(
+      tenantId,
+      'REG_VEN',
+      '202605',
+    );
+    expect(queries.some((query) =>
+      query.table === 'sire_files'
+      && (query.updated as any)?.sunat_ticket === 'ticket-sunat-1')).toBe(true);
   });
 
   it('aplica filtros de periodo, tipo y estado al listado de reportes', async () => {

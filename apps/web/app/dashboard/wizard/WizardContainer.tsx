@@ -58,6 +58,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
 
   const currentStepData = resolvedSteps[state.currentStep]
   const isFinalStep = state.currentStep === state.steps.length - 1
+  const isPersistedSummary = state.hasPersistedConfiguration && isFinalStep
   const progress = ((state.currentStep + 1) / state.steps.length) * 100
 
   return (
@@ -109,10 +110,10 @@ export function WizardContainer({ children }: WizardContainerProps) {
           {/* Step Title */}
           <div className="mb-8">
             <h2 className="text-[2rem] font-extrabold text-[var(--primary-800)] mb-3">
-              {state.hasPersistedConfiguration ? 'Resumen de Configuración' : currentStepData.title}
+              {isPersistedSummary ? 'Resumen de Configuración' : currentStepData.title}
             </h2>
             <p className="text-base text-[var(--primary-600)] font-medium leading-7">
-              {state.hasPersistedConfiguration
+              {isPersistedSummary
                 ? 'Tu sistema está configurado. Aquí puedes ver y editar algunos ajustes.'
                 : currentStepData.description}
             </p>
@@ -131,7 +132,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
           )}
 
           {/* Navigation Buttons - No mostrar si el wizard ya está completado */}
-          {!state.isLoading && !state.hasPersistedConfiguration && (
+          {!state.isLoading && !isPersistedSummary && (
             <div className="flex mt-10 pt-8 border-t gap-4">
               {state.currentStep > 0 && !isFinalStep && (
                 <button

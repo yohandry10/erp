@@ -50,6 +50,15 @@ const ESTADO_CONFIG = {
   }
 }
 
+const formatApproverName = (name: string) => {
+  const normalized = name
+    .split(/\s+/)
+    .filter((part) => part && !['null', 'undefined'].includes(part.toLowerCase()))
+    .join(' ')
+
+  return normalized || 'Sistema'
+}
+
 export default function AprobacionesPanel({ ordenId, estadoOrden }: AprobacionesPanelProps) {
   const { get } = useApi()
   const [aprobaciones, setAprobaciones] = useState<Aprobacion[]>([])
@@ -224,7 +233,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
                 </div>
                 <div className="flex-[1]">
                   <div className="text-[0.875rem] font-semibold text-[var(--primary-800)]">
-                    {aprobacion.aprobador_nombre}
+                    {formatApproverName(aprobacion.aprobador_nombre)}
                   </div>
                   <div className="text-xs text-[var(--primary-500)]">
                     Nivel {aprobacion.nivel}

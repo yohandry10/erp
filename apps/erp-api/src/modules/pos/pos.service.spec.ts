@@ -5,6 +5,7 @@ const productoBase = {
   codigo: 'P1',
   nombre: 'Prod 1',
   precio_venta: 100,
+  costo: 50,
   stock_actual: 5,
   stock_reservado: 0,
   activo: true,
@@ -296,6 +297,7 @@ describe('PosService full transaction contract', () => {
         rows: expect.objectContaining({
           cpe_pendiente: true,
           cpe_data: expect.objectContaining({
+            costo_ventas: 50,
             items: [
               expect.objectContaining({
                 codigo_producto: 'P1',

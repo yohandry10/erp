@@ -115,6 +115,7 @@ export class DevolucionesProveedorService {
 
       // Crear los items de la devolución
       const itemsData = createDto.items.map(item => ({
+        tenant_id: tenantId,
         devolucion_id: devolucion.id,
         recepcion_item_id: item.recepcion_item_id || null,
         producto_id: item.producto_id,

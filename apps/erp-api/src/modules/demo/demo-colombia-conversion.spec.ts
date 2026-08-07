@@ -29,7 +29,12 @@ describe('DemoService - promoción colombiana real', () => {
   });
 
   it('elimina fixtures colombianos mediante el RPC antes de entregar la cuenta real', async () => {
-    const rpc = jest.fn().mockResolvedValue({ data: { prepared: true }, error: null });
+    const rpc = jest.fn((name: string) => Promise.resolve({
+      data: name === 'prepare_colombia_real_onboarding'
+        ? { prepared: true }
+        : { success: true, reinicio: { reiniciado: false } },
+      error: null,
+    }));
     const from = jest.fn((table: string) => {
       if (table === 'empresa_config') {
         const builder: any = {
@@ -70,6 +75,11 @@ describe('DemoService - promoción colombiana real', () => {
     expect(rpc).toHaveBeenCalledWith('prepare_colombia_real_onboarding', {
       p_tenant_id: 'tenant-co',
     });
+    expect(rpc).toHaveBeenCalledWith('completar_conversion_demo', expect.objectContaining({
+      p_tenant: 'tenant-co',
+      p_ruc: '900373913-5',
+      p_email: 'admin@empresa.co',
+    }));
     expect(result).toEqual(expect.objectContaining({ success: true, tenant_id: 'tenant-co' }));
     expect(login).toHaveBeenCalled();
   });

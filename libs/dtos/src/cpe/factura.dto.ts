@@ -112,6 +112,14 @@ export class CreateFacturaDto {
   @Min(0)
   total_venta: number;
 
+  // Costo contable de los bienes vendidos. No forma parte del XML UBL, pero
+  // viaja con el comprobante para que el evento factura.emitida registre
+  // Dr 69 / Cr 20 y no sobrestime la utilidad ni el inventario contable.
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costo_ventas?: number;
+
   // Bases por tipo de afectación del IGV (SUNAT Catálogo 07). Son opcionales
   // para no romper a los emisores que solo manejan operaciones gravadas, pero
   // sin ellas un comprobante con ítems exonerados se declararía como gravado.

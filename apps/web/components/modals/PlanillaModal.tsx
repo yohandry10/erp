@@ -242,14 +242,14 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
       // Calcular con empleados personalizados
       const calcResponse = await post(`/api/rrhh/planillas/${createResponse.id}/calcular-personalizada`, {
         empleados: empleadosSeleccionados.map((empleado) => ({
-          ...empleado,
-          ...(isArgentina
-            ? {
-                horas_extras_50: empleado.horas_extras_25,
-                horas_extras_100: empleado.horas_extras_35,
-              }
-            : {}),
-        }))
+          empleado_id: empleado.id,
+          dias_trabajados: empleado.dias_trabajados,
+          horas_extras_25: empleado.horas_extras_25,
+          horas_extras_35: empleado.horas_extras_35,
+          tardanzas_minutos: empleado.tardanzas_minutos,
+          faltas: empleado.faltas,
+          bonos_adicionales: empleado.bonos_adicionales,
+        })),
       })
       console.log('🔥 Respuesta calcular:', calcResponse)
 

@@ -67,6 +67,48 @@ describe('TesoreriaService', () => {
 
     jest.clearAllMocks();
     mockSupabaseClient.from.mockReturnValue(mockQueryBuilder);
+    mockSupabaseClient.rpc.mockImplementation(async (fn: string, args: any) => {
+      if (fn !== 'aplicar_pago_cxp_tx') return { data: null, error: null };
+      const first = await mockQueryBuilder.maybeSingle();
+      if (args.p_pago.idempotency_key === 'idem-cxp-payment-1' && first?.data?.id) {
+        const current = await mockQueryBuilder.maybeSingle();
+        return {
+          data: {
+            idempotent: true,
+            cxp: current?.data,
+            pago: first.data,
+            movimiento_bancario: first.data,
+          },
+          error: null,
+        };
+      }
+      const cxp = first?.data;
+      if (!cxp) return { data: null, error: { message: 'Cuenta por pagar no encontrada' } };
+      if (cxp.estado === 'ANULADA') return { data: null, error: { message: 'No se puede aplicar pago a una cuenta por pagar anulada' } };
+      if (cxp.estado === 'PAGADA' || Number(cxp.saldo) <= 0) return { data: null, error: { message: 'La cuenta por pagar ya está completamente pagada' } };
+      if (Number(args.p_pago.monto) > Number(cxp.saldo)) return { data: null, error: { message: `El monto del pago (${args.p_pago.monto}) no puede ser mayor al saldo pendiente (${cxp.saldo})` } };
+      if (Number(cxp.total) >= 2000 && args.p_pago.metodo_pago === 'EFECTIVO') return { data: null, error: { message: 'El pago supera el umbral de bancarización' } };
+      if (Number(cxp.total) >= 2000 && !args.p_pago.referencia) return { data: null, error: { message: 'El pago requiere referencia bancaria por bancarización' } };
+      let movimiento: any = null;
+      if (args.p_pago.cuenta_bancaria_id) {
+        const bankResult = await mockQueryBuilder.maybeSingle();
+        const bank = bankResult?.data;
+        if (!bank) return { data: null, error: { message: 'Cuenta bancaria no encontrada' } };
+        if (bank.moneda !== cxp.moneda) return { data: null, error: { message: `La moneda de la cuenta bancaria (${bank.moneda}) no coincide con la moneda de la CxP (${cxp.moneda})` } };
+        if (!bank.permite_sobregiro && Number(bank.saldo) < Number(args.p_pago.monto)) return { data: null, error: { message: 'Saldo insuficiente en la cuenta bancaria' } };
+        movimiento = { id: 'mov-123', monto: args.p_pago.monto };
+      }
+      const saldo = Number(cxp.saldo) - Number(args.p_pago.monto);
+      return {
+        data: {
+          idempotent: false,
+          cxp: { ...cxp, saldo, estado: saldo === 0 ? 'PAGADA' : 'PARCIAL' },
+          pago: movimiento ?? { id: 'pago-123', monto: args.p_pago.monto },
+          movimiento_bancario: movimiento,
+        },
+        error: null,
+      };
+    });
   });
 
   afterEach(() => {
@@ -376,7 +418,8 @@ describe('TesoreriaService', () => {
       expect(result.success).toBe(true);
       expect(result.data.cxp.estado).toBe('PAGADA');
       expect(result.data.cxp.saldo).toBe(0);
-      expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalled();
+      expect(eventBusService.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('aplicar_pago_cxp_tx', expect.any(Object));
     });
 
     it('should successfully register partial pago and update CxP to PARCIAL', async () => {
@@ -408,7 +451,8 @@ describe('TesoreriaService', () => {
       expect(result.success).toBe(true);
       expect(result.data.cxp.estado).toBe('PARCIAL');
       expect(result.data.cxp.saldo).toBe(500);
-      expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalled();
+      expect(eventBusService.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('aplicar_pago_cxp_tx', expect.any(Object));
     });
 
     it('should register pago without cuenta bancaria', async () => {

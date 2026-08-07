@@ -10,6 +10,7 @@ import {
   dividirRemuneracionPorVacaciones,
   semestreCts,
   tiempoComputableCts,
+  tiempoCtsTrunca,
   tiempoDeServicios,
   parseFechaLocal,
 } from './liquidacion-peru.util';
@@ -175,6 +176,23 @@ describe('deposito semestral de CTS', () => {
     const rc = remuneracionComputableCts(1200); // 1400
     const t = tiempoComputableCts('2026-05', parseFechaLocal('2020-01-01'))!;
     expect(calcularCts(rc, t)).toBe(700);
+  });
+});
+
+describe('CTS trunca al cese', () => {
+  it('sólo computa el semestre mayo-octubre aunque exista mucha antigüedad', () => {
+    expect(tiempoCtsTrunca(parseFechaLocal('2020-01-01'), parseFechaLocal('2026-08-15')))
+      .toEqual({ meses: 3, dias: 14 });
+  });
+
+  it('usa noviembre del año anterior para un cese entre enero y abril', () => {
+    expect(tiempoCtsTrunca(parseFechaLocal('2020-01-01'), parseFechaLocal('2026-02-01')))
+      .toEqual({ meses: 3, dias: 0 });
+  });
+
+  it('respeta el ingreso dentro del semestre', () => {
+    expect(tiempoCtsTrunca(parseFechaLocal('2026-07-10'), parseFechaLocal('2026-08-25')))
+      .toEqual({ meses: 1, dias: 15 });
   });
 });
 

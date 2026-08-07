@@ -317,6 +317,21 @@ export class CxpService {
     userId?: string,
   ): Promise<{ success: boolean; data: any }> {
     const client = this.supabase.getClient();
+    const tipoDocumento = this.normalizarTipoDocumentoCompra(dto.tipo_documento);
+    const moneda = String(dto.moneda ?? 'PEN').trim().toUpperCase();
+
+    if (moneda !== 'PEN' && (!Number.isFinite(dto.tipo_cambio) || Number(dto.tipo_cambio) <= 0)) {
+      throw new BadRequestException('El tipo de cambio es obligatorio para documentos en moneda extranjera');
+    }
+    if (
+      tipoDocumento === 'NOTA_CREDITO'
+      && (!dto.documento_referencia_tipo
+        || !dto.documento_referencia_serie
+        || !dto.documento_referencia_numero
+        || !dto.documento_referencia_fecha)
+    ) {
+      throw new BadRequestException('La nota de crédito requiere los datos completos del comprobante modificado');
+    }
 
     // Validar que el proveedor existe
     const { data: proveedor, error: proveedorError } = await client
@@ -452,7 +467,18 @@ export class CxpService {
       percepcion_total: ajustesTributarios.percepcion,
       detraccion_total: ajustesTributarios.detraccion,
       anticipo_total: ajustesTributarios.anticipo,
-      moneda: dto.moneda ?? 'PEN',
+      moneda,
+      tipo_documento: tipoDocumento,
+      referencia_tipo: dto.referencia_tipo ?? (dto.recepcion_id ? 'RECEPCION' : null),
+      referencia_id: dto.referencia_id ?? dto.recepcion_id ?? null,
+      fiscal_metadata: {
+        serie: dto.serie ?? null,
+        tipo_cambio: dto.tipo_cambio ?? (moneda === 'PEN' ? 1 : null),
+        documento_referencia_tipo: dto.documento_referencia_tipo ?? null,
+        documento_referencia_serie: dto.documento_referencia_serie ?? null,
+        documento_referencia_numero: dto.documento_referencia_numero ?? null,
+        documento_referencia_fecha: dto.documento_referencia_fecha ?? null,
+      },
       // Cotización con la que se contabiliza el documento. Sin ella la
       // diferencia de cambio del saldo no es calculable al cierre.
       tipo_cambio_origen:
@@ -464,50 +490,22 @@ export class CxpService {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: cxp, error: cxpError } = await client
-      .from('cuentas_por_pagar')
-      .insert(cxpData)
-      .select()
-      .single();
+    const eventId = uuidv4();
+    const idempotencyKey = `cxp:factura:${tenantId}:${dto.proveedor_id}:${dto.numero_documento.trim().toUpperCase()}`;
+    const { data: cxpResult, error: cxpError } = await client.rpc(
+      'crear_factura_proveedor_tx',
+      {
+        p_tenant_id: tenantId,
+        p_cxp: cxpData,
+        p_event_id: eventId,
+        p_idempotency_key: idempotencyKey,
+      },
+    );
+    const cxp = Array.isArray(cxpResult) ? cxpResult[0] : cxpResult;
 
-    if (cxpError) {
+    if (cxpError || !cxp?.id) {
       console.error('Error creando cuenta por pagar:', cxpError);
       throw new BadRequestException('No se pudo crear la cuenta por pagar');
-    }
-
-    // Emitir evento FacturaProveedorRegistrada
-    try {
-      const eventId = uuidv4();
-      const idempotencyKey = `cxp:factura:${tenantId}:${cxp.id}`;
-
-      const eventoPayload: any = {
-        tenantId,
-        eventId,
-        idempotencyKey,
-        facturaProvId: cxp.id,
-        numeroDocumento: cxp.numero_documento,
-        serie: null,
-        ordenId: cxp.orden_id,
-        recepcionId: cxp.recepcion_id,
-        proveedorId: cxp.proveedor_id,
-        subtotal: Number(cxp.subtotal),
-        igv: Number(cxp.igv),
-        total: Number(cxp.total),
-        retencion: Number(cxp.retencion_total ?? ajustesTributarios.retencion),
-        percepcion: Number(cxp.percepcion_total ?? ajustesTributarios.percepcion),
-        detraccion: Number(cxp.detraccion_total ?? ajustesTributarios.detraccion),
-        anticipo: Number(cxp.anticipo_total ?? ajustesTributarios.anticipo),
-        moneda: cxp.moneda,
-        fechaEmision: cxp.fecha_emision,
-        fechaVencimiento: cxp.fecha_vencimiento,
-        estadoComparacion: 'OK',
-        emittedAt: new Date().toISOString(),
-      };
-
-      this.eventBus.emitFacturaProveedorRegistrada(eventoPayload);
-      console.log('✅ Evento FacturaProveedorRegistrada emitido exitosamente');
-    } catch (errorEvento) {
-      console.error('❌ Error emitiendo evento FacturaProveedorRegistrada:', errorEvento);
     }
 
     return {
@@ -1775,9 +1773,28 @@ export class CxpService {
   private parseFechaLocal(valor: string | Date): Date {
     if (valor instanceof Date) return valor;
 
-    const partes = /^(d{4})-(d{2})-(d{2})/.exec(String(valor ?? ''));
+    const partes = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(valor ?? ''));
     if (!partes) return new Date(valor);
 
     return new Date(Number(partes[1]), Number(partes[2]) - 1, Number(partes[3]));
+  }
+
+  private normalizarTipoDocumentoCompra(valor?: string): string {
+    const clave = String(valor ?? 'FACTURA').trim().toUpperCase().replace(/[\s-]+/g, '_');
+    const tipos: Record<string, string> = {
+      '01': 'FACTURA',
+      FACTURA: 'FACTURA',
+      '07': 'NOTA_CREDITO',
+      NOTA_CREDITO: 'NOTA_CREDITO',
+      '08': 'NOTA_DEBITO',
+      NOTA_DEBITO: 'NOTA_DEBITO',
+      '02': 'RECIBO_HONORARIOS',
+      RECIBO_HONORARIOS: 'RECIBO_HONORARIOS',
+    };
+    const normalizado = tipos[clave];
+    if (!normalizado) {
+      throw new BadRequestException(`Tipo de documento de compra no soportado: ${valor}`);
+    }
+    return normalizado;
   }
 }

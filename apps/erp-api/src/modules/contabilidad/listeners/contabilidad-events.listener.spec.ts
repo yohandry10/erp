@@ -21,6 +21,8 @@ describe("ContabilidadEventsListener", () => {
       generarAsientoVenta: jest.fn(),
       generarAsientoCobro: jest.fn(),
       generarAsientoCompra: jest.fn(),
+      generarAsientoRecepcion: jest.fn(),
+      generarAsientoFacturaProveedor: jest.fn(),
       generarAsientoPago: jest.fn(),
       generarAsientoAjusteInventario: jest.fn(),
       generarAsientoPlanilla: jest.fn(),
@@ -440,7 +442,7 @@ describe("ContabilidadEventsListener", () => {
       expect(asientosGenerator.marcarEventoComoFallido).not.toHaveBeenCalled();
     });
 
-    it("should complete non-accounting events defensively if they reach the accounting processor", async () => {
+    it("should account for a supplier invoice separately from the receipt", async () => {
       const operationalEvent: OutboxEvent = {
         id: "1",
         event_id: "evt-operational-cxp",
@@ -450,7 +452,12 @@ describe("ContabilidadEventsListener", () => {
         event_type: "factura.proveedor.registrada",
         event_data: {
           tenantId: "tenant-001",
-          numeroDocumento: "REC-2026-0999",
+          numeroDocumento: "F001-99",
+          fechaEmision: "2026-05-14",
+          subtotal: 100,
+          igv: 18,
+          total: 118,
+          recepcionId: "rec-1",
         },
         event_version: 1,
         created_at: "2026-05-14T10:00:00Z",
@@ -460,14 +467,20 @@ describe("ContabilidadEventsListener", () => {
         error_message: null,
       };
 
+      asientosGenerator.generarAsientoFacturaProveedor.mockResolvedValue({
+        id: "asiento-fp-1",
+      } as any);
       await (listener as any).procesarEvento(operationalEvent);
 
-      expect(asientosGenerator.marcarEventoComoProcesado).toHaveBeenCalledWith(
-        "evt-operational-cxp",
+      expect(asientosGenerator.generarAsientoFacturaProveedor).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: "tenant-001",
+          subtotal: 100,
+          igv: 18,
+          total: 118,
+          recepcion_id: "rec-1",
+        }),
       );
-      expect(asientosGenerator.marcarEventoComoFallido).not.toHaveBeenCalled();
-      expect(asientosGenerator.generarAsientoCompra).not.toHaveBeenCalled();
-      expect(asientosGenerator.generarAsientoPago).not.toHaveBeenCalled();
     });
   });
 
@@ -551,7 +564,7 @@ describe("ContabilidadEventsListener", () => {
       outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
         mockEventos,
       );
-      asientosGenerator.generarAsientoCompra.mockResolvedValue({
+      asientosGenerator.generarAsientoRecepcion.mockResolvedValue({
         id: "asiento-003",
         tenant_id: "tenant-001",
         numero_asiento: 3,
@@ -565,10 +578,10 @@ describe("ContabilidadEventsListener", () => {
 
       await listener.procesarEventosPendientes();
 
-      expect(asientosGenerator.generarAsientoCompra).toHaveBeenCalledWith(
+      expect(asientosGenerator.generarAsientoRecepcion).toHaveBeenCalledWith(
         expect.objectContaining({
           tenant_id: "tenant-001",
-          total: 118,
+          costo: 100,
           event_id: "evt-004",
         }),
       );
@@ -606,7 +619,7 @@ describe("ContabilidadEventsListener", () => {
       outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
         mockEventos,
       );
-      asientosGenerator.generarAsientoCompra.mockResolvedValue({
+      asientosGenerator.generarAsientoRecepcion.mockResolvedValue({
         id: "asiento-003",
         tenant_id: "tenant-001",
         numero_asiento: 3,
@@ -620,12 +633,10 @@ describe("ContabilidadEventsListener", () => {
 
       await listener.procesarEventosPendientes();
 
-      expect(asientosGenerator.generarAsientoCompra).toHaveBeenCalledWith(
+      expect(asientosGenerator.generarAsientoRecepcion).toHaveBeenCalledWith(
         expect.objectContaining({
           tenant_id: "tenant-001",
-          total: 118,
           costo: 100,
-          igv: 18,
           event_id: "evt-004-partial",
         }),
       );
@@ -660,7 +671,7 @@ describe("ContabilidadEventsListener", () => {
       outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
         mockEventos,
       );
-      asientosGenerator.generarAsientoCompra.mockResolvedValue({
+      asientosGenerator.generarAsientoRecepcion.mockResolvedValue({
         id: "asiento-003",
         tenant_id: "tenant-001",
         numero_asiento: 3,

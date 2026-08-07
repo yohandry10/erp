@@ -31,6 +31,10 @@ services:
       # al activarla conserva lo que cargo.
       - key: DEMO_API_ENABLED
         value: true
+      - key: FEATURE_POS_ENABLED
+        value: true
+      - key: FEATURE_RRHH_ENABLED
+        value: true
 
       # Los módulos cerrados para Perú quedan activos por defecto. Una
       # desactivación de emergencia debe ser explícita en el panel.

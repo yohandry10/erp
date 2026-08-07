@@ -592,7 +592,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         )}
       </div>
 
-      {!!status?.missingItems?.length && (
+      {!status?.isDemo && !!status?.missingItems?.length && (
         <div className="relative mt-4 rounded-2xl border border-primary/30 bg-primary/10 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           <h2 className="m-0 mb-2 text-base font-semibold text-primary">Pendientes detectados por backend</h2>
           <ul className="m-0 list-disc pl-5 text-foreground/85">

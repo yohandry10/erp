@@ -6,7 +6,6 @@ import {
   RecepcionRegistradaEvent,
 } from '../../../../shared/events/event-bus.service';
 import { CxpService } from '../cxp.service';
-import { CondicionesPagoCxp, CrearCxpDto } from '../dto/crear-cxp.dto';
 
 @Injectable()
 export class CxpEventsListener implements OnModuleInit {
@@ -38,49 +37,12 @@ export class CxpEventsListener implements OnModuleInit {
       return;
     }
 
-    try {
-      const dto: CrearCxpDto = {
-        proveedor_id: data.proveedorId,
-        orden_id: data.ordenId,
-        recepcion_id: data.recepcionId,
-        numero_documento: data.numeroRecepcion,
-        fecha_emision: data.fechaRecepcion,
-        // No se fija fecha_vencimiento: forzarla a la fecha de recepción hacía vencer
-        // la CxP el mismo día. Se deja que crearCxp la calcule desde fecha_emision +
-        // dias_credito según las condiciones de pago del proveedor/orden.
-        condiciones_pago: (data.condicionesPago as CondicionesPagoCxp | undefined) ?? undefined,
-        dias_credito: data.diasCredito ?? undefined,
-        subtotal: data.subtotalParcial ?? data.subtotal,
-        igv: data.igvParcial ?? data.igv,
-        total: data.totalParcial ?? data.total,
-        moneda: data.moneda,
-        observaciones: data.greProveedor
-          ? `Recepción ${data.numeroRecepcion} - GRE Proveedor: ${data.greProveedor}`
-          : `Recepción ${data.numeroRecepcion} de OC ${data.numeroOrden}`,
-        numero: data.numeroRecepcion,
-        tipo_documento: 'RECEPCION',
-        referencia_tipo: 'RECEPCION',
-        referencia_id: data.recepcionId,
-        idempotency_key: data.idempotencyKey,
-      };
-
-      // Idempotencia: el servicio valida unicidad por proveedor + número_documento.
-      await this.cxpService.crearCuentaPorPagar(tenantId, dto, null);
-      this.logger.log(
-        `✅ [CxP] Cuenta por pagar creada automáticamente para recepción ${data.numeroRecepcion}`,
-      );
-    } catch (error: any) {
-      if (/Ya existe una cuenta por pagar/i.test(error?.message || '')) {
-        this.logger.log(
-          `⏭️ [CxP] Cuenta por pagar ya existente para recepción ${data.numeroRecepcion}; evento idempotente omitido`,
-        );
-        return;
-      }
-      // No bloquear el flujo de eventos; solo registrar.
-      this.logger.error(
-        `❌ [CxP] Error creando CxP automática para recepción ${data.numeroRecepcion}: ${error?.message}`,
-      );
-    }
+    // Una recepción acredita que la mercadería llegó, no que exista una deuda
+    // tributaria documentada. La CxP y el IGV crédito nacen recién al registrar
+    // la factura del proveedor, que puede vincularse a esta recepción.
+    this.logger.log(
+      `⏳ [CxP] Recepción ${data.numeroRecepcion} pendiente de factura; no se crea CxP automáticamente`,
+    );
   }
 
   private async handleDevolucionProveedorEmitida(

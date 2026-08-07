@@ -14,8 +14,8 @@ migraciones verificados, prevalece la implementación actual.
   `COP`, DIAN).
 - PROD `wypnbcptofqdmoynlonq` es el único proyecto remoto operativo. El antiguo
   DEV está retirado y bloqueado por runtime, scripts y CI.
-- El cierre más reciente del backend reporta 167/167 suites y 1562/1562 pruebas.
-- El cierre Web del 2026-08-07 reporta type-check limpio y build Next 123/123
+- El cierre más reciente del backend reporta 170/170 suites y 1591/1591 pruebas.
+- El cierre Web del 2026-08-07 reporta type-check limpio y build Next 124/124
   rutas; 73 rutas se verificaron en escritorio y móvil (146 casos) y el
   recorrido visible de demos nuevas PE/AR/CO no presentó errores de consola.
 - Los cálculos de nómina PE/AR/CO conservan cobertura automatizada sin depender
@@ -99,6 +99,16 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   movimientos y cierre. El ensayo se revirtió, la función quedó como
   `SECURITY INVOKER`, `anon/authenticated` no pueden ejecutarla y el tenant de
   verificación devolvió 15 cuentas PCGE.
+- `412..432`: aplicadas y registradas en PROD el 2026-08-07 después de preflight,
+  respaldo PostgreSQL 17 restaurado en infraestructura local efímera y ensayo
+  íntegro sobre una copia de PROD. Cierran la hidratación transaccional de demos,
+  conversión demo→real, teléfono de clientes, costo de ventas POS/pedidos,
+  planilla y liquidación atómicas, cuenta PCGE 4699, asientos/CxP/pagos con
+  outbox e idempotencia y la firma única de `create_demo_tenant`. El verificador
+  posterior confirmó 21 versiones, 29/29 demos consultables, cero asientos
+  confirmados descuadrados, cero roles `ADMIN_DEMO` en cuentas reales, cero
+  teléfonos inválidos y cero tenants sin 4699. Los RPC `SECURITY DEFINER` que
+  aceptan `tenant_id` quedaron limitados a `service_role`.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -150,6 +160,11 @@ Cambios recientes principales:
   una sola transacción con las huellas de los trabajadores aceptados.
 - `401..411`: paridad operativa del rol CONTADOR, RPC transaccionales de Perú,
   PCGE para diferidos y recurrencia contable reprogramable.
+- `412..424`: demos empresariales coherentes y conversión a cuenta real sin
+  estado parcial; backfills limitados a tenants aún marcados como demo.
+- `425..432`: escrituras críticas de planilla, liquidación, asientos, factura
+  proveedor y pago bancario en una sola transacción, con outbox e idempotencia;
+  reconciliación de costo de ventas y contrato RPC demo no ambiguo.
 
 ## Flujos cerrados técnicamente
 
@@ -266,7 +281,7 @@ productivo autorizado.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `411` en PROD.
+1. Código y migraciones actuales; estado remoto verificado hasta `432` en PROD.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.

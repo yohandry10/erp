@@ -114,6 +114,10 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
   formato 3.1 pertenece al Estado de Situación Financiera y no se usa para este
   reporte. Los TXT son insumos para PVS: el ERP no los presenta ni sustituye la
   validación oficial.
+- En el Registro de Compras 8.1, las notas de crédito invierten base, IGV y
+  total, conservan la referencia SUNAT del comprobante modificado y una compra
+  en moneda extranjera se rechaza si no tiene tipo de cambio de origen; nunca se
+  inventa 1.000 para USD u otra divisa.
 - El asiento manual nace en `BORRADOR` o `CONFIRMADO`; un confirmado es
   inmutable y se corrige mediante un contra-asiento enlazado, nunca reescribiendo
   silenciosamente el original.

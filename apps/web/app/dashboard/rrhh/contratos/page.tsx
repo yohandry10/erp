@@ -12,6 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ContractFormDialog } from './ContractFormDialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCountryContext } from '@/hooks/use-country-context';
+import { unwrapApiArray } from '@/lib/api-contract';
+
+const normalizarEstadoContrato = (estado: unknown) => String(estado ?? '').trim().toLowerCase();
+const normalizarTipoContrato = (tipo: unknown) => String(tipo ?? '').trim().toLowerCase();
+const contratoEstaVigente = (estado: unknown) =>
+  ['vigente', 'renovado', 'en_periodo_prueba'].includes(normalizarEstadoContrato(estado));
 
 const ContratosPage = () => {
   const country = useCountryContext();
@@ -25,7 +31,7 @@ const ContratosPage = () => {
       ? ['indefinido', 'fijo', 'obra_labor', 'prestacion_servicios']
       : ['indefinido', 'temporal', 'practicas', 'locacion_servicios'];
   const isActiveContract = (contrato: any) =>
-    ['activo', 'vigente'].includes(String(contrato?.estado || '').toLowerCase());
+    contratoEstaVigente(contrato?.estado) || normalizarEstadoContrato(contrato?.estado) === 'activo';
   const [contratos, setContratos] = useState<any[]>([]);
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [filtroEstado, setFiltroEstado] = useState('todos');
@@ -80,24 +86,12 @@ const ContratosPage = () => {
       setLoading(true);
 
       // Cargar contratos
-      const contratosData = await get('/rrhh/contratos');
-      setContratos(
-        contratosData?.success && Array.isArray(contratosData.data)
-          ? contratosData.data
-          : Array.isArray(contratosData)
-            ? contratosData
-            : [],
-      );
+      const contratosData = await get('/api/rrhh/contratos');
+      setContratos(unwrapApiArray(contratosData));
 
       // Cargar empleados
-      const empleadosData = await get('/rrhh/empleados');
-      setEmpleados(
-        empleadosData?.success && Array.isArray(empleadosData.data)
-          ? empleadosData.data
-          : Array.isArray(empleadosData)
-            ? empleadosData
-            : [],
-      );
+      const empleadosData = await get('/api/rrhh/empleados');
+      setEmpleados(unwrapApiArray(empleadosData));
     } catch (error) {
       console.error('Error cargando contratos:', error);
     } finally {
@@ -183,7 +177,7 @@ const ContratosPage = () => {
     }
 
     if (filtroTipo !== 'todos') {
-      filtrados = filtrados.filter(c => c.tipo_contrato === filtroTipo);
+      filtrados = filtrados.filter(c => normalizarTipoContrato(c.tipo_contrato) === filtroTipo);
     }
 
     return filtrados;
@@ -197,7 +191,9 @@ const ContratosPage = () => {
       'finalizado': 'bg-muted text-foreground',
       'en_periodo_prueba': 'bg-amber-500/10 text-amber-400'
     };
-    return colores[estado] || 'bg-muted text-foreground';
+    const estadoNormalizado = normalizarEstadoContrato(estado);
+    if (contratoEstaVigente(estadoNormalizado)) return colores.activo;
+    return colores[estadoNormalizado] || 'bg-muted text-foreground';
   };
 
   const getTipoColor = (tipo: string) => {
@@ -210,13 +206,13 @@ const ContratosPage = () => {
       'practicas': 'bg-violet-500/10 text-violet-400',
       'locacion_servicios': 'bg-violet-500/10 text-violet-400'
     };
-    return colores[tipo] || 'bg-muted text-foreground';
+    return colores[normalizarTipoContrato(tipo)] || 'bg-muted text-foreground';
   };
 
   const calcularEstadisticas = () => {
     const total = contratos.length;
     const activos = contratos.filter(isActiveContract).length;
-    const vencidos = contratos.filter(c => c.estado === 'vencido').length;
+    const vencidos = contratos.filter(c => normalizarEstadoContrato(c.estado) === 'vencido').length;
     const porVencer = contratos.filter(c => {
       if (!c.fecha_fin) return false;
       const fechaFin = new Date(c.fecha_fin);
@@ -342,7 +338,7 @@ const ContratosPage = () => {
             <SelectTrigger id="filtro-estado-contratos" aria-label="Filtrar contratos por estado"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="activo">Activo</SelectItem>
+              <SelectItem value="vigente">Vigente</SelectItem>
               <SelectItem value="vencido">Vencido</SelectItem>
               <SelectItem value="renovado">Renovado</SelectItem>
               <SelectItem value="finalizado">Finalizado</SelectItem>
@@ -509,9 +505,9 @@ const ContratosPage = () => {
             </thead>
             <tbody>
               {contractTypes.map(tipo => {
-                const contratosTipo = contratos.filter(c => c.tipo_contrato === tipo);
+                const contratosTipo = contratos.filter(c => normalizarTipoContrato(c.tipo_contrato) === tipo);
                 const activos = contratosTipo.filter(isActiveContract).length;
-                const vencidos = contratosTipo.filter(c => c.estado === 'vencido').length;
+                const vencidos = contratosTipo.filter(c => normalizarEstadoContrato(c.estado) === 'vencido').length;
                 const salarioPromedio = contratosTipo.length > 0
                   ? contratosTipo.reduce((sum, c) => sum + (c.salario || 0), 0) / contratosTipo.length
                   : 0;

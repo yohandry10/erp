@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTenant } from "@/contexts/TenantContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { DashboardThemeToggle } from "@/components/ui/dashboard-theme-toggle";
 import { NotificationBell } from "@/components/notifications";
 import { useDashboardTheme } from "@/hooks/use-dashboard-theme";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 
 export default function SuperAdminLayout({
   children,
@@ -14,7 +17,19 @@ export default function SuperAdminLayout({
 }) {
   const router = useRouter();
   const { isSuperAdmin, tenant, loading: tenantLoading } = useTenant();
+  const { signOut } = useAuth();
   const { theme: dashboardTheme, toggleTheme } = useDashboardTheme();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace("/login");
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   // Guard: redirect non-superadmin users
   useEffect(() => {
@@ -42,6 +57,17 @@ export default function SuperAdminLayout({
             la campana pedía /notifications/unread, recibía 401 y sacaba un
             "No autorizado para consultar este recurso" en su propio panel. */}
         {tenant ? <NotificationBell /> : null}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={handleSignOut}
+          disabled={signingOut}
+          aria-label="Cerrar Sesión"
+        >
+          <LogOut className="h-4 w-4" />
+          {signingOut ? "Cerrando..." : "Cerrar Sesión"}
+        </Button>
         <DashboardThemeToggle
           theme={dashboardTheme}
           onToggle={toggleTheme}

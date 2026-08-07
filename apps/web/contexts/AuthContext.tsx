@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useCallback, useContext, useState, useEffect, ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import { customAuth, Session, User } from '@/lib/auth-service'
 import { clearPermissionCache } from '@/hooks/use-permission'
@@ -99,9 +99,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [session, setSession] = useState<Session | null>(() => readStoredSession())
   const [user, setUser] = useState<User | null>(() => readStoredSession()?.user ?? null)
-  const [loading, setLoading] = useState(() => readStoredSession() === null)
+  // El snapshot solo sirve para pintar la identidad de forma optimista. Hasta que
+  // /auth/profile confirme la cookie actual no puede considerarse autoritativo:
+  // el usuario puede haber cambiado de cuenta/tenant en otra pestaña.
+  const [loading, setLoading] = useState(true)
 
-  const loadSession = async () => {
+  const loadSession = useCallback(async () => {
     // En rutas públicas (/login, /demo, /) el middleware ya garantiza que no hay
     // sesión válida: si la hubiera, habría redirigido a /dashboard antes de
     // renderizar. Saltamos el fetch a /auth/profile para evitar el 401 esperado
@@ -139,13 +142,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [pathname])
 
   useEffect(() => {
     clearLegacySensitiveStorage()
     loadSession()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [loadSession])
+
+  useEffect(() => {
+    const handleSessionStorageChange = (event: StorageEvent) => {
+      if (event.key !== AUTH_SESSION_STORAGE_KEY) return
+      // Otra pestaña inició/cerró/cambió de cuenta. Una navegación completa deja
+      // que el middleware valide la cookie HttpOnly y decida entre login/dashboard,
+      // evitando que una ruta pública conserve un AuthContext de otro tenant.
+      window.location.reload()
+    }
+
+    window.addEventListener('storage', handleSessionStorageChange)
+    return () => window.removeEventListener('storage', handleSessionStorageChange)
+  }, [loadSession])
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await customAuth.signInWithPassword({ email, password })

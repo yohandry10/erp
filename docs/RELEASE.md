@@ -37,7 +37,7 @@ Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 8. Comparar conteos y revisar logs.
 9. Detener y revertir ante cualquier diferencia no explicada.
 
-El estado remoto vigente está verificado hasta `411`; cualquier rango posterior
+El estado remoto vigente está verificado hasta `432`; cualquier rango posterior
 vuelve a comenzar por preflight, respaldo y ensayo transaccional.
 
 ## Go-live

@@ -79,11 +79,13 @@ export default function SuperAdminDashboard() {
           }
         }
 
+        const serverStats = tenantsResponse?.stats
+
         setStats({
-          totalTenants,
-          activeTenants,
-          totalUsers,
-          activeUsers,
+          totalTenants: serverStats?.totalTenants ?? totalTenants,
+          activeTenants: serverStats?.activeTenants ?? activeTenants,
+          totalUsers: serverStats?.totalUsers ?? totalUsers,
+          activeUsers: serverStats?.activeUsers ?? activeUsers,
         })
       } catch (error) {
         console.error('Error fetching system stats:', error)

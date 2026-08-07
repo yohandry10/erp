@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
+import { unwrapApiArray } from '@/lib/api-contract';
 
 const AsistenciaPage = () => {
   const [empleados, setEmpleados] = useState<any[]>([]);
@@ -10,12 +11,6 @@ const AsistenciaPage = () => {
   const [loading, setLoading] = useState(true);
   const { get, post } = useApi();
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
-
-  const normalizeArrayResponse = (response: any) => {
-    if (Array.isArray(response)) return response;
-    if (Array.isArray(response?.data)) return response.data;
-    return [];
-  };
 
   const formatLocalDate = (date: string) => {
     const [year, month, day] = date.split('-').map(Number);
@@ -39,11 +34,11 @@ const AsistenciaPage = () => {
 
       // Cargar empleados
       const empleadosData = await get('/api/rrhh/empleados');
-      setEmpleados(normalizeArrayResponse(empleadosData));
+      setEmpleados(unwrapApiArray(empleadosData));
 
       // Cargar asistencias del día
       const asistenciasData = await get(`/api/rrhh/asistencias?fecha=${fecha}`);
-      setAsistencias(normalizeArrayResponse(asistenciasData));
+      setAsistencias(unwrapApiArray(asistenciasData));
     } catch (error) {
       console.error('Error cargando asistencias:', error);
     } finally {
@@ -219,7 +214,7 @@ const AsistenciaPage = () => {
                         <div className="text-sm text-muted-foreground">{empleado.numero_documento || empleado.documento}</div>
                       </div>
                     </td>
-                    <td>{empleado.departamento?.nombre || 'N/A'}</td>
+                    <td>{empleado.departamentos?.nombre || empleado.departamento?.nombre || 'Sin departamento'}</td>
                     <td>{asistencia?.hora_entrada || '-'}</td>
                     <td>{asistencia?.hora_salida || '-'}</td>
                     <td>{horasT}</td>

@@ -27,6 +27,7 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
 import { encryptText } from '../../shared/utils/secure-config.utils';
 import { DianFiscalService } from '../fiscal/dian-fiscal.service';
+import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
 import {
   INITIAL_ACTIVE_COUNTRY_CODE,
   INITIAL_ACTIVE_COUNTRY_ID,
@@ -49,6 +50,7 @@ export class ConfigurationController {
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
     private readonly dianFiscalService: DianFiscalService,
+    private readonly cacheInvalidation: CacheInvalidationService,
   ) {}
 
   @Post('colombia/dian/test')
@@ -628,6 +630,7 @@ export class ConfigurationController {
           // no dispone de una columna dedicada para configurarla.
           serieGuiaRemision: data.serie_guia_remision
             || (data.pais === 'PE' ? 'T001' : null),
+          certificateExpiresAt: data.certificado_expira_en,
           // OSE
           oseActivo: data.ose_activo,
           oseUrl: data.ose_url,
@@ -931,6 +934,11 @@ export class ConfigurationController {
         data?.id,
         { accion: 'ACTUALIZAR_CONFIGURACION_EMPRESA' },
       );
+
+      // El contexto de país/empresa se cachea para el bootstrap del dashboard.
+      // Sin invalidarlo, cambios como usar_flujo_logistica podían tardar hasta
+      // un minuto en reflejarse y dejaban UI y backend en estados distintos.
+      await this.cacheInvalidation.invalidateAllTenantCache(tenantId);
 
       return {
         success: true,

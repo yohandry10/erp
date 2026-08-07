@@ -225,7 +225,12 @@ test.describe('CASE-19 Auditoria real', () => {
     await login(
       page,
       process.env.TEST_APROBADOR_EMAIL || 'admin@erp.local',
-      process.env.TEST_APROBADOR_PASSWORD || 'AdminProd2026!',
+      (() => {
+        if (!process.env.TEST_APROBADOR_PASSWORD) {
+          throw new Error('TEST_APROBADOR_PASSWORD es obligatorio para E2E local efímero');
+        }
+        return process.env.TEST_APROBADOR_PASSWORD;
+      })(),
       true,
     );
     const browserFailures = await collectBrowserFailures(page);

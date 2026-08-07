@@ -23,9 +23,12 @@ describe('CxpService', () => {
     gte: jest.fn().mockReturnThis(),
     lte: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
+    rpc: jest.fn(),
     single: jest.fn(),
     maybeSingle: jest.fn(),
   };
+
+  mockSupabaseClient.rpc.mockImplementation(() => mockSupabaseClient.single());
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -73,6 +76,34 @@ describe('CxpService', () => {
     const tenantId = 'tenant-123';
     const userId = 'user-456';
 
+    it('rechaza moneda extranjera sin tipo de cambio antes de persistir', async () => {
+      await expect(service.crearCuentaPorPagar(tenantId, {
+        proveedor_id: 'prov-001',
+        numero_documento: 'F001-USD-1',
+        fecha_emision: '2025-10-25',
+        subtotal: 100,
+        igv: 18,
+        total: 118,
+        moneda: 'USD',
+      }, userId)).rejects.toThrow('tipo de cambio es obligatorio');
+
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+    });
+
+    it('rechaza nota de credito sin comprobante modificado completo', async () => {
+      await expect(service.crearCuentaPorPagar(tenantId, {
+        proveedor_id: 'prov-001',
+        numero_documento: 'FC01-1',
+        fecha_emision: '2025-10-25',
+        subtotal: 100,
+        igv: 18,
+        total: 118,
+        tipo_documento: '07',
+      }, userId)).rejects.toThrow('comprobante modificado');
+
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+    });
+
     it('should create a CxP successfully', async () => {
       const dto = {
         proveedor_id: 'prov-001',
@@ -105,15 +136,19 @@ describe('CxpService', () => {
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockCxp);
-      expect(eventBusService.emitFacturaProveedorRegistrada).toHaveBeenCalledTimes(1);
-      expect(eventBusService.emitFacturaProveedorRegistrada).toHaveBeenCalledWith(
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_factura_proveedor_tx',
         expect.objectContaining({
-          tenantId,
-          facturaProvId: mockCxp.id,
-          numeroDocumento: dto.numero_documento,
-          total: dto.total,
+          p_tenant_id: tenantId,
+          p_event_id: expect.any(String),
+          p_idempotency_key: expect.stringContaining(dto.numero_documento),
+          p_cxp: expect.objectContaining({
+            numero_documento: dto.numero_documento,
+            total: dto.total,
+          }),
         }),
       );
+      expect(eventBusService.emitFacturaProveedorRegistrada).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException if proveedor does not exist', async () => {
@@ -222,13 +257,16 @@ describe('CxpService', () => {
         undefined,
         expect.objectContaining({ aplicar_retencion: true }),
       );
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_factura_proveedor_tx',
         expect.objectContaining({
-          saldo: 1062,
-          saldo_pendiente: 1062,
-          retencion_total: 70.8,
-          detraccion_total: 47.2,
-          estado: 'PARCIAL',
+          p_cxp: expect.objectContaining({
+            saldo: 1062,
+            saldo_pendiente: 1062,
+            retencion_total: 70.8,
+            detraccion_total: 47.2,
+            estado: 'PARCIAL',
+          }),
         }),
       );
     });

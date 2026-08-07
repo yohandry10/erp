@@ -155,6 +155,8 @@ export class AsientosGeneratorService {
         throw new Error(`Error creando asiento contable: ${asientoError.message}`);
       }
 
+      if (!asiento?.id) throw new Error('La transacción contable no retornó un asiento válido');
+
       console.log(
         `✅ [Asientos] Asiento ${asiento.codigo ?? asiento.numero_asiento ?? asiento.id} creado exitosamente para tenant ${tenantId}`
       );
@@ -989,20 +991,19 @@ export class AsientosGeneratorService {
         ['20', '40', '42']
       );
 
-      // Validar que costo + igv = total (tolerancia 0.01)
+      // Validar el documento; el IGV nunca puede usarse como cuenta de ajuste
+      // para tapar diferencias entre subtotal y total.
       const sumaDebitos = costo + igv;
       const diferenciaCompra = Math.abs(sumaDebitos - total);
-      // Si hay diferencia por redondeo, ajustar igv para que debitos = creditos
-      const igvAjustado = diferenciaCompra > 0.001 ? (total - costo) : igv;
       if (diferenciaCompra > 0.01) {
-        console.log(
-          `COMPRA_BALANCE_ADJUST costo=${costo} + igv=${igv} = ${sumaDebitos} != total=${total}, diff=${diferenciaCompra.toFixed(4)}, igvAjustado=${igvAjustado}`,
+        throw new Error(
+          `Documento de compra inconsistente: subtotal ${costo} + IGV ${igv} no coincide con total ${total}`,
         );
       }
 
       const detalles: DetalleAsiento[] = [
         { cuenta_id: cuentas.get('20')!.id, debe: costo, haber: 0, concepto: 'Mercaderías', centro_costo_id },
-        { cuenta_id: cuentas.get('40')!.id, debe: igvAjustado, haber: 0, concepto: 'IGV Crédito Fiscal' },
+        { cuenta_id: cuentas.get('40')!.id, debe: igv, haber: 0, concepto: 'IGV Crédito Fiscal' },
         { cuenta_id: cuentas.get('42')!.id, debe: 0, haber: total, concepto: 'Proveedores' }
       ];
 
@@ -1023,6 +1024,73 @@ export class AsientosGeneratorService {
       }
       throw error;
     }
+  }
+
+  /** Recepción física sin factura: Dr 20 / Cr 4699. No reconoce IGV ni CxP. */
+  async generarAsientoRecepcion(evento: any): Promise<AsientoContable> {
+    const { tenant_id, fecha, costo, centro_costo_id } = evento;
+    const monto = Number(costo || 0);
+    if (!Number.isFinite(monto) || monto <= 0) {
+      throw new Error('La recepción debe tener un costo positivo');
+    }
+    const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+      tenant_id,
+      ['20', '4699'],
+    );
+    const detalles: DetalleAsiento[] = [
+      { cuenta_id: cuentas.get('20')!.id, debe: monto, haber: 0, concepto: 'Mercaderías recibidas', centro_costo_id },
+      { cuenta_id: cuentas.get('4699')!.id, debe: 0, haber: monto, concepto: 'Mercaderías recibidas por facturar' },
+    ];
+    return this.generarAsiento(
+      tenant_id,
+      new Date(fecha),
+      'Recepción de mercadería pendiente de factura',
+      detalles,
+      evento.referencia,
+      evento.event_id,
+    );
+  }
+
+  /**
+   * Factura del proveedor. Si está vinculada a una recepción, cancela la cuenta
+   * transitoria 4699; si no, reconoce directamente la mercadería.
+   */
+  async generarAsientoFacturaProveedor(evento: any): Promise<AsientoContable> {
+    const { tenant_id, fecha, subtotal, igv, total, recepcion_id } = evento;
+    const base = Number(subtotal || 0);
+    const impuesto = Number(igv || 0);
+    const importe = Number(total || 0);
+    if (![base, impuesto, importe].every(Number.isFinite) || base < 0 || impuesto < 0 || importe <= 0) {
+      throw new Error('La factura de proveedor contiene importes inválidos');
+    }
+    if (Math.abs(base + impuesto - importe) > 0.01) {
+      throw new Error(
+        `Factura de proveedor inconsistente: subtotal ${base} + IGV ${impuesto} no coincide con total ${importe}`,
+      );
+    }
+    const cuentaBase = recepcion_id ? '4699' : '20';
+    const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+      tenant_id,
+      [cuentaBase, '40', '42'],
+    );
+    const detalles: DetalleAsiento[] = [
+      {
+        cuenta_id: cuentas.get(cuentaBase)!.id,
+        debe: base,
+        haber: 0,
+        concepto: recepcion_id ? 'Aplicación de mercadería recibida por facturar' : 'Mercaderías',
+      },
+      { cuenta_id: cuentas.get('40')!.id, debe: impuesto, haber: 0, concepto: 'IGV Crédito Fiscal' },
+      { cuenta_id: cuentas.get('42')!.id, debe: 0, haber: importe, concepto: 'Proveedores' },
+    ];
+    return this.generarAsiento(
+      tenant_id,
+      new Date(fecha),
+      'Factura de proveedor',
+      detalles,
+      evento.referencia,
+      evento.event_id,
+    );
   }
 
   /**

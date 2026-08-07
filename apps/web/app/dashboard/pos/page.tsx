@@ -449,7 +449,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
             }
           };
           setConfigurationStatus(configData);
-          if (!configResponse.data.isComplete && process.env.NODE_ENV === 'development') {
+          if (!configResponse.data.isDemo && !configResponse.data.isComplete && process.env.NODE_ENV === 'development') {
             console.info('Configuración POS incompleta:', configResponse.data.missingItems);
           }
         }
@@ -1427,7 +1427,19 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
         return
       }
 
-      // Mostrar modal de cierre de caja
+      const saldoResponse = await api.get(`/cajas/saldo-esperado/${sesionCajaId}`)
+      const saldoEsperado = Number(saldoResponse?.data?.saldo ?? saldoResponse?.saldo)
+
+      if (Number.isFinite(saldoEsperado)) {
+        setEstadoCaja((prev) => prev ? {
+          ...prev,
+          montoFinal: saldoEsperado,
+          ventasEfectivo: saldoEsperado - prev.montoInicial,
+        } : prev)
+        setMontoContadoInput(formatMoney(saldoEsperado))
+      }
+
+      // Mostrar modal de cierre de caja con el saldo calculado por el backend.
       setMostrarModalCerrarCaja(true)
     } catch (error) {
       console.error('❌ Error preparando cierre de caja:', error)
@@ -1831,13 +1843,16 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           </div>
 
           {/* Configuration Warning Banner */}
-          <ConfigStatusBanner
-            onOpenWizard={() => window.location.href = '/dashboard/wizard'}
-            configurationStatus={configurationStatus}
-          />
+          {!configurationStatus?.isDemo && (
+            <ConfigStatusBanner
+              onOpenWizard={() => window.location.href = '/dashboard/wizard'}
+              configurationStatus={configurationStatus}
+            />
+          )}
 
           {/* Certificate Expiring Warning */}
           {configurationStatus &&
+            !configurationStatus.isDemo &&
             configurationStatus.certificate.isValid &&
             configurationStatus.certificate.expiresAt && (
               (() => {
@@ -2568,8 +2583,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   <p className="mt-1 font-semibold">{formatCurrency(estadoCaja?.montoInicial || 0)}</p>
                 </div>
                 <div className="rounded-lg border bg-muted/30 p-3">
-                  <span className="text-xs text-muted-foreground">Ventas en efectivo</span>
-                  <p className="mt-1 font-semibold">{formatCurrency(estadoCaja?.ventasEfectivo || 0)}</p>
+                  <span className="text-xs text-muted-foreground">Saldo esperado</span>
+                  <p className="mt-1 font-semibold">{formatCurrency(estadoCaja?.montoFinal || 0)}</p>
                 </div>
               </div>
 

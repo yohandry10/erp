@@ -375,7 +375,7 @@ export class CpeController {
 
       // Enviar a SUNAT usando el método existente
       const fileName = `${cpe.ruc_emisor}-${cpe.tipo_documento}-${cpe.serie}-${cpe.numero}`;
-      await this.cpeService.sendToOseManual(id, cpe.xml_firmado, fileName, { idempotencyKey });
+      await this.cpeService.sendToOseManual(id, cpe.xml_firmado, fileName, { idempotencyKey }, tenantId);
 
       return {
         success: true,

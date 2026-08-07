@@ -302,6 +302,8 @@ export class AsientosService {
         throw new Error(`Error creando asiento contable: ${asientoError.message}`);
       }
 
+      if (!asiento?.id) throw new Error('La transacción contable no retornó un asiento válido');
+
       this.logger.log(
         `✅ Asiento manual ${asiento.codigo ?? asiento.numero_asiento ?? asiento.id} creado exitosamente para tenant ${tenantId}`
       );

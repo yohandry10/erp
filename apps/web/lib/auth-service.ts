@@ -342,7 +342,9 @@ class AuthService {
           : await this.fetchProfile();
         if (user) {
           this.saveSession({ user, access_token: this.accessToken || undefined });
-        } else if (!this.session) {
+        } else {
+          // Si el perfil canónico ya no existe para la cookie actual, cualquier
+          // snapshot optimista es obsoleto y debe descartarse.
           this.clearSession();
         }
       } catch {

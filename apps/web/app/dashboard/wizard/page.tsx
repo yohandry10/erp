@@ -14,11 +14,13 @@ import { SunatConfigStep } from './steps/SunatConfigStep'
 import { ValidationStep } from './steps/ValidationStep'
 import { CompletionStep } from './steps/CompletionStep'
 import { ConfigurationSummaryStep } from './steps/ConfigurationSummaryStep'
+import { useDemoStatus } from '@/hooks/useDemoStatus'
 
 function WizardContent() {
   const { state } = useWizardContext()
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const { isDemoTenant, loading: demoLoading } = useDemoStatus()
 
   useEffect(() => {
     // Solo los super-admins de plataforma se saltan el wizard (no necesitan
@@ -27,11 +29,18 @@ function WizardContent() {
     // nada en el código actual escribe localStorage.user, así que el check
     // anterior era código muerto y, si quedaba basura legacy, podía mandar
     // a /dashboard a usuarios demo que sí necesitan el wizard.
-    if (authLoading) return
-    if (user?.is_super_admin === true) {
+    if (authLoading || demoLoading) return
+    // Una demo ya nace totalmente configurada. El wizard pide certificado y
+    // credenciales fiscales reales, que solo corresponden al convertir la
+    // cuenta; nunca deben quedar expuestos como tarea de una demo.
+    if (user?.is_super_admin === true || isDemoTenant) {
       router.replace('/dashboard')
     }
-  }, [authLoading, user, router])
+  }, [authLoading, demoLoading, isDemoTenant, user, router])
+
+  if (authLoading || demoLoading || user?.is_super_admin === true || isDemoTenant) {
+    return null
+  }
 
   const renderStep = () => {
     const currentStep = state.steps[state.currentStep]

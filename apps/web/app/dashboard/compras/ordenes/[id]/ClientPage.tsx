@@ -445,14 +445,14 @@ export default function OrdenCompraDetallePage() {
               </div>
 
               <div className="grid gap-3">
-                <ProtectedComponent modulo="compras" accion="aprobar" recurso="ordenes_compra" fallback={null}>
+                <ProtectedComponent modulo="compras" accion="aprobar" recurso="ordenes" fallback={null}>
                   <button onClick={() => setShowAprobarModal(true)} className={`${primaryActionClass} w-full`}>
                     <CheckCircle size={16} />
                     Aprobar Orden
                   </button>
                 </ProtectedComponent>
 
-                <ProtectedComponent modulo="compras" accion="rechazar" recurso="ordenes_compra" fallback={null}>
+                <ProtectedComponent modulo="compras" accion="rechazar" recurso="ordenes" fallback={null}>
                   <button onClick={() => setShowRechazarModal(true)} className={`${secondaryActionClass} w-full`}>
                     <XCircle size={16} />
                     Rechazar Orden

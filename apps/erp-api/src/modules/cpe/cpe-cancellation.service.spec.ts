@@ -79,4 +79,70 @@ describe('CpeCancellationService', () => {
       await expect(resolver([{ id: 'ses-hoy' }], null)).resolves.toBe('ses-hoy');
     });
   });
+
+  describe('ciclo fiscal de la anulación', () => {
+    const query = (resultado: any) => {
+      const chain: any = {};
+      for (const metodo of ['select', 'eq', 'update', 'insert']) {
+        chain[metodo] = jest.fn(() => chain);
+      }
+      chain.single = jest.fn(async () => resultado);
+      chain.maybeSingle = jest.fn(async () => resultado);
+      return chain;
+    };
+
+    it('crear la nota no anula ni revierte antes del CDR aceptado', async () => {
+      const original = {
+        id: 'cpe-1', estado: 'ACEPTADO', nota_credito_id: null,
+        tipo_documento: '01', serie: 'F001', numero: 1,
+        total_gravadas: 100, total_igv: 18, total_venta: 118,
+        ruc_emisor: '20123456789', razon_social_emisor: 'Demo',
+        tipo_documento_receptor: '6', documento_receptor: '20999999999',
+        razon_social_receptor: 'Cliente', moneda: 'PEN',
+      };
+      const nota = { id: 'nc-1', estado: 'BORRADOR', serie: 'FC01', numero: 1 };
+      const lectura = query({ data: original, error: null });
+      const insercion = query({ data: nota, error: null });
+      const actualizacion = query({ data: null, error: null });
+      const client = { from: jest.fn()
+        .mockReturnValueOnce(lectura)
+        .mockReturnValueOnce(insercion)
+        .mockReturnValueOnce(actualizacion) };
+      const sut = new CpeCancellationService(
+        { getClient: () => client } as unknown as SupabaseService,
+        {} as unknown as AuditService,
+      );
+      jest.spyOn(sut as any, 'assertCpeOriginalAccountingReady').mockResolvedValue(undefined);
+      jest.spyOn(sut as any, 'obtenerSiguienteNumeroNotaCredito').mockResolvedValue(1);
+      const reverso = jest.spyOn(sut as any, 'aplicarReversionOperativa').mockResolvedValue(undefined);
+
+      const result = await sut.anularComprobante('cpe-1', 'Error de operación', 'tenant-1');
+
+      expect(reverso).not.toHaveBeenCalled();
+      expect(actualizacion.update).toHaveBeenCalledWith(expect.objectContaining({
+        nota_credito_id: 'nc-1',
+        motivo_anulacion: 'Error de operación',
+      }));
+      expect(actualizacion.update.mock.calls[0][0]).not.toHaveProperty('estado', 'ANULADO');
+      expect(result.cpe_anulado.anulacion_estado).toBe('PENDIENTE_CDR');
+    });
+
+    it('no finaliza una nota aceptada si todavía no existe CDR', async () => {
+      const lectura = query({
+        data: { id: 'nc-1', tipo_documento: '07', estado: 'ACEPTADO', cdr_sunat: null },
+        error: null,
+      });
+      const client = { from: jest.fn().mockReturnValueOnce(lectura) };
+      const sut = new CpeCancellationService(
+        { getClient: () => client } as unknown as SupabaseService,
+        {} as unknown as AuditService,
+      );
+      const reverso = jest.spyOn(sut as any, 'aplicarReversionOperativa').mockResolvedValue(undefined);
+
+      await expect(sut.finalizarAnulacionAceptada('nc-1', 'tenant-1'))
+        .resolves.toMatchObject({ estado: 'PENDIENTE_CDR' });
+      expect(reverso).not.toHaveBeenCalled();
+      expect(client.from).toHaveBeenCalledTimes(1);
+    });
+  });
 });

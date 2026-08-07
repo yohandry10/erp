@@ -98,6 +98,25 @@ describe("PleExportService", () => {
     return new PleExportService(supabase, tenantContext);
   };
 
+  const facturaCompra = {
+    id: "cxp-1",
+    numero_documento: "F001-00000123",
+    tipo_documento: "FACTURA",
+    fecha_emision: "2026-08-01",
+    fecha_vencimiento: "2026-08-31",
+    subtotal: 100,
+    igv: 18,
+    total: 118,
+    moneda: "PEN",
+    estado: "PENDIENTE",
+    proveedores: {
+      ruc: "20512345671",
+      numero_documento: "20512345671",
+      razon_social: "DISTRIBUIDORA ANDINA S.A.C.",
+      tipo_documento: "RUC",
+    },
+  };
+
   describe("Registro de Ventas 14.1", () => {
     // Boleta mixta: S/ 25.00 gravados, S/ 3.50 exonerados, IGV solo sobre la
     // base gravada. Es el caso que obliga a separar las bases.
@@ -189,25 +208,6 @@ describe("PleExportService", () => {
   });
 
   describe("Registro de Compras 8.1", () => {
-    const facturaCompra = {
-      id: "cxp-1",
-      numero_documento: "F001-00000123",
-      tipo_documento: "FACTURA",
-      fecha_emision: "2026-08-01",
-      fecha_vencimiento: "2026-08-31",
-      subtotal: 100,
-      igv: 18,
-      total: 118,
-      moneda: "PEN",
-      estado: "PENDIENTE",
-      proveedores: {
-        ruc: "20512345671",
-        numero_documento: "20512345671",
-        razon_social: "DISTRIBUIDORA ANDINA S.A.C.",
-        tipo_documento: "RUC",
-      },
-    };
-
     it("separa serie y numero del comprobante del proveedor", async () => {
       const service = montarServicio("cuentas_por_pagar", [facturaCompra]);
 
@@ -316,6 +316,44 @@ describe("PleExportService", () => {
       expect(ventas[13]).toBe("0.00");
       expect(ventas[15]).toBe("50.00");
       expect(ventas[18]).toBe("1");
+    });
+
+    it('declara una nota de credito con importes negativos y referencia SUNAT', async () => {
+      const service = montarServicio('cuentas_por_pagar', [{
+        ...facturaCompra,
+        numero_documento: 'FC01-00000009',
+        tipo_documento: 'NOTA_CREDITO',
+        fiscal_metadata: {
+          documento_referencia_tipo: 'FACTURA',
+          documento_referencia_serie: 'F001',
+          documento_referencia_numero: '00000123',
+          documento_referencia_fecha: '2026-07-31',
+        },
+      }]);
+
+      const result = await service.exportarRegistroCompras(2026, 8);
+      const campos = result.content.split('|');
+
+      expect(campos[5]).toBe('07');
+      expect(campos[13]).toBe('-100.00');
+      expect(campos[14]).toBe('-18.00');
+      expect(campos[22]).toBe('-118.00');
+      expect(campos[25]).toBe('31/07/2026');
+      expect(campos[26]).toBe('01');
+      expect(campos[27]).toBe('F001');
+      expect(campos[29]).toBe('00000123');
+    });
+
+    it('exige tipo de cambio para compras en moneda extranjera', async () => {
+      const service = montarServicio('cuentas_por_pagar', [{
+        ...facturaCompra,
+        moneda: 'USD',
+        fiscal_metadata: {},
+      }]);
+
+      await expect(service.exportarRegistroCompras(2026, 8)).rejects.toThrow(
+        'Tipo de cambio requerido',
+      );
     });
   });
 });

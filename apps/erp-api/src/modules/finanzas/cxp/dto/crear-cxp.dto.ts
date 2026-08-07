@@ -126,6 +126,22 @@ export class CrearCxpDto {
   tipo_cambio?: number;
 
   @IsOptional()
+  @IsString()
+  documento_referencia_tipo?: string;
+
+  @IsOptional()
+  @IsString()
+  documento_referencia_serie?: string;
+
+  @IsOptional()
+  @IsString()
+  documento_referencia_numero?: string;
+
+  @IsOptional()
+  @IsDateString({}, { message: 'La fecha del comprobante modificado debe ser válida' })
+  documento_referencia_fecha?: string;
+
+  @IsOptional()
   @IsNumber({}, { message: 'La detracción debe ser numérica' })
   @Min(0, { message: 'La detracción no puede ser negativa' })
   detraccion?: number;

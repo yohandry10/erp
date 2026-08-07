@@ -54,17 +54,21 @@ function buildHarness(country: Country) {
     }],
   };
   let employeePlanillaPayload: any;
-  let planillaUpdatePayload: any;
+  let calculationRpcPayload: any;
 
   const client = {
+    rpc: jest.fn((name: string, payload: any) => {
+      if (name !== 'guardar_calculo_planilla_tx') {
+        throw new Error(`RPC no contemplado por la prueba: ${name}`);
+      }
+      calculationRpcPayload = payload;
+      employeePlanillaPayload = payload.p_empleados?.[0];
+      return Promise.resolve({ data: { success: true, total_empleados: 1 }, error: null });
+    }),
     from: jest.fn((table: string) => {
       if (table === 'planillas') {
         const query = thenableQuery({ error: null });
         query.single = jest.fn().mockResolvedValue({ data: planilla, error: null });
-        query.update = jest.fn((payload: any) => {
-          planillaUpdatePayload = payload;
-          return query;
-        });
         return query;
       }
       if (table === 'empleados') {
@@ -108,7 +112,7 @@ function buildHarness(country: Country) {
     countryService,
     eventBus,
     getEmployeePayload: () => employeePlanillaPayload,
-    getPlanillaUpdate: () => planillaUpdatePayload,
+    getCalculationRpcPayload: () => calculationRpcPayload,
   };
 }
 
@@ -137,11 +141,10 @@ describe('PlanillasService — despacho normativo por país', () => {
         total_descuentos: expectedDiscount,
         neto_pagar: expectedNet,
       }));
-      expect(harness.getPlanillaUpdate()).toEqual(expect.objectContaining({
-        total_ingresos: expectedIncome,
-        total_descuentos: expectedDiscount,
-        total_neto: expectedNet,
-        estado: 'calculada',
+      expect(harness.getCalculationRpcPayload()).toEqual(expect.objectContaining({
+        p_tenant_id: `tenant-${country}`,
+        p_planilla_id: 'payroll-1',
+        p_empleados: expect.any(Array),
       }));
       expect(harness.eventBus.emitPlanillaCalculada).toHaveBeenCalledWith(
         expect.objectContaining({ totalIngresos: expectedIncome, totalNeto: expectedNet }),

@@ -10,6 +10,18 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCountryContext } from '@/hooks/use-country-context';
 
+const asList = (response: any): any[] => {
+  if (Array.isArray(response)) return response;
+  return Array.isArray(response?.data) ? response.data : [];
+};
+
+const paymentStatus = (payment: any) => String(payment?.estado ?? 'pendiente').trim().toLowerCase();
+
+const paymentAmount = (value: unknown) => {
+  const parsed = typeof value === 'number' ? value : Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const PagosPage = () => {
   const country = useCountryContext();
   const isArgentina = country.paisCodigo === 'AR';
@@ -58,7 +70,7 @@ const PagosPage = () => {
       console.log('📦 [Frontend] Respuesta pagos:', pagosResponse);
 
       // Verificar si la respuesta tiene la estructura correcta
-      let pagosData = [];
+      let pagosData: any[] = [];
       if (pagosResponse?.success && Array.isArray(pagosResponse.data)) {
         pagosData = pagosResponse.data;
         console.log(`✅ [Frontend] Estructura correcta - ${pagosData.length} pagos recibidos`);
@@ -74,15 +86,11 @@ const PagosPage = () => {
 
       // Cargar empleados
       const empleadosData = await get('/api/rrhh/empleados');
-      if (empleadosData && Array.isArray(empleadosData)) {
-        setEmpleados(empleadosData);
-      }
+      setEmpleados(asList(empleadosData));
 
       // Cargar planillas
       const planillasData = await get('/api/rrhh/planillas');
-      if (planillasData && Array.isArray(planillasData)) {
-        setPlanillas(planillasData);
-      }
+      setPlanillas(asList(planillasData));
     } catch (error) {
       console.error('Error cargando pagos:', error);
     } finally {
@@ -135,7 +143,7 @@ const PagosPage = () => {
     let filtrados = pagos;
 
     if (filtroEstado !== 'todos') {
-      filtrados = filtrados.filter(p => p.estado === filtroEstado);
+      filtrados = filtrados.filter(p => paymentStatus(p) === filtroEstado);
     }
 
     if (filtroPeriodo !== 'todos') {
@@ -151,21 +159,24 @@ const PagosPage = () => {
       'procesado': 'bg-emerald-500/10 text-emerald-400',
       'rechazado': 'bg-destructive/10 text-destructive'
     };
-    return colores[estado] || 'bg-muted text-foreground';
+    return colores[String(estado ?? '').toLowerCase()] || 'bg-muted text-foreground';
   };
 
   const calcularEstadisticas = () => {
     const total = pagos.length;
-    const pendientes = pagos.filter(p => p.estado === 'pendiente').length;
-    const procesados = pagos.filter(p => p.estado === 'procesado').length;
-    const montoTotal = pagos.filter(p => p.estado === 'procesado').reduce((sum, p) => sum + (p.monto_neto || 0), 0);
+    const pendientes = pagos.filter(p => paymentStatus(p) === 'pendiente').length;
+    const procesados = pagos.filter(p => paymentStatus(p) === 'procesado').length;
+    const montoTotal = pagos
+      .filter(p => paymentStatus(p) === 'procesado')
+      .reduce((sum, p) => sum + paymentAmount(p.monto_neto), 0);
 
     return { total, pendientes, procesados, montoTotal };
   };
 
-  const getEmpleadoNombre = (empleadoId: string) => {
-    const empleado = empleados.find(e => e.id === empleadoId);
-    return empleado ? `${empleado.nombres} ${empleado.apellidos}` : 'N/A';
+  const getEmpleadoNombre = (pago: any) => {
+    const empleado = pago?.empleado ?? empleados.find(e => e.id === pago?.empleado_id);
+    const nombre = `${empleado?.nombres ?? ''} ${empleado?.apellidos ?? ''}`.trim();
+    return nombre || 'Empleado sin nombre';
   };
 
   const getPeriodosUnicos = () => {
@@ -314,14 +325,14 @@ const PagosPage = () => {
                 <tr key={pago.id}>
                   <td>
                     <div>
-                      <div className="font-medium">{getEmpleadoNombre(pago.empleado_id)}</div>
+                      <div className="font-medium">{getEmpleadoNombre(pago)}</div>
                       <div className="text-sm text-muted-foreground">ID: {pago.empleado_id?.substring(0, 8)}...</div>
                     </div>
                   </td>
                   <td>{pago.periodo}</td>
-                  <td className="text-right">{currencySymbol} {(pago.monto_bruto || 0).toLocaleString(locale)}</td>
-                  <td className="text-right text-destructive">{currencySymbol} {(pago.total_descuentos || 0).toLocaleString(locale)}</td>
-                  <td className="text-right font-bold text-emerald-400">{currencySymbol} {(pago.monto_neto || 0).toLocaleString(locale)}</td>
+                  <td className="text-right">{currencySymbol} {paymentAmount(pago.monto_bruto ?? pago.sueldo_bruto).toLocaleString(locale)}</td>
+                  <td className="text-right text-destructive">{currencySymbol} {paymentAmount(pago.descuentos ?? pago.total_descuentos).toLocaleString(locale)}</td>
+                  <td className="text-right font-bold text-emerald-400">{currencySymbol} {paymentAmount(pago.monto_neto).toLocaleString(locale)}</td>
                   <td>{pago.fecha_pago ? parseDateLocal(pago.fecha_pago).toLocaleDateString(locale) : '-'}</td>
                   <td>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoColor(pago.estado)}`}>
@@ -330,7 +341,7 @@ const PagosPage = () => {
                   </td>
                   <td>
                     <div className="flex gap-2">
-                      {pago.estado === 'pendiente' && (
+                      {paymentStatus(pago) === 'pendiente' && (
                         <button
                           onClick={() => procesarPago(pago.id)}
                           className="action-btn bg-green-500 hover:bg-green-600 text-white"
@@ -339,7 +350,7 @@ const PagosPage = () => {
                           💰 Pagar
                         </button>
                       )}
-                      {pago.estado === 'procesado' && (
+                      {paymentStatus(pago) === 'procesado' && (
                         <button
                           onClick={() => generarComprobante(pago.id)}
                           className="action-btn bg-blue-500 hover:bg-blue-600 text-white"
@@ -352,14 +363,14 @@ const PagosPage = () => {
                         onClick={() => {
                           const detalles = `
 DETALLE DEL PAGO
-Empleado: ${getEmpleadoNombre(pago.empleado_id)}
+Empleado: ${getEmpleadoNombre(pago)}
 Período: ${pago.periodo}
-Sueldo Bruto: ${currencySymbol} ${(pago.monto_bruto || 0).toLocaleString(locale)}
+Sueldo Bruto: ${currencySymbol} ${paymentAmount(pago.monto_bruto ?? pago.sueldo_bruto).toLocaleString(locale)}
 ${isArgentina ? 'SIPA/INSSJP/obra social' : isColombia ? 'Salud/pensión/FSP' : 'AFP/ONP'}: ${currencySymbol} ${(pago.descuento_afp || 0).toLocaleString(locale)}
 ${isArgentina ? 'Ganancias' : isColombia ? 'Retención en la fuente' : 'Renta 5ta'}: ${currencySymbol} ${(pago.descuento_renta || 0).toLocaleString(locale)}
-Otros Desc.: ${currencySymbol} ${((pago.total_descuentos || 0) - (pago.descuento_afp || 0) - (pago.descuento_renta || 0)).toLocaleString(locale)}
-Total Descuentos: ${currencySymbol} ${(pago.total_descuentos || 0).toLocaleString(locale)}
-MONTO NETO: ${currencySymbol} ${(pago.monto_neto || 0).toLocaleString(locale)}
+Otros Desc.: ${currencySymbol} ${(paymentAmount(pago.descuentos ?? pago.total_descuentos) - paymentAmount(pago.descuento_afp) - paymentAmount(pago.descuento_renta)).toLocaleString(locale)}
+Total Descuentos: ${currencySymbol} ${paymentAmount(pago.descuentos ?? pago.total_descuentos).toLocaleString(locale)}
+MONTO NETO: ${currencySymbol} ${paymentAmount(pago.monto_neto).toLocaleString(locale)}
                           `;
                           alert(detalles);
                         }}
@@ -404,8 +415,9 @@ MONTO NETO: ${currencySymbol} ${(pago.monto_neto || 0).toLocaleString(locale)}
               {empleados.map((empleado) => {
                 const pagosEmpleado = pagos.filter(p => p.empleado_id === empleado.id);
                 const ultimoPago = pagosEmpleado.sort((a, b) => new Date(b.periodo).getTime() - new Date(a.periodo).getTime())[0];
-                const totalPagado = pagosEmpleado.filter(p => p.estado === 'procesado').reduce((sum, p) => sum + (p.monto_neto || 0), 0);
-                const promedioMensual = pagosEmpleado.length > 0 ? totalPagado / pagosEmpleado.filter(p => p.estado === 'procesado').length : 0;
+                const pagosProcesados = pagosEmpleado.filter(p => paymentStatus(p) === 'procesado');
+                const totalPagado = pagosProcesados.reduce((sum, p) => sum + paymentAmount(p.monto_neto), 0);
+                const promedioMensual = pagosProcesados.length > 0 ? totalPagado / pagosProcesados.length : 0;
 
                 return (
                   <tr key={empleado.id}>
