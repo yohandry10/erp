@@ -106,6 +106,7 @@ export class RrhhController {
 
   // ===== PLANILLAS (EXISTENTE) =====
   @Get('planillas')
+  @RequirePermission('rrhh.planillas.read')
   async getPlanillas(@CurrentTenant() tenantId: string) {
     this.logger.debug(`📋 [RRHH] Obteniendo planillas para tenant: ${tenantId}`);
     return this.planillasService.getPlanillas(tenantId);
@@ -127,6 +128,7 @@ export class RrhhController {
   }
 
   @Get('planillas/:id/detalle')
+  @RequirePermission('rrhh.planillas.read')
   async getDetallePlanilla(
     @CurrentTenant() tenantId: string,
     @Param('id') planillaId: string
@@ -136,6 +138,7 @@ export class RrhhController {
   }
 
   @Get('boleta/:empleadoPlanillaId')
+  @RequirePermission('rrhh.planillas.read')
   async getBoleta(
     @CurrentTenant() tenantId: string,
     @Param('empleadoPlanillaId') empleadoPlanillaId: string
@@ -220,6 +223,7 @@ export class RrhhController {
   }
 
   @Post('planillas/:id/generar-asientos')
+  @RequirePermission('rrhh.planillas.accounting')
   async generarAsientosContables(
     @CurrentTenant() tenantId: string,
     @Param('id') planillaId: string
@@ -230,6 +234,7 @@ export class RrhhController {
 
   // ===== PLANILLA ELECTRÓNICA PERÚ: PLAME / T-REGISTRO =====
   @Get('peru/planilla-electronica/:planillaId/preview')
+  @RequirePermission('rrhh.planilla_electronica.read')
   async previsualizarPlanillaElectronicaPeru(
     @CurrentTenant() tenantId: string,
     @Param('planillaId') planillaId: string,
@@ -238,6 +243,7 @@ export class RrhhController {
   }
 
   @Put('peru/planilla-electronica/empleados/:empleadoId/ficha')
+  @RequirePermission('rrhh.planilla_electronica.write')
   async guardarFichaLaboralPeru(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
@@ -248,6 +254,7 @@ export class RrhhController {
   }
 
   @Put('peru/planilla-electronica/detalles/:detalleId/jornada')
+  @RequirePermission('rrhh.planilla_electronica.write')
   async guardarJornadaPlamePeru(
     @CurrentTenant() tenantId: string,
     @Param('detalleId') detalleId: string,
@@ -257,6 +264,7 @@ export class RrhhController {
   }
 
   @Post('peru/planilla-electronica/:planillaId/paquetes')
+  @RequirePermission('rrhh.planilla_electronica.write')
   async guardarPaquetePlanillaElectronicaPeru(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
@@ -267,6 +275,7 @@ export class RrhhController {
   }
 
   @Get('peru/planilla-electronica/paquetes/historial')
+  @RequirePermission('rrhh.planilla_electronica.read')
   async historialPlanillaElectronicaPeru(
     @CurrentTenant() tenantId: string,
     @Query('limite') limite?: string,
@@ -275,6 +284,7 @@ export class RrhhController {
   }
 
   @Post('peru/planilla-electronica/paquetes/:id/evidencia')
+  @RequirePermission('rrhh.planilla_electronica.write')
   async registrarEvidenciaPlanillaElectronicaPeru(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
@@ -285,6 +295,7 @@ export class RrhhController {
   }
 
   @Get('peru/planilla-electronica/paquetes/:id/descargar')
+  @RequirePermission('rrhh.planilla_electronica.read')
   async descargarPaquetePlanillaElectronicaPeru(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,

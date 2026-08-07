@@ -12,10 +12,12 @@ describe('CPEIntegrationService documento de cliente', () => {
       { getTasaIgv: jest.fn().mockResolvedValue(0.18) } as any,
     );
 
-    jest.spyOn(service as any, 'obtenerSerieYNumero').mockResolvedValue({
-      serie: 'F001',
-      numero: 151,
-    });
+    jest.spyOn(service as any, 'obtenerSerieYNumero').mockImplementation(
+      async (_tenantId: string, tipoDocumento: TipoDocumento) => ({
+        serie: tipoDocumento === TipoDocumento.BOLETA ? 'B001' : 'F001',
+        numero: 151,
+      }),
+    );
 
     return service;
   };
@@ -92,6 +94,48 @@ describe('CPEIntegrationService documento de cliente', () => {
       response: expect.objectContaining({
         code: 'CLIENTE_SIN_DOCUMENTO',
       }),
+    });
+  });
+
+  it('emite boleta para un cliente con DNI', async () => {
+    const service = buildService();
+
+    const boleta = await (service as any).mapearPedidoACPE(
+      pedido,
+      {
+        documento_tipo: 'DNI',
+        documento_numero: '45123456',
+        razon_social: 'CLIENTE QA CONTABLE PERU',
+        direccion: 'Lima',
+      },
+      empresaConfig,
+    );
+
+    expect(boleta).toEqual(
+      expect.objectContaining({
+        tipo_documento: TipoDocumento.BOLETA,
+        serie: 'B001',
+        tipo_documento_receptor: '1',
+        documento_receptor: '45123456',
+      }),
+    );
+  });
+
+  it('rechaza un cliente marcado como RUC con documento corto', async () => {
+    const service = buildService();
+
+    await expect(
+      (service as any).mapearPedidoACPE(
+        pedido,
+        {
+          documento_tipo: 'RUC',
+          documento_numero: '12345678',
+          razon_social: 'RUC inválido',
+        },
+        empresaConfig,
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'CLIENTE_RUC_INVALIDO' }),
     });
   });
 });

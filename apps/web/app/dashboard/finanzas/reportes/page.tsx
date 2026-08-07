@@ -65,19 +65,19 @@ export default function ReportesFinanzasPage() {
   ]
 
   const handleExport = () => {
-    alert('📥 Funcionalidad de exportación próximamente')
+    window.print()
   }
 
   return (
     <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
       {/* Header */}
-      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8">
+      <div className="relative mb-8 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-lg backdrop-blur-xl before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary md:flex-row md:items-center md:p-8 print:shadow-none">
         <div>
           <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Reportes Financieros</h1>
           <p className="mt-2 text-base text-muted-foreground">Análisis y reportes del módulo de finanzas</p>
         </div>
         <button
-          onClick={handleExport} className="py-3 px-6 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold text-foreground/85 transition"
+          onClick={handleExport} className="py-3 px-6 rounded-lg border bg-card cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold text-foreground/85 transition print:hidden"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#f9fafb'
           }}
@@ -86,12 +86,12 @@ export default function ReportesFinanzasPage() {
           }}
         >
           <Download size={16} />
-          Exportar Reporte
+          Imprimir / PDF
         </button>
       </div>
 
       {/* Report Selection Grid */}
-      <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-4 mb-8">
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-4 mb-8 print:hidden">
         {reports.map((report) => {
           const Icon = report.icon
           const isSelected = selectedReport === report.id

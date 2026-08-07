@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { parseDateLocal } from '@/lib/date-utils'
-import { AlertCircle, CalendarRange, Loader2, RefreshCw, XCircle } from 'lucide-react'
+import { AlertCircle, CalendarRange, Loader2, Plus, RefreshCw, Save, X, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,16 +27,48 @@ interface ResultadoDevengo {
   omitidos?: Array<{ diferido_id: string; nombre?: string; motivo: string }>
 }
 
+interface Cuenta {
+  id: string
+  codigo: string
+  nombre: string
+}
+
+interface CentroCosto {
+  id: string
+  codigo?: string
+  nombre: string
+}
+
+const hoy = new Date().toISOString().slice(0, 10)
+const diferidoInicial = {
+  codigo: '',
+  nombre: '',
+  descripcion: '',
+  tipo: 'GASTO' as 'GASTO' | 'INGRESO',
+  cuenta_diferido_id: '',
+  cuenta_resultado_id: '',
+  monto_total: '',
+  periodos: '12',
+  fecha_inicio: hoy,
+  centro_costo_id: '',
+}
+
 const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function DiferidosPage() {
   const { get, post, del } = useApi()
 
   const [diferidos, setDiferidos] = useState<Diferido[]>([])
+  const [cuentas, setCuentas] = useState<Cuenta[]>([])
+  const [centrosCosto, setCentrosCosto] = useState<CentroCosto[]>([])
   const [loading, setLoading] = useState(true)
+  const [guardando, setGuardando] = useState(false)
   const [devengando, setDevengando] = useState(false)
   const [resultado, setResultado] = useState<ResultadoDevengo | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const [mostrarAlta, setMostrarAlta] = useState(false)
+  const [form, setForm] = useState(diferidoInicial)
 
   const ahora = new Date()
   const [anio, setAnio] = useState(ahora.getFullYear())
@@ -46,8 +78,14 @@ export default function DiferidosPage() {
     try {
       setLoading(true)
       setError(null)
-      const response = await get('/api/contabilidad/diferidos')
+      const [response, cuentasResponse, centrosResponse] = await Promise.all([
+        get('/api/contabilidad/diferidos'),
+        get('/api/contabilidad/plan-cuentas'),
+        get('/api/contabilidad/centros-costo'),
+      ])
       if (response?.success) setDiferidos(response.data || [])
+      if (cuentasResponse?.success) setCuentas(cuentasResponse.data || [])
+      if (centrosResponse?.success) setCentrosCosto(centrosResponse.data || [])
     } catch (err: any) {
       setError(err.message || 'Error al cargar los diferidos')
     } finally {
@@ -58,6 +96,50 @@ export default function DiferidosPage() {
   useEffect(() => {
     cargar()
   }, [cargar])
+
+  const crearDiferido = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const monto = Number(form.monto_total)
+    const periodos = Number(form.periodos)
+    if (!form.nombre.trim() || !form.cuenta_diferido_id || !form.cuenta_resultado_id) {
+      setError('Nombre, cuenta de balance y cuenta de resultados son obligatorios.')
+      return
+    }
+    if (form.cuenta_diferido_id === form.cuenta_resultado_id) {
+      setError('La cuenta de balance y la cuenta de resultados deben ser distintas.')
+      return
+    }
+    if (!Number.isFinite(monto) || monto <= 0 || !Number.isInteger(periodos) || periodos < 1) {
+      setError('Ingrese un importe positivo y una cantidad válida de períodos.')
+      return
+    }
+    try {
+      setGuardando(true)
+      setError(null)
+      setAviso(null)
+      const response = await post('/api/contabilidad/diferidos', {
+        codigo: form.codigo.trim() || undefined,
+        nombre: form.nombre.trim(),
+        descripcion: form.descripcion.trim() || undefined,
+        tipo: form.tipo,
+        cuenta_diferido_id: form.cuenta_diferido_id,
+        cuenta_resultado_id: form.cuenta_resultado_id,
+        monto_total: monto,
+        periodos,
+        fecha_inicio: form.fecha_inicio,
+        centro_costo_id: form.centro_costo_id || undefined,
+      })
+      if (!response?.success) throw new Error(response?.message || 'No se pudo registrar el diferido')
+      setAviso(`Diferido "${response.data.nombre}" registrado y listo para devengar.`)
+      setForm(diferidoInicial)
+      setMostrarAlta(false)
+      await cargar()
+    } catch (err: any) {
+      setError(err.message || 'No se pudo registrar el diferido')
+    } finally {
+      setGuardando(false)
+    }
+  }
 
   const devengar = async () => {
     const periodo = `${anio}-${String(mes).padStart(2, '0')}`
@@ -144,6 +226,10 @@ export default function DiferidosPage() {
               <RefreshCw className="h-4 w-4" />
               Actualizar
             </Button>
+            <Button type="button" onClick={() => setMostrarAlta((actual) => !actual)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              {mostrarAlta ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {mostrarAlta ? 'Cerrar alta' : 'Registrar diferido'}
+            </Button>
           </div>
 
           <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-4">
@@ -186,12 +272,36 @@ export default function DiferidosPage() {
           </div>
         </section>
 
+        {mostrarAlta && (
+          <Card className="border-cyan-400/20 bg-card/70 text-foreground shadow-xl shadow-blue-950/20">
+            <CardHeader className="border-b border-cyan-400/10 px-5 py-4"><CardTitle className="text-base">Nuevo ingreso o gasto diferido</CardTitle></CardHeader>
+            <CardContent className="p-5">
+              <form onSubmit={crearDiferido} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <label className={labelClass}>Código<input aria-label="Código del diferido" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal" /></label>
+                <label className={labelClass}>Nombre<input aria-label="Nombre del diferido" required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal" /></label>
+                <label className={labelClass}>Tipo<select aria-label="Tipo de diferido" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value as 'GASTO' | 'INGRESO' })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal"><option value="GASTO">Gasto pagado por adelantado</option><option value="INGRESO">Ingreso cobrado por adelantado</option></select></label>
+                <label className={labelClass}>Primer período<input aria-label="Primer período del diferido" type="date" required value={form.fecha_inicio} onChange={(e) => setForm({ ...form, fecha_inicio: e.target.value })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal" /></label>
+                <label className={labelClass}>Importe total<input aria-label="Importe total del diferido" type="number" min="0.01" step="0.01" required value={form.monto_total} onChange={(e) => setForm({ ...form, monto_total: e.target.value })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal" /></label>
+                <label className={labelClass}>Períodos mensuales<input aria-label="Períodos del diferido" type="number" min="1" step="1" required value={form.periodos} onChange={(e) => setForm({ ...form, periodos: e.target.value })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal" /></label>
+                <label className={labelClass}>Cuenta de balance<select aria-label="Cuenta de balance del diferido" required value={form.cuenta_diferido_id} onChange={(e) => setForm({ ...form, cuenta_diferido_id: e.target.value })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal"><option value="">Seleccione…</option>{cuentas.map((cuenta) => <option key={cuenta.id} value={cuenta.id}>{cuenta.codigo} — {cuenta.nombre}</option>)}</select></label>
+                <label className={labelClass}>Cuenta de resultados<select aria-label="Cuenta de resultados del diferido" required value={form.cuenta_resultado_id} onChange={(e) => setForm({ ...form, cuenta_resultado_id: e.target.value })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal"><option value="">Seleccione…</option>{cuentas.map((cuenta) => <option key={cuenta.id} value={cuenta.id}>{cuenta.codigo} — {cuenta.nombre}</option>)}</select></label>
+                <label className={labelClass}>Centro de costo<select aria-label="Centro de costo del diferido" value={form.centro_costo_id} onChange={(e) => setForm({ ...form, centro_costo_id: e.target.value })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal"><option value="">Sin centro</option>{centrosCosto.map((centro) => <option key={centro.id} value={centro.id}>{centro.codigo ? `${centro.codigo} — ` : ''}{centro.nombre}</option>)}</select></label>
+                <label className={`${labelClass} md:col-span-2`}>Descripción<input aria-label="Descripción del diferido" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm normal-case tracking-normal" /></label>
+                <div className="flex items-end"><Button type="submit" disabled={guardando} className="w-full gap-2 bg-blue-600 text-white hover:bg-blue-500">{guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar diferido</Button></div>
+              </form>
+              <p className="mt-4 text-xs text-muted-foreground">Para gastos use normalmente una cuenta de balance 18 y una cuenta de resultados 6; para ingresos, una cuenta de pasivo 49 y una cuenta 7. El sistema exige que ambas sean distintas.</p>
+            </CardContent>
+          </Card>
+        )}
+
         {error && (
           <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <p className="text-sm font-medium text-primary">{error}</p>
           </div>
         )}
+
+        {aviso && <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm font-medium text-emerald-300">{aviso}</div>}
 
         {resultado && (
           <Card className="border-cyan-400/20 bg-card/70 text-foreground shadow-xl shadow-blue-950/20">

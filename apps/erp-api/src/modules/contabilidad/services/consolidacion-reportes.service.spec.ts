@@ -181,4 +181,21 @@ describe('ConsolidacionReportesService', () => {
     expect(resultado.map((m) => m.codigo)).toEqual(['7011', '4100', '41001']);
     expect(movimientos[0].codigo).toBe('4100');
   });
+
+  it('incluye los movimientos ocurridos durante todo el día de fecha hasta', async () => {
+    const query = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockReturnThis(),
+      range: jest.fn().mockResolvedValue({ data: [], error: null }),
+    };
+    from.mockReturnValue(query);
+
+    await (service as any).cargarMovimientos('tenant-1', '2026-08-07');
+
+    expect(query.lte).toHaveBeenCalledWith(
+      'asientos_contables.fecha',
+      '2026-08-07T23:59:59.999Z',
+    );
+  });
 });

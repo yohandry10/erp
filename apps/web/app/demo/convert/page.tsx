@@ -140,7 +140,7 @@ export default function ConvertDemoPage() {
       // HttpOnly sin copiar el JWT devuelto a Web Storage.
       await signIn(formData.email, formData.password);
 
-      router.push('/dashboard');
+      window.location.replace('/dashboard/');
     } catch (err: any) {
       setError(err.message || 'Error al convertir la cuenta');
       setLoading(false);
@@ -168,7 +168,7 @@ export default function ConvertDemoPage() {
 
         if (estado === 'COMPLETADA') {
           await signIn(formData.email, formData.password);
-          router.push('/dashboard');
+          window.location.replace('/dashboard/');
         } else if (estado !== 'PENDIENTE') {
           setPago(null);
           setError(

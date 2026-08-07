@@ -39,7 +39,7 @@ const PagosPage = () => {
     variant: 'default'
   });
 
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
 
   const loadData = useCallback(async () => {
     if (!rrhhEnabled) {

@@ -7,6 +7,7 @@ import PlanillaCalcularModal from '@/components/modals/PlanillaCalcularModal';
 import PlanillaPagarModal from '@/components/modals/PlanillaPagarModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useApi } from '@/hooks/use-api';
+import { usePermission } from '@/hooks/use-permission';
 import { apiSucceeded, unwrapApiArray } from '@/lib/api-contract';
 import { fetchApi } from '@/lib/api-fetch';
 import {
@@ -34,8 +35,13 @@ const PlanillasPage = () => {
   const isColombia = country.paisCodigo === 'CO';
   const currencySymbol = country.simboloMoneda || 'S/';
   const locale = country.locale || 'es-PE';
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
   const { get } = useApi();
+  // CONTADOR sólo consulta la planilla fuente, descarga boletas/reportes y
+  // genera su integración contable. Crear, calcular, aprobar o pagar sigue
+  // reservado al rol RRHH/ADMIN mediante el permiso global rrhh.access.
+  const { hasPermission: canManagePayroll } = usePermission('rrhh', 'access', '__global__');
+  const { hasPermission: canGenerateAccounting } = usePermission('rrhh', 'accounting', 'planillas');
   const [planillas, setPlanillas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [detallePlanilla, setDetallePlanilla] = useState<any[]>([]);
@@ -295,7 +301,7 @@ const PlanillasPage = () => {
 
   const descargarBoleta = async (empleadoPlanillaId: string) => {
     try {
-      const response = await fetchApi(`/api/rrhh/planillas/empleado/${empleadoPlanillaId}`);
+      const response = await fetchApi(`/api/rrhh/boleta/${empleadoPlanillaId}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -492,13 +498,13 @@ const PlanillasPage = () => {
           </h1>
           <p className="mt-2 text-base text-muted-foreground">Gestión de nómina</p>
         </div>
-        <button
+        {canManagePayroll && <button
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
           onClick={abrirModalPlanilla}
         >
           <Rocket className="h-4 w-4" aria-hidden="true" />
           Crear Nueva Planilla
-        </button>
+        </button>}
       </div>
 
       {/* Estadísticas */}
@@ -555,13 +561,13 @@ const PlanillasPage = () => {
               <Rocket className="mx-auto mb-4 h-14 w-14 text-primary/70" aria-hidden="true" />
               <h3>¡Comienza con tu Primera Planilla!</h3>
               <p>Usa el botón &quot;Crear Nueva Planilla&quot; para configurar y generar tu primera planilla</p>
-              <button
+              {canManagePayroll && <button
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
                 onClick={abrirModalPlanilla}
               >
                 <Rocket className="h-4 w-4" aria-hidden="true" />
                 Crear primera planilla
-              </button>
+              </button>}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -622,7 +628,7 @@ const PlanillasPage = () => {
                       <td>
                         <div className="flex gap-2 items-center flex-wrap">
                           {/* Botón Calcular - Solo para borradores */}
-                          {planilla?.estado === 'borrador' && (
+                          {canManagePayroll && planilla?.estado === 'borrador' && (
                             <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-blue-500 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-blue-600"
                               onClick={() => abrirCalcularPlanilla(planilla)}
                               title="Calcular planilla detallada"
@@ -632,7 +638,7 @@ const PlanillasPage = () => {
                           )}
 
                           {/* Botón Pagar - Para calculadas y aprobadas */}
-                          {(planilla?.estado === 'calculada' || planilla?.estado === 'aprobada') && (
+                          {canManagePayroll && (planilla?.estado === 'calculada' || planilla?.estado === 'aprobada') && (
                             <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-emerald-600 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-emerald-700"
                               onClick={() => abrirPagarPlanilla(planilla)}
                               title="Pagar planilla"
@@ -657,8 +663,8 @@ const PlanillasPage = () => {
                             <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" /> Reporte
                           </button>
 
-                          {/* Botón Generar Asientos - Solo para calculadas */}
-                          {planilla?.estado === 'calculada' && (
+                          {/* La aprobación no debe ocultar la integración contable. */}
+                          {canGenerateAccounting && (planilla?.estado === 'calculada' || planilla?.estado === 'aprobada') && (
                             <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-blue-700 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-blue-800"
                               onClick={() => generarAsientosContables(planilla?.id)}
                               title="Generar asientos contables"
@@ -668,7 +674,7 @@ const PlanillasPage = () => {
                           )}
 
                           {/* Botón Aprobar - Solo para calculadas */}
-                          {planilla?.estado === 'calculada' && (
+                          {canManagePayroll && planilla?.estado === 'calculada' && (
                             <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-emerald-600 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-emerald-700"
                               onClick={() => aprobarPlanilla(planilla?.id)}
                               title="Aprobar planilla"
@@ -781,16 +787,16 @@ const PlanillasPage = () => {
       )}
 
       {/* Modal de Planilla */}
-      <PlanillaModal
+      {canManagePayroll && <PlanillaModal
         isOpen={showPlanillaModal}
         onClose={() => {
           setShowPlanillaModal(false)
         }}
         onSuccess={handlePlanillaSuccess}
-      />
+      />}
 
       {/* Modal de Calcular Planilla */}
-      <PlanillaCalcularModal
+      {canManagePayroll && <PlanillaCalcularModal
         isOpen={showCalcularModal}
         onClose={() => {
           setShowCalcularModal(false)
@@ -798,10 +804,10 @@ const PlanillasPage = () => {
         }}
         onSuccess={handleCalcularSuccess}
         planilla={planillaSeleccionada}
-      />
+      />}
 
       {/* Modal de Pagar Planilla */}
-      <PlanillaPagarModal
+      {canManagePayroll && <PlanillaPagarModal
         isOpen={showPagarModal}
         onClose={() => {
           setShowPagarModal(false)
@@ -809,7 +815,7 @@ const PlanillasPage = () => {
         }}
         onSuccess={handlePagarSuccess}
         planilla={planillaSeleccionada}
-      />
+      />}
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}

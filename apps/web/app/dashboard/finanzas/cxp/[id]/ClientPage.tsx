@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { PagoProveedorModal } from '@/components/finanzas'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { usePermission } from '@/hooks/use-permission'
 
 const toNumber = (value: unknown) => {
   const numeric = Number(value)
@@ -33,6 +34,7 @@ export default function CxpDetallePage() {
   const router = useRouter()
   const params = useParams()
   const { get } = useApi()
+  const { hasPermission: canManageCxp } = usePermission('finanzas', 'gestionar', 'cxp')
   const id = params?.id as string
 
   const [cxp, setCxp] = useState<any>(null)
@@ -92,7 +94,7 @@ export default function CxpDetallePage() {
     loadPagos()
   }
 
-  const canApplyPayment = cxp && cxp.estado !== 'PAGADA' && cxp.estado !== 'ANULADA' && toNumber(cxp.saldo) > 0
+  const canApplyPayment = canManageCxp && cxp && cxp.estado !== 'PAGADA' && cxp.estado !== 'ANULADA' && toNumber(cxp.saldo) > 0
 
   if (loading) {
     return (
@@ -421,7 +423,7 @@ export default function CxpDetallePage() {
       </div>
 
       {/* Pago Modal */}
-      {cxp && (
+      {cxp && canManageCxp && (
         <PagoProveedorModal
           isOpen={showPagoModal}
           onClose={() => setShowPagoModal(false)}

@@ -7,6 +7,7 @@ import { AlertCircle, ArrowLeft, Calendar, CheckCircle, Download, FileText, Load
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface DetalleAsiento {
   id: string
@@ -99,7 +100,7 @@ export default function AsientoDetallePage() {
     }).format(amount || 0)
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
+    parseDateLocal(dateString).toLocaleDateString(country.locale || 'es-PE', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -121,6 +122,40 @@ export default function AsientoDetallePage() {
   const isBalanced = () => {
     if (!asiento) return false
     return Math.abs(asiento.total_debe - asiento.total_haber) < 0.01
+  }
+
+  const descargarPdf = async () => {
+    if (!asiento) return
+
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ])
+    const doc = new jsPDF()
+    doc.setFontSize(16)
+    doc.text(`Asiento contable ${asiento.numero_asiento}`, 14, 18)
+    doc.setFontSize(10)
+    doc.text(`Fecha: ${formatDate(asiento.fecha)}`, 14, 27)
+    doc.text(`Estado: ${asiento.estado}`, 14, 33)
+    doc.text(`Concepto: ${asiento.concepto || '-'}`, 14, 39, { maxWidth: 180 })
+    if (asiento.referencia) doc.text(`Referencia: ${asiento.referencia}`, 14, 49)
+
+    autoTable(doc, {
+      startY: asiento.referencia ? 56 : 49,
+      head: [['Cuenta', 'Nombre', 'Concepto', 'Debe', 'Haber']],
+      body: (asiento.detalles || []).map((detalle) => [
+        detalle.cuenta_codigo,
+        detalle.cuenta_nombre,
+        detalle.concepto || '',
+        Number(detalle.debe || 0).toFixed(2),
+        Number(detalle.haber || 0).toFixed(2),
+      ]),
+      foot: [['', '', 'Totales', Number(asiento.total_debe || 0).toFixed(2), Number(asiento.total_haber || 0).toFixed(2)]],
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [37, 99, 235] },
+    })
+
+    doc.save(`asiento-${String(asiento.numero_asiento).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`)
   }
 
   const cerrarPanelAccion = () => {
@@ -342,7 +377,7 @@ export default function AsientoDetallePage() {
 
               <Button
                 type="button"
-                onClick={() => alert('Funcionalidad de descarga proximamente')}
+                onClick={descargarPdf}
                 className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
               >
                 <Download className="h-4 w-4" />

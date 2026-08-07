@@ -20,6 +20,7 @@ import { MetricCard } from '@/components/erp/metric-card'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { parseDateLocal } from '@/lib/date-utils'
 
 const rrhhModules = [
   { href: '/dashboard/rrhh/planillas', title: 'Planillas', description: 'Cálculo de sueldos y beneficios', icon: BadgeDollarSign },
@@ -33,7 +34,7 @@ const rrhhModules = [
 
 const formatDate = (dateString?: string) => {
   if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('es-PE')
+  return parseDateLocal(dateString).toLocaleDateString('es-PE')
 }
 
 export default function RrhhPage() {
@@ -56,7 +57,7 @@ export default function RrhhPage() {
     variant: 'default',
   })
 
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false'
 
   const toList = (d: any): any[] =>
     d?.success && Array.isArray(d.data) ? d.data : Array.isArray(d) ? d : []
@@ -88,7 +89,7 @@ export default function RrhhPage() {
     const activos = empleados.filter((emp: any) => emp?.estado === 'activo').length
     const nuevos = empleados.filter((emp: any) => {
       if (!emp?.fecha_ingreso) return false
-      const fechaIngreso = new Date(emp.fecha_ingreso)
+      const fechaIngreso = parseDateLocal(emp.fecha_ingreso)
       const haceUnMes = new Date()
       haceUnMes.setMonth(haceUnMes.getMonth() - 1)
       return fechaIngreso > haceUnMes

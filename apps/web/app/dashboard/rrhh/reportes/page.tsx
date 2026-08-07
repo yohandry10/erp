@@ -22,7 +22,7 @@ export default function ReportesRrhhPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { get } = useApi<any>({ showErrorToast: false })
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false'
 
   const loadData = useCallback(async () => {
     if (!rrhhEnabled) {

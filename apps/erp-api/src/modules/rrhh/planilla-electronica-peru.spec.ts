@@ -53,6 +53,14 @@ describe('Planilla electrónica Perú', () => {
     ]));
   });
 
+  it('acepta una planilla aprobada como fuente oficial de PLAME', () => {
+    const fuente = fuenteBase();
+    fuente.planilla.estado = 'aprobada';
+    const paquete = construirPaquetePlanillaElectronicaPeru(fuente);
+    expect(paquete.bloqueos.map((item) => item.codigo)).not.toContain('PLANILLA_NO_CALCULADA');
+    expect(paquete.resumen.listo_para_pvs).toBe(true);
+  });
+
   it('bloquea horas inventadas y acepta jornada respaldada por asistencia', () => {
     const fuente = fuenteBase();
     fuente.asistencias = [];

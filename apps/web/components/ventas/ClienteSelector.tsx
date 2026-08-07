@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Search, Plus, X, ChevronDown } from 'lucide-react'
 import ClienteQuickCreate from './ClienteQuickCreate'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { unwrapApiArray } from '@/lib/api-contract'
 
 interface ClienteSelectorProps {
   value?: string
@@ -48,33 +49,8 @@ export default function ClienteSelector({
   const loadAllClientes = useCallback(async () => {
     try {
       setLoading(true)
-      console.log('🔍 [ClienteSelector] Cargando todos los clientes...')
       const response = await get('/api/ventas/clientes?limit=100')
-
-      console.log('📦 [ClienteSelector] Respuesta recibida:', response)
-
-      // Si response es null, probablemente no hay token
-      if (response === null) {
-        console.error('❌ [ClienteSelector] No se recibió respuesta - probablemente no hay token de autenticación')
-        setClientes([])
-        return
-      }
-
-      if (response?.success && response?.data) {
-        console.log('✅ [ClienteSelector] Clientes cargados:', response.data.length || 0)
-        setClientes(response.data || [])
-      } else if (Array.isArray(response?.data)) {
-        // A veces la respuesta viene directamente en data sin success flag
-        console.log('✅ [ClienteSelector] Clientes cargados (sin success flag):', response.data.length)
-        setClientes(response.data)
-      } else if (Array.isArray(response)) {
-        // A veces la respuesta es directamente el array
-        console.log('✅ [ClienteSelector] Clientes cargados (array directo):', response.length)
-        setClientes(response)
-      } else {
-        console.warn('⚠️ [ClienteSelector] Respuesta sin datos válidos:', response)
-        setClientes([])
-      }
+      setClientes(unwrapApiArray<Cliente>(response))
     } catch (error) {
       console.error('❌ [ClienteSelector] Error loading clientes:', error)
       setClientes([])
@@ -87,11 +63,11 @@ export default function ClienteSelector({
     try {
       setLoading(true)
       const response = await get(`/api/ventas/clientes?search=${encodeURIComponent(search)}&limit=10`)
-
-      if (response?.success) {
-        setClientes(response.data || [])
-        setIsOpen(true)
-      }
+      // ClientesService devuelve { data, pagination } sin `success`; otros
+      // despliegues pueden envolverlo como { success, data }. Normalizar ambos
+      // contratos evita que una búsqueda válida deje el selector vacío.
+      setClientes(unwrapApiArray<Cliente>(response))
+      setIsOpen(true)
     } catch (error) {
       console.error('Error searching clientes:', error)
       setClientes([])

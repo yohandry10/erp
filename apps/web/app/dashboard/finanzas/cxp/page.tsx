@@ -10,6 +10,8 @@ import VencimientosAlert from '@/components/finanzas/VencimientosAlert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { usePermission } from '@/hooks/use-permission'
+import { downloadCsv } from '@/lib/csv-export'
 
 interface CuentaPorPagar {
   id: string
@@ -48,6 +50,7 @@ export default function CuentasPorPagarPage() {
   const { currency, locale, formatCurrency: formatLocalizedCurrency, taxIdLabel } = useLocalizedMoney()
   const router = useRouter()
   const { get } = useApi()
+  const { hasPermission: canReadRecepciones } = usePermission('compras', 'ver', 'recepciones')
 
   const [cuentas, setCuentas] = useState<CuentaPorPagar[]>([])
   const [proveedores, setProveedores] = useState<any[]>([])
@@ -109,7 +112,24 @@ export default function CuentasPorPagarPage() {
     setVencimientoHasta('')
   }
 
-  const handleExport = () => alert('Funcionalidad de exportacion proximamente')
+  const handleExport = () => {
+    downloadCsv(
+      `cuentas-por-pagar-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Documento', 'Tipo', 'Proveedor', taxIdLabel, 'Emisión', 'Vencimiento', 'Moneda', 'Total', 'Saldo', 'Estado'],
+      cuentas.map((cuenta) => [
+        cuenta.numero_documento,
+        cuenta.tipo_documento,
+        cuenta.proveedores?.razon_social,
+        cuenta.proveedores?.ruc,
+        cuenta.fecha_emision?.slice(0, 10),
+        cuenta.fecha_vencimiento?.slice(0, 10),
+        cuenta.moneda,
+        Number(cuenta.total || 0).toFixed(2),
+        Number(cuenta.saldo || 0).toFixed(2),
+        cuenta.estado,
+      ]),
+    )
+  }
 
   const formatCurrency = (amount: number | undefined, moneda: string = currency) => {
     if (!amount) return '-'
@@ -179,10 +199,10 @@ export default function CuentasPorPagarPage() {
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
-              <Button type="button" onClick={() => router.push('/dashboard/compras/recepciones')} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              {canReadRecepciones && <Button type="button" onClick={() => router.push('/dashboard/compras/recepciones')} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
                 Ir a recepciones
-              </Button>
+              </Button>}
             </div>
           </div>
         </section>

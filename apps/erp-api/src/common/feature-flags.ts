@@ -11,8 +11,10 @@ export const isFeatureFlagEnabled = (envName: string, defaultEnabled = false): b
   return value.toLowerCase() === 'true';
 };
 
-export const isRrhhEnabled = (): boolean => isFeatureFlagEnabled('FEATURE_RRHH_ENABLED');
-export const isPosEnabled = (): boolean => isFeatureFlagEnabled('FEATURE_POS_ENABLED');
+export const isRrhhEnabled = (): boolean =>
+  isFeatureFlagEnabled('FEATURE_RRHH_ENABLED', true);
+export const isPosEnabled = (): boolean =>
+  isFeatureFlagEnabled('FEATURE_POS_ENABLED', true);
 export const isInventarioEnabled = (): boolean =>
   isFeatureFlagEnabled('FEATURE_INVENTARIO_ENABLED', true);
 

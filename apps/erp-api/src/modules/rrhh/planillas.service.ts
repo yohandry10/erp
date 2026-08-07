@@ -1156,7 +1156,24 @@ export class PlanillasService {
     const { data, error } = await query.select();
 
     if (error) throw error;
-    return data[0];
+    const planillaActualizada = data?.[0];
+    if (!planillaActualizada) {
+      throw new NotFoundException('Planilla no encontrada para el tenant actual');
+    }
+
+    // El trigger de estados es la última autoridad. Si una base desactualizada
+    // vuelve a degradar APROBADA a CALCULADA, no debemos responder 200 ni dejar
+    // que la interfaz anuncie una aprobación que nunca quedó persistida.
+    if (
+      String(updateData?.estado || '').toLowerCase() === 'aprobada'
+      && String(planillaActualizada.estado || '').toLowerCase() !== 'aprobada'
+    ) {
+      throw new ConflictException(
+        'La aprobación de la planilla no quedó persistida; revise el contrato de estados de la base de datos',
+      );
+    }
+
+    return planillaActualizada;
   }
 
   // Eliminar planilla y todos sus datos asociados

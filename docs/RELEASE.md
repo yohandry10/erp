@@ -13,7 +13,7 @@ Debe cumplirse:
 - Worktree y commit identificados.
 - Type-check, build y pruebas relevantes en verde.
 - Sin migraciones duplicadas ni pendientes desconocidas.
-- Preflight DEV/PROD satisfactorio.
+- Preflight PROD satisfactorio; el proyecto DEV retirado debe ser rechazado.
 - Respaldo productivo disponible y probado.
 - RLS, RBAC y aislamiento tenant validados.
 - CPE y contabilidad cuadran en los escenarios aplicables.
@@ -26,17 +26,19 @@ Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 ## Promoción de migraciones
 
 1. Identificar exactamente el rango pendiente.
-2. Ejecutar preflight DEV y validar el rango allí.
+2. Ensayar el SQL dentro de una transacción con `ROLLBACK` o en infraestructura
+   local efímera; nunca redirigirlo al DEV retirado.
 3. Auditar SQL, duración, locks, backfills y rollback.
 4. Ejecutar preflight PROD usando `.env.production` o secretos inyectados.
-5. Crear respaldo y registrar referencia.
+5. Crear respaldo verificable y registrar referencia.
 6. Aplicar migraciones en orden.
 7. Ejecutar validadores de entorno, seguridad, contabilidad, inventario y
    tesorería.
 8. Comparar conteos y revisar logs.
 9. Detener y revertir ante cualquier diferencia no explicada.
 
-Actualmente `347..361` deben considerarse sólo DEV hasta verificación remota.
+El estado remoto vigente está verificado hasta `411`; cualquier rango posterior
+vuelve a comenzar por preflight, respaldo y ensayo transaccional.
 
 ## Go-live
 
@@ -102,7 +104,8 @@ Reglas:
 - Stock inicial exige `almacen_id`.
 - Totales por módulo deben cuadrar contra el sistema origen.
 - Una falla detiene el lote o queda registrada de forma reanudable.
-- El rollback se prueba en DEV antes de usar datos reales.
+- El rollback se prueba localmente o en una transacción revertida antes de usar
+  datos reales; DEV no es un destino permitido.
 
 ## Rollback
 
@@ -119,7 +122,6 @@ correctivo probado. Nunca improvisarlo sobre PROD.
 
 ## Bloqueantes actuales
 
-- Promoción controlada de `347..361`.
 - Certificado productivo compatible con el RUC.
 - Credenciales GRE REST si el cliente usa guías.
 - Secretos finales y smoke productivo autorizado.

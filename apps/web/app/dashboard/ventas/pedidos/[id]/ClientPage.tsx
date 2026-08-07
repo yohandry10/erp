@@ -124,6 +124,13 @@ export default function PedidoDetailPage() {
   const clienteDocumento = clienteInfo
     ? (clienteInfo.numero_documento ?? clienteInfo.documento_numero ?? clienteInfo.ruc ?? clienteInfo.codigo ?? null)
     : null
+  const clienteTipoDocumento = String(
+    clienteInfo?.documento_tipo ?? clienteInfo?.tipo_documento ?? '',
+  ).trim().toUpperCase()
+  const clienteEsRuc =
+    ['RUC', '6'].includes(clienteTipoDocumento) &&
+    /^\d{11}$/.test(String(clienteDocumento ?? ''))
+  const documentType = clienteEsRuc ? 'FACTURA' : 'BOLETA'
 
   const facturaButtonConfig = {
     usar_flujo_logistica: empresaConfig?.usar_flujo_logistica ?? false,
@@ -253,6 +260,7 @@ export default function PedidoDetailPage() {
             pedidoId={pedidoId}
             onSuccess={loadPedido}
             config={facturaButtonConfig}
+            documentType={documentType}
             onGenerated={handleFacturaGenerada}
           />
         </div>

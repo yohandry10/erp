@@ -94,9 +94,9 @@ const menuItems: MenuItem[] = [
     href: '/dashboard/analytics',
     icon: Download,
     permission: {
-      modulo: 'reportes',
-      accion: 'ver',
-      recurso: 'dashboard'
+      modulo: 'analytics',
+      accion: 'read',
+      recurso: 'finanzas'
     }
   },
   {
@@ -195,9 +195,9 @@ const menuItems: MenuItem[] = [
     href: '/dashboard/gre',
     icon: Truck,
     permission: {
-      modulo: 'logistica',
+      modulo: 'gre',
       accion: 'ver',
-      recurso: 'gre'
+      recurso: 'guias'
     }
   },
   {
@@ -205,9 +205,9 @@ const menuItems: MenuItem[] = [
     href: '/dashboard/sire',
     icon: Download,
     permission: {
-      modulo: 'reportes',
-      accion: 'ver',
-      recurso: 'ventas'
+      modulo: 'sire',
+      accion: 'read',
+      recurso: '__global__'
     }
   },
   {
@@ -308,8 +308,18 @@ const menuItems: MenuItem[] = [
     icon: Users,
     permission: {
       modulo: 'rrhh',
-      accion: 'ver',
-      recurso: 'empleados'
+      accion: 'access',
+      recurso: '__global__'
+    }
+  },
+  {
+    title: 'PLAME / T-Registro',
+    href: '/dashboard/rrhh/planilla-electronica',
+    icon: FileSpreadsheet,
+    permission: {
+      modulo: 'rrhh',
+      accion: 'read',
+      recurso: 'planilla_electronica'
     }
   },
   {
@@ -579,12 +589,9 @@ export default function Sidebar() {
   const country = useCountryContext()
   const prefetchedRoutes = useRef<Set<string>>(new Set())
   const isPeru = country.paisCodigo === 'PE'
-  const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
-  const inventarioEnabled =
-    process.env.NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED === undefined
-      ? true
-      : process.env.NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED === 'true'
+  const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED !== 'false'
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false'
+  const inventarioEnabled = process.env.NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED !== 'false'
 
   // El Admin del tenant tiene acceso a todo el menú.
   // Los roles pueden venir como string[] o como objetos en snapshots antiguos.
@@ -611,13 +618,14 @@ export default function Sidebar() {
         .filter((item) => {
           // HARDENING: ocultar módulos deshabilitados por feature flags en el menú.
           if (!posEnabled && item.href === '/dashboard/pos') return false
-          if (!rrhhEnabled && item.href === '/dashboard/rrhh') return false
+          if (!rrhhEnabled && item.href?.startsWith('/dashboard/rrhh')) return false
           if (!inventarioEnabled && item.title === 'Productos') return false
           if (
             !isPeru &&
             (
               item.href === '/dashboard/gre' ||
               item.href === '/dashboard/sire' ||
+              item.href === '/dashboard/rrhh/planilla-electronica' ||
               item.title === 'Reportes SIRE'
             )
           ) return false

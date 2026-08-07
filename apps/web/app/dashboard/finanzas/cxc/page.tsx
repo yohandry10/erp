@@ -11,6 +11,7 @@ import { CobroModal, HistorialDrawer, NotaCreditoModal, ReprogramarModal } from 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { downloadCsv } from '@/lib/csv-export'
 
 type EstadoCxc = 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO'
 
@@ -136,6 +137,25 @@ export default function CuentasPorCobrarPage() {
       setClientes([])
     }
   }, [canReadClientes, clientesPermissionLoading, get])
+
+  const exportarCuentas = () => {
+    downloadCsv(
+      `cuentas-por-cobrar-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Documento', 'Tipo', 'Cliente', 'Documento cliente', 'Emisión', 'Vencimiento', 'Moneda', 'Total', 'Saldo', 'Estado'],
+      cuentas.map((cuenta) => [
+        [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || 'N/A',
+        cuenta.tipo_documento,
+        cuenta.clientes?.razon_social,
+        cuenta.clientes?.documento_numero,
+        cuenta.fecha_emision?.slice(0, 10),
+        cuenta.fecha_vencimiento?.slice(0, 10),
+        cuenta.moneda,
+        Number(cuenta.total || 0).toFixed(2),
+        Number(cuenta.saldo || 0).toFixed(2),
+        cuenta.estado,
+      ]),
+    )
+  }
 
   const fetchHistorial = useCallback(
     async (cxcId: string) => {
@@ -286,7 +306,7 @@ export default function CuentasPorCobrarPage() {
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
-              <Button type="button" onClick={() => alert('Exportacion en desarrollo')} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
+              <Button type="button" onClick={exportarCuentas} variant="outline" className="gap-2 border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground">
                 <Download className="h-4 w-4" />
                 Exportar
               </Button>
