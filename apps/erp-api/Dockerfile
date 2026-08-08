@@ -19,6 +19,10 @@ COPY apps/erp-api/ ./apps/erp-api/
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
+# La demo pública necesita un certificado autofirmado desechable para ejercitar
+# el flujo SUNAT beta. Se genera en cada build y nunca se versiona una clave.
+RUN node apps/erp-api/scripts/generate-demo-pfx.cjs /app/certs/demo.pfx
+
 # Build libraries first
 RUN pnpm --filter=@erp-suite/dtos build
 RUN pnpm --filter=@erp-suite/crypto build
@@ -62,6 +66,7 @@ COPY --from=base /app/libs/crypto/package.json ./libs/crypto/
 # Copy built application
 COPY --from=base /app/apps/erp-api/dist ./apps/erp-api/dist
 COPY --from=base /app/apps/erp-api/package.json ./apps/erp-api/
+COPY --from=base /app/certs/demo.pfx ./certs/demo.pfx
 
 # Install only production dependencies
 RUN pnpm install --prod --frozen-lockfile
@@ -69,6 +74,7 @@ RUN pnpm install --prod --frozen-lockfile
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nestjs -u 1001
+RUN chown nestjs:nodejs /app/certs/demo.pfx && chmod 400 /app/certs/demo.pfx
 
 USER nestjs
 
