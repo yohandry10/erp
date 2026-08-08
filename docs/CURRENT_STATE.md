@@ -40,7 +40,9 @@ migraciones verificados, prevalece la implementación actual.
 
 Reglas vigentes:
 
-- Nunca ejecutar QA, demos ni seeds sintéticos en PROD.
+- Nunca ejecutar QA ni seeds sintéticos ad hoc en PROD. La demo pública es una
+  función productiva: sólo puede crearse por su endpoint versionado y para una
+  verificación explícita del flujo de cliente.
 - El runtime usa `.env.production` o secretos inyectados; no carga `.env.local`
   ni `.env`.
 - QA con escritura usa dobles o infraestructura local efímera; nunca PROD.
@@ -104,12 +106,15 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   movimientos y cierre. El ensayo se revirtió, la función quedó como
   `SECURITY INVOKER`, `anon/authenticated` no pueden ejecutarla y el tenant de
   verificación devolvió 15 cuentas PCGE.
-- `412..432`: aplicadas y registradas en PROD el 2026-08-07 después de preflight,
+- `412..433`: aplicadas y registradas en PROD el 2026-08-07 después de preflight,
   respaldo PostgreSQL 17 restaurado en infraestructura local efímera y ensayo
   íntegro sobre una copia de PROD. Cierran la hidratación transaccional de demos,
   conversión demo→real, teléfono de clientes, costo de ventas POS/pedidos,
   planilla y liquidación atómicas, cuenta PCGE 4699, asientos/CxP/pagos con
-  outbox e idempotencia y la firma única de `create_demo_tenant`. El verificador
+  outbox e idempotencia y la firma única de `create_demo_tenant`. La `433`
+  restaura además el contrato exacto de nombres requerido por PostgREST
+  (`p_nombre`, `p_dias_duracion`, `p_pais_codigo`), recarga su caché de esquema
+  y rechaza la sobrecarga histórica de dos argumentos. El verificador
   posterior confirmó 21 versiones, 29/29 demos consultables, cero asientos
   confirmados descuadrados, cero roles `ADMIN_DEMO` en cuentas reales, cero
   teléfonos inválidos y cero tenants sin 4699. Los RPC `SECURITY DEFINER` que
@@ -167,9 +172,11 @@ Cambios recientes principales:
   PCGE para diferidos y recurrencia contable reprogramable.
 - `412..424`: demos empresariales coherentes y conversión a cuenta real sin
   estado parcial; backfills limitados a tenants aún marcados como demo.
-- `425..432`: escrituras críticas de planilla, liquidación, asientos, factura
+- `425..433`: escrituras críticas de planilla, liquidación, asientos, factura
   proveedor y pago bancario en una sola transacción, con outbox e idempotencia;
-  reconciliación de costo de ventas y contrato RPC demo no ambiguo.
+  reconciliación de costo de ventas y contrato RPC demo no ambiguo. La prueba
+  productiva posterior creó una demo Perú, emitió sesión y segundo aprobador,
+  y entró visualmente al dashboard sin errores de consola.
 
 ## Flujos cerrados técnicamente
 
