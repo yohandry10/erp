@@ -38,12 +38,10 @@ export class PeriodosService {
     const anio = fecha.getFullYear();
     const mes = fecha.getMonth() + 1; // JavaScript months are 0-indexed
 
-    const periodo = await this.obtenerPeriodo(tenantId, anio, mes);
+    let periodo = await this.obtenerPeriodo(tenantId, anio, mes);
 
     if (!periodo) {
-      // Si no existe el período, se asume que está abierto (auto-creación implícita)
-      console.log(`📅 [Periodos] Período ${anio}-${mes} no existe para tenant ${tenantId}, se permite operación`);
-      return;
+      periodo = await this.asegurarPeriodoAbierto(tenantId, anio, mes);
     }
 
     if (periodo.estado === EstadoPeriodo.CERRADO) {
@@ -61,6 +59,36 @@ export class PeriodosService {
     }
 
     console.log(`✅ [Periodos] Período ${anio}-${mes} está ABIERTO para tenant ${tenantId}`);
+  }
+
+  /** Materializa un período abierto real para que nunca quede implícito e invisible. */
+  private async asegurarPeriodoAbierto(
+    tenantId: string,
+    anio: number,
+    mes: number
+  ): Promise<PeriodoContable> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('periodos_contables')
+      .upsert(
+        { tenant_id: tenantId, anio, mes, estado: EstadoPeriodo.ABIERTO },
+        { onConflict: 'tenant_id,anio,mes', ignoreDuplicates: true }
+      )
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      console.error('❌ [Periodos] Error materializando período:', error);
+      throw new Error(`Error creando período contable: ${error.message}`);
+    }
+
+    const periodo = (data as PeriodoContable | null) ||
+      (await this.obtenerPeriodo(tenantId, anio, mes));
+    if (!periodo) {
+      throw new Error(`No se pudo materializar el período contable ${anio}-${String(mes).padStart(2, '0')}`);
+    }
+
+    return periodo;
   }
 
   /**

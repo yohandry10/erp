@@ -411,15 +411,13 @@ test.describe("Finanzas - Tesorería", () => {
       const modal = page.getByRole("dialog", {
         name: /Nueva conciliación bancaria/i,
       });
-      const cuentaBancariaSelect = modal.locator("select").first();
-      const cuentaOptions = await cuentaBancariaSelect
-        .locator('option:not([value=""])')
-        .count();
-      expect(
-        cuentaOptions,
-        "Debe existir al menos una cuenta bancaria para conciliar",
-      ).toBeGreaterThan(0);
-      await cuentaBancariaSelect.selectOption({ index: 1 });
+      const cuentaBancariaSelect = modal.getByRole("combobox", {
+        name: /Cuenta bancaria/i,
+      });
+      await expect(
+        cuentaBancariaSelect,
+        "Debe existir una cuenta bancaria seleccionable para conciliar",
+      ).toBeVisible();
 
       // Set date range (last month)
       const today = new Date();
@@ -427,7 +425,7 @@ test.describe("Finanzas - Tesorería", () => {
       const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
       await modal
-        .locator('input[type="text"]')
+        .getByRole("textbox", { name: /Período/i })
         .fill(today.toISOString().slice(0, 7));
 
       const dateInputs = modal.locator('input[type="date"]');

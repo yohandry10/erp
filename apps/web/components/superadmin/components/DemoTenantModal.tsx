@@ -107,7 +107,7 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4">
-            <h3 className="text-xl font-bold m-0">Activar demo</h3>
+            <h3 className="text-xl font-bold m-0">{tenant.is_demo ? 'Administrar demo' : 'Activar demo'}</h3>
             <p className="text-muted-foreground">
               {tenant.razon_social}
             </p>
@@ -118,10 +118,13 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
             )}
           </div>
 
+          {!tenant.is_demo && (
           <div className="grid gap-3">
             <div>
               <label className="text-xs font-semibold text-muted-foreground">Email</label>
               <input
+                type="email"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="cliente@empresa.com" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
@@ -130,7 +133,8 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
             <div>
               <label className="text-xs font-semibold text-muted-foreground">Contraseña</label>
               <input
-                type="text"
+                type="password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Contraseña temporal" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
@@ -147,6 +151,7 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
               />
             </div>
           </div>
+          )}
 
           {(error || success) && (
             <div className="mt-4 py-3 px-4 font-semibold text-sm"
@@ -156,20 +161,15 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
           )}
 
           <div className="flex gap-3 mt-5">
-            <button
-              type="button"
-              onClick={handleActivate}
-              disabled={loading} className="flex-[1] py-3 px-4 border-0 text-white font-bold cursor-pointer"
-            >
-              Activar demo
-            </button>
-            <button
-              type="button"
-              onClick={handleDeactivate}
-              disabled={loading} className="flex-[1] py-3 px-4 border bg-card text-foreground font-bold cursor-pointer"
-            >
-              Quitar demo
-            </button>
+            {tenant.is_demo ? (
+              <button type="button" onClick={handleDeactivate} disabled={loading} className="flex-[1] py-3 px-4 border bg-card text-foreground font-bold cursor-pointer">
+                Quitar demo
+              </button>
+            ) : (
+              <button type="button" onClick={handleActivate} disabled={loading} className="flex-[1] py-3 px-4 border-0 text-white font-bold cursor-pointer">
+                Activar demo
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose} className="py-3 px-4 border bg-muted/30 text-foreground/80 font-bold cursor-pointer"

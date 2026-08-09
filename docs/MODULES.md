@@ -97,6 +97,9 @@ Código principal: `apps/erp-api/src/modules/inventario`,
 - Retenciones y detracciones respetan configuración fiscal del tenant.
 - Los dashboards financieros consumen agregados; no reconstruyen reglas
   contables en frontend.
+- La ruta raíz de Finanzas funciona como centro operativo y enlaza CxC, CxP,
+  bancos, tesorería, conciliación y reportes; no debe renderizar una superficie
+  vacía ni depender de una redirección cliente.
 
 Código principal: `apps/erp-api/src/modules/finanzas`,
 `apps/erp-api/src/modules/cajas`.
@@ -105,6 +108,9 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 
 - Plan de cuentas, períodos, centros de costo y presupuestos son catálogos
   tenant-scoped.
+- Si una operación alcanza un mes todavía no configurado, el backend crea de
+  forma idempotente el período `ABIERTO`; nunca permite el movimiento bajo un
+  estado abierto meramente implícito e invisible para el contador.
 - Asientos se originan en eventos de ventas, compras, POS, caja, RRHH y activos.
 - Debe/haber debe cuadrar y el período debe permitir la operación.
 - Libros, estados financieros y materialized views son proyecciones.
