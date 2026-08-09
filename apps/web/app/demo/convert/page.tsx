@@ -53,6 +53,7 @@ export default function ConvertDemoPage() {
     ruc: '',
     telefono: '',
   });
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     void fetchApi('/api/demo/status')
@@ -83,6 +84,10 @@ export default function ConvertDemoPage() {
     e.preventDefault();
     setError(null);
     setNotice(null);
+    if (formData.password !== confirmPassword) {
+      setError('Las contraseñas no coinciden. Confirma la clave permanente antes de continuar.');
+      return;
+    }
     // El formulario ya esta validado por el navegador; antes de activar hay
     // que resolver que pasa con los datos, porque una de las dos opciones no
     // tiene vuelta atras.
@@ -356,7 +361,7 @@ export default function ConvertDemoPage() {
             </div>
 
             <div className="mb-5">
-              <label htmlFor="convert-password" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Contraseña *</label>
+              <label htmlFor="convert-password" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Contraseña permanente *</label>
               <input id="convert-password"
                 type="password"
                 name="password"
@@ -364,6 +369,24 @@ export default function ConvertDemoPage() {
                 onChange={handleChange}
                 placeholder="Mínimo 8 caracteres"
                 minLength={8}
+                autoComplete="new-password"
+                required className="w-[100%] py-[0.875rem] px-4 rounded-xl text-base bg-card text-foreground border border-border outline-none transition focus:border-primary"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Esta clave reemplazará la contraseña temporal de la demo y será la que usarás en el login.
+              </p>
+            </div>
+
+            <div className="mb-5">
+              <label htmlFor="convert-confirm-password" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Confirmar contraseña permanente *</label>
+              <input id="convert-confirm-password"
+                type="password"
+                name="confirm_password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Repite la contraseña"
+                minLength={8}
+                autoComplete="new-password"
                 required className="w-[100%] py-[0.875rem] px-4 rounded-xl text-base bg-card text-foreground border border-border outline-none transition focus:border-primary"
               />
             </div>
@@ -426,6 +449,15 @@ export default function ConvertDemoPage() {
                   Tu cuenta y tus datos ya viven donde vivirá la cuenta real, así que
                   no hay nada que migrar. Solo decide con qué quieres empezar.
                 </p>
+                <div className="mt-4 rounded-xl border border-primary/25 bg-primary/10 p-4 text-sm">
+                  <p className="font-semibold text-foreground">Credenciales permanentes</p>
+                  <p className="mt-1 text-muted-foreground break-all">
+                    Usuario: <span className="font-semibold text-foreground">{formData.email}</span>
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Contraseña: la clave que acabas de escribir y confirmar. Por seguridad no se mostrará ni se guardará en texto plano.
+                  </p>
+                </div>
 
                 <div className="mt-5 space-y-3">
                   <button

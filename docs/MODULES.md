@@ -108,6 +108,12 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - Asientos se originan en eventos de ventas, compras, POS, caja, RRHH y activos.
 - Debe/haber debe cuadrar y el período debe permitir la operación.
 - Libros, estados financieros y materialized views son proyecciones.
+- El Balance de Comprobación y el Balance General son estados a fecha de cierre:
+  conservan el último saldo de cuentas sin movimiento en el mes y respetan la
+  naturaleza deudora o acreedora. La pantalla de estados incluye comprobación,
+  resultados, situación financiera, flujo de efectivo indirecto e indicadores;
+  estos dos últimos explicitan sus supuestos y no se presentan como EBITDA
+  auditado ni como sustituto de conciliación bancaria.
 - La descarga PLE de Diario y Mayor filtra exclusivamente asientos
   `CONFIRMADO`. El Balance de Comprobación electrónico es el formato SUNAT 3.17
   (`031700`), con período `AAAAMMDD` al cierre y 19 campos posicionales; el
@@ -133,6 +139,10 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 - La distribución analítica reparte una línea por varios ejes independientes.
   Ingresos y gastos diferidos se reconocen por período y la última cuota absorbe
   residuos de redondeo.
+- El detalle del asiento permite registrar y mantener esa distribución
+  analítica por línea. El registro de consignaciones calcula el total en el
+  servidor, toma el tenant del contexto autenticado y limita sus cambios a
+  estados válidos; el cliente no puede imponer tenant, total ni estado inicial.
 - Consolidación agrupa empresas legalmente separadas solo después de que cada
   miembro acepta la invitación. Homologa códigos de cuenta, exige tasas de
   cierre/promedio/históricas cuando cambia la moneda y aplica eliminaciones o
@@ -228,6 +238,12 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
 - La demo Perú se crea en PEN, con IGV, RUC/DNI, series F001/B001/T001,
   SUNAT/OSE simulado, GRE/SIRE y flujo logístico habilitado. El PCGE inicial se
   inserta por código sin duplicar cuentas ya existentes.
+- La conversión de demo a cuenta real exige que el cliente defina y confirme
+  un correo de acceso y una contraseña permanente antes de elegir si conserva
+  o reinicia sus datos. La activación sustituye atómicamente las credenciales
+  temporales; sólo persiste el hash de la contraseña y el login posterior usa
+  esas mismas credenciales. El asistente fiscal se ejecuta después de autenticar
+  y no crea una identidad paralela.
 - La demo Colombia crea datos sintéticos en COP, NIT/CC y configuración DIAN,
   PILA y nómina electrónica simuladas, incluido un contrato colombiano con
   salario válido para ejercitar el cálculo completo. La transmisión real

@@ -78,3 +78,4 @@ apps/**/src-tauri/gen/
 Thumbs.db
 .idea/
 .vscode/
+.vercel/

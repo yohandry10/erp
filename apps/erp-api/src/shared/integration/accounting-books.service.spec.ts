@@ -8,8 +8,11 @@ describe('AccountingBooksService', () => {
       lte: jest.fn(() => ({ data: [], error: null })),
       eq: jest.fn(() => chain),
       select: jest.fn(() => chain),
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
       in: jest.fn(() => chain),
       like: jest.fn(() => chain),
+      single: jest.fn(() => ({ data: {}, error: null })),
     };
 
     const from = jest.fn(() => chain);
@@ -82,5 +85,46 @@ describe('AccountingBooksService', () => {
       { id: '407-a', codigo: '407', nombre: 'AFP por pagar' },
       { id: '627', codigo: '627', nombre: 'Seguridad social' },
     ]);
+  });
+
+  it('fuerza tenant, estado y total de la consignación desde el servidor', async () => {
+    const { supabase, chain } = buildSupabaseMock();
+    chain.single.mockReturnValue({ data: { id: 'cons-1' }, error: null });
+    const service = new AccountingBooksService(
+      supabase as any,
+      { getTenantId: jest.fn(() => 'tenant-seguro') } as any,
+    );
+
+    await service.createConsignacion({
+      tenant_id: 'tenant-ajeno',
+      estado: 'CERRADA',
+      cantidad: 3,
+      valor_unitario: 10.125,
+      valor_total: 1,
+      consignatario_nombre: ' Cliente QA ',
+    });
+
+    expect(chain.insert).toHaveBeenCalledWith(expect.objectContaining({
+      tenant_id: 'tenant-seguro',
+      estado: 'PENDIENTE',
+      cantidad: 3,
+      valor_unitario: 10.125,
+      valor_total: 30.38,
+      consignatario_nombre: 'Cliente QA',
+    }));
+  });
+
+  it('rechaza estados de consignación fuera del flujo permitido', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+    const { supabase } = buildSupabaseMock();
+    const service = new AccountingBooksService(
+      supabase as any,
+      { getTenantId: jest.fn(() => 'tenant-1') } as any,
+    );
+
+    await expect(service.updateEstadoConsignacion('cons-1', 'BORRADA')).rejects.toThrow(
+      /Estado de consignación no permitido/,
+    );
+    errorSpy.mockRestore();
   });
 });

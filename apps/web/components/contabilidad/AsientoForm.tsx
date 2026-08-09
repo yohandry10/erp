@@ -138,7 +138,22 @@ export default function AsientoForm({
     if (!validateForm()) return
 
     try {
-      await onSubmit(formData)
+      // El selector conserva codigo/nombre para presentar la cuenta, pero el
+      // contrato estricto de la API solo admite los campos contables del DTO.
+      // Tampoco se debe enviar centro_costo_id="": IsOptional no convierte una
+      // cadena vacia en ausencia y la validacion UUID la rechaza con HTTP 400.
+      await onSubmit({
+        fecha: formData.fecha,
+        concepto: formData.concepto,
+        referencia: formData.referencia,
+        detalles: formData.detalles.map((detalle) => ({
+          cuenta_id: detalle.cuenta_id,
+          debe: detalle.debe,
+          haber: detalle.haber,
+          concepto: detalle.concepto,
+          ...(detalle.centro_costo_id ? { centro_costo_id: detalle.centro_costo_id } : {}),
+        })),
+      })
     } catch (error) {
       console.error('Error submitting form:', error)
     }
@@ -148,8 +163,8 @@ export default function AsientoForm({
     errors[key] ? <p className="mt-1 text-xs font-medium text-primary">{errors[key]}</p> : null
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-w-0 space-y-4">
         <Card className="border-cyan-400/20 bg-card/70 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
             <CardTitle className="text-base text-white">Informacion general</CardTitle>
@@ -215,7 +230,7 @@ export default function AsientoForm({
             )}
 
             {formData.detalles.map((detalle, index) => (
-              <div key={index} className="rounded-2xl border border-cyan-400/15 bg-card/70 p-4">
+              <div key={index} className="min-w-0 rounded-2xl border border-cyan-400/15 bg-card/70 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold text-white">Movimiento {index + 1}</span>
                   {formData.detalles.length > 2 && (
@@ -233,8 +248,8 @@ export default function AsientoForm({
                   )}
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-[minmax(220px,2fr)_130px_130px_minmax(160px,1fr)]">
-                  <label className="space-y-2">
+                <div className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(0,2fr)_130px_130px_minmax(0,1fr)]">
+                  <label className="min-w-0 space-y-2">
                     <span className={labelClass}>Cuenta *</span>
                     <select
                       value={detalle.cuenta_id}
@@ -252,7 +267,7 @@ export default function AsientoForm({
                     {fieldError(`detalle_${index}_cuenta`)}
                   </label>
 
-                  <label className="space-y-2">
+                  <label className="min-w-0 space-y-2">
                     <span className={labelClass}>Debe</span>
                     <input
                       type="number"
@@ -266,7 +281,7 @@ export default function AsientoForm({
                     />
                   </label>
 
-                  <label className="space-y-2">
+                  <label className="min-w-0 space-y-2">
                     <span className={labelClass}>Haber</span>
                     <input
                       type="number"
@@ -280,7 +295,7 @@ export default function AsientoForm({
                     />
                   </label>
 
-                  <label className="space-y-2">
+                  <label className="min-w-0 space-y-2">
                     <span className={labelClass}>Centro</span>
                     <select
                       value={detalle.centro_costo_id || ''}

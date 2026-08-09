@@ -8,6 +8,17 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Type } from "class-transformer";
+import {
+  IsDateString,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  Min,
+} from "class-validator";
 import { CurrentTenant } from "../../../common";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import { PermissionGuard } from "../../../common/guards/permission.guard";
@@ -15,6 +26,47 @@ import { AccountingBooksService } from "../../../shared/integration/accounting-b
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { EstadosFinancierosService } from "../services/estados-financieros.service";
 import { PleExportService } from "../services/ple-export.service";
+
+class CreateConsignacionDto {
+  @IsOptional()
+  @IsString()
+  numero?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fecha_registro?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fecha_entrega?: string;
+
+  @IsOptional()
+  @IsUUID()
+  producto_id?: string;
+
+  @IsString()
+  consignatario_nombre: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.0001)
+  cantidad: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  valor_unitario: number;
+
+  @IsOptional()
+  @Matches(/^[A-Za-z]{3}$/)
+  moneda?: string;
+}
+
+class UpdateEstadoConsignacionDto {
+  @IsString()
+  @IsIn(["PENDIENTE", "VENDIDA", "DEVUELTA", "ANULADA", "CERRADA"])
+  estado: string;
+}
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -578,7 +630,7 @@ export class ContabilidadLibrosController {
   @RequirePermission("contabilidad.consignaciones.crear") // HARDENING: permisos granulares.
   @ApiOperation({ summary: "Crear nueva consignación" })
   @ApiResponse({ status: 201, description: "Consignación creada exitosamente" })
-  async createConsignacion(@Body() consignacionData: any) {
+  async createConsignacion(@Body() consignacionData: CreateConsignacionDto) {
     try {
       console.log("📋 [ContabilidadController] Creando nueva consignación...");
 
@@ -608,7 +660,7 @@ export class ContabilidadLibrosController {
   })
   async updateEstadoConsignacion(
     @Param("id") id: string,
-    @Body("estado") nuevoEstado: string,
+    @Body() body: UpdateEstadoConsignacionDto,
   ) {
     try {
       console.log(
@@ -616,7 +668,7 @@ export class ContabilidadLibrosController {
       );
 
       const consignacion =
-        await this.accountingService.updateEstadoConsignacion(id, nuevoEstado);
+        await this.accountingService.updateEstadoConsignacion(id, body.estado);
 
       return {
         success: true,

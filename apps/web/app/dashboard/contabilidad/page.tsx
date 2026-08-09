@@ -111,6 +111,7 @@ export default function ContabilidadPage() {
   const country = useCountryContext();
   const isArgentina = country.paisCodigo === "AR";
   const isColombia = country.paisCodigo === "CO";
+  const isPeru = country.paisCodigo === "PE";
   const darkMode = theme === "dark";
   const vistasLocalizadas = vistas.map((vista) =>
     vista.id === "libros-electronicos-sunat" && (isArgentina || isColombia)
@@ -127,13 +128,16 @@ export default function ContabilidadPage() {
   );
 
   const [registroCompras, setRegistroCompras] = useState<any>(null);
+  const [estadoResultados, setEstadoResultados] = useState<any>(null);
   const [balanceComprobacion, setBalanceComprobacion] = useState<any>(null);
   // El endpoint responde con el array de cuentas y sus movimientos: no existe
   // un campo totalCuentas, asi que el balance salia siempre en 0 aunque hubiera
   // asientos contabilizados.
   const totalCuentasBalance = Array.isArray(balanceComprobacion)
     ? balanceComprobacion.length
-    : Number(balanceComprobacion?.totalCuentas) || 0;
+    : Array.isArray(balanceComprobacion?.cuentas)
+      ? balanceComprobacion.cuentas.length
+      : Number(balanceComprobacion?.totalCuentas) || 0;
   const [kardexValorizado, setKardexValorizado] = useState<any>(null);
   // El endpoint responde con el array de movimientos, no con un resumen: los
   // contadores se derivan de el en vez de leer campos que no existen.
@@ -158,11 +162,112 @@ export default function ContabilidadPage() {
   const [librosElectronicosSunat, setLibrosElectronicosSunat] =
     useState<any>(null);
 
+  const libroCajaBancosItems = Array.isArray(libroCajaBancos)
+    ? libroCajaBancos
+    : [];
+  const saldoEfectivo = libroCajaBancosItems.reduce(
+    (suma: number, cuenta: any) => suma + (Number(cuenta?.saldoFinal) || 0),
+    0,
+  );
+  const movimientosCajaBancos = libroCajaBancosItems.reduce(
+    (suma: number, cuenta: any) =>
+      suma + (Array.isArray(cuenta?.movimientos) ? cuenta.movimientos.length : 0),
+    0,
+  );
+
+  const activosFijosItems = Array.isArray(registroActivosFijos)
+    ? registroActivosFijos
+    : [];
+  const valorBrutoActivos = activosFijosItems.reduce(
+    (suma: number, activo: any) =>
+      suma +
+      (Number(activo?.valor_adquisicion) ||
+        Number(activo?.debe) - Number(activo?.haber) ||
+        0),
+    0,
+  );
+  const depreciacionActivos = activosFijosItems.reduce(
+    (suma: number, activo: any) =>
+      suma + (Number(activo?.depreciacion_acumulada) || 0),
+    0,
+  );
+  const valorNetoActivos = activosFijosItems.reduce(
+    (suma: number, activo: any) =>
+      suma +
+      (Number(activo?.valor_neto) ||
+        Math.max(
+          0,
+          (Number(activo?.valor_adquisicion) || 0) -
+            (Number(activo?.depreciacion_acumulada) || 0),
+        )),
+    0,
+  );
+
+  const planillaItems = Array.isArray(libroPlanillas) ? libroPlanillas : [];
+  const asientosPlanilla = new Set(
+    planillaItems.map((item: any) => item?.asiento_id).filter(Boolean),
+  ).size;
+  const debePlanilla = planillaItems.reduce(
+    (suma: number, item: any) => suma + (Number(item?.debe) || 0),
+    0,
+  );
+  const haberPlanilla = planillaItems.reduce(
+    (suma: number, item: any) => suma + (Number(item?.haber) || 0),
+    0,
+  );
+
+  const inventariosItems = Array.isArray(libroInventariosBalances)
+    ? libroInventariosBalances
+    : [];
+  const inventarioInicial = inventariosItems.reduce(
+    (suma: number, item: any) => suma + (Number(item?.saldoInicial) || 0),
+    0,
+  );
+  const entradasInventario = inventariosItems.reduce(
+    (suma: number, item: any) => suma + (Number(item?.entradas) || 0),
+    0,
+  );
+  const salidasInventario = inventariosItems.reduce(
+    (suma: number, item: any) => suma + (Number(item?.salidas) || 0),
+    0,
+  );
+  const inventarioFinal = inventariosItems.reduce(
+    (suma: number, item: any) => suma + (Number(item?.saldoFinal) || 0),
+    0,
+  );
+
+  const costosItems = Array.isArray(registroCostos) ? registroCostos : [];
+  const centrosConCostos = new Set(
+    costosItems.map((item: any) => item?.centro_costo_id).filter(Boolean),
+  ).size;
+  const debeCostos = costosItems.reduce(
+    (suma: number, item: any) => suma + (Number(item?.debe) || 0),
+    0,
+  );
+  const haberCostos = costosItems.reduce(
+    (suma: number, item: any) => suma + (Number(item?.haber) || 0),
+    0,
+  );
+
+  const asientosPle = Array.isArray(librosElectronicosSunat)
+    ? librosElectronicosSunat
+    : [];
+  const lineasPle = asientosPle.reduce(
+    (suma: number, asiento: any) =>
+      suma +
+      (Array.isArray(asiento?.detalle_asientos)
+        ? asiento.detalle_asientos.length
+        : 0),
+    0,
+  );
+
   const { get } = useApi();
 
   // La exportacion PLE existia en el backend sin ninguna ruta ni boton que la
   // alcanzara: el contador no podia bajar ningun libro electronico.
   const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1;
   const [pleAnio, setPleAnio] = useState(String(hoy.getFullYear()));
   const [pleMes, setPleMes] = useState(
     String(hoy.getMonth() + 1).padStart(2, "0"),
@@ -313,6 +418,20 @@ export default function ContabilidadPage() {
     }).format(valor);
   };
 
+  const cargarEstadoResultados = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await get(
+        `/api/contabilidad/estados/estado-resultados?anio=${anioActual}&mes=${mesActual}`,
+      );
+      if (response?.success) setEstadoResultados(response.data);
+    } catch (error) {
+      console.error("Error cargando estado de resultados:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [anioActual, get, mesActual]);
+
   const cargarRegistroCompras = useCallback(async () => {
     setLoading(true);
     try {
@@ -328,14 +447,16 @@ export default function ContabilidadPage() {
   const cargarBalanceComprobacion = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await get("/api/contabilidad/balance-comprobacion");
+      const response = await get(
+        `/api/contabilidad/balance-comprobacion?anio=${anioActual}&mes=${mesActual}`,
+      );
       if (response && response.success) setBalanceComprobacion(response.data);
     } catch (error) {
       console.error("Error cargando balance de comprobación:", error);
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [anioActual, get, mesActual]);
 
   const cargarKardexValorizado = useCallback(async () => {
     setLoading(true);
@@ -435,7 +556,8 @@ export default function ContabilidadPage() {
   }, [get, isArgentina, isColombia]);
 
   const cargarDatos = useCallback(async () => {
-    if (vistaActual === "registro-compras") await cargarRegistroCompras();
+    if (vistaActual === "estado-resultados") await cargarEstadoResultados();
+    else if (vistaActual === "registro-compras") await cargarRegistroCompras();
     else if (vistaActual === "balance-comprobacion")
       await cargarBalanceComprobacion();
     else if (vistaActual === "kardex-valorizado")
@@ -451,6 +573,7 @@ export default function ContabilidadPage() {
       await cargarLibrosElectronicosSunat();
   }, [
     cargarBalanceComprobacion,
+    cargarEstadoResultados,
     cargarKardexValorizado,
     cargarLibroCajaBancos,
     cargarLibroInventariosBalances,
@@ -471,6 +594,7 @@ export default function ContabilidadPage() {
   // datos. Se cargan una vez al abrir la pantalla, con independencia de la vista.
   useEffect(() => {
     void Promise.allSettled([
+      cargarEstadoResultados(),
       cargarRegistroCompras(),
       cargarBalanceComprobacion(),
       cargarKardexValorizado(),
@@ -588,11 +712,32 @@ export default function ContabilidadPage() {
     if (vistaActual === "estado-resultados") {
       return renderPanel(
         "Estado de Resultados",
-        "Vista ejecutiva de resultados y análisis financiero.",
+        "Ingresos, costos, gastos y utilidad del periodo actual.",
         [
-          { label: "Vista", value: "Activa" },
-          { label: "Periodo", value: "Actual" },
-          { label: "Estado", value: "Operativo" },
+          {
+            label: "Ingresos",
+            value: formatearMoneda(
+              Number(estadoResultados?.ingresos?.total_ingresos) || 0,
+            ),
+          },
+          {
+            label: "Costo de ventas",
+            value: formatearMoneda(
+              Number(estadoResultados?.costos?.costo_ventas) || 0,
+            ),
+          },
+          {
+            label: "Gastos",
+            value: formatearMoneda(
+              Number(estadoResultados?.gastos?.total_gastos) || 0,
+            ),
+          },
+          {
+            label: "Utilidad neta",
+            value: formatearMoneda(
+              Number(estadoResultados?.utilidad_neta) || 0,
+            ),
+          },
         ],
       );
     }
@@ -615,7 +760,12 @@ export default function ContabilidadPage() {
         "Balance contable para validar saldos y consistencia de cuentas.",
         [
           { label: "Estado", value: "Activo" },
-          { label: "Total cuentas", value: totalCuentasBalance },
+          {
+            label: "Total cuentas",
+            value: Array.isArray(balanceComprobacion?.cuentas)
+              ? balanceComprobacion.cuentas.length
+              : totalCuentasBalance,
+          },
           { label: "Control", value: "Debe/Haber" },
         ],
       );
@@ -642,16 +792,16 @@ export default function ContabilidadPage() {
         "Control separado de caja, bancos y movimientos financieros.",
         [
           {
-            label: "Saldo caja",
-            value: formatearMoneda(libroCajaBancos?.saldoCaja || 0),
+            label: "Saldo efectivo",
+            value: formatearMoneda(saldoEfectivo),
           },
           {
-            label: "Saldo bancos",
-            value: formatearMoneda(libroCajaBancos?.saldoBancos || 0),
+            label: "Cuentas",
+            value: libroCajaBancosItems.length,
           },
           {
             label: "Movimientos",
-            value: libroCajaBancos?.totalMovimientos || 0,
+            value: movimientosCajaBancos,
           },
         ],
       );
@@ -664,21 +814,19 @@ export default function ContabilidadPage() {
         [
           {
             label: "Total activos",
-            value: registroActivosFijos?.totalActivos || 0,
+            value: activosFijosItems.length,
           },
           {
             label: "Valor bruto",
-            value: formatearMoneda(registroActivosFijos?.valorBruto || 0),
+            value: formatearMoneda(valorBrutoActivos),
           },
           {
             label: "Valor neto",
-            value: formatearMoneda(registroActivosFijos?.valorNeto || 0),
+            value: formatearMoneda(valorNetoActivos),
           },
           {
             label: "Depreciación",
-            value: formatearMoneda(
-              registroActivosFijos?.depreciacionAcumulada || 0,
-            ),
+            value: formatearMoneda(depreciacionActivos),
           },
         ],
       );
@@ -689,18 +837,18 @@ export default function ContabilidadPage() {
         "Libro de Planillas",
         "Integración contable con remuneraciones y descuentos de RRHH.",
         [
-          { label: "Empleados", value: libroPlanillas?.totalEmpleados || 0 },
+          { label: "Movimientos", value: planillaItems.length },
           {
-            label: "Planillas",
-            value: libroPlanillas?.planillasProcesadas || 0,
+            label: "Asientos",
+            value: asientosPlanilla,
           },
           {
-            label: "Remuneraciones",
-            value: formatearMoneda(libroPlanillas?.totalRemuneraciones || 0),
+            label: "Debe",
+            value: formatearMoneda(debePlanilla),
           },
           {
-            label: "Descuentos",
-            value: formatearMoneda(libroPlanillas?.totalDescuentos || 0),
+            label: "Haber",
+            value: formatearMoneda(haberPlanilla),
           },
         ],
       );
@@ -713,23 +861,19 @@ export default function ContabilidadPage() {
         [
           {
             label: "Inventario inicial",
-            value: formatearMoneda(
-              libroInventariosBalances?.inventarioInicial || 0,
-            ),
+            value: formatearMoneda(inventarioInicial),
           },
           {
             label: "Inventario final",
-            value: formatearMoneda(
-              libroInventariosBalances?.inventarioFinal || 0,
-            ),
+            value: formatearMoneda(inventarioFinal),
           },
           {
-            label: "Total activos",
-            value: formatearMoneda(libroInventariosBalances?.totalActivos || 0),
+            label: "Entradas",
+            value: formatearMoneda(entradasInventario),
           },
           {
-            label: "Patrimonio",
-            value: formatearMoneda(libroInventariosBalances?.patrimonio || 0),
+            label: "Salidas",
+            value: formatearMoneda(salidasInventario),
           },
         ],
       );
@@ -741,20 +885,20 @@ export default function ContabilidadPage() {
         "Control por centros de costo con costos directos e indirectos.",
         [
           {
+            label: "Movimientos",
+            value: costosItems.length,
+          },
+          {
             label: "Centros de costo",
-            value: registroCostos?.centrosCosto || 0,
+            value: centrosConCostos,
           },
           {
-            label: "Costos directos",
-            value: formatearMoneda(registroCostos?.costosDirectos || 0),
+            label: "Debe",
+            value: formatearMoneda(debeCostos),
           },
           {
-            label: "Costos indirectos",
-            value: formatearMoneda(registroCostos?.costosIndirectos || 0),
-          },
-          {
-            label: "Total costos",
-            value: formatearMoneda(registroCostos?.totalCostos || 0),
+            label: "Haber",
+            value: formatearMoneda(haberCostos),
           },
         ],
       );
@@ -773,20 +917,20 @@ export default function ContabilidadPage() {
           : "Preparación para PLE y control de archivos electrónicos.",
       [
         {
-          label: "Libros configurados",
-          value: librosElectronicosSunat?.librosConfigurados || 0,
+          label: "Asientos disponibles",
+          value: asientosPle.length,
         },
         {
-          label: "Archivos generados",
-          value: librosElectronicosSunat?.archivosGenerados || 0,
+          label: "Líneas contables",
+          value: lineasPle,
         },
         {
-          label: "Último envío",
-          value: librosElectronicosSunat?.ultimoEnvio || "Pendiente",
+          label: "Generación",
+          value: "A solicitud",
         },
         {
           label: isArgentina ? "Estado registral" : "Estado PLE",
-          value: librosElectronicosSunat?.estadoPLE || "Configurado",
+          value: asientosPle.length > 0 ? "Datos disponibles" : "Sin datos",
         },
       ],
     );
@@ -806,7 +950,7 @@ export default function ContabilidadPage() {
     ["Compras", registroCompras?.total || 0],
     ["Cuentas en balance", totalCuentasBalance],
     ["Productos valorizados", productosValorizados],
-    ["Movimientos caja/bancos", libroCajaBancos?.totalMovimientos || 0],
+    ["Movimientos caja/bancos", movimientosCajaBancos],
   ];
 
   const controlItems = [
@@ -851,6 +995,12 @@ export default function ContabilidadPage() {
       icon: Calculator,
     },
     {
+      title: "Consignaciones",
+      description: "Mercadería de terceros, venta, devolución y cierre.",
+      href: "/dashboard/contabilidad/consignaciones",
+      icon: Boxes,
+    },
+    {
       title: "Presupuestos",
       description: "Ejecución y alertas del periodo.",
       href: "/dashboard/contabilidad/presupuestos",
@@ -862,18 +1012,22 @@ export default function ContabilidadPage() {
       href: "/dashboard/contabilidad/consolidacion",
       icon: Building2,
     },
-    {
-      title: "Impuestos Perú",
-      description: "Borrador mensual IGV/Renta y constancias SUNAT.",
-      href: "/dashboard/contabilidad/impuestos",
-      icon: Receipt,
-    },
-    {
-      title: "Renta anual e ITAN",
-      description: "Conciliación FV 710, escala RMT e ITAN.",
-      href: "/dashboard/contabilidad/impuestos/anual",
-      icon: Calculator,
-    },
+    ...(isPeru
+      ? [
+          {
+            title: "Impuestos Perú",
+            description: "Borrador mensual IGV/Renta y constancias SUNAT.",
+            href: "/dashboard/contabilidad/impuestos",
+            icon: Receipt,
+          },
+          {
+            title: "Renta anual e ITAN",
+            description: "Conciliación FV 710, escala RMT e ITAN.",
+            href: "/dashboard/contabilidad/impuestos/anual",
+            icon: Calculator,
+          },
+        ]
+      : []),
   ];
 
   const barMetrics = connectedMetrics.map(([label, value]) => {

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { parseDateLocal } from '@/lib/date-utils'
+import { DistribucionAnaliticaPanel } from '@/components/contabilidad/DistribucionAnaliticaPanel'
 
 interface DetalleAsiento {
   id: string
@@ -67,6 +68,7 @@ export default function AsientoDetallePage() {
   const [motivo, setMotivo] = useState('')
   const [fechaReversion, setFechaReversion] = useState('')
   const [accionError, setAccionError] = useState<string | null>(null)
+  const [detalleAnalitico, setDetalleAnalitico] = useState<DetalleAsiento | null>(null)
 
   const loadAsiento = useCallback(async () => {
     if (!asientoId) return
@@ -511,6 +513,7 @@ export default function AsientoDetallePage() {
                         <th className="px-4 py-3">Centro</th>
                         <th className="px-4 py-3 text-right">Debe</th>
                         <th className="px-4 py-3 text-right">Haber</th>
+                        <th className="px-4 py-3">Analítica</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -529,11 +532,12 @@ export default function AsientoDetallePage() {
                             <td className="px-4 py-3 text-right font-semibold text-primary dark:text-blue-200">
                               {detalle.haber > 0 ? formatCurrency(detalle.haber) : '-'}
                             </td>
+                            <td className="px-4 py-3"><Button type="button" variant="outline" size="sm" onClick={() => setDetalleAnalitico(detalle)}>Distribuir</Button></td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
                             No hay detalles en este asiento
                           </td>
                         </tr>
@@ -546,13 +550,14 @@ export default function AsientoDetallePage() {
                         </td>
                         <td className="px-4 py-4 text-right text-primary">{formatCurrency(asiento.total_debe)}</td>
                         <td className="px-4 py-4 text-right text-primary dark:text-blue-200">{formatCurrency(asiento.total_haber)}</td>
+                        <td />
                       </tr>
                       {!isBalanced() && (
                         <tr className="border-t border-cyan-400/15 text-sm font-bold text-primary">
                           <td colSpan={3} className="px-4 py-4">
                             Diferencia
                           </td>
-                          <td colSpan={2} className="px-4 py-4 text-right">
+                          <td colSpan={3} className="px-4 py-4 text-right">
                             {formatCurrency(difference)}
                           </td>
                         </tr>
@@ -562,6 +567,15 @@ export default function AsientoDetallePage() {
                 </div>
               </CardContent>
             </Card>
+            {detalleAnalitico && (
+              <DistribucionAnaliticaPanel
+                detalleId={detalleAnalitico.id}
+                cuenta={`${detalleAnalitico.cuenta_codigo} · ${detalleAnalitico.cuenta_nombre}`}
+                importe={Number(detalleAnalitico.debe || 0) - Number(detalleAnalitico.haber || 0)}
+                formatCurrency={formatCurrency}
+                onClose={() => setDetalleAnalitico(null)}
+              />
+            )}
           </div>
 
           <aside className="space-y-4">

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { FiltrosContables } from './accounting.interfaces';
 import { TenantContextService } from '../tenant/tenant-context.service';
@@ -795,7 +795,7 @@ export class AccountingBooksService {
   async getRegistroConsignaciones(filtros: FiltrosContables = {}) {
     try {
       const tenantId = this.resolveTenantId();
-      const { fechaDesde, fechaHasta } = filtros;
+      const { fechaDesde, fechaHasta, estado } = filtros;
 
       let query = this.supabase
         .getClient()
@@ -812,6 +812,7 @@ export class AccountingBooksService {
 
       if (fechaDesde) query = query.gte('fecha_registro', fechaDesde);
       if (fechaHasta) query = query.lte('fecha_registro', fechaHasta);
+      if (estado) query = query.eq('estado', String(estado).trim().toUpperCase());
 
       const { data: consignaciones, error } = await query;
       if (error) throw error;
@@ -826,7 +827,30 @@ export class AccountingBooksService {
   async createConsignacion(consignacionData: any) {
     try {
       const tenantId = this.resolveTenantId();
-      const payload = { ...consignacionData, tenant_id: consignacionData?.tenant_id ?? tenantId };
+      const cantidad = Number(consignacionData?.cantidad || 0);
+      const valorUnitario = Number(consignacionData?.valor_unitario || 0);
+      if (!Number.isFinite(cantidad) || cantidad <= 0) {
+        throw new BadRequestException('La cantidad de la consignación debe ser mayor que cero');
+      }
+      if (!Number.isFinite(valorUnitario) || valorUnitario < 0) {
+        throw new BadRequestException('El valor unitario de la consignación no puede ser negativo');
+      }
+
+      const payload = {
+        numero: consignacionData?.numero,
+        fecha_registro: consignacionData?.fecha_registro,
+        fecha_entrega: consignacionData?.fecha_entrega,
+        producto_id: consignacionData?.producto_id || null,
+        consignatario_nombre: String(consignacionData?.consignatario_nombre || '').trim(),
+        cantidad,
+        valor_unitario: valorUnitario,
+        valor_total: Math.round(cantidad * valorUnitario * 100) / 100,
+        moneda: String(consignacionData?.moneda || 'PEN').trim().toUpperCase(),
+        estado: 'PENDIENTE',
+        // Nunca se confía en tenant_id, valor_total ni estado enviados por el
+        // cliente: pertenecen al contexto y a reglas del servidor.
+        tenant_id: tenantId,
+      };
       const { data: consignacion, error } = await this.supabase
         .getClient()
         .from('registro_consignaciones')
@@ -845,10 +869,15 @@ export class AccountingBooksService {
   async updateEstadoConsignacion(id: string, nuevoEstado: string) {
     try {
       const tenantId = this.resolveTenantId();
+      const estado = String(nuevoEstado || '').trim().toUpperCase();
+      const permitidos = new Set(['PENDIENTE', 'VENDIDA', 'DEVUELTA', 'ANULADA', 'CERRADA']);
+      if (!permitidos.has(estado)) {
+        throw new BadRequestException(`Estado de consignación no permitido: ${nuevoEstado}`);
+      }
       const { data, error } = await this.supabase
         .getClient()
         .from('registro_consignaciones')
-        .update({ estado: nuevoEstado, updated_at: new Date().toISOString() })
+        .update({ estado, updated_at: new Date().toISOString() })
         .eq('id', id)
         .eq('tenant_id', tenantId)
         .select()

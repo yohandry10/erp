@@ -1,5 +1,4 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EstadosFinancierosService, BalanceComprobacionItem, EstadoResultados } from './estados-financieros.service';
 
 export interface CashFlowSection {
@@ -30,7 +29,6 @@ export interface RatiosResponse {
 @Injectable()
 export class CashflowService {
   constructor(
-    private readonly supabase: SupabaseService,
     private readonly estadosFinancieros: EstadosFinancierosService,
   ) { }
 
@@ -46,18 +44,18 @@ export class CashflowService {
 
     const balanceActual = await this.getBalance(tenantId, anio, mes);
     const { anio: anioPrev, mes: mesPrev } = this.getPeriodoAnterior(anio, mes);
-    const balancePrevio = await this.getBalance(tenantId, anioPrev, mesPrev, true);
+    const balancePrevio = await this.getBalance(tenantId, anioPrev, mesPrev);
     const estadoResultados = await this.estadosFinancieros.getEstadoResultados(tenantId, anio, mes);
 
     const netIncome = estadoResultados.utilidad_neta || 0;
 
     const cxc = this.sumByPrefix(balanceActual, ['12']);
     const inv = this.sumByPrefix(balanceActual, ['20']);
-    const cxp = this.sumByPrefix(balanceActual, ['42']);
+    const cxp = this.sumCreditBalanceByPrefix(balanceActual, ['42']);
 
     const cxcPrev = this.sumByPrefix(balancePrevio, ['12']);
     const invPrev = this.sumByPrefix(balancePrevio, ['20']);
-    const cxpPrev = this.sumByPrefix(balancePrevio, ['42']);
+    const cxpPrev = this.sumCreditBalanceByPrefix(balancePrevio, ['42']);
 
     const deltaCxc = cxc - cxcPrev;
     const deltaInv = inv - invPrev;
@@ -69,8 +67,8 @@ export class CashflowService {
     const deltaInversiones = invActivos - invActivosPrev;
 
     // Financiamiento: variación de obligaciones/patrimonio (45-48, 50)
-    const financ = this.sumByPrefix(balanceActual, ['45', '46', '47', '48', '50']);
-    const financPrev = this.sumByPrefix(balancePrevio, ['45', '46', '47', '48', '50']);
+    const financ = this.sumCreditBalanceByPrefix(balanceActual, ['45', '46', '47', '48', '50']);
+    const financPrev = this.sumCreditBalanceByPrefix(balancePrevio, ['45', '46', '47', '48', '50']);
     const deltaFinanc = financ - financPrev;
 
     const operativo = netIncome - deltaCxc - deltaInv + deltaCxp;
@@ -108,10 +106,10 @@ export class CashflowService {
     const er: EstadoResultados = await this.estadosFinancieros.getEstadoResultados(tenantId, anio, mes);
 
     const activosCorrientes = this.sumByPrefix(balance, ['10', '11', '12', '13', '14', '20']);
-    const pasivosCorrientes = this.sumByPrefix(balance, ['40', '41', '42', '43']);
+    const pasivosCorrientes = this.sumCreditBalanceByPrefix(balance, ['40', '41', '42', '43']);
     const inventarios = this.sumByPrefix(balance, ['20']);
     const cxc = this.sumByPrefix(balance, ['12']);
-    const cxp = this.sumByPrefix(balance, ['42']);
+    const cxp = this.sumCreditBalanceByPrefix(balance, ['42']);
 
     const ventasNetas = er?.ingresos?.total_ingresos ?? 0;
     const costoVentas = er?.costos?.costo_ventas ?? 0;
@@ -160,37 +158,19 @@ export class CashflowService {
       .reduce((sum, item) => sum + (item.saldo_final || 0), 0);
   }
 
+  private sumCreditBalanceByPrefix(balance: BalanceComprobacionItem[], prefixes: string[]): number {
+    // La MV expresa saldo como debe - haber. Pasivos y patrimonio, de
+    // naturaleza acreedora, deben normalizarse a magnitud positiva para ratios
+    // y variaciones de financiamiento.
+    return -this.sumByPrefix(balance, prefixes);
+  }
+
   private async getBalance(
     tenantId: string,
     anio: number,
     mes: number,
-    allowEmpty: boolean = false
+    _allowEmpty: boolean = false
   ): Promise<BalanceComprobacionItem[]> {
-    const { data, error } = await this.supabase
-      .getClient({ silent: true })
-      .from('mv_balance_comprobacion')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('anio', anio)
-      .eq('mes', mes)
-      .order('cuenta', { ascending: true });
-
-    if (error) {
-      if (allowEmpty) return [];
-      throw new Error(`Error consultando balance de comprobación: ${error.message}`);
-    }
-
-    if ((!data || data.length === 0) && !allowEmpty) {
-      throw new BadRequestException(`No hay balance de comprobación para ${anio}-${mes}`);
-    }
-
-    return (data || []).map((item: any) => ({
-      cuenta: item.cuenta,
-      nombre: item.nombre_cuenta,
-      saldo_inicial: parseFloat(item.saldo_inicial || 0),
-      debe: parseFloat(item.debe || 0),
-      haber: parseFloat(item.haber || 0),
-      saldo_final: parseFloat(item.saldo_final || 0),
-    }));
+    return this.estadosFinancieros.getBalanceComprobacion(tenantId, anio, mes);
   }
 }
