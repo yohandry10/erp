@@ -11,6 +11,7 @@ describe('PeriodosService', () => {
     from: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
     insert: jest.fn().mockReturnThis(),
+    upsert: jest.fn().mockReturnThis(),
     update: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
     gte: jest.fn().mockReturnThis(),
@@ -164,7 +165,7 @@ describe('PeriodosService', () => {
       await expect(service.validarPeriodoAbierto(tenantId, fecha)).rejects.toThrow(BadRequestException);
     });
 
-    it('should allow operations when period does not exist', async () => {
+    it('materializa un período abierto cuando todavía no existe', async () => {
       const tenantId = 'tenant-123';
       const fecha = new Date(2024, 0, 15);
 
@@ -172,8 +173,16 @@ describe('PeriodosService', () => {
         data: null,
         error: { code: 'PGRST116' }
       });
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: { id: 'periodo-123', tenant_id: tenantId, anio: 2024, mes: 1, estado: EstadoPeriodo.ABIERTO },
+        error: null
+      });
 
       await expect(service.validarPeriodoAbierto(tenantId, fecha)).resolves.not.toThrow();
+      expect(mockSupabaseClient.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ tenant_id: tenantId, anio: 2024, mes: 1, estado: EstadoPeriodo.ABIERTO }),
+        { onConflict: 'tenant_id,anio,mes', ignoreDuplicates: true }
+      );
     });
   });
 

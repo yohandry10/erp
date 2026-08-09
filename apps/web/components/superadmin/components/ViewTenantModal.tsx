@@ -244,12 +244,27 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                 <h3 className="text-[1.125rem] font-bold text-foreground m-0">Modo Demo</h3>
               </div>
 
+              {tenantState.is_demo ? (
+                <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                  <div>
+                    <p className="font-semibold text-foreground">Demo activa</p>
+                    <p className="text-sm text-muted-foreground">
+                      {tenantState.demo_expires_at ? `Vigente hasta ${new Date(tenantState.demo_expires_at).toLocaleString('es-PE')}` : 'Sin vencimiento informado'}
+                    </p>
+                  </div>
+                  <button type="button" onClick={handleDeactivateDemo} disabled={demoLoading} className="py-[0.65rem] px-4 border bg-card text-foreground font-bold cursor-pointer">
+                    Quitar demo
+                  </button>
+                </div>
+              ) : (
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-5">
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground mb-2">
                     Email demo
                   </label>
                   <input
+                    type="email"
+                    autoComplete="username"
                     value={demoEmail}
                     onChange={(e) => setDemoEmail(e.target.value)}
                     placeholder="cliente@empresa.com" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
@@ -260,7 +275,8 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                     Contraseña demo
                   </label>
                   <input
-                    type="text"
+                    type="password"
+                    autoComplete="new-password"
                     value={demoPassword}
                     onChange={(e) => setDemoPassword(e.target.value)}
                     placeholder="Contraseña temporal" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
@@ -278,7 +294,7 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                     onChange={(e) => setDemoDays(Number(e.target.value))} className="w-[100%] border py-[0.65rem] px-[0.8rem] text-sm"
                   />
                 </div>
-                <div className="flex gap-3">
+                <div>
                   <button
                     type="button"
                     onClick={handleActivateDemo}
@@ -286,15 +302,9 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                   >
                     Activar demo
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleDeactivateDemo}
-                    disabled={demoLoading} className="py-[0.65rem] px-4 border bg-card text-foreground font-bold cursor-pointer"
-                  >
-                    Quitar demo
-                  </button>
                 </div>
               </div>
+              )}
 
               {(demoError || demoSuccess) && (
                 <div className="mt-4 py-3 px-4 font-semibold text-sm"

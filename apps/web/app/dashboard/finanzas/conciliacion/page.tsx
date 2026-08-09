@@ -450,13 +450,34 @@ function NewConciliacionForm({
   // Sin throwOnError el hook devuelve null en caso de error y el motivo real
   // del backend -por ejemplo el formato del periodo- nunca llega al usuario.
   const { post } = useApi({ throwOnError: true, showErrorToast: false });
-  const [formData, setFormData] = useState({
-    cuenta_bancaria_id: "",
-    periodo: "",
-    fecha_desde: "",
-    fecha_hasta: "",
+  const [formData, setFormData] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const lastDay = String(
+      new Date(year, now.getMonth() + 1, 0).getDate(),
+    ).padStart(2, "0");
+
+    return {
+      // El valor visible y el enviado deben nacer sincronizados. Radix puede
+      // resaltar la primera opción al abrir la lista aunque el estado sea vacío.
+      cuenta_bancaria_id: cuentasBancarias[0]?.id || "",
+      periodo: `${year}-${month}`,
+      fecha_desde: `${year}-${month}-01`,
+      fecha_hasta: `${year}-${month}-${lastDay}`,
+    };
   });
   const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (!formData.cuenta_bancaria_id && cuentasBancarias[0]?.id) {
+      setFormData((current) => ({
+        ...current,
+        cuenta_bancaria_id: cuentasBancarias[0].id,
+      }));
+    }
+  }, [cuentasBancarias, formData.cuenta_bancaria_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -467,27 +488,31 @@ function NewConciliacionForm({
       !formData.fecha_desde ||
       !formData.fecha_hasta
     ) {
-      alert("Por favor completa todos los campos");
+      setErrorMessage(
+        "Completa la cuenta bancaria, el período y el rango de fechas.",
+      );
       return;
     }
 
     try {
       setSubmitting(true);
+      setErrorMessage("");
       const response = await post("/api/finanzas/conciliacion", formData);
 
       if (response?.success) {
         alert("✅ Conciliación creada exitosamente");
         onSuccess();
       } else {
-        alert(
-          "Error: " + (response?.message || "No se pudo crear la conciliación"),
+        setErrorMessage(
+          response?.message || "No se pudo crear la conciliación.",
         );
       }
     } catch (error) {
       console.error("Error creating conciliacion:", error);
-      alert(
-        "Error: " +
-          (error instanceof Error ? error.message : "No se pudo crear la conciliación"),
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo crear la conciliación.",
       );
     } finally {
       setSubmitting(false);
@@ -557,6 +582,14 @@ function NewConciliacionForm({
         </div>
 
         <div className="flex flex-wrap justify-end gap-3 pt-2">
+          {errorMessage ? (
+            <p
+              role="alert"
+              className="w-full rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            >
+              {errorMessage}
+            </p>
+          ) : null}
           <Button
             type="button"
             onClick={onCancel}

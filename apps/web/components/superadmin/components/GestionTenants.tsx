@@ -224,7 +224,7 @@ export default function GestionTenants({
                     </div>
 
                     <div className="flex justify-end gap-2">
-                      <Button type="button" size="icon" variant="outline" title="Activar demo" onClick={() => onDemoTenant?.(tenant)} className="border-cyan-400/20 bg-card/70 text-primary hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
+                      <Button type="button" size="icon" variant="outline" title={tenant.is_demo ? 'Administrar demo' : 'Activar demo'} onClick={() => onDemoTenant?.(tenant)} className="border-cyan-400/20 bg-card/70 text-primary hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
                         <ShieldCheck className="h-4 w-4" />
                       </Button>
                       <Button type="button" size="icon" variant="outline" title="Ver detalles" onClick={() => onViewTenant?.(tenant)} className="border-cyan-400/20 bg-card/70 text-primary hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground/85">
