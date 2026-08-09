@@ -408,38 +408,73 @@ export class EstadosFinancierosService {
 
       console.log(`⚖️ [EstadosFinancieros] Consultando Balance de Comprobación desde vista materializada para ${anio}-${mes}, tenant: ${tenantId}`);
 
-      // Consultar vista materializada en lugar de calcular en tiempo real
-      const { data: balance, error } = await this.supabase
-        .getClient()
-        .from('mv_balance_comprobacion')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('anio', anio)
-        .eq('mes', mes)
-        .order('cuenta', { ascending: true });
+      // La MV tiene una fila por cuenta únicamente en meses con movimiento. Un
+      // filtro exacto por mes omite saldos arrastrados de cuentas inactivas y
+      // produce balances incompletos. Tomamos la última fila de cada cuenta al
+      // cierre solicitado; cuando no hubo movimiento en el mes, el último saldo
+      // pasa a ser saldo inicial/final y debe/haber quedan en cero.
+      const rows: any[] = [];
+      const pageSize = 1000;
+      let viewError: any = null;
 
-      if (error) {
-        if (this.isMaterializedViewUnavailable(error)) {
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await this.supabase
+          .getClient()
+          .from('mv_balance_comprobacion')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .lte('anio', anio)
+          .order('cuenta', { ascending: true })
+          .order('anio', { ascending: true })
+          .order('mes', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+
+        if (error) {
+          viewError = error;
+          break;
+        }
+
+        rows.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+      }
+
+      if (viewError) {
+        if (this.isMaterializedViewUnavailable(viewError)) {
           console.warn('⚠️ Balance de comprobación sin MV disponible; calculando desde asientos');
           const fallbackBalance = await this.calcularBalanceComprobacionDesdeAsientos(tenantId, anio, mes);
           this.setCache(cacheKey, fallbackBalance);
           return fallbackBalance;
         }
-        console.error('❌ Error consultando vista materializada:', error);
-        throw error;
+        console.error('❌ Error consultando vista materializada:', viewError);
+        throw viewError;
       }
 
-      console.log(`✅ Balance obtenido con ${balance?.length || 0} cuentas desde vista materializada`);
+      const latestByAccount = new Map<string, any>();
+      for (const item of rows) {
+        const itemAnio = Number(item.anio);
+        const itemMes = Number(item.mes);
+        if (itemAnio < anio || (itemAnio === anio && itemMes <= mes)) {
+          latestByAccount.set(item.cuenta, item);
+        }
+      }
 
-      // Mapear los datos de la vista materializada al formato esperado
-      const balanceItems: BalanceComprobacionItem[] = (balance || []).map((item: any) => ({
-        cuenta: item.cuenta,
-        nombre: item.nombre_cuenta,
-        saldo_inicial: parseFloat(item.saldo_inicial || 0),
-        debe: parseFloat(item.debe || 0),
-        haber: parseFloat(item.haber || 0),
-        saldo_final: parseFloat(item.saldo_final || 0),
-      }));
+      console.log(`✅ Balance obtenido con ${latestByAccount.size} cuentas acumuladas desde vista materializada`);
+
+      const balanceItems: BalanceComprobacionItem[] = [...latestByAccount.values()]
+        .map((item: any) => {
+          const tuvoMovimientoEnPeriodo = Number(item.anio) === anio && Number(item.mes) === mes;
+          const saldoFinal = parseFloat(item.saldo_final || 0);
+          return {
+            cuenta: item.cuenta,
+            nombre: item.nombre_cuenta,
+            saldo_inicial: tuvoMovimientoEnPeriodo ? parseFloat(item.saldo_inicial || 0) : saldoFinal,
+            debe: tuvoMovimientoEnPeriodo ? parseFloat(item.debe || 0) : 0,
+            haber: tuvoMovimientoEnPeriodo ? parseFloat(item.haber || 0) : 0,
+            saldo_final: saldoFinal,
+          };
+        })
+        .filter(item => Math.abs(item.saldo_inicial) > 0.01 || Math.abs(item.debe) > 0.01 || Math.abs(item.haber) > 0.01 || Math.abs(item.saldo_final) > 0.01)
+        .sort((a, b) => a.cuenta.localeCompare(b.cuenta, 'es'));
 
       if (balanceItems.length === 0) {
         console.warn('⚠️ Balance de comprobación con MV vacía; calculando desde asientos');
@@ -611,33 +646,48 @@ export class EstadosFinancierosService {
 
       console.log(`🏦 [EstadosFinancieros] Consultando Balance General desde vista materializada para ${anio}-${mes}, tenant: ${tenantId}`);
 
-      // Consultar vista materializada en lugar de calcular en tiempo real
-      const { data: balance, error } = await this.supabase
-        .getClient()
-        .from('mv_balance_general')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('anio', anio)
-        .eq('mes', mes)
-        .single();
+      // El Balance General es un estado a fecha de cierre, no sólo de cuentas
+      // con movimiento en ese mes. Se deriva del snapshot acumulado que ya
+      // arrastra el último saldo de cada cuenta; la MV agregada mensual omitía
+      // cuentas inactivas y podía romper la ecuación contable.
+      const balanceComprobacion = await this.getBalanceComprobacion(tenantId, anio, mes);
+      const sum = (pattern: RegExp, creditNature = false, positiveOnly = false) => {
+        const raw = balanceComprobacion
+          .filter((item) => pattern.test(item.cuenta))
+          .reduce((total, item) => {
+            const value = Number(item.saldo_final || 0);
+            // Para activos se conserva el contrato de la vista: una cuenta con
+            // saldo acreedor anómalo no compensa silenciosamente otra cuenta
+            // deudora del mismo rubro.
+            return total + (positiveOnly ? Math.max(value, 0) : value);
+          }, 0);
+        if (creditNature) return Math.abs(raw);
+        return raw;
+      };
 
-      if (error) {
-        if (this.isMaterializedViewUnavailable(error)) {
-          console.warn('⚠️ Balance general sin MV poblada o sin filas, retornando valores en cero');
-          const estadoResultados = await this.getEstadoResultados(tenantId, anio, mes);
-          const emptyBalance = this.getEmptyBalanceGeneral(estadoResultados.utilidad_neta);
-          this.setCache(cacheKey, emptyBalance, 5 * 60 * 1000); // 5 min para vacíos
-          return emptyBalance;
-        }
-        console.error('❌ Error consultando vista materializada:', error);
-        throw error;
-      }
+      const balance = {
+        efectivo: sum(/^10/, false, true),
+        cuentas_por_cobrar: sum(/^12/, false, true),
+        inventarios: sum(/^20/, false, true),
+        otros_activos_corrientes: sum(/^(11|13|14|16|18)/, false, true),
+        activos_fijos: sum(/^33/, false, true),
+        depreciacion_acumulada: sum(/^39/, true),
+        otros_activos_no_corrientes: sum(/^(34|35|36|37|38)/, false, true),
+        cuentas_por_pagar: sum(/^42/, true),
+        tributos_por_pagar: sum(/^40/, true),
+        remuneraciones_por_pagar: sum(/^41/, true),
+        otros_pasivos_corrientes: sum(/^(43|44)/, true),
+        deudas_largo_plazo: sum(/^(45|46|47|48)/, true),
+        otros_pasivos_no_corrientes: sum(/^49/, true),
+        capital: sum(/^50/, true),
+        resultados_acumulados: sum(/^(56|57|58|59)/, true),
+      };
 
       // Obtener el resultado del ejercicio desde el Estado de Resultados (usa cache si está disponible)
       const estadoResultados = await this.getEstadoResultados(tenantId, anio, mes);
       const resultadoEjercicio = estadoResultados.utilidad_neta;
 
-      if (!balance) {
+      if (balanceComprobacion.length === 0) {
         console.log('⚠️ No se encontraron datos para el período especificado, retornando valores en cero');
         const emptyBalance = this.getEmptyBalanceGeneral(resultadoEjercicio);
         this.setCache(cacheKey, emptyBalance, 5 * 60 * 1000); // 5 min para vacíos
@@ -645,25 +695,25 @@ export class EstadosFinancierosService {
       }
 
       // Mapear los datos de la vista materializada al formato esperado
-      const efectivo = parseFloat(balance.efectivo || 0);
-      const cuentasPorCobrar = parseFloat(balance.cuentas_por_cobrar || 0);
-      const inventarios = parseFloat(balance.inventarios || 0);
-      const otrosActivosCorrientes = parseFloat(balance.otros_activos_corrientes || 0);
+      const efectivo = Number(balance.efectivo || 0);
+      const cuentasPorCobrar = Number(balance.cuentas_por_cobrar || 0);
+      const inventarios = Number(balance.inventarios || 0);
+      const otrosActivosCorrientes = Number(balance.otros_activos_corrientes || 0);
 
-      const activosFijos = parseFloat(balance.activos_fijos || 0);
-      const depreciacionAcumulada = parseFloat(balance.depreciacion_acumulada || 0);
-      const otrosActivosNoCorrientes = parseFloat(balance.otros_activos_no_corrientes || 0);
+      const activosFijos = Number(balance.activos_fijos || 0);
+      const depreciacionAcumulada = Number(balance.depreciacion_acumulada || 0);
+      const otrosActivosNoCorrientes = Number(balance.otros_activos_no_corrientes || 0);
 
-      const cuentasPorPagar = parseFloat(balance.cuentas_por_pagar || 0);
-      const tributosPorPagar = parseFloat(balance.tributos_por_pagar || 0);
-      const remuneracionesPorPagar = parseFloat(balance.remuneraciones_por_pagar || 0);
-      const otrosPasivosCorrientes = parseFloat(balance.otros_pasivos_corrientes || 0);
+      const cuentasPorPagar = Number(balance.cuentas_por_pagar || 0);
+      const tributosPorPagar = Number(balance.tributos_por_pagar || 0);
+      const remuneracionesPorPagar = Number(balance.remuneraciones_por_pagar || 0);
+      const otrosPasivosCorrientes = Number(balance.otros_pasivos_corrientes || 0);
 
-      const deudasLargoPlazo = parseFloat(balance.deudas_largo_plazo || 0);
-      const otrosPasivosNoCorrientes = parseFloat(balance.otros_pasivos_no_corrientes || 0);
+      const deudasLargoPlazo = Number(balance.deudas_largo_plazo || 0);
+      const otrosPasivosNoCorrientes = Number(balance.otros_pasivos_no_corrientes || 0);
 
-      const capital = parseFloat(balance.capital || 0);
-      const resultadosAcumulados = parseFloat(balance.resultados_acumulados || 0);
+      const capital = Number(balance.capital || 0);
+      const resultadosAcumulados = Number(balance.resultados_acumulados || 0);
 
       // Calcular totales y subtotales
       const totalActivosCorrientes = efectivo + cuentasPorCobrar + inventarios + otrosActivosCorrientes;

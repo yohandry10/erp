@@ -26,6 +26,7 @@ describe('EstadosFinancierosService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EstadosFinancierosService,
@@ -71,7 +72,7 @@ describe('EstadosFinancierosService', () => {
         },
       ];
 
-      mockSupabaseClient.order.mockResolvedValueOnce({
+      mockSupabaseClient.range.mockResolvedValueOnce({
         data: mockBalance,
         error: null,
       });
@@ -89,7 +90,7 @@ describe('EstadosFinancierosService', () => {
     });
 
     it('should handle empty balance', async () => {
-      mockSupabaseClient.order.mockResolvedValueOnce({
+      mockSupabaseClient.range.mockResolvedValueOnce({
         data: [],
         error: null,
       });
@@ -107,7 +108,7 @@ describe('EstadosFinancierosService', () => {
     it('should throw error when database query fails', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
       const dbError = { message: 'Database error' };
-      mockSupabaseClient.order.mockResolvedValueOnce({
+      mockSupabaseClient.range.mockResolvedValueOnce({
         data: null,
         error: dbError,
       });
@@ -149,7 +150,7 @@ describe('EstadosFinancierosService', () => {
 
       // Resetear el mock antes de este test
       jest.clearAllMocks();
-      mockSupabaseClient.order.mockResolvedValueOnce({
+      mockSupabaseClient.range.mockResolvedValueOnce({
         data: mockBalance,
         error: null,
       });
@@ -164,7 +165,44 @@ describe('EstadosFinancierosService', () => {
       expect(result2).toEqual(result1);
 
       // Verificar que solo se llamó una vez a la BD
-      expect(mockSupabaseClient.order).toHaveBeenCalledTimes(1);
+      expect(mockSupabaseClient.range).toHaveBeenCalledTimes(1);
+    });
+
+    it('arrastra cuentas sin movimiento hasta el periodo solicitado', async () => {
+      mockSupabaseClient.range.mockResolvedValueOnce({
+        data: [
+          {
+            cuenta: '10',
+            nombre_cuenta: 'Efectivo',
+            saldo_inicial: 0,
+            debe: 1000,
+            haber: 0,
+            saldo_final: 1000,
+            tenant_id: 'tenant-1',
+            anio: 2024,
+            mes: 1,
+          },
+          {
+            cuenta: '42',
+            nombre_cuenta: 'Cuentas por pagar',
+            saldo_inicial: -500,
+            debe: 100,
+            haber: 0,
+            saldo_final: -400,
+            tenant_id: 'tenant-1',
+            anio: 2024,
+            mes: 3,
+          },
+        ],
+        error: null,
+      });
+
+      const result = await service.getBalanceComprobacion('tenant-1', 2024, 4);
+
+      expect(result).toEqual([
+        expect.objectContaining({ cuenta: '10', saldo_inicial: 1000, debe: 0, haber: 0, saldo_final: 1000 }),
+        expect.objectContaining({ cuenta: '42', saldo_inicial: -400, debe: 0, haber: 0, saldo_final: -400 }),
+      ]);
     });
   });
 
@@ -267,26 +305,18 @@ describe('EstadosFinancierosService', () => {
       // Total Patrimonio debe ser: 49000 (para que 43000 + 49000 = 92000)
       // Patrimonio = Capital (30000) + Resultados Acumulados (18000) + Resultado Ejercicio (1000) = 49000
 
-      const mockBalance = {
-        tenant_id: 'tenant-1',
-        anio: 2024,
-        mes: 1,
-        efectivo: 10000,
-        cuentas_por_cobrar: 15000,
-        inventarios: 20000,
-        otros_activos_corrientes: 2000,
-        activos_fijos: 50000,
-        depreciacion_acumulada: 10000,
-        otros_activos_no_corrientes: 5000,
-        cuentas_por_pagar: 12000,
-        tributos_por_pagar: 3000,
-        remuneraciones_por_pagar: 5000,
-        otros_pasivos_corrientes: 1000,
-        deudas_largo_plazo: 20000,
-        otros_pasivos_no_corrientes: 2000,
-        capital: 30000,
-        resultados_acumulados: 18000, // Ajustado para que cuadre
-      };
+      const mockBalance = [
+        ['10', 10000], ['12', 15000], ['20', 20000], ['11', 2000],
+        ['33', 50000], ['39', -10000], ['34', 5000], ['42', -12000],
+        ['40', -3000], ['41', -5000], ['43', -1000], ['45', -20000],
+        ['49', -2000], ['50', -30000], ['56', -18000],
+      ].map(([cuenta, saldo]) => ({
+        tenant_id: 'tenant-1', anio: 2024, mes: 1, cuenta,
+        nombre_cuenta: `Cuenta ${cuenta}`, saldo_inicial: 0,
+        debe: Number(saldo) > 0 ? Number(saldo) : 0,
+        haber: Number(saldo) < 0 ? Math.abs(Number(saldo)) : 0,
+        saldo_final: Number(saldo),
+      }));
 
       const mockEstado = {
         tenant_id: 'tenant-1',
@@ -300,17 +330,8 @@ describe('EstadosFinancierosService', () => {
         gastos_financieros: 200,
       };
 
-      // Mock para Balance General
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: mockBalance,
-          error: null,
-        })
-        // Mock para Estado de Resultados (llamado internamente)
-        .mockResolvedValueOnce({
-          data: mockEstado,
-          error: null,
-        });
+      mockSupabaseClient.range.mockResolvedValueOnce({ data: mockBalance, error: null });
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: mockEstado, error: null });
 
       const result = await service.getBalanceGeneral('tenant-1', 2024, 1);
 
@@ -359,17 +380,36 @@ describe('EstadosFinancierosService', () => {
       expect(result.activos.total_activos).toBe(totalPasivosPatrimonio);
     });
 
+    it('does not offset an anomalous creditor asset against another asset account', async () => {
+      const mockBalance = [
+        { cuenta: '101', saldo_final: 1000 },
+        { cuenta: '104', saldo_final: -400 },
+      ].map((item) => ({
+        tenant_id: 'tenant-1', anio: 2024, mes: 1,
+        nombre_cuenta: `Cuenta ${item.cuenta}`, saldo_inicial: 0,
+        debe: Math.max(item.saldo_final, 0),
+        haber: Math.max(-item.saldo_final, 0),
+        ...item,
+      }));
+      const mockEstado = {
+        tenant_id: 'tenant-1', anio: 2024, mes: 1,
+        ventas: 0, otros_ingresos: 0, costo_ventas: 0,
+        gastos_administrativos: 0, gastos_ventas: 0, gastos_financieros: 0,
+      };
+
+      mockSupabaseClient.range.mockResolvedValueOnce({ data: mockBalance, error: null });
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: mockEstado, error: null });
+
+      const result = await service.getBalanceGeneral('tenant-1', 2024, 1);
+
+      expect(result.activos.corrientes.efectivo).toBe(1000);
+    });
+
     it('should handle empty balance general', async () => {
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: null,
-          error: null,
-        })
-        // Mock para Estado de Resultados
-        .mockResolvedValueOnce({
-          data: null,
-          error: null,
-        });
+      mockSupabaseClient.range
+        .mockResolvedValueOnce({ data: [], error: null })
+        .mockResolvedValueOnce({ data: [], error: null });
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: null, error: null });
 
       const result = await service.getBalanceGeneral('tenant-1', 2024, 1);
 
@@ -382,7 +422,7 @@ describe('EstadosFinancierosService', () => {
     it('should throw error when database query fails', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
       const dbError = { message: 'Database error' };
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.range.mockResolvedValueOnce({
         data: null,
         error: dbError,
       });
@@ -395,26 +435,18 @@ describe('EstadosFinancierosService', () => {
     });
 
     it('should validate accounting equation (Assets = Liabilities + Equity)', async () => {
-      const mockBalance = {
-        tenant_id: 'tenant-1',
-        anio: 2024,
-        mes: 1,
-        efectivo: 50000,
-        cuentas_por_cobrar: 30000,
-        inventarios: 40000,
-        otros_activos_corrientes: 5000,
-        activos_fijos: 100000,
-        depreciacion_acumulada: 20000,
-        otros_activos_no_corrientes: 10000,
-        cuentas_por_pagar: 25000,
-        tributos_por_pagar: 8000,
-        remuneraciones_por_pagar: 12000,
-        otros_pasivos_corrientes: 5000,
-        deudas_largo_plazo: 50000,
-        otros_pasivos_no_corrientes: 10000,
-        capital: 80000,
-        resultados_acumulados: 20000,
-      };
+      const mockBalance = [
+        ['10', 50000], ['12', 30000], ['20', 40000], ['11', 5000],
+        ['33', 100000], ['39', -20000], ['34', 10000], ['42', -25000],
+        ['40', -8000], ['41', -12000], ['43', -5000], ['45', -50000],
+        ['49', -10000], ['50', -80000], ['56', -20000],
+      ].map(([cuenta, saldo]) => ({
+        tenant_id: 'tenant-1', anio: 2024, mes: 1, cuenta,
+        nombre_cuenta: `Cuenta ${cuenta}`, saldo_inicial: 0,
+        debe: Number(saldo) > 0 ? Number(saldo) : 0,
+        haber: Number(saldo) < 0 ? Math.abs(Number(saldo)) : 0,
+        saldo_final: Number(saldo),
+      }));
 
       const mockEstado = {
         tenant_id: 'tenant-1',
@@ -428,15 +460,8 @@ describe('EstadosFinancierosService', () => {
         gastos_financieros: 5000,
       };
 
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: mockBalance,
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: mockEstado,
-          error: null,
-        });
+      mockSupabaseClient.range.mockResolvedValueOnce({ data: mockBalance, error: null });
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: mockEstado, error: null });
 
       const result = await service.getBalanceGeneral('tenant-1', 2024, 1);
 

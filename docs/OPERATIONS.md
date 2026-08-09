@@ -21,6 +21,10 @@ Servicios principales:
 - API: puerto definido por `PORT`.
 - Supabase, Redis y observabilidad: según variables del entorno o Docker.
 
+El arranque filtrado de la API (`pnpm --filter erp-api start`) resuelve
+`.env.production` tanto desde la raíz del workspace como desde
+`apps/erp-api`; nunca recurre a `.env` ni `.env.local`.
+
 Comandos frecuentes:
 
 ```powershell

@@ -1,57 +1,38 @@
 import { CashflowService } from './cashflow.service';
-import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EstadosFinancierosService } from './estados-financieros.service';
-
-// Helper para simular el builder de Supabase
-const createMockClient = (datasets: any[][]) => {
-  let call = 0;
-  return {
-    from: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    order: jest.fn().mockImplementation(() => {
-      const data = datasets[Math.min(call, datasets.length - 1)];
-      call += 1;
-      return Promise.resolve({ data, error: null });
-    }),
-  };
-};
 
 describe('CashflowService', () => {
   let service: CashflowService;
-  let supabaseService: jest.Mocked<SupabaseService>;
   let estadosFinancieros: jest.Mocked<EstadosFinancierosService>;
 
   beforeEach(() => {
-    supabaseService = {
-      getClient: jest.fn(),
-    } as any;
-
     estadosFinancieros = {
       getEstadoResultados: jest.fn(),
+      getBalanceComprobacion: jest.fn(),
     } as any;
 
-    service = new CashflowService(supabaseService as any, estadosFinancieros as any);
+    service = new CashflowService(estadosFinancieros as any);
   });
 
   it('calcula cashflow indirecto con variaciones de capital de trabajo', async () => {
     const currentBalance = [
       { cuenta: '12', saldo_final: 120 },
       { cuenta: '20', saldo_final: 200 },
-      { cuenta: '42', saldo_final: 80 },
+      { cuenta: '42', saldo_final: -80 },
       { cuenta: '33', saldo_final: 300 },
-      { cuenta: '45', saldo_final: 400 },
+      { cuenta: '45', saldo_final: -400 },
     ];
     const prevBalance = [
       { cuenta: '12', saldo_final: 100 },
       { cuenta: '20', saldo_final: 150 },
-      { cuenta: '42', saldo_final: 60 },
+      { cuenta: '42', saldo_final: -60 },
       { cuenta: '33', saldo_final: 250 },
-      { cuenta: '45', saldo_final: 350 },
+      { cuenta: '45', saldo_final: -350 },
     ];
 
-    const mockClient = createMockClient([currentBalance, prevBalance]);
-    supabaseService.getClient.mockReturnValue(mockClient as any);
+    estadosFinancieros.getBalanceComprobacion
+      .mockResolvedValueOnce(currentBalance as any)
+      .mockResolvedValueOnce(prevBalance as any);
 
     estadosFinancieros.getEstadoResultados.mockResolvedValue({
       ingresos: { total_ingresos: 0 },
@@ -80,12 +61,11 @@ describe('CashflowService', () => {
       { cuenta: '10', saldo_final: 100 },
       { cuenta: '12', saldo_final: 120 },
       { cuenta: '20', saldo_final: 200 },
-      { cuenta: '40', saldo_final: 10 },
-      { cuenta: '42', saldo_final: 80 },
+      { cuenta: '40', saldo_final: -10 },
+      { cuenta: '42', saldo_final: -80 },
     ];
 
-    const mockClient = createMockClient([balance]);
-    supabaseService.getClient.mockReturnValue(mockClient as any);
+    estadosFinancieros.getBalanceComprobacion.mockResolvedValueOnce(balance as any);
 
     estadosFinancieros.getEstadoResultados.mockResolvedValue({
       ingresos: { total_ingresos: 500 },

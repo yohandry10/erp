@@ -8,12 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BalanceComprobacion } from '@/components/contabilidad/BalanceComprobacion'
 import { EstadoResultados } from '@/components/contabilidad/EstadoResultados'
 import { BalanceGeneral } from '@/components/contabilidad/BalanceGeneral'
+import { FlujoEfectivo } from '@/components/contabilidad/FlujoEfectivo'
+import { RatiosFinancieros } from '@/components/contabilidad/RatiosFinancieros'
 import { Calendar, FileText, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDashboardTheme } from '@/hooks/use-dashboard-theme'
 
 export default function EstadosFinancierosPage() {
-  const { get } = useApi()
+  const { post } = useApi()
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('balance-comprobacion')
 
@@ -44,7 +46,7 @@ export default function EstadosFinancierosPage() {
   const handleRefresh = async () => {
     setLoading(true)
     try {
-      await get(`/api/contabilidad/estados/refrescar?anio=${anio}&mes=${mes}`)
+      await post(`/api/contabilidad/estados/refrescar?anio=${anio}&mes=${mes}`, {})
       setRefreshKey((prev) => prev + 1)
     } catch (error) {
       console.error('Error refrescando estados financieros:', error)
@@ -75,7 +77,7 @@ export default function EstadosFinancierosPage() {
               </div>
               <h1 className={cn('text-4xl font-bold tracking-tight', darkMode ? 'text-foreground' : 'text-foreground')}>Estados Financieros</h1>
               <p className={cn('mt-3 max-w-3xl text-sm leading-6', darkMode ? 'text-muted-foreground' : 'text-muted-foreground')}>
-                Balance de comprobación, estado de resultados y balance general con periodo controlado.
+                Balance de comprobación, resultados, situación financiera, flujo de efectivo e indicadores con periodo controlado.
               </p>
             </div>
             </div>
@@ -140,7 +142,7 @@ export default function EstadosFinancierosPage() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={cn('mb-6 grid w-full grid-cols-1 border p-1 sm:grid-cols-3', darkMode ? 'border-cyan-400/15 bg-card/70' : 'border-border bg-card')}>
+          <TabsList className={cn('mb-6 grid h-auto w-full grid-cols-1 border p-1 sm:grid-cols-2 xl:grid-cols-5', darkMode ? 'border-cyan-400/15 bg-card/70' : 'border-border bg-card')}>
             <TabsTrigger
               value="balance-comprobacion"
               className={cn(darkMode ? 'text-muted-foreground data-[state=active]:bg-cyan-400/15 data-[state=active]:text-primary' : 'text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary')}
@@ -159,6 +161,18 @@ export default function EstadosFinancierosPage() {
             >
               Balance General
             </TabsTrigger>
+            <TabsTrigger
+              value="flujo-efectivo"
+              className={cn(darkMode ? 'text-muted-foreground data-[state=active]:bg-cyan-400/15 data-[state=active]:text-primary' : 'text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary')}
+            >
+              Flujo de Efectivo
+            </TabsTrigger>
+            <TabsTrigger
+              value="ratios-financieros"
+              className={cn(darkMode ? 'text-muted-foreground data-[state=active]:bg-cyan-400/15 data-[state=active]:text-primary' : 'text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary')}
+            >
+              Indicadores
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="balance-comprobacion">
@@ -171,6 +185,14 @@ export default function EstadosFinancierosPage() {
 
           <TabsContent value="balance-general">
             <BalanceGeneral key={`bg-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
+          </TabsContent>
+
+          <TabsContent value="flujo-efectivo">
+            <FlujoEfectivo key={`fe-${refreshKey}`} anio={anio} mes={mes} />
+          </TabsContent>
+
+          <TabsContent value="ratios-financieros">
+            <RatiosFinancieros key={`rf-${refreshKey}`} anio={anio} mes={mes} />
           </TabsContent>
         </Tabs>
       </div>

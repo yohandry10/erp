@@ -239,7 +239,12 @@ async function loginApi(baseURL: string, email: string, password: string) {
 }
 
 test.describe('Auth, sesión, país/empresa, wizard y permisos', () => {
-  test.skip(!adminPassword, 'TEST_USER_PASSWORD es obligatorio para E2E local efímero');
+  test.beforeAll(() => {
+    expect(
+      adminPassword,
+      'TEST_USER_PASSWORD es obligatorio para E2E local efímero',
+    ).toBeTruthy();
+  });
   test('sin sesión redirige rutas protegidas a login y no deja pantalla en blanco', async ({ browser }, testInfo) => {
     const context = await browser.newContext({
       baseURL: getBaseURL(testInfo),
