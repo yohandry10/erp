@@ -77,17 +77,17 @@ export class CashflowService {
     const neto = operativo + inversion + financiamiento;
 
     return {
-      operativo,
-      inversion,
-      financiamiento,
-      neto,
+      operativo: this.roundCurrency(operativo),
+      inversion: this.roundCurrency(inversion),
+      financiamiento: this.roundCurrency(financiamiento),
+      neto: this.roundCurrency(neto),
       detalle: {
-        utilidadNeta: netIncome,
-        variacionCxc: deltaCxc,
-        variacionInventario: deltaInv,
-        variacionCxp: deltaCxp,
-        variacionInversiones: deltaInversiones,
-        variacionFinanciamiento: deltaFinanc,
+        utilidadNeta: this.roundCurrency(netIncome),
+        variacionCxc: this.roundCurrency(deltaCxc),
+        variacionInventario: this.roundCurrency(deltaInv),
+        variacionCxp: this.roundCurrency(deltaCxp),
+        variacionInversiones: this.roundCurrency(deltaInversiones),
+        variacionFinanciamiento: this.roundCurrency(deltaFinanc),
       },
     };
   }
@@ -138,6 +138,10 @@ export class CashflowService {
   }
 
   // Helpers
+  private roundCurrency(value: number): number {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
   private validatePeriodo(anio: number, mes: number) {
     if (!anio || !mes || mes < 1 || mes > 12) {
       throw new BadRequestException('Periodo inválido. Envíe anio y mes (1-12).');
