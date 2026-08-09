@@ -243,7 +243,9 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   o reinicia sus datos. La activación sustituye atómicamente las credenciales
   temporales; sólo persiste el hash de la contraseña y el login posterior usa
   esas mismas credenciales. El asistente fiscal se ejecuta después de autenticar
-  y no crea una identidad paralela.
+  y no crea una identidad paralela. La ruta de conversión exige sesión válida,
+  falla cerrada si no puede comprobar el tenant y devuelve al dashboard a una
+  cuenta que ya fue convertida, evitando ofrecer una segunda conversión.
 - La demo Colombia crea datos sintéticos en COP, NIT/CC y configuración DIAN,
   PILA y nómina electrónica simuladas, incluido un contrato colombiano con
   salario válido para ejercitar el cálculo completo. La transmisión real

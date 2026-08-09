@@ -86,4 +86,28 @@ describe('CashflowService', () => {
     expect(result.dio).toBeCloseTo((200 / 300) * 30, 6);
     expect(result.rotacionInventario).toBeCloseTo(300 / 200, 6);
   });
+
+  it('redondea los importes monetarios del flujo a dos decimales', async () => {
+    estadosFinancieros.getBalanceComprobacion
+      .mockResolvedValueOnce([
+        { cuenta: '12', saldo_final: 94.4 },
+        { cuenta: '20', saldo_final: 350 },
+        { cuenta: '42', saldo_final: -295 },
+        { cuenta: '50', saldo_final: -300 },
+      ] as any)
+      .mockResolvedValueOnce([] as any);
+    estadosFinancieros.getEstadoResultados.mockResolvedValue({
+      ingresos: { total_ingresos: 0 },
+      costos: { costo_ventas: 0 },
+      gastos: { total_gastos: 0 },
+      utilidad_neta: 0,
+    } as any);
+
+    const result = await service.getCashFlow('tenant', 2026, 8);
+
+    expect(result.operativo).toBe(-149.4);
+    expect(result.financiamiento).toBe(300);
+    expect(result.neto).toBe(150.6);
+    expect(result.detalle.variacionCxc).toBe(94.4);
+  });
 });

@@ -24,6 +24,8 @@ interface InstruccionesDePago {
 export default function ConvertDemoPage() {
   const router = useRouter();
   const { signIn } = useAuth();
+  const [checkingEligibility, setCheckingEligibility] = useState(true);
+  const [eligibilityError, setEligibilityError] = useState<string | null>(null);
 
   // Esta página vive fuera del layout del dashboard, así que no hereda el tema.
   // Replicamos el contrato: fijar data-erp-theme en <html> para que los tokens
@@ -57,12 +59,30 @@ export default function ConvertDemoPage() {
 
   useEffect(() => {
     void fetchApi('/api/demo/status')
-      .then(async (response) => response.ok ? response.json() : null)
+      .then(async (response) => {
+        if (response.status === 401) {
+          window.location.replace('/login/?redirect=/demo/convert');
+          return null;
+        }
+        if (!response.ok) {
+          throw new Error('No se pudo verificar el estado de la cuenta.');
+        }
+        return response.json();
+      })
       .then((status) => {
+        if (!status) return;
+        if (status.is_demo !== true) {
+          window.location.replace('/dashboard/');
+          return;
+        }
         const code = String(status?.pais || '').toUpperCase();
         if (code === 'AR' || code === 'CO' || code === 'PE') setCountryCode(code);
+        setCheckingEligibility(false);
       })
-      .catch(() => undefined);
+      .catch((statusError: unknown) => {
+        setEligibilityError(statusError instanceof Error ? statusError.message : 'No se pudo verificar el estado de la cuenta.');
+        setCheckingEligibility(false);
+      });
   }, []);
 
   const taxDocument = countryCode === 'AR' ? 'CUIT' : countryCode === 'CO' ? 'NIT' : 'RUC';
@@ -210,6 +230,36 @@ export default function ConvertDemoPage() {
       [e.target.name]: e.target.value,
     });
   };
+
+  if (checkingEligibility) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-8">
+        <div className="rounded-2xl border border-border bg-card px-6 py-5 text-center shadow">
+          <p className="font-semibold">Verificando el estado de tu cuenta…</p>
+          <p className="mt-1 text-sm text-muted-foreground">La conversión sólo está disponible para demos activas.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (eligibilityError) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-8">
+        <div className="max-w-md rounded-2xl border border-destructive/30 bg-card px-6 py-5 text-center shadow">
+          <h1 className="text-lg font-bold">No pudimos validar la conversión</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{eligibilityError}</p>
+          <div className="mt-5 flex justify-center gap-3">
+            <button type="button" onClick={() => window.location.reload()} className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+              Reintentar
+            </button>
+            <button type="button" onClick={() => router.push('/dashboard/')} className="rounded-xl border border-border px-4 py-2 text-sm font-semibold">
+              Ir al dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-8">

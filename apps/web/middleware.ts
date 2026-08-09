@@ -75,7 +75,8 @@ export async function middleware(request: NextRequest) {
     : pathname;
   const protectedRoute =
     normalizedPathname.startsWith('/dashboard') ||
-    normalizedPathname.startsWith('/superadmin');
+    normalizedPathname.startsWith('/superadmin') ||
+    normalizedPathname === '/demo/convert';
   const loginRoute = normalizedPathname === '/login';
 
   if (!protectedRoute && !loginRoute) {
@@ -115,5 +116,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/superadmin/:path*', '/login'],
+  matcher: ['/dashboard/:path*', '/superadmin/:path*', '/demo/convert', '/login'],
 };
