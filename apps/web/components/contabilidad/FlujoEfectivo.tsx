@@ -37,7 +37,7 @@ export function FlujoEfectivo({ anio, mes }: FlujoEfectivoProps) {
     setLoading(true)
     setError(null)
     try {
-      const response = await get(`/api/contabilidad/estados/flujo-efectivo?anio=${anio}&mes=${mes}`)
+      const response = await get(`/api/contabilidad/flujo-efectivo?anio=${anio}&mes=${mes}`)
       if (!response?.success || !response.data) throw new Error(response?.message || 'No se pudo calcular el flujo de efectivo')
       setData(response.data)
     } catch (err: any) {
