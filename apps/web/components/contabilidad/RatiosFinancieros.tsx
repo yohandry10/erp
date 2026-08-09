@@ -30,7 +30,7 @@ export function RatiosFinancieros({ anio, mes }: RatiosFinancierosProps) {
     setLoading(true)
     setError(null)
     try {
-      const response = await get(`/api/contabilidad/estados/ratios-financieros?anio=${anio}&mes=${mes}`)
+      const response = await get(`/api/contabilidad/ratios-financieros?anio=${anio}&mes=${mes}`)
       if (!response?.success || !response.data) throw new Error(response?.message || 'No se pudieron calcular los indicadores')
       setData(response.data)
     } catch (err: any) {
