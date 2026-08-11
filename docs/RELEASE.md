@@ -37,7 +37,7 @@ Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 8. Comparar conteos y revisar logs.
 9. Detener y revertir ante cualquier diferencia no explicada.
 
-El estado remoto vigente está verificado hasta `432`; cualquier rango posterior
+El estado remoto vigente está verificado hasta `490`; cualquier rango posterior
 vuelve a comenzar por preflight, respaldo y ensayo transaccional.
 
 ## Go-live
@@ -122,6 +122,8 @@ correctivo probado. Nunca improvisarlo sobre PROD.
 
 ## Bloqueantes actuales
 
+- Completar el despliegue de la API en Render desde el SHA vigente y verificar
+  health/logs; no confundir el servicio anterior saludable con el release nuevo.
 - Certificado productivo compatible con el RUC.
 - Credenciales GRE REST si el cliente usa guías.
 - Secretos finales y smoke productivo autorizado.
