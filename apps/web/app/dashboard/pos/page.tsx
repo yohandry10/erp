@@ -1310,47 +1310,17 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       setEstadoVentaActual({ estado: 'CANCELADA', fecha_estado: new Date().toISOString() })
       setCurrentIdempotencyKey(null)
 
-      console.error('❌ ERROR REAL procesando venta:', error)
-
-      // Mostrar error detallado y real
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
 
-      // Crear mensaje de error más detallado
-      let mensajeDetallado = `❌ ERROR REAL EN VENTA
+      // Un solo registro estructurado: el detalle tecnico sirve para diagnosticar,
+      // pero no se le dictan instrucciones de base de datos a quien atiende la caja.
+      console.error('Error procesando venta POS', {
+        mensaje: errorMessage,
+        backend: resultado && resultado.success === false
+          ? { message: resultado.message, error: resultado.error, debug_info: resultado.debug_info }
+          : undefined,
+      })
 
-MENSAJE: ${errorMessage}`;
-
-      if (resultado && resultado.success === false) {
-        mensajeDetallado += `
-
-🔍 DETALLES DEL BACKEND:
-- Message: ${resultado.message || 'No message'}
-- Success: ${resultado.success}`;
-
-        if (resultado.error) {
-          mensajeDetallado += `
-
-💥 ERROR TÉCNICO:
-- Tipo: ${resultado.error.tipo || 'Unknown'}
-- Mensaje: ${resultado.error.mensaje || 'No error message'}
-- Código: ${resultado.error.codigo || 'No code'}
-- Detalles: ${resultado.error.detalles || 'No details'}
-- Sugerencia: ${resultado.error.sugerencia || 'No suggestion'}`;
-        }
-
-        if (resultado.debug_info) {
-          mensajeDetallado += `
-
-🐛 DEBUG INFO:
-${JSON.stringify(resultado.debug_info, null, 2)}`;
-        }
-      }
-
-      mensajeDetallado += `
-
-🚨 LA VENTA NO SE GUARDÓ - REVISA EL ERROR Y CORRIGE LA BD`;
-
-      console.error(mensajeDetallado)
       toast({
         variant: 'destructive',
         title: '❌ Error procesando venta',

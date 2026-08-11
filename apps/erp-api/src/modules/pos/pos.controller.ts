@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Param, ForbiddenException, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Param, ForbiddenException, ParseUUIDPipe, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -69,7 +69,30 @@ export class PosController {
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.vender') // HARDENING: venta rápida requiere permiso.
   async procesarVenta(@Body() ventaData: CreateVentaPosDto, @Req() req: any) {
-    return this.posService.procesarVenta(ventaData, req.user);
+    const resultado: any = await this.posService.procesarVenta(ventaData, req.user);
+    // Una venta que no se registró no puede responder 201 Created: los clientes
+    // (y cualquier proxy o reintento automático) leen el código HTTP, no el
+    // campo `success`. El cuerpo se conserva tal cual para no romper a la UI.
+    if (resultado && resultado.success === false) {
+      throw new HttpException(resultado, PosController.estadoHttpDeFalloVenta(resultado));
+    }
+    return resultado;
+  }
+
+  private static estadoHttpDeFalloVenta(resultado: any): HttpStatus {
+    switch (resultado?.error?.tipo) {
+      case 'VALIDATION_ERROR':
+      case 'CONFIG_ERROR':
+        return HttpStatus.BAD_REQUEST;
+      case 'CAJA_CERRADA':
+        return HttpStatus.CONFLICT;
+      case 'DATABASE_ERROR':
+        return HttpStatus.INTERNAL_SERVER_ERROR;
+      default:
+        // Los rechazos de validación temprana (idempotency_key, items, datos del
+        // cliente) devuelven `message` sin `error.tipo`: son culpa del request.
+        return resultado?.error ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.BAD_REQUEST;
+    }
   }
 
   @Post('ventas/:ventaId/canjear-ticket')
