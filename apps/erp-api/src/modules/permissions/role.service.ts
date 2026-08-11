@@ -107,7 +107,7 @@ export class RoleService {
     await this.getRoleById(tenantId, roleId);
     const { data, error } = await this.supabase.getClient()
       .from('user_roles')
-      .select('usuario_sistema_id, usuarios_sistema(id, tenant_id, nombre, apellido, email, telefono, cargo, departamento, estado, activo, created_at)')
+      .select('usuario_sistema_id, usuarios_sistema!user_roles_usuario_sistema_id_fkey(id, tenant_id, nombre, apellido, email, telefono, cargo, departamento, estado, activo, created_at)')
       .eq('tenant_id', tenantId)
       .eq('role_id', roleId);
     if (error) throw new BadRequestException('Error al obtener usuarios del rol');

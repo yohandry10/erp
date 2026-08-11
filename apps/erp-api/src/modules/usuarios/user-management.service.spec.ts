@@ -8,11 +8,13 @@ import { PermissionService } from '../permissions/permission.service';
 describe('UserManagementService contrato atómico 462', () => {
   let service: UserManagementService;
   let rpc: jest.Mock;
+  let from: jest.Mock;
   let email: { sendUserActivationEmail: jest.Mock; sendPasswordResetEmail: jest.Mock };
   let permission: { invalidateUserPermissions: jest.Mock };
 
   beforeEach(async () => {
     rpc = jest.fn();
+    from = jest.fn();
     email = {
       sendUserActivationEmail: jest.fn().mockResolvedValue(undefined),
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
@@ -21,7 +23,7 @@ describe('UserManagementService contrato atómico 462', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserManagementService,
-        { provide: SupabaseService, useValue: { getClient: () => ({ rpc }) } },
+        { provide: SupabaseService, useValue: { getClient: () => ({ rpc, from }) } },
         { provide: EmailService, useValue: email },
         { provide: PermissionService, useValue: permission },
       ],
@@ -132,5 +134,24 @@ describe('UserManagementService contrato atómico 462', () => {
     expect(rpc).toHaveBeenCalledWith('desmarcar_usuarios_demo_rbac_tx', {
       p_tenant_id: 'tenant-1', p_actor_id: 'actor-1',
     });
+  });
+
+  it('desambigua la relación principal de usuarios a roles en PostgREST', async () => {
+    const query: any = {
+      eq: jest.fn(),
+      range: jest.fn(),
+      order: jest.fn().mockResolvedValue({ data: [], error: null, count: 0 }),
+    };
+    query.eq.mockReturnValue(query);
+    query.range.mockReturnValue(query);
+    const select = jest.fn().mockReturnValue(query);
+    from.mockReturnValue({ select });
+
+    await service.getUsers('tenant-1');
+
+    expect(select).toHaveBeenCalledWith(
+      expect.stringContaining('user_roles!user_roles_usuario_sistema_id_fkey'),
+      { count: 'exact' },
+    );
   });
 });
