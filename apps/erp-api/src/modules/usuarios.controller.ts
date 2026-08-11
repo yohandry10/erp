@@ -26,7 +26,10 @@ const USER_SAFE_COLUMNS = `
   id, tenant_id, email, nombre, apellido, telefono, cargo, departamento,
   activo, estado, is_super_admin, is_demo_user, fecha_ultimo_acceso,
   created_at, updated_at,
-  roles_usuario:user_roles(role_id, roles(id, nombre, descripcion, activo))
+  roles_usuario:user_roles!user_roles_usuario_sistema_id_fkey(
+    role_id,
+    roles!user_roles_role_id_fkey(id, nombre, descripcion, activo)
+  )
 `;
 
 const DEMO_RECOMMENDED_ROLE_NAMES = new Set([
@@ -130,7 +133,10 @@ export class UsuariosController {
       .from('roles')
       .select(`
         id, tenant_id, nombre, descripcion, is_system_role, activo,
-        user_roles(usuario_sistema_id, usuarios_sistema(id, estado, activo)),
+        user_roles!user_roles_role_id_fkey(
+          usuario_sistema_id,
+          usuarios_sistema!user_roles_usuario_sistema_id_fkey(id, estado, activo)
+        ),
         rol_permisos(concedido, permisos(id, tenant_id, modulo, recurso, accion, activo))
       `)
       .eq('tenant_id', tenantId)
