@@ -20,6 +20,22 @@ describe('UsuariosController security', () => {
     expect(selectSql).not.toContain('*');
     expect(selectSql).not.toContain('password_hash');
     expect(selectSql).not.toContain('password_reset_token');
+    expect(selectSql).toContain('user_roles!user_roles_usuario_sistema_id_fkey');
+    expect(selectSql).toContain('roles!user_roles_role_id_fkey');
+  });
+
+  it('desambigua el usuario asignado del actor que asignó el rol', async () => {
+    const order = jest.fn().mockResolvedValue({ data: [], error: null });
+    const eqActivo = jest.fn().mockReturnValue({ order });
+    const eqTenant = jest.fn().mockReturnValue({ eq: eqActivo });
+    const select = jest.fn().mockReturnValue({ eq: eqTenant });
+    const controller = createController({ from: jest.fn().mockReturnValue({ select }) });
+
+    await controller.getRoles({ tenantId: 'tenant-1', user: { id: 'admin-1' } });
+
+    const selectSql = select.mock.calls[0][0] as string;
+    expect(selectSql).toContain('user_roles!user_roles_role_id_fkey');
+    expect(selectSql).toContain('usuarios_sistema!user_roles_usuario_sistema_id_fkey');
   });
 
   it('el alias visual actualiza sólo campos permitidos y delega roles a la RPC', async () => {
