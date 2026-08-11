@@ -17,7 +17,7 @@ const USER_SAFE_SELECT = `
   id, tenant_id, email, nombre, apellido, telefono, cargo, departamento,
   estado, activo, is_super_admin, is_demo_user, fecha_ultimo_acceso,
   created_at, updated_at,
-  user_roles(role_id, roles(id, nombre, descripcion, activo))
+  user_roles!user_roles_usuario_sistema_id_fkey(role_id, roles(id, nombre, descripcion, activo))
 `;
 
 @Injectable()
