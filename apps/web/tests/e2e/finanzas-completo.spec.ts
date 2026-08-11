@@ -151,7 +151,7 @@ async function createSaleWithCxc(apiContext: APIRequestContext) {
   );
 
   await parseOk<any>(
-    await apiContext.post(api(`/ventas/pedidos/${pedido.id}/confirmar`), { data: { forzar_confirmacion: false } }),
+    await apiContext.post(api(`/ventas/pedidos/${pedido.id}/confirmar`), { data: {} }),
     'confirmar pedido venta T13',
   );
 
@@ -236,6 +236,7 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
       data: {
         orden_id: orden.id,
+        idempotency_key: `recepcion:${runId}:finanzas`,
         almacen_id: almacenId,
         observaciones: 'Recepcion Finanzas T13',
         items: [{ detalle_id: detalleId, cantidad_recibida: 1, calidad: 'OK', almacen_id: almacenId }],

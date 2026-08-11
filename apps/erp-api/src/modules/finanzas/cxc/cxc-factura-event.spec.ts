@@ -242,43 +242,30 @@ describe('CxcService - FacturaEmitidaEvent', () => {
     }));
   });
 
-  it('crea cliente fallback desde CPE sin columnas inexistentes y sin desbordar documento entero', async () => {
-    const insertClienteQuery = {
-      insert: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({
-        data: { id: 'cliente-ruc', numero_documento: null },
-        error: null,
-      }),
-    };
+  it.each(['cpe.api.atomic', 'ventas.pedidos.atomic', 'pos.atomic.476'])(
+    'no duplica la CxC ya persistida por %s',
+    async (source) => {
+      await service.crearCuentaPorCobrarDesdeFactura({
+        eventId: 'evt-atomic',
+        tenantId: 'tenant-001',
+        facturaId: 'documento-atomic',
+        serie: 'F001',
+        numero: '1',
+        clienteId: '11111111-1111-4111-8111-111111111111',
+        subtotal: 100,
+        impuestos: 18,
+        total: 118,
+        moneda: 'PEN',
+        fechaEmision: '2026-08-11',
+        source,
+      } as FacturaEmitidaEvent);
 
-    mockSupabaseClient.from.mockImplementationOnce(() => insertClienteQuery);
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+      expect(eventBusService.emitCuentaPorCobrarCreadaEvent).not.toHaveBeenCalled();
+    },
+  );
 
-    const result = await (service as any).crearClienteDesdeCpe(
-      'tenant-001',
-      '20668394163',
-      '6',
-      'Cliente Fiscal SAC',
-      'Av. Fiscal 100',
-    );
-
-    expect(result).toEqual({ id: 'cliente-ruc', numeroDocumento: null });
-    expect(insertClienteQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
-      tenant_id: 'tenant-001',
-      tipo: 'EMPRESA',
-      tipo_documento: 'R',
-      documento_tipo: 'RUC',
-      razon_social: 'Cliente Fiscal SAC',
-      nombre: 'Cliente Fiscal SAC',
-      codigo: '20668394163',
-      ruc: '20668394163',
-      estado: 'ACTIVO',
-    }));
-    expect(insertClienteQuery.insert).toHaveBeenCalledWith(expect.not.objectContaining({
-      contacto: expect.anything(),
-      telefono: expect.anything(),
-      numero_documento: expect.anything(),
-      documento_numero: expect.anything(),
-    }));
+  it('no conserva un writer implícito de clientes dentro del listener CxC', () => {
+    expect((service as any).crearClienteDesdeCpe).toBeUndefined();
   });
 });

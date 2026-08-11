@@ -359,87 +359,39 @@ export class XmlSigner {
   }
 
   validateSignature(signedXml: string): boolean {
+    return this.validateSignatureStrict(signedXml);
+  }
+
+  /**
+   * Verifica criptograficamente una unica firma XMLDSig contra el certificado
+   * configurado en esta instancia. No existe bypass para modo demo: los tests
+   * deben firmar con el certificado efimero y verificar esa firma real.
+   */
+  validateSignatureStrict(signedXml: string): boolean {
     try {
-      console.log('🔍 Validando firma XML...');
-      
-      // En modo DEMO, simplificar la validación
-      if (this.demoMode) {
-        const hasSignature = signedXml.includes('<ds:Signature');
-        const hasSignatureValue = signedXml.includes('<ds:SignatureValue>');
-        const hasCertificate = signedXml.includes('<ds:X509Certificate>');
-        const hasDigestValue = signedXml.includes('<ds:DigestValue>');
-
-        const demoChecks = [
-          { label: 'Signature', ok: hasSignature },
-          { label: 'SignatureValue', ok: hasSignatureValue },
-          { label: 'Certificado', ok: hasCertificate },
-          { label: 'DigestValue', ok: hasDigestValue },
-        ];
-
-        demoChecks.forEach((check) =>
-          console.log(`📊 Validación DEMO - ${check.label}: ${check.ok ? '✅' : '⚠️ faltante'}`),
-        );
-
-        if (!demoChecks.every((item) => item.ok)) {
-          console.warn(
-            '⚠️ Validación DEMO no concluyente. Continuando solo para pruebas (SUNAT validará en producción).',
-          );
-        } else {
-          console.log('📊 Resultado DEMO: ✅ VÁLIDO');
-        }
-
-        return true;
-      }
-      
-      // Validación completa para certificados reales
-      const signatureMatch = signedXml.match(/<ds:SignatureValue>(.*?)<\/ds:SignatureValue>/);
-      const hashMatch = signedXml.match(/<ds:DigestValue>(.*?)<\/ds:DigestValue>/);
-      
-      if (!signatureMatch || !hashMatch) {
-        console.error('❌ No se encontró firma o hash en el XML');
+      const signatures = signedXml.match(
+        /<(?:[\w.-]+:)?Signature\b[\s\S]*?<\/(?:[\w.-]+:)?Signature>/g,
+      );
+      if (!signatures || signatures.length !== 1) {
         return false;
       }
-      
-      const signature = signatureMatch[1];
-      const expectedHash = hashMatch[1];
-      
-      // Para validación real, extraer el XML original (sin la firma)
-      const originalXml = signedXml.replace(/<ds:Signature[\s\S]*?<\/ds:Signature>/, '');
-      const calculatedHash = crypto.createHash('sha256').update(originalXml).digest('base64');
-      
-      // Validar hash
-      const hashValid = expectedHash === calculatedHash;
-      
-      // Validar firma
-      let signatureValid = true;
-      try {
-        const verify = crypto.createVerify('SHA256');
-        verify.update(originalXml);
-        const publicKeyPem = forge.pki.publicKeyToPem(this.certificate.publicKey);
-        signatureValid = verify.verify(publicKeyPem, signature, 'base64');
-      } catch (error) {
-        console.warn('⚠️  No se pudo validar la firma completamente:', error);
-        signatureValid = signature.length > 50; // Validación básica de formato
+
+      const verifier = new SignedXml({
+        publicCert: forge.pki.certificateToPem(this.certificate),
+      });
+      verifier.loadSignature(signatures[0]);
+      const references = verifier.getReferences();
+      if (references.length !== 1) {
+        return false;
       }
-      
-      const isValid = hashValid && signatureValid;
-
-      console.log(`📊 Validación de hash (local): ${hashValid ? '✅ OK' : '⚠️ no coincide'}`);
-      console.log(
-        `📊 Validación de firma (local): ${signatureValid ? '✅ OK' : '⚠️ verificación incompleta'}`,
-      );
-
-      if (!isValid) {
-        console.warn(
-          '⚠️ Validación criptográfica local no concluyente. Continuando (SUNAT realizará la validación oficial).',
-        );
-        return true;
+      const referenceUri = String(references[0]?.uri ?? '');
+      if (referenceUri !== '' && !referenceUri.startsWith('#')) {
+        return false;
       }
 
-      console.log('📊 Resultado final: ✅ VÁLIDO');
-      return true;
+      return verifier.checkSignature(signedXml);
     } catch (error) {
-      console.error('❌ Error validando firma:', error);
+      console.error('❌ Firma XMLDSig inválida:', error);
       return false;
     }
   }

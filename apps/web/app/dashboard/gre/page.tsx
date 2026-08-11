@@ -82,8 +82,8 @@ export default function GREPage() {
     const queryParams = new URLSearchParams()
     if (filters.modalidad) queryParams.append('modalidad', filters.modalidad)
     if (filters.estado) queryParams.append('estado', filters.estado)
-    if (filters.fechaDesde) queryParams.append('fechaDesde', filters.fechaDesde)
-    if (filters.fechaHasta) queryParams.append('fechaHasta', filters.fechaHasta)
+    if (filters.fechaDesde) queryParams.append('desde', filters.fechaDesde)
+    if (filters.fechaHasta) queryParams.append('hasta', filters.fechaHasta)
 
     const response = await get(`/api/gre/guias?${queryParams}`)
     const documents = unwrapApiArray<GreDocument>(response)
@@ -279,10 +279,13 @@ export default function GREPage() {
               className={inputClass}
             >
               <option value="">Todos los estados</option>
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="EN_TRANSITO">En Transito</option>
-              <option value="COMPLETADO">Completado</option>
-              <option value="CANCELADO">Cancelado</option>
+              <option value="BORRADOR">Borrador</option>
+              <option value="FIRMADO">Firmado</option>
+              <option value="ENVIADO">Enviado</option>
+              <option value="ACEPTADO">Aceptado</option>
+              <option value="RECHAZADO">Rechazado</option>
+              <option value="ERROR">Error técnico</option>
+              <option value="ANULADO">Anulado</option>
             </select>
             <input
               type="date"

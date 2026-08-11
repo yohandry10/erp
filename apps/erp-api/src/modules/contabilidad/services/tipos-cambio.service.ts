@@ -7,6 +7,7 @@ import {
   LadoTipoCambio
 } from '@erp-suite/dtos';
 import { getActiveCountryByCode, ACTIVE_COUNTRY_PROFILES } from '../../paises/initial-country';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class TiposCambioService {
@@ -86,8 +87,21 @@ export class TiposCambioService {
   async registrar(
     tenantId: string,
     userId: string,
-    dto: CreateTipoCambioDto
+    dto:CreateTipoCambioDto,
+    idempotencyKey?:string,
   ): Promise<TipoCambioResponseDto> {
+    const monedaOrigenValidada=dto.moneda_origen.toUpperCase();
+    const monedaDestinoValidada=dto.moneda_destino.toUpperCase();
+    if(monedaOrigenValidada===monedaDestinoValidada) throw new BadRequestException('La moneda de origen y la de destino no pueden ser la misma.');
+    if(dto.compra===undefined&&dto.venta===undefined) throw new BadRequestException('Debe informar al menos una cotización: compra o venta.');
+    const key=idempotencyKey?.trim()||`fx-upsert:${createHash('sha256').update(JSON.stringify({tenantId,userId,dto})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_maestro_contable_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_entity:'FX',p_action:'CREATE',p_record_id:null,p_payload:dto,p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo registrar el tipo de cambio');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData; return result.record as TipoCambioResponseDto;
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     const monedaOrigen = dto.moneda_origen.toUpperCase();
     const monedaDestino = dto.moneda_destino.toUpperCase();
 
@@ -155,7 +169,15 @@ export class TiposCambioService {
     return data as TipoCambioResponseDto;
   }
 
-  async eliminar(tenantId: string, id: string): Promise<void> {
+  async eliminar(tenantId:string,id:string,userId:string,idempotencyKey?:string):Promise<void> {
+    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    const key=idempotencyKey?.trim()||`fx-deactivate:${createHash('sha256').update(JSON.stringify({tenantId,id,userId})).digest('hex')}`;
+    const {error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_maestro_contable_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_entity:'FX',p_action:'DEACTIVATE',p_record_id:id,p_payload:{},p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo desactivar el tipo de cambio'); return;
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     const { error } = await this.supabaseService
       .getClient()
       .from('tipos_cambio')

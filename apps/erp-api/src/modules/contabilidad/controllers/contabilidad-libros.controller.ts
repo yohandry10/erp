@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Query,
@@ -19,7 +20,7 @@ import {
   Matches,
   Min,
 } from "class-validator";
-import { CurrentTenant } from "../../../common";
+import { CurrentTenant, CurrentUser } from "../../../common";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { AccountingBooksService } from "../../../shared/integration/accounting-books.service";
@@ -630,12 +631,16 @@ export class ContabilidadLibrosController {
   @RequirePermission("contabilidad.consignaciones.crear") // HARDENING: permisos granulares.
   @ApiOperation({ summary: "Crear nueva consignación" })
   @ApiResponse({ status: 201, description: "Consignación creada exitosamente" })
-  async createConsignacion(@Body() consignacionData: CreateConsignacionDto) {
+  async createConsignacion(
+    @Body() consignacionData:CreateConsignacionDto,
+    @CurrentUser("id") userId:string,
+    @Headers('idempotency-key') idempotencyKey?:string,
+  ) {
     try {
       console.log("📋 [ContabilidadController] Creando nueva consignación...");
 
       const consignacion =
-        await this.accountingService.createConsignacion(consignacionData);
+        await this.accountingService.createConsignacion(consignacionData,userId,idempotencyKey);
 
       return {
         success: true,
@@ -661,6 +666,8 @@ export class ContabilidadLibrosController {
   async updateEstadoConsignacion(
     @Param("id") id: string,
     @Body() body: UpdateEstadoConsignacionDto,
+    @CurrentUser("id") userId:string,
+    @Headers('idempotency-key') idempotencyKey?:string,
   ) {
     try {
       console.log(
@@ -668,7 +675,7 @@ export class ContabilidadLibrosController {
       );
 
       const consignacion =
-        await this.accountingService.updateEstadoConsignacion(id, body.estado);
+        await this.accountingService.updateEstadoConsignacion(id,body.estado,userId,idempotencyKey);
 
       return {
         success: true,

@@ -206,7 +206,7 @@ test.describe('T07 Ventas vertical completo', () => {
 
     const confirmado = await parseOk<any>(
       await apiContext.post(api(`/ventas/pedidos/${pedido.id}/confirmar`), {
-        data: { forzar_confirmacion: false },
+        data: {},
       }),
       'confirmar pedido',
     );

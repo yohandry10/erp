@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/use-api";
 import { ArrowLeft, Package, Save } from "lucide-react";
@@ -9,6 +9,8 @@ import {
   etiquetaNoGravado,
   etiquetaSinImpuesto,
 } from "@/lib/afectacion-labels";
+import { ProductImageField } from "@/components/ProductImageField";
+import { uploadProductImage } from "@/lib/product-images";
 
 type CampoExtra = {
   key: string;
@@ -32,7 +34,7 @@ const camposClass =
 
 export default function NuevoProductoPage() {
   const router = useRouter();
-  const { get, post } = useApi();
+  const { get, post, apiCall } = useApi();
   const country = useCountryContext();
   // El backend exige almacen_id para poder abrir el stock fisico. El formulario
   // nunca lo pedia, asi que cualquier alta con stock inicial fallaba.
@@ -45,9 +47,13 @@ export default function NuevoProductoPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [atributosExtra, setAtributosExtra] = useState<Record<string, string>>({});
+  const intentRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const imageIntentRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const [productImage, setProductImage] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     codigo: "",
     nombre: "",
+    marca: "",
     descripcion: "",
     categoria: "",
     precioVenta: "",
@@ -163,13 +169,60 @@ export default function NuevoProductoPage() {
 
     setIsLoading(true);
     try {
-      const response = await post("/inventario/productos", {
-        ...formData,
+      const payload = {
+        codigo: formData.codigo.trim(),
+        nombre: formData.nombre.trim(),
+        marca: formData.marca.trim() || undefined,
+        descripcion: formData.descripcion.trim() || undefined,
+        categoria: formData.categoria,
+        precio_venta: Number(formData.precioVenta),
+        precio_compra: formData.precioCompra === "" ? 0 : Number(formData.precioCompra),
+        stock_inicial: formData.stock === "" ? 0 : Number(formData.stock),
+        stock_minimo: formData.stockMinimo === "" ? 0 : Number(formData.stockMinimo),
+        stock_reservado: 0,
         almacen_id: formData.almacenId || null,
+        codigo_barras: formData.codigoBarras.trim() || undefined,
+        impuesto: formData.impuesto === "" ? 0 : Number(formData.impuesto),
+        afectacion_igv: formData.afectacionIgv,
         atributos_extra: Object.keys(atributosExtra).length > 0 ? atributosExtra : undefined,
+      };
+      const fingerprint = JSON.stringify(payload);
+      if (intentRef.current?.fingerprint !== fingerprint) {
+        intentRef.current = {
+          fingerprint,
+          key: `inventory-product-create:${crypto.randomUUID()}`,
+        };
+      }
+      const response = await post("/inventario/productos", {
+        ...payload,
+        idempotency_key: intentRef.current.key,
       });
 
       if (response?.success) {
+        const productId = String(response.data?.id || "");
+        if (!productId) {
+          throw new Error("El alta no devolvió el identificador del producto");
+        }
+        if (productImage) {
+          const imageFingerprint = [
+            productImage.name,
+            productImage.type,
+            productImage.size,
+            productImage.lastModified,
+          ].join(":");
+          if (imageIntentRef.current?.fingerprint !== imageFingerprint) {
+            imageIntentRef.current = {
+              fingerprint: imageFingerprint,
+              key: `inventory-product-image-upload:${productId}:${crypto.randomUUID()}`,
+            };
+          }
+          await uploadProductImage(
+            apiCall,
+            productId,
+            productImage,
+            imageIntentRef.current.key,
+          );
+        }
         alert("✅ Producto creado exitosamente");
         router.push("/dashboard/inventario/productos");
       } else {
@@ -311,6 +364,21 @@ export default function NuevoProductoPage() {
           </div>
 
           <div className="mt-4">
+            <label htmlFor="nuevo-marca">Marca</label>
+            <input id="nuevo-marca"
+              type="text"
+              name="marca"
+              value={formData.marca}
+              onChange={handleChange}
+              maxLength={120}
+              placeholder="Ej: Acme"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Se usa en listas de precios y comisiones comerciales por marca.
+            </p>
+          </div>
+
+          <div className="mt-4">
             <label htmlFor="nuevo-descripcion">Descripción</label>
             <textarea id="nuevo-descripcion"
               name="descripcion"
@@ -357,6 +425,18 @@ export default function NuevoProductoPage() {
               </p>
             )}
           </div>
+        </div>
+
+        <div className="mb-8">
+          <ProductImageField
+            file={productImage}
+            disabled={isLoading}
+            onFileChange={(file) => {
+              setProductImage(file);
+              imageIntentRef.current = null;
+              if (submitError) setSubmitError(null);
+            }}
+          />
         </div>
 
         {/* Campos dinámicos según categoría */}

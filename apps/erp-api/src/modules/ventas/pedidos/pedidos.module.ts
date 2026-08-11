@@ -12,7 +12,6 @@ import { PermissionsModule } from '../../permissions/permissions.module';
 import { AuditModule } from '../../audit/audit.module';
 import { IntegrationModule } from '../../../shared/integration/integration.module';
 import { AuthModule } from '../../auth/auth.module';
-import { DocumentosModule } from '../../documentos/documentos.module';
 
 /**
  * PedidosModule
@@ -30,7 +29,6 @@ import { DocumentosModule } from '../../documentos/documentos.module';
     AuditModule,
     IntegrationModule,
     AuthModule,
-    DocumentosModule,
   ],
   controllers: [PedidosController],
   providers: [PedidosService, CPEIntegrationService, GREIntegrationService],

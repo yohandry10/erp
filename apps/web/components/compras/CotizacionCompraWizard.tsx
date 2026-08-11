@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -39,6 +39,7 @@ interface ProductoDetalle {
   cantidad: number
   precio_unitario: number
   subtotal: number
+  afectacion_igv?: string
 }
 
 interface CotizacionWizardProps {
@@ -60,6 +61,7 @@ export function CotizacionCompraWizard({
   const [detalles, setDetalles] = useState<ProductoDetalle[]>([])
   const [loadingProveedores, setLoadingProveedores] = useState(false)
   const [loadingProductos, setLoadingProductos] = useState(false)
+  const createIdempotencyKeyRef = useRef<string | null>(null)
   const { get } = useApi()
 
   const {
@@ -137,7 +139,8 @@ export function CotizacionCompraWizard({
       descripcion: producto.nombre || producto.descripcion || 'Producto',
       cantidad,
       precio_unitario: precio,
-      subtotal
+      subtotal,
+      afectacion_igv: producto.afectacion_igv || '10'
     }
     setDetalles(prev => [...prev, newDetalle])
   }
@@ -148,7 +151,14 @@ export function CotizacionCompraWizard({
 
   const calculateTotals = () => {
     const subtotal = detalles.reduce((sum, d) => sum + d.subtotal, 0)
-    const igv = subtotal * tasaIgv
+    const baseImponible = detalles.reduce(
+      (sum, detalle) =>
+        String(detalle.afectacion_igv || '10').startsWith('1')
+          ? sum + detalle.subtotal
+          : sum,
+      0,
+    )
+    const igv = baseImponible * tasaIgv
     const total = subtotal + igv
     return { subtotal, igv, total }
   }
@@ -156,13 +166,16 @@ export function CotizacionCompraWizard({
   const handleFinalSubmit = async () => {
     const { subtotal, igv, total } = calculateTotals()
 
+    if (!createIdempotencyKeyRef.current) {
+      createIdempotencyKeyRef.current = crypto.randomUUID()
+    }
     const cotizacionData = {
+      idempotency_key: createIdempotencyKeyRef.current,
       numero: formData.numero,
       proveedor_id: formData.proveedor_id,
       fecha_cotizacion: formData.fecha_cotizacion,
       validez_dias: formData.validez_dias,
       observaciones: formData.observaciones,
-      estado: 'BORRADOR',
       detalles: detalles.map(d => ({
         producto_id: d.producto_id,
         descripcion: d.descripcion,
@@ -558,7 +571,14 @@ function Step2AddProducts({
 function TotalesSummary({ detalles, formatCurrency }: any) {
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const subtotal = detalles.reduce((sum: number, d: ProductoDetalle) => sum + d.subtotal, 0)
-  const igv = subtotal * tasaIgv
+  const baseImponible = detalles.reduce(
+    (sum: number, detalle: ProductoDetalle) =>
+      String(detalle.afectacion_igv || '10').startsWith('1')
+        ? sum + detalle.subtotal
+        : sum,
+    0,
+  )
+  const igv = baseImponible * tasaIgv
   const total = subtotal + igv
 
   return (

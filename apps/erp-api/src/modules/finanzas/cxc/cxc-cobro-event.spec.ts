@@ -1,398 +1,196 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { CxcService } from './cxc.service';
-import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { EventBusService } from '../../../shared/events/event-bus.service';
+import { Test, TestingModule } from '@nestjs/testing';
 import { AuditService } from '../../audit/audit.service';
+import { EventBusService } from '../../../shared/events/event-bus.service';
+import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
+import { CxcService } from './cxc.service';
 
-describe('CxcService - CobroRegistrado Event', () => {
+describe('CxcService - writer transaccional de cobros', () => {
+  const tenantId = '11111111-1111-4111-8111-111111111111';
+  const cuentaId = '22222222-2222-4222-8222-222222222222';
+  const userId = '33333333-3333-4333-8333-333333333333';
+  const cuentaBancariaId = '44444444-4444-4444-8444-444444444444';
+  const sesionCajaId = '55555555-5555-4555-8555-555555555555';
+
   let service: CxcService;
-  let supabaseService: SupabaseService;
-  let eventBusService: EventBusService;
-  let mockSupabaseClient: any;
+  let eventBus: { emitPagoFactura: jest.Mock; emitCobroRegistrado: jest.Mock };
+  let client: { rpc?: jest.Mock; from: jest.Mock };
+
+  const dtoBase = {
+    monto: 250,
+    fecha_pago: '2026-08-09',
+    metodo_pago: 'TRANSFERENCIA',
+    cuenta_bancaria_id: cuentaBancariaId,
+    referencia: 'OP-CXC-001',
+    idempotency_key: 'cxc-intento-001',
+  };
 
   beforeEach(async () => {
-    mockSupabaseClient = {
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-      maybeSingle: jest.fn(),
-      order: jest.fn().mockReturnThis(),
+    client = {
+      rpc: jest.fn(),
+      from: jest.fn(),
     };
-    mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null, error: null });
+    eventBus = {
+      emitPagoFactura: jest.fn(),
+      emitCobroRegistrado: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CxcService,
-        {
-          provide: SupabaseService,
-          useValue: {
-            getClient: jest.fn(() => mockSupabaseClient),
-          },
-        },
-        {
-          provide: EventBusService,
-          useValue: {
-            emitPagoFactura: jest.fn(),
-            emitCobroRegistrado: jest.fn(),
-          },
-        },
+        { provide: SupabaseService, useValue: { getClient: () => client } },
+        { provide: EventBusService, useValue: eventBus },
         {
           provide: AuditService,
-          useValue: {
-            registrarCambio: jest.fn(),
-            logIntegration: jest.fn(),
-          },
+          useValue: { registrarCambio: jest.fn(), logIntegration: jest.fn() },
         },
         {
           provide: RetencionesValidationService,
           useValue: {
-            validarCalculoAjustes: jest.fn().mockResolvedValue({ valido: true, errores: [] }),
-            validarMontoPendiente: jest.fn().mockReturnValue({ valido: true }),
+            validarCalculoAjustes: jest.fn(),
+            validarMontoPendiente: jest.fn(),
           },
         },
       ],
     }).compile();
 
-    service = module.get<CxcService>(CxcService);
-    supabaseService = module.get<SupabaseService>(SupabaseService);
-    eventBusService = module.get<EventBusService>(EventBusService);
+    service = module.get(CxcService);
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  it('delega el cobro completo a registrar_cxc_pago_tx y devuelve sus evidencias', async () => {
+    client.rpc!.mockResolvedValue({
+      data: {
+        idempotent: false,
+        cuenta: { id: cuentaId, estado: 'PARCIAL', monto_pendiente: 750 },
+        pago: { id: '66666666-6666-4666-8666-666666666666' },
+        movimiento_bancario: { id: '77777777-7777-4777-8777-777777777777' },
+        movimiento_caja: null,
+        valuacion: {
+          tipo_cambio_origen: 3.7,
+          tipo_cambio_liquidacion: 3.8,
+          monto_contabilizado: 925,
+          monto_liquidacion: 950,
+          diferencia_cambio: 25,
+        },
+      },
+      error: null,
+    });
+
+    const result = await service.registrarPago(tenantId, cuentaId, dtoBase, userId);
+
+    expect(client.rpc).toHaveBeenCalledWith('registrar_cxc_pago_tx', {
+      p_tenant_id: tenantId,
+      p_cuenta_id: cuentaId,
+      p_pago: expect.objectContaining({
+        monto: 250,
+        fecha_pago: '2026-08-09',
+        metodo_pago: 'TRANSFERENCIA',
+        cuenta_bancaria_id: cuentaBancariaId,
+        referencia: 'OP-CXC-001',
+        idempotency_key: 'cxc-intento-001',
+      }),
+      p_user_id: userId,
+    });
+    expect(result).toEqual({
+      success: true,
+      data: expect.objectContaining({
+        id: cuentaId,
+        pago: expect.objectContaining({ id: expect.any(String) }),
+        movimiento_bancario: expect.objectContaining({ id: expect.any(String) }),
+        movimiento_caja: null,
+        valuacion: expect.objectContaining({ diferencia_cambio: 25 }),
+        idempotent_replay: false,
+      }),
+    });
+    expect(client.from).not.toHaveBeenCalled();
+    expect(eventBus.emitPagoFactura).not.toHaveBeenCalled();
+    expect(eventBus.emitCobroRegistrado).not.toHaveBeenCalled();
   });
 
-  describe('registrarPago', () => {
-    it('mapea a 404 cuando la RPC no encuentra la cuenta por cobrar', async () => {
-      mockSupabaseClient.rpc = jest.fn().mockResolvedValue({
-        data: null,
-        error: { code: 'P0001', message: 'Cuenta por cobrar no encontrada' },
-      });
-
-      await expect(
-        service.registrarPago('tenant-123', 'cxc-inexistente', {
-          monto: 100,
-          fecha_pago: '2026-07-24',
-          metodo_pago: 'TRANSFERENCIA',
-        } as any),
-      ).rejects.toThrow(NotFoundException);
+  it('propaga la sesión para efectivo sin ejecutar escrituras JS', async () => {
+    client.rpc!.mockResolvedValue({
+      data: {
+        idempotent: true,
+        cuenta: { id: cuentaId },
+        pago: { id: '66666666-6666-4666-8666-666666666666' },
+        movimiento_caja: { id: '88888888-8888-4888-8888-888888888888' },
+      },
+      error: null,
     });
 
-    it('rechaza fechas de cobro inválidas antes de persistir', async () => {
-      await expect(
-        service.registrarPago('tenant-123', 'cxc-456', {
-          monto: 100,
-          fecha_pago: '2026-02-31',
-          metodo_pago: 'TRANSFERENCIA',
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-
-      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
-    });
-
-    it('rechaza montos con más de dos decimales antes de persistir', async () => {
-      await expect(
-        service.registrarPago('tenant-123', 'cxc-456', {
-          monto: 10.005,
-          fecha_pago: '2026-05-14',
-          metodo_pago: 'TRANSFERENCIA',
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-
-      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
-    });
-
-    it('should emit CobroRegistrado event and insert into outbox when payment is registered', async () => {
-      // Arrange
-      const tenantId = 'tenant-123';
-      const cuentaId = 'cxc-456';
-      const userId = 'user-789';
-
-      const cuentaMock = {
-        id: cuentaId,
-        tenant_id: tenantId,
-        cliente_id: 'cliente-001',
-        documento_id: 'doc-001',
-        serie: 'F001',
-        numero: '00001234',
-        monto_total: 1000,
-        monto_pendiente: 1000,
-        moneda: 'PEN',
-        estado: 'PENDIENTE',
-        fecha_vencimiento: '2025-12-31',
-        clientes: {
-          razon_social: 'Cliente Test SAC',
-        },
-      };
-
-      const pagoDto = {
-        monto: 500,
-        fecha_pago: '2025-10-26',
-        metodo_pago: 'TRANSFERENCIA',
-        referencia: 'REF-001',
-        notas: 'Pago parcial',
-      };
-
-      const pagoRegistradoMock = {
-        id: 'pago-001',
-        tenant_id: tenantId,
-        cuenta_id: cuentaId,
-        monto: 500,
-        moneda: 'PEN',
-        fecha_pago: '2025-10-26',
-        metodo_pago: 'TRANSFERENCIA',
-        referencia: 'REF-001',
-        notas: 'Pago parcial',
-      };
-
-      // Mock obtenerCuentaPorCobrar (called twice)
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({ data: cuentaMock, error: null })
-        .mockResolvedValueOnce({
-          data: { ...cuentaMock, monto_pendiente: 500, estado: 'PARCIAL', pagos: [] },
-          error: null,
-        });
-
-      // Mock insert pago
-      const mockInsertPago = {
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: pagoRegistradoMock,
-          error: null,
-        }),
-      };
-
-      // Mock update cuenta (needs to chain three .eq() calls + .select() for optimistic concurrency)
-      const mockIdempotencyEq2 = jest.fn().mockResolvedValueOnce({ error: null });
-      const mockIdempotencyEq1 = jest.fn().mockReturnValue({ eq: mockIdempotencyEq2 });
-      const mockCuentaSelect = jest.fn().mockResolvedValueOnce({ data: [{ id: cuentaId }], error: null });
-      const mockCuentaEq3 = jest.fn().mockReturnValue({ select: mockCuentaSelect });
-      const mockCuentaEq2 = jest.fn().mockReturnValue({ eq: mockCuentaEq3 });
-      const mockCuentaEq1 = jest.fn().mockReturnValue({ eq: mockCuentaEq2 });
-
-      mockSupabaseClient.insert
-        .mockReturnValueOnce(mockInsertPago)
-        .mockResolvedValueOnce({ error: null });
-
-      mockSupabaseClient.update
-        .mockReturnValueOnce({ eq: mockIdempotencyEq1 })
-        .mockReturnValueOnce({ eq: mockCuentaEq1 });
-
-      // Act
-      await service.registrarPago(tenantId, cuentaId, pagoDto, userId);
-
-      // Assert - Verify EventBus emission
-      expect(eventBusService.emitPagoFactura).not.toHaveBeenCalled();
-      expect(eventBusService.emitCobroRegistrado).toHaveBeenCalledTimes(1);
-      expect(eventBusService.emitCobroRegistrado).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantId,
-          cobroId: 'pago-001',
-          cxcId: cuentaId,
-          clienteId: 'cliente-001',
-          clienteNombre: 'Cliente Test SAC',
-          documentoId: 'doc-001',
-          numeroDocumento: 'F001-00001234',
-          monto: 500,
-          moneda: 'PEN',
-          fecha: '2025-10-26',
-          medio: 'TRANSFERENCIA',
-          referencia: 'REF-001',
-          notas: 'Pago parcial',
-          saldoAnterior: 1000,
-          saldoNuevo: 500,
-          estadoAnterior: 'PENDIENTE',
-          estadoNuevo: 'PARCIAL',
-          createdBy: userId,
-          eventId: expect.any(String),
-          idempotencyKey: expect.any(String),
-          source: 'finanzas.cxc',
-          timestamp: expect.any(String),
-        }),
-      );
-
-      // Assert - Verify outbox_events insertion (check that insert was called twice)
-      expect(mockSupabaseClient.insert).toHaveBeenCalledTimes(2);
-      // The second call should be for outbox_events
-      expect(mockSupabaseClient.insert).toHaveBeenNthCalledWith(2,
-        expect.objectContaining({
-          event_type: 'cobro.registrado',
-          aggregate_type: 'cobro',
-          aggregate_id: 'pago-001',  // The payment ID is the aggregate for this event
-          payload: expect.objectContaining({
-            tenant_id: tenantId,
-            cobro_id: 'pago-001',
-            cxc_id: cuentaId,
-            cliente_id: 'cliente-001',
-            cliente_nombre: 'Cliente Test SAC',
-            numero_documento: 'F001-00001234',
-            monto: 500,
-            moneda: 'PEN',
-            medio: 'TRANSFERENCIA',
-            referencia: 'REF-001',
-            saldo_anterior: 1000,
-            saldo_nuevo: 500,
-            estado_anterior: 'PENDIENTE',
-            estado_nuevo: 'PARCIAL',
-            eventId: expect.any(String),
-            idempotency_key: expect.any(String),
-          }),
-          status: 'pending',
-          retry_count: 0,
-        }),
-      );
-    });
-
-    it('should emit CobroRegistrado with CANCELADO state when fully paid', async () => {
-      // Arrange
-      const tenantId = 'tenant-123';
-      const cuentaId = 'cxc-456';
-
-      const cuentaMock = {
-        id: cuentaId,
-        tenant_id: tenantId,
-        cliente_id: 'cliente-001',
-        documento_id: 'doc-001',
-        serie: 'F001',
-        numero: '00001234',
-        monto_total: 1000,
-        monto_pendiente: 1000,
-        moneda: 'PEN',
-        estado: 'PENDIENTE',
-        fecha_vencimiento: '2025-12-31',
-        clientes: {
-          razon_social: 'Cliente Test SAC',
-        },
-      };
-
-      const pagoDto = {
-        monto: 1000,
-        fecha_pago: '2025-10-26',
+    const result = await service.registrarPago(
+      tenantId,
+      cuentaId,
+      {
+        ...dtoBase,
         metodo_pago: 'EFECTIVO',
-      };
+        cuenta_bancaria_id: undefined,
+        referencia: undefined,
+        sesion_caja_id: sesionCajaId,
+      },
+      userId,
+    );
 
-      const pagoRegistradoMock = {
-        id: 'pago-002',
-        tenant_id: tenantId,
-        cuenta_id: cuentaId,
-        monto: 1000,
-        moneda: 'PEN',
-        fecha_pago: '2025-10-26',
-        metodo_pago: 'EFECTIVO',
-      };
+    expect(client.rpc).toHaveBeenCalledWith(
+      'registrar_cxc_pago_tx',
+      expect.objectContaining({
+        p_pago: expect.objectContaining({ sesion_caja_id: sesionCajaId }),
+      }),
+    );
+    expect(result.data.idempotent_replay).toBe(true);
+    expect(client.from).not.toHaveBeenCalled();
+  });
 
-      // Mock obtenerCuentaPorCobrar
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({ data: cuentaMock, error: null })
-        .mockResolvedValueOnce({
-          data: { ...cuentaMock, monto_pendiente: 0, estado: 'CANCELADO', pagos: [] },
-          error: null,
-        });
+  it('falla cerrado si el cliente no expone el writer RPC', async () => {
+    client.rpc = undefined;
 
-      // Mock insert pago
-      const mockInsertPago = {
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: pagoRegistradoMock,
-          error: null,
-        }),
-      };
+    await expect(service.registrarPago(tenantId, cuentaId, dtoBase, userId)).rejects.toThrow(
+      'writer transaccional registrar_cxc_pago_tx no esta disponible',
+    );
+    expect(client.from).not.toHaveBeenCalled();
+  });
 
-      // Mock update cuenta (needs to chain three .eq() calls + .select() for optimistic concurrency)
-      const mockIdempotencyEq2 = jest.fn().mockResolvedValueOnce({ error: null });
-      const mockIdempotencyEq1 = jest.fn().mockReturnValue({ eq: mockIdempotencyEq2 });
-      const mockCuentaSelect = jest.fn().mockResolvedValueOnce({ data: [{ id: cuentaId }], error: null });
-      const mockCuentaEq3 = jest.fn().mockReturnValue({ select: mockCuentaSelect });
-      const mockCuentaEq2 = jest.fn().mockReturnValue({ eq: mockCuentaEq3 });
-      const mockCuentaEq1 = jest.fn().mockReturnValue({ eq: mockCuentaEq2 });
+  it('exige actor UUID e idempotency key antes de invocar el writer', async () => {
+    await expect(service.registrarPago(tenantId, cuentaId, dtoBase, 'actor-invalido')).rejects.toThrow(
+      'actor autenticado es obligatorio',
+    );
+    await expect(
+      service.registrarPago(tenantId, cuentaId, { ...dtoBase, idempotency_key: '' }, userId),
+    ).rejects.toThrow('llave de idempotencia es obligatoria');
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
 
-      mockSupabaseClient.insert
-        .mockReturnValueOnce(mockInsertPago)
-        .mockResolvedValueOnce({ error: null });
-
-      mockSupabaseClient.update
-        .mockReturnValueOnce({ eq: mockIdempotencyEq1 })
-        .mockReturnValueOnce({ eq: mockCuentaEq1 });
-
-      // Act
-      await service.registrarPago(tenantId, cuentaId, pagoDto);
-
-      // Assert - Verify EventBus emission
-      expect(eventBusService.emitCobroRegistrado).toHaveBeenCalledWith(
-        expect.objectContaining({
-          estadoAnterior: 'PENDIENTE',
-          estadoNuevo: 'CANCELADO',
-          saldoAnterior: 1000,
-          saldoNuevo: 0,
-          medio: 'EFECTIVO',
-          eventId: expect.any(String),
-          idempotencyKey: expect.any(String),
-          source: 'finanzas.cxc',
-        }),
-      );
-
-      // Assert - Verify outbox_events insertion (check that insert was called twice)
-      expect(mockSupabaseClient.insert).toHaveBeenCalledTimes(2);
-      // The second call should be for outbox_events
-      expect(mockSupabaseClient.insert).toHaveBeenNthCalledWith(2,
-        expect.objectContaining({
-          event_type: 'cobro.registrado',
-          aggregate_type: 'cobro',
-          status: 'pending',
-        }),
-      );
+  it('mapea cuenta inexistente a 404 y los rechazos semánticos a 400', async () => {
+    client.rpc!.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'P0001', message: 'Cuenta por cobrar no encontrada' },
     });
+    await expect(service.registrarPago(tenantId, cuentaId, dtoBase, userId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
 
-    it('should throw BadRequestException when idempotency key is duplicated', async () => {
-      const tenantId = 'tenant-dup';
-      const cuentaId = 'cxc-dup';
-
-      const cuentaMock = {
-        id: cuentaId,
-        tenant_id: tenantId,
-        cliente_id: 'cliente-dup',
-        documento_id: 'doc-dup',
-        serie: 'F001',
-        numero: '00000001',
-        monto_total: 500,
-        monto_pendiente: 500,
-        moneda: 'PEN',
-        estado: 'PENDIENTE',
-        fecha_vencimiento: '2025-12-31',
-        clientes: {
-          razon_social: 'Cliente Dup SAC',
-        },
-      };
-
-      mockSupabaseClient.single.mockResolvedValueOnce({ data: cuentaMock, error: null });
-
-      const mockInsertPagoError = {
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: null,
-          error: { message: 'duplicate key value violates unique constraint "cxc_pagos_idempotency_key_key"' },
-        }),
-      };
-
-      mockSupabaseClient.insert.mockReturnValueOnce(mockInsertPagoError);
-
-      await expect(
-        service.registrarPago(tenantId, cuentaId, {
-          monto: 100,
-          fecha_pago: '2025-10-01',
-          metodo_pago: 'EFECTIVO',
-          idempotency_key: 'dup-key',
-        } as any),
-      ).rejects.toBeInstanceOf(BadRequestException);
-
-      expect(mockSupabaseClient.insert).toHaveBeenCalledTimes(1);
-      expect(mockInsertPagoError.select).toHaveBeenCalled();
-      expect(mockInsertPagoError.single).toHaveBeenCalled();
+    client.rpc!.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: '23505',
+        message: 'Llave de idempotencia reutilizada con parámetros diferentes',
+      },
     });
+    await expect(service.registrarPago(tenantId, cuentaId, dtoBase, userId)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('rechaza monto y fecha inválidos antes de tocar persistencia', async () => {
+    await expect(
+      service.registrarPago(tenantId, cuentaId, { ...dtoBase, monto: 10.005 }, userId),
+    ).rejects.toThrow('máximo 2 decimales');
+    await expect(
+      service.registrarPago(tenantId, cuentaId, { ...dtoBase, fecha_pago: '2026-02-31' }, userId),
+    ).rejects.toThrow('fecha de pago es inválida');
+    expect(client.rpc).not.toHaveBeenCalled();
+    expect(client.from).not.toHaveBeenCalled();
   });
 });

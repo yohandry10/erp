@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useApi } from "@/hooks/use-api";
 import { toast } from "@/components/ui/use-toast";
 import { Truck } from "lucide-react";
@@ -21,13 +21,16 @@ export function ConfirmarDespachoButton({
   const { post } = useApi();
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const dispatchKeyRef = useRef<string | null>(null);
 
   const handleConfirmar = async () => {
     try {
       setLoading(true);
+      dispatchKeyRef.current ??= crypto.randomUUID();
 
       const response = await post(
         `/inventario/logistica/${pedidoId}/confirmar-despacho`,
+        { idempotency_key: dispatchKeyRef.current },
       );
 
       if (response?.success) {
@@ -35,6 +38,7 @@ export function ConfirmarDespachoButton({
           title: "Despacho Confirmado",
           description: `El pedido ${pedidoNumero} ha sido despachado exitosamente`,
         });
+        dispatchKeyRef.current = null;
         onSuccess?.();
       } else {
         throw new Error("Error al confirmar despacho");

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { parseDateLocal } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -41,6 +41,14 @@ const ContratosPage = () => {
   const [contratoDetail, setContratoDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { get, post, put } = useApi();
+  const mutationIntents = useRef(new Map<string, string>());
+  const intentFor = (signature: string) => {
+    const existing = mutationIntents.current.get(signature);
+    if (existing) return existing;
+    const key = `rrhh-contract:${crypto.randomUUID()}`;
+    mutationIntents.current.set(signature, key);
+    return key;
+  };
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
 
   // Estado para diálogo de confirmación
@@ -112,10 +120,14 @@ const ContratosPage = () => {
       variant: 'default',
       onConfirm: async (meses: string) => {
         if (!isNaN(Number(meses))) {
+          const signature = `renew:${contratoId}:${parseInt(meses)}`;
           try {
             await post(`/api/rrhh/contratos/${contratoId}/renovar`, {
               meses: parseInt(meses)
+            }, {
+              headers: { 'Idempotency-Key': intentFor(signature) },
             });
+            mutationIntents.current.delete(signature);
             loadData();
           } catch (error) {
             console.error('Error renovando contrato:', error);
@@ -134,11 +146,16 @@ const ContratosPage = () => {
       variant: 'warning',
       multiline: true,
       onConfirm: async (motivo: string) => {
+        const fechaFinalizacion = new Date().toLocaleDateString('en-CA');
+        const signature = `finalize:${contratoId}:${fechaFinalizacion}:${motivo}`;
         try {
           await put(`/api/rrhh/contratos/${contratoId}/finalizar`, {
             motivo_finalizacion: motivo,
-            fecha_finalizacion: new Date().toISOString().split('T')[0]
+            fecha_finalizacion: fechaFinalizacion,
+          }, {
+            headers: { 'Idempotency-Key': intentFor(signature) },
           });
+          mutationIntents.current.delete(signature);
           loadData();
         } catch (error) {
           console.error('Error finalizando contrato:', error);

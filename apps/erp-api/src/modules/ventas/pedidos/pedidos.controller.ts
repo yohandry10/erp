@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   Query,
+  Headers,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -21,7 +22,6 @@ import { PedidosService } from './pedidos.service';
 import {
   CreatePedidoDto,
   UpdatePedidoDto,
-  ConfirmarPedidoDto,
   CancelarPedidoDto,
   DecidirAprobacionDto,
 } from './dto';
@@ -214,23 +214,25 @@ export class PedidosController {
   @RequirePermission('ventas.pedidos.confirmar')
   @ApiOperation({
     summary: 'Confirmar pedido',
-    description: 'Confirma el pedido y reserva el stock. Puede retornar warnings si hay stock insuficiente.',
+    description:
+      'Evalúa las políticas vigentes y confirma el pedido reservando stock. Si requiere aprobación comercial, retorna un outcome exitoso de workflow con confirmado=false y requiere_aprobacion=true.',
   })
-  @ApiResponse({ status: 200, description: 'Pedido confirmado exitosamente' })
-  @ApiResponse({ status: 400, description: 'Estado inválido para confirmar' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pedido confirmado o derivado correctamente a aprobación comercial',
+  })
+  @ApiResponse({ status: 400, description: 'Estado inválido, crédito bloqueado o stock insuficiente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   async confirmar(
     @Param('id') id: string,
-    @Body() confirmarPedidoDto: ConfirmarPedidoDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
     return this.pedidosService.confirmarPedido(
       id,
       tenantId,
-      confirmarPedidoDto.forzar_confirmacion,
       user?.id,
     );
   }
@@ -253,6 +255,7 @@ export class PedidosController {
   async cancelar(
     @Param('id') id: string,
     @Body() cancelarPedidoDto: CancelarPedidoDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
@@ -261,6 +264,8 @@ export class PedidosController {
       tenantId,
       cancelarPedidoDto.motivo,
       user?.id,
+      idempotencyKey,
+      cancelarPedidoDto.confirmar_retorno_fisico === true,
     );
   }
 

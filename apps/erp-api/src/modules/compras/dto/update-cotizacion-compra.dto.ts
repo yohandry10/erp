@@ -1,7 +1,7 @@
-import { IsString, IsUUID, IsDate, IsOptional, IsNumber, IsEnum, IsArray, ValidateNested, Min, IsInt, ArrayMinSize } from 'class-validator';
+import { IsString, IsUUID, IsDate, IsOptional, IsArray, ValidateNested, Min, IsInt, ArrayMinSize } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { EstadoCotizacionCompra, CotizacionCompraDetalleDto } from './create-cotizacion-compra.dto';
+import { CotizacionCompraDetalleDto } from './create-cotizacion-compra.dto';
 
 export class UpdateCotizacionCompraDto {
   @ApiPropertyOptional({ description: 'Número de cotización', example: 'COT-2024-001' })
@@ -25,14 +25,6 @@ export class UpdateCotizacionCompraDto {
   @IsInt({ message: 'Los días de validez deben ser un número entero' })
   @Min(1, { message: 'Los días de validez deben ser al menos 1' })
   validez_dias?: number;
-
-  @ApiPropertyOptional({ 
-    description: 'Estado de la cotización', 
-    enum: EstadoCotizacionCompra
-  })
-  @IsOptional()
-  @IsEnum(EstadoCotizacionCompra, { message: 'Estado de cotización inválido' })
-  estado?: EstadoCotizacionCompra;
 
   @ApiPropertyOptional({ description: 'Observaciones adicionales', example: 'Incluye envío gratuito' })
   @IsOptional()

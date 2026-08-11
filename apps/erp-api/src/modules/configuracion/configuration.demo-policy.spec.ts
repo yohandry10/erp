@@ -56,20 +56,26 @@ describe('ConfigurationService - política demo', () => {
       completionPercentage: 100,
       missingItems: [],
       certificate: { exists: false, isValid: true },
+      fiscal: { isEnabled: false, isReady: false, missingItems: [] },
     });
   });
 
-  it('mantiene obligatoria la configuración cuando el tenant ya es real', async () => {
+  it('habilita el ERP real sin fingir habilitación fiscal', async () => {
     const status = await createService(false).getConfigurationStatus('tenant-real');
 
     expect(status.isDemo).toBe(false);
-    expect(status.isComplete).toBe(false);
-    expect(status.completionPercentage).toBeLessThan(100);
-    expect(status.missingItems).toEqual(expect.arrayContaining([
-      'Certificado digital',
+    expect(status.isComplete).toBe(true);
+    expect(status.completionPercentage).toBe(100);
+    expect(status.missingItems).toEqual([]);
+    expect(status.fiscal).toMatchObject({
+      isEnabled: false,
+      isReady: false,
+      missingItems: expect.arrayContaining([
+        'Certificado digital del cliente',
       'Usuario SOL secundario',
       'Clave SOL secundaria',
-    ]));
+      ]),
+    });
     expect(status.certificate.isValid).toBe(false);
   });
 });

@@ -179,6 +179,7 @@ test.describe('T06 Compras vertical completo', () => {
       await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
         data: {
           orden_id: orden.id,
+          idempotency_key: `recepcion:${runId}:sobre-recepcion`,
           almacen_id: almacenId,
           items: [
             {
@@ -198,6 +199,7 @@ test.describe('T06 Compras vertical completo', () => {
       await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
         data: {
           orden_id: orden.id,
+          idempotency_key: `recepcion:${runId}:valida`,
           almacen_id: almacenId,
           observaciones: 'Recepción T06',
           items: [

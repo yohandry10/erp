@@ -9,6 +9,7 @@ interface InstruccionesDePago {
   solicitud_id: string;
   monto: number;
   plan: string;
+  oferta?: OfertaComercial;
   datos_pago: {
     titular: string;
     banco: string;
@@ -19,6 +20,24 @@ interface InstruccionesDePago {
     whatsappUrl: string;
     email: string;
   };
+}
+
+interface OfertaComercial {
+  id: 'trimestral' | 'semestral' | 'anual';
+  nombre: string;
+  meses_pagados: number;
+  meses_bonificados: number;
+  meses_servicio: number;
+  monto: number;
+  moneda: string;
+}
+
+interface PlanComercial {
+  id: 'basico' | 'profesional' | 'enterprise';
+  nombre: string;
+  usuarios: number | string;
+  facturas_mes: number | string;
+  ofertas: OfertaComercial[];
 }
 
 export default function ConvertDemoPage() {
@@ -48,12 +67,15 @@ export default function ConvertDemoPage() {
   const [mostrarEleccionDatos, setMostrarEleccionDatos] = useState(false);
   const [eleccionDatos, setEleccionDatos] = useState<'conservar' | 'reiniciar'>('conservar');
   const [countryCode, setCountryCode] = useState<'PE' | 'AR' | 'CO'>('PE');
+  const [planes, setPlanes] = useState<PlanComercial[]>([]);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     razon_social: '',
     ruc: '',
     telefono: '',
+    plan_id: 'basico' as PlanComercial['id'],
+    periodo: 'trimestral' as OfertaComercial['id'],
   });
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -77,6 +99,7 @@ export default function ConvertDemoPage() {
         }
         const code = String(status?.pais || '').toUpperCase();
         if (code === 'AR' || code === 'CO' || code === 'PE') setCountryCode(code);
+        setPlanes(Array.isArray(status?.planes_disponibles) ? status.planes_disponibles : []);
         setCheckingEligibility(false);
       })
       .catch((statusError: unknown) => {
@@ -99,6 +122,8 @@ export default function ConvertDemoPage() {
       ? '+57 300 123 4567'
       : '+51 999 999 999';
   const countryName = countryCode === 'AR' ? 'Argentina' : countryCode === 'CO' ? 'Colombia' : 'Perú';
+  const selectedPlan = planes.find((plan) => plan.id === formData.plan_id);
+  const selectedOffer = selectedPlan?.ofertas?.find((oferta) => oferta.id === formData.periodo);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +171,7 @@ export default function ConvertDemoPage() {
           solicitud_id: data.solicitud_id,
           monto: Number(data.monto) || 0,
           plan: data.plan,
+          oferta: data.oferta,
           datos_pago: data.datos_pago,
         });
         setLoading(false);
@@ -279,7 +305,7 @@ export default function ConvertDemoPage() {
               Ya casi: falta la transferencia
             </h2>
             <p className="text-muted-foreground mb-6 text-[0.875rem]">
-              {pago.plan}. Transfiere el monto, envíanos el comprobante por
+              {pago.plan}{pago.oferta ? ` · ${pago.oferta.nombre} (${pago.oferta.meses_servicio} meses de servicio)` : ''}. Transfiere el monto, envíanos el comprobante por
               WhatsApp y activamos tu cuenta.
             </p>
 
@@ -366,6 +392,62 @@ export default function ConvertDemoPage() {
                 <p className="text-sm text-foreground/85">{notice}</p>
               </div>
             )}
+
+            <fieldset className="mb-6">
+              <legend className="mb-3 text-sm font-semibold text-foreground/80">Nivel del ERP *</legend>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {planes.map((plan) => (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => setFormData((current) => ({ ...current, plan_id: plan.id }))}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      formData.plan_id === plan.id
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/40'
+                    }`}
+                  >
+                    <span className="block font-semibold text-foreground">{plan.nombre}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {plan.usuarios} usuarios · {plan.facturas_mes} comprobantes/mes
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset className="mb-6">
+              <legend className="mb-3 text-sm font-semibold text-foreground/80">Vigencia y promoción *</legend>
+              <div className="grid gap-3">
+                {(selectedPlan?.ofertas || []).map((oferta) => (
+                  <button
+                    key={oferta.id}
+                    type="button"
+                    onClick={() => setFormData((current) => ({ ...current, periodo: oferta.id }))}
+                    className={`flex items-center justify-between gap-4 rounded-xl border p-4 text-left transition ${
+                      formData.periodo === oferta.id
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/40'
+                    }`}
+                  >
+                    <span>
+                      <span className="block font-semibold text-foreground">{oferta.nombre}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        Pagas {oferta.meses_pagados} · recibes {oferta.meses_bonificados} gratis · vigencia total {oferta.meses_servicio} meses
+                      </span>
+                    </span>
+                    <span className="shrink-0 font-bold text-primary">
+                      {oferta.moneda === 'PEN' ? 'S/' : oferta.moneda} {Number(oferta.monto).toFixed(2)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {selectedOffer && selectedOffer.meses_bonificados > 0 && (
+                <p className="mt-3 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  Promoción aplicada: {selectedOffer.meses_bonificados} meses gratis. Tu cuenta vencerá después de {selectedOffer.meses_servicio} meses, no antes.
+                </p>
+              )}
+            </fieldset>
 
             <div className="mb-5">
               <label htmlFor="convert-razon-social" className="block font-semibold text-foreground/80 mb-2 text-[0.875rem]">Razón Social *</label>
@@ -457,7 +539,7 @@ export default function ConvertDemoPage() {
                 ✓ ¿Qué incluye la cuenta real?
               </h4>
               <ul className="text-[0.875rem] text-foreground/85 list-none p-0 m-0">
-                <li className="mb-1">✓ Acceso ilimitado sin expiración</li>
+                <li className="mb-1">✓ Acceso completo durante los {selectedOffer?.meses_servicio || 3} meses contratados</li>
                 <li className="mb-1">✓ Onboarding de facturación electrónica real ante {fiscalAuthority}</li>
                 <li className="mb-1">✓ Soporte técnico prioritario</li>
                 <li className="mb-1">✓ Eliges si conservas lo que probaste o empiezas de cero</li>

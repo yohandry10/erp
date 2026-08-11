@@ -162,6 +162,10 @@ export class CrearCxpDto {
   anticipo?: number;
 
   @IsOptional()
+  @IsUUID('4', { message: 'El ID del anticipo debe ser un UUID válido' })
+  anticipo_id?: string;
+
+  @IsOptional()
   @IsString()
   idempotency_key?: string;
 

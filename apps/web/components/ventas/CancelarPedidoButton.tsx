@@ -18,11 +18,13 @@ import { toast } from '@/components/ui/use-toast'
 interface CancelarPedidoButtonProps {
   pedidoId: string
   onSuccess: () => void
+  hasPhysicalDispatch?: boolean
 }
 
 export default function CancelarPedidoButton({
   pedidoId,
-  onSuccess
+  onSuccess,
+  hasPhysicalDispatch = false,
 }: CancelarPedidoButtonProps) {
   const { post } = useApi()
 
@@ -30,10 +32,16 @@ export default function CancelarPedidoButton({
   const [motivo, setMotivo] = useState('')
   const [canceling, setCanceling] = useState(false)
   const [error, setError] = useState('')
+  const [confirmPhysicalReturn, setConfirmPhysicalReturn] = useState(false)
+  const [idempotencyKey, setIdempotencyKey] = useState('')
 
   const handleCancel = async () => {
     if (!motivo.trim()) {
       setError('Debe ingresar un motivo de cancelación')
+      return
+    }
+    if (hasPhysicalDispatch && !confirmPhysicalReturn) {
+      setError('Debe confirmar que la mercadería despachada retornó físicamente al almacén')
       return
     }
 
@@ -43,7 +51,11 @@ export default function CancelarPedidoButton({
 
       const response = await post(
         `/ventas/pedidos/${pedidoId}/cancelar`,
-        { motivo }
+        {
+          motivo,
+          confirmar_retorno_fisico: hasPhysicalDispatch && confirmPhysicalReturn,
+        },
+        { headers: { 'Idempotency-Key': idempotencyKey } },
       )
 
       if (response?.success) {
@@ -53,6 +65,8 @@ export default function CancelarPedidoButton({
         })
         setShowDialog(false)
         setMotivo('')
+        setConfirmPhysicalReturn(false)
+        setIdempotencyKey('')
         onSuccess()
       } else {
         throw new Error(response?.message || 'Error al cancelar el pedido')
@@ -71,7 +85,12 @@ export default function CancelarPedidoButton({
 
   const handleOpenDialog = () => {
     setMotivo('')
+    setConfirmPhysicalReturn(false)
     setError('')
+    setIdempotencyKey(
+      globalThis.crypto?.randomUUID?.()
+        ?? `pedido-cancel-${pedidoId}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    )
     setShowDialog(true)
   }
 
@@ -90,7 +109,9 @@ export default function CancelarPedidoButton({
           <DialogHeader>
             <DialogTitle>Cancelar Pedido</DialogTitle>
             <DialogDescription>
-              ¿Está seguro que desea cancelar este pedido? Esta acción liberará el stock reservado.
+              {hasPhysicalDispatch
+                ? 'El pedido tiene mercadería despachada. La cancelación registrará su retorno físico al almacén antes de liberar reservas.'
+                : '¿Está seguro que desea cancelar este pedido? Esta acción liberará el stock reservado.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -110,6 +131,22 @@ export default function CancelarPedidoButton({
             />
             {error && (
               <p className="text-sm text-destructive mt-1">{error}</p>
+            )}
+            {hasPhysicalDispatch && (
+              <label className="mt-4 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={confirmPhysicalReturn}
+                  onChange={(event) => {
+                    setConfirmPhysicalReturn(event.target.checked)
+                    setError('')
+                  }}
+                />
+                <span>
+                  Confirmo que toda la mercadería despachada de este pedido fue recibida nuevamente en el almacén de origen.
+                </span>
+              </label>
             )}
           </div>
 

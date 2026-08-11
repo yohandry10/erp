@@ -7,6 +7,7 @@ import {
   Body,
   Query,
   Param,
+  Headers,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
@@ -50,6 +51,7 @@ export class ContabilidadPresupuestosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
     @Body() createPresupuestoDto: CreatePresupuestoDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<{
     success: boolean;
     data: PresupuestoResponseDto;
@@ -64,6 +66,7 @@ export class ContabilidadPresupuestosController {
         tenantId,
         createPresupuestoDto,
         userId,
+        idempotencyKey,
       );
 
       return {
@@ -191,6 +194,7 @@ export class ContabilidadPresupuestosController {
     @CurrentUser("id") userId: string,
     @Param("id") presupuestoId: string,
     @Body() updatePresupuestoDto: UpdatePresupuestoDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<{
     success: boolean;
     data: PresupuestoResponseDto;
@@ -206,6 +210,7 @@ export class ContabilidadPresupuestosController {
         presupuestoId,
         updatePresupuestoDto,
         userId,
+        idempotencyKey,
       );
 
       return {
@@ -237,7 +242,9 @@ export class ContabilidadPresupuestosController {
   })
   async eliminarPresupuesto(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
     @Param("id") presupuestoId: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<{
     success: boolean;
     data: PresupuestoResponseDto;
@@ -251,6 +258,8 @@ export class ContabilidadPresupuestosController {
       const presupuesto = await this.presupuestosService.eliminarPresupuesto(
         tenantId,
         presupuestoId,
+        userId,
+        idempotencyKey,
       );
 
       return {

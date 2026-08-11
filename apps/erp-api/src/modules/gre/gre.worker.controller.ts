@@ -19,6 +19,6 @@ export class GreWorkerController {
     @CurrentTenant() tenantId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.greService.enviarManualmenteSunat(id, tenantId, { idempotencyKey });
+    return this.greService.enviarManualmenteSunat(id, tenantId, null, { idempotencyKey });
   }
 }

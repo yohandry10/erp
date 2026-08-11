@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import PDFDocument from 'pdfkit';
@@ -22,6 +22,7 @@ import { calcularLiquidacionColombia } from './liquidacion-colombia.util';
 import { RrhhCountryService } from './rrhh-country.service';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { createHash, randomUUID } from 'crypto';
 import { decryptText, encryptText } from '../../shared/utils/secure-config.utils';
 
 // Respaldo si normativa_peru_periodos no tiene fila para el periodo consultado.
@@ -37,6 +38,51 @@ export class RrhhService {
     @Optional() private readonly countryService?: RrhhCountryService,
     @Optional() private readonly configService?: ConfigService,
   ) { }
+
+  /**
+   * Única salida de escritura para RRHH operativo. El fallback de llave sólo
+   * conserva compatibilidad con clientes anteriores; la Web 475 envía una
+   * intención explícita y los reintentos deben reutilizarla.
+   */
+  private async ejecutarOperacionRrhh(
+    operacion: string,
+    payload: Record<string, any>,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ): Promise<any> {
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    if (!actorId) throw new ForbiddenException('Actor autenticado requerido para modificar RRHH');
+    const key = String(idempotencyKey || '').trim()
+      || `rrhh-compat-${operacion.toLowerCase()}-${randomUUID()}`;
+    if (key.length < 8 || key.length > 200) {
+      throw new BadRequestException('Idempotency-Key debe tener entre 8 y 200 caracteres');
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'ejecutar_operacion_rrhh_tx',
+      {
+        p_tenant_id: tenantId,
+        p_actor_id: actorId,
+        p_operacion: operacion,
+        p_payload: payload || {},
+        p_idempotency_key: key,
+      },
+    );
+    if (!error && data) return data;
+
+    const message = String(error?.message || 'No se pudo completar la operación de RRHH');
+    if (error?.code === '42501') throw new ForbiddenException(message);
+    if (error?.code === 'P0002') throw new NotFoundException(message);
+    if (error?.code === '23505') throw new ConflictException(message);
+    throw new BadRequestException(message);
+  }
+
+  private idempotencyPilaResultado(idempotencyKey: string | undefined, resultado: string) {
+    const base = String(idempotencyKey || '').trim() || `pila-${randomUUID()}`;
+    const candidate = `${base}:${resultado}`;
+    if (candidate.length <= 200) return candidate;
+    return `pila-${createHash('sha256').update(candidate, 'utf8').digest('hex')}`;
+  }
 
   private async obtenerPaisLaboral(tenantId: string): Promise<'PE' | 'AR' | 'CO'> {
     if (!this.countryService) return 'PE';
@@ -194,7 +240,12 @@ export class RrhhService {
     };
   }
 
-  async updateConfiguracionLaboralArgentina(tenantId: string, input: any) {
+  async updateConfiguracionLaboralArgentina(
+    tenantId: string,
+    input: any,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     if ((await this.obtenerPaisLaboral(tenantId)) !== 'AR') {
       throw new BadRequestException(
         'La configuración solicitada sólo corresponde a tenants de Argentina.',
@@ -250,24 +301,18 @@ export class RrhhService {
       }
     }
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('rrhh_configuracion_argentina')
-      .upsert(
-        {
-          tenant_id: tenantId,
-          ...payload,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'tenant_id' },
-      )
-      .select()
-      .single();
-    if (error) throw error;
+    const data = await this.ejecutarOperacionRrhh(
+      'CONFIG_AR_UPDATE', payload, tenantId, actorId, idempotencyKey,
+    );
     return { success: true, data };
   }
 
-  async updateConfiguracionLaboralColombia(tenantId: string, input: any) {
+  async updateConfiguracionLaboralColombia(
+    tenantId: string,
+    input: any,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     if ((await this.obtenerPaisLaboral(tenantId)) !== 'CO') {
       throw new BadRequestException(
         'La configuración solicitada sólo corresponde a tenants de Colombia.',
@@ -350,20 +395,17 @@ export class RrhhService {
         }
       }
     }
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('rrhh_configuracion_colombia')
-      .upsert(
-        { tenant_id: tenantId, ...payload, updated_at: new Date().toISOString() },
-        { onConflict: 'tenant_id' },
-      )
-      .select()
-      .single();
-    if (error) throw error;
+    const data = await this.ejecutarOperacionRrhh(
+      'CONFIG_CO_UPDATE', payload, tenantId, actorId, idempotencyKey,
+    );
     return { success: true, data };
   }
 
-  async probarIntegracionPilaColombia(tenantId: string) {
+  async probarIntegracionPilaColombia(
+    tenantId: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     if ((await this.obtenerPaisLaboral(tenantId)) !== 'CO') {
       throw new BadRequestException('La prueba PILA sólo corresponde a tenants de Colombia.');
     }
@@ -376,10 +418,10 @@ export class RrhhService {
     if (empresaError) throw empresaError;
     if (!config) throw new BadRequestException('Configuración colombiana no encontrada.');
     if (empresa?.is_demo === true) {
-      await client.from('rrhh_configuracion_colombia').update({
-        pila_ultima_prueba_at: new Date().toISOString(),
-        pila_ultima_prueba_estado: 'SIMULADA',
-      }).eq('tenant_id', tenantId);
+      await this.ejecutarOperacionRrhh(
+        'PILA_TEST_RESULT', { estado: 'SIMULADA' }, tenantId, actorId,
+        this.idempotencyPilaResultado(idempotencyKey, 'simulada'),
+      );
       return {
         success: true,
         mode: 'SIMULATED_DEMO',
@@ -391,18 +433,18 @@ export class RrhhService {
     const commonMissing = ['operador_pila', 'eps_default', 'fondo_pension_default', 'arl_default', 'caja_compensacion_default']
       .filter((field) => !String(config[field] || '').trim());
     if (commonMissing.length) {
-      await client.from('rrhh_configuracion_colombia').update({
-        pila_ultima_prueba_at: new Date().toISOString(),
-        pila_ultima_prueba_estado: 'INCOMPLETA',
-      }).eq('tenant_id', tenantId);
+      await this.ejecutarOperacionRrhh(
+        'PILA_TEST_RESULT', { estado: 'INCOMPLETA' }, tenantId, actorId,
+        this.idempotencyPilaResultado(idempotencyKey, 'incompleta'),
+      );
       return { success: false, mode: config.pila_integracion_modo, missing: commonMissing };
     }
 
     if (config.pila_integracion_modo !== 'API_PROVEEDOR') {
-      await client.from('rrhh_configuracion_colombia').update({
-        pila_ultima_prueba_at: new Date().toISOString(),
-        pila_ultima_prueba_estado: 'CONFIGURADA',
-      }).eq('tenant_id', tenantId);
+      await this.ejecutarOperacionRrhh(
+        'PILA_TEST_RESULT', { estado: 'CONFIGURADA' }, tenantId, actorId,
+        this.idempotencyPilaResultado(idempotencyKey, 'configurada'),
+      );
       return {
         success: true,
         mode: 'ARCHIVO_OPERADOR',
@@ -428,10 +470,10 @@ export class RrhhService {
         },
       });
       const ok = response.status >= 200 && response.status < 400;
-      await client.from('rrhh_configuracion_colombia').update({
-        pila_ultima_prueba_at: new Date().toISOString(),
-        pila_ultima_prueba_estado: ok ? 'CONFIGURADA' : 'ERROR',
-      }).eq('tenant_id', tenantId);
+      await this.ejecutarOperacionRrhh(
+        'PILA_TEST_RESULT', { estado: ok ? 'CONFIGURADA' : 'ERROR' }, tenantId, actorId,
+        this.idempotencyPilaResultado(idempotencyKey, `http-${response.status}`),
+      );
       return {
         success: ok,
         mode: 'API_PROVEEDOR',
@@ -440,10 +482,10 @@ export class RrhhService {
         message: ok ? 'API del operador PILA accesible.' : 'El operador rechazó la prueba de conectividad.',
       };
     } catch (requestError) {
-      await client.from('rrhh_configuracion_colombia').update({
-        pila_ultima_prueba_at: new Date().toISOString(),
-        pila_ultima_prueba_estado: 'ERROR',
-      }).eq('tenant_id', tenantId);
+      await this.ejecutarOperacionRrhh(
+        'PILA_TEST_RESULT', { estado: 'ERROR' }, tenantId, actorId,
+        this.idempotencyPilaResultado(idempotencyKey, 'error'),
+      );
       return {
         success: false,
         mode: 'API_PROVEEDOR',
@@ -604,7 +646,12 @@ export class RrhhService {
     throw new BadRequestException('Estado de empleado inválido');
   }
 
-  async createEmpleado(empleadoData: any, tenantId?: string) {
+  async createEmpleado(
+    empleadoData: any,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     // ✅ MULTI-TENANT: Agregar tenant_id al crear
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
@@ -625,24 +672,28 @@ export class RrhhService {
     }
     await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento));
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empleados')
-      .insert({
+    return this.ejecutarOperacionRrhh(
+      'EMPLOYEE_CREATE',
+      {
         ...datosLimpios,
         tipo_documento:
           datosLimpios.tipo_documento ||
           (paisLaboral === 'AR' ? 'CUIL' : paisLaboral === 'CO' ? 'CC' : 'DNI'),
         ...this.estadoActivoPatch(datosLimpios.estado || 'activo'),
-        tenant_id: currentTenantId, // ✅ Incluir tenant
-      })
-      .select();
-
-    if (error) throw error;
-    return data?.[0];
+      },
+      currentTenantId,
+      actorId,
+      idempotencyKey,
+    );
   }
 
-  async updateEmpleado(id: string, empleadoData: any, tenantId?: string) {
+  async updateEmpleado(
+    id: string,
+    empleadoData: any,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     // ✅ MULTI-TENANT: Validar tenant al actualizar
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
@@ -661,61 +712,47 @@ export class RrhhService {
       await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento), id);
     }
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empleados')
-      .update({
-        ...datosLimpios,
-        ...this.estadoActivoPatch(datosLimpios.estado),
-      })
-      .eq('id', id)
-      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
-      .select();
-
-    if (error) throw error;
-    if (!data?.[0]) {
-      throw new NotFoundException('Empleado no encontrado');
-    }
-    return data[0];
+    return this.ejecutarOperacionRrhh(
+      'EMPLOYEE_UPDATE',
+      { id, ...datosLimpios, ...this.estadoActivoPatch(datosLimpios.estado) },
+      currentTenantId,
+      actorId,
+      idempotencyKey,
+    );
   }
 
-  async deleteEmpleado(id: string, tenantId?: string) {
+  async deleteEmpleado(
+    id: string,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     // ✅ MULTI-TENANT: Validar tenant al eliminar
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empleados')
-      .update({ estado: 'inactivo', activo: false })
-      .eq('id', id)
-      .eq('tenant_id', currentTenantId)
-      .select('id, estado')
-      .single();
-
-    if (error) throw error;
-    if (!data?.id) {
-      throw new NotFoundException('Empleado no encontrado');
-    }
+    const data = await this.ejecutarOperacionRrhh(
+      'EMPLOYEE_DEACTIVATE', { id }, currentTenantId, actorId, idempotencyKey,
+    );
     return { success: true, message: 'Empleado inactivado exitosamente', data };
   }
 
-  async createDepartamento(departamentoData: any, tenantId?: string) {
+  async createDepartamento(
+    departamentoData: any,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('departamentos')
-      .insert({ ...departamentoData, tenant_id: currentTenantId })
-      .select();
-
-    if (error) throw error;
-    return data?.[0];
+    return this.ejecutarOperacionRrhh(
+      'DEPARTMENT_CREATE', departamentoData, currentTenantId, actorId, idempotencyKey,
+    );
   }
 
   // ===== RECLUTAMIENTO Y VACANTES =====
@@ -740,7 +777,12 @@ export class RrhhService {
     return { success: true, data: data || [] };
   }
 
-  async createVacante(vacanteData: any, tenantId?: string) {
+  async createVacante(
+    vacanteData: any,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
@@ -752,14 +794,10 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('vacantes')
-      .insert({ ...vacanteData, tenant_id: currentTenantId })
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'VACANCY_CREATE', vacanteData, currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   async getCandidatos(vacanteId?: string, tenantId?: string) {
@@ -788,7 +826,12 @@ export class RrhhService {
     return { success: true, data: data || [] };
   }
 
-  async createCandidato(candidatoData: any, tenantId?: string) {
+  async createCandidato(
+    candidatoData: any,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
@@ -808,14 +851,27 @@ export class RrhhService {
       Object.entries(candidatoData ?? {}).map(([k, v]) => [k, v === '' ? null : v]),
     );
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('candidatos')
-      .insert({ ...sanitized, tenant_id: currentTenantId })
-      .select();
+    const data = await this.ejecutarOperacionRrhh(
+      'CANDIDATE_CREATE', sanitized, currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
+  }
 
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+  async updateCandidato(
+    candidatoId: string,
+    candidatoData: any,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    const sanitized = Object.fromEntries(
+      Object.entries(candidatoData ?? {}).map(([key, value]) => [key, value === '' ? null : value]),
+    );
+    const data = await this.ejecutarOperacionRrhh(
+      'CANDIDATE_UPDATE', { id: candidatoId, ...sanitized }, tenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   async updateEstadoCandidato(
@@ -823,22 +879,19 @@ export class RrhhService {
     estado: string,
     observaciones?: string,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('candidatos')
-      .update({ estado, observaciones })
-      .eq('id', candidatoId)
-      .eq('tenant_id', currentTenantId)
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'CANDIDATE_STATUS', { id: candidatoId, estado, observaciones },
+      currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   // ===== ASISTENCIA Y TIEMPO =====
@@ -846,6 +899,8 @@ export class RrhhService {
     empleadoId: string,
     tipo: 'entrada' | 'salida',
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Agregar tenant_id
     if (!tenantId) {
@@ -853,50 +908,17 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    // Verificar que el empleado pertenece al tenant
-    const { data: empleado, error: empError } = await this.supabaseService
-      .getClient()
-      .from('empleados')
-      .select('id')
-      .eq('id', empleadoId)
-      .eq('tenant_id', currentTenantId)
-      .single();
-
-    if (empError || !empleado) {
-      throw new NotFoundException('Empleado no encontrado en este tenant');
-    }
-
     const hoy = new Date().toISOString().split('T')[0];
     const horaActual = new Date().toTimeString().split(' ')[0];
-
-    // Buscar registro existente del día
-    const { data: registroExistente } = await this.supabaseService
-      .getClient()
-      .from('asistencia')
-      .select('*')
-      .eq('id_empleado', empleadoId)
-      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
-      .eq('fecha', hoy)
-      .single();
+    const data = await this.ejecutarOperacionRrhh(
+      'ATTENDANCE_MARK',
+      { empleado_id: empleadoId, fecha: hoy, tipo, hora: horaActual },
+      currentTenantId,
+      actorId,
+      idempotencyKey,
+    );
 
     if (tipo === 'entrada') {
-      if (registroExistente) {
-        throw new ConflictException('Ya se registró entrada para este día');
-      }
-
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('asistencia')
-        .insert({
-          id_empleado: empleadoId,
-          tenant_id: currentTenantId, // ✅ Incluir tenant
-          fecha: hoy,
-          hora_entrada: horaActual,
-          estado: 'presente',
-        })
-        .select();
-
-      if (error) throw error;
 
       // 🎯 EMITIR EVENTO DE ASISTENCIA (si eventBus está disponible)
       if (this.eventBus) {
@@ -912,49 +934,17 @@ export class RrhhService {
         this.logger.log('✅ [RRHH] Evento de entrada de empleado emitido');
       }
 
-      return { success: true, data: data?.[0], message: 'Entrada registrada' };
+      return { success: true, data, message: 'Entrada registrada' };
     } else {
-      if (!registroExistente || registroExistente.hora_salida) {
-        throw new BadRequestException(
-          'No se puede registrar salida sin entrada o ya se registró salida',
-        );
-      }
-
-      // Calcular horas trabajadas
-      const entrada = new Date(`${hoy}T${registroExistente.hora_entrada}`);
-      const salida = new Date(`${hoy}T${horaActual}`);
-      
-      // ✅ FIX: Validar que hora de salida sea posterior a hora de entrada
-      if (salida.getTime() <= entrada.getTime()) {
-        throw new BadRequestException(
-          `La hora de salida (${horaActual}) debe ser posterior a la hora de entrada (${registroExistente.hora_entrada})`,
-        );
-      }
-      
-      const horasTrabajadas =
-        (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60);
-
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('asistencia')
-        .update({
-          hora_salida: horaActual,
-          horas_trabajadas: horasTrabajadas,
-        })
-        .eq('id', registroExistente.id)
-        .eq('tenant_id', currentTenantId) // ✅ Validar tenant
-        .select();
-
-      if (error) throw error;
-
       // 🎯 EMITIR EVENTO DE ASISTENCIA COMPLETADA (si eventBus está disponible)
-      const horasExtras = Math.max(0, horasTrabajadas - 8); // Considerar extras si excede 8 horas
+      const horasTrabajadas = Number(data?.horas_trabajadas || 0);
+      const horasExtras = Math.max(0, horasTrabajadas - 8);
 
       if (this.eventBus) {
         this.eventBus.emitEmpleadoAsistencia({
           empleadoId: empleadoId,
           fecha: hoy,
-          horaEntrada: registroExistente.hora_entrada,
+          horaEntrada: data?.hora_entrada,
           horaSalida: horaActual,
           horasExtras: horasExtras,
           tipoTurno: 'REGULAR',
@@ -966,7 +956,7 @@ export class RrhhService {
         );
       }
 
-      return { success: true, data: data?.[0], message: 'Salida registrada' };
+      return { success: true, data, message: 'Salida registrada' };
     }
   }
 
@@ -1036,31 +1026,31 @@ export class RrhhService {
     return { success: true, data: data || [] };
   }
 
-  async createSolicitud(solicitudData: any, tenantId?: string) {
+  async createSolicitud(
+    solicitudData: any,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     // ✅ MULTI-TENANT: Agregar tenant_id
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('solicitudes')
-      .insert({
-        ...solicitudData,
-        tenant_id: currentTenantId, // ✅ Incluir tenant
-      })
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'REQUEST_CREATE', solicitudData, currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   async aprobarSolicitud(
     solicitudId: string,
-    aprobadoPor: string,
+    _aprobadoPor: string,
     observaciones?: string,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Validar tenant
     if (!tenantId) {
@@ -1068,28 +1058,20 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('solicitudes')
-      .update({
-        estado: 'aprobada',
-        aprobado_por: aprobadoPor,
-        fecha_aprobacion: new Date().toISOString(),
-        observaciones_aprobacion: observaciones,
-      })
-      .eq('id', solicitudId)
-      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'REQUEST_DECIDE', { id: solicitudId, decision: 'aprobada', observaciones },
+      currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   async rechazarSolicitud(
     solicitudId: string,
-    aprobadoPor: string,
+    _aprobadoPor: string,
     observaciones: string,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Validar tenant
     if (!tenantId) {
@@ -1097,21 +1079,11 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('solicitudes')
-      .update({
-        estado: 'rechazada',
-        aprobado_por: aprobadoPor,
-        fecha_aprobacion: new Date().toISOString(),
-        observaciones_aprobacion: observaciones,
-      })
-      .eq('id', solicitudId)
-      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'REQUEST_DECIDE', { id: solicitudId, decision: 'rechazada', observaciones },
+      currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   // ===== BENEFICIOS =====
@@ -1163,6 +1135,8 @@ export class RrhhService {
     beneficioId: string,
     fechaInicio: string,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Agregar tenant_id
     if (!tenantId) {
@@ -1170,20 +1144,12 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empleado_beneficios')
-      .insert({
-        id_empleado: empleadoId,
-        id_beneficio: beneficioId,
-        fecha_inicio: fechaInicio,
-        tenant_id: currentTenantId, // ✅ Incluir tenant
-        estado: 'activo',
-      })
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'BENEFIT_ASSIGN',
+      { empleado_id: empleadoId, beneficio_id: beneficioId, fecha_inicio: fechaInicio },
+      currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   // ===== EVALUACIONES DE DESEMPEÑO =====
@@ -1214,30 +1180,30 @@ export class RrhhService {
     return { success: true, data: data || [] };
   }
 
-  async createEvaluacion(evaluacionData: any, tenantId?: string) {
+  async createEvaluacion(
+    evaluacionData: any,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     // ✅ MULTI-TENANT: Agregar tenant_id
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('evaluaciones')
-      .insert({
-        ...evaluacionData,
-        tenant_id: currentTenantId, // ✅ Incluir tenant
-      })
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'EVALUATION_CREATE', evaluacionData, currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   async updateEvaluacion(
     id: string,
     evaluacionData: any,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Validar tenant
     if (!tenantId) {
@@ -1245,16 +1211,10 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('evaluaciones')
-      .update(evaluacionData)
-      .eq('id', id)
-      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'EVALUATION_UPDATE', { id, ...evaluacionData }, currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   // ===== CAPACITACIONES =====
@@ -1305,6 +1265,8 @@ export class RrhhService {
     empleadoId: string,
     capacitacionId: string,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Agregar tenant_id
     if (!tenantId) {
@@ -1312,19 +1274,11 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empleado_capacitaciones')
-      .insert({
-        id_empleado: empleadoId,
-        id_capacitacion: capacitacionId,
-        tenant_id: currentTenantId, // ✅ Incluir tenant
-        estado: 'inscrito',
-      })
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'TRAINING_ENROLL', { empleado_id: empleadoId, capacitacion_id: capacitacionId },
+      currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   // ===== LIQUIDACIONES =====
@@ -1333,10 +1287,14 @@ export class RrhhService {
     motivoTerminacion: string,
     fechaTerminacion: string,
     tenantId?: string,
+    usuarioId?: string,
   ) {
     // ✅ MULTI-TENANT: Filtrar por tenant
     if (!tenantId) {
-      throw new Error('Tenant requerido para RRHH');
+      throw new BadRequestException('Tenant requerido para RRHH');
+    }
+    if (!usuarioId) {
+      throw new BadRequestException('Actor requerido para calcular la liquidación');
     }
     const currentTenantId = tenantId;
 
@@ -1352,15 +1310,24 @@ export class RrhhService {
         )
         .eq('id', empleadoId)
         .eq('tenant_id', currentTenantId)
-        .eq('contratos.estado', 'vigente')
+        .in('contratos.estado', ['vigente', 'renovado', 'en_periodo_prueba'])
         .single();
 
-    if (empError || !empleado) {
-      throw new Error('Empleado no encontrado');
-    }
+    if (empError && empError.code !== 'PGRST116') throw empError;
+    if (!empleado) throw new NotFoundException('Empleado no encontrado');
 
-    const contrato = empleado.contratos[0];
+    const contrato = (empleado.contratos || []).find((item: any) =>
+      ['vigente', 'renovado', 'en_periodo_prueba'].includes(
+        String(item?.estado || '').toLowerCase(),
+      ),
+    );
+    if (!contrato) {
+      throw new ConflictException('El empleado no tiene un contrato laboral activo');
+    }
     const sueldoMensual = parseFloat(contrato.sueldo_bruto);
+    if (!Number.isFinite(sueldoMensual) || sueldoMensual <= 0) {
+      throw new ConflictException('El contrato activo no tiene una remuneración válida');
+    }
     const paisLaboral = await this.obtenerPaisLaboral(currentTenantId);
 
     if (paisLaboral === 'AR') {
@@ -1390,56 +1357,34 @@ export class RrhhService {
         ),
       });
 
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('liquidaciones')
-        .insert({
-          id_empleado: empleadoId,
-          motivo_terminacion: motivoTerminacion,
-          fecha_terminacion: fechaTerminacion,
-          ultimo_dia_trabajado: fechaTerminacion,
-          vacaciones_pendientes: calculoArgentina.diasVacacionesProporcionales,
-          dias_cts: 0,
-          monto_cts: 0,
-          indemnizacion: calculoArgentina.indemnizacionAntiguedad,
-          total_liquidacion: calculoArgentina.total,
-          estado: 'calculada',
-          tenant_id: currentTenantId,
-          pais_codigo: 'AR',
-          moneda: 'ARS',
-          metadata: {
-            normativa: 'LCT_ARGENTINA',
-            version_normativa: '2026-03',
-            base_indemnizacion: calculoArgentina.baseIndemnizacion,
-            anios_indemnizables: calculoArgentina.aniosIndemnizables,
-            vacaciones_no_gozadas: calculoArgentina.vacacionesNoGozadas,
-            sac_proporcional: calculoArgentina.sacProporcional,
-            preaviso: calculoArgentina.preaviso,
-            sac_sobre_preaviso: calculoArgentina.sacSobrePreaviso,
-            integracion_mes_despido: calculoArgentina.integracionMesDespido,
-            sac_sobre_integracion: calculoArgentina.sacSobreIntegracion,
-            fondo_cese_aplicado: calculoArgentina.fondoCeseAplicado,
-          },
-        })
-        .select();
-
-      if (error) throw error;
-
-      await this.supabaseService
-        .getClient()
-        .from('empleados')
-        .update({ estado: 'inactivo' })
-        .eq('id', empleadoId)
-        .eq('tenant_id', currentTenantId);
-      await this.supabaseService
-        .getClient()
-        .from('contratos')
-        .update({ estado: 'terminado', fecha_fin: fechaTerminacion })
-        .eq('id_empleado', empleadoId)
-        .eq('tenant_id', currentTenantId)
-        .eq('estado', 'vigente');
-
-      return { success: true, data: data?.[0] };
+      return this.guardarLiquidacionCalculada(currentTenantId, usuarioId, {
+        id_empleado: empleadoId,
+        motivo_terminacion: motivoTerminacion,
+        fecha_terminacion: fechaTerminacion,
+        ultimo_dia_trabajado: fechaTerminacion,
+        vacaciones_pendientes: calculoArgentina.diasVacacionesProporcionales,
+        dias_cts: 0,
+        monto_cts: 0,
+        indemnizacion: calculoArgentina.indemnizacionAntiguedad,
+        total_liquidacion: calculoArgentina.total,
+        estado: 'calculada',
+        tenant_id: currentTenantId,
+        pais_codigo: 'AR',
+        moneda: 'ARS',
+        metadata: {
+          normativa: 'LCT_ARGENTINA',
+          version_normativa: '2026-03',
+          base_indemnizacion: calculoArgentina.baseIndemnizacion,
+          anios_indemnizables: calculoArgentina.aniosIndemnizables,
+          vacaciones_no_gozadas: calculoArgentina.vacacionesNoGozadas,
+          sac_proporcional: calculoArgentina.sacProporcional,
+          preaviso: calculoArgentina.preaviso,
+          sac_sobre_preaviso: calculoArgentina.sacSobrePreaviso,
+          integracion_mes_despido: calculoArgentina.integracionMesDespido,
+          sac_sobre_integracion: calculoArgentina.sacSobreIntegracion,
+          fondo_cese_aplicado: calculoArgentina.fondoCeseAplicado,
+        },
+      });
     }
 
     if (paisLaboral === 'CO') {
@@ -1465,42 +1410,31 @@ export class RrhhService {
         salarioMinimo: Number(config?.salario_minimo ?? 1_750_905),
         vacacionesDiasGozados: Number(metadata.vacaciones_dias_gozados ?? 0),
       });
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('liquidaciones')
-        .insert({
-          id_empleado: empleadoId,
-          motivo_terminacion: motivoTerminacion,
-          fecha_terminacion: fechaTerminacion,
-          ultimo_dia_trabajado: fechaTerminacion,
-          vacaciones_pendientes: calculo.diasVacacionesPendientes,
-          dias_cts: 0,
-          monto_cts: 0,
-          indemnizacion: calculo.indemnizacion,
-          total_liquidacion: calculo.total,
-          estado: 'calculada',
-          tenant_id: currentTenantId,
-          pais_codigo: 'CO',
-          moneda: 'COP',
-          metadata: {
-            normativa: 'CST_COLOMBIA',
-            version_normativa: '2026-01',
-            dias_servicio: calculo.diasServicio,
-            dias_prestaciones_pendientes: calculo.diasPrestaciones,
-            cesantias: calculo.cesantias,
-            intereses_cesantias: calculo.interesesCesantias,
-            prima_servicios: calculo.primaServicios,
-            vacaciones: calculo.vacaciones,
-          },
-        })
-        .select();
-      if (error) throw error;
-      await this.supabaseService.getClient().from('empleados')
-        .update({ estado: 'inactivo' }).eq('id', empleadoId).eq('tenant_id', currentTenantId);
-      await this.supabaseService.getClient().from('contratos')
-        .update({ estado: 'terminado', fecha_fin: fechaTerminacion })
-        .eq('id_empleado', empleadoId).eq('tenant_id', currentTenantId).eq('estado', 'vigente');
-      return { success: true, data: data?.[0] };
+      return this.guardarLiquidacionCalculada(currentTenantId, usuarioId, {
+        id_empleado: empleadoId,
+        motivo_terminacion: motivoTerminacion,
+        fecha_terminacion: fechaTerminacion,
+        ultimo_dia_trabajado: fechaTerminacion,
+        vacaciones_pendientes: calculo.diasVacacionesPendientes,
+        dias_cts: 0,
+        monto_cts: 0,
+        indemnizacion: calculo.indemnizacion,
+        total_liquidacion: calculo.total,
+        estado: 'calculada',
+        tenant_id: currentTenantId,
+        pais_codigo: 'CO',
+        moneda: 'COP',
+        metadata: {
+          normativa: 'CST_COLOMBIA',
+          version_normativa: '2026-01',
+          dias_servicio: calculo.diasServicio,
+          dias_prestaciones_pendientes: calculo.diasPrestaciones,
+          cesantias: calculo.cesantias,
+          intereses_cesantias: calculo.interesesCesantias,
+          prima_servicios: calculo.primaServicios,
+          vacaciones: calculo.vacaciones,
+        },
+      });
     }
 
     const fechaIngreso = parseFechaLocal(empleado.fecha_ingreso);
@@ -1564,64 +1498,190 @@ export class RrhhService {
     const totalLiquidacion =
       montoCts + montoVacaciones + gratificacionTrunca.total + indemnizacion;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('liquidaciones')
-      .insert({
-        id_empleado: empleadoId,
-        motivo_terminacion: motivoTerminacion,
-        fecha_terminacion: fechaTerminacion,
-        ultimo_dia_trabajado: fechaTerminacion,
-        vacaciones_pendientes: vacacionesPendientes,
-        dias_cts: diasCts,
-        monto_cts: montoCts,
-        indemnizacion: indemnizacion,
-        total_liquidacion: totalLiquidacion,
-        estado: 'calculada',
-        tenant_id: currentTenantId, // ✅ Incluir tenant
-        pais_codigo: 'PE',
-        moneda: 'PEN',
-        // La tabla no tiene columnas para vacaciones truncas ni gratificación
-        // trunca; el desglose queda aquí para poder auditar el importe pagado.
-        metadata: {
-          remuneracion_mensual: sueldoMensual,
-          tiempo_servicios: tiempoTotal,
-          remuneracion_computable_cts: remuneracionCts,
-          tiempo_cts_trunca: tiempoCtsPendiente,
-          monto_cts_trunca: ctsTrunca,
-          depositos_cts_pendientes: depositosPendientes || [],
-          monto_cts_semestres_pendientes: Number(ctsSemestresPendientes.toFixed(2)),
-          monto_vacaciones_truncas: montoVacaciones,
-          gratificacion_trunca: gratificacionTrunca.gratificacion,
-          bonificacion_extraordinaria_9: gratificacionTrunca.bonificacionExtraordinaria,
-          vacaciones_dias_gozados: vacacionesUsadas,
-        },
-      })
-      .select();
-
-    if (error) throw error;
-
-    return { success: true, data: data?.[0] };
+    return this.guardarLiquidacionCalculada(currentTenantId, usuarioId, {
+      id_empleado: empleadoId,
+      motivo_terminacion: motivoTerminacion,
+      fecha_terminacion: fechaTerminacion,
+      ultimo_dia_trabajado: fechaTerminacion,
+      vacaciones_pendientes: vacacionesPendientes,
+      dias_cts: diasCts,
+      monto_cts: montoCts,
+      indemnizacion: indemnizacion,
+      total_liquidacion: totalLiquidacion,
+      estado: 'calculada',
+      tenant_id: currentTenantId, // ✅ Incluir tenant
+      pais_codigo: 'PE',
+      moneda: 'PEN',
+      // La tabla no tiene columnas para vacaciones truncas ni gratificación
+      // trunca; el desglose queda aquí para poder auditar el importe pagado.
+      metadata: {
+        remuneracion_mensual: sueldoMensual,
+        tiempo_servicios: tiempoTotal,
+        remuneracion_computable_cts: remuneracionCts,
+        tiempo_cts_trunca: tiempoCtsPendiente,
+        monto_cts_trunca: ctsTrunca,
+        depositos_cts_pendientes: depositosPendientes || [],
+        monto_cts_semestres_pendientes: Number(ctsSemestresPendientes.toFixed(2)),
+        monto_vacaciones_truncas: montoVacaciones,
+        gratificacion_trunca: gratificacionTrunca.gratificacion,
+        bonificacion_extraordinaria_9: gratificacionTrunca.bonificacionExtraordinaria,
+        vacaciones_dias_gozados: vacacionesUsadas,
+      },
+    });
   }
 
-  async confirmarLiquidacion(liquidacionId: string, tenantId: string, usuarioId?: string) {
+  private async guardarLiquidacionCalculada(
+    tenantId: string,
+    usuarioId: string,
+    liquidacion: Record<string, unknown>,
+  ) {
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'guardar_liquidacion_calculada_tx',
+      {
+        p_tenant_id: tenantId,
+        p_liquidacion: liquidacion,
+        p_usuario_id: usuarioId,
+      },
+    );
+    if (error) this.throwRrhhLifecycleRpcError(error);
+    return data;
+  }
+
+  async confirmarLiquidacion(liquidacionId: string, tenantId: string, usuarioId: string) {
     if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    if (!usuarioId) throw new BadRequestException('Actor requerido para confirmar la liquidación');
 
     const { data, error } = await this.supabaseService.getClient().rpc(
       'confirmar_liquidacion_tx',
       {
         p_tenant_id: tenantId,
         p_liquidacion_id: liquidacionId,
-        p_usuario_id: usuarioId || null,
+        p_usuario_id: usuarioId,
       },
     );
 
-    if (error) {
-      if (error.code === 'P0002') throw new NotFoundException(error.message);
-      if (['22023', '23514'].includes(error.code)) throw new BadRequestException(error.message);
-      throw error;
-    }
+    if (error) this.throwRrhhLifecycleRpcError(error);
     return data;
+  }
+
+  async getLiquidaciones(tenantId: string) {
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    const { data, error } = await this.supabaseService.getClient()
+      .from('liquidaciones')
+      .select('*, empleados!liquidaciones_id_empleado_fkey(id,nombres,apellidos,numero_documento)')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { success: true, data: data || [] };
+  }
+
+  async pagarLiquidacion(
+    liquidacionId: string,
+    pago: {
+      metodo_pago: 'efectivo' | 'transferencia';
+      cuenta_bancaria_id?: string;
+      referencia?: string;
+      fecha_pago?: string;
+      idempotency_key?: string;
+    },
+    tenantId: string,
+    usuarioId: string,
+  ) {
+    if (!tenantId || !usuarioId) {
+      throw new BadRequestException('Tenant y actor son obligatorios para pagar la liquidación');
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'pagar_liquidacion_tx',
+      {
+        p_tenant_id: tenantId,
+        p_liquidacion_id: liquidacionId,
+        p_pago: pago,
+        p_usuario_id: usuarioId,
+      },
+    );
+    if (error) this.throwRrhhLifecycleRpcError(error);
+    return data;
+  }
+
+  async revertirPagoLiquidacion(
+    liquidacionId: string,
+    motivo: string,
+    tenantId: string,
+    usuarioId: string,
+  ) {
+    if (!tenantId || !usuarioId) {
+      throw new BadRequestException('Tenant y actor son obligatorios para revertir el pago');
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'revertir_pago_liquidacion_tx',
+      {
+        p_tenant_id: tenantId,
+        p_liquidacion_id: liquidacionId,
+        p_motivo: motivo,
+        p_usuario_id: usuarioId,
+      },
+    );
+    if (error) this.throwRrhhLifecycleRpcError(error);
+    return data;
+  }
+
+  async getDepositosCts(tenantId: string, periodo?: string) {
+    if (!tenantId) throw new BadRequestException('Tenant requerido para RRHH');
+    let query = this.supabaseService.getClient()
+      .from('depositos_cts')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('periodo', { ascending: false });
+    if (periodo) query = query.eq('periodo', periodo);
+    const { data, error } = await query;
+    if (error) throw error;
+    const empleadoIds = [...new Set((data || []).map((item: any) => item.empleado_id).filter(Boolean))];
+    if (empleadoIds.length === 0) return { success: true, data: data || [] };
+    const { data: empleados, error: empleadosError } = await this.supabaseService.getClient()
+      .from('empleados')
+      .select('id,nombres,apellidos,numero_documento')
+      .eq('tenant_id', tenantId)
+      .in('id', empleadoIds);
+    if (empleadosError) throw empleadosError;
+    const empleadosPorId = new Map((empleados || []).map((empleado: any) => [empleado.id, empleado]));
+    return {
+      success: true,
+      data: (data || []).map((item: any) => ({ ...item, empleados: empleadosPorId.get(item.empleado_id) })),
+    };
+  }
+
+  async depositarCts(
+    depositoId: string,
+    pago: { cuenta_bancaria_id: string; referencia: string; fecha_deposito?: string },
+    tenantId: string,
+    usuarioId: string,
+  ) {
+    if (!tenantId || !usuarioId) {
+      throw new BadRequestException('Tenant y actor son obligatorios para depositar CTS');
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'depositar_cts_tx',
+      {
+        p_tenant_id: tenantId,
+        p_deposito_id: depositoId,
+        p_pago: pago,
+        p_usuario_id: usuarioId,
+      },
+    );
+    if (error) this.throwRrhhLifecycleRpcError(error);
+    return data;
+  }
+
+  private throwRrhhLifecycleRpcError(error: any): never {
+    if (error?.code === 'P0002') throw new NotFoundException(error.message);
+    if (error?.code === '42501') throw new ForbiddenException(error.message);
+    if (['22003', '22007', '22008', '22023', '22P02'].includes(error?.code)) {
+      throw new BadRequestException(error.message);
+    }
+    if (['23503', '23505', '23514', '40001'].includes(error?.code)) {
+      throw new ConflictException(error.message);
+    }
+    throw error;
   }
 
   private async calcularVacacionesUsadas(
@@ -1687,6 +1747,8 @@ export class RrhhService {
     horarioId: string,
     fechaInicio: string,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Validar tenant
     if (!tenantId) {
@@ -1694,30 +1756,12 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    // Desactivar horario anterior
-    await this.supabaseService
-      .getClient()
-      .from('empleado_horarios')
-      .update({ activo: false, fecha_fin: fechaInicio })
-      .eq('id_empleado', empleadoId)
-      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
-      .eq('activo', true);
-
-    // Asignar nuevo horario
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('empleado_horarios')
-      .insert({
-        id_empleado: empleadoId,
-        id_horario: horarioId,
-        fecha_inicio: fechaInicio,
-        tenant_id: currentTenantId, // ✅ Incluir tenant
-        activo: true,
-      })
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'SCHEDULE_ASSIGN',
+      { empleado_id: empleadoId, horario_id: horarioId, fecha_inicio: fechaInicio },
+      currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   // ===== EXPEDIENTE =====
@@ -1746,8 +1790,10 @@ export class RrhhService {
     tipoDocumento: string,
     nombreArchivo: string,
     archivoUrl: string,
-    subidoPor: string,
+    _subidoPor: string,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Agregar tenant_id
     if (!tenantId) {
@@ -1755,21 +1801,17 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('expediente_documentos')
-      .insert({
-        id_empleado: empleadoId,
+    const data = await this.ejecutarOperacionRrhh(
+      'FILE_ADD',
+      {
+        empleado_id: empleadoId,
         tipo_documento: tipoDocumento,
         nombre_archivo: nombreArchivo,
         archivo_url: archivoUrl,
-        subido_por: subidoPor,
-        tenant_id: currentTenantId, // ✅ Incluir tenant
-      })
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+      },
+      currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   // ===== DASHBOARD Y REPORTES =====
@@ -1912,28 +1954,6 @@ export class RrhhService {
         error: error?.message || 'Error obteniendo pagos',
       };
     }
-  }
-
-  async procesarPago(pagoId: string, tenantId?: string) {
-    // ✅ MULTI-TENANT: Validar tenant
-    if (!tenantId) {
-      throw new Error('Tenant requerido para RRHH');
-    }
-    const currentTenantId = tenantId;
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('rrhh_pagos')
-      .update({
-        estado: 'procesado',
-        fecha_pago: new Date().toISOString().split('T')[0],
-      })
-      .eq('id', pagoId)
-      .eq('tenant_id', currentTenantId)
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
   }
 
   async generarComprobantePago(pagoId: string, tenantId?: string): Promise<Buffer> {
@@ -2255,9 +2275,12 @@ export class RrhhService {
    * ni está afecta a aportes o a renta, por eso tiene su propio libro. Recalcular
    * un semestre actualiza el importe en vez de duplicar el depósito.
    */
-  async calcularDepositosCts(periodo: string, tenantId: string) {
+  async calcularDepositosCts(periodo: string, tenantId: string, usuarioId: string) {
     if (!tenantId) {
       throw new BadRequestException('Tenant requerido para RRHH');
+    }
+    if (!usuarioId) {
+      throw new BadRequestException('Actor requerido para calcular los depósitos CTS');
     }
     if ((await this.obtenerPaisLaboral(tenantId)) !== 'PE') {
       throw new BadRequestException(
@@ -2317,15 +2340,29 @@ export class RrhhService {
       return { success: true, periodo, depositos: [], total: 0 };
     }
 
-    const { data, error: upsertError } = await client
-      .from('depositos_cts')
-      .upsert(depositos, { onConflict: 'tenant_id,empleado_id,periodo' })
-      .select();
+    const { data: persisted, error: persistError } = await client.rpc(
+      'guardar_depositos_cts_calculados_tx',
+      {
+        p_tenant_id: tenantId,
+        p_periodo: periodo,
+        p_depositos: depositos,
+        p_usuario_id: usuarioId,
+      },
+    );
+    if (persistError) this.throwRrhhLifecycleRpcError(persistError);
 
-    if (upsertError) throw upsertError;
+    const ids = Array.isArray(persisted?.depositosIds) ? persisted.depositosIds : [];
+    const { data, error: reloadError } = ids.length > 0
+      ? await client.from('depositos_cts').select('*').eq('tenant_id', tenantId).in('id', ids)
+      : { data: [], error: null };
+    if (reloadError) throw reloadError;
 
-    const total = (data || []).reduce((suma: number, d: any) => suma + Number(d.monto || 0), 0);
-    return { success: true, periodo, depositos: data || [], total: Number(total.toFixed(2)) };
+    return {
+      success: true,
+      periodo,
+      depositos: data || [],
+      total: Number(persisted?.total || 0),
+    };
   }
 
   /** Igual criterio que la planilla para decidir si corresponde asignación familiar. */
@@ -2495,7 +2532,12 @@ export class RrhhService {
     }
   }
 
-  async createContrato(contratoData: any, tenantId?: string) {
+  async createContrato(
+    contratoData: any,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     // ✅ MULTI-TENANT: Agregar tenant_id
     if (!tenantId) {
       throw new Error('Tenant requerido para RRHH');
@@ -2598,70 +2640,23 @@ export class RrhhService {
     if (Object.keys(metadata).length > 0) {
       datosLimpios.metadata = metadata;
     }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('contratos')
-      .insert({
-        ...datosLimpios,
-        tenant_id: currentTenantId,
-      })
-      .select();
-
-    if (error) {
-      const isDuplicate = error.code === '23505' ||
-        String(error.message || '').toLowerCase().includes('duplicate key');
-      if (isDuplicate) {
-        throw new ConflictException('Ya existe un contrato activo para el empleado, fecha y tipo indicados');
-      }
-      throw error;
+    // Compatibilidad con el formulario histórico: "activo" significaba
+    // contrato vigente, pero nunca fue un estado válido de la tabla.
+    if (String(datosLimpios.estado || '').toLowerCase() === 'activo') {
+      datosLimpios.estado = 'vigente';
     }
-    return { success: true, data: data?.[0] };
+    const data = await this.ejecutarOperacionRrhh(
+      'CONTRACT_CREATE', datosLimpios, currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
-  async renovarContrato(contratoId: string, meses: number, tenantId?: string) {
-    // ✅ MULTI-TENANT: Validar tenant
-    if (!tenantId) {
-      throw new Error('Tenant requerido para RRHH');
-    }
-    const currentTenantId = tenantId;
-
-    // Obtener contrato actual
-    const { data: contrato } = await this.supabaseService
-      .getClient()
-      .from('contratos')
-      .select('*')
-      .eq('id', contratoId)
-      .eq('tenant_id', currentTenantId)
-      .single();
-
-    if (!contrato) throw new Error('Contrato no encontrado');
-
-    // Calcular nueva fecha de fin
-    const fechaFin = new Date(contrato.fecha_fin || contrato.fecha_inicio);
-    fechaFin.setMonth(fechaFin.getMonth() + meses);
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('contratos')
-      .update({
-        fecha_fin: fechaFin.toISOString().split('T')[0],
-        estado: 'renovado',
-        observaciones: `Renovado por ${meses} meses el ${new Date().toLocaleDateString()}`,
-      })
-      .eq('id', contratoId)
-      .eq('tenant_id', currentTenantId)
-      .select();
-
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
-  }
-
-  async finalizarContrato(
+  async renovarContrato(
     contratoId: string,
-    motivoFinalizacion: string,
-    fechaFinalizacion: string,
+    meses: number,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Validar tenant
     if (!tenantId) {
@@ -2669,20 +2664,32 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('contratos')
-      .update({
-        estado: 'finalizado',
-        fecha_fin: fechaFinalizacion,
-        motivo_finalizacion: motivoFinalizacion,
-      })
-      .eq('id', contratoId)
-      .eq('tenant_id', currentTenantId)
-      .select();
+    const data = await this.ejecutarOperacionRrhh(
+      'CONTRACT_RENEW', { id: contratoId, meses }, currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
+  }
 
-    if (error) throw error;
-    return { success: true, data: data?.[0] };
+  async finalizarContrato(
+    contratoId: string,
+    motivoFinalizacion: string,
+    fechaFinalizacion: string,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
+    // ✅ MULTI-TENANT: Validar tenant
+    if (!tenantId) {
+      throw new Error('Tenant requerido para RRHH');
+    }
+    const currentTenantId = tenantId;
+
+    const data = await this.ejecutarOperacionRrhh(
+      'CONTRACT_FINALIZE',
+      { id: contratoId, motivo_finalizacion: motivoFinalizacion, fecha_finalizacion: fechaFinalizacion },
+      currentTenantId, actorId, idempotencyKey,
+    );
+    return { success: true, data };
   }
 
   async generarContratoPDF(contratoId: string, tenantId?: string): Promise<Buffer> {
@@ -2797,6 +2804,8 @@ export class RrhhService {
     tipo: 'entrada' | 'salida',
     hora: string,
     tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
   ) {
     // ✅ MULTI-TENANT: Validar tenant
     if (!tenantId) {
@@ -2804,70 +2813,15 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    // Buscar registro existente del día
-    const { data: registroExistente } = await this.supabaseService
-      .getClient()
-      .from('asistencia')
-      .select('*')
-      .eq('id_empleado', empleadoId)
-      .eq('tenant_id', currentTenantId)
-      .eq('fecha', fecha)
-      .single();
-
-    if (tipo === 'entrada') {
-      if (registroExistente) {
-        throw new ConflictException('Ya se registró entrada para este día');
-      }
-
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('asistencia')
-        .insert({
-          id_empleado: empleadoId,
-          fecha: fecha,
-          hora_entrada: hora,
-          estado: 'presente',
-          tenant_id: currentTenantId,
-        })
-        .select();
-
-      if (error) throw error;
-      return { success: true, data: data?.[0], message: 'Entrada registrada' };
-    } else {
-      if (!registroExistente || registroExistente.hora_salida) {
-        throw new Error(
-          'No se puede registrar salida sin entrada o ya se registró salida',
-        );
-      }
-
-      // Calcular horas trabajadas
-      const entrada = new Date(`${fecha}T${registroExistente.hora_entrada}`);
-      const salida = new Date(`${fecha}T${hora}`);
-      
-      // ✅ FIX: Validar que hora de salida sea posterior a hora de entrada
-      if (salida.getTime() <= entrada.getTime()) {
-        throw new BadRequestException(
-          `La hora de salida (${hora}) debe ser posterior a la hora de entrada (${registroExistente.hora_entrada})`,
-        );
-      }
-      
-      const horasTrabajadas =
-        (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60);
-
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('asistencia')
-        .update({
-          hora_salida: hora,
-          horas_trabajadas: horasTrabajadas,
-        })
-        .eq('id', registroExistente.id)
-        .eq('tenant_id', currentTenantId)
-        .select();
-
-      if (error) throw error;
-      return { success: true, data: data?.[0], message: 'Salida registrada' };
-    }
+    const data = await this.ejecutarOperacionRrhh(
+      'ATTENDANCE_MARK', { empleado_id: empleadoId, fecha, tipo, hora },
+      currentTenantId, actorId, idempotencyKey,
+    );
+    return {
+      success: true,
+      data,
+      message: tipo === 'entrada' ? 'Entrada registrada' : 'Salida registrada',
+    };
   }
 
   private monedaLaboralPorPais(pais: string): 'PEN' | 'ARS' | 'COP' {

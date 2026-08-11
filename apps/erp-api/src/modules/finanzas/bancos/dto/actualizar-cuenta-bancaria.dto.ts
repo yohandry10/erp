@@ -3,10 +3,15 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  IsUUID,
 } from 'class-validator';
 import { TipoCuenta } from './crear-cuenta-bancaria.dto';
 
 export class ActualizarCuentaBancariaDto {
+  @IsOptional()
+  @IsUUID('4', { message: 'La cuenta contable bancaria debe ser un UUID válido' })
+  cuenta_contable_id?: string;
+
   @IsOptional()
   @IsString({ message: 'El nombre de la cuenta debe ser texto' })
   nombre?: string;

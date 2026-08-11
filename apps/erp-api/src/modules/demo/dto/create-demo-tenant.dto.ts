@@ -2,6 +2,15 @@ import { IsOptional, IsString, IsInt, Min, Max, IsEmail, MinLength, IsIn, Matche
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDemoTenantDto {
+  @ApiPropertyOptional({
+    description: 'Clave estable para reintentar la creación sin duplicar la demo',
+    minLength: 8,
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString()
+  idempotency_key?: string;
+
   @ApiPropertyOptional({ description: 'Nombre opcional para el tenant demo' })
   @IsOptional()
   @IsString()
@@ -23,6 +32,16 @@ export class CreateDemoTenantDto {
   @IsString()
   @IsIn(['PE', 'AR', 'CO'])
   pais?: 'PE' | 'AR' | 'CO' = 'PE';
+
+  @ApiPropertyOptional({
+    description: 'Rubro principal de la empresa demo',
+    enum: ['COMERCIO', 'DISTRIBUCION', 'SERVICIOS', 'RESTAURANTE', 'MANUFACTURA'],
+    default: 'COMERCIO',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['COMERCIO', 'DISTRIBUCION', 'SERVICIOS', 'RESTAURANTE', 'MANUFACTURA'])
+  rubro?: 'COMERCIO' | 'DISTRIBUCION' | 'SERVICIOS' | 'RESTAURANTE' | 'MANUFACTURA' = 'COMERCIO';
 }
 
 export class ConvertDemoToRealDto {
@@ -68,11 +87,18 @@ export class ConvertDemoToRealDto {
   @IsIn(['basico', 'profesional', 'enterprise'], { message: 'Plan no válido' })
   plan_id?: string = 'basico';
 
-  @ApiPropertyOptional({ description: 'Periodo de facturación: mensual o anual' })
+  @ApiPropertyOptional({
+    description:
+      'Vigencia prepagada: 3 meses; 6 meses + 3 gratis; o 12 meses + 6 gratis',
+    enum: ['trimestral', 'semestral', 'anual'],
+    default: 'trimestral',
+  })
   @IsOptional()
   @IsString()
-  @IsIn(['mensual', 'anual'], { message: 'Periodo debe ser mensual o anual' })
-  periodo?: string = 'mensual';
+  @IsIn(['trimestral', 'semestral', 'anual'], {
+    message: 'Periodo debe ser trimestral, semestral o anual',
+  })
+  periodo?: 'trimestral' | 'semestral' | 'anual' = 'trimestral';
 
   // Campo interno para webhook (no expuesto en API)
   password_hash?: string;

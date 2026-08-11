@@ -40,6 +40,18 @@ REVOKE ALL ON FUNCTION public.registrar_constancia_tributo_mensual_tx(uuid, uuid
 REVOKE ALL ON FUNCTION public.guardar_tributo_anual_tx(uuid, uuid, jsonb) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.registrar_constancia_tributo_anual_tx(uuid, uuid, uuid, text, timestamptz) FROM PUBLIC, anon, authenticated;
 
+-- El backend escribe exclusivamente mediante los puentes públicos. Revocar
+-- grants directos heredados evita que una reaplicación conserve writers viejos.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE
+  ON TABLE public.tributos_declaraciones_mensuales,
+           public.tributos_declaraciones_anuales
+  FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION app.guardar_tributo_mensual_tx(uuid, uuid, jsonb),
+  app.registrar_constancia_tributo_mensual_tx(uuid, uuid, uuid, text, timestamptz),
+  app.guardar_tributo_anual_tx(uuid, uuid, jsonb),
+  app.registrar_constancia_tributo_anual_tx(uuid, uuid, uuid, text, timestamptz)
+  FROM PUBLIC, anon, authenticated, service_role;
+
 GRANT EXECUTE ON FUNCTION public.guardar_tributo_mensual_tx(uuid, uuid, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.registrar_constancia_tributo_mensual_tx(uuid, uuid, uuid, text, timestamptz) TO service_role;
 GRANT EXECUTE ON FUNCTION public.guardar_tributo_anual_tx(uuid, uuid, jsonb) TO service_role;

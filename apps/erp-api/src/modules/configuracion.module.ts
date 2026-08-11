@@ -10,7 +10,7 @@ import { CryptoModule } from '../shared/crypto/crypto.module';
 import { ValidationModule } from './validations/validation.module';
 import { AuthModule } from './auth/auth.module';
 import { PermissionsModule } from './permissions/permissions.module';
-import { DocumentosModule } from './documentos.module';
+import { DocumentosModule } from './documentos/documentos.module';
 import { AuditModule } from './audit/audit.module';
 import { FiscalModule } from './fiscal/fiscal.module';
 import { ConfigModule } from '@nestjs/config';

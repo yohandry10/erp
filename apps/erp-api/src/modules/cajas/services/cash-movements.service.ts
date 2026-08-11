@@ -49,7 +49,7 @@ export interface ValidationResult {
  * Servicio para gestionar movimientos de caja con trazabilidad completa
  *
  * Responsabilidades:
- * - Registrar movimientos con secuencia consecutiva automática
+ * - Consultar y validar el ledger inmutable de movimientos
  * - Validar cuadre matemático (saldo_anterior + monto = saldo_nuevo)
  * - Calcular saldo en tiempo real
  * - Detectar gaps en secuencia de movimientos
@@ -62,7 +62,10 @@ export class CashMovementsService {
     constructor(private readonly supabase: SupabaseService) {}
 
     /**
-     * Registra un movimiento de caja utilizando la función de BD que garantiza secuencia consecutiva
+     * Compatibilidad fail-closed. Un movimiento aislado no puede demostrar su
+     * contrapartida contable, actor/RBAC ni outbox dentro del mismo commit.
+     * Los callers productivos deben usar abrir/cerrar 451 o los RPC de negocio
+     * 452/456/466/474, según el origen del efectivo.
      */
     async registrarMovimiento(
         sesionId: string,
@@ -71,30 +74,13 @@ export class CashMovementsService {
         metadata: MovimientoMetadata = {},
         tenantId: string,
     ): Promise<MovimientoCaja> {
-        this.logger.log(`Registrando movimiento: sesión=${sesionId}, tipo=${tipo}, monto=${monto}`);
-
-        const { data, error } = await this.supabase
-            .getClient()
-            .rpc('registrar_movimiento_caja', {
-                p_sesion_caja_id: sesionId,
-                p_tipo_movimiento: tipo,
-                p_monto: monto,
-                p_referencia_documento: metadata.referencia_documento || null,
-                p_referencia_tipo: metadata.referencia_tipo || null,
-                p_motivo: metadata.motivo || null,
-                p_usuario_id: metadata.usuario_id || null,
-                p_supervisor_id: metadata.supervisor_id || null,
-                p_ip_address: metadata.ip_address || null,
-                p_metadata: metadata,
-            });
-
-        if (error) {
-            this.logger.error(`Error registrando movimiento: ${error.message}`, error);
-            throw new BadRequestException(`Error al registrar movimiento: ${error.message}`);
-        }
-
-        this.logger.log(`Movimiento registrado exitosamente: secuencia=${data.secuencia}`);
-        return data as MovimientoCaja;
+        this.logger.warn(
+            `Writer aislado bloqueado: sesión=${sesionId}, tipo=${tipo}, monto=${monto}, tenant=${tenantId}`,
+        );
+        void metadata;
+        throw new BadRequestException(
+            'El movimiento aislado está bloqueado: use el flujo atómico de negocio con contrapartida contable',
+        );
     }
 
     /**

@@ -113,7 +113,7 @@ export default function ConvertirPedidoButton({
               <p className="font-semibold text-foreground">Al confirmar:</p>
               <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
                 <li>Se generará un pedido vinculado a la cotización</li>
-                <li>Se reservará stock disponible para cada ítem</li>
+                <li>El stock se reservará después, al confirmar el pedido</li>
                 <li>Se actualizarán el historial y la auditoría</li>
               </ul>
             </div>

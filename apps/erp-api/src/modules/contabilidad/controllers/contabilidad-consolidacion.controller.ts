@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CrearAjusteConsolidacionDto,
@@ -84,10 +84,11 @@ export class ContabilidadConsolidacionController {
     @CurrentUser('id') userId: string,
     @Param('grupoId') grupoId: string,
     @Body() dto: RegistrarTasaConsolidacionDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     return {
       success: true,
-      data: await this.service.registrarTasa(tenantId, userId, grupoId, dto),
+      data: await this.service.registrarTasa(tenantId, userId, grupoId, dto, idempotencyKey),
       message: 'Tasa de consolidación registrada.',
     };
   }
@@ -100,10 +101,11 @@ export class ContabilidadConsolidacionController {
     @CurrentUser('id') userId: string,
     @Param('grupoId') grupoId: string,
     @Body() dto: RegistrarMapeoCuentaConsolidacionDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     return {
       success: true,
-      data: await this.service.registrarMapeoCuenta(tenantId, userId, grupoId, dto),
+      data: await this.service.registrarMapeoCuenta(tenantId, userId, grupoId, dto, idempotencyKey),
       message: 'Mapeo de cuenta registrado.',
     };
   }
@@ -116,10 +118,11 @@ export class ContabilidadConsolidacionController {
     @CurrentUser('id') userId: string,
     @Param('grupoId') grupoId: string,
     @Body() dto: CrearAjusteConsolidacionDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     return {
       success: true,
-      data: await this.service.crearAjuste(tenantId, userId, grupoId, dto),
+      data: await this.service.crearAjuste(tenantId, userId, grupoId, dto, idempotencyKey),
       message: 'Ajuste de consolidación creado; los libros legales no fueron modificados.',
     };
   }

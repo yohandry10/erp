@@ -73,6 +73,11 @@ export function ImportarExtractoCSV({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
+  const [saldoInicial, setSaldoInicial] = useState('');
+  const [saldoFinal, setSaldoFinal] = useState('');
+  const [idempotencyKey, setIdempotencyKey] = useState(
+    () => `recon-import:${crypto.randomUUID()}`,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Detectar banco automáticamente
@@ -100,6 +105,7 @@ export function ImportarExtractoCSV({
     }
 
     setSelectedFile(file);
+    setIdempotencyKey(`recon-import:${crypto.randomUUID()}`);
     setCsvContent('');
     setError(null);
     setParseErrors([]);
@@ -317,7 +323,13 @@ export function ImportarExtractoCSV({
   };
 
   const handleImport = async () => {
-    if (!selectedFile || previewData.length === 0) {
+    const saldoInicialNumero = Number(saldoInicial);
+    const saldoFinalNumero = Number(saldoFinal);
+    if (
+      !selectedFile || previewData.length === 0 || parseErrors.length > 0 ||
+      !Number.isFinite(saldoInicialNumero) || !Number.isFinite(saldoFinalNumero)
+    ) {
+      setError('Complete los saldos del extracto y corrija todas las filas inválidas');
       return;
     }
 
@@ -336,6 +348,9 @@ export function ImportarExtractoCSV({
           body: JSON.stringify({
             contenidoCsv: csvContent,
             banco: bancoTemplate,
+            saldo_banco_inicial: saldoInicialNumero,
+            saldo_banco_final: saldoFinalNumero,
+            idempotency_key: idempotencyKey,
           }),
         }
       );
@@ -359,6 +374,9 @@ export function ImportarExtractoCSV({
     setPreviewData([]);
     setParseErrors([]);
     setError(null);
+    setSaldoInicial('');
+    setSaldoFinal('');
+    setIdempotencyKey(`recon-import:${crypto.randomUUID()}`);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -366,6 +384,7 @@ export function ImportarExtractoCSV({
 
   const handleTemplateChange = (value: string) => {
     setBancoTemplate(value as BancoTemplate);
+    setIdempotencyKey(`recon-import:${crypto.randomUUID()}`);
     if (selectedFile) {
       processCSVPreview(selectedFile);
     }
@@ -496,8 +515,8 @@ export function ImportarExtractoCSV({
           </CardHeader>
           <CardContent>
             <div className="space-y-1 max-h-32 overflow-y-auto">
-              {parseErrors.slice(0, 10).map((err, idx) => (
-                <div key={idx} className="text-sm text-amber-400">
+              {parseErrors.slice(0, 10).map((err) => (
+                <div key={err} className="text-sm text-amber-400">
                   • {err}
                 </div>
               ))}
@@ -525,6 +544,45 @@ export function ImportarExtractoCSV({
 
       {!isProcessing && previewData.length > 0 && (
         <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Saldos informados por el banco</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="extracto-saldo-inicial">Saldo inicial *</Label>
+                <input
+                  id="extracto-saldo-inicial"
+                  type="number"
+                  step="0.01"
+                  value={saldoInicial}
+                  onChange={(event) => {
+                    setSaldoInicial(event.target.value);
+                    setIdempotencyKey(`recon-import:${crypto.randomUUID()}`);
+                  }}
+                  className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3"
+                />
+              </div>
+              <div>
+                <Label htmlFor="extracto-saldo-final">Saldo final *</Label>
+                <input
+                  id="extracto-saldo-final"
+                  type="number"
+                  step="0.01"
+                  value={saldoFinal}
+                  onChange={(event) => {
+                    setSaldoFinal(event.target.value);
+                    setIdempotencyKey(`recon-import:${crypto.randomUUID()}`);
+                  }}
+                  className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground md:col-span-2">
+                El servidor verifica saldo inicial + abonos − cargos = saldo final.
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Resumen */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
@@ -581,8 +639,8 @@ export function ImportarExtractoCSV({
                     </tr>
                   </thead>
                   <tbody className="bg-card divide-y divide-gray-200">
-                    {previewData.map((mov, idx) => (
-                      <tr key={idx} className="hover:bg-muted/30">
+                    {previewData.map((mov) => (
+                      <tr key={`${mov.fecha}:${mov.tipo}:${mov.monto}:${mov.referencia || mov.descripcion}`} className="hover:bg-muted/30">
                         <td className="px-4 py-3 text-sm text-foreground">
                           {formatDate(mov.fecha)}
                         </td>
@@ -623,7 +681,10 @@ export function ImportarExtractoCSV({
         <Button
           type="button"
           onClick={handleImport}
-          disabled={!selectedFile || previewData.length === 0 || isUploading}
+          disabled={
+            !selectedFile || previewData.length === 0 || parseErrors.length > 0 ||
+            saldoInicial === '' || saldoFinal === '' || isUploading
+          }
         >
           {isUploading ? (
             <>

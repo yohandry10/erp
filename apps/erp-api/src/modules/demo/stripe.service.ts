@@ -1,21 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import Stripe from 'stripe';
 
-const PLANES_STRIPE = {
-  basico: {
-    mensual: process.env.STRIPE_PRICE_BASICO_MENSUAL || 'price_basico_mensual',
-    anual: process.env.STRIPE_PRICE_BASICO_ANUAL || 'price_basico_anual',
-  },
-  profesional: {
-    mensual: process.env.STRIPE_PRICE_PROFESIONAL_MENSUAL || 'price_profesional_mensual',
-    anual: process.env.STRIPE_PRICE_PROFESIONAL_ANUAL || 'price_profesional_anual',
-  },
-  enterprise: {
-    mensual: process.env.STRIPE_PRICE_ENTERPRISE_MENSUAL || 'price_enterprise_mensual',
-    anual: process.env.STRIPE_PRICE_ENTERPRISE_ANUAL || 'price_enterprise_anual',
-  },
-};
-
 @Injectable()
 export class StripeService {
   private stripe: Stripe | null = null;
@@ -38,6 +23,11 @@ export class StripeService {
     tenantId: string;
     planId: string;
     periodo: string;
+    monto: number;
+    moneda: string;
+    mesesPagados: number;
+    mesesBonificados: number;
+    mesesServicio: number;
     email: string;
     razonSocial: string;
     ruc: string;
@@ -48,19 +38,28 @@ export class StripeService {
       throw new BadRequestException('Stripe no está configurado. Configure STRIPE_SECRET_KEY');
     }
 
-    const priceId = PLANES_STRIPE[params.planId]?.[params.periodo];
-    if (!priceId) {
-      throw new BadRequestException(`Plan ${params.planId} con periodo ${params.periodo} no encontrado`);
+    if (!Number.isFinite(params.monto) || params.monto <= 0) {
+      throw new BadRequestException('El monto comercial no es válido');
     }
 
     try {
       const session = await this.stripe.checkout.sessions.create({
         payment_method_types: ['card'],
-        mode: 'subscription',
+        // Los contratos son paquetes prepagados con meses bonificados. Un cobro
+        // único evita que Stripe renueve antes de consumir la bonificación; la
+        // vigencia se gobierna por el snapshot durable confirmado en PostgreSQL.
+        mode: 'payment',
         customer_email: params.email,
         line_items: [
           {
-            price: priceId,
+            price_data: {
+              currency: params.moneda.toLowerCase(),
+              unit_amount: Math.round(params.monto * 100),
+              product_data: {
+                name: `ERP ${params.planId} - ${params.periodo}`,
+                description: `${params.mesesPagados} meses pagados + ${params.mesesBonificados} meses bonificados (${params.mesesServicio} meses de servicio)`,
+              },
+            },
             quantity: 1,
           },
         ],
@@ -70,6 +69,9 @@ export class StripeService {
           periodo: params.periodo,
           razon_social: params.razonSocial,
           ruc: params.ruc,
+          meses_pagados: String(params.mesesPagados),
+          meses_bonificados: String(params.mesesBonificados),
+          meses_servicio: String(params.mesesServicio),
         },
         success_url: params.successUrl,
         cancel_url: params.cancelUrl,

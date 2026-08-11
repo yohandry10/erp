@@ -6,6 +6,7 @@ import {
   Body,
   Query,
   Param,
+  Headers,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
@@ -76,10 +77,18 @@ export class ContabilidadAnaliticaController {
   @ApiOperation({ summary: "Eliminar el reparto de una línea en un eje" })
   async eliminarDistribucion(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
     @Param("detalleId") detalleId: string,
     @Query("eje") eje: string,
+    @Headers("idempotency-key") idempotencyKey?: string,
   ) {
-    await this.distribucionService.eliminar(tenantId, detalleId, eje || "CENTRO_COSTO");
+    await this.distribucionService.eliminar(
+      tenantId,
+      detalleId,
+      eje || "CENTRO_COSTO",
+      userId,
+      idempotencyKey,
+    );
     return { success: true, message: "Distribución eliminada" };
   }
 
@@ -119,8 +128,9 @@ export class ContabilidadAnaliticaController {
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
     @Body() dto: CreateDiferidoDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.diferidosService.crear(tenantId, userId, dto);
+    const data = await this.diferidosService.crear(tenantId, userId, dto, idempotencyKey);
     return { success: true, data, message: `Diferido "${data.nombre}" creado` };
   }
 
@@ -164,9 +174,11 @@ export class ContabilidadAnaliticaController {
   @ApiResponse({ status: 200, type: DiferidoResponseDto })
   async cancelarDiferido(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
     @Param("id") diferidoId: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.diferidosService.cancelar(tenantId, diferidoId);
+    const data = await this.diferidosService.cancelar(tenantId, diferidoId, userId, idempotencyKey);
     return { success: true, data, message: `Diferido "${data.nombre}" cancelado` };
   }
 }

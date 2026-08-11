@@ -17,6 +17,7 @@ import { CacheModule } from '../../shared/cache/cache.module';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { FiscalModule } from '../fiscal/fiscal.module';
+import { ReferencedNotesService } from './referenced-notes.service';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { FiscalModule } from '../fiscal/fiscal.module';
     CpeHelperService,
     ComunicacionBajaService,
     FiscalAdapterService,
+    ReferencedNotesService,
   ],
   exports: [
     CpeService,
@@ -47,6 +49,7 @@ import { FiscalModule } from '../fiscal/fiscal.module';
     CpeHelperService,
     ComunicacionBajaService,
     FiscalAdapterService,
+    ReferencedNotesService,
   ],
 })
-export class CpeModule {} 
+export class CpeModule {}

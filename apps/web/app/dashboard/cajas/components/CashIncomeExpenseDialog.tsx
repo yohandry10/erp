@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { CashDialogFrame } from './CashDialogFrame';
 import { useCountryContext } from '@/hooks/use-country-context';
@@ -10,6 +10,13 @@ interface CashIncomeExpenseDialogProps {
     sesionId: string;
 }
 
+interface AccountingOption {
+    id: string;
+    codigo: string;
+    nombre: string;
+    aplicable_a?: { gasto?: boolean; ingreso?: boolean };
+}
+
 export function CashIncomeExpenseDialog({
     isOpen,
     onClose,
@@ -18,12 +25,44 @@ export function CashIncomeExpenseDialog({
 }: CashIncomeExpenseDialogProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-    const { post } = useApi();
+    const { get, post } = useApi();
     const [tipo, setTipo] = useState<'INGRESO' | 'GASTO'>('INGRESO');
     const [monto, setMonto] = useState('');
     const [motivo, setMotivo] = useState('');
+    const [cuentaContrapartidaId, setCuentaContrapartidaId] = useState('');
+    const [cuentas, setCuentas] = useState<AccountingOption[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const idempotencyKey = useRef('');
+
+    const nextKey = useCallback(() => {
+        if (!idempotencyKey.current) {
+            idempotencyKey.current = `cash-manual-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+        return idempotencyKey.current;
+    }, []);
+
+    useEffect(() => {
+        idempotencyKey.current = '';
+    }, [tipo, monto, motivo, cuentaContrapartidaId]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let active = true;
+        idempotencyKey.current = '';
+        setError(null);
+        get('/cajas/opciones-contables').then((response) => {
+            if (!active) return;
+            if (response?.success) {
+                setCuentas(response.data?.cuentas || []);
+            } else {
+                setError('No se pudieron cargar las contrapartidas contables');
+            }
+        }).catch(() => {
+            if (active) setError('No se pudieron cargar las contrapartidas contables');
+        });
+        return () => { active = false; };
+    }, [get, isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -38,6 +77,10 @@ export function CashIncomeExpenseDialog({
             setError('Debe ingresar un motivo');
             return;
         }
+        if (!cuentaContrapartidaId) {
+            setError(`Seleccione la cuenta de ${tipo === 'INGRESO' ? 'ingreso' : 'gasto'}`);
+            return;
+        }
 
         try {
             setLoading(true);
@@ -45,9 +88,13 @@ export function CashIncomeExpenseDialog({
                 tipo,
                 monto: montoNum,
                 motivo: motivo.trim(),
+                cuenta_contrapartida_id: cuentaContrapartidaId,
             };
-            const response = await post(`/cajas/movimientos/manual/${sesionId}`, payload);
+            const response = await post(`/cajas/movimientos/manual/${sesionId}`, payload, {
+                headers: { 'Idempotency-Key': nextKey() },
+            });
             if (response?.success) {
+                idempotencyKey.current = '';
                 onSuccess();
                 onClose();
             } else {
@@ -66,7 +113,7 @@ export function CashIncomeExpenseDialog({
             onClose={onClose}
             preventClose={loading}
             title="Ingreso o gasto"
-            description="Registre un movimiento extraordinario de la sesión de caja."
+            description="Registre el efectivo y su contrapartida contable en una sola operación."
         >
             <form onSubmit={handleSubmit} className="w-full text-left">
 
@@ -82,7 +129,10 @@ export function CashIncomeExpenseDialog({
                                         <select
                                             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                                             value={tipo}
-                                            onChange={(e) => setTipo(e.target.value as 'INGRESO' | 'GASTO')}
+                                            onChange={(e) => {
+                                                setTipo(e.target.value as 'INGRESO' | 'GASTO');
+                                                setCuentaContrapartidaId('');
+                                            }}
                                         >
                                             <option value="INGRESO">Ingreso</option>
                                             <option value="GASTO">Gasto</option>
@@ -105,6 +155,29 @@ export function CashIncomeExpenseDialog({
                                                 onChange={(e) => setMonto(e.target.value)}
                                             />
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-foreground/85">
+                                            Contrapartida contable
+                                        </label>
+                                        <select
+                                            aria-label="Contrapartida contable del movimiento"
+                                            className="mt-1 block w-full rounded-md border border-border p-2 text-sm"
+                                            value={cuentaContrapartidaId}
+                                            onChange={(e) => setCuentaContrapartidaId(e.target.value)}
+                                        >
+                                            <option value="">Seleccione una cuenta...</option>
+                                            {cuentas
+                                                .filter((cuenta) => tipo === 'INGRESO'
+                                                    ? cuenta.aplicable_a?.ingreso
+                                                    : cuenta.aplicable_a?.gasto)
+                                                .map((cuenta) => (
+                                                    <option key={cuenta.id} value={cuenta.id}>
+                                                        {cuenta.codigo} · {cuenta.nombre}
+                                                    </option>
+                                                ))}
+                                        </select>
                                     </div>
 
                                     <div>

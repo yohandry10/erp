@@ -9,6 +9,7 @@ import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interfac
 import { DocumentoFiscal } from '../../documentos/interfaces/documento-fiscal.interface';
 import { sanitizePostgrestSearch } from '../../../common/util/postgrest.util';
 import Decimal from 'decimal.js';
+import { createHash } from 'crypto';
 
 interface ListarCxcFilters {
   estado?: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO';
@@ -154,6 +155,18 @@ export class CxcService {
     };
   }
   async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<void> {
+    const atomicSources = new Set([
+      'cpe.api.atomic',
+      'ventas.pedidos.atomic',
+      'pos.atomic.476',
+    ]);
+    if (evento.source && atomicSources.has(evento.source)) {
+      this.logger.log(
+        `ℹ️ [CXC] ${evento.source} ya persistió la CxC dentro del commit fiscal; evento sólo informativo`,
+      );
+      return;
+    }
+
     // Una venta al contado (POS/efectivo) ya está pagada: no genera cuenta por
     // cobrar. Solo se salta cuando el emisor lo marca explícitamente como NO
     // crédito; si viene undefined (flujos legacy) se conserva el comportamiento
@@ -642,396 +655,38 @@ export class CxcService {
   ): Promise<{ success: boolean; data: any }> {
     const client = this.supabase.getClient();
 
-    const montoPago = this.parseMontoPago(dto.monto);
-    const fechaPago = this.parseFechaPago(dto.fecha_pago);
-    const pagoTxResult = await this.registrarPagoViaRpcIfAvailable(
+    this.parseMontoPago(dto.monto);
+    this.parseFechaPago(dto.fecha_pago);
+    const pagoTxResult = await this.registrarPagoViaRequiredRpc(
       client,
       tenantId,
       cuentaId,
       dto,
       userId,
     );
-    if (pagoTxResult) {
-      return pagoTxResult;
-    }
-
-    const cuenta = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
-
-    const pendienteActual = Number(cuenta.monto_pendiente ?? 0);
-    const montoTotal = Number(cuenta.monto_total ?? 0);
-
-    // Tolerancia de 1 centimo para redondeo; no permitir sobrepago real
-    if (montoPago - pendienteActual > 0.01) {
-      throw new BadRequestException('El monto del pago supera el saldo pendiente');
-    }
-
-    const movimientoTipo =
-      dto.tipo ?? (dto.aplica_retencion ? TipoMovimientoCxc.RETENCION : TipoMovimientoCxc.PAGO);
-    const esNotaCredito = movimientoTipo === TipoMovimientoCxc.NOTA_CREDITO;
-
-    const retencionMonto =
-      !esNotaCredito && dto.retencion_monto != null
-        ? Number(dto.retencion_monto)
-        : !esNotaCredito && movimientoTipo === TipoMovimientoCxc.RETENCION
-          ? montoPago
-          : null;
-
-    const nuevoPendiente = this.round2(Math.max(pendienteActual - montoPago, 0));
-    const nuevoEstado = this.calcularEstadoCuenta(montoTotal, nuevoPendiente);
-    const diasMora = nuevoPendiente > 0 ? this.calcularDiasMora(cuenta.fecha_vencimiento) : 0;
-
-    // Si se especificó cuenta bancaria, validar que existe y la moneda coincida
-    let cuentaBancaria: any = null;
-    if (!esNotaCredito && dto.cuenta_bancaria_id) {
-      const { data: cuentaBanco, error: errorCuentaBanco } = await client
-        .from('cuentas_bancarias')
-        .select('id, nombre, saldo, moneda, permite_sobregiro, activa')
-        .eq('tenant_id', tenantId)
-        .eq('id', dto.cuenta_bancaria_id)
-        .maybeSingle();
-
-      if (errorCuentaBanco || !cuentaBanco) {
-        throw new BadRequestException('Cuenta bancaria no encontrada');
-      }
-
-      if (!cuentaBanco.activa) {
-        throw new BadRequestException('No se pueden registrar cobros en una cuenta bancaria inactiva');
-      }
-
-      cuentaBancaria = cuentaBanco;
-
-      // Validar que la moneda coincida
-      const monedaCuenta = dto.moneda ?? cuenta.moneda ?? 'PEN';
-      if (cuentaBanco.moneda !== monedaCuenta) {
-        throw new BadRequestException(
-          `La moneda de la cuenta bancaria (${cuentaBanco.moneda}) no coincide con la moneda del cobro (${monedaCuenta})`,
-        );
-      }
-    }
-
-    // ✅ IDEMPOTENCIA: Validar que no exista un pago duplicado con la misma referencia
-    if (dto.referencia) {
-      const { data: pagoDuplicado } = await client
-        .from('cxc_pagos')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('cuenta_id', cuentaId)
-        .eq('referencia', dto.referencia)
-        .maybeSingle();
-
-      if (pagoDuplicado) {
-        throw new BadRequestException(
-          `Ya existe un pago registrado con la referencia "${dto.referencia}". Use una referencia única.`,
-        );
-      }
-    }
-
-    const cobroEventId = uuidv4();
-    const submittedIdempotency = dto.idempotency_key?.trim() || null;
-    const provisionalIdempotencyKey = submittedIdempotency ?? `cxc.cobro:${tenantId}:${cobroEventId}`;
-    const ahora = new Date().toISOString();
-
-    const { data: pagoRegistrado, error: pagoError } = await client
-      .from('cxc_pagos')
-      .insert({
-        tenant_id: tenantId,
-        cuenta_id: cuentaId,
-        pedido_id: cuenta.pedido_id ?? null,
-        documento_id: dto.documento_pago_id ?? null,
-        monto: this.round2(montoPago),
-        moneda: dto.moneda ?? cuenta.moneda ?? 'PEN',
-        fecha_pago: fechaPago,
-        metodo_pago: esNotaCredito ? 'NOTA_CREDITO' : dto.metodo_pago ?? null,
-        referencia: dto.referencia ?? null,
-        notas: dto.notas ?? null,
-        tipo: movimientoTipo,
-        aplica_retencion: !esNotaCredito && (dto.aplica_retencion ?? movimientoTipo === TipoMovimientoCxc.RETENCION),
-        retencion_monto: !esNotaCredito ? retencionMonto : null,
-        usuario_id: userId ?? null,
-        cuenta_bancaria_id: dto.cuenta_bancaria_id ?? null,
-        event_id: cobroEventId,
-        idempotency_key: provisionalIdempotencyKey,
-        source: 'finanzas.cxc',
-        created_at: ahora,
-        updated_at: ahora,
-      })
-      .select()
-      .single();
-
-    if (pagoError || !pagoRegistrado) {
-      console.error('Error registrando pago de CxC:', pagoError);
-      throw new BadRequestException('No se pudo registrar el pago de la cuenta por cobrar');
-    }
-
-    const finalIdempotencyKey = submittedIdempotency ?? `cxc.cobro:${tenantId}:${pagoRegistrado.id}`;
-    if (!submittedIdempotency && finalIdempotencyKey !== provisionalIdempotencyKey) {
-      const { error: idempotencyUpdateError } = await client
-        .from('cxc_pagos')
-        .update({
-          idempotency_key: finalIdempotencyKey,
-          updated_at: ahora,
-        })
-        .eq('id', pagoRegistrado.id)
-        .eq('tenant_id', tenantId);
-
-      if (idempotencyUpdateError) {
-        this.logger.warn(
-          `⚠️ [CXC] No se pudo actualizar idempotency_key del cobro ${pagoRegistrado.id}:`,
-          idempotencyUpdateError,
-        );
-      } else {
-        (pagoRegistrado as any).idempotency_key = finalIdempotencyKey;
-      }
-    }
-
-    // Si hay cuenta bancaria, crear movimiento bancario y actualizar saldo
-    let movimientoBancario: any = null;
-    if (!esNotaCredito && dto.cuenta_bancaria_id && cuentaBancaria) {
-      const clienteNombre = cuenta.clientes?.razon_social || cuenta.cliente_id;
-      const numeroDocumento = [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || cuenta.documento_id;
-
-      const { data: movimiento, error: errorMovimiento } = await client
-        .from('movimientos_bancarios')
-        .insert({
-          tenant_id: tenantId,
-          cuenta_bancaria_id: dto.cuenta_bancaria_id,
-          tipo: 'ABONO',
-          monto: this.round2(montoPago),
-          fecha: fechaPago,
-          descripcion: `Cobro de cliente ${clienteNombre} - Doc: ${numeroDocumento}`,
-          referencia: dto.referencia || null,
-          metodo_pago: dto.metodo_pago,
-          cliente_id: cuenta.cliente_id,
-          cxc_id: cuentaId,
-          conciliado: false,
-          created_by: userId || null,
-          created_at: ahora,
-        })
-        .select()
-        .single();
-
-      if (errorMovimiento) {
-        console.error('Error creando movimiento bancario:', errorMovimiento);
-        await client.from('cxc_pagos').delete().eq('id', pagoRegistrado.id);
-        throw new BadRequestException('No se pudo crear el movimiento bancario');
-      }
-
-      movimientoBancario = movimiento;
-
-      const nuevoSaldoBanco = this.round2(cuentaBancaria.saldo + montoPago);
-      const { error: errorSaldoBanco } = await client
-        .from('cuentas_bancarias')
-        .update({
-          saldo: nuevoSaldoBanco,
-          updated_at: ahora,
-        })
-        .eq('tenant_id', tenantId)
-        .eq('id', dto.cuenta_bancaria_id);
-
-      if (errorSaldoBanco) {
-        console.error('Error actualizando saldo de cuenta bancaria:', errorSaldoBanco);
-        await client.from('movimientos_bancarios').delete().eq('id', movimiento.id);
-        await client.from('cxc_pagos').delete().eq('id', pagoRegistrado.id);
-        throw new BadRequestException('No se pudo actualizar el saldo de la cuenta bancaria');
-      }
-    }
-
-    const acumulados = {
-      retencion: Number(cuenta.retencion_total ?? 0),
-      percepcion: Number(cuenta.percepcion_total ?? 0),
-      detraccion: Number(cuenta.detraccion_total ?? 0),
-      anticipo: Number(cuenta.anticipo_total ?? 0),
-    };
-
-    if (!esNotaCredito && (movimientoTipo === TipoMovimientoCxc.RETENCION || dto.aplica_retencion)) {
-      acumulados.retencion = this.round2(
-        acumulados.retencion + (retencionMonto != null ? Number(retencionMonto) : montoPago),
-      );
-    }
-
-    if (!esNotaCredito && movimientoTipo === TipoMovimientoCxc.PERCEPCION) {
-      acumulados.percepcion = this.round2(acumulados.percepcion + montoPago);
-    }
-
-    if (!esNotaCredito && movimientoTipo === TipoMovimientoCxc.DETRACCION) {
-      acumulados.detraccion = this.round2(acumulados.detraccion + montoPago);
-    }
-
-    if (!esNotaCredito && movimientoTipo === TipoMovimientoCxc.ANTICIPO) {
-      acumulados.anticipo = this.round2(acumulados.anticipo + montoPago);
-    }
-
-    // HARDENING: Optimistic concurrency — si otro pago ya cambio monto_pendiente, este falla
-    const { data: updateData, error: updateError } = await client
-      .from('cuentas_por_cobrar')
-      .update({
-        monto_pendiente: nuevoPendiente,
-        saldo_pendiente: nuevoPendiente,
-        estado: nuevoEstado,
-        dias_mora: diasMora,
-        retencion_total: acumulados.retencion,
-        percepcion_total: acumulados.percepcion,
-        detraccion_total: acumulados.detraccion,
-        anticipo_total: acumulados.anticipo,
-        updated_at: ahora,
-      })
-      .eq('id', cuentaId)
-      .eq('tenant_id', tenantId)
-      .eq('monto_pendiente', pendienteActual)
-      .select('id');
-
-    if (updateError) {
-      console.error('Error actualizando cuenta por cobrar después del pago:', updateError);
-      throw new BadRequestException('No se pudo actualizar la cuenta por cobrar');
-    }
-
-    if (!updateData || updateData.length === 0) {
-      throw new BadRequestException(
-        'Conflicto de concurrencia: el saldo de la cuenta fue modificado por otro pago simultáneo. Intente de nuevo.'
-      );
-    }
-
-    const detalleActualizado = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
-
-    const medioCobro = esNotaCredito ? 'NOTA_CREDITO' : (dto.metodo_pago ?? 'EFECTIVO'); // HARDENING: aseguramos precedencia al calcular medio de cobro.
-
-    this.emitirEventoCobroRegistrado(
-      tenantId,
-      pagoRegistrado,
-      cuenta,
-      detalleActualizado,
-      pendienteActual,
-      nuevoPendiente,
-      nuevoEstado,
-      userId,
-      {
-        eventId: cobroEventId,
-        idempotencyKey: finalIdempotencyKey,
-        medio: medioCobro,
-        cuentaBancariaId: dto.cuenta_bancaria_id || null,
-        timestamp: ahora,
-      },
-    );
-
-    const numeroDocumento =
-      [detalleActualizado.serie, detalleActualizado.numero].filter(Boolean).join('-') ||
-      detalleActualizado.documento_id ||
-      'SIN-DOC';
-
-    const clienteNombre =
-      detalleActualizado.clientes?.razon_social ||
-      cuenta.clientes?.razon_social ||
-      null;
-
-    const eventoPayload = {
-      tenant_id: tenantId,
-      tenantId,
-      event_id: cobroEventId,
-      eventId: cobroEventId,
-      idempotency_key: finalIdempotencyKey,
-      idempotencyKey: finalIdempotencyKey,
-      cobro_id: pagoRegistrado.id,
-      cobroId: pagoRegistrado.id,
-      cxc_id: pagoRegistrado.cuenta_id,
-      cxcId: pagoRegistrado.cuenta_id,
-      cliente_id: detalleActualizado.cliente_id,
-      clienteId: detalleActualizado.cliente_id,
-      cliente_nombre: clienteNombre,
-      clienteNombre,
-      documento_id: detalleActualizado.documento_id || null,
-      documentoId: detalleActualizado.documento_id || null,
-      numero_documento: numeroDocumento,
-      numeroDocumento,
-      monto: this.round2(pagoRegistrado.monto),
-      moneda: pagoRegistrado.moneda || 'PEN',
-      fecha: fechaPago,
-      medio: medioCobro,
-      metodo_pago: medioCobro,
-      cuenta_bancaria_id: dto.cuenta_bancaria_id || null,
-      cuentaBancariaId: dto.cuenta_bancaria_id || null,
-      referencia: pagoRegistrado.referencia || null,
-      notas: pagoRegistrado.notas || null,
-      saldo_anterior: this.round2(pendienteActual),
-      saldoAnterior: this.round2(pendienteActual),
-      saldo_nuevo: this.round2(nuevoPendiente),
-      saldoNuevo: this.round2(nuevoPendiente),
-      estado_anterior: cuenta.estado || 'PENDIENTE',
-      estadoAnterior: cuenta.estado || 'PENDIENTE',
-      estado_nuevo: nuevoEstado,
-      estadoNuevo: nuevoEstado,
-      movimiento_bancario_id: movimientoBancario?.id || null,
-      movimientoBancarioId: movimientoBancario?.id || null,
-      created_by: userId || null,
-      createdBy: userId || null,
-      source: 'finanzas.cxc',
-      timestamp: ahora,
-    };
-
-    // Usar el builder para garantizar estructura consistente
-    const eventToInsert = OutboxEventBuilder.build({
-      tenantId,
-      eventType: 'cobro.registrado',
-      aggregateType: 'cobro',
-      aggregateId: pagoRegistrado.id,
-      eventData: eventoPayload,
-      eventId: cobroEventId,
-      correlationId: finalIdempotencyKey,
-      idempotencyKey: finalIdempotencyKey,
-    });
-
-    const { error: errorOutbox } = await client
-      .from('outbox_events')
-      .insert(eventToInsert);
-
-    if (errorOutbox) {
-      console.error('Error insertando evento CobroRegistrado en outbox:', errorOutbox);
-    }
-
-    {
-      const auditoriaAccion = esNotaCredito ? 'APLICAR_NOTA_CREDITO' : 'REGISTRAR_PAGO';
-      try {
-        await this.auditService.registrarCambio(
-          'cuentas_por_cobrar',
-          'UPDATE',
-          userId || 'SYSTEM',
-          {
-            old: { monto_pendiente: pendienteActual, estado: cuenta.estado },
-            new: { monto_pendiente: nuevoPendiente, estado: nuevoEstado, dias_mora: diasMora },
-          },
-          tenantId,
-          cuentaId,
-          {
-            accion: auditoriaAccion,
-            monto: montoPago,
-            medio_cobro: medioCobro,
-            referencia: dto.referencia,
-            tipo_movimiento: movimientoTipo,
-            event_id: cobroEventId,
-          },
-        );
-      } catch (error) {
-        console.warn('⚠️ No se pudo registrar auditoría de pago CxC:', error);
-      }
-    }
-
-    return {
-      success: true,
-      data: detalleActualizado,
-    };
+    return pagoTxResult;
   }
 
-  private async registrarPagoViaRpcIfAvailable(
+  private async registrarPagoViaRequiredRpc(
     client: any,
     tenantId: string,
     cuentaId: string,
     dto: RegistrarPagoCxcDto,
     userId?: string,
-  ): Promise<{ success: boolean; data: any } | null> {
+  ): Promise<{ success: boolean; data: any }> {
     if (typeof client?.rpc !== 'function') {
-      return null;
+      throw new BadRequestException(
+        'El writer transaccional registrar_cxc_pago_tx no esta disponible; el cobro no fue aplicado',
+      );
     }
 
-    const userUuid = this.isUuid(userId) ? userId : null;
+    if (!this.isUuid(userId)) {
+      throw new BadRequestException('El actor autenticado es obligatorio para registrar el cobro');
+    }
+    if (!dto.idempotency_key?.trim()) {
+      throw new BadRequestException('La llave de idempotencia es obligatoria para registrar el cobro');
+    }
+
     const { data, error } = await client.rpc('registrar_cxc_pago_tx', {
       p_tenant_id: tenantId,
       p_cuenta_id: cuentaId,
@@ -1043,36 +698,18 @@ export class CxcService {
         referencia: dto.referencia,
         notas: dto.notas,
         cuenta_bancaria_id: dto.cuenta_bancaria_id,
+        sesion_caja_id: dto.sesion_caja_id,
         tipo: dto.tipo,
         aplica_retencion: dto.aplica_retencion,
         retencion_monto: dto.retencion_monto,
         documento_pago_id: dto.documento_pago_id,
         idempotency_key: dto.idempotency_key,
       },
-      p_user_id: userUuid,
+      p_user_id: userId,
     });
 
     if (error) {
       const message = String(error?.message || error?.details || '');
-      const code = String(error?.code || '');
-      const rpcMissing =
-        code === 'PGRST202' ||
-        code === '42883' ||
-        message.includes('registrar_cxc_pago_tx') ||
-        message.includes('Could not find the function');
-      const rpcShapeMismatch =
-        code === '42703' ||
-        message.includes('has no field') ||
-        message.includes('record "v_cuenta"') ||
-        (message.includes('column') && message.includes('does not exist'));
-
-      if (rpcMissing || rpcShapeMismatch) {
-        this.logger.warn(
-          `RPC registrar_cxc_pago_tx no disponible o no alineada con el esquema; se usa flujo legacy de CxC. code=${code || 'N/A'} message=${message || 'sin detalle'}`,
-        );
-        return null;
-      }
-
       if (message.includes('Cuenta por cobrar no encontrada')) {
         throw new NotFoundException('Cuenta por cobrar no encontrada');
       }
@@ -1081,42 +718,16 @@ export class CxcService {
       throw new BadRequestException(error.message || 'No se pudo registrar el pago de la cuenta por cobrar');
     }
 
-    const payload = data ?? {};
-    const cuentaAnterior = payload.cuenta_anterior ?? payload.cuenta ?? {};
-    const pagoRegistrado = payload.pago ?? {};
-    const detalleActualizado = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
-    const saldoAnterior = Number(payload.saldo_anterior ?? cuentaAnterior.monto_pendiente ?? 0);
-    const saldoNuevo = Number(
-      payload.saldo_nuevo ??
-      detalleActualizado.monto_pendiente ??
-      detalleActualizado.saldo_pendiente ??
-      0,
-    );
-    const estadoNuevo = String(payload.estado_nuevo ?? detalleActualizado.estado ?? 'PENDIENTE');
-    const esNotaCredito = (dto.tipo ?? pagoRegistrado.tipo) === TipoMovimientoCxc.NOTA_CREDITO;
-    const medioCobro = esNotaCredito ? 'NOTA_CREDITO' : (dto.metodo_pago ?? pagoRegistrado.metodo_pago ?? 'EFECTIVO');
-
-    this.emitirEventoCobroRegistrado(
-      tenantId,
-      pagoRegistrado,
-      cuentaAnterior,
-      detalleActualizado,
-      saldoAnterior,
-      saldoNuevo,
-      estadoNuevo,
-      userId,
-      {
-        eventId: payload.event_id ?? pagoRegistrado.event_id ?? uuidv4(),
-        idempotencyKey: payload.idempotency_key ?? pagoRegistrado.idempotency_key ?? `cxc.cobro:${tenantId}:${pagoRegistrado.id}`,
-        medio: medioCobro,
-        cuentaBancariaId: dto.cuenta_bancaria_id || null,
-        timestamp: new Date().toISOString(),
-      },
-    );
-
     return {
       success: true,
-      data: detalleActualizado,
+      data: {
+        ...(data?.cuenta ?? {}),
+        pago: data?.pago ?? null,
+        movimiento_bancario: data?.movimiento_bancario ?? null,
+        movimiento_caja: data?.movimiento_caja ?? null,
+        valuacion: data?.valuacion ?? null,
+        idempotent_replay: Boolean(data?.idempotent),
+      },
     };
   }
 
@@ -1126,39 +737,69 @@ export class CxcService {
     dto: AplicarNotaCreditoDto,
     userId?: string,
   ): Promise<{ success: boolean; data: any }> {
-    const serieNumero = [dto.serie, dto.numero].filter(Boolean).join('-');
-    const referenciaCalculada =
-      dto.referencia ?? (serieNumero ? serieNumero : undefined); // HARDENING: referencia calculada segura para evitar rupturas de compilación.
-    const notas = dto.notas ?? dto.motivo ?? undefined;
-
-    // HARDENING: reutilizamos flujo de registrarPago con tipo NOTA_CREDITO para garantizar idempotencia.
-    return this.registrarPago(
-      tenantId,
-      cuentaId,
+    if (!userId) {
+      throw new BadRequestException('La nota de crédito requiere un actor autenticado');
+    }
+    const cuenta = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
+    if (!cuenta?.documento_id) {
+      throw new BadRequestException(
+        'La CxC no tiene documento fiscal origen; debe sanearse antes de emitir una nota',
+      );
+    }
+    if (dto.documento_id && dto.documento_id !== cuenta.documento_id) {
+      throw new BadRequestException('El documento declarado no coincide con la CxC seleccionada');
+    }
+    const key = String(dto.idempotency_key ?? '').trim().toLowerCase();
+    if (key.length < 8 || key.length > 200) {
+      throw new BadRequestException('idempotency_key es obligatorio y debe tener entre 8 y 200 caracteres');
+    }
+    const { data, error } = await this.supabase.getClient().rpc(
+      'crear_nota_referenciada_tx',
       {
-        monto: dto.monto,
-        fecha_pago: dto.fecha_emision,
-        metodo_pago: 'NOTA_CREDITO',
-        referencia: referenciaCalculada,
-        notas,
-        tipo: TipoMovimientoCxc.NOTA_CREDITO,
-        documento_pago_id: dto.documento_id,
-        idempotency_key: dto.documento_id
-          ? `cxc.nota_credito:${tenantId}:${dto.documento_id}`
-          : referenciaCalculada
-            ? `cxc.nota_credito:${tenantId}:${referenciaCalculada}`
-            : undefined,
-      } as RegistrarPagoCxcDto,
-      userId,
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+        p_documento_origen_id: cuenta.documento_id,
+        p_tipo_documento: '07',
+        p_codigo_motivo: dto.codigo_motivo ?? '10',
+        p_motivo: dto.motivo ?? dto.notas ?? 'Ajuste comercial de cuenta por cobrar',
+        p_monto_total: dto.monto,
+        p_idempotency_key: key,
+      },
     );
+    if (error) {
+      this.logger.error('Error en crear_nota_referenciada_tx desde CxC:', error);
+      throw new BadRequestException(error.message || 'No se pudo crear la nota de crédito referenciada');
+    }
+    return { success: true, data: Array.isArray(data) ? data[0] : data };
   }
-
   async reprogramarCuentaPorCobrar(
     tenantId: string,
     cuentaId: string,
     dto: ReprogramarCxcDto,
     userId?: string,
+    idempotencyKey?: string,
   ): Promise<{ success: boolean; data: any }> {
+    if (!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    const key = idempotencyKey?.trim() || `cxc-reprogram:${createHash('sha256')
+      .update(JSON.stringify({ tenantId, cuentaId, dto, userId }))
+      .digest('hex')}`;
+    const { data: rpcData, error: rpcError } = await this.supabase.getClient().rpc(
+      'reprogramar_cxc_tx',
+      {
+        p_tenant_id: tenantId,
+        p_cxc_id: cuentaId,
+        p_actor_id: userId,
+        p_fecha_vencimiento: dto.nueva_fecha_vencimiento,
+        p_motivo: dto.motivo ?? null,
+        p_comentarios: dto.comentarios ?? null,
+        p_idempotency_key: key,
+      },
+    );
+    if (rpcError) throw new BadRequestException(rpcError.message || 'No se pudo reprogramar la cuenta por cobrar');
+    const result: any = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+    return { success: true, data: result?.cuenta ?? result };
+
+    /* istanbul ignore next -- implementación legacy inalcanzable; retirar tras ventana compatible */
     const client = this.supabase.getClient();
 
     const cuenta = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
@@ -1671,120 +1312,6 @@ export class CxcService {
     return new Decimal(value).toDecimalPlaces(2).toNumber();
   }
 
-  private emitirEventoPagoFactura(
-    tenantId: string,
-    cuenta: any,
-    cuentaId: string,
-    pago: { monto: number; metodo?: string; fecha: string },
-    saldoPendiente: number,
-    estadoCuenta: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO',
-  ): void {
-    if (!this.eventBus || !cuenta?.documento_id) {
-      return;
-    }
-
-    try {
-      const numeroFactura =
-        [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || cuenta.documento_id;
-      const tenantFromContext = tenantId || cuenta.tenant_id || cuenta.tenantId || null;
-
-      if (!tenantFromContext) {
-        // HARDENING: sin tenant no generamos evento de pago.
-        console.warn('⚠️ [CXC] Pago de factura sin tenantId, se omite evento contable');
-        return;
-      }
-
-      this.eventBus.emitPagoFactura({
-        eventId: uuidv4(),
-        tenantId: tenantFromContext,
-        cxcId: cuentaId,
-        facturaId: cuenta.documento_id,
-        cpeId: cuenta.documento_id,
-        numeroFactura,
-        clienteId: cuenta.cliente_id,
-        montoPagado: this.round2(pago.monto),
-        moneda: cuenta.moneda || 'PEN',
-        metodoPago: pago.metodo ?? 'desconocido',
-        cuentaBancariaId: cuenta.cuenta_bancaria_id ?? null,
-        fechaPago: pago.fecha,
-        saldoPendiente: this.round2(saldoPendiente),
-        estadoPago: estadoCuenta === 'CANCELADO' ? 'COMPLETO' : 'PARCIAL',
-      });
-    } catch (error) {
-      console.error('Error emitiendo evento de pago de factura para contabilidad:', error);
-    }
-  }
-
-  private emitirEventoCobroRegistrado(
-    tenantId: string,
-    pagoRegistrado: any,
-    cuentaAnterior: any,
-    cuentaActualizada: any,
-    saldoAnterior: number,
-    saldoNuevo: number,
-    estadoNuevo: string,
-    userId?: string,
-    extras?: {
-      eventId: string;
-      idempotencyKey: string;
-      medio: string;
-      cuentaBancariaId?: string | null;
-      timestamp?: string;
-    },
-  ): void {
-    if (!this.eventBus) {
-      return;
-    }
-
-    try {
-      const numeroDocumento =
-        [cuentaActualizada.serie, cuentaActualizada.numero].filter(Boolean).join('-') ||
-        cuentaActualizada.documento_id ||
-        'SIN-DOC';
-
-      const clienteNombre =
-        cuentaActualizada.clientes?.razon_social ||
-        cuentaAnterior.clientes?.razon_social ||
-        null;
-
-      const estadoAnterior = cuentaAnterior.estado || 'PENDIENTE';
-
-      const eventId = extras?.eventId ?? uuidv4();
-      const idempotencyKey = extras?.idempotencyKey ?? `cxc.cobro:event:${eventId}`;
-      const medio =
-        extras?.medio ?? (pagoRegistrado.metodo_pago || 'EFECTIVO'); // HARDENING: parentesis para respetar precedencia segura.
-
-      this.eventBus.emitCobroRegistrado({
-        tenantId,
-        eventId,
-        idempotencyKey,
-        cobroId: pagoRegistrado.id,
-        cxcId: pagoRegistrado.cuenta_id,
-        clienteId: cuentaActualizada.cliente_id,
-        clienteNombre,
-        documentoId: cuentaActualizada.documento_id || null,
-        numeroDocumento,
-        monto: this.round2(pagoRegistrado.monto),
-        moneda: pagoRegistrado.moneda || 'PEN',
-        fecha: pagoRegistrado.fecha_pago,
-        medio,
-        cuentaBancariaId: extras?.cuentaBancariaId ?? pagoRegistrado.cuenta_bancaria_id ?? null,
-        referencia: pagoRegistrado.referencia || null,
-        notas: pagoRegistrado.notas || null,
-        saldoAnterior: this.round2(saldoAnterior),
-        saldoNuevo: this.round2(saldoNuevo),
-        estadoAnterior,
-        estadoNuevo,
-        source: 'finanzas.cxc',
-        createdBy: userId || null,
-        timestamp: extras?.timestamp ?? new Date().toISOString(),
-      });
-
-      console.log('✅ Evento CobroRegistrado emitido exitosamente');
-    } catch (error) {
-      console.error('Error emitiendo evento CobroRegistrado:', error);
-    }
-  }
 
   private buildNumeroDocumento(
     serie?: string | null,
@@ -1947,109 +1474,12 @@ export class CxcService {
         return clientePorDocumento;
       }
 
-      const clienteCreado = await this.crearClienteDesdeCpe(
-        tenantId,
-        documentoReceptor,
-        cpeRecord.tipo_documento_receptor,
-        cpeRecord.razon_social_receptor,
-        cpeRecord.direccion_receptor,
+      this.logger.warn(
+        `⚠️ [CXC] El receptor ${documentoReceptor} no está dado de alta como cliente del tenant; no se crea un maestro implícito.`,
       );
-      if (clienteCreado) {
-        return clienteCreado;
-      }
     }
 
     return null;
-  }
-
-  private mapSunatDocumentoTipo(code?: string | null): 'RUC' | 'DNI' | 'CE' | 'PASAPORTE' {
-    switch ((code ?? '').toString().trim()) {
-      case '6':
-        return 'RUC';
-      case '4':
-        return 'CE';
-      case '7':
-        return 'PASAPORTE';
-      case '1':
-      default:
-        return 'DNI';
-    }
-  }
-
-  private mapDocumentoTipoCorto(tipo: string): string {
-    switch (tipo) {
-      case 'RUC':
-        return 'R';
-      case 'CE':
-        return 'C';
-      case 'PASAPORTE':
-        return 'P';
-      default:
-        return 'D';
-    }
-  }
-
-  private async crearClienteDesdeCpe(
-    tenantId: string,
-    documento: string,
-    tipoDocumentoSunat?: string | null,
-    razonSocial?: string | null,
-    direccion?: string | null,
-  ): Promise<ClienteReferenciaInfo | null> {
-    if (!documento) {
-      return null;
-    }
-
-    const client = this.supabase.getClient();
-    const tipoDocumento = this.mapSunatDocumentoTipo(tipoDocumentoSunat);
-    const tipoCliente = tipoDocumento === 'RUC' ? 'EMPRESA' : 'PERSONA';
-    const tipoDocumentoCorto = this.mapDocumentoTipoCorto(tipoDocumento);
-    const documentoEnteroSeguro = this.toSafeIntegerDocument(documento);
-
-    const insertData: Record<string, any> = {
-      tenant_id: tenantId,
-      tipo: tipoCliente,
-      tipo_documento: tipoDocumentoCorto,
-      documento_tipo: tipoDocumento,
-      razon_social: razonSocial ?? 'CLIENTE',
-      nombre: razonSocial ?? 'CLIENTE',
-      codigo: documento,
-      direccion: direccion ?? null,
-      email: null,
-      activo: true,
-      estado: 'ACTIVO',
-    };
-
-    if (tipoDocumento === 'RUC') {
-      insertData.ruc = documento;
-    }
-
-    if (documentoEnteroSeguro !== null) {
-      insertData.numero_documento = documentoEnteroSeguro;
-      insertData.documento_numero = documentoEnteroSeguro;
-    }
-
-    try {
-      const { data, error } = await client
-        .from('clientes')
-        .insert(insertData)
-        .select('id, numero_documento')
-        .single();
-
-      if (error) {
-        this.logger.error('❌ [CXC] Error creando cliente desde CPE:', error);
-        return null;
-      }
-
-      if (!data) {
-        return null;
-      }
-
-      return { id: data.id, numeroDocumento: data.numero_documento ?? null } as ClienteReferenciaInfo;
-    } catch (error) {
-      this.logger.error('❌ [CXC] Error inesperado creando cliente desde CPE:', error);
-      return null;
-    }
   }
 
   private toSafeIntegerDocument(documento: string): number | null {

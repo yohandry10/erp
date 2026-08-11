@@ -80,7 +80,8 @@ export default function PagoLotePage() {
     fecha_pago: string;
     metodo_pago: string;
     cuenta_bancaria_id: string;
-    referencia_lote?: string;
+    referencia_lote: string;
+    idempotency_key: string;
     observaciones?: string;
   }) => {
     try {

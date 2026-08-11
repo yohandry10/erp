@@ -1,199 +1,132 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { SireService } from './sire.service';
-import { EventBusService } from '../../shared/events/event-bus.service';
-import { PermissionGuard } from '../../common/guards/permission.guard';
-import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { isProduction } from '../../common/feature-flags';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { GenerateSireReportDto, SireReportFiltersDto } from './sire.dto';
+import { SireService } from './sire.service';
 
 @ApiTags('sire')
 @Controller('sire')
-@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: proteger SIRE con permisos.
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @ApiBearerAuth()
 export class SireController {
-  constructor(
-    private readonly sireService: SireService,
-    private readonly eventBus: EventBusService
-  ) {}
+  constructor(private readonly sireService: SireService) {}
 
   @Get('stats')
-  @ApiOperation({ summary: 'Get SIRE statistics' })
-  @ApiResponse({ status: 200, description: 'SIRE statistics retrieved successfully' })
+  @ApiOperation({ summary: 'Obtener estadísticas SIRE del tenant' })
+  @ApiResponse({ status: 200, description: 'Estadísticas SIRE obtenidas' })
   @RequirePermission('sire.read')
-  async getStats(@CurrentTenant() tenantId: string) {
-    console.log('📊 Endpoint SIRE stats llamado');
-    return await this.sireService.getStats(tenantId);
+  getStats(@CurrentTenant() tenantId: string) {
+    return this.sireService.getStats(tenantId);
   }
 
   @Get('reportes')
-  @ApiOperation({ summary: 'Get SIRE reports' })
-  @ApiResponse({ status: 200, description: 'SIRE reports retrieved successfully' })
+  @ApiOperation({ summary: 'Listar reportes SIRE' })
+  @ApiResponse({ status: 200, description: 'Reportes SIRE obtenidos' })
   @RequirePermission('sire.read')
-  async getReportes(@Query() filters: any, @CurrentTenant() tenantId: string) {
-    console.log('📄 Endpoint SIRE reportes llamado con filtros:', filters);
-    return await this.sireService.getReportes(filters, tenantId);
+  getReportes(@Query() filters: SireReportFiltersDto, @CurrentTenant() tenantId: string) {
+    return this.sireService.getReportes(filters, tenantId);
   }
 
   @Post('generar-reporte')
-  @ApiOperation({ summary: 'Generate new SIRE report' })
-  @ApiResponse({ status: 201, description: 'SIRE report generated successfully' })
+  @ApiOperation({ summary: 'Congelar una instantánea local RVIE/RCE' })
+  @ApiResponse({ status: 201, description: 'Instantánea SIRE generada de forma idempotente' })
   @RequirePermission('sire.emitir')
-  async generarReporte(@Body() reportData: any, @CurrentTenant() tenantId: string) {
-    try {
-      console.log('🔄 Endpoint SIRE generar-reporte llamado con data:', reportData);
-      return await this.sireService.generarReporte(reportData, tenantId);
-    } catch (error) {
-      console.error('❌ Error en endpoint SIRE generar-reporte:', error);
-      throw error;
-    }
+  generarReporte(
+    @Body() reportData: GenerateSireReportDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string | undefined,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.sireService.generarReporte(
+      reportData,
+      tenantId,
+      this.requireActor(actorId),
+      this.requireIdempotencyKey(idempotencyKey),
+    );
   }
 
   @Get('reportes/:id/download')
-  @ApiOperation({ summary: 'Download SIRE report' })
-  @ApiResponse({ status: 200, description: 'SIRE report downloaded successfully' })
+  @ApiOperation({ summary: 'Descargar la instantánea SIRE congelada' })
+  @ApiResponse({ status: 200, description: 'Instantánea SIRE obtenida' })
   @RequirePermission('sire.read')
-  async downloadReporte(@Param('id') id: string, @CurrentTenant() tenantId: string) {
-    console.log('📥 Endpoint SIRE download llamado para ID:', id);
-    return await this.sireService.downloadReporte(id, tenantId);
+  downloadReporte(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.sireService.downloadReporte(id, tenantId);
   }
 
   @Post('reportes/:id/enviar-sunat')
-  @ApiOperation({ summary: 'Send SIRE report to SUNAT' })
-  @ApiResponse({ status: 200, description: 'SIRE report sent to SUNAT successfully' })
+  @ApiOperation({ summary: 'Aceptar la propuesta RVIE/RCE y persistir su ticket' })
+  @ApiResponse({ status: 200, description: 'Aceptación reservada/finalizada idempotentemente' })
   @RequirePermission('sire.emitir')
-  async enviarSunat(
-    @Param('id') id: string,
+  enviarSunat(
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
-    @CurrentUser('id') userId?: string,
+    @CurrentUser('id') actorId: string | undefined,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    console.log('📡 Endpoint SIRE aceptar-propuesta llamado para ID:', id);
-    return await this.sireService.enviarSunat(id, tenantId, userId);
+    return this.sireService.enviarSunat(
+      id,
+      tenantId,
+      this.requireActor(actorId),
+      this.requireIdempotencyKey(idempotencyKey),
+    );
   }
 
   @Post('reportes/:id/consultar-ticket')
-  @ApiOperation({ summary: 'Consultar estado del ticket SIRE en SUNAT' })
-  @ApiResponse({ status: 200, description: 'Estado del ticket persistido con evidencia' })
+  @ApiOperation({ summary: 'Consultar y persistir el estado del ticket SIRE' })
+  @ApiResponse({ status: 200, description: 'Consulta SIRE finalizada idempotentemente' })
   @RequirePermission('sire.emitir')
-  async consultarTicket(
-    @Param('id') id: string,
+  consultarTicket(
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentTenant() tenantId: string,
-    @CurrentUser('id') userId?: string,
+    @CurrentUser('id') actorId: string | undefined,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return await this.sireService.consultarTicket(id, tenantId, userId);
+    return this.sireService.consultarTicket(
+      id,
+      tenantId,
+      this.requireActor(actorId),
+      this.requireIdempotencyKey(idempotencyKey),
+    );
   }
 
   @Get('reportes/:id/operaciones')
-  @ApiOperation({ summary: 'Obtener bitácora de operaciones SUNAT del reporte SIRE' })
+  @ApiOperation({ summary: 'Obtener la bitácora durable de operaciones SIRE' })
   @RequirePermission('sire.read')
-  async getOperaciones(@Param('id') id: string, @CurrentTenant() tenantId: string) {
-    return await this.sireService.getOperaciones(id, tenantId);
+  getOperaciones(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.sireService.getOperaciones(id, tenantId);
   }
 
-  @Post('test-evento')
-  @ApiOperation({ summary: 'Test SIRE event processing' })
-  @RequirePermission('system.debug')
-  async testEvento(@Body() testData: any) {
-    try {
-      if (isProduction()) {
-        throw new ForbiddenException('Endpoint restringido en producción');
-      }
+  private requireActor(actorId?: string): string {
+    if (!actorId) throw new BadRequestException('Se requiere un usuario autenticado para operar SIRE');
+    return actorId;
+  }
 
-      const tenantId = testData?.tenantId || testData?.tenant_id;
-      if (!tenantId) {
-        throw new BadRequestException('tenantId requerido en body para test-evento');
-      }
-
-      console.log('🧪 [SIRE TEST] Probando evento de comprobante...');
-      
-      // Simular un evento de comprobante creado
-      const eventoTest = {
-        id: 'test-cpe-123',
-        numero_comprobante: 'F001-00001',
-        tipo_comprobante: '01',
-        fecha_emision: new Date().toISOString(),
-        total: 100.00,
-        serie: 'F001',
-        numero: 1
-      };
-      
-      console.log('🧪 [SIRE TEST] Emitiendo evento de prueba:', eventoTest);
-      await this.eventBus.emitComprobanteCreadoEvent({
-        eventId: 'sire-test-event',
-        tenantId,
-        idempotencyKey: `sire.test:${tenantId}:${eventoTest.id}`,
-        cpeId: eventoTest.id,
-        tipoDocumento: eventoTest.tipo_comprobante,
-        serie: eventoTest.serie,
-        numero: eventoTest.numero,
-        clienteId: '12345678',
-        total: eventoTest.total,
-        esCredito: false
-      });
-      
-      return {
-        success: true,
-        message: 'Evento de prueba emitido correctamente - Revisa logs del servidor para ver si SIRE procesó el evento',
-        data: eventoTest
-      };
-    } catch (error) {
-      console.error('❌ [SIRE TEST] Error en prueba:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+  private requireIdempotencyKey(value?: string): string {
+    const key = String(value ?? '').trim();
+    if (key.length < 8 || key.length > 200) {
+      throw new BadRequestException('Idempotency-Key SIRE es obligatorio y debe tener entre 8 y 200 caracteres');
     }
-  }
-
-  @Post('test-integracion-pos')
-  @ApiOperation({ summary: 'Test POS → CPE → SIRE integration' })
-  @RequirePermission('system.debug')
-  async testIntegracionPOS() {
-    try {
-      if (isProduction()) {
-        throw new ForbiddenException('Endpoint restringido en producción');
-      }
-
-      console.log('🧪 [INTEGRATION TEST] Probando flujo completo POS → CPE → SIRE...');
-      
-      // Simular comprobante generado desde POS
-      const comprobanteFromPOS = {
-        cpeId: 'pos-cpe-456',
-        tipoDocumento: '03', // Boleta
-        serie: 'T001',
-        numero: '000123',
-        clienteId: '12345678',
-        total: 250.00,
-        esCredito: false,
-        ventaId: 'venta-789'
-      };
-      
-      console.log('🧪 [INTEGRATION TEST] Simulando evento desde POS:', comprobanteFromPOS);
-      
-      // Llamar directamente al procesamiento de SIRE
-      await this.sireService.procesarComprobanteParaSire(comprobanteFromPOS);
-      
-      return {
-        success: true,
-        message: '✅ Test de integración POS → CPE → SIRE completado - Revisa las estadísticas de SIRE',
-        data: comprobanteFromPOS
-      };
-    } catch (error) {
-      console.error('❌ [INTEGRATION TEST] Error en test de integración:', error);
-      return {
-        success: false,
-        error: error.message,
-        message: 'Error en test de integración - Revisa logs del servidor'
-      };
-    }
-  }
-
-  @Get()
-  @ApiOperation({ summary: 'Get SIRE module status' })
-  @RequirePermission('sire.read')
-  findAll() {
-    return this.sireService.findAll();
+    return key;
   }
 }

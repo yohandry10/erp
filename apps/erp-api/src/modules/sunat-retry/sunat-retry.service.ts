@@ -80,13 +80,14 @@ export class SunatRetryService implements OnModuleInit {
   private async processFailedCpes(): Promise<void> {
     const client = this.supabase.getClient();
 
-    // Buscar CPEs rechazados que tengan errores técnicos recuperables
+    // ERROR identifica fallas tecnicas recuperables. RECHAZADO es definitivo
+    // y nunca vuelve a la cola automatica.
     // y que no hayan excedido el máximo de reintentos
     const { data: failedCpes, error } = await client
       .from('cpe')
       .select('id, tenant_id, estado, error_message, retry_count, updated_at, next_retry_at')
-      .eq('estado', 'RECHAZADO')
-      .not('retry_count', 'is', null) // Solo documentos con retry_count (errores técnicos)
+      .eq('estado', 'ERROR')
+      .eq('sunat_status', 'ERROR')
       .lt('retry_count', this.MAX_RETRIES)
       .gte('updated_at', new Date(Date.now() - this.MAX_RETRY_AGE_HOURS * 60 * 60 * 1000).toISOString())
       .order('updated_at', { ascending: true })
@@ -155,10 +156,6 @@ export class SunatRetryService implements OnModuleInit {
   private async retryCpe(cpeId: string, tenantId: string, currentRetryCount: number): Promise<void> {
     const client = this.supabase.getClient();
 
-    // Calcular tiempo de espera con backoff exponencial
-    const backoffMs = this.calculateBackoff(currentRetryCount);
-    const nextRetryAt = new Date(Date.now() + backoffMs);
-
     // Verificar si es momento de reintentar (respetar backoff)
     const { data: cpe, error: fetchError } = await client
       .from('cpe')
@@ -177,68 +174,14 @@ export class SunatRetryService implements OnModuleInit {
       return;
     }
 
-    // Incrementar contador de reintentos
-    const newRetryCount = (cpe.retry_count || 0) + 1;
-
     this.logger.log(
-      `🔄 [SunatRetry] Reintentando CPE ${cpeId} (intento ${newRetryCount}/${this.MAX_RETRIES})`
+      `🔄 [SunatRetry] Reclamando CPE ${cpeId} mediante contrato durable 476`
     );
-
-    try {
-      // Actualizar contador de reintentos (sin tocar estado para evitar carreras).
-      await client
-        .from('cpe')
-        .update({
-          retry_count: newRetryCount,
-          next_retry_at: null, // Se establecerá después según resultado
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', cpeId)
-        .eq('tenant_id', tenantId);
-
-      // Reintentar envío usando el método existente del servicio
-      await this.cpeService.retrySendToOse(cpeId, {
-        idempotencyKey: `cpe.send:${tenantId}:${cpeId}`,
-      });
-
-      this.logger.log(`✅ [SunatRetry] CPE ${cpeId} reintentado exitosamente`);
-    } catch (error) {
-      this.logger.error(`❌ [SunatRetry] Error reintentando CPE ${cpeId}:`, error);
-
-      // Si aún no se alcanzó el máximo, programar siguiente reintento
-      if (newRetryCount < this.MAX_RETRIES) {
-        await client
-          .from('cpe')
-          .update({
-            estado: 'RECHAZADO',
-            retry_count: newRetryCount,
-            next_retry_at: nextRetryAt.toISOString(),
-            error_message: `Error técnico (reintento ${newRetryCount}): ${error.message}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', cpeId)
-          .eq('tenant_id', tenantId);
-
-        this.logger.log(
-          `⏳ [SunatRetry] CPE ${cpeId} programado para siguiente reintento en ${backoffMs}ms`
-        );
-      } else {
-        // Máximo de reintentos alcanzado, marcar como fallido permanentemente
-        await client
-          .from('cpe')
-          .update({
-            estado: 'RECHAZADO',
-            retry_count: newRetryCount,
-            next_retry_at: null,
-            error_message: `Error técnico: Máximo de reintentos alcanzado (${this.MAX_RETRIES}). ${error.message}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', cpeId)
-          .eq('tenant_id', tenantId);
-
-        this.logger.warn(`⚠️ [SunatRetry] CPE ${cpeId} alcanzó máximo de reintentos`);
-      }
-    }
+    await this.cpeService.retrySendToOse(cpeId, tenantId, {
+      idempotencyKey: `cpe.send:${tenantId}:${cpeId}`,
+      origin: 'SYSTEM',
+    });
+    this.logger.log(`✅ [SunatRetry] CPE ${cpeId} procesado por el owner durable 476`);
   }
 
   /**
@@ -246,10 +189,6 @@ export class SunatRetryService implements OnModuleInit {
    */
   private async retryGre(greId: string, tenantId: string, currentRetryCount: number): Promise<void> {
     const client = this.supabase.getClient();
-
-    // Calcular tiempo de espera con backoff exponencial
-    const backoffMs = this.calculateBackoff(currentRetryCount);
-    const nextRetryAt = new Date(Date.now() + backoffMs);
 
     // Verificar si es momento de reintentar
     const { data: gre, error: fetchError } = await client
@@ -277,18 +216,7 @@ export class SunatRetryService implements OnModuleInit {
     );
 
     try {
-      // Actualizar contador de reintentos (sin tocar estado para evitar carreras).
-      await client
-        .from('gre_guias')
-        .update({
-          retry_count: newRetryCount,
-          next_retry_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', greId)
-        .eq('tenant_id', tenantId);
-
-      // Reintentar envío usando el método existente del servicio
+      // El claim/finalizador 463 es el único dueño de intento, estado y backoff.
       await this.greService.retryProcesarEnvioSunat(greId, tenantId, {
         idempotencyKey: `gre.send:${tenantId}:${greId}`,
       });
@@ -297,37 +225,11 @@ export class SunatRetryService implements OnModuleInit {
     } catch (error) {
       this.logger.error(`❌ [SunatRetry] Error reintentando GRE ${greId}:`, error);
 
-      // Si aún no se alcanzó el máximo, programar siguiente reintento
       if (newRetryCount < this.MAX_RETRIES) {
-        await client
-          .from('gre_guias')
-          .update({
-            estado: 'ERROR',
-            retry_count: newRetryCount,
-            next_retry_at: nextRetryAt.toISOString(),
-            error_message: `Error técnico (reintento ${newRetryCount}): ${error.message}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', greId)
-          .eq('tenant_id', tenantId);
-
         this.logger.log(
-          `⏳ [SunatRetry] GRE ${greId} programada para siguiente reintento en ${backoffMs}ms`
+          `⏳ [SunatRetry] GRE ${greId} conserva el backoff durable del finalizador 463`
         );
       } else {
-        // Máximo de reintentos alcanzado
-        await client
-          .from('gre_guias')
-          .update({
-            estado: 'ERROR',
-            retry_count: newRetryCount,
-            next_retry_at: null,
-            error_message: `Error técnico: Máximo de reintentos alcanzado (${this.MAX_RETRIES}). ${error.message}`,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', greId)
-          .eq('tenant_id', tenantId);
-
         this.logger.warn(`⚠️ [SunatRetry] GRE ${greId} alcanzó máximo de reintentos`);
       }
     }
@@ -352,7 +254,6 @@ export class SunatRetryService implements OnModuleInit {
    * Método manual para forzar reintento de un CPE específico
    */
   async retryCpeManual(cpeId: string, tenantId: string): Promise<{ success: boolean; message: string }> {
-    try {
       const client = this.supabase.getClient();
 
       const { data: cpe, error } = await client
@@ -366,16 +267,12 @@ export class SunatRetryService implements OnModuleInit {
         return { success: false, message: 'CPE no encontrado' };
       }
 
-      if (cpe.estado !== 'RECHAZADO') {
-        return { success: false, message: `CPE no está en estado RECHAZADO (estado actual: ${cpe.estado})` };
+      if (cpe.estado !== 'ERROR') {
+        throw new Error(`CPE no está en estado técnico ERROR (estado actual: ${cpe.estado})`);
       }
 
       await this.retryCpe(cpeId, tenantId, cpe.retry_count || 0);
       return { success: true, message: 'CPE reintentado exitosamente' };
-    } catch (error) {
-      this.logger.error(`❌ [SunatRetry] Error en retryCpeManual:`, error);
-      return { success: false, message: `Error: ${error.message}` };
-    }
   }
 
   /**

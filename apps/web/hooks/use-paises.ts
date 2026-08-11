@@ -137,14 +137,22 @@ export function usePaises() {
   // Actualizar configuración del usuario
   const updateUserConfiguration = async (configuracion: Partial<UsuarioConfiguracion>) => {
     try {
+      const intentStorageKey = 'country-preference-intent'
+      let idempotencyKey = window.sessionStorage.getItem(intentStorageKey)
+      if (!idempotencyKey) {
+        idempotencyKey = `country-preference-${window.crypto.randomUUID()}`
+        window.sessionStorage.setItem(intentStorageKey, idempotencyKey)
+      }
       const response = await put('/api/paises/usuario/configuracion', {
         ...configuracion,
         pais_preferido_id: configuracion.pais_preferido_id &&
           isActiveCountryId(configuracion.pais_preferido_id)
           ? Number(configuracion.pais_preferido_id)
           : Number(INITIAL_ACTIVE_COUNTRY_ID),
-      })
-      return apiSucceeded(response)
+      }, { headers: { 'Idempotency-Key': idempotencyKey } })
+      const succeeded = apiSucceeded(response)
+      if (succeeded) window.sessionStorage.removeItem(intentStorageKey)
+      return succeeded
     } catch (err) {
       console.error('Error updating user configuration:', err)
       return false

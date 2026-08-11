@@ -63,23 +63,23 @@ export class RegistrarPagoLoteDto {
   @IsUUID('4', { message: 'El ID de la cuenta bancaria debe ser un UUID válido' })
   cuenta_bancaria_id: string;
 
-  @ApiPropertyOptional({
-    description: 'Referencia del lote de pagos',
+  @ApiProperty({
+    description: 'Referencia bancaria del lote de pagos',
     example: 'LOTE-2025-001',
   })
-  @IsOptional()
+  @IsNotEmpty({ message: 'La referencia bancaria del lote es requerida' })
   @IsString({ message: 'La referencia debe ser un texto' })
   @MaxLength(120, { message: 'La referencia del lote no puede exceder 120 caracteres' })
-  referencia_lote?: string;
+  referencia_lote: string;
 
-  @ApiPropertyOptional({
-    description: 'Clave idempotente generada por cliente desktop/offline para reintentos seguros',
+  @ApiProperty({
+    description: 'Clave idempotente estable generada por el cliente para reintentos seguros',
     example: 'local-payment-batch-550e8400-e29b-41d4-a716-446655440000',
   })
-  @IsOptional()
+  @IsNotEmpty({ message: 'La clave idempotente es requerida' })
   @IsString({ message: 'La clave idempotente debe ser un texto' })
   @MaxLength(160, { message: 'La clave idempotente no puede exceder 160 caracteres' })
-  idempotency_key?: string;
+  idempotency_key: string;
 
   @ApiPropertyOptional({
     description: 'Observaciones adicionales sobre el lote de pagos',

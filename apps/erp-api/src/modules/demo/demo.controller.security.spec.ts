@@ -52,7 +52,7 @@ describe('DemoController security gates', () => {
     const controller = new DemoController({ createDemoTenant } as any);
 
     await expect(controller.createDemo(dto as any)).resolves.toEqual({ tenant_id: 'tenant-demo' });
-    expect(createDemoTenant).toHaveBeenCalledWith(dto);
+    expect(createDemoTenant).toHaveBeenCalledWith(dto, undefined);
   });
 
   it('sirve la demo en PROD cuando esta habilitada: ahi vive la prueba gratuita', async () => {

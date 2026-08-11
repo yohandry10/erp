@@ -1,9 +1,13 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
-import { CreateGuiaRemisionDto, GuiaRemisionResponseDto } from './gre.types';
+import {
+  CreateGuiaRemisionDto,
+  GreAutoConfigDto,
+  GreListQueryDto,
+  GuiaRemisionResponseDto,
+} from './gre.types';
 import { EventBusService } from '../../shared/events/event-bus.service';
-import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
 import { OseService } from '../ose/ose.service';
 import { ValidationService } from '../validations/validation.service';
 
@@ -22,7 +26,6 @@ export class GreService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly eventBus: EventBusService,
-    private readonly inventoryService: InventoryIntegrationService,
     private readonly oseService: OseService,
     private readonly validationService: ValidationService,
   ) {
@@ -249,73 +252,67 @@ export class GreService {
     return pesoFinal;
   }
 
-  findAll() {
-    // Mock data for now
-    return {
-      message: 'GRE module is working',
-      data: []
-    };
-  }
-
-  async findAllGuias(tenantId: string): Promise<GuiaRemisionResponseDto[]> {
+  async findAllGuias(
+    tenantId: string,
+    filters: GreListQueryDto = {},
+  ): Promise<GuiaRemisionResponseDto[]> {
     const supabase = this.supabaseService.getClient();
+    let query = supabase
+      .from('gre_guias')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(filters.limit ?? 100);
 
-    try {
-      console.log(`🔍 Consultando tabla gre_guias para tenant ${tenantId}...`);
-
-      const { data, error } = await supabase
-        .from('gre_guias')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: false });
-
-      console.log('📊 Resultado de consulta:', { data, error });
-
-      if (error) {
-        console.error('❌ Error al consultar GREs:', error);
-        throw new Error(`Error al consultar las guías de remisión: ${error.message}`);
+    if (filters.estado) query = query.eq('estado', filters.estado);
+    if (filters.modalidad) query = query.eq('modalidad', filters.modalidad);
+    if (filters.desde) query = query.gte('fecha_traslado', filters.desde);
+    if (filters.hasta) query = query.lte('fecha_traslado', filters.hasta);
+    if (filters.buscar?.trim()) {
+      const term = filters.buscar.trim().replace(/[%_,()]/g, '');
+      if (term) {
+        query = query.or(`numero.ilike.%${term}%,destinatario.ilike.%${term}%`);
       }
-
-      console.log(`✅ Se encontraron ${data?.length || 0} registros GRE`);
-
-      return (data || []).map(gre => this.mapGreRecordToResponse(gre));
-    } catch (error) {
-      console.error('❌ Error en servicio GRE:', error);
-      throw error;
     }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new BadRequestException(`Error al consultar las GRE: ${error.message}`);
+    }
+    return (data || []).map((gre: any) => this.mapGreRecordToResponse(gre));
   }
 
   async findGuiaById(id: string, tenantId: string): Promise<GuiaRemisionResponseDto> {
     const supabase = this.supabaseService.getClient();
 
-    try {
-      console.log(`🔍 Consultando GRE con ID: ${id} para tenant ${tenantId}`);
-
-      const { data, error } = await supabase
+    const [{ data, error }, { data: details, error: detailsError }] = await Promise.all([
+      supabase
         .from('gre_guias')
         .select('*')
         .eq('id', id)
         .eq('tenant_id', tenantId)
-        .single();
+        .maybeSingle(),
+      supabase
+        .from('gre_detalles')
+        .select('producto_id,descripcion,cantidad,unidad_medida,peso')
+        .eq('gre_id', id)
+        .eq('tenant_id', tenantId)
+        .eq('estado', 'ACTIVO')
+        .order('created_at', { ascending: true }),
+    ]);
+    if (error) throw new BadRequestException(`Error al consultar la GRE: ${error.message}`);
+    if (!data) throw new NotFoundException('Guía de remisión no encontrada');
+    if (detailsError) throw new BadRequestException(`Error al consultar líneas GRE: ${detailsError.message}`);
 
-      console.log('📊 Resultado de consulta individual:', { data, error });
-
-      if (error) {
-        console.error('❌ Error al consultar GRE:', error);
-        throw new Error(`Error al consultar la guía de remisión: ${error.message}`);
-      }
-
-      if (!data) {
-        throw new Error('Guía de remisión no encontrada');
-      }
-
-      console.log(`✅ GRE encontrada:`, data);
-
-      return this.mapGreRecordToResponse(data);
-    } catch (error) {
-      console.error('❌ Error en servicio GRE al obtener por ID:', error);
-      throw error;
-    }
+    const response = this.mapGreRecordToResponse(data);
+    response.items = (details || []).map((item: any) => ({
+      productoId: item.producto_id || undefined,
+      descripcion: item.descripcion,
+      cantidad: Number(item.cantidad),
+      unidadMedida: item.unidad_medida,
+      peso: item.peso == null ? undefined : Number(item.peso),
+    }));
+    return response;
   }
 
   /**
@@ -326,7 +323,7 @@ export class GreService {
 
     let query = supabase
       .from('gre_guias')
-      .select('serie, numero, fecha_emision, fecha_vencimiento, cliente_ruc, cliente_nombre, base_imponible, igv, total, moneda, estado, tenant_id, anio, mes')
+      .select('serie,numero,fecha_emision,fecha_traslado,destinatario,direccion_destino,modalidad,motivo,peso_total,estado,sunat_status,numero_sunat,anio,mes')
       .eq('tenant_id', tenantId);
 
     if (anio) query = query.eq('anio', anio);
@@ -339,53 +336,25 @@ export class GreService {
       throw new Error(`Error generando CSV GRE: ${error.message}`);
     }
 
-    const headers = [
-      'serie',
-      'numero',
-      'fecha_emision',
-      'fecha_vencimiento',
-      'ruc_cliente',
-      'razon_social',
-      'base',
-      'igv',
-      'total',
-      'moneda',
-      'estado',
-    ];
+    const headers = ['serie','numero','fecha_emision','fecha_traslado','destinatario',
+      'direccion_destino','modalidad','motivo','peso_total','estado','sunat_status','numero_sunat'];
 
     const rows = (data || []).map((g: any) => [
       g.serie || '',
       g.numero || '',
       (g.fecha_emision || '').split('T')[0],
-      (g.fecha_vencimiento || '').split('T')[0],
-      g.cliente_ruc || '',
-      (g.cliente_nombre || '').replace(/,/g, ' '),
-      this.formatNumber(g.base_imponible),
-      this.formatNumber(g.igv),
-      this.formatNumber(g.total),
-      g.moneda || 'PEN',
+      (g.fecha_traslado || '').split('T')[0],
+      g.destinatario || '',
+      g.direccion_destino || '',
+      g.modalidad || '',
+      g.motivo || '',
+      this.formatNumber(g.peso_total),
       g.estado || '',
+      g.sunat_status || '',
+      g.numero_sunat || '',
     ]);
-
-    const lines = [headers.join(',')].concat(rows.map(r => r.join(',')));
-
-    // Auditoría opcional: registrar en integration_logs la generación del CSV
-    try {
-      await supabase.from('integration_logs').insert({
-        tenant_id: tenantId,
-        tipo: 'GRE_CSV',
-        estado: 'GENERATED',
-        payload: {
-          periodo: anio && mes ? `${anio}-${String(mes).padStart(2, '0')}` : 'all',
-          filas: rows.length,
-        },
-        referencia: `gre_csv_${anio || 'all'}_${mes || 'all'}`,
-      });
-    } catch (logErr) {
-      this.logger.warn('⚠️ [GRE] No se pudo registrar integration_logs para CSV:', logErr?.message || logErr);
-    }
-
-    return lines.join('\n');
+    const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    return [headers, ...rows].map(row => row.map(escapeCsv).join(',')).join('\n');
   }
 
   private formatNumber(value: any): string {
@@ -393,273 +362,266 @@ export class GreService {
     return Number.isFinite(num) ? num.toFixed(2) : '0.00';
   }
 
-  async createGuia(greData: CreateGuiaRemisionDto, tenantId: string): Promise<GuiaRemisionResponseDto> {
-    const supabase = this.supabaseService.getClient();
+  async createGuia(
+    greData: CreateGuiaRemisionDto,
+    tenantId: string,
+    actorId?: string,
+    headerIdempotencyKey?: string,
+  ): Promise<GuiaRemisionResponseDto> {
+    this.assertCreateGreDataValida(greData);
+    const effectiveActor = actorId || await this.resolveGreActorId(greData, tenantId);
+    const idempotencyKey = String(
+      headerIdempotencyKey || greData.idempotencyKey || this.resolveGreIdempotencyKey(greData, tenantId),
+    ).trim();
+    if (!idempotencyKey || idempotencyKey.length > 200) {
+      throw new BadRequestException('Idempotency-Key GRE requerido y de hasta 200 caracteres');
+    }
+    const eventId = randomUUID();
+    const items = await this.resolveGreItems(greData, tenantId);
+    const payload = {
+      destinatario: greData.destinatario.trim(),
+      direccion_destino: greData.direccionDestino.trim(),
+      fecha_traslado: greData.fechaTraslado,
+      modalidad: greData.modalidad,
+      motivo: greData.motivo,
+      peso_total: Number(greData.pesoTotal),
+      observaciones: greData.observaciones?.trim() || null,
+      transportista: greData.transportista?.trim() || null,
+      placa_vehiculo: greData.placaVehiculo?.trim() || null,
+      licencia_conducir: greData.licenciaConducir?.trim() || null,
+      cpe_relacionado: greData.cpeRelacionado || null,
+      pedido_id: greData.pedidoId || null,
+      despacho_evento_id: greData.despachosAsociados?.[0] || null,
+      es_automatica: greData.datosAdicionales?.origen === 'VENTA_AUTOMATICA',
+      venta_id: typeof greData.datosAdicionales?.ventaId === 'string'
+        ? greData.datosAdicionales.ventaId
+        : null,
+      motivo_creacion: greData.datosAdicionales?.origen === 'VENTA_AUTOMATICA'
+        ? 'AUTO_THRESHOLD'
+        : 'MANUAL',
+      event_id: eventId,
+      datos_adicionales: this.buildGreAdditionalData(greData) || {},
+    };
 
-    try {
-      this.logger.log(`🚚 [GRE] Creando nueva guía de remisión para tenant: ${tenantId}`);
-      console.log('🚚 [GRE] Datos recibidos:', greData);
-      this.assertCreateGreDataValida(greData);
+    const { data, error } = await this.supabaseService.getClient().rpc('crear_gre_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: effectiveActor,
+      p_payload: payload,
+      p_items: items.map(item => ({
+        producto_id: item.productoId || null,
+        descripcion: item.descripcion.trim(),
+        cantidad: Number(item.cantidad),
+        unidad_medida: item.unidadMedida || 'NIU',
+        peso: item.peso == null ? null : Number(item.peso),
+      })),
+      p_idempotency_key: idempotencyKey,
+    });
+    if (error || !data) {
+      throw this.toGreException(error, 'No se pudo crear la GRE');
+    }
 
-      // VALIDACIÓN: GRE es exclusivo de Perú
-      const { data: empresaConfig } = await supabase
-        .from('empresa_config')
-        .select('pais_id')
-        .eq('tenant_id', tenantId)
-        .single();
-
-      if (empresaConfig?.pais_id) {
-        const { data: pais } = await supabase
-          .from('paises')
-          .select('codigo_iso, nombre')
-          .eq('id', empresaConfig.pais_id)
-          .single();
-
-        if (pais && pais.codigo_iso !== 'PE') {
-          this.logger.error(`❌ [GRE] Intento de crear GRE para país ${pais.nombre} (${pais.codigo_iso}). GRE solo disponible para Perú.`);
-          throw new BadRequestException({
-            message: `Las Guías de Remisión Electrónicas (GRE) solo están disponibles para empresas peruanas. Su empresa está configurada para ${pais.nombre}.`,
-            code: 'GRE_NOT_AVAILABLE_FOR_COUNTRY',
-            country: pais.nombre,
-          });
-        }
-      }
-
-      await this.assertOrigenGreExiste(greData, tenantId);
-
-      const eventId = randomUUID();
-      const idempotencyKey = this.resolveGreIdempotencyKey(greData, tenantId);
-
-      const { data: existingGre, error: existingGreError } = await supabase
-        .from('gre_guias')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('idempotency_key', idempotencyKey)
-        .maybeSingle();
-
-      if (existingGreError && existingGreError.code && existingGreError.code !== 'PGRST116') {
-        this.logger.error(
-          `❌ [GRE] Error verificando idempotencia (${idempotencyKey}): ${existingGreError.message}`,
-        );
-        throw new BadRequestException('No se pudo validar idempotencia al crear la GRE');
-      }
-
-      if (existingGre) {
-        this.logger.warn(
-          `♻️ [GRE] Solicitud idempotente detectada (${idempotencyKey}), retornando GRE existente ${existingGre.id}`,
-        );
-        return this.mapGreRecordToResponse(existingGre);
-      }
-
-      // HARDENING E2: Validar certificado antes de generar GRE
-      this.logger.log(`🔐 [GRE] Validando certificado digital antes de generar GRE...`);
-      const certificateValidation = await this.validationService.validateCertificate(tenantId);
-
-      if (!certificateValidation.isValid) {
-        this.logger.error(`❌ [GRE] Validación de certificado fallida: ${certificateValidation.errors.join(', ')}`);
-        throw new BadRequestException({
-          message: 'No se puede generar la GRE: Certificado digital inválido',
-          errors: certificateValidation.errors,
-          code: 'CERT_VALIDATION_FAILED',
-        });
-      }
-
-      if (certificateValidation.warnings.length > 0) {
-        this.logger.warn(`⚠️ [GRE] Advertencias de certificado: ${certificateValidation.warnings.join(', ')}`);
-      }
-
-      this.logger.log(`✅ [GRE] Certificado validado exitosamente antes de generar GRE`);
-
-      const numeroCorrelativo = await this.generarNumeroCorrelativo(tenantId);
-      const { serie, correlativo } = this.extractSerieYCorrelativo(numeroCorrelativo);
-      const datosAdicionales = this.buildGreAdditionalData(greData);
-      const timestamp = new Date().toISOString();
-
-      const greDataInsert: Record<string, any> = {
-        numero: numeroCorrelativo,
-        serie,
-        correlativo,
-        estado: 'BORRADOR',
-        destinatario: greData.destinatario,
-        direccion_destino: greData.direccionDestino,
-        fecha_traslado: greData.fechaTraslado,
-        modalidad: greData.modalidad,
-        motivo: greData.motivo,
-        peso_total: greData.pesoTotal,
-        observaciones: greData.observaciones,
-        transportista: greData.transportista,
-        placa_vehiculo: greData.placaVehiculo,
-        licencia_conducir: greData.licenciaConducir,
-        cpe_relacionado: greData.cpeRelacionado || null,
-        tenant_id: tenantId,
-        created_at: timestamp,
-        idempotency_key: idempotencyKey,
-        event_id: eventId,
-        sunat_status: this.sunatStatuses.NOT_SENT,
-      };
-
-      if (datosAdicionales) {
-        greDataInsert.datos_adicionales = datosAdicionales;
-      }
-
-      console.log('🚚 [GRE] Datos preparados para inserción:', greDataInsert);
-
-      const { data, error } = await supabase
-        .from('gre_guias')
-        .insert(greDataInsert)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ Error insertando GRE:', error);
-        throw new Error(`Error creando guía de remisión: ${error.message}`);
-      }
-
-      // Auditoría: integration_logs por tenant (éxito)
+    let record: any = data;
+    if (!(data as any).idempotent && (data as any).estado === 'BORRADOR') {
       try {
-        await supabase.from('integration_logs').insert({
-          tenant_id: tenantId,
-          servicio: 'GRE',
-          operacion: 'CREATE',
-          correlacion_id: data.id,
-          correlacion_tipo: 'GRE',
-          status: 'SUCCESS',
-          request_summary: { idempotencyKey, serie, correlativo },
-          response_summary: { id: data.id, estado: data.estado },
-        });
-      } catch (logErr) {
-        this.logger.warn('⚠️ [GRE] No se pudo registrar integration_logs de creación:', logErr?.message || logErr);
-      }
-
-      console.log('✅ GRE creada exitosamente:', data);
-
-      if (greData.pedidoId) {
-        const { data: pedidoDetalles, error: pedidoDetallesError } = await supabase
-          .from('pedidos_venta_detalle')
-          .select('producto_id, descripcion, cantidad')
-          .eq('pedido_id', greData.pedidoId)
-          .eq('tenant_id', tenantId);
-
-        if (pedidoDetallesError) {
-          throw new Error(`Error obteniendo detalle del pedido para GRE: ${pedidoDetallesError.message}`);
-        }
-
-        if (!pedidoDetalles || pedidoDetalles.length === 0) {
-          throw new Error('No se puede generar GRE: el pedido no tiene items para gre_detalles');
-        }
-
-        const detalleInvalido = pedidoDetalles.find((item: any) => Number(item.cantidad || 0) <= 0);
-        if (detalleInvalido) {
-          throw new BadRequestException('No se puede generar GRE: el pedido contiene cantidades inválidas');
-        }
-
-        const greDetalles = pedidoDetalles.map((item: any) => ({
-          gre_id: data.id,
-          tenant_id: tenantId,
-          producto_id: item.producto_id,
-          descripcion: item.descripcion,
-          cantidad: Number(item.cantidad || 0),
-          unidad_medida: 'NIU',
-          peso: Number(greData.pesoTotal || 0) / Math.max(pedidoDetalles.length, 1),
-          estado: 'ACTIVO',
-        }));
-
-        const { error: greDetallesError } = await supabase
-          .from('gre_detalles')
-          .insert(greDetalles);
-
-        if (greDetallesError) {
-          throw new Error(`Error creando detalle de GRE: ${greDetallesError.message}`);
-        }
-
-        await this.registrarRelacionPedidoGre({
-          pedidoId: greData.pedidoId,
-          greId: data.id,
-          greNumero: data.numero,
-          greEstado: data.estado ?? 'BORRADOR',
-          tenantIdHint: greData.tenantId,
-          notas: greData.observaciones ?? null,
-          despachos: greData.despachosAsociados,
-        });
-      }
-
-      const xmlPreparation = await this.procesarGeneracionXML(data.id, tenantId);
-      const sunatStatusForEvent = xmlPreparation.success ? this.sunatStatuses.READY : this.sunatStatuses.ERROR;
-
-      let greRecord = data;
-      try {
-        const { data: refreshedGre, error: refreshError } = await supabase
+        const signed = await this.firmarGuia(
+          (data as any).id,
+          tenantId,
+          effectiveActor,
+          `${idempotencyKey}:sign`,
+        );
+        const { data: signedRecord } = await this.supabaseService.getClient()
           .from('gre_guias')
           .select('*')
-          .eq('id', data.id)
+          .eq('tenant_id', tenantId)
+          .eq('id', signed.id)
           .maybeSingle();
-
-        if (!refreshError && refreshedGre) {
-          greRecord = refreshedGre;
-        } else {
-          greRecord = {
-            ...data,
-            sunat_status: sunatStatusForEvent,
-            hash_gre: xmlPreparation.hash ?? data.hash_gre,
-          };
-        }
-      } catch (refreshError) {
-        this.logger.warn(`⚠️ [GRE] No se pudo refrescar GRE ${data.id} después de la inserción:`, refreshError);
-        greRecord = {
-          ...data,
-          sunat_status: sunatStatusForEvent,
-          hash_gre: xmlPreparation.hash ?? data.hash_gre,
-        };
+        record = signedRecord || data;
+      } catch (signError) {
+        this.logger.warn(
+          `GRE ${(data as any).numero} creada en BORRADOR; firma pendiente: ${this.errorMessage(signError)}`,
+        );
+        const { data: pendingRecord } = await this.supabaseService.getClient()
+          .from('gre_guias')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .eq('id', (data as any).id)
+          .maybeSingle();
+        record = pendingRecord || data;
       }
 
       await this.eventBus.emitGuiaRemisionCreada({
-        eventId,
+        eventId: (data as any).event_id || eventId,
         tenantId,
         idempotencyKey,
-        greId: greRecord.id,
+        greId: (data as any).id,
         tipoDocumento: '09',
-        serie: greRecord.serie ?? serie,
-        numero: Number(greRecord.correlativo ?? correlativo) || correlativo,
-        numeroCompleto: greRecord.numero ?? numeroCorrelativo,
-        transportistaId: greRecord.transportista ?? greData.transportista ?? undefined,
-        vehiculoId: greRecord.placa_vehiculo ?? greData.placaVehiculo ?? undefined,
-        ruta: greRecord.direccion_destino ?? greData.direccionDestino,
-        peso: Number(greRecord.peso_total ?? greData.pesoTotal) || greData.pesoTotal,
-        cpeRelacionado: greRecord.cpe_relacionado ?? greData.cpeRelacionado ?? undefined,
-        ventaRelacionada: greRecord.venta_id ?? undefined,
-        fechaTraslado: greRecord.fecha_traslado ?? greData.fechaTraslado,
-        destinatario: greRecord.destinatario ?? greData.destinatario,
-        direccionDestino: greRecord.direccion_destino ?? greData.direccionDestino,
-        sunatStatus: greRecord.sunat_status ?? sunatStatusForEvent,
-        hashGre: greRecord.hash_gre ?? xmlPreparation.hash ?? undefined,
-        notasSalida: greData.despachosAsociados ?? [],
+        serie: (data as any).serie,
+        numero: Number((data as any).correlativo),
+        numeroCompleto: (data as any).numero,
+        transportistaId: (data as any).transportista || undefined,
+        vehiculoId: (data as any).placa_vehiculo || undefined,
+        ruta: (data as any).direccion_destino,
+        peso: Number((data as any).peso_total),
+        cpeRelacionado: (data as any).cpe_relacionado || undefined,
+        ventaRelacionada: (data as any).venta_id || undefined,
+        fechaTraslado: (data as any).fecha_traslado,
+        destinatario: (data as any).destinatario,
+        direccionDestino: (data as any).direccion_destino,
+        sunatStatus: record.sunat_status || this.sunatStatuses.NOT_SENT,
+        hashGre: record.hash_gre || undefined,
+        notasSalida: greData.despachosAsociados || [],
       });
-
-      return this.mapGreRecordToResponse(greRecord);
-    } catch (error) {
-      console.error('❌ Error en createGuia:', error);
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      // Auditoría: integration_logs por tenant (error)
-      try {
-        await this.supabaseService.getClient().from('integration_logs').insert({
-          tenant_id: tenantId,
-          servicio: 'GRE',
-          operacion: 'CREATE',
-          correlacion_tipo: 'GRE',
-          status: 'ERROR',
-          error_message: error instanceof Error ? error.message : 'Error creando GRE',
-          request_summary: {
-            destinatario: greData?.destinatario,
-            fechaTraslado: greData?.fechaTraslado,
-          },
-        });
-      } catch {
-        /* ignore logging errors */
-      }
-      throw new BadRequestException(error?.message || 'Error creando guía de remisión');
     }
+    return this.mapGreRecordToResponse(record);
+  }
+
+  async firmarGuia(
+    greId: string,
+    tenantId: string,
+    actorId: string,
+    idempotencyKey: string,
+  ): Promise<GuiaRemisionResponseDto> {
+    try {
+      const { data: greData, error } = await this.supabaseService.getClient()
+        .from('gre_guias')
+        .select('*')
+        .eq('id', greId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (error) throw new BadRequestException(`No se pudo obtener la GRE: ${error.message}`);
+      if (!greData) throw new NotFoundException('Guía de remisión no encontrada');
+
+      const certificateValidation = await this.validationService.validateCertificate(tenantId);
+      if (!certificateValidation.isValid) {
+        throw new BadRequestException({
+          code: 'GRE_SIGNATURE_CREDENTIALS_PENDING',
+          message: 'La GRE quedó en borrador: configure un certificado digital válido del cliente',
+          errors: certificateValidation.errors,
+        });
+      }
+      const xmlPayload = await this.buildGreXmlPayload(greData);
+      const xmlContent = this.generateGreXmlUbl(xmlPayload);
+      const xmlSigned = await this.firmarXmlGre(xmlContent, tenantId);
+      const hash = this.generarHashXml(xmlSigned);
+      const { data, error: signatureError } = await this.supabaseService.getClient().rpc(
+        'guardar_firma_gre_tx',
+        {
+          p_tenant_id: tenantId,
+          p_actor_id: actorId,
+          p_gre_id: greId,
+          p_xml_ubl: xmlContent,
+          p_xml_firmado: xmlSigned,
+          p_hash: hash,
+          p_idempotency_key: idempotencyKey,
+        },
+      );
+      if (signatureError || !data) {
+        throw this.toGreException(signatureError, 'No se pudo persistir la firma GRE');
+      }
+      return this.mapGreRecordToResponse(data);
+    } catch (error) {
+      const details = this.extractGreError(error);
+      const { error: persistError } = await this.supabaseService.getClient().rpc(
+        'registrar_fallo_firma_gre_tx',
+        {
+          p_tenant_id: tenantId,
+          p_actor_id: actorId,
+          p_gre_id: greId,
+          p_error_code: details.code,
+          p_error_message: details.message,
+          p_idempotency_key: `${idempotencyKey}:failure`,
+        },
+      );
+      if (persistError) {
+        this.logger.error(`No se pudo persistir el fallo de firma GRE ${greId}: ${persistError.message}`);
+      }
+      throw error;
+    }
+  }
+
+  private async resolveGreActorId(
+    dto: CreateGuiaRemisionDto,
+    tenantId: string,
+  ): Promise<string> {
+    const client = this.supabaseService.getClient();
+    if (dto.cpeRelacionado) {
+      const { data } = await client
+        .from('cpe')
+        .select('created_by')
+        .eq('tenant_id', tenantId)
+        .eq('id', dto.cpeRelacionado)
+        .maybeSingle();
+      if (data?.created_by) return data.created_by;
+    }
+    if (dto.pedidoId) {
+      const { data } = await client
+        .from('pedidos_venta')
+        .select('created_by,confirmado_por,aprobado_por')
+        .eq('tenant_id', tenantId)
+        .eq('id', dto.pedidoId)
+        .maybeSingle();
+      const actor = data?.created_by || data?.confirmado_por || data?.aprobado_por;
+      if (actor) return actor;
+    }
+    throw new BadRequestException(
+      'La creación automática de GRE requiere un actor trazable en el CPE o pedido origen',
+    );
+  }
+
+  private async resolveGreItems(dto: CreateGuiaRemisionDto, tenantId: string) {
+    if (dto.items?.length) return dto.items;
+    if (dto.pedidoId) return [];
+    if (dto.cpeRelacionado) {
+      const { data, error } = await this.supabaseService.getClient()
+        .from('cpe')
+        .select('items')
+        .eq('tenant_id', tenantId)
+        .eq('id', dto.cpeRelacionado)
+        .maybeSingle();
+      if (error) throw new BadRequestException(`No se pudieron leer los ítems del CPE: ${error.message}`);
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const mapped = items.map((item: any) => ({
+        productoId: item.producto_id || item.productoId || item.id || undefined,
+        descripcion: String(item.descripcion || item.nombre || item.producto_nombre || '').trim(),
+        cantidad: Number(item.cantidad || item.quantity || 0),
+        unidadMedida: String(item.unidad_medida || item.unidad || 'NIU').toUpperCase(),
+        peso: item.peso == null ? undefined : Number(item.peso),
+      })).filter((item: any) => item.descripcion && item.cantidad > 0);
+      if (mapped.length) return mapped;
+    }
+    throw new BadRequestException(
+      'La GRE manual requiere al menos un ítem; un pedido válido puede aportar sus propias líneas',
+    );
+  }
+
+  private toGreException(error: any, fallback: string): BadRequestException | NotFoundException {
+    const message = String(error?.message || fallback);
+    if (message.includes('GRE_NOT_FOUND')) return new NotFoundException('Guía de remisión no encontrada');
+    const labels: Record<string, string> = {
+      GRE_IDEMPOTENCY_COLLISION: 'La Idempotency-Key ya fue usada con otros datos GRE',
+      GRE_ONLY_PERU: 'GRE sólo está disponible para empresas configuradas en Perú',
+      GRE_ITEMS_REQUIRED: 'La GRE requiere al menos un ítem válido',
+      GRE_ITEM_PRODUCT_TENANT_INVALID: 'Un producto de la GRE pertenece a otro tenant o no existe',
+      FISCAL_ACTOR_INVALID: 'El actor no pertenece al tenant o está inactivo',
+      GRE_NOT_READY_TO_SEND: 'La GRE debe estar firmada antes de enviarse',
+      GRE_CANCEL_REQUIRES_FISCAL_FLOW: 'Una GRE ya transmitida requiere el flujo fiscal de baja, no anulación interna',
+    };
+    const code = Object.keys(labels).find(key => message.includes(key));
+    return new BadRequestException({ code: code || 'GRE_OPERATION_FAILED', message: code ? labels[code] : message });
+  }
+
+  private extractGreError(error: any): { code: string; message: string } {
+    const response = typeof error?.getResponse === 'function' ? error.getResponse() : null;
+    const responseObject = response && typeof response === 'object' ? response as any : null;
+    return {
+      code: String(responseObject?.code || error?.code || 'GRE_SIGNATURE_ERROR').slice(0, 100),
+      message: String(responseObject?.message || error?.message || 'No se pudo firmar la GRE').slice(0, 1000),
+    };
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    return String(error || 'error desconocido');
   }
 
   private async buildGreXmlPayload(greData: any) {
@@ -690,6 +652,7 @@ export class GreService {
         .from('cpe')
         .select('tipo_documento_receptor, documento_receptor, razon_social_receptor, direccion_receptor')
         .eq('id', greData.cpe_relacionado)
+        .eq('tenant_id', tenantId)
         .maybeSingle();
 
       if (cpe) {
@@ -770,94 +733,9 @@ export class GreService {
       throw new BadRequestException('No se puede generar GRE: peso total debe ser mayor a cero');
     }
 
-    const extras = dto.datosAdicionales || {};
-    const ubigeoDestino = this.normalizeDigits(
-      dto.ubigeoDestino ||
-      extras.destinoUbigeo ||
-      extras.ubigeoDestino,
-    );
-    if (!/^\d{6}$/.test(ubigeoDestino)) {
-      throw new BadRequestException(
-        'No se puede generar GRE: el ubigeo de destino debe tener 6 dígitos',
-      );
-    }
-
-    if (dto.modalidad === 'TRANSPORTE_PUBLICO') {
-      if (!dto.transportista?.trim()) {
-        throw new BadRequestException('No se puede generar GRE: transporte público requiere transportista');
-      }
-
-      const transportistaDocumento = this.normalizeDigits(
-        dto.transportistaDocumento ||
-        extras.transportistaDocumento ||
-        extras.transportistaRuc,
-      );
-      if (!/^\d{11}$/.test(transportistaDocumento)) {
-        throw new BadRequestException('No se puede generar GRE: transporte público requiere RUC válido del transportista');
-      }
-    }
-
-    if (dto.modalidad === 'TRANSPORTE_PRIVADO') {
-      const placa = this.normalizeGrePlate(dto.placaVehiculo || extras.placaVehiculo || extras.placa);
-      if (!placa) {
-        throw new BadRequestException('No se puede generar GRE: transporte privado requiere placa del vehículo');
-      }
-      const licenciaConducir = String(dto.licenciaConducir || extras.licenciaConducir || '').trim();
-      if (!licenciaConducir) {
-        throw new BadRequestException('No se puede generar GRE: transporte privado requiere licencia de conducir');
-      }
-
-      const conductorDocumentoTipo = String(dto.conductorDocumentoTipo || extras.conductorDocumentoTipo || '1').trim();
-      const conductorDocumentoNumero = this.normalizeDigits(dto.conductorDocumentoNumero || extras.conductorDocumentoNumero);
-      const conductorNombres = String(dto.conductorNombres || extras.conductorNombres || '').trim();
-      const conductorApellidos = String(dto.conductorApellidos || extras.conductorApellidos || '').trim();
-
-      if (!/^[0147A]$/.test(conductorDocumentoTipo) || conductorDocumentoTipo === '6') {
-        throw new BadRequestException('No se puede generar GRE: tipo de documento del conductor inválido');
-      }
-      if (!conductorDocumentoNumero || conductorDocumentoNumero.length > 15) {
-        throw new BadRequestException('No se puede generar GRE: transporte privado requiere número de documento del conductor');
-      }
-      if (!conductorNombres || !conductorApellidos) {
-        throw new BadRequestException('No se puede generar GRE: transporte privado requiere nombres y apellidos del conductor');
-      }
-    }
-  }
-
-  private async assertOrigenGreExiste(dto: CreateGuiaRemisionDto, tenantId: string): Promise<void> {
-    const supabase = this.supabaseService.getClient();
-
-    if (dto.cpeRelacionado) {
-      const { data, error } = await supabase
-        .from('cpe')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('id', dto.cpeRelacionado)
-        .maybeSingle();
-
-      if (error) {
-        throw new BadRequestException(`No se pudo validar CPE relacionado para GRE: ${error.message}`);
-      }
-      if (!data) {
-        throw new BadRequestException('No se puede generar GRE: documento origen CPE no existe');
-      }
-    }
-
-    if (dto.pedidoId) {
-      const { data, error } = await supabase
-        .from('pedidos_venta')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('id', dto.pedidoId)
-        .maybeSingle();
-
-      if (error) {
-        throw new BadRequestException(`No se pudo validar pedido relacionado para GRE: ${error.message}`);
-      }
-      if (!data) {
-        throw new BadRequestException('No se puede generar GRE: documento origen pedido no existe');
-      }
-    }
+    // El alta interna no depende de habilitación legal ni de certificado. Los
+    // datos UBL específicos se verifican al firmar; si faltan, la guía conserva
+    // BORRADOR y el usuario puede completarlos/reintentar sin duplicarla.
   }
 
   /**
@@ -1187,78 +1065,6 @@ ${lines}
     return `<![CDATA[${String(value ?? '').replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
   }
 
-  private async registrarRelacionPedidoGre(params: {
-    pedidoId: string;
-    greId: string;
-    greNumero: string;
-    greEstado: string;
-    tenantIdHint?: string;
-    notas?: string | null;
-    despachos?: string[] | undefined;
-  }): Promise<void> {
-    const client = this.supabaseService.getClient();
-
-    try {
-      const { data: pedido, error: pedidoError } = await client
-        .from('pedidos_venta')
-        .select('tenant_id, numero')
-        .eq('id', params.pedidoId)
-        .single();
-
-      if (pedidoError || !pedido) {
-        console.warn(
-          `⚠️ [GRE] No se pudo vincular GRE ${params.greId} con pedido ${params.pedidoId}: ${pedidoError?.message ?? 'pedido no encontrado'
-          }`,
-        );
-        return;
-      }
-
-      const tenantId = pedido.tenant_id ?? params.tenantIdHint;
-      if (!tenantId) {
-        console.warn(
-          `⚠️ [GRE] Tenant desconocido al vincular GRE ${params.greId} con pedido ${params.pedidoId}`,
-        );
-        return;
-      }
-
-      const relacion = {
-        tenant_id: tenantId,
-        pedido_id: params.pedidoId,
-        gre_id: params.greId,
-        estado: params.greEstado ?? 'BORRADOR',
-        notas: params.notas ?? null,
-        creado_en: new Date().toISOString(),
-      };
-
-      const { error: linkError } = await client.from('pedido_gres').insert(relacion);
-      if (linkError) {
-        console.error(
-          `❌ [GRE] Error registrando relación pedido-gre (${params.pedidoId} -> ${params.greId}): ${linkError.message}`,
-        );
-      }
-
-      const { error: pedidoUpdate } = await client
-        .from('pedidos_venta')
-        .update({
-          gre_id: params.greId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', params.pedidoId)
-        .eq('tenant_id', tenantId);
-
-      if (pedidoUpdate) {
-        console.warn(
-          `⚠️ [GRE] No se pudo actualizar pedidos_venta.gre_id para ${params.pedidoId}: ${pedidoUpdate.message}`,
-        );
-      }
-    } catch (error) {
-      console.error(
-        `❌ [GRE] Error inesperado al vincular GRE ${params.greId} con pedido ${params.pedidoId}`,
-        error as Error,
-      );
-    }
-  }
-
   /**
    * Obtener código SUNAT para motivo de traslado
    */
@@ -1285,116 +1091,6 @@ ${lines}
       'TRANSPORTE_PRIVADO': '02'
     };
     return modalidadCodes[modalidad] || '01';
-  }
-
-  /**
-   * Procesar generación de XML UBL y firma (sin enviar a SUNAT)
-   * 
-   * NOTA: El envío automático a SUNAT está DESACTIVADO por ahora.
-   * Para enviar manualmente usar el endpoint: POST /api/gre/guias/:id/enviar-sunat
-   * 
-   * HARDENING E2: Valida certificado antes de firmar el XML
-   */
-  private async procesarGeneracionXML(
-    greId: string,
-    tenantId?: string,
-  ): Promise<{ success: boolean; hash?: string }> {
-    try {
-      this.logger.log(`📄 [GRE] Generando XML para GRE ${greId}...`);
-
-      // Obtener datos de la GRE
-      const query = this.supabaseService.getClient()
-        .from('gre_guias')
-        .select('*')
-        .eq('id', greId);
-
-      if (tenantId) {
-        query.eq('tenant_id', tenantId);
-      }
-
-      const { data: greData, error } = await query.single();
-
-      if (error || !greData) {
-        throw new Error('No se pudo obtener los datos de la GRE');
-      }
-
-      // HARDENING E2: Validar certificado antes de firmar XML (si se proporciona tenantId)
-      if (tenantId) {
-        this.logger.log(`🔐 [GRE] Validando certificado antes de firmar XML para GRE ${greId}...`);
-        const certificateValidation = await this.validationService.validateCertificate(tenantId);
-
-        if (!certificateValidation.isValid) {
-          this.logger.error(`❌ [GRE] Validación de certificado fallida antes de firmar: ${certificateValidation.errors.join(', ')}`);
-
-          // Marcar GRE como ERROR sin intentar firmar
-          await this.supabaseService.update(
-            'gre_guias',
-            {
-              estado: 'ERROR',
-              error_message: `Error validando certificado antes de firmar: ${certificateValidation.errors.join(', ')}`,
-              updated_at: new Date().toISOString()
-            },
-            { id: greId }
-          );
-
-          throw new BadRequestException({
-            message: 'No se puede firmar la GRE: Certificado digital inválido',
-            errors: certificateValidation.errors,
-            code: 'CERT_VALIDATION_FAILED',
-          });
-        }
-
-        if (certificateValidation.warnings.length > 0) {
-          this.logger.warn(`⚠️ [GRE] Advertencias de certificado: ${certificateValidation.warnings.join(', ')}`);
-        }
-
-        this.logger.log(`✅ [GRE] Certificado validado exitosamente antes de firmar XML`);
-      }
-
-      // Generar XML UBL
-      const xmlPayload = await this.buildGreXmlPayload(greData);
-      const xmlContent = this.generateGreXmlUbl(xmlPayload);
-
-      // Firmar el XML (sin enviar a SUNAT)
-      const xmlSigned = await this.firmarXmlGre(xmlContent, tenantId);
-      const hash = this.generarHashXml(xmlSigned);
-
-      // Guardar XML firmado en BD
-      await this.supabaseService.update(
-        'gre_guias',
-        {
-          xml_firmado: xmlSigned,
-          hash_gre: hash,
-          estado: 'FIRMADO', // Estado que indica que está listo para SUNAT
-          sunat_status: this.sunatStatuses.READY,
-          updated_at: new Date().toISOString()
-        },
-        { id: greId }
-      );
-
-      this.logger.log(`✅ [GRE] XML generado y firmado para GRE ${greId} - Hash: ${hash}`);
-      return { success: true, hash };
-    } catch (error) {
-      this.logger.error(`❌ [GRE] Error generando XML para GRE ${greId}:`, error);
-
-      // Marcar como ERROR
-      await this.supabaseService.update(
-        'gre_guias',
-        {
-          estado: 'ERROR',
-          error_message: `Error generando XML: ${error.message}`,
-          sunat_status: this.sunatStatuses.ERROR,
-          updated_at: new Date().toISOString()
-        },
-        { id: greId }
-      );
-
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-
-      return { success: false };
-    }
   }
 
   /**
@@ -1464,148 +1160,131 @@ ${lines}
     greId: string,
     tenantId?: string,
     options?: { idempotencyKey?: string },
-  ): Promise<void> {
-    return this.procesarEnvioSunat(greId, tenantId, options);
+  ): Promise<any> {
+    if (!tenantId) {
+      throw new BadRequestException('Tenant requerido para reintentar la GRE');
+    }
+    const { data: gre, error } = await this.supabaseService.getClient()
+      .from('gre_guias')
+      .select('retry_count')
+      .eq('id', greId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error || !gre) {
+      throw new NotFoundException('Guía de remisión no encontrada');
+    }
+    const base = String(options?.idempotencyKey || `gre.send:${tenantId}:${greId}`)
+      .trim()
+      .slice(0, 160);
+    const attemptKey = `${base}:attempt:${Number(gre.retry_count || 0) + 1}`;
+    return this.procesarEnvioSunat(greId, tenantId, null, attemptKey, 'WORKER');
   }
 
-  /**
-   * Procesar envío de GRE a SUNAT (método preparado para activar después)
-   */
   private async procesarEnvioSunat(
     greId: string,
-    tenantId?: string,
-    options?: { idempotencyKey?: string },
-  ): Promise<void> {
+    tenantId: string,
+    actorId: string | null,
+    idempotencyKey: string,
+    origin: 'USUARIO' | 'WORKER' | 'SISTEMA',
+  ): Promise<any> {
+    const client = this.supabaseService.getClient();
+    const { data: claim, error: claimError } = await client.rpc('reservar_envio_gre_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_gre_id: greId,
+      p_idempotency_key: idempotencyKey,
+      p_origen: origin,
+    });
+    if (claimError || !claim) {
+      throw this.toGreException(claimError, 'No se pudo reservar el envío GRE');
+    }
+    if (!(claim as any).claimed) {
+      return claim;
+    }
+
+    const gre = (claim as any).gre;
+    const operation = (claim as any).operation;
+    if (!gre?.xml_firmado || !operation?.id || !operation?.claim_token) {
+      throw new BadRequestException('La reserva GRE no devolvió XML ni claim verificable');
+    }
+
+    const { data: config, error: configError } = await client
+      .from('empresa_config')
+      .select('ruc')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (configError || !/^\d{11}$/.test(String(config?.ruc || ''))) {
+      await this.finalizarFalloEnvioGre(
+        tenantId,
+        operation,
+        'GRE_ISSUER_RUC_INVALID',
+        'RUC emisor del tenant requerido para transmitir GRE',
+      );
+      throw new BadRequestException('RUC emisor del tenant requerido para transmitir GRE');
+    }
+
+    let response: Awaited<ReturnType<OseService['enviarGre']>>;
     try {
-      console.log(`📤 [GRE] Procesando envío de GRE ${greId} a SUNAT...`);
-
-      // Obtener datos de la GRE
-      const { data: greData, error } = await this.supabaseService.getClient()
-        .from('gre_guias')
-        .select('*')
-        .eq('id', greId)
-        .single();
-
-      if (error || !greData) {
-        throw new Error('No se pudo obtener los datos de la GRE');
-      }
-
-      const effectiveTenantId = tenantId ?? (greData as any).tenant_id;
-      if (!effectiveTenantId) {
-        throw new Error('Tenant requerido para enviar GRE a SUNAT');
-      }
-      const effectiveIdempotencyKey =
-        String(options?.idempotencyKey ?? '').trim() ||
-        String((greData as any).idempotency_key ?? '').trim() ||
-        `gre.send:${effectiveTenantId}:${greId}`;
-
-      // HARDENING: evitar doble envío concurrente si ya está en flight.
-      if (
-        (greData as any).estado === 'ENVIADO' &&
-        (greData as any).sunat_status === this.sunatStatuses.SENDING
-      ) {
-        this.logger.warn(
-          `♻️ [GRE] Envío ya en progreso para ${greId} (idempotencyKey=${effectiveIdempotencyKey}); omitiendo duplicado.`,
-        );
-        return;
-      }
-
-      // Marcar como ENVIADO
-      await this.supabaseService.update(
-        'gre_guias',
-        {
-          estado: 'ENVIADO',
-          sunat_status: this.sunatStatuses.SENDING,
-          updated_at: new Date().toISOString()
-        },
-        { id: greId }
-      );
-
-      // Generar XML UBL con datos reales
-      const xmlPayload = await this.buildGreXmlPayload(greData);
-      const xmlContent = this.generateGreXmlUbl(xmlPayload);
-      const fileName = `${xmlPayload.emisor.ruc}-09-${greData.numero}`;
-
-      // Enviar a SUNAT mediante OSE
-      const response = await this.oseService.enviarGre(xmlContent, fileName, { tenantId: effectiveTenantId });
-
-      if (response.success) {
-        if (response.ticket && !response.cdr) {
-          console.log(`⏳ [GRE] GRE ${greId} recibida por SUNAT con ticket ${response.ticket}; pendiente de consulta CDR`);
-
-          await this.supabaseService.update(
-            'gre_guias',
-            {
-              estado: 'ENVIADO',
-              sunat_status: this.sunatStatuses.SENDING,
-              numero_sunat: response.ticket,
-              hash_gre: response.hashCPE,
-              updated_at: new Date().toISOString()
-            },
-            { id: greId }
-          );
-          return;
-        }
-
-        console.log(`✅ [GRE] GRE ${greId} enviada exitosamente a SUNAT`);
-
-        // Actualizar como ACEPTADO
-        await this.supabaseService.update(
-          'gre_guias',
-          {
-            estado: 'ACEPTADO',
-            sunat_status: this.sunatStatuses.ACCEPTED,
-            numero_sunat: response.numeroComprobante,
-            hash_gre: response.hashCPE,
-            cdr_sunat: response.cdr || 'CDR_RECEIVED',
-            updated_at: new Date().toISOString()
-          },
-          { id: greId }
-        );
-      } else {
-        console.error(`❌ [GRE] Error enviando GRE ${greId}: ${response.descripcionRespuesta}`);
-
-        // 🔴 CRÍTICO FIX: Determinar si es error técnico recuperable o error de validación
-        const isTechnicalError = this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta);
-
-        // Marcar como RECHAZADO
-        await this.supabaseService.update(
-          'gre_guias',
-          {
-            estado: isTechnicalError ? 'ERROR' : 'RECHAZADO',
-            sunat_status: isTechnicalError ? this.sunatStatuses.ERROR : this.sunatStatuses.REJECTED,
-            error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
-            retry_count: 0,
-            next_retry_at: null,
-            updated_at: new Date().toISOString()
-          },
-          { id: greId }
-        );
-
-        throw new BadRequestException(`SUNAT rechazó la GRE: ${response.codigoRespuesta}: ${response.descripcionRespuesta}`);
-      }
-
+      const fileName = `${config.ruc}-09-${gre.numero}`;
+      response = await this.oseService.enviarGre(gre.xml_firmado, fileName, { tenantId });
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
+      const message = this.errorMessage(error);
+      await this.finalizarFalloEnvioGre(tenantId, operation, 'GRE_TRANSPORT_EXCEPTION', message);
+      throw new BadRequestException(`Error técnico enviando GRE: ${message}`);
+    }
 
-      console.error(`❌ [GRE] Error técnico enviando GRE ${greId}:`, error);
-
-      // 🔴 CRÍTICO FIX: Marcar como RECHAZADO con información de reintento
-      const retryCount = 0; // Primera vez que falla
-      await this.supabaseService.update(
-        'gre_guias',
-        {
-          estado: 'ERROR',
-          sunat_status: this.sunatStatuses.ERROR,
-          error_message: `Error técnico: ${error.message}`,
-          retry_count: retryCount,
-          next_retry_at: null, // El servicio de reintentos lo programará
-          updated_at: new Date().toISOString()
-        },
-        { id: greId }
+    const technicalError = !response.success
+      && this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta);
+    const { data: finalized, error: finalizeError } = await client.rpc('finalizar_envio_gre_tx', {
+      p_tenant_id: tenantId,
+      p_operation_id: operation.id,
+      p_claim_token: operation.claim_token,
+      p_success: response.success,
+      p_technical_error: technicalError,
+      p_codigo: response.codigoRespuesta,
+      p_descripcion: response.descripcionRespuesta,
+      p_ticket: response.ticket || null,
+      p_numero_sunat: response.numeroComprobante || null,
+      p_hash: response.hashCPE || gre.hash_gre || null,
+      p_cdr: response.cdr || null,
+      p_response_summary: {
+        observaciones: response.observaciones || [],
+        transport: response.ticket ? 'REST_TICKET' : 'DIRECT',
+      },
+    });
+    if (finalizeError || !finalized) {
+      throw this.toGreException(finalizeError, 'SUNAT respondió, pero no se pudo cerrar el envío GRE');
+    }
+    if (!response.success) {
+      throw new BadRequestException(
+        `${technicalError ? 'Error técnico' : 'SUNAT rechazó la GRE'}: ${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
       );
+    }
+    return finalized;
+  }
+
+  private async finalizarFalloEnvioGre(
+    tenantId: string,
+    operation: any,
+    code: string,
+    message: string,
+  ): Promise<void> {
+    const { error } = await this.supabaseService.getClient().rpc('finalizar_envio_gre_tx', {
+      p_tenant_id: tenantId,
+      p_operation_id: operation.id,
+      p_claim_token: operation.claim_token,
+      p_success: false,
+      p_technical_error: true,
+      p_codigo: code,
+      p_descripcion: message,
+      p_ticket: null,
+      p_numero_sunat: null,
+      p_hash: null,
+      p_cdr: null,
+      p_response_summary: { exception: true },
+    });
+    if (error) {
+      this.logger.error(`No se pudo finalizar el fallo de envío GRE ${operation.id}: ${error.message}`);
     }
   }
 
@@ -1615,24 +1294,16 @@ ${lines}
   async reenviarGre(
     greId: string,
     tenantId: string,
+    actorId: string,
     options?: { idempotencyKey?: string },
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      console.log(`🔄 [GRE] Reenviando GRE ${greId} a SUNAT...`);
-
-      await this.procesarEnvioSunat(greId, tenantId, options);
-
-      return {
-        success: true,
-        message: 'GRE reenviada exitosamente a SUNAT'
-      };
-    } catch (error) {
-      console.error(`❌ [GRE] Error reenviando GRE ${greId}:`, error);
-      return {
-        success: false,
-        message: `Error reenviando GRE: ${error.message}`
-      };
-    }
+  ): Promise<any> {
+    return this.procesarEnvioSunat(
+      greId,
+      tenantId,
+      actorId,
+      this.requireGreKey(options?.idempotencyKey),
+      'USUARIO',
+    );
   }
 
   /**
@@ -1641,157 +1312,212 @@ ${lines}
   async enviarManualmenteSunat(
     greId: string,
     tenantId: string,
+    actorId: string | null,
     options?: { idempotencyKey?: string },
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      console.log(`🚀 [GRE] Enviando manualmente GRE ${greId} a SUNAT...`);
-      await this.procesarEnvioSunat(greId, tenantId, options);
-      return { success: true, message: 'GRE enviada a SUNAT exitosamente' };
-    } catch (error) {
-      console.error(`❌ Error enviando manualmente GRE ${greId}:`, error);
-      return { success: false, message: `Error enviando GRE: ${error.message}` };
-    }
+  ): Promise<any> {
+    return this.procesarEnvioSunat(
+      greId,
+      tenantId,
+      actorId,
+      this.requireGreKey(options?.idempotencyKey),
+      actorId ? 'USUARIO' : 'WORKER',
+    );
   }
 
-  /**
-   * Consultar estado de GRE en SUNAT
-   */
-  async consultarEstadoGre(greId: string, tenantId: string): Promise<any> {
+  async consultarEstadoGre(
+    greId: string,
+    tenantId: string,
+    actorId: string | null,
+    idempotencyKey: string,
+    origin: 'USUARIO' | 'WORKER' | 'SISTEMA' = actorId ? 'USUARIO' : 'WORKER',
+  ): Promise<any> {
+    const client = this.supabaseService.getClient();
+    const { data: claim, error: claimError } = await client.rpc('reservar_consulta_gre_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_gre_id: greId,
+      p_idempotency_key: this.requireGreKey(idempotencyKey),
+      p_origen: origin,
+    });
+    if (claimError || !claim) {
+      throw this.toGreException(claimError, 'No se pudo reservar la consulta GRE');
+    }
+    if (!(claim as any).claimed) return claim;
+
+    const gre = (claim as any).gre;
+    const operation = (claim as any).operation;
+    const { data: config, error: configError } = await client
+      .from('empresa_config')
+      .select('ruc')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (configError || !/^\d{11}$/.test(String(config?.ruc || ''))) {
+      await this.finalizarFalloConsultaGre(
+        tenantId,
+        operation,
+        'GRE_ISSUER_RUC_INVALID',
+        'RUC emisor requerido para consultar GRE',
+      );
+      throw new BadRequestException('RUC emisor requerido para consultar GRE');
+    }
+
+    let response: Awaited<ReturnType<OseService['consultarEstadoCpe']>>;
     try {
-      console.log(`🔍 [GRE] Consultando estado de GRE ${greId} en SUNAT...`);
-
-      // Obtener datos de la GRE
-      const { data: greData, error } = await this.supabaseService.getClient()
-        .from('gre_guias')
-        .select('numero, numero_sunat')
-        .eq('id', greId)
-        .eq('tenant_id', tenantId)
-        .single();
-
-      if (error || !greData) {
-        throw new Error('GRE no encontrada');
-      }
-
-      const { data: empresaConfig, error: empresaError } = await this.supabaseService.getClient()
-        .from('empresa_config')
-        .select('ruc, sunat_gre_transport')
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-
-      if (empresaError) {
-        throw new Error(`No se pudo obtener RUC emisor para GRE: ${empresaError.message}`);
-      }
-
-      const rucEmisor = (empresaConfig as any)?.ruc;
-      if (!rucEmisor) {
-        throw new Error('RUC emisor requerido para consultar GRE en SUNAT');
-      }
-
-      let response: Awaited<ReturnType<OseService['consultarEstadoCpe']>>;
-      if ((empresaConfig as any)?.sunat_gre_transport === 'rest' && greData.numero_sunat) {
-        response = await this.oseService.consultarTicketGre(greData.numero_sunat, { tenantId });
+      if (gre.sunat_ticket) {
+        response = await this.oseService.consultarTicketGre(gre.sunat_ticket, { tenantId });
       } else {
-        const [serie, numero] = String(greData.numero || '').split('-');
-        if (!serie || !numero) {
-          throw new Error(`Número GRE inválido para consulta SUNAT: ${greData.numero}`);
-        }
-
+        const [serie, numero] = String(gre.numero || '').split('-');
+        if (!serie || !numero) throw new Error(`Número GRE inválido: ${gre.numero}`);
         response = await this.oseService.consultarEstadoCpe(
-          rucEmisor,
+          config.ruc,
           '09',
           serie,
           numero,
           { tenantId },
         );
       }
-
-      // Actualizar estado en BD si es necesario
-      if (response.success) {
-        await this.supabaseService.update(
-          'gre_guias',
-          {
-            estado: 'ACEPTADO',
-            sunat_status: this.sunatStatuses.ACCEPTED,
-            cdr_sunat: response.cdr || 'CDR_RECEIVED',
-            updated_at: new Date().toISOString()
-          },
-          { id: greId }
-        );
-      } else {
-        await this.supabaseService.update(
-          'gre_guias',
-          {
-            sunat_status: this.sunatStatuses.REJECTED,
-            error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
-            updated_at: new Date().toISOString()
-          },
-          { id: greId }
-        );
-      }
-
-      return {
-        id: greId,
-        estado: response.success ? 'ACEPTADO' : 'PENDIENTE',
-        codigoSunat: response.codigoRespuesta,
-        descripcionSunat: response.descripcionRespuesta,
-        timestamp: new Date()
-      };
-
     } catch (error) {
-      console.error(`❌ [GRE] Error consultando estado de GRE ${greId}:`, error);
-      await this.supabaseService.update(
-        'gre_guias',
-        {
-          sunat_status: this.sunatStatuses.ERROR,
-          error_message: `Error consultando estado: ${error.message}`,
-          updated_at: new Date().toISOString()
-        },
-        { id: greId }
+      const message = this.errorMessage(error);
+      await this.finalizarFalloConsultaGre(tenantId, operation, 'GRE_QUERY_EXCEPTION', message);
+      throw new BadRequestException(`Error técnico consultando GRE: ${message}`);
+    }
+
+    const pending = !response.success && String(response.codigoRespuesta) === '98';
+    const technicalError = !response.success && !pending
+      && this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta);
+    const { data: finalized, error: finalizeError } = await client.rpc('finalizar_consulta_gre_tx', {
+      p_tenant_id: tenantId,
+      p_operation_id: operation.id,
+      p_claim_token: operation.claim_token,
+      p_success: response.success,
+      p_pending: pending,
+      p_technical_error: technicalError,
+      p_codigo: response.codigoRespuesta,
+      p_descripcion: response.descripcionRespuesta,
+      p_cdr: response.cdr || null,
+      p_response_summary: { observaciones: response.observaciones || [] },
+    });
+    if (finalizeError || !finalized) {
+      throw this.toGreException(finalizeError, 'No se pudo cerrar la consulta GRE');
+    }
+    if (!response.success && !pending) {
+      throw new BadRequestException(
+        `${technicalError ? 'Error técnico' : 'SUNAT rechazó la GRE'}: ${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
       );
-      return {
-        id: greId,
-        estado: 'ERROR',
-        mensaje: `Error consultando estado: ${error.message}`,
-        timestamp: new Date()
-      };
+    }
+    return finalized;
+  }
+
+  private async finalizarFalloConsultaGre(
+    tenantId: string,
+    operation: any,
+    code: string,
+    message: string,
+  ): Promise<void> {
+    const { error } = await this.supabaseService.getClient().rpc('finalizar_consulta_gre_tx', {
+      p_tenant_id: tenantId,
+      p_operation_id: operation.id,
+      p_claim_token: operation.claim_token,
+      p_success: false,
+      p_pending: false,
+      p_technical_error: true,
+      p_codigo: code,
+      p_descripcion: message,
+      p_cdr: null,
+      p_response_summary: { exception: true },
+    });
+    if (error) {
+      this.logger.error(`No se pudo finalizar el fallo de consulta GRE ${operation.id}: ${error.message}`);
     }
   }
 
-  private async generarNumeroCorrelativo(tenantId: string): Promise<string> {
-    try {
-      // Obtener el último número usado
-      const { data, error } = await this.supabaseService.getClient()
-        .from('gre_guias')
-        .select('serie, correlativo')
-        .eq('tenant_id', tenantId)
-        .order('correlativo', { ascending: false })
-        .limit(1);
-
-      if (error) {
-        console.error('Error obteniendo último número:', error);
-        return 'T001-00000001'; // Número inicial si hay error
-      }
-
-      if (!data || data.length === 0) {
-        return 'T001-00000001'; // Primer número
-      }
-
-      const serie = data[0].serie || 'T001';
-      const correlativoActual = Number(data[0].correlativo || 0);
-      const siguienteNumero = correlativoActual + 1 || 1;
-      return `${serie}-${siguienteNumero.toString().padStart(8, '0')}`;
-    } catch (error) {
-      console.error('Error generando número correlativo:', error);
-      return 'T001-00000001';
-    }
+  async anularGuia(
+    greId: string,
+    tenantId: string,
+    actorId: string,
+    motivo: string,
+    idempotencyKey: string,
+  ): Promise<GuiaRemisionResponseDto> {
+    const { data, error } = await this.supabaseService.getClient().rpc('anular_gre_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_gre_id: greId,
+      p_motivo: motivo,
+      p_idempotency_key: this.requireGreKey(idempotencyKey),
+    });
+    if (error || !data) throw this.toGreException(error, 'No se pudo anular la GRE');
+    return this.mapGreRecordToResponse(data);
   }
 
-  private extractSerieYCorrelativo(numeroCompleto: string): { serie: string; correlativo: number } {
-    const [serieRaw, correlativoRaw] = (numeroCompleto || '').split('-');
-    const serie = serieRaw && serieRaw.trim().length > 0 ? serieRaw.trim().toUpperCase() : 'T001';
-    const correlativoNumber = Number(correlativoRaw ?? '0');
-    const correlativo = Number.isFinite(correlativoNumber) && correlativoNumber > 0 ? correlativoNumber : 0;
-    return { serie, correlativo };
+  async obtenerXmlFirmado(
+    greId: string,
+    tenantId: string,
+  ): Promise<{ filename: string; content: string }> {
+    const { data, error } = await this.supabaseService.getClient()
+      .from('gre_guias')
+      .select('numero,xml_firmado')
+      .eq('id', greId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) throw new BadRequestException(`No se pudo leer el XML GRE: ${error.message}`);
+    if (!data) throw new NotFoundException('Guía de remisión no encontrada');
+    if (!data.xml_firmado) throw new BadRequestException('La GRE aún no tiene XML firmado');
+    return { filename: `${data.numero}.xml`, content: data.xml_firmado };
+  }
+
+  async generarRepresentacionGre(
+    greId: string,
+    tenantId: string,
+  ): Promise<{ filename: string; content: string }> {
+    const gre = await this.findGuiaById(greId, tenantId);
+    const lines = [
+      `GUÍA DE REMISIÓN ELECTRÓNICA ${gre.numero}`,
+      `Estado: ${gre.estado}`,
+      `Destinatario: ${gre.destinatario}`,
+      `Destino: ${gre.direccionDestino}`,
+      `Fecha de traslado: ${gre.fechaTraslado}`,
+      `Motivo: ${gre.motivo}`,
+      `Modalidad: ${gre.modalidad}`,
+      `Peso total: ${gre.pesoTotal} kg`,
+      '',
+      ...(gre.items || []).map((item, index) => (
+        `${index + 1}. ${item.descripcion} — ${item.cantidad} ${item.unidadMedida || 'NIU'}`
+      )),
+    ];
+    return { filename: `${gre.numero}.txt`, content: lines.join('\n') };
+  }
+
+  async updateAutoConfig(
+    tenantId: string,
+    actorId: string,
+    body: GreAutoConfigDto,
+    idempotencyKey: string,
+  ): Promise<any> {
+    const { data, error } = await this.supabaseService.getClient().rpc('actualizar_config_gre_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_payload: {
+        umbral_gre_automatico: body.umbralGREAutomatico,
+        gre_automatico_habilitado: body.greAutomaticoHabilitado,
+        gre_obligatorio: body.greObligatorio,
+      },
+      p_idempotency_key: this.requireGreKey(idempotencyKey),
+    });
+    if (error || !data) throw this.toGreException(error, 'No se pudo actualizar la configuración GRE');
+    return {
+      umbralGREAutomatico: Number((data as any).umbral_gre_automatico),
+      greAutomaticoHabilitado: (data as any).gre_automatico_habilitado === true,
+      greObligatorio: (data as any).gre_obligatorio === true,
+      idempotent: (data as any).idempotent === true,
+    };
+  }
+
+  private requireGreKey(value?: string): string {
+    const key = String(value || '').trim();
+    if (!key || key.length > 200) {
+      throw new BadRequestException('Idempotency-Key GRE requerido y de hasta 200 caracteres');
+    }
+    return key;
   }
 
   private resolveGreIdempotencyKey(dto: CreateGuiaRemisionDto, tenantId: string): string {
@@ -1881,6 +1607,11 @@ ${lines}
       sunatStatus: record.sunat_status,
       idempotencyKey: record.idempotency_key,
       eventId: record.event_id,
+      errorMessage: record.error_message || undefined,
+      signedAt: record.signed_at || undefined,
+      lastSentAt: record.last_sent_at || undefined,
+      lastConsultedAt: record.last_consulted_at || undefined,
+      motivoAnulacion: record.motivo_anulacion || undefined,
     };
   }
 
@@ -1905,14 +1636,20 @@ ${lines}
       }
 
       // Procesar estadísticas
+      const estados = guias.reduce((acc, guia) => {
+        acc[guia.estado] = (acc[guia.estado] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      const today = new Date().toISOString().slice(0, 10);
       const stats = {
         total: guias.length,
-        estados: guias.reduce((acc, guia) => {
-          acc[guia.estado] = (acc[guia.estado] || 0) + 1;
-          return acc;
-        }, {}),
+        estados,
         pesoTotal: guias.reduce((sum, guia) => sum + (guia.peso_total || 0), 0),
-        tendencia: this.calcularTendenciaSemanal(guias)
+        tendencia: this.calcularTendenciaSemanal(guias),
+        greEmitidas: guias.filter((guia) => String(guia.created_at || '').slice(0, 10) === today).length,
+        totalGre: guias.length,
+        enTransito: (estados.ENVIADO || 0) + (estados.FIRMADO || 0),
+        completados: estados.ACEPTADO || 0,
       };
 
       console.log('📊 Estadísticas GRE:', stats);
@@ -1923,7 +1660,11 @@ ${lines}
         total: 0,
         estados: {},
         pesoTotal: 0,
-        tendencia: []
+        tendencia: [],
+        greEmitidas: 0,
+        totalGre: 0,
+        enTransito: 0,
+        completados: 0,
       };
     }
   }
@@ -2054,22 +1795,6 @@ ${lines}
       // Create GRE (with certificate validation)
       const gre = await this.createGuia(greData, saleData.tenantId);
 
-      // Update GRE to mark as automatic and link to sale
-      await this.supabaseService.getClient()
-        .from('gre_guias')
-        .update({
-          es_automatica: true,
-          venta_id: saleId,
-          motivo_creacion: 'AUTO_THRESHOLD',
-        })
-        .eq('id', gre.id);
-
-      // Link GRE with inventory movement
-      await this.linkGREWithInventory(gre.id, saleId, saleData.tenantId, {
-        productos: saleData.productos,
-        total: saleData.total,
-      });
-
       console.log(`✅ [GRE] Automatic GRE created successfully: ${gre.numero} for sale ${saleId}`);
 
       return gre;
@@ -2120,34 +1845,6 @@ ${lines}
   }
 
   /**
-   * Link GRE with inventory movement
-   * Requirements: 2.3, 2.6
-   */
-  async linkGREToInventoryMovement(greId: string, movementId: string): Promise<void> {
-    try {
-      console.log(`🚚 [GRE] Linking GRE ${greId} to inventory movement ${movementId}`);
-
-      const { error } = await this.supabaseService.getClient()
-        .from('gre_guias')
-        .update({
-          movimiento_inventario_id: movementId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', greId);
-
-      if (error) {
-        console.error(`❌ [GRE] Error linking GRE to inventory movement:`, error);
-        throw error;
-      }
-
-      console.log(`✅ [GRE] GRE ${greId} linked to inventory movement ${movementId}`);
-    } catch (error) {
-      console.error(`❌ [GRE] Error linking GRE to inventory movement:`, error);
-      throw error;
-    }
-  }
-
-  /**
    * Get GRE threshold configuration for tenant
    * Requirements: 2.1, 2.2, 2.6
    */
@@ -2175,7 +1872,7 @@ ${lines}
       }
 
       return {
-        umbralGREAutomatico: data?.umbral_gre_automatico || 700.0,
+        umbralGREAutomatico: data?.umbral_gre_automatico ?? 700.0,
         greAutomaticoHabilitado: data?.gre_automatico_habilitado === true,
         greObligatorio: data?.gre_obligatorio === true,
       };
@@ -2190,76 +1887,4 @@ ${lines}
     }
   }
 
-  /**
-   * Find or create inventory movement for a sale
-   * Requirements: 2.3, 2.6
-   */
-  async findOrCreateInventoryMovement(
-    saleId: string,
-    tenantId: string,
-    saleData?: {
-      productos?: any[];
-      total?: number;
-    }
-  ): Promise<string | null> {
-    try {
-      console.log(`🚚 [GRE] Finding canonical inventory movement for sale ${saleId}`);
-
-      // First, try to find existing inventory movement for this sale
-      const { data: existingMovement, error: findError } = await this.supabaseService.getClient()
-        .from('movimientos_inventario')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('referencia_id', saleId)
-        .in('referencia_tipo', ['VENTA_POS', 'VENTA'])
-        .eq('tipo', 'SALIDA')
-        .limit(1)
-        .maybeSingle();
-
-      if (existingMovement && !findError) {
-        console.log(`✅ [GRE] Found existing inventory movement: ${existingMovement.id}`);
-        return existingMovement.id;
-      }
-
-      // GRE no crea stock: la venta física debe haberlo hecho atómicamente.
-      // Inventar aquí un almacén causaría un segundo descuento.
-      console.warn(`⚠️ [GRE] No canonical inventory movement found for sale ${saleId}`);
-      return null;
-    } catch (error) {
-      console.error(`❌ [GRE] Error finding/creating inventory movement:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * Link GRE with inventory movement and update GRE record
-   * Requirements: 2.3, 2.6
-   */
-  async linkGREWithInventory(
-    greId: string,
-    saleId: string,
-    tenantId: string,
-    saleData?: {
-      productos?: any[];
-      total?: number;
-    }
-  ): Promise<void> {
-    try {
-      console.log(`🚚 [GRE] Linking GRE ${greId} with inventory for sale ${saleId}`);
-
-      // Find or create inventory movement
-      const movementId = await this.findOrCreateInventoryMovement(saleId, tenantId, saleData);
-
-      if (movementId) {
-        // Link GRE to inventory movement
-        await this.linkGREToInventoryMovement(greId, movementId);
-        console.log(`✅ [GRE] GRE ${greId} linked to inventory movement ${movementId}`);
-      } else {
-        console.warn(`⚠️ [GRE] Could not link GRE ${greId} to inventory - no movement found/created`);
-      }
-    } catch (error) {
-      console.error(`❌ [GRE] Error linking GRE with inventory:`, error);
-      // Don't throw - this is not critical for GRE creation
-    }
-  }
 }

@@ -37,20 +37,15 @@ export class CashAuthorizationService {
 
         if (error) {
             this.logger.warn(`No se encontró configuración para tenant ${tenantId}, usando valores por defecto`);
-
-            // Crear configuración por defecto si no existe
-            const { data: newConfig, error: insertError } = await this.supabase
-                .getClient()
-                .from('configuracion_caja')
-                .insert([{ tenant_id: tenantId }])
-                .select()
-                .single();
-
-            if (insertError) {
-                throw new BadRequestException('Error creando configuración de caja');
-            }
-
-            return newConfig as ConfiguracionCaja;
+            // Leer no crea datos de forma implícita. La configuración durable se
+            // guarda únicamente mediante guardar_configuracion_caja_tx (474).
+            return {
+                monto_apertura_min: 100,
+                monto_apertura_max: 2000,
+                retiro_max_sin_autorizacion: 500,
+                saldo_minimo_operativo: 50,
+                tolerancia_diferencia_cierre: 10,
+            };
         }
 
         return data as ConfiguracionCaja;
@@ -231,27 +226,11 @@ export class CashAuthorizationService {
         razon: string,
         tenantId: string,
     ): Promise<void> {
-        // Registrar en la tabla de auditoría de caja
-        const { error } = await this.supabase
-            .getClient()
-            .from('caja_audit_log')
-            .insert([
-                {
-                    evento: tipo,
-                    usuario_id: usuarioId,
-                    parametros: {
-                        supervisor_id: supervisorId,
-                        monto,
-                        razon,
-                    },
-                    resultado: 'APROBADO',
-                    tenant_id: tenantId,
-                },
-            ]);
-
-        if (error) {
-            this.logger.error(`Error registrando autorización especial: ${error.message}`);
-        }
+        // No se escribe una auditoría separada del negocio: la RPC dueña de la
+        // operación debe persistir autorización y auditoría en el mismo commit.
+        this.logger.debug(
+            `Autorización validada para frontera atómica: ${tipo}/${tenantId}/${usuarioId}/${supervisorId}/${monto}/${razon}`,
+        );
     }
 
     /**

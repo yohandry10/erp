@@ -41,7 +41,7 @@ export class OrdenesCompraController {
   @ApiOperation({
     summary: "Crear nueva orden de compra",
     description:
-      "Crea una nueva orden de compra con sus detalles. Puede ser creada desde una cotización aprobada o de forma independiente.",
+      "Crea una orden independiente con sus detalles. Una cotización aprobada se convierte únicamente desde su acción Convertir.",
   })
   @ApiResponse({
     status: 201,
@@ -294,9 +294,7 @@ export class OrdenesCompraController {
   @ApiOperation({
     summary: "Cancelar orden de compra",
     description:
-      "Cancela una orden de compra cambiando su estado a ANULADA. Solo se pueden cancelar órdenes en estado PENDIENTE, BORRADOR, APROBACION, APROBADA o PARCIAL. " +
-      "Por defecto, se bloquea si existen recepciones activas (no CERRADAS) salvo que se envíe permitir_cancelar_con_recepciones_activas=true. " +
-      "También se bloquea si existen recepciones CERRADAS salvo que se envíe permitir_cancelar_con_recepciones_cerradas=true (lo que implica reversa de inventario/CxP).",
+      "Cancela atómicamente una orden sin progreso. Los borradores de recepción se eliminan; una recepción procesada o CxP activa exige el flujo de devolución, no una cancelación forzada.",
   })
   @ApiResponse({
     status: 200,
@@ -332,12 +330,12 @@ export class OrdenesCompraController {
   }
 
   @Post(":id/recepciones")
-  @RequirePermission("compras.ordenes.actualizar")
+  @RequirePermission("compras.recepciones.crear")
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: "Crear recepción para una orden de compra",
     description:
-      "Crea una nueva recepción de mercancía en estado BORRADOR para una orden de compra específica. La orden debe estar en estado APROBADA o PARCIAL.",
+      "Crea una nueva recepción de bienes o servicios en estado BORRADOR para una orden de compra específica. La orden debe estar en estado APROBADA o PARCIAL.",
   })
   @ApiResponse({
     status: 201,
@@ -355,6 +353,7 @@ export class OrdenesCompraController {
     @Param("id") ordenId: string,
     @Body(ValidationPipe) createRecepcionDto: CreateRecepcionDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     // Asegurar que el orden_id del DTO coincida con el parámetro de la ruta
     createRecepcionDto.orden_id = ordenId;
@@ -362,7 +361,7 @@ export class OrdenesCompraController {
     const recepcion = await this.recepcionesService.crearRecepcion(
       tenantId,
       createRecepcionDto,
-      null, // userId - se puede obtener del CurrentUser decorator cuando se habilite autenticación
+      user?.id,
     );
 
     return {

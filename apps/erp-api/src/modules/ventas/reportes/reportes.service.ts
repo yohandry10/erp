@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 /**
@@ -870,126 +870,37 @@ export class ReportesService {
    */
   async getAgingCxc(
     tenantId: string,
-    fechaDesde?: string,
-    fechaHasta?: string,
+    fechaCorte?: string,
+    clienteFiltro?: string,
   ) {
+    const corte = fechaCorte?.trim() || null;
+    if (corte) {
+      const parsed = /^\d{4}-\d{2}-\d{2}$/.test(corte)
+        ? new Date(`${corte}T00:00:00.000Z`)
+        : null;
+      if (
+        !parsed ||
+        Number.isNaN(parsed.getTime()) ||
+        parsed.toISOString().slice(0, 10) !== corte
+      ) {
+        throw new BadRequestException('fechaCorte debe ser una fecha válida YYYY-MM-DD');
+      }
+    }
+
     const client = this.supabase.getClient();
-
-    let query = client
-      .from('cuentas_por_cobrar')
-      .select(
-        `
-        id,
-        cliente_id,
-        serie,
-        numero,
-        fecha_emision,
-        fecha_vencimiento,
-        estado,
-        monto_pendiente,
-        clientes!cuentas_por_cobrar_cliente_id_fkey!inner(razon_social, documento_numero:codigo)
-      `,
-      )
-      .eq('tenant_id', tenantId)
-      .neq('estado', 'CANCELADO');
-
-    if (fechaDesde) {
-      query = query.gte('fecha_emision', fechaDesde);
-    }
-    if (fechaHasta) {
-      query = query.lte('fecha_emision', fechaHasta);
-    }
-
-    const { data: cuentas, error } = await query;
-    if (error) throw error;
-
-    const hoy = new Date();
-    let totalPendiente = 0;
-    let totalVencido = 0;
-
-    const bucketMap = new Map<string, { nombre: string; rango: string; monto: number }>();
-    const registrarBucket = (id: string, nombre: string, rango: string) => {
-      if (!bucketMap.has(id)) {
-        bucketMap.set(id, { nombre, rango, monto: 0 });
-      }
-    };
-
-    registrarBucket('corriente', 'Al día', '≤ 0 días');
-    registrarBucket('b30', '1 - 30 días', '1 a 30 días');
-    registrarBucket('b60', '31 - 60 días', '31 a 60 días');
-    registrarBucket('b90', '61 - 90 días', '61 a 90 días');
-    registrarBucket('b120', 'Más de 90 días', '> 90 días');
-
-    const cuentasDetalladas = (cuentas || []).map((cuenta) => {
-      const monto = Number(cuenta.monto_pendiente ?? 0);
-      totalPendiente += monto;
-
-      const fechaVenc = cuenta.fecha_vencimiento ? new Date(cuenta.fecha_vencimiento) : null;
-      const diasEnMora =
-        fechaVenc != null
-          ? Math.floor((hoy.getTime() - fechaVenc.getTime()) / (1000 * 60 * 60 * 24))
-          : 0;
-
-      const bucketId = this.definirBucketAging(diasEnMora);
-      const bucket = bucketMap.get(bucketId);
-      if (bucket) {
-        bucket.monto += monto;
-      }
-
-      if (diasEnMora > 0) {
-        totalVencido += monto;
-      }
-
-      return {
-        id: cuenta.id,
-        cliente: (cuenta.clientes as any)?.razon_social ?? 'Cliente sin razón social',
-        documento: [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || cuenta.id,
-        monto: this.round2(monto),
-        diasMora: diasEnMora > 0 ? diasEnMora : 0,
-        estado: cuenta.estado,
-        cliente_documento: (cuenta.clientes as any)?.documento_numero ?? null,
-      };
+    const { data, error } = await client.rpc('reporte_cxc_aging_470', {
+      p_tenant_id: tenantId,
+      p_fecha_corte: corte,
+      p_cliente_filtro: clienteFiltro?.trim() || null,
+      p_limit: 1000,
     });
 
-    const buckets = Array.from(bucketMap.values()).map((bucket) => ({
-      ...bucket,
-      monto: this.round2(bucket.monto),
-      porcentaje:
-        totalPendiente > 0 ? this.round2((bucket.monto / totalPendiente) * 100) : 0,
-    }));
+    if (error) throw error;
+    if (!data || typeof data !== 'object' || !Array.isArray((data as any).detalle)) {
+      throw new Error('El reporte canónico de CxC devolvió una respuesta inválida');
+    }
 
-    const resumen = {
-      totalPendiente: this.round2(totalPendiente),
-      totalVencido: this.round2(totalVencido),
-      porcentajeVencido:
-        totalPendiente > 0 ? this.round2((totalVencido / totalPendiente) * 100) : 0,
-      cuentasAnalizadas: cuentas?.length ?? 0,
-    };
-
-    const cuentasCriticas = cuentasDetalladas
-      .filter((cuenta) => cuenta.diasMora > 0)
-      .sort((a, b) => b.monto - a.monto)
-      .slice(0, 15);
-
-    const saldoPorCliente = this.agruparMontosPorClave(
-      cuentasDetalladas,
-      (cuenta) => cuenta.cliente,
-      (cuenta) => cuenta.monto,
-    );
-
-    return {
-      resumen,
-      buckets,
-      cuentasCriticas,
-      saldoPorCliente: saldoPorCliente
-        .map((item) => ({
-          cliente: item.clave,
-          monto: this.round2(item.monto),
-          porcentaje:
-            totalPendiente > 0 ? this.round2((item.monto / totalPendiente) * 100) : 0,
-        }))
-        .slice(0, 15),
-    };
+    return data;
   }
 
   /**

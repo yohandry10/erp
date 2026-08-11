@@ -11,10 +11,6 @@ export class CreatePedidoDto {
   @IsUUID('4', { message: 'El ID del cliente debe ser un UUID válido' })
   cliente_id: string;
 
-  @IsOptional()
-  @IsUUID('4', { message: 'El ID de la cotización debe ser un UUID válido' })
-  cotizacion_id?: string;
-
   @IsArray({ message: 'El detalle debe ser un array' })
   @ArrayMinSize(1, { message: 'El pedido debe tener al menos un producto' })
   @ArrayMaxSize(999, { message: 'El pedido no puede tener más de 999 productos' })

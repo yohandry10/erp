@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { unwrapApiObject } from '@/lib/api-contract'
 import { fetchApi } from '@/lib/api-fetch'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface GreViewModalProps {
   isOpen: boolean
@@ -21,7 +22,7 @@ interface GreData {
   modalidad: 'TRANSPORTE_PUBLICO' | 'TRANSPORTE_PRIVADO'
   motivo: string
   pesoTotal: number
-  estado: 'PENDIENTE' | 'EMITIDO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO'
+  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO' | 'ERROR'
   observaciones?: string
   transportista?: string
   transportistaDocumento?: string
@@ -31,12 +32,39 @@ interface GreData {
   conductorDocumentoNumero?: string
   conductorNombres?: string
   conductorApellidos?: string
+  sunatStatus?: string
+  errorMessage?: string
 }
 
 export default function GreViewModal({ isOpen, onClose, documentId }: GreViewModalProps) {
   const [greData, setGreData] = useState<GreData | null>(null)
   const [loading, setLoading] = useState(false)
-  const { get } = useApiCall<GreData>()
+  const { get, post } = useApiCall<GreData>()
+  const [actionLoading, setActionLoading] = useState(false)
+  const operationKeys = useRef(new Map<string, string>())
+
+  const keyFor = (action: string) => {
+    const semantic = `${documentId}:${action}`
+    const existing = operationKeys.current.get(semantic)
+    if (existing) return existing
+    const key = `gre-${action}:${crypto.randomUUID()}`
+    operationKeys.current.set(semantic, key)
+    return key
+  }
+
+  const runLifecycleAction = async (action: 'firmar' | 'enviar-sunat' | 'reenviar' | 'consultar-sunat' | 'anular') => {
+    setActionLoading(true)
+    try {
+      const body = action === 'anular' ? { motivo: 'Anulación operativa solicitada por el usuario' } : {}
+      await post(`/api/gre/guias/${documentId}/${action}`, body, {
+        headers: { 'Idempotency-Key': keyFor(action) },
+      })
+      operationKeys.current.delete(`${documentId}:${action}`)
+      await loadGreData()
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   const loadGreData = useCallback(async () => {
     if (!documentId) return
@@ -100,8 +128,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
       </head>
       <body>
         <div class="header">
-          <div class="empresa">NEON SYSTEM</div>
-          <div class="ruc">RUC: 12345678901</div>
+          <div class="empresa">EMISOR CONFIGURADO EN EL ERP</div>
           <div class="tipo-doc">GUÍA DE REMISIÓN ELECTRÓNICA</div>
           <div class="numero">${escapeHtml(greData.numero)}</div>
           <div class="fecha">Emisión: ${escapeHtml(new Date(greData.fechaCreacion).toLocaleDateString('es-PE'))}</div>
@@ -118,7 +145,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
           <div><span class="label">MOTIVO:</span><span class="valor">${escapeHtml(getMotivoText(greData.motivo))}</span></div>
           <div><span class="label">MODALIDAD:</span><span class="valor">${escapeHtml(getModalidadText(greData.modalidad))}</span></div>
           <div><span class="label">PESO:</span><span class="valor">${escapeHtml(greData.pesoTotal)} Kg</span></div>
-          <div><span class="label">FECHA TRASLADO:</span><span class="valor">${escapeHtml(new Date(greData.fechaTraslado).toLocaleDateString('es-PE'))}</span></div>
+          <div><span class="label">FECHA TRASLADO:</span><span class="valor">${escapeHtml(parseDateLocal(greData.fechaTraslado).toLocaleDateString('es-PE'))}</span></div>
         </div>
 
         ${greData.transportista || greData.placaVehiculo || greData.conductorDocumentoNumero ? `
@@ -138,7 +165,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
 
         <div class="footer">
           <div>Representación impresa de GRE</div>
-          <div>Sistema certificado por SUNAT</div>
+          <div>La transmisión fiscal depende de las credenciales configuradas por el cliente.</div>
         </div>
       </body>
       </html>
@@ -180,9 +207,9 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
     switch (greData.estado) {
       case 'ACEPTADO':
         return '#10b981'
-      case 'EMITIDO':
+      case 'FIRMADO':
         return '#f59e0b'
-      case 'PENDIENTE':
+      case 'BORRADOR':
         return '#6b7280'
       case 'RECHAZADO':
         return '#ef4444'
@@ -203,7 +230,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
         }
       }}
     >
-      <div className="bg-card rounded-lg w-[95%] max-w-[1200px] overflow-auto shadow relative"
+      <div className="bg-card rounded-lg w-[95%] max-w-[1200px] max-h-[95vh] overflow-auto shadow relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -218,6 +245,31 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
               </p>
             </div>
             <div className="flex gap-2 items-center">
+              {greData?.estado === 'BORRADOR' && (
+                <button disabled={actionLoading} onClick={() => runLifecycleAction('firmar')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                  Firmar
+                </button>
+              )}
+              {greData?.estado === 'FIRMADO' && (
+                <button disabled={actionLoading} onClick={() => runLifecycleAction('enviar-sunat')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                  Enviar
+                </button>
+              )}
+              {greData?.estado === 'ERROR' && (
+                <button disabled={actionLoading} onClick={() => runLifecycleAction('reenviar')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                  Reintentar envío
+                </button>
+              )}
+              {greData?.estado === 'ENVIADO' && (
+                <button disabled={actionLoading} onClick={() => runLifecycleAction('consultar-sunat')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                  Consultar estado
+                </button>
+              )}
+              {greData && ['BORRADOR', 'FIRMADO', 'ERROR'].includes(greData.estado) && (
+                <button disabled={actionLoading} onClick={() => runLifecycleAction('anular')} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm">
+                  Anular
+                </button>
+              )}
               <button
                 onClick={handleDownloadPdf} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-sm cursor-pointer flex items-center gap-[4px]"
               >
@@ -255,19 +307,10 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                       <td className="border p-4 w-[65%]">
                         <div className="text-center">
                           <h1 className="text-2xl font-bold mb-2 mt-0 mr-0 ml-0">
-                            NEON SYSTEM
+                            EMISOR CONFIGURADO EN EL ERP
                           </h1>
                           <p className="text-sm mb-[4px] my-[4px] mx-0">
-                            Sistema Empresarial Integrado
-                          </p>
-                          <p className="text-sm mb-[4px] my-[4px] mx-0">
-                            <strong>RUC:</strong> 12345678901
-                          </p>
-                          <p className="text-sm mb-[4px] my-[4px] mx-0">
-                            <strong>Razón Social:</strong> NEON SYSTEM SAC
-                          </p>
-                          <p className="text-sm my-[4px] mx-0">
-                            Dirección: Lima, Perú
+                            Datos del emisor tomados de la configuración del tenant
                           </p>
                         </div>
                       </td>
@@ -286,7 +329,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                               <strong>Fecha Emisión:</strong> {new Date(greData.fechaCreacion).toLocaleDateString('es-PE')}
                             </p>
                             <p className="mb-[4px] my-[4px] mx-0">
-                              <strong>Fecha Traslado:</strong> {new Date(greData.fechaTraslado).toLocaleDateString('es-PE')}
+                              <strong>Fecha Traslado:</strong> {parseDateLocal(greData.fechaTraslado).toLocaleDateString('es-PE')}
                             </p>
                             <p className="my-[4px] mx-0">
                               <strong>Estado:</strong> {greData.estado}
@@ -332,7 +375,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                               <strong>Peso Total:</strong> {greData.pesoTotal} Kg
                             </p>
                             <p className="my-[4px] mx-0">
-                              <strong>Fecha Traslado:</strong> {new Date(greData.fechaTraslado).toLocaleDateString('es-PE')}
+                              <strong>Fecha Traslado:</strong> {parseDateLocal(greData.fechaTraslado).toLocaleDateString('es-PE')}
                             </p>
                           </div>
                         </div>
@@ -430,13 +473,13 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
               {/* FOOTER */}
               <div className="text-center text-xs text-foreground/85 border-t pt-4">
                 <p className="font-bold mt-0 mr-0 mb-[4px] ml-0">
-                  NEON SYSTEM - Sistema Empresarial Integrado
+                  Representación operativa generada por el ERP
                 </p>
                 <p className="mt-0 mr-0 mb-[4px] ml-0">
                   Documento generado automáticamente el {new Date().toLocaleDateString('es-PE')}
                 </p>
                 <p className="m-0">
-                  Para consultas sobre este documento, contacte al emisor • Sistema certificado por SUNAT
+                  Para consultas sobre este documento, contacte al emisor. La aceptación fiscal se muestra únicamente cuando existe respuesta persistida.
                 </p>
               </div>
             </div>

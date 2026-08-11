@@ -134,16 +134,20 @@ export class ClientesController {
   @RequirePermission('ventas.clientes.eliminar')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
-    summary: 'Eliminar cliente',
-    description: 'Elimina un cliente del sistema (verifica dependencias)',
+    summary: 'Desactivar cliente',
+    description: 'Desactiva el cliente conservando su trazabilidad comercial',
   })
   @ApiResponse({ status: 204, description: 'Cliente eliminado exitosamente' })
   @ApiResponse({ status: 400, description: 'Cliente tiene dependencias' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Cliente no encontrado' })
-  async delete(@Param('id') id: string, @CurrentTenant() tenantId: string) {
-    await this.clientesService.delete(id, tenantId);
+  async delete(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    await this.clientesService.delete(id, tenantId, user?.id);
   }
 
   /**

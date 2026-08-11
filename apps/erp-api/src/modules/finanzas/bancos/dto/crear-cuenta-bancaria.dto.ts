@@ -4,6 +4,8 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
+  Max,
   Min,
 } from 'class-validator';
 
@@ -21,6 +23,9 @@ export enum Moneda {
 }
 
 export class CrearCuentaBancariaDto {
+  @IsUUID('4', { message: 'La cuenta contable bancaria debe ser un UUID válido' })
+  cuenta_contable_id!: string;
+
   @IsString({ message: 'El nombre de la cuenta es requerido' })
   nombre!: string;
 
@@ -41,6 +46,7 @@ export class CrearCuentaBancariaDto {
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El saldo debe ser numérico' })
   @Min(0, { message: 'El saldo no puede ser negativo' })
+  @Max(0, { message: 'El saldo inicial se registra mediante apertura contable' })
   saldo?: number;
 
   @IsOptional()

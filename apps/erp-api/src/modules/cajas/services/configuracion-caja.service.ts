@@ -19,6 +19,9 @@ export interface ConfiguracionCajaDto {
     monto_apertura_max: number;
     requiere_supervisor_fuera_rango?: boolean;
     tolerancia_diferencia_cierre?: number;
+    retiro_max_sin_autorizacion?: number;
+    saldo_minimo_operativo?: number;
+    moneda?: string;
 }
 
 /**
@@ -74,6 +77,8 @@ export class ConfiguracionCajaService {
     async guardarConfiguracion(
         tenantId: string,
         dto: ConfiguracionCajaDto,
+        actorId: string,
+        idempotencyKey: string,
     ): Promise<ConfiguracionCaja> {
         // Validar que min < max
         if (dto.monto_apertura_min >= dto.monto_apertura_max) {
@@ -82,26 +87,15 @@ export class ConfiguracionCajaService {
             );
         }
 
-        const configData = {
-            tenant_id: tenantId,
-            caja_id: dto.caja_id || null,
-            monto_apertura_min: dto.monto_apertura_min,
-            monto_apertura_max: dto.monto_apertura_max,
-            requiere_supervisor_fuera_rango:
-                dto.requiere_supervisor_fuera_rango ?? true,
-            tolerancia_diferencia_cierre: dto.tolerancia_diferencia_cierre ?? 10.0,
-            updated_at: new Date().toISOString(),
-        };
-
-        // Upsert usando constraint unique
-        const { data, error } = await this.supabase
-            .getClient()
-            .from('configuracion_caja')
-            .upsert(configData, {
-                onConflict: 'tenant_id,caja_id',
-            })
-            .select()
-            .single();
+        const { data, error } = await this.supabase.getClient().rpc(
+            'guardar_configuracion_caja_tx',
+            {
+                p_tenant_id: tenantId,
+                p_payload: dto,
+                p_actor_id: actorId,
+                p_idempotency_key: idempotencyKey,
+            },
+        );
 
         if (error) {
             this.logger.error(
@@ -115,7 +109,7 @@ export class ConfiguracionCajaService {
             `Configuración guardada: Tenant=${tenantId}, Caja=${dto.caja_id || 'DEFAULT'}, Min=${dto.monto_apertura_min}, Max=${dto.monto_apertura_max}`,
         );
 
-        return data;
+        return ((data as any)?.configuracion ?? data) as ConfiguracionCaja;
     }
 
     /**
@@ -155,14 +149,18 @@ export class ConfiguracionCajaService {
     /**
      * Inicializa configuración por defecto para un tenant
      */
-    async crearConfiguracionDefault(tenantId: string): Promise<ConfiguracionCaja> {
+    async crearConfiguracionDefault(
+        tenantId: string,
+        actorId: string,
+        idempotencyKey: string,
+    ): Promise<ConfiguracionCaja> {
         return this.guardarConfiguracion(tenantId, {
             caja_id: null, // Configuración default (sin caja específica)
             monto_apertura_min: 100.0,
             monto_apertura_max: 2000.0,
             requiere_supervisor_fuera_rango: true,
             tolerancia_diferencia_cierre: 10.0,
-        });
+        }, actorId, idempotencyKey);
     }
 
     /**

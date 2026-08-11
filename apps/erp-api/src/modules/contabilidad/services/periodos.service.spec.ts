@@ -1,13 +1,11 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { PeriodosService, EstadoPeriodo } from './periodos.service';
+import { Test } from '@nestjs/testing';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { EstadoPeriodo, PeriodosService } from './periodos.service';
 
-describe('PeriodosService', () => {
+describe('PeriodosService — frontera atómica 458', () => {
   let service: PeriodosService;
-  let supabaseService: jest.Mocked<SupabaseService>;
-
-  const mockSupabaseClient = {
+  const client: any = {
     from: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
     insert: jest.fn().mockReturnThis(),
@@ -20,466 +18,120 @@ describe('PeriodosService', () => {
     order: jest.fn().mockReturnThis(),
     single: jest.fn(),
     maybeSingle: jest.fn(),
-    rpc: jest.fn()
+    rpc: jest.fn(),
   };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    jest.clearAllMocks();
+    for (const method of ['from', 'select', 'insert', 'upsert', 'update', 'eq', 'gte', 'lte', 'is', 'order']) {
+      client[method].mockReturnValue(client);
+    }
+    const module = await Test.createTestingModule({
       providers: [
         PeriodosService,
-        {
-          provide: SupabaseService,
-          useValue: {
-            getClient: jest.fn(() => mockSupabaseClient)
-          }
-        },
-        {
-          provide: 'EstadosFinancierosService',
-          useValue: {
-            refrescarEstadosFinancieros: jest.fn()
-          }
-        }
-      ]
+        { provide: SupabaseService, useValue: { getClient: () => client } },
+        { provide: 'EstadosFinancierosService', useValue: {} },
+      ],
     }).compile();
-
-    service = module.get<PeriodosService>(PeriodosService);
-    supabaseService = module.get(SupabaseService) as jest.Mocked<SupabaseService>;
+    service = module.get(PeriodosService);
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  it('crea un período abierto si todavía no existe', async () => {
+    client.rpc.mockResolvedValueOnce({data:{record:{id:'period-1',tenant_id:'tenant-1',anio:2026,mes:8,estado:'ABIERTO'}},error:null});
+
+    await expect(service.crearPeriodo('tenant-1',2026,8,'user-1','period-create-test')).resolves.toEqual(
+      expect.objectContaining({ id: 'period-1', estado: EstadoPeriodo.ABIERTO }),
+    );
+    expect(client.rpc).toHaveBeenCalledWith('gestionar_maestro_contable_tx',expect.objectContaining({
+      p_entity:'PERIOD',p_action:'CREATE',p_actor_id:'user-1',p_idempotency_key:'period-create-test',
+    }));
+    expect(client.insert).not.toHaveBeenCalled();
   });
 
-  describe('crearPeriodo', () => {
-    it('should create a new period successfully', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 1;
+  it('falla cerrado si el período no fue creado explícitamente', async () => {
+    client.single.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
+    await expect(
+      service.validarPeriodoAbierto('tenant-1', new Date(2026, 7, 9)),
+    ).rejects.toThrow('Debe crearse explícitamente');
+    expect(client.upsert).not.toHaveBeenCalled();
+  });
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: null,
-        error: { code: 'PGRST116' }
-      });
+  it('rechaza una escritura en período cerrado', async () => {
+    client.single.mockResolvedValueOnce({
+      data: { id: 'period-1', tenant_id: 'tenant-1', anio: 2026, mes: 8, estado: 'CERRADO' },
+      error: null,
+    });
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: {
-          id: 'periodo-123',
-          tenant_id: tenantId,
-          anio,
-          mes,
-          estado: EstadoPeriodo.ABIERTO,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+    await expect(
+      service.validarPeriodoAbierto('tenant-1', new Date(2026, 7, 9)),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('limita la inspección de eventos pendientes al tenant solicitado', async () => {
+    client.lte.mockResolvedValueOnce({ count: 2, error: null });
+
+    await expect(service.validarEventosPendientes('tenant-1', 2026, 8)).resolves.toEqual({
+      valido: false,
+      eventosPendientes: 2,
+    });
+    expect(client.eq).toHaveBeenCalledWith('tenant_id', 'tenant-1');
+  });
+
+  it('delega el cierre completo a una sola RPC con actor', async () => {
+    client.rpc.mockResolvedValueOnce({
+      data: {
+        periodo: {
+          id: 'period-1', tenant_id: 'tenant-1', anio: 2026, mes: 8,
+          estado: 'CERRADO', cerrado_por: 'user-1',
         },
-        error: null
-      });
-
-      const result = await service.crearPeriodo(tenantId, anio, mes);
-
-      expect(result).toBeDefined();
-      expect(result.anio).toBe(anio);
-      expect(result.mes).toBe(mes);
-      expect(result.estado).toBe(EstadoPeriodo.ABIERTO);
+        idempotent: false,
+      },
+      error: null,
     });
 
-    it('should throw error if period already exists', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 1;
-
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: {
-          id: 'periodo-123',
-          tenant_id: tenantId,
-          anio,
-          mes,
-          estado: EstadoPeriodo.ABIERTO
-        },
-        error: null
-      });
-
-      await expect(service.crearPeriodo(tenantId, anio, mes)).rejects.toThrow(BadRequestException);
+    await expect(service.cerrarPeriodo('tenant-1', 2026, 8, 'user-1')).resolves.toEqual(
+      expect.objectContaining({ estado: EstadoPeriodo.CERRADO, cerrado_por: 'user-1' }),
+    );
+    expect(client.rpc).toHaveBeenCalledWith('cerrar_periodo_contable_tx', {
+      p_tenant_id: 'tenant-1', p_anio: 2026, p_mes: 8, p_actor_id: 'user-1',
     });
-
-    it('should throw error for invalid month', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 13;
-
-      await expect(service.crearPeriodo(tenantId, anio, mes)).rejects.toThrow(BadRequestException);
-    });
+    expect(client.update).not.toHaveBeenCalled();
   });
 
-  describe('validarPeriodoAbierto', () => {
-    it('should allow operations when period is open', async () => {
-      const tenantId = 'tenant-123';
-      const fecha = new Date(2024, 0, 15);
-
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: {
-          id: 'periodo-123',
-          tenant_id: tenantId,
-          anio: 2024,
-          mes: 1,
-          estado: EstadoPeriodo.ABIERTO
-        },
-        error: null
-      });
-
-      await expect(service.validarPeriodoAbierto(tenantId, fecha)).resolves.not.toThrow();
+  it('propaga como conflicto un cierre rechazado por pendientes o borradores', async () => {
+    client.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'ACCOUNTING_PERIOD_HAS_PENDING_EVENTS:1' },
     });
 
-    it('should throw error when period is closed', async () => {
-      const tenantId = 'tenant-123';
-      const fecha = new Date(2024, 0, 15);
-
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: {
-          id: 'periodo-123',
-          tenant_id: tenantId,
-          anio: 2024,
-          mes: 1,
-          estado: EstadoPeriodo.CERRADO
-        },
-        error: null
-      });
-
-      await expect(service.validarPeriodoAbierto(tenantId, fecha)).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw error when period is blocked', async () => {
-      const tenantId = 'tenant-123';
-      const fecha = new Date(2024, 0, 15);
-
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: {
-          id: 'periodo-123',
-          tenant_id: tenantId,
-          anio: 2024,
-          mes: 1,
-          estado: EstadoPeriodo.BLOQUEADO
-        },
-        error: null
-      });
-
-      await expect(service.validarPeriodoAbierto(tenantId, fecha)).rejects.toThrow(BadRequestException);
-    });
-
-    it('materializa un período abierto cuando todavía no existe', async () => {
-      const tenantId = 'tenant-123';
-      const fecha = new Date(2024, 0, 15);
-
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: null,
-        error: { code: 'PGRST116' }
-      });
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
-        data: { id: 'periodo-123', tenant_id: tenantId, anio: 2024, mes: 1, estado: EstadoPeriodo.ABIERTO },
-        error: null
-      });
-
-      await expect(service.validarPeriodoAbierto(tenantId, fecha)).resolves.not.toThrow();
-      expect(mockSupabaseClient.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ tenant_id: tenantId, anio: 2024, mes: 1, estado: EstadoPeriodo.ABIERTO }),
-        { onConflict: 'tenant_id,anio,mes', ignoreDuplicates: true }
-      );
-    });
+    await expect(service.cerrarPeriodo('tenant-1', 2026, 8, 'user-1')).rejects.toThrow(
+      'ACCOUNTING_PERIOD_HAS_PENDING_EVENTS:1',
+    );
   });
 
-  describe('cerrarPeriodo', () => {
-    it('should close period when all validations pass', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 1;
-      const usuarioId = 'user-123';
+  it('reabre y bloquea sólo mediante RPCs con trazabilidad del actor', async () => {
+    client.rpc
+      .mockResolvedValueOnce({
+        data: { periodo: { id: 'period-1', estado: 'ABIERTO' }, idempotent: false },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { periodo: { id: 'period-1', estado: 'BLOQUEADO' }, idempotent: false },
+        error: null,
+      });
 
-      // Mock obtenerPeriodo - need to setup the full chain
-      const mockObtenerPeriodoChain = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: {
-            id: 'periodo-123',
-            tenant_id: tenantId,
-            anio,
-            mes,
-            estado: EstadoPeriodo.ABIERTO
-          },
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockObtenerPeriodoChain as any);
+    await expect(service.reabrirPeriodo('tenant-1', 2026, 8, 'user-1')).resolves.toEqual(
+      expect.objectContaining({ estado: EstadoPeriodo.ABIERTO }),
+    );
+    await expect(service.bloquearPeriodo('tenant-1', 2026, 8, 'user-1')).resolves.toEqual(
+      expect.objectContaining({ estado: EstadoPeriodo.BLOQUEADO }),
+    );
 
-      // Mock validarAsientosCuadran - query for asientos
-      const mockAsientosChain = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValueOnce({
-          data: [],
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockAsientosChain as any);
-
-      // Mock validarEventosPendientes - query for eventos
-      const mockEventosChain = {
-        select: jest.fn().mockReturnThis(),
-        is: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValueOnce({
-          count: 0,
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockEventosChain as any);
-
-      // Mock contarAsientosBorrador - no hay borradores pendientes
-      const mockBorradoresChain = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValueOnce({
-          count: 0,
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockBorradoresChain as any);
-
-      // Mock update period
-      const mockUpdateChain = {
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: {
-            id: 'periodo-123',
-            tenant_id: tenantId,
-            anio,
-            mes,
-            estado: EstadoPeriodo.CERRADO,
-            fecha_cierre: new Date().toISOString(),
-            cerrado_por: usuarioId
-          },
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockUpdateChain as any);
-
-      const result = await service.cerrarPeriodo(tenantId, anio, mes, usuarioId);
-
-      expect(result).toBeDefined();
-      expect(result.estado).toBe(EstadoPeriodo.CERRADO);
-      expect(result.cerrado_por).toBe(usuarioId);
+    expect(client.rpc).toHaveBeenNthCalledWith(1, 'reabrir_periodo_contable_tx', {
+      p_tenant_id: 'tenant-1', p_anio: 2026, p_mes: 8, p_actor_id: 'user-1',
     });
-
-    it('no cierra el período si quedan asientos en BORRADOR', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 1;
-      const usuarioId = 'user-123';
-
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: { id: 'periodo-123', tenant_id: tenantId, anio, mes, estado: EstadoPeriodo.ABIERTO },
-          error: null
-        })
-      } as any);
-
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValueOnce({ data: [], error: null })
-      } as any);
-
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        is: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValueOnce({ count: 0, error: null })
-      } as any);
-
-      // Dos borradores sin confirmar dentro del período.
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValueOnce({ count: 2, error: null })
-      } as any);
-
-      await expect(
-        service.cerrarPeriodo(tenantId, anio, mes, usuarioId)
-      ).rejects.toThrow(/2 asiento\(s\) en BORRADOR/);
-    });
-
-    it('should throw error if period does not exist', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 1;
-      const usuarioId = 'user-123';
-
-      const mockObtenerPeriodoChain = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: null,
-          error: { code: 'PGRST116' }
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockObtenerPeriodoChain as any);
-
-      await expect(service.cerrarPeriodo(tenantId, anio, mes, usuarioId)).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw error if period is already closed', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 1;
-      const usuarioId = 'user-123';
-
-      const mockObtenerPeriodoChain = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: {
-            id: 'periodo-123',
-            tenant_id: tenantId,
-            anio,
-            mes,
-            estado: EstadoPeriodo.CERRADO
-          },
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockObtenerPeriodoChain as any);
-
-      await expect(service.cerrarPeriodo(tenantId, anio, mes, usuarioId)).rejects.toThrow(BadRequestException);
-    });
-  });
-
-  describe('reabrirPeriodo', () => {
-    it('should reopen a closed period', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 1;
-
-      // Mock obtenerPeriodo
-      const mockObtenerPeriodoChain = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: {
-            id: 'periodo-123',
-            tenant_id: tenantId,
-            anio,
-            mes,
-            estado: EstadoPeriodo.CERRADO
-          },
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockObtenerPeriodoChain as any);
-
-      // Mock update period
-      const mockUpdateChain = {
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: {
-            id: 'periodo-123',
-            tenant_id: tenantId,
-            anio,
-            mes,
-            estado: EstadoPeriodo.ABIERTO,
-            fecha_cierre: null,
-            cerrado_por: null
-          },
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockUpdateChain as any);
-
-      const result = await service.reabrirPeriodo(tenantId, anio, mes);
-
-      expect(result).toBeDefined();
-      expect(result.estado).toBe(EstadoPeriodo.ABIERTO);
-      expect(result.fecha_cierre).toBeNull();
-    });
-
-    it('should throw error if period is already open', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 1;
-
-      const mockObtenerPeriodoChain = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: {
-            id: 'periodo-123',
-            tenant_id: tenantId,
-            anio,
-            mes,
-            estado: EstadoPeriodo.ABIERTO
-          },
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockObtenerPeriodoChain as any);
-
-      await expect(service.reabrirPeriodo(tenantId, anio, mes)).rejects.toThrow(BadRequestException);
-    });
-  });
-
-  describe('bloquearPeriodo', () => {
-    it('should block a period', async () => {
-      const tenantId = 'tenant-123';
-      const anio = 2024;
-      const mes = 1;
-
-      // Mock obtenerPeriodo
-      const mockObtenerPeriodoChain = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: {
-            id: 'periodo-123',
-            tenant_id: tenantId,
-            anio,
-            mes,
-            estado: EstadoPeriodo.ABIERTO
-          },
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockObtenerPeriodoChain as any);
-
-      // Mock update period
-      const mockUpdateChain = {
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValueOnce({
-          data: {
-            id: 'periodo-123',
-            tenant_id: tenantId,
-            anio,
-            mes,
-            estado: EstadoPeriodo.BLOQUEADO
-          },
-          error: null
-        })
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(mockUpdateChain as any);
-
-      const result = await service.bloquearPeriodo(tenantId, anio, mes);
-
-      expect(result).toBeDefined();
-      expect(result.estado).toBe(EstadoPeriodo.BLOQUEADO);
+    expect(client.rpc).toHaveBeenNthCalledWith(2, 'bloquear_periodo_contable_tx', {
+      p_tenant_id: 'tenant-1', p_anio: 2026, p_mes: 8, p_actor_id: 'user-1',
     });
   });
 });

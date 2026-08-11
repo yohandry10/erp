@@ -218,6 +218,7 @@ test.describe('T17 Usuarios, permisos, auditoria y configuracion', () => {
     if (currentEmpresa?.pais_id) {
       await parseOk<any>(
         await apiContext.put(api('/configuration/empresa'), {
+          headers: { 'Idempotency-Key': `configuration-empresa-${runId}` },
           data: {
             pais_id: currentEmpresa.pais_id,
             telefono: `T17-${runId.slice(0, 8)}`,

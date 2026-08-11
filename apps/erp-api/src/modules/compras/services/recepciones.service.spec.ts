@@ -4,14 +4,12 @@ import { RecepcionesService } from './recepciones.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
-import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 import { CreateRecepcionDto, CerrarRecepcionDto, CalidadRecepcion } from '../dto';
 
 describe('RecepcionesService', () => {
   let service: RecepcionesService;
   let supabaseService: jest.Mocked<SupabaseService>;
   let eventBusService: jest.Mocked<EventBusService>;
-  let eventEmitter: { emit: jest.Mock };
   let testingModule: TestingModule;
 
   const mockSupabaseClient = {
@@ -55,12 +53,6 @@ describe('RecepcionesService', () => {
           },
         },
         {
-          provide: EventEmitterService,
-          useValue: {
-            emit: jest.fn(),
-          },
-        },
-        {
           provide: AuditService,
           useValue: {
             registrarCambio: jest.fn(),
@@ -83,12 +75,10 @@ describe('RecepcionesService', () => {
     service = module.get<RecepcionesService>(RecepcionesService);
     supabaseService = module.get(SupabaseService) as jest.Mocked<SupabaseService>;
     eventBusService = module.get(EventBusService) as jest.Mocked<EventBusService>;
-    eventEmitter = module.get(EventEmitterService) as any;
-
     // Reset mocks
     jest.clearAllMocks();
     mockSupabaseClient.from.mockReturnValue(mockQueryBuilder);
-    mockSupabaseClient.rpc.mockResolvedValue({ data: { movimientos: [] }, error: null });
+    mockSupabaseClient.rpc.mockResolvedValue({ data: { id: 'rec-1', movimientos: [] }, error: null });
     mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
     mockQueryBuilder.single.mockResolvedValue({ data: null, error: null });
   });
@@ -247,6 +237,7 @@ describe('RecepcionesService', () => {
 
     const createDto: CreateRecepcionDto = {
       orden_id: 'orden-1',
+      idempotency_key: 'recepcion:orden-1:intento-1',
       items: [
         {
           detalle_id: 'detalle-1',
@@ -257,7 +248,7 @@ describe('RecepcionesService', () => {
       ],
     };
 
-    it('should create a recepcion successfully', async () => {
+    it('crea o reutiliza la recepción por RPC con actor, detalle e idempotencia explícitos', async () => {
       const mockRecepcion = {
         id: 'rec-1',
         numero: 'REC-2025-0001',
@@ -270,63 +261,89 @@ describe('RecepcionesService', () => {
         orden: mockOrden,
       };
 
-      // Secuencia de mocks en orden de ejecución:
-      // 1. Query de orden de compra
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: mockOrden, error: null });
-
-      // 2. Query para generar número (busca últimas recepciones)
-      Object.assign(mockQueryBuilder, { data: [], error: null });
-
-      // 3. Insert de recepción
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: mockRecepcion, error: null });
-
-      // 4. Insert de items (no usa .single(), solo retorna error)
-      Object.assign(mockQueryBuilder, { data: null, error: null });
-
-      // 5. Query final para obtener recepción completa (usa maybeSingle, no single)
-      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: mockRecepcionCompleta, error: null });
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: mockRecepcion, error: null });
+      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcionCompleta as any);
 
       const result = await service.crearRecepcion('tenant-1', createDto, 'user-1');
 
       expect(result).toBeDefined();
       expect(result.numero).toBe('REC-2025-0001');
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('ordenes_compra');
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('recepciones');
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('recepcion_items');
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('crear_recepcion_tx', {
+        p_tenant_id: 'tenant-1',
+        p_orden_id: 'orden-1',
+        p_items: [{
+          detalle_id: 'detalle-1',
+          cantidad_recibida: 5,
+          calidad: CalidadRecepcion.OK,
+          almacen_id: 'alm-1',
+          ubicacion_id: null,
+          lote: null,
+          serie: null,
+          fecha_expiracion: null,
+          observaciones: null,
+        }],
+        p_observaciones: null,
+        p_created_by: 'user-1',
+        p_idempotency_key: 'recepcion:orden-1:intento-1',
+      });
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('ordenes_compra');
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('recepciones');
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('recepcion_items');
     });
 
-    it('should throw NotFoundException when orden not found', async () => {
-      // Reset mocks para este test
-      jest.clearAllMocks();
-      mockSupabaseClient.from.mockReturnValue(mockQueryBuilder);
+    it('devuelve el resultado confirmado si falla la hidratación posterior al commit', async () => {
+      const committed = {
+        id: 'rec-commit-1',
+        numero: 'REC-2025-0099',
+        estado: 'BORRADOR',
+        items: createDto.items,
+        idempotent: false,
+      };
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: committed, error: null });
+      jest.spyOn(service, 'obtenerRecepcionPorId').mockRejectedValueOnce(
+        new Error('join no disponible'),
+      );
 
-      // Solo mock la primera llamada (query de orden)
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: { message: 'Not found' } });
+      await expect(
+        service.crearRecepcion('tenant-1', createDto, 'user-1'),
+      ).resolves.toEqual(expect.objectContaining({
+        id: 'rec-commit-1',
+        numero: 'REC-2025-0099',
+        tenant_id: 'tenant-1',
+      }));
+    });
+
+    it('propaga como BadRequestException que la orden no existe según la RPC', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Orden de compra no encontrada' },
+      });
 
       await expect(service.crearRecepcion('tenant-1', createDto, 'user-1')).rejects.toThrow(
-        NotFoundException
+        'Orden de compra no encontrada',
+      );
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('ordenes_compra');
+    });
+
+    it('delega a la RPC la validación del estado de la orden', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'La orden debe estar APROBADA o PARCIAL' },
+      });
+
+      await expect(service.crearRecepcion('tenant-1', createDto, 'user-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_recepcion_tx',
+        expect.objectContaining({ p_orden_id: 'orden-1' }),
       );
     });
 
-    it('should throw BadRequestException when orden is not in valid state', async () => {
-      // Reset mocks para este test
-      jest.clearAllMocks();
-      mockSupabaseClient.from.mockReturnValue(mockQueryBuilder);
-
-      const invalidOrden = { ...mockOrden, estado: 'BORRADOR' };
-      // Solo mock la primera llamada (query de orden)
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: invalidOrden, error: null });
-
-      await expect(service.crearRecepcion('tenant-1', createDto, 'user-1')).rejects.toThrow(
-        BadRequestException
-      );
-    });
-
-    it('should throw BadRequestException when cantidad exceeds pendiente', async () => {
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: mockOrden, error: null });
-
+    it('delega a la RPC la validación de sobre-recepción', async () => {
       const invalidDto: CreateRecepcionDto = {
         orden_id: 'orden-1',
+        idempotency_key: 'recepcion:orden-1:sobre-recepcion',
         items: [
           {
             detalle_id: 'detalle-1',
@@ -336,17 +353,20 @@ describe('RecepcionesService', () => {
           },
         ],
       };
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'La cantidad recibida excede la cantidad pendiente' },
+      });
 
       await expect(service.crearRecepcion('tenant-1', invalidDto, 'user-1')).rejects.toThrow(
-        BadRequestException
+        'excede la cantidad pendiente',
       );
     });
 
-    it('should throw BadRequestException when detalle not found in orden', async () => {
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: mockOrden, error: null });
-
+    it('delega a la RPC la pertenencia del detalle a la orden y al tenant', async () => {
       const invalidDto: CreateRecepcionDto = {
         orden_id: 'orden-1',
+        idempotency_key: 'recepcion:orden-1:detalle-ajeno',
         items: [
           {
             detalle_id: 'invalid-detalle',
@@ -356,9 +376,13 @@ describe('RecepcionesService', () => {
           },
         ],
       };
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Detalle no encontrado en la orden o tenant' },
+      });
 
       await expect(service.crearRecepcion('tenant-1', invalidDto, 'user-1')).rejects.toThrow(
-        BadRequestException
+        'Detalle no encontrado',
       );
     });
   });
@@ -385,15 +409,10 @@ describe('RecepcionesService', () => {
       ],
     };
 
-    it('cierra la recepción de forma atómica vía RPC y emite el evento de recepción', async () => {
-      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion as any);
-      // Aislamos los eventos post-commit; se testean por separado más abajo.
-      const emitMovs = jest
-        .spyOn(service as any, 'emitirEventosMovimientoEntrada')
-        .mockResolvedValue(undefined);
-      const emitRecepcion = jest
-        .spyOn(service as any, 'emitirEventoRecepcionRegistrada')
-        .mockResolvedValue(undefined);
+    it('cierra la recepción por RPC y no duplica fuera del commit el evento durable de 440', async () => {
+      const recepcionCerrada = { ...mockRecepcion, estado: 'CERRADA' };
+      jest.spyOn(service, 'obtenerRecepcionPorId')
+        .mockResolvedValueOnce(recepcionCerrada as any);
 
       mockSupabaseClient.rpc.mockResolvedValueOnce({
         data: {
@@ -407,85 +426,90 @@ describe('RecepcionesService', () => {
         },
         error: null,
       });
-      // Orden para el evento canónico.
-      mockQueryBuilder.single.mockResolvedValueOnce({
-        data: { id: 'orden-1', numero: 'OC-2025-0001', proveedor: { id: 'prov-1' } },
-        error: null,
-      });
-
       const cerrarDto: CerrarRecepcionDto = { observaciones: 'Recepción completa' };
       const result = await service.cerrarRecepcion('rec-1', 'tenant-1', cerrarDto, 'user-1');
 
-      expect(result).toBeDefined();
+      expect(result).toEqual(recepcionCerrada);
       expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
         'cerrar_recepcion_tx',
-        expect.objectContaining({
+        {
           p_recepcion_id: 'rec-1',
           p_tenant_id: 'tenant-1',
           p_user_id: 'user-1',
-        }),
-      );
-      expect(emitMovs).toHaveBeenCalled();
-      expect(emitRecepcion).toHaveBeenCalled();
-      expect(eventBusService.emitCompraEntregada).not.toHaveBeenCalled();
-    });
-
-    it('prioriza el crédito pactado en la orden sobre la condición por defecto del proveedor', async () => {
-      const recepcion = {
-        ...mockRecepcion,
-        fecha_recepcion: '2026-07-15',
-        items: [{
-          ...mockRecepcion.items[0],
-          detalle: { descripcion: 'Producto Test', precio_unitario: 100 },
-        }],
-      };
-      const orden = {
-        id: 'orden-1',
-        numero: 'OC-2026-0001',
-        subtotal: 100,
-        igv: 18,
-        total: 118,
-        moneda: 'PEN',
-        condiciones_pago: 'CREDITO_30',
-        dias_credito: 30,
-        proveedor: {
-          id: 'prov-1',
-          razon_social: 'Proveedor Demo',
-          condiciones_pago: 'CONTADO',
-          dias_credito: 0,
+          p_observaciones: 'Recepción completa',
         },
-      };
+      );
+      expect(eventBusService.emitRecepcionRegistrada).not.toHaveBeenCalled();
+      expect(eventBusService.emitCompraEntregada).not.toHaveBeenCalled();
+      expect(eventBusService.emitMovimientoStock).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('productos');
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('movimientos_almacen');
+    });
 
-      await (service as any).emitirEventoRecepcionRegistrada(recepcion, orden, 'tenant-1');
+    it('reintenta una recepción CERRADA en la RPC y devuelve el mismo cierre idempotente', async () => {
+      const recepcionCerrada = { ...mockRecepcion, estado: 'CERRADA' };
+      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue(recepcionCerrada as any);
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: {
+          id: 'rec-1',
+          recepcion_id: 'rec-1',
+          numero: 'REC-2025-0001',
+          orden_id: 'orden-1',
+          estado: 'CERRADA',
+          idempotent: true,
+          movimientos: [],
+        },
+        error: null,
+      });
 
-      expect(eventBusService.emitRecepcionRegistrada).toHaveBeenCalledWith(
-        expect.objectContaining({
-          condicionesPago: 'CREDITO_30',
-          diasCredito: 30,
-        }),
+      await expect(
+        service.cerrarRecepcion('rec-1', 'tenant-1', {}, 'user-1'),
+      ).resolves.toEqual(recepcionCerrada);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'cerrar_recepcion_tx',
+        expect.objectContaining({ p_recepcion_id: 'rec-1', p_tenant_id: 'tenant-1' }),
       );
     });
 
-    it('lanza BadRequestException si la recepción no está en BORRADOR (sin invocar la RPC)', async () => {
-      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue({ ...mockRecepcion, estado: 'CERRADA' } as any);
+    it('no informa fallo transaccional si sólo falla la hidratación posterior al cierre', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: {
+          id: 'rec-1',
+          recepcion_id: 'rec-1',
+          numero: 'REC-2025-0001',
+          orden_id: 'orden-1',
+          estado: 'CERRADA',
+          idempotent: false,
+          movimientos: [],
+        },
+        error: null,
+      });
+      jest.spyOn(service, 'obtenerRecepcionPorId').mockRejectedValueOnce(
+        new Error('falló join de detalle'),
+      );
 
       await expect(
         service.cerrarRecepcion('rec-1', 'tenant-1', {}, 'user-1'),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+      ).resolves.toEqual(expect.objectContaining({
+        id: 'rec-1',
+        estado: 'CERRADA',
+        tenant_id: 'tenant-1',
+      }));
     });
 
-    it('lanza BadRequestException si la recepción no tiene items (sin invocar la RPC)', async () => {
-      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue({ ...mockRecepcion, items: [] } as any);
+    it('propaga el rechazo transaccional si la recepción no tiene items', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'La recepción debe tener al menos un item' },
+      });
 
       await expect(
         service.cerrarRecepcion('rec-1', 'tenant-1', {}, 'user-1'),
       ).rejects.toThrow(BadRequestException);
-      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.rpc).toHaveBeenCalled();
     });
 
     it('propaga el error de la RPC como BadRequestException (p.ej. over-recepción o race)', async () => {
-      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion as any);
       mockSupabaseClient.rpc.mockResolvedValueOnce({
         data: null,
         error: { message: 'La cantidad recibida acumulada (13) excede la ordenada (10)' },
@@ -496,10 +520,9 @@ describe('RecepcionesService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('re-emite MovimientoStockEvent por cada movimiento devuelto por la RPC (preserva asiento de entrada)', async () => {
-      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion as any);
-      jest.spyOn(service as any, 'emitirEventoRecepcionRegistrada').mockResolvedValue(undefined);
-
+    it('no re-emite en caliente los movimientos ya persistidos por cerrar_recepcion_tx', async () => {
+      jest.spyOn(service, 'obtenerRecepcionPorId')
+        .mockResolvedValueOnce({ ...mockRecepcion, estado: 'CERRADA' } as any);
       mockSupabaseClient.rpc.mockResolvedValueOnce({
         data: {
           numero: 'REC-2025-0001',
@@ -512,40 +535,28 @@ describe('RecepcionesService', () => {
         error: null,
       });
 
-      // from('ordenes_compra').single() (orden para evento) y luego
-      // from('productos').single() (dentro de emitirEventosMovimientoEntrada).
-      mockQueryBuilder.single
-        .mockResolvedValueOnce({ data: { id: 'orden-1', numero: 'OC-2025-0001', proveedor: {} }, error: null })
-        .mockResolvedValueOnce({ data: { stock_actual: 5, precio_compra: 10 }, error: null });
-
       await service.cerrarRecepcion('rec-1', 'tenant-1', {}, 'user-1');
 
-      expect(eventBusService.emitMovimientoStock).toHaveBeenCalledTimes(1);
-      expect(eventBusService.emitMovimientoStock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          movimientoId: 'mov-1',
-          productoId: 'prod-1',
-          tipoMovimiento: 'ENTRADA',
-          cantidad: 5,
-          valor: 50,
-        }),
-        'tenant-1',
-      );
+      expect(eventBusService.emitMovimientoStock).not.toHaveBeenCalled();
+      expect(eventBusService.emitRecepcionRegistrada).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('productos');
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('movimientos_almacen');
     });
 
-    it('no emite MovimientoStockEvent cuando la RPC no devuelve movimientos (todos rechazados/idempotente)', async () => {
-      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion as any);
-      jest.spyOn(service as any, 'emitirEventoRecepcionRegistrada').mockResolvedValue(undefined);
-
+    it('cierra sin movimientos cuando todos los items son rechazados y no toca inventario en JavaScript', async () => {
+      const recepcionCerrada = { ...mockRecepcion, estado: 'CERRADA' };
+      jest.spyOn(service, 'obtenerRecepcionPorId')
+        .mockResolvedValueOnce(recepcionCerrada as any);
       mockSupabaseClient.rpc.mockResolvedValueOnce({
         data: { numero: 'REC-2025-0001', orden_id: 'orden-1', orden_estado: 'APROBADA', movimientos: [] },
         error: null,
       });
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: { id: 'orden-1', proveedor: {} }, error: null });
 
-      await service.cerrarRecepcion('rec-1', 'tenant-1', {}, 'user-1');
+      const result = await service.cerrarRecepcion('rec-1', 'tenant-1', {}, 'user-1');
 
+      expect(result).toEqual(recepcionCerrada);
       expect(eventBusService.emitMovimientoStock).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('productos');
     });
   });
 
@@ -558,13 +569,31 @@ describe('RecepcionesService', () => {
       };
 
       jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion);
-      mockQueryBuilder.single.mockResolvedValue({ data: null, error: null });
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: { id: 'rec-1' }, error: null });
 
       const updateDto = { observaciones: 'Updated observations' };
       const result = await service.actualizarRecepcion('rec-1', 'tenant-1', updateDto, 'user-1');
 
       expect(result).toBeDefined();
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('recepciones');
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('estado', 'BORRADOR');
+    });
+
+    it('should fail safely when the reception closes during an update', async () => {
+      jest.spyOn(service, 'obtenerRecepcionPorId').mockResolvedValue({
+        id: 'rec-1',
+        estado: 'BORRADOR',
+      });
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+      await expect(
+        service.actualizarRecepcion(
+          'rec-1',
+          'tenant-1',
+          { observaciones: 'No debe alcanzar una recepción cerrada' },
+          'user-1',
+        ),
+      ).rejects.toThrow('dejó de estar en BORRADOR');
     });
 
     it('should throw BadRequestException when updating non-BORRADOR recepcion', async () => {

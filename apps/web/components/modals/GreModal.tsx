@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 
 function showToast(message: string) {
@@ -16,6 +16,15 @@ function showToast(message: string) {
       toast.parentNode.removeChild(toast)
     }
   }, 3000)
+}
+
+function defaultTransferDate() {
+  const value = new Date()
+  value.setDate(value.getDate() + 1)
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 interface CpeData {
@@ -61,7 +70,7 @@ export default function GreModal({
     destinatario: '',
     direccionDestino: '',
     ubigeoDestino: '',
-    fechaTraslado: '',
+    fechaTraslado: defaultTransferDate(),
     modalidad: 'TRANSPORTE_PUBLICO',
     motivo: 'VENTA',
     pesoTotal: '',
@@ -78,6 +87,8 @@ export default function GreModal({
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [manualItems, setManualItems] = useState([{ descripcion: '', cantidad: '1', unidadMedida: 'NIU' }])
+  const requestKeyRef = useRef(`gre-create:${crypto.randomUUID()}`)
 
   const api = useApiCall()
 
@@ -123,7 +134,15 @@ export default function GreModal({
         pesoTotal: parseFloat(formData.pesoTotal) || 0,
         pedidoId: pedidoContext?.id,
         pedidoNumero: pedidoContext?.numero,
-        tenantId: pedidoContext?.tenantId
+        tenantId: pedidoContext?.tenantId,
+        idempotencyKey: requestKeyRef.current,
+        ...(!pedidoContext && !cpeData ? {
+          items: manualItems.map((item) => ({
+            descripcion: item.descripcion.trim(),
+            cantidad: Number(item.cantidad),
+            unidadMedida: item.unidadMedida.trim().toUpperCase() || 'NIU',
+          })),
+        } : {}),
       }
 
       console.log('🚚 Enviando datos GRE:', greData)
@@ -139,12 +158,13 @@ export default function GreModal({
 
         onSuccess(result.data)
         onClose()
+        requestKeyRef.current = `gre-create:${crypto.randomUUID()}`
         // Reset form
         setFormData({
           destinatario: '',
           direccionDestino: '',
           ubigeoDestino: '',
-          fechaTraslado: '',
+          fechaTraslado: defaultTransferDate(),
           modalidad: 'TRANSPORTE_PUBLICO',
           motivo: 'VENTA',
           pesoTotal: '',
@@ -158,6 +178,7 @@ export default function GreModal({
           conductorNombres: '',
           conductorApellidos: ''
         })
+        setManualItems([{ descripcion: '', cantidad: '1', unidadMedida: 'NIU' }])
       } else {
         console.log('❌ Error en la respuesta:', result)
         setError(result?.message || 'Error al crear la guía de remisión')
@@ -220,6 +241,67 @@ export default function GreModal({
                 required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
+
+            {!pedidoContext && !cpeData && (
+              <div className="col-span-full rounded-lg border border-border p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-foreground">Bienes trasladados *</div>
+                    <div className="text-xs text-muted-foreground">La guía manual debe indicar lo que realmente se transporta.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setManualItems((items) => [...items, { descripcion: '', cantidad: '1', unidadMedida: 'NIU' }])}
+                    className="rounded-md border px-3 py-2 text-sm font-semibold"
+                  >
+                    Agregar línea
+                  </button>
+                </div>
+                <div className="grid gap-3">
+                  {manualItems.map((item, index) => (
+                    <div key={index} className="grid gap-2 sm:grid-cols-[1fr_110px_90px_auto]">
+                      <input
+                        aria-label={`Descripción del bien ${index + 1}`}
+                        value={item.descripcion}
+                        onChange={(event) => setManualItems((items) => items.map((current, currentIndex) => currentIndex === index ? { ...current, descripcion: event.target.value } : current))}
+                        placeholder="Descripción real del bien"
+                        required
+                        maxLength={500}
+                        className="w-full rounded-md border p-3 text-sm"
+                      />
+                      <input
+                        aria-label={`Cantidad del bien ${index + 1}`}
+                        type="number"
+                        min="0.001"
+                        step="0.001"
+                        value={item.cantidad}
+                        onChange={(event) => setManualItems((items) => items.map((current, currentIndex) => currentIndex === index ? { ...current, cantidad: event.target.value } : current))}
+                        required
+                        className="w-full rounded-md border p-3 text-sm"
+                      />
+                      <input
+                        aria-label={`Unidad del bien ${index + 1}`}
+                        value={item.unidadMedida}
+                        onChange={(event) => setManualItems((items) => items.map((current, currentIndex) => currentIndex === index ? { ...current, unidadMedida: event.target.value } : current))}
+                        minLength={2}
+                        maxLength={3}
+                        required
+                        className="w-full rounded-md border p-3 text-sm uppercase"
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Quitar bien ${index + 1}`}
+                        disabled={manualItems.length === 1}
+                        onClick={() => setManualItems((items) => items.filter((_, currentIndex) => currentIndex !== index))}
+                        className="rounded-md border px-3 py-2 text-sm disabled:opacity-40"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <label htmlFor="gre-modal-direccion-destino" className="block mb-2 font-semibold text-foreground/85">

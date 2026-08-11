@@ -6,6 +6,8 @@ import { TenantContextService } from '../../shared/tenant/tenant-context.service
 import { UserManagementService } from '../usuarios/user-management.service';
 
 describe('TenantManagementService', () => {
+    const actorId = '00000000-0000-0000-0000-000000000464';
+    const idempotencyKey = 'tenant-test-464';
     let service: TenantManagementService;
     let mockClient: any;
 
@@ -73,6 +75,15 @@ describe('TenantManagementService', () => {
                 email: 'admin@testcompany.com',
                 temporaryPassword: 'TempPass123!',
             }),
+            createFirstAdmin: jest.fn().mockResolvedValue({
+                id: 'user-123',
+                nombre: 'Admin',
+                email: 'admin@testcompany.com',
+                temporaryPassword: 'TempPass123!',
+            }),
+            rotateDemoCredential: jest.fn().mockResolvedValue({ id: 'user-123' }),
+            clearDemoUsers: jest.fn().mockResolvedValue({ usuarios_actualizados: 1 }),
+            assignRoles: jest.fn().mockResolvedValue({ roles: ['role-admin'] }),
             revokeAllUserSessions: jest.fn().mockResolvedValue(undefined),
         };
 
@@ -141,34 +152,48 @@ describe('TenantManagementService', () => {
         it('should update tenant successfully', async () => {
             const updatedTenant = { ...mockTenant, razon_social: 'Updated Company S.A.C.' };
 
-            mockClient.single
-                .mockResolvedValueOnce({ data: mockTenant, error: null })  // Check tenant exists
-                .mockResolvedValueOnce({ data: updatedTenant, error: null }); // Update result
+            mockClient.single.mockResolvedValueOnce({ data: mockTenant, error: null });
+            mockClient.rpc.mockResolvedValueOnce({
+                data: { configuracion: updatedTenant, idempotent: false },
+                error: null,
+            });
 
             const result = await service.updateTenant('tenant-123', {
-                razon_social: 'Updated Company S.A.C.',
-            } as any);
+                nombre: 'Updated Company S.A.C.',
+            }, actorId, idempotencyKey);
 
-            expect(result).toBeDefined();
+            expect(result).toEqual(updatedTenant);
+            expect(mockClient.rpc).toHaveBeenCalledWith('actualizar_empresa_config_tx', {
+                p_tenant_id: 'tenant-123',
+                p_actor_id: actorId,
+                p_idempotency_key: idempotencyKey,
+                p_operation: 'TENANT_UPDATE',
+                p_patch: { razon_social: 'Updated Company S.A.C.' },
+            });
         });
 
         it('should update an active Colombia tenant country consistently', async () => {
             const updatedTenant = { ...mockTenant, pais_id: 2, pais: 'CO', moneda_defecto: 'COP' };
             mockClient.single
                 .mockResolvedValueOnce({ data: mockTenant, error: null })
-                .mockResolvedValueOnce({ data: { id: 2, codigo_iso: 'CO' }, error: null })
-                .mockResolvedValueOnce({ data: updatedTenant, error: null });
+                .mockResolvedValueOnce({ data: { id: 2, codigo_iso: 'CO' }, error: null });
+            mockClient.rpc.mockResolvedValueOnce({
+                data: { configuracion: updatedTenant, idempotent: false },
+                error: null,
+            });
 
             const result = await service.updateTenant('tenant-123', {
                 pais_id: 2,
                 pais: 'CO',
-            } as any);
+            }, actorId, idempotencyKey);
 
             expect(result).toEqual(updatedTenant);
-            expect(mockClient.update).toHaveBeenCalledWith(expect.objectContaining({
-                pais_id: 2,
-                pais: 'CO',
-            }));
+            expect(mockClient.rpc).toHaveBeenCalledWith(
+                'actualizar_empresa_config_tx',
+                expect.objectContaining({
+                    p_patch: expect.objectContaining({ pais_id: 2, pais: 'CO' }),
+                }),
+            );
         });
 
         it('should reject a country outside the active PE/AR/CO catalog', async () => {
@@ -177,13 +202,18 @@ describe('TenantManagementService', () => {
             await expect(service.updateTenant('tenant-123', {
                 pais_id: 99,
                 pais: 'XX',
-            } as any)).rejects.toThrow(BadRequestException);
+            } as any, actorId, idempotencyKey)).rejects.toThrow(BadRequestException);
         });
 
         it('should throw NotFoundException when tenant not found', async () => {
             mockClient.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
 
-            await expect(service.updateTenant('non-existent', { razon_social: 'Test' } as any))
+            await expect(service.updateTenant(
+                'non-existent',
+                { nombre: 'Test' },
+                actorId,
+                idempotencyKey,
+            ))
                 .rejects.toThrow(NotFoundException);
         });
     });
@@ -194,37 +224,108 @@ describe('TenantManagementService', () => {
             const inactiveTenant = { ...mockTenant, estado: 'INACTIVO' };
             const activatedTenant = { ...mockTenant, estado: 'ACTIVO' };
 
-            mockClient.single
-                .mockResolvedValueOnce({ data: inactiveTenant, error: null })  // Get tenant
-                .mockResolvedValueOnce({ data: activatedTenant, error: null }); // Update result
+            mockClient.rpc.mockResolvedValueOnce({
+                data: { tenant: activatedTenant, idempotent: false },
+                error: null,
+            });
 
-            const result = await service.activateTenant('tenant-123');
+            const result = await service.activateTenant('tenant-123', actorId, idempotencyKey);
 
-            expect(result).toBeDefined();
+            expect(result).toEqual(activatedTenant);
+            expect(mockClient.rpc).toHaveBeenCalledWith('cambiar_estado_tenant_tx', {
+                p_tenant_id: 'tenant-123',
+                p_actor_id: actorId,
+                p_idempotency_key: idempotencyKey,
+                p_estado: 'ACTIVO',
+            });
         });
 
         it('should throw NotFoundException when tenant not found', async () => {
-            mockClient.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+            mockClient.rpc.mockResolvedValue({ data: null, error: { message: 'TENANT_STATE_NOT_FOUND' } });
 
-            await expect(service.activateTenant('non-existent'))
+            await expect(service.activateTenant('non-existent', actorId, idempotencyKey))
                 .rejects.toThrow(NotFoundException);
         });
     });
 
     // ==================== DEACTIVATE TENANT ====================
     describe('deactivateTenant', () => {
-        it('should throw BadRequestException when ADMIN role not found', async () => {
-            // getTenantById returns tenant
-            mockClient.single
-                .mockResolvedValueOnce({ data: mockTenant, error: null })  // getTenantById
-                .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } }); // ADMIN role not found
+        it('should propagate the atomic active-admin invariant', async () => {
+            mockClient.rpc.mockResolvedValueOnce({
+                data: null,
+                error: { message: 'TENANT_STATE_ACTIVE_ADMIN_REQUIRED' },
+            });
 
-            await expect(service.deactivateTenant('tenant-123'))
+            await expect(service.deactivateTenant('tenant-123', actorId, idempotencyKey))
                 .rejects.toThrow(BadRequestException);
         });
 
         it('should have deactivateTenant method defined', () => {
             expect(service.deactivateTenant).toBeDefined();
+        });
+    });
+
+    describe('demo tenant lifecycle', () => {
+        it('activates demo flags, credential and ADMIN role in one atomic RPC', async () => {
+            mockClient.rpc.mockResolvedValueOnce({
+                data: {
+                    tenant_id: 'tenant-123',
+                    demo_expires_at: '2026-08-25T00:00:00.000Z',
+                    user: { id: 'demo-user-464' },
+                    idempotent: false,
+                },
+                error: null,
+            });
+
+            const result = await service.activateDemoTenant(
+                'tenant-123',
+                { email: 'demo@example.test', password: 'StrongDemoPass464!', dias_duracion: 15 },
+                { id: actorId },
+                'tenant-demo-activate-464',
+            );
+
+            expect(result).toEqual(expect.objectContaining({
+                success: true,
+                tenant_id: 'tenant-123',
+                user: expect.objectContaining({ id: 'demo-user-464' }),
+            }));
+            expect(mockClient.rpc).toHaveBeenCalledWith(
+                'configurar_demo_tenant_tx',
+                expect.objectContaining({
+                    p_tenant_id: 'tenant-123',
+                    p_actor_id: actorId,
+                    p_idempotency_key: 'tenant-demo-activate-464',
+                    p_activo: true,
+                    p_password_hash: expect.any(String),
+                    p_password_fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+                }),
+            );
+        });
+
+        it('deactivates flags and demo users through the same transaction boundary', async () => {
+            mockClient.rpc.mockResolvedValueOnce({
+                data: { tenant_id: 'tenant-123', is_demo: false, idempotent: false },
+                error: null,
+            });
+
+            const result = await service.deactivateDemoTenant(
+                'tenant-123',
+                { sub: actorId },
+                'tenant-demo-deactivate-464',
+            );
+
+            expect(result.success).toBe(true);
+            expect(mockClient.rpc).toHaveBeenCalledWith('configurar_demo_tenant_tx', {
+                p_tenant_id: 'tenant-123',
+                p_actor_id: actorId,
+                p_idempotency_key: 'tenant-demo-deactivate-464',
+                p_activo: false,
+                p_dias_duracion: null,
+                p_email: null,
+                p_password_hash: null,
+                p_password_fingerprint: null,
+                p_perfil: {},
+            });
         });
     });
 
@@ -279,13 +380,12 @@ describe('TenantManagementService', () => {
                 error: null
             });
 
-            // RUC exists
-            mockClient.maybeSingle.mockResolvedValueOnce({
-                data: { tenant_id: 'existing', razon_social: 'Existing Company' },
-                error: null
+            mockClient.rpc.mockResolvedValueOnce({
+                data: null,
+                error: { code: '23505', message: 'TENANT_CREATE_ID_TAX_OR_EMAIL_CONFLICT' },
             });
 
-            await expect(service.createTenant(createDto as any))
+            await expect(service.createTenant(createDto as any, actorId, idempotencyKey))
                 .rejects.toThrow(ConflictException);
         });
 
@@ -309,27 +409,29 @@ describe('TenantManagementService', () => {
             };
 
             mockClient.single
-                .mockResolvedValueOnce({ data: { id: 2, codigo_iso: 'CO', moneda_codigo: 'COP' }, error: null })
-                .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } })
-                .mockResolvedValueOnce({ data: colombiaTenant, error: null })
-                .mockResolvedValueOnce({ data: { id: 'role-admin' }, error: null });
-            mockClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
-            mockClient.insert
-                .mockReturnValueOnce({ error: null })
-                .mockReturnValueOnce(mockClient);
+                .mockResolvedValueOnce({ data: { id: 2, codigo_iso: 'CO', moneda_codigo: 'COP' }, error: null });
             mockClient.rpc.mockResolvedValueOnce({
-                data: [{ permisos_seeded: 195, roles_seeded: 10, role_permissions_seeded: 465 }],
+                data: {
+                    tenant: colombiaTenant,
+                    adminUser: { id: 'user-123', email: createDto.email },
+                    idempotent: false,
+                },
                 error: null,
             });
 
-            const result = await service.createTenant(createDto as any);
+            const result = await service.createTenant(createDto as any, actorId, idempotencyKey);
 
             expect(result.success).toBe(true);
             expect(result.data.tenant).toEqual(colombiaTenant);
             expect(mockClient.from).toHaveBeenCalledWith('paises');
-            expect(mockClient.rpc).toHaveBeenCalledWith('seed_operational_rbac_for_tenant', {
-                p_tenant_id: expect.any(String),
-            });
+            expect(mockClient.rpc).toHaveBeenCalledWith(
+                'crear_tenant_empresa_admin_tx',
+                expect.objectContaining({
+                    p_actor_id: actorId,
+                    p_idempotency_key: idempotencyKey,
+                    p_empresa: expect.objectContaining({ pais: 'CO', moneda_defecto: 'COP' }),
+                }),
+            );
         });
 
         it('should reject a country outside the active PE/AR/CO catalog', async () => {
@@ -341,11 +443,12 @@ describe('TenantManagementService', () => {
                 pais: 'XX',
             };
 
-            await expect(service.createTenant(createDto as any)).rejects.toThrow(BadRequestException);
+            await expect(service.createTenant(createDto as any, actorId, idempotencyKey))
+                .rejects.toThrow(BadRequestException);
             expect(mockClient.from).not.toHaveBeenCalledWith('paises');
         });
 
-        it('should create canonical tenant and seed operational RBAC before admin user', async () => {
+        it('should create canonical tenant, RBAC and first admin in one RPC', async () => {
             const createDto = {
                 razon_social: 'New Company S.A.C.',
                 ruc: '20987654321',
@@ -357,27 +460,27 @@ describe('TenantManagementService', () => {
             };
 
             mockClient.single
-                .mockResolvedValueOnce({ data: { id: 1, codigo_iso: 'PE', moneda_codigo: 'PEN' }, error: null })
-                .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } })
-                .mockResolvedValueOnce({ data: mockTenant, error: null })
-                .mockResolvedValueOnce({ data: { id: 'role-admin' }, error: null });
-
-            mockClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
-            mockClient.insert
-                .mockReturnValueOnce({ error: null })
-                .mockReturnValueOnce(mockClient);
+                .mockResolvedValueOnce({ data: { id: 1, codigo_iso: 'PE', moneda_codigo: 'PEN' }, error: null });
             mockClient.rpc.mockResolvedValueOnce({
-                data: [{ permisos_seeded: 195, roles_seeded: 10, role_permissions_seeded: 465 }],
+                data: {
+                    tenant: mockTenant,
+                    adminUser: { id: 'user-123', email: createDto.admin_email },
+                    idempotent: false,
+                },
                 error: null,
             });
 
-            const result = await service.createTenant(createDto as any);
+            const result = await service.createTenant(createDto as any, actorId, idempotencyKey);
 
             expect(result.success).toBe(true);
-            expect(mockClient.from).toHaveBeenCalledWith('tenants');
-            expect(mockClient.rpc).toHaveBeenCalledWith('seed_operational_rbac_for_tenant', {
-                p_tenant_id: expect.any(String),
-            });
+            expect(mockClient.from).not.toHaveBeenCalledWith('tenants');
+            expect(mockClient.rpc).toHaveBeenCalledWith(
+                'crear_tenant_empresa_admin_tx',
+                expect.objectContaining({
+                    p_actor_id: actorId,
+                    p_idempotency_key: idempotencyKey,
+                }),
+            );
         });
     });
 });

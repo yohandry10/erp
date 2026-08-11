@@ -26,10 +26,11 @@ interface SesionCaja {
 
 interface CashSessionSelectorProps {
     onSelect: (sesion: SesionCaja) => void;
+    onOpen?: () => void;
     className?: string;
 }
 
-export function CashSessionSelector({ onSelect, className = '' }: CashSessionSelectorProps) {
+export function CashSessionSelector({ onSelect, onOpen, className = '' }: CashSessionSelectorProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
     const { get } = useApi();
@@ -186,7 +187,10 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
             >
                 <p className="text-[var(--text-secondary,_#6b7280)] mb-2">No hay sesiones recientes</p>
                 <button
-                    onClick={() => {/* placeholder for abrir caja */}} className="py-2.5 px-3.5 bg-[var(--gradient-primary,_linear-gradient(90deg,#2563eb,#1d4ed8))] text-[#fff] border-0 rounded-[0.625rem] cursor-pointer"
+                    type="button"
+                    onClick={onOpen}
+                    disabled={!onOpen}
+                    className="py-2.5 px-3.5 bg-[var(--gradient-primary,_linear-gradient(90deg,#2563eb,#1d4ed8))] text-[#fff] border-0 rounded-[0.625rem] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     Abrir Nueva Caja
                 </button>

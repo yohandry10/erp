@@ -15,7 +15,27 @@ const productoBase = {
   unidad_medida: 'NIU',
 };
 
-const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any[]; metodoPago?: any } = {}) => {
+const resolvedCommercialPrices = (args: any) => ({
+  data: (args?.p_detalle ?? []).map((item: any, index: number) => ({
+    ...item,
+    orden: item.orden ?? index + 1,
+    precio_regla_snapshot: {
+      regla_aplicada: false,
+      fuente: 'PRECIO_SOLICITADO',
+      producto_id: item.producto_id,
+      precio_unitario: item.precio_unitario ?? item.precio_original,
+      snapshot_version: 469,
+    },
+  })),
+  error: null,
+});
+
+const createSupabaseMock = (fixtures: {
+  ventasPosResponse?: any;
+  canjesResponse?: any;
+  productos?: any[];
+  metodoPago?: any;
+} = {}) => {
   const inserts: Array<{ table: string; rows: any }> = [];
   const updates: Array<{ table: string; rows: any }> = [];
   const responseFor = (table: string) => {
@@ -39,6 +59,8 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any
         return { data: null, error: null };
       case 'ventas_pos':
         return { data: fixtures.ventasPosResponse ?? [], error: null };
+      case 'pos_ticket_canjes':
+        return { data: fixtures.canjesResponse ?? [], error: null };
       case 'metodos_pago':
         return {
           data: fixtures.metodoPago ?? { id: 'mp-efectivo', codigo: 'efectivo', tipo: 'EFECTIVO' },
@@ -60,25 +82,28 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any
     }
   };
 
-  let correlativoFiscal = 40;
-  const rpcMock = jest.fn(async (fn: string, _args?: any) => {
-    if (fn === 'obtener_siguiente_numero_documento') {
-      correlativoFiscal += 1;
-      return { data: String(correlativoFiscal).padStart(8, '0'), error: null };
-    }
-    if (fn === 'pos_registrar_venta_full_tx') {
+  const rpcMock = jest.fn(async (fn: string, args?: any) => {
+    if (fn === 'reintentar_venta_pos_comercial_tx') return { data: null, error: null };
+    if (fn === 'resolver_precios_venta_tx') return resolvedCommercialPrices(args);
+    if (fn === 'pos_registrar_venta_comercial_tx') {
       return {
-        data: [
-          {
-            venta_id: 'venta-1',
-            numero_ticket: 'T001-000001',
-            subtotal: 100,
-            impuestos: 18,
-            total: 118,
-            impactos_aplicados: true,
-            caja_movimiento_id: 'mov-caja-1',
-          },
-        ],
+        data: {
+          venta_id: 'venta-1',
+          numero_ticket: 'T001-00000001',
+          subtotal: 100,
+          impuestos: 18,
+          total: 118,
+          impactos_aplicados: true,
+          caja_movimiento_id: 'mov-caja-1',
+          cpe_id: null,
+          cpe_pendiente: true,
+          facturacion_pendiente: true,
+          cuenta_por_cobrar_id: null,
+          credito_monto: 0,
+          accounting_event_id: 'event-1',
+          documento_id: 'doc-1',
+          items_actualizados: [],
+        },
         error: null,
       };
     }
@@ -95,6 +120,7 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any
       gte: jest.fn(() => chain),
       lte: jest.fn(() => chain),
       lt: jest.fn(() => chain),
+      not: jest.fn(() => chain),
       in: jest.fn(() => chain),
       limit: jest.fn(() => chain),
       is: jest.fn(() => chain),
@@ -122,7 +148,12 @@ const createSupabaseMock = (fixtures: { ventasPosResponse?: any; productos?: any
   return { supabaseClient, rpcMock, inserts, updates };
 };
 
-const createService = (fixtures: { ventasPosResponse?: any; productos?: any[]; metodoPago?: any } = {}) => {
+const createService = (fixtures: {
+  ventasPosResponse?: any;
+  canjesResponse?: any;
+  productos?: any[];
+  metodoPago?: any;
+} = {}) => {
   const { supabaseClient, rpcMock, inserts, updates } = createSupabaseMock(fixtures);
 
   const supabaseService: any = {
@@ -188,7 +219,7 @@ const ventaBase = {
   ],
 };
 
-describe('PosService full transaction contract', () => {
+describe('PosService atomic transaction contract', () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
@@ -208,12 +239,12 @@ describe('PosService full transaction contract', () => {
     expect(result.success).toBe(true);
     expect(result.cpe_pendiente).toBe(true);
     expect(ctx.validationService.validateCertificate).not.toHaveBeenCalled();
-    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_registrar_venta_full_tx', expect.any(Object));
+    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_registrar_venta_comercial_tx', expect.any(Object));
     expect(ctx.rpcMock).not.toHaveBeenCalledWith('acquire_pos_lock', expect.any(Object));
     expect(ctx.rpcMock).not.toHaveBeenCalledWith('release_pos_lock', expect.any(Object));
   });
 
-  it('procesa venta feliz exclusivamente mediante full_tx', async () => {
+  it('procesa venta feliz exclusivamente mediante atomic_tx', async () => {
     const ctx = createService();
     ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
@@ -230,22 +261,62 @@ describe('PosService full transaction contract', () => {
     expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_tx', expect.any(Object));
   });
 
-  it('usa RPC full_tx y no duplica detalles, pagos, stock ni caja desde la API', async () => {
+  it('devuelve el retry confirmado antes de recalcular una lista que pudo cambiar', async () => {
     const ctx = createService();
     ctx.rpcMock.mockImplementation(async (fn: string) => {
-      if (fn === 'pos_registrar_venta_full_tx') {
+      if (fn === 'reintentar_venta_pos_comercial_tx') {
         return {
-          data: [
-            {
-              venta_id: 'venta-full-1',
-              numero_ticket: 'B001-00000199',
-              subtotal: 100,
-              impuestos: 18,
-              total: 118,
-              impactos_aplicados: true,
-              caja_movimiento_id: 'mov-caja-1',
-            },
-          ],
+          data: {
+            venta_id: 'venta-idempotente',
+            numero_ticket: 'T001-00000077',
+            subtotal: 70,
+            impuestos: 12.6,
+            total: 82.6,
+            impactos_aplicados: true,
+            idempotent: true,
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    const result = await ctx.service.procesarVenta(ventaBase, user);
+
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      venta_id: 'venta-idempotente',
+      total: 82.6,
+      idempotent: true,
+    }));
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('resolver_precios_venta_tx', expect.any(Object));
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_comercial_tx', expect.any(Object));
+    expect(ctx.supabaseClient.from).not.toHaveBeenCalledWith('empresa_config');
+  });
+
+  it('usa RPC atomic_tx y no duplica detalles, pagos, stock ni caja desde la API', async () => {
+    const ctx = createService();
+    ctx.rpcMock.mockImplementation(async (fn: string, args?: any) => {
+      if (fn === 'resolver_precios_venta_tx') return resolvedCommercialPrices(args);
+      if (fn === 'pos_registrar_venta_comercial_tx') {
+        return {
+          data: {
+            venta_id: 'venta-atomic-1',
+            numero_ticket: 'T001-00000199',
+            subtotal: 100,
+            impuestos: 18,
+            total: 118,
+            impactos_aplicados: true,
+            caja_movimiento_id: 'mov-caja-1',
+            cpe_id: null,
+            cpe_pendiente: true,
+            facturacion_pendiente: true,
+            cuenta_por_cobrar_id: null,
+            credito_monto: 0,
+            accounting_event_id: 'event-atomic-1',
+            documento_id: 'doc-atomic-1',
+            items_actualizados: [],
+          },
           error: null,
         };
       }
@@ -255,8 +326,8 @@ describe('PosService full transaction contract', () => {
     const result = await ctx.service.procesarVenta(ventaBase, user);
 
     expect(result.success).toBe(true);
-    expect(result.venta_id).toBe('venta-full-1');
-    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_registrar_venta_full_tx', expect.any(Object));
+    expect(result.venta_id).toBe('venta-atomic-1');
+    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_registrar_venta_comercial_tx', expect.any(Object));
     expect(ctx.inserts.find((entry) => entry.table === 'detalle_ventas_pos')).toBeUndefined();
     expect(ctx.inserts.find((entry) => entry.table === 'ventas_pos_pagos')).toBeUndefined();
     expect(ctx.inserts.find((entry) => entry.table === 'movimientos_inventario')).toBeUndefined();
@@ -272,8 +343,8 @@ describe('PosService full transaction contract', () => {
     const result = await ctx.service.procesarVenta({ ...ventaBase, metodo_pago_id: 'efectivo', total: 118 }, user);
 
     expect(result.success).toBe(true);
-    const fullTxCall = ctx.rpcMock.mock.calls.find((call: any[]) => call[0] === 'pos_registrar_venta_full_tx');
-    expect(fullTxCall?.[1]).toEqual(expect.objectContaining({ p_metodo_pago: 'efectivo' }));
+    const atomicTxCall = ctx.rpcMock.mock.calls.find((call: any[]) => call[0] === 'pos_registrar_venta_comercial_tx');
+    expect(atomicTxCall?.[1]?.p_payload).toEqual(expect.objectContaining({ metodo_pago: 'efectivo' }));
   });
 
   it('usa metadata canonica de productos para dejar CPE POS en cola durable', async () => {
@@ -291,24 +362,18 @@ describe('PosService full transaction contract', () => {
 
     expect(result.success).toBe(true);
     expect(ctx.cpeService.create).not.toHaveBeenCalled();
-    expect(ctx.updates).toContainEqual(
-      expect.objectContaining({
-        table: 'ventas_pos',
-        rows: expect.objectContaining({
-          cpe_pendiente: true,
-          cpe_data: expect.objectContaining({
-            costo_ventas: 50,
-            items: [
-              expect.objectContaining({
-                codigo_producto: 'P1',
-                descripcion: 'Prod 1',
-                unidad_medida: 'NIU',
-              }),
-            ],
-          }),
-        }),
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1].p_payload).toEqual(expect.objectContaining({
+      items: expect.arrayContaining([
+        expect.objectContaining({ producto_id: 'prod-1', cantidad: 1 }),
+      ]),
+      cpe_data: expect.objectContaining({
+        tipo_documento: '03',
+        serie: 'B001',
+        total_venta: 118,
       }),
-    );
+    }));
+    expect(ctx.updates.find((entry) => entry.table === 'ventas_pos')).toBeUndefined();
   });
 
   it('no abre cuenta por cobrar cuando el pago se liquida en el acto', async () => {
@@ -332,13 +397,28 @@ describe('PosService full transaction contract', () => {
     ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
+    ctx.rpcMock.mockImplementation(async (fn: string, args?: any) => {
+      if (fn === 'resolver_precios_venta_tx') return resolvedCommercialPrices(args);
+      if (fn === 'pos_registrar_venta_comercial_tx') {
+        return {
+          data: null,
+          error: {
+            code: '23514',
+            message: 'POS_CREDIT_REQUIRES_ACTIVE_CUSTOMER',
+          },
+        };
+      }
+      return { data: null, error: null };
+    });
 
     // Sin cliente registrado la venta a crédito se rechaza antes de crear la CxC:
     // ese rechazo es la señal de que el medio se clasificó como diferido.
     const result = await ctx.service.procesarVenta({ ...ventaBase, metodo_pago_id: 'credito' }, user);
 
     expect(result.success).toBe(false);
-    expect(result.error?.codigo).toBe('CLIENTE_REQUERIDO_CREDITO');
+    expect(result.message).toContain('POS_CREDIT_REQUIRES_ACTIVE_CUSTOMER');
+    expect(result.error?.codigo).toBe('23514');
+    expect(ctx.inserts).toHaveLength(0);
   });
 
   it('descuenta el descuento global de la base imponible, no del total con IGV', async () => {
@@ -352,15 +432,13 @@ describe('PosService full transaction contract', () => {
       user,
     );
 
-    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_full_tx');
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
     // Base 100 - 10 % = 90; el IGV se calcula sobre 90, no sobre 100.
-    expect(rpc?.[1].p_items[0].subtotal).toBe(90);
-    expect(rpc?.[1].p_items[0].igv).toBe(16.2);
-
-    const colaCpe = ctx.updates.find((entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data);
-    expect(colaCpe?.rows.cpe_data.total_gravadas).toBe(90);
-    expect(colaCpe?.rows.cpe_data.total_igv).toBe(16.2);
-    expect(colaCpe?.rows.cpe_data.total_venta).toBe(106.2);
+    expect(rpc?.[1].p_payload.items[0].subtotal).toBe(90);
+    expect(rpc?.[1].p_payload.items[0].igv).toBe(16.2);
+    expect(rpc?.[1].p_payload.cpe_data.total_gravadas).toBe(90);
+    expect(rpc?.[1].p_payload.cpe_data.total_igv).toBe(16.2);
+    expect(rpc?.[1].p_payload.cpe_data.total_venta).toBe(106.2);
   });
 
   it('no cobra IGV sobre un producto exonerado', async () => {
@@ -373,14 +451,12 @@ describe('PosService full transaction contract', () => {
 
     await ctx.service.procesarVenta(ventaBase, user);
 
-    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_full_tx');
-    expect(rpc?.[1].p_items[0].igv).toBe(0);
-
-    const colaCpe = ctx.updates.find((entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data);
-    expect(colaCpe?.rows.cpe_data.total_exoneradas).toBe(100);
-    expect(colaCpe?.rows.cpe_data.total_gravadas).toBe(0);
-    expect(colaCpe?.rows.cpe_data.total_igv).toBe(0);
-    expect(colaCpe?.rows.cpe_data.total_venta).toBe(100);
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1].p_payload.items[0].igv).toBe(0);
+    expect(rpc?.[1].p_payload.cpe_data.total_exoneradas).toBe(100);
+    expect(rpc?.[1].p_payload.cpe_data.total_gravadas).toBe(0);
+    expect(rpc?.[1].p_payload.cpe_data.total_igv).toBe(0);
+    expect(rpc?.[1].p_payload.cpe_data.total_venta).toBe(100);
   });
 
   it('prorratea el descuento global sin mover base entre afectaciones', async () => {
@@ -406,62 +482,36 @@ describe('PosService full transaction contract', () => {
       user,
     );
 
-    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_full_tx');
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
     // 20 repartidos por peso: 10 a cada ítem de 100.
-    expect(rpc?.[1].p_items.map((item: any) => item.subtotal)).toEqual([90, 90]);
-    expect(rpc?.[1].p_items.map((item: any) => item.igv)).toEqual([16.2, 0]);
-
-    const colaCpe = ctx.updates.find((entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data);
-    expect(colaCpe?.rows.cpe_data.total_gravadas).toBe(90);
-    expect(colaCpe?.rows.cpe_data.total_exoneradas).toBe(90);
-    expect(colaCpe?.rows.cpe_data.total_igv).toBe(16.2);
+    expect(rpc?.[1].p_payload.items.map((item: any) => item.subtotal)).toEqual([90, 90]);
+    expect(rpc?.[1].p_payload.items.map((item: any) => item.igv)).toEqual([16.2, 0]);
+    expect(rpc?.[1].p_payload.cpe_data.total_gravadas).toBe(90);
+    expect(rpc?.[1].p_payload.cpe_data.total_exoneradas).toBe(90);
+    expect(rpc?.[1].p_payload.cpe_data.total_igv).toBe(16.2);
   });
 
-  it('reserva el correlativo fiscal en documento_series cuando el ticket usa serie interna', async () => {
+  it('delega ticket y correlativo fiscal a la frontera atómica', async () => {
     const ctx = createService();
     ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
 
-    // El mock de full_tx devuelve el ticket interno T001-000001: ese correlativo
-    // pertenece a la secuencia por caja y no puede viajar al comprobante.
     const result = await ctx.service.procesarVenta(ventaBase, user);
 
     expect(result.success).toBe(true);
-    expect(ctx.rpcMock).toHaveBeenCalledWith('obtener_siguiente_numero_documento', {
-      p_tenant_id: 'tenant-1',
-      p_tipo_documento: '03',
-      p_serie: 'B001',
-    });
-    const colaCpe = ctx.updates.find(
-      (entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data,
-    );
-    expect(colaCpe?.rows.cpe_data.serie).toBe('B001');
-    expect(colaCpe?.rows.cpe_data.numero).toBe(41);
-    expect(colaCpe?.rows.cpe_data.numero).not.toBe(1);
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('obtener_siguiente_numero_documento', expect.any(Object));
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1].p_payload.ticket_serie).toBe('T001');
+    expect(rpc?.[1].p_payload.cpe_data).toEqual(expect.objectContaining({
+      tipo_documento: '03',
+      serie: 'B001',
+    }));
+    expect(rpc?.[1].p_payload.cpe_data.numero).toBeUndefined();
   });
 
-  it('conserva el correlativo del ticket cuando el POS ya lo reservo sobre la serie fiscal', async () => {
+  it('respeta una serie fiscal válida sin mezclarla con la serie interna del ticket', async () => {
     const ctx = createService();
-    ctx.rpcMock.mockImplementation(async (fn: string) => {
-      if (fn === 'pos_registrar_venta_full_tx') {
-        return {
-          data: [
-            {
-              venta_id: 'venta-1',
-              numero_ticket: 'B001-00000199',
-              subtotal: 100,
-              impuestos: 18,
-              total: 118,
-              impactos_aplicados: true,
-              caja_movimiento_id: 'mov-caja-1',
-            },
-          ],
-          error: null,
-        };
-      }
-      return { data: null, error: null };
-    });
     ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
@@ -472,18 +522,40 @@ describe('PosService full transaction contract', () => {
     );
 
     expect(result.success).toBe(true);
-    expect(ctx.rpcMock).not.toHaveBeenCalledWith(
-      'obtener_siguiente_numero_documento',
-      expect.any(Object),
-    );
-    const colaCpe = ctx.updates.find(
-      (entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data,
-    );
-    expect(colaCpe?.rows.cpe_data.numero).toBe(199);
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1].p_payload.ticket_serie).toBe('T001');
+    expect(rpc?.[1].p_payload.cpe_data.serie).toBe('B001');
   });
 
-  it('reutiliza el correlativo fiscal ya reservado si la venta se reintenta', async () => {
-    const ctx = createService({ ventasPosResponse: { cpe_data: { serie: 'B001', numero: 77 } } });
+  it('propaga la respuesta idempotente de la frontera sin reservar otro correlativo', async () => {
+    const ctx = createService();
+    ctx.rpcMock.mockImplementation(async (fn: string, args?: any) => {
+      if (fn === 'resolver_precios_venta_tx') return resolvedCommercialPrices(args);
+      if (fn === 'pos_registrar_venta_comercial_tx') {
+        return {
+          data: {
+            venta_id: 'venta-existente',
+            numero_ticket: 'T001-00000077',
+            subtotal: 100,
+            impuestos: 18,
+            total: 118,
+            impactos_aplicados: true,
+            caja_movimiento_id: null,
+            cpe_id: null,
+            cpe_pendiente: true,
+            facturacion_pendiente: true,
+            cuenta_por_cobrar_id: null,
+            credito_monto: 0,
+            accounting_event_id: 'event-existing-1',
+            documento_id: 'doc-existing-1',
+            items_actualizados: [],
+            idempotent: true,
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
     ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
     ctx.validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, errors: [], warnings: [] });
@@ -491,14 +563,9 @@ describe('PosService full transaction contract', () => {
     const result = await ctx.service.procesarVenta(ventaBase, user);
 
     expect(result.success).toBe(true);
-    expect(ctx.rpcMock).not.toHaveBeenCalledWith(
-      'obtener_siguiente_numero_documento',
-      expect.any(Object),
-    );
-    const colaCpe = ctx.updates.find(
-      (entry) => entry.table === 'ventas_pos' && entry.rows?.cpe_data,
-    );
-    expect(colaCpe?.rows.cpe_data.numero).toBe(77);
+    expect(result.venta_id).toBe('venta-existente');
+    expect(result.idempotent).toBe(true);
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('obtener_siguiente_numero_documento', expect.any(Object));
   });
 
   it('no bloquea la venta POS emitiendo CPE sincrono y la deja pendiente para el worker', async () => {
@@ -514,18 +581,13 @@ describe('PosService full transaction contract', () => {
     expect(result.cpe_id).toBeNull();
     expect(result.cpe_pendiente).toBe(true);
     expect(ctx.cpeService.create).not.toHaveBeenCalled();
-    expect(ctx.updates).toContainEqual(
-      expect.objectContaining({
-        table: 'ventas_pos',
-        rows: expect.objectContaining({
-          cpe_id: null,
-          cpe_pendiente: true,
-          intentos_facturacion: 0,
-          error_facturacion: null,
-          cpe_data: expect.any(Object),
-        }),
-      }),
-    );
+    expect(ctx.updates.find((entry) => entry.table === 'ventas_pos')).toBeUndefined();
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1].p_payload.cpe_data).toEqual(expect.objectContaining({
+      total_gravadas: 100,
+      total_igv: 18,
+      total_venta: 118,
+    }));
   });
 
   it('persiste cpe_id al reintentar facturacion POS incluso si la cola quedo marcada como no pendiente', async () => {
@@ -541,6 +603,8 @@ describe('PosService full transaction contract', () => {
           tipo_documento: '03',
           serie: 'B001',
           numero: 1,
+          documento_id: 'doc-1',
+          venta_pos_id: 'venta-1',
           total_venta: 118,
           items: [],
         },
@@ -558,17 +622,9 @@ describe('PosService full transaction contract', () => {
       expect.objectContaining({ idempotency_key: 'pos.cpe:tenant-1:lock-123' }),
       'tenant-1',
       'user-1',
+      { finalizarDocumentoPosReservado: true },
     );
-    expect(ctx.updates).toContainEqual(
-      expect.objectContaining({
-        table: 'ventas_pos',
-        rows: expect.objectContaining({
-          cpe_id: 'cpe-1',
-          cpe_pendiente: false,
-          error_facturacion: null,
-        }),
-      }),
-    );
+    expect(ctx.updates).toEqual([]);
   });
 
   // ======= FORENSIC ANALYSIS TESTS =======
@@ -674,22 +730,30 @@ describe('PosService full transaction contract', () => {
     // (1 item x 100 precio x 1 cantidad)
   });
 
-  it('retorna venta existente si idempotency_key ya fue usada en full_tx', async () => {
+  it('retorna venta existente si idempotency_key ya fue usada en atomic_tx', async () => {
     const ctx = createService();
-    ctx.rpcMock.mockImplementation(async (fn: string) => {
-      if (fn === 'pos_registrar_venta_full_tx') {
+    ctx.rpcMock.mockImplementation(async (fn: string, args?: any) => {
+      if (fn === 'resolver_precios_venta_tx') return resolvedCommercialPrices(args);
+      if (fn === 'pos_registrar_venta_comercial_tx') {
         return {
-          data: [
-            {
-              venta_id: 'venta-existente',
-              numero_ticket: 'B001-00000001',
-              subtotal: 100,
-              impuestos: 18,
-              total: 118,
-              impactos_aplicados: true,
-              caja_movimiento_id: null,
-            },
-          ],
+          data: {
+            venta_id: 'venta-existente',
+            numero_ticket: 'T001-00000001',
+            subtotal: 100,
+            impuestos: 18,
+            total: 118,
+            impactos_aplicados: true,
+            caja_movimiento_id: null,
+            cpe_id: null,
+            cpe_pendiente: true,
+            facturacion_pendiente: true,
+            cuenta_por_cobrar_id: null,
+            credito_monto: 0,
+            accounting_event_id: 'event-existing-1',
+            documento_id: 'doc-existing-1',
+            items_actualizados: [],
+            idempotent: true,
+          },
           error: null,
         };
       }
@@ -706,16 +770,17 @@ describe('PosService full transaction contract', () => {
     expect(r2.venta_id).toBe('venta-existente');
   });
 
-  it('bloquea la venta si falta full_tx y nunca cae al RPC legacy', async () => {
+  it('bloquea la venta si falta atomic_tx y nunca cae al RPC legacy', async () => {
     const ctx = createService();
-    ctx.rpcMock.mockImplementation(async (fn: string) => {
-      if (fn === 'pos_registrar_venta_full_tx') {
+    ctx.rpcMock.mockImplementation(async (fn: string, args?: any) => {
+      if (fn === 'resolver_precios_venta_tx') return resolvedCommercialPrices(args);
+      if (fn === 'pos_registrar_venta_comercial_tx') {
         return {
           data: null,
           error: {
             code: 'PGRST202',
-            message: 'Could not find the public.pos_registrar_venta_full_tx function',
-            details: 'pos_registrar_venta_full_tx',
+            message: 'Could not find the public.pos_registrar_venta_comercial_tx function',
+            details: 'pos_registrar_venta_comercial_tx',
           },
         };
       }
@@ -723,9 +788,9 @@ describe('PosService full transaction contract', () => {
     });
     const result = await ctx.service.procesarVenta(ventaBase, user);
     expect(result.success).toBe(false);
-    expect(result.message).toContain('POS_INVENTORY_CONTRACT_UNAVAILABLE');
+    expect(result.message).toContain('POS_ATOMIC_CONTRACT_UNAVAILABLE');
     const rpcCalls = ctx.rpcMock.mock.calls.map((c: any) => c[0]);
-    expect(rpcCalls).toContain('pos_registrar_venta_full_tx');
+    expect(rpcCalls).toContain('pos_registrar_venta_comercial_tx');
     expect(rpcCalls).not.toContain('pos_registrar_venta_tx');
   });
 
@@ -750,11 +815,203 @@ describe('PosService full transaction contract', () => {
     }, user);
 
     expect(result.success).toBe(true);
-    const fullTxCall = ctx.rpcMock.mock.calls.find((call: any[]) => call[0] === 'pos_registrar_venta_full_tx');
-    expect(fullTxCall?.[1]?.p_items?.[0]).toEqual(expect.objectContaining({
+    const atomicTxCall = ctx.rpcMock.mock.calls.find((call: any[]) => call[0] === 'pos_registrar_venta_comercial_tx');
+    expect(atomicTxCall?.[1]?.p_payload?.items?.[0]).toEqual(expect.objectContaining({
       precio_unitario: 100,
       descuento_monto: 10,
       subtotal: 190,
     }));
+  });
+
+  it('registra un ticket interno real sin enviar intención CPE ni reservar datos fiscales', async () => {
+    const ctx = createService();
+    ctx.rpcMock.mockImplementation(async (fn: string, args?: any) => {
+      if (fn === 'reintentar_venta_pos_comercial_tx') return { data: null, error: null };
+      if (fn === 'resolver_precios_venta_tx') return resolvedCommercialPrices(args);
+      if (fn === 'pos_registrar_venta_comercial_tx') {
+        return {
+          data: {
+            venta_id: '3b135288-622d-42dc-8ff7-5cc3e3700e20',
+            numero_ticket: 'T001-00000081',
+            tipo_emision: 'TICKET',
+            subtotal: 100,
+            impuestos: 18,
+            total: 118,
+            cpe_id: null,
+            cpe_pendiente: false,
+            facturacion_pendiente: false,
+            canjeable: true,
+            impactos_aplicados: true,
+            documento_id: '2f3a1303-32b2-4244-a116-16064cd45ff5',
+            items_actualizados: [],
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase,
+      emitir_cpe: false,
+      metodo_pago_id: 'mp-efectivo',
+      cliente_tipo_documento: '1',
+      comprobante: { tipo: 'TICKET', serie: 'T001' },
+    }, user);
+
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      tipo_emision: 'TICKET',
+      canjeable: true,
+      cpe_pendiente: false,
+      factura_electronica: false,
+    }));
+    const call = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(call?.[1].p_payload).toEqual(expect.objectContaining({
+      emitir_cpe: false,
+      cliente_tipo_documento: '1',
+      cpe_data: null,
+      commercial_request: expect.objectContaining({
+        emitir_cpe: false,
+        metodo_pago_id: 'mp-efectivo',
+        cliente_tipo_documento: '1',
+      }),
+    }));
+  });
+
+  it('canjea por una única RPC y no acepta importes ni líneas desde la API', async () => {
+    const ctx = createService();
+    ctx.rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === 'pos_canjear_ticket_tx') {
+        return {
+          data: {
+            canje_id: 'b64dd6db-096a-407c-98ee-8b6487bb3d91',
+            venta_id: '3b135288-622d-42dc-8ff7-5cc3e3700e20',
+            documento_id: 'ccf70abf-748b-40b2-a0aa-b16c27c28010',
+            numero_fiscal: 'F001-00000021',
+            tipo_emision: 'TICKET_CANJEADO',
+            impactos_economicos_reaplicados: false,
+            idempotent: false,
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    const result = await ctx.service.canjearTicket(
+      '3b135288-622d-42dc-8ff7-5cc3e3700e20',
+      {
+        idempotency_key: ' canje-01 ',
+        tipo_documento: '01',
+        cliente_id: '6394d65e-5dbd-4261-a028-280643e76da7',
+        cliente_tipo_documento: '6',
+        cliente_documento: '20123456789',
+        cliente_nombre: ' Cliente Fiscal SAC ',
+      },
+      user,
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      numero_fiscal: 'F001-00000021',
+      impactos_economicos_reaplicados: false,
+    }));
+    expect(ctx.rpcMock).toHaveBeenCalledWith('pos_canjear_ticket_tx', {
+      p_tenant_id: 'tenant-1',
+      p_venta_pos_id: '3b135288-622d-42dc-8ff7-5cc3e3700e20',
+      p_actor_id: 'user-1',
+      p_idempotency_key: 'canje-01',
+      p_payload: {
+        tipo_documento: '01',
+        serie: null,
+        cliente_id: '6394d65e-5dbd-4261-a028-280643e76da7',
+        cliente_tipo_documento: '6',
+        cliente_documento: '20123456789',
+        cliente_nombre: 'Cliente Fiscal SAC',
+        cliente_direccion: null,
+      },
+    });
+  });
+
+  it('expone en el historial el vínculo inmutable ticket a documento fiscal', async () => {
+    const ctx = createService({
+      ventasPosResponse: [{
+        id: '3b135288-622d-42dc-8ff7-5cc3e3700e20',
+        numero_ticket: 'T001-00000081',
+        tipo_emision: 'TICKET_CANJEADO',
+        cpe_id: null,
+        atomic_result: { numero_fiscal: 'F001-00000021' },
+      }],
+      canjesResponse: [{
+        id: 'b64dd6db-096a-407c-98ee-8b6487bb3d91',
+        venta_pos_id: '3b135288-622d-42dc-8ff7-5cc3e3700e20',
+        documento_fiscal_id: 'ccf70abf-748b-40b2-a0aa-b16c27c28010',
+        tipo_documento: '01',
+        serie: 'F001',
+        numero: '00000021',
+        estado: 'RESERVADO',
+      }],
+    });
+
+    const result = await ctx.service.getVentasRecientes(user);
+
+    expect(result).toEqual({
+      success: true,
+      data: [expect.objectContaining({
+        numero_ticket: 'T001-00000081',
+        numero_fiscal: 'F001-00000021',
+        canjeable: false,
+        canje: expect.objectContaining({
+          documento_fiscal_id: 'ccf70abf-748b-40b2-a0aa-b16c27c28010',
+        }),
+      })],
+    });
+  });
+
+  it('no convierte un ticket puro en reintento CPE ni consume contador de intentos', async () => {
+    const ctx = createService({
+      ventasPosResponse: {
+        id: '3b135288-622d-42dc-8ff7-5cc3e3700e20',
+        tenant_id: 'tenant-1',
+        numero_ticket: 'T001-00000081',
+        tipo_emision: 'TICKET',
+        cpe_id: null,
+        cpe_pendiente: false,
+        cpe_data: null,
+        intentos_facturacion: 0,
+      },
+    });
+
+    const result = await ctx.service.reintentarFacturacionVenta(
+      '3b135288-622d-42dc-8ff7-5cc3e3700e20',
+      user,
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      success: false,
+      message: expect.stringContaining('flujo de canje'),
+    }));
+    expect(ctx.cpeService.create).not.toHaveBeenCalled();
+    expect(ctx.updates).toHaveLength(0);
+  });
+
+  it('el worker ignora defensivamente un ticket interno aunque esté marcado pendiente por datos antiguos', async () => {
+    const ctx = createService({
+      ventasPosResponse: [{
+        id: '3b135288-622d-42dc-8ff7-5cc3e3700e20',
+        tenant_id: 'tenant-1',
+        tipo_emision: 'TICKET',
+        cpe_id: null,
+        cpe_pendiente: true,
+        cpe_data: { tipo_documento: '03' },
+        intentos_facturacion: 0,
+      }],
+    });
+
+    const result = await ctx.service.procesarVentasPendientesFacturacion('tenant-1', 10);
+
+    expect(result).toEqual({ procesadas: 0, errores: 0 });
+    expect(ctx.cpeService.create).not.toHaveBeenCalled();
   });
 });

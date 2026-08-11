@@ -8,13 +8,21 @@ import { useApi } from '@/hooks/use-api'
 type KardexMovimiento = {
   id: string
   tipo: 'ENTRADA' | 'SALIDA' | 'AJUSTE' | 'DEVOLUCION'
+  sentido: 'ENTRADA' | 'SALIDA' | 'PENDIENTE'
   fecha: string | null
   documento?: string | null
   estado?: string | null
   cantidad: number
-  costoUnitario: number
-  valorTotal: number
-  moneda: string
+  cantidadFirmada: number | null
+  costoUnitario: number | null
+  valorTotal: number | null
+  valorFirmado: number | null
+  moneda: string | null
+  monedaBase: string | null
+  tipoCambio: number | null
+  valorTotalBase: number | null
+  valorFirmadoBase: number | null
+  valuacionEstado: string
   producto: {
     id: string
     nombre: string
@@ -41,11 +49,19 @@ type KardexResumen = {
   totalMovimientos: number
   totalEntradas: number
   totalSalidas: number
-  valorEntradas: number
-  valorSalidas: number
-  saldoCantidad: number
-  saldoValorizado: number
+  totalAjustes: number
+  totalDevoluciones: number
+  valorEntradasBase: number | null
+  valorSalidasBase: number | null
+  saldoCantidad: number | null
+  saldoValorizadoBase: number | null
+  monedaBase: string | null
+  pendientesValorizacion: number
+  pendientesSentido: number
+  multiplesMonedasBase: boolean
+  resumenConfiable: boolean
   valorPorMoneda: Record<string, number>
+  valorBasePorMoneda: Record<string, number>
 }
 
 type FilterState = {
@@ -59,11 +75,19 @@ const DEFAULT_RESUMEN: KardexResumen = {
   totalMovimientos: 0,
   totalEntradas: 0,
   totalSalidas: 0,
-  valorEntradas: 0,
-  valorSalidas: 0,
+  totalAjustes: 0,
+  totalDevoluciones: 0,
+  valorEntradasBase: 0,
+  valorSalidasBase: 0,
   saldoCantidad: 0,
-  saldoValorizado: 0,
+  saldoValorizadoBase: 0,
+  monedaBase: 'PEN',
+  pendientesValorizacion: 0,
+  pendientesSentido: 0,
+  multiplesMonedasBase: false,
+  resumenConfiable: true,
   valorPorMoneda: {},
+  valorBasePorMoneda: {},
 }
 
 const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
@@ -74,11 +98,25 @@ const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   minute: '2-digit',
 }
 
-const formatCurrency = (value?: number | null, currency: string = 'PEN') =>
-  new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(value ?? 0)
+const formatCurrency = (value?: number | null, currency?: string | null) => {
+  if (value === null || value === undefined) return 'Por valorizar'
+  if (!currency) return `${value.toFixed(2)} (sin moneda)`
+  try {
+    return new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(value)
+  } catch {
+    return `${currency} ${value.toFixed(2)}`
+  }
+}
 
-const formatNumber = (value?: number | null) =>
-  (value ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const formatNumber = (value?: number | null) => value === null || value === undefined
+  ? 'Pendiente'
+  : value.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const nullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return '—'
@@ -153,13 +191,21 @@ export default function KardexPage() {
           (Array.isArray(response.data) ? response.data : []).map((item: any) => ({
             id: item.id ?? item.recepcionItemId ?? crypto.randomUUID(),
             tipo: String(item.tipo ?? 'ENTRADA').toUpperCase() as KardexMovimiento['tipo'],
+            sentido: String(item.sentido ?? (item.tipo === 'SALIDA' ? 'SALIDA' : 'ENTRADA')).toUpperCase() as KardexMovimiento['sentido'],
             fecha: item.fecha ?? item.fechaRecepcion ?? null,
             documento: item.documento ?? item.recepcionNumero ?? null,
             estado: item.estado ?? item.recepcionEstado ?? null,
             cantidad: Number(item.cantidad ?? item.cantidadRecibida ?? 0),
-            costoUnitario: Number(item.costoUnitario ?? 0),
-            valorTotal: Number(item.valorTotal ?? 0),
-            moneda: item.moneda ?? item.monedaDetalle ?? 'PEN',
+            cantidadFirmada: nullableNumber(item.cantidadFirmada),
+            costoUnitario: nullableNumber(item.costoUnitario),
+            valorTotal: nullableNumber(item.valorTotal),
+            valorFirmado: nullableNumber(item.valorFirmado),
+            moneda: item.moneda ?? item.monedaDetalle ?? null,
+            monedaBase: item.monedaBase ?? null,
+            tipoCambio: nullableNumber(item.tipoCambio),
+            valorTotalBase: nullableNumber(item.valorTotalBase),
+            valorFirmadoBase: nullableNumber(item.valorFirmadoBase),
+            valuacionEstado: item.valuacionEstado ?? 'PENDIENTE_COSTO',
             producto: {
               id: item.producto?.id ?? item.productoId,
               nombre: item.producto?.nombre ?? item.productoNombre ?? 'Producto',
@@ -195,6 +241,7 @@ export default function KardexPage() {
           ...DEFAULT_RESUMEN,
           ...resumenPayload,
           valorPorMoneda: resumenPayload.valorPorMoneda ?? {},
+          valorBasePorMoneda: resumenPayload.valorBasePorMoneda ?? {},
         })
       } else {
         setMovimientos([])
@@ -233,7 +280,7 @@ export default function KardexPage() {
       {
         label: 'Movimientos',
         value: resumen.totalMovimientos,
-        note: 'Entradas y salidas contabilizadas',
+        note: 'Entradas, salidas, ajustes y devoluciones',
       },
       {
         label: 'Saldo unidades',
@@ -241,16 +288,15 @@ export default function KardexPage() {
         note: `${formatNumber(resumen.totalEntradas)} entradas · ${formatNumber(resumen.totalSalidas)} salidas`,
       },
       {
-        label: 'Valor movimientos',
-        value: resumen.valorEntradas - resumen.valorSalidas,
-        note: `${formatCurrency(resumen.valorEntradas)} entradas · ${formatCurrency(resumen.valorSalidas)} salidas`,
-        formatted: formatCurrency(resumen.valorEntradas - resumen.valorSalidas),
+        label: `Flujo valorizado (${resumen.monedaBase ?? 'bases múltiples'})`,
+        value: resumen.saldoValorizadoBase,
+        note: `${formatCurrency(resumen.valorEntradasBase, resumen.monedaBase)} entradas · ${formatCurrency(resumen.valorSalidasBase, resumen.monedaBase)} salidas`,
+        formatted: formatCurrency(resumen.saldoValorizadoBase, resumen.monedaBase),
       },
       {
-        label: 'Saldo valorizado',
-        value: resumen.saldoValorizado,
-        note: 'Inventario valorizado',
-        formatted: formatCurrency(resumen.saldoValorizado),
+        label: 'Ajustes y devoluciones',
+        value: resumen.totalAjustes + resumen.totalDevoluciones,
+        note: `${formatNumber(resumen.totalAjustes)} ajustes netos · ${formatNumber(resumen.totalDevoluciones)} devoluciones netas`,
       },
     ],
     [resumen],
@@ -267,10 +313,15 @@ export default function KardexPage() {
           </span>
         </div>
         <p className="m-0 text-foreground/80 max-w-[760px] leading-7">
-          Consulta entradas y salidas de inventario con costo valorizado, filtrando por producto, almacén y rango de
-          fechas. Los datos respetan el tenant activo y exponen el total por moneda para conciliación contable.
+          Consulta todos los movimientos físicos con costo y moneda congelados al registrar la operación. Los filtros
+          se aplican por igual a entradas, salidas, ajustes y devoluciones; una valoración incompleta nunca se presenta como cero.
         </p>
         <div className="flex gap-3 flex-wrap">
+          <Link
+            href="/dashboard/inventario/operaciones" className="text-primary font-semibold hover:text-primary/80"
+          >
+            Ajustar o transferir →
+          </Link>
           <Link
             href="/dashboard/inventario/recepciones" className="text-primary font-semibold hover:text-primary/80"
           >
@@ -376,6 +427,15 @@ export default function KardexPage() {
                 </div>
               )}
 
+              {!error && !resumen.resumenConfiable && (
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4 text-sm text-amber-950 dark:text-amber-100">
+                  <strong>Valoración incompleta.</strong> Hay {resumen.pendientesValorizacion} movimiento(s) sin costo o
+                  tipo de cambio durable y {resumen.pendientesSentido} sin sentido físico determinable.
+                  {resumen.multiplesMonedasBase ? ' El rango contiene snapshots de más de una moneda base.' : ''} El saldo base
+                  permanece “Por valorizar” para evitar inventar importes.
+                </div>
+              )}
+
               <section className="grid gap-4 grid-cols-[repeat(auto-fit,_minmax(220px,_1fr))]"
               >
                 {resumenCards.map((card) => (
@@ -394,13 +454,22 @@ export default function KardexPage() {
               </section>
 
               {Object.keys(resumen.valorPorMoneda ?? {}).length > 0 && (
-                <section className="rounded-[0.875rem] border bg-blue-500/10 p-4 text-[#1e3a8a] text-sm flex flex-wrap gap-4"
+                <section className="rounded-[0.875rem] border bg-blue-500/10 p-4 text-foreground text-sm flex flex-wrap gap-4"
                 >
-                  <strong>Valor por moneda:</strong>
+                  <strong>Saldo valorizado por moneda origen:</strong>
                   {Object.entries(resumen.valorPorMoneda).map(([moneda, valor]) => (
                     <span key={moneda}>
                       {moneda}: {formatCurrency(valor, moneda)}
                     </span>
+                  ))}
+                </section>
+              )}
+
+              {Object.keys(resumen.valorBasePorMoneda ?? {}).length > 1 && (
+                <section className="rounded-[0.875rem] border border-amber-500/40 bg-amber-500/10 p-4 text-sm flex flex-wrap gap-4">
+                  <strong>Snapshots por moneda base:</strong>
+                  {Object.entries(resumen.valorBasePorMoneda).map(([moneda, valor]) => (
+                    <span key={moneda}>{moneda}: {formatCurrency(valor, moneda)}</span>
                   ))}
                 </section>
               )}
@@ -432,8 +501,8 @@ export default function KardexPage() {
                             <td className="py-3 px-2 text-foreground font-semibold">{formatDateTime(mov.fecha)}</td>
                             <td className="py-3 px-2 text-foreground/80">{mov.documento ?? '—'}</td>
                             <td className="py-3 px-2">
-                              <span className={mov.tipo === 'SALIDA' ? 'font-semibold text-rose-400' : 'font-semibold text-emerald-400'}>
-                                {mov.tipo}
+                              <span className={mov.sentido === 'SALIDA' ? 'font-semibold text-rose-500' : mov.sentido === 'ENTRADA' ? 'font-semibold text-emerald-500' : 'font-semibold text-amber-500'}>
+                                {mov.tipo} · {mov.sentido}
                               </span>
                             </td>
                             <td className="py-3 px-2">
@@ -453,13 +522,28 @@ export default function KardexPage() {
                               ) : null}
                             </td>
                             <td className="py-3 px-2 text-right text-foreground font-semibold">
-                              {mov.tipo === 'SALIDA' ? '-' : '+'}{formatNumber(mov.cantidad)}
+                              {mov.sentido === 'SALIDA' ? '-' : mov.sentido === 'ENTRADA' ? '+' : ''}{formatNumber(mov.cantidad)}
                             </td>
                             <td className="py-3 px-2 text-right text-foreground/80">
                               {formatCurrency(mov.costoUnitario, mov.moneda)}
                             </td>
                             <td className="py-3 px-2 text-right text-foreground font-semibold">
-                              {mov.tipo === 'SALIDA' ? '-' : '+'}{formatCurrency(mov.valorTotal, mov.moneda)}
+                              {mov.valorTotal === null ? (
+                                <span className="text-amber-600">Por valorizar</span>
+                              ) : (
+                                <>
+                                  {mov.sentido === 'SALIDA' ? '-' : mov.sentido === 'ENTRADA' ? '+' : ''}
+                                  {formatCurrency(mov.valorTotal, mov.moneda)}
+                                </>
+                              )}
+                              {mov.valorFirmadoBase !== null && mov.monedaBase && mov.moneda !== mov.monedaBase && (
+                                <span className="block text-xs font-normal text-muted-foreground">
+                                  ≈ {formatCurrency(Math.abs(mov.valorFirmadoBase), mov.monedaBase)} · TC {mov.tipoCambio}
+                                </span>
+                              )}
+                              {mov.valuacionEstado !== 'CONFIRMADA' && (
+                                <span className="block text-xs font-normal text-amber-600">{mov.valuacionEstado}</span>
+                              )}
                             </td>
                             <td className="py-3 px-2 text-foreground/80">
                               {mov.lote ?? '—'} {mov.serie ? ` / ${mov.serie}` : ''}

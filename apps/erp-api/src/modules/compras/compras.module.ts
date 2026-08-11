@@ -19,7 +19,6 @@ import { DevolucionesProveedorRepository } from './repositories/devoluciones-pro
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { EventsModule } from '../../shared/events/events.module';
 import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
-import { InventarioService } from '../inventario/inventario.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditModule } from '../audit/audit.module';
 import { CacheModule } from '../../shared/cache/cache.module';
@@ -48,7 +47,6 @@ import { PermissionsModule } from '../permissions/permissions.module';
     OrdenesCompraRepository,
     OcAprobacionesRepository,
     DevolucionesProveedorRepository,
-    InventarioService,
     InventoryIntegrationService,
   ],
   exports: [

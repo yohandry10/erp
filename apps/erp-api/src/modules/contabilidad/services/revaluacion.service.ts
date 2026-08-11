@@ -206,24 +206,27 @@ export class RevaluacionService {
 
     const { data: asiento, error: asientoError } = await this.supabaseService
       .getClient()
-      .from('asientos_contables')
-      .insert({
-        tenant_id: tenantId,
-        fecha: fechaCorte.toISOString(),
-        concepto: concepto || `Diferencia de cambio no realizada al ${fecha}`,
-        referencia: `REVAL-${fecha}`,
-        tipo_asiento: 'AJUSTE',
-        origen: 'REVALUACION_MONEDA',
-        source_event_id: sourceEventId,
-        total_debe: totalDebe,
-        total_haber: totalHaber,
-        estado: EstadoAsiento.CONFIRMADO,
-        created_by: userId,
-        confirmado_por: userId,
-        confirmado_en: new Date().toISOString()
-      })
-      .select()
-      .single();
+      .rpc('crear_asiento_con_detalles_tx', {
+        p_tenant_id: tenantId,
+        p_asiento: {
+          fecha: fechaCorte.toISOString(),
+          concepto: concepto || `Diferencia de cambio no realizada al ${fecha}`,
+          referencia: `REVAL-${fecha}`,
+          tipo_asiento: 'AJUSTE',
+          origen: 'REVALUACION_MONEDA',
+          source_event_id: sourceEventId,
+          estado: EstadoAsiento.CONFIRMADO,
+          created_by: userId,
+          confirmado_por: userId,
+          confirmado_en: new Date().toISOString()
+        },
+        p_detalles: lineas.map(linea => ({
+          cuenta_id: linea.cuenta_id,
+          debe: linea.debe,
+          haber: linea.haber,
+          concepto: linea.concepto
+        }))
+      });
 
     if (asientoError || !asiento) {
       if (asientoError?.code === '23505') {
@@ -232,28 +235,6 @@ export class RevaluacionService {
         );
       }
       throw new Error(`Error creando asiento de revaluación: ${asientoError?.message}`);
-    }
-
-    const { error: detallesError } = await this.supabaseService
-      .getClient()
-      .from('detalle_asientos')
-      .insert(
-        lineas.map(linea => ({
-          asiento_id: asiento.id,
-          cuenta_id: linea.cuenta_id,
-          debe: linea.debe,
-          haber: linea.haber,
-          concepto: linea.concepto
-        }))
-      );
-
-    if (detallesError) {
-      await this.supabaseService
-        .getClient()
-        .from('asientos_contables')
-        .delete()
-        .eq('id', asiento.id);
-      throw new Error(`Error creando detalles de la revaluación: ${detallesError.message}`);
     }
 
     this.logger.log(

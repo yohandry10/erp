@@ -201,6 +201,15 @@ describe('ProveedoresImporter.validate', () => {
     const errs = importer.validate(parseCsv(csv));
     expect(errs.some((e) => e.field === 'detraccion_tasa')).toBe(true);
   });
+
+  it('exige email válido porque el maestro canónico lo requiere', () => {
+    const csv = [
+      'external_id,tipo,tipo_documento,numero_documento,razon_social,email',
+      'PROV-1,EMPRESA,DNI,12345678,Prov,sin-arroba',
+    ].join('\n');
+    const errs = importer.validate(parseCsv(csv));
+    expect(errs.some((e) => e.field === 'email')).toBe(true);
+  });
 });
 
 describe('CxcAbiertasImporter.validate', () => {
@@ -224,6 +233,15 @@ describe('CxcAbiertasImporter.validate', () => {
     const errs = importer.validate(parseCsv(csv));
     expect(errs.some((e) => e.field === 'moneda')).toBe(true);
   });
+
+  it('rechaza monto_total cero antes de invocar el RPC', () => {
+    const csv = [
+      'external_id,external_id_cliente,tipo_documento,serie,numero,fecha_emision,fecha_vencimiento,moneda,monto_total,saldo_pendiente',
+      'CXC-1,CLI-1,FACTURA,F001,1,2026-01-01,2026-02-01,PEN,0,0',
+    ].join('\n');
+    const errs = importer.validate(parseCsv(csv));
+    expect(errs.some((e) => e.field === 'monto_total')).toBe(true);
+  });
 });
 
 describe('CxpAbiertasImporter.validate', () => {
@@ -237,6 +255,15 @@ describe('CxpAbiertasImporter.validate', () => {
     ].join('\n');
     const errs = importer.validate(parseCsv(csv));
     expect(errs).toEqual([]);
+  });
+
+  it('rechaza monto_total cero antes de invocar el RPC', () => {
+    const csv = [
+      'external_id,external_id_proveedor,tipo_documento,serie,numero,fecha_emision,fecha_vencimiento,moneda,monto_total,saldo_pendiente',
+      'CXP-1,PROV-1,FACTURA,F002,5,2026-01-01,2026-02-01,PEN,0,0',
+    ].join('\n');
+    const errs = importer.validate(parseCsv(csv));
+    expect(errs.some((e) => e.field === 'monto_total')).toBe(true);
   });
 });
 
@@ -314,7 +341,7 @@ describe('StockInicialImporter.validate', () => {
 });
 
 describe('StockInicialImporter.run', () => {
-  it('valida idempotencia por producto, sucursal, almacén y fecha de corte', async () => {
+  it('delega huella, actor y agregado físico al RPC histórico canónico', async () => {
     const tenantId = '11111111-1111-1111-1111-111111111111';
     const sucursalId = '22222222-2222-2222-2222-222222222222';
     const fechaCorte = '2026-05-01';
@@ -327,26 +354,15 @@ describe('StockInicialImporter.run', () => {
         error: null,
       }),
     };
-    const movimientosBuilder = {
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      contains: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-      insert: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: { id: 'mov-1' }, error: null }),
-    };
-    const stockBuilder = {
-      upsert: jest.fn().mockResolvedValue({ error: null }),
-    };
     const client = {
       from: jest.fn((table: string) => {
         if (table === 'productos') return productosBuilder;
-        if (table === 'producto_stock_sucursal') return stockBuilder;
-        if (table === 'movimientos_inventario') return movimientosBuilder;
         throw new Error(`tabla inesperada: ${table}`);
       }),
-      // run() aplica el movimiento vía RPC atómica aplicar_movimiento_inventario_tx.
-      rpc: jest.fn().mockResolvedValue({ data: 'mov-1', error: null }),
+      rpc: jest.fn().mockResolvedValue({
+        data: { id: 'mov-1', action: 'CREATED', idempotent: false },
+        error: null,
+      }),
     };
     const importer = new StockInicialImporter(
       { getClient: jest.fn().mockReturnValue(client) } as any,
@@ -363,15 +379,25 @@ describe('StockInicialImporter.run', () => {
 
     const result = await importer.run(parsed, {
       tenantId,
+      startedBy: '44444444-4444-4444-4444-444444444444',
       fechaCorte,
       dryRun: false,
     });
 
     expect(result.created).toBe(1);
-    expect(movimientosBuilder.contains).toHaveBeenCalledWith('metadata', {
-      fecha_corte: fechaCorte,
-      sucursal_id: sucursalId,
-      almacen_id: almacenId,
+    expect(client.rpc).toHaveBeenCalledWith('importar_stock_inicial_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: '44444444-4444-4444-4444-444444444444',
+      p_run_id: null,
+      p_external_id: `stock:PROD-1:${almacenId}:${fechaCorte}`,
+      p_stock: expect.objectContaining({
+        producto_id: 'producto-1',
+        almacen_id: almacenId,
+        sucursal_id: sucursalId,
+        fecha_corte: fechaCorte,
+        cantidad: 10,
+        costo_unitario: 2.5,
+      }),
     });
   });
 });
@@ -433,6 +459,19 @@ describe('ComprobantesHistoricoImporter.validate', () => {
     const errs = importer.validate(parseCsv(csv));
     expect(errs).toEqual([]);
   });
+
+  it('rechaza correlativo fiscal no numérico o mayor a ocho dígitos', () => {
+    const header =
+      'external_id,tipo_documento,serie,numero,fecha_emision,external_id_cliente,moneda,subtotal,igv,total';
+    const nonNumeric = importer.validate(
+      parseCsv([header, 'CPE-1,FACTURA,F001,ABC,2026-01-01,CLI-1,PEN,100,18,118'].join('\n')),
+    );
+    const tooLong = importer.validate(
+      parseCsv([header, 'CPE-2,FACTURA,F001,123456789,2026-01-01,CLI-1,PEN,100,18,118'].join('\n')),
+    );
+    expect(nonNumeric.some((e) => e.field === 'numero')).toBe(true);
+    expect(tooLong.some((e) => e.field === 'numero')).toBe(true);
+  });
 });
 
 describe('ClientesImporter.run (con Supabase mockeada)', () => {
@@ -470,5 +509,41 @@ describe('migrations/341 transactional idempotency coverage', () => {
     expect(migration).toContain('Reservas existentes incompletas o ambiguas');
     expect(migration).toContain('reservas completas existentes');
     expect(migration).not.toContain("'reservas ya existentes'");
+  });
+});
+
+describe('migration/473 canonical writer coverage', () => {
+  const importerCases = [
+    ['clientes.importer.ts', 'importar_cliente_historico_tx', 'clientes'],
+    ['proveedores.importer.ts', 'importar_proveedor_historico_tx', 'proveedores'],
+    ['cxc-abiertas.importer.ts', 'importar_cxc_apertura_tx', 'cuentas_por_cobrar'],
+    ['cxp-abiertas.importer.ts', 'importar_cxp_apertura_tx', 'cuentas_por_pagar'],
+    ['stock-inicial.importer.ts', 'importar_stock_inicial_tx', 'movimientos_inventario'],
+    ['comprobantes-historico.importer.ts', 'importar_cpe_historico_tx', 'cpe'],
+    ['balance-apertura.importer.ts', 'importar_balance_apertura_tx', 'asientos_contables'],
+  ] as const;
+
+  it.each(importerCases)(
+    '%s delega en %s y elimina el writer directo de %s',
+    (filename, rpc, table) => {
+      const source = readRepoFile(`apps/erp-api/src/modules/migration/importers/${filename}`);
+      expect(source).toContain(`rpc('${rpc}'`);
+      expect(source).not.toContain(`.from('${table}')`);
+    },
+  );
+
+  it('writers contables compartido y revaluación usan crear_asiento_con_detalles_tx', () => {
+    const integration = readRepoFile('apps/erp-api/src/shared/integration/accounting-entries.service.ts');
+    const revaluation = readRepoFile(
+      'apps/erp-api/src/modules/contabilidad/services/revaluacion.service.ts',
+    );
+    const entries = readRepoFile('apps/erp-api/src/modules/contabilidad/services/asientos.service.ts');
+
+    for (const source of [integration, revaluation]) {
+      expect(source).toContain("rpc('crear_asiento_con_detalles_tx'");
+      expect(source).not.toContain("from('detalle_asientos').insert(");
+      expect(source).not.toContain("from('asientos_contables').insert(");
+    }
+    expect(entries).not.toContain('private async insertarDetalles');
   });
 });

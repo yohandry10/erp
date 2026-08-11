@@ -76,7 +76,7 @@ export function CompletionStep() {
         </h3>
 
         <p className="text-[1.125rem] text-[var(--primary-600)] max-w-[600px] my-0 mx-auto leading-7">
-          Tu sistema está listo para comenzar a emitir comprobantes electrónicos
+          Tu ERP está listo para ventas, compras, inventario, caja y demás operaciones
         </p>
       </div>
 
@@ -101,10 +101,14 @@ export function CompletionStep() {
           </div>
           <div>
             <h4 className="text-base font-semibold text-[var(--primary-900)] mb-1">
-              Certificado Digital Activo
+              {state.configuration.certificateBase64
+                ? 'Certificado Digital Activo'
+                : 'Emisión electrónica pendiente (opcional)'}
             </h4>
             <p className="text-[0.875rem] text-[var(--primary-600)] leading-6 m-0">
-              Tu certificado digital está cargado y listo para firmar documentos
+              {state.configuration.certificateBase64
+                ? 'Tu certificado digital está cargado y listo para firmar documentos'
+                : 'Cuando quieras emitir, carga el certificado y las credenciales propias de tu empresa'}
             </p>
           </div>
         </div>
@@ -115,10 +119,10 @@ export function CompletionStep() {
           </div>
           <div>
             <h4 className="text-base font-semibold text-[var(--primary-900)] mb-1">
-              Validaciones Exitosas
+              Configuración Operativa Validada
             </h4>
             <p className="text-[0.875rem] text-[var(--primary-600)] leading-6 m-0">
-              Toda tu configuración ha sido verificada y aprobada
+              Los datos obligatorios del ERP fueron verificados correctamente
             </p>
           </div>
         </div>
@@ -138,8 +142,8 @@ export function CompletionStep() {
           </h4>
         </div>
         <p className="text-[0.875rem] text-[var(--primary-600)] leading-7 mt-0 mr-0 mb-4 ml-0">
-          Ahora puedes comenzar a usar el sistema para emitir facturas, boletas,
-          guías de remisión y más. Explora el dashboard para conocer todas las funcionalidades.
+          Ya puedes usar los módulos operativos. La transmisión a la autoridad fiscal permanecerá
+          bloqueada hasta que configures y valides tus propios certificados y credenciales.
         </p>
 
         <div className="flex flex-wrap justify-center gap-4">

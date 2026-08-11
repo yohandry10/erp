@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { ImporterResult, ImporterRowError } from '../dto/import.dto';
 import { ParsedCsv, nonEmpty, toNumber, validateHeaders } from '../util/csv-parser.util';
-import { toSafeIntegerDocumento, validateDocumento } from '../util/peru-doc.util';
+import { validateDocumento } from '../util/peru-doc.util';
 import { Importer, ImporterContext, emptyResult } from './importer.interface';
 import { MigrationRunsService } from '../migration-runs.service';
 
@@ -86,6 +86,14 @@ export class ClientesImporter implements Importer {
       } else if (TIPOS_DOC.has(tipoDoc)) {
         const docErr = validateDocumento(tipoDoc, numDoc);
         if (docErr) errs.push({ rowIndex, externalId, field: 'numero_documento', message: docErr });
+        else if (numDoc.length < 6 || numDoc.length > 20) {
+          errs.push({
+            rowIndex,
+            externalId,
+            field: 'numero_documento',
+            message: 'numero_documento debe tener entre 6 y 20 caracteres para el maestro canónico',
+          });
+        }
       }
       if (!nonEmpty(row['razon_social'])) {
         errs.push({ rowIndex, externalId, field: 'razon_social', message: 'razon_social requerido' });
@@ -146,35 +154,21 @@ export class ClientesImporter implements Importer {
 
       const tipoDoc = String(row['tipo_documento']).toUpperCase().trim();
       const numDocTexto = String(row['numero_documento']).trim();
-      const numDocInt = toSafeIntegerDocumento(numDocTexto);
-
       const payload: Record<string, any> = {
-        tenant_id: ctx.tenantId,
-        external_id: externalId,
         tipo: String(row['tipo']).toUpperCase().trim(),
-        tipo_documento: tipoDoc,
         documento_tipo: tipoDoc,
-        numero_documento: numDocInt,
-        documento_numero: numDocInt,
+        documento_identidad: numDocTexto,
+        documento_numero: numDocTexto,
         razon_social: row['razon_social'],
-        nombre: row['razon_social'],
-        codigo: numDocTexto,
-        ruc: tipoDoc === 'RUC' ? numDocTexto : null,
         direccion: nonEmpty(row['direccion']),
         email: nonEmpty(row['email']),
         pais: nonEmpty(row['pais']) ?? 'PE',
-        activo: true,
-        estado: 'ACTIVO',
+        telefono: nonEmpty(row['telefono']),
       };
 
       const lc = toNumber(row['limite_credito']);
       if (Number.isFinite(lc) && lc > 0) {
         payload.limite_credito = lc;
-      }
-
-      const tel = nonEmpty(row['telefono']);
-      if (tel) {
-        payload.metadata = { telefono: tel };
       }
 
       if (ctx.dryRun) {
@@ -183,45 +177,30 @@ export class ClientesImporter implements Importer {
       }
 
       try {
-        const { data: existing } = await client
-          .from('clientes')
-          .select('id')
-          .eq('tenant_id', ctx.tenantId)
-          .eq('external_id', externalId)
-          .maybeSingle();
-
-        let targetId: string | null = null;
-        if (existing?.id) {
-          const { data, error } = await client
-            .from('clientes')
-            .update({ ...payload, updated_at: new Date().toISOString() })
-            .eq('id', existing.id)
-            .eq('tenant_id', ctx.tenantId)
-            .select('id')
-            .single();
-          if (error) throw error;
-          targetId = data?.id ?? null;
-          result.updated++;
-        } else {
-          const { data, error } = await client
-            .from('clientes')
-            .insert(payload)
-            .select('id')
-            .single();
-          if (error) throw error;
-          targetId = data?.id ?? null;
-          result.created++;
-        }
-        result.okRows++;
+        const { data, error } = await client.rpc('importar_cliente_historico_tx', {
+          p_tenant_id: ctx.tenantId,
+          p_actor_id: ctx.startedBy,
+          p_run_id: ctx.runCtx?.runId ?? null,
+          p_external_id: externalId,
+          p_cliente: payload,
+        });
+        if (error) throw error;
+        const targetId = data?.id ?? null;
+        const action = String(data?.action ?? '');
+        if (action === 'CREATED') result.created++;
+        else if (action === 'IDEMPOTENT') result.skippedRows++;
+        else result.updated++;
+        if (action !== 'IDEMPOTENT') result.okRows++;
         if (ctx.runCtx) {
           await this.runs.recordRow({
             runId: ctx.runCtx.runId,
             tenantId: ctx.tenantId,
             rowIndex,
             externalId,
-            status: 'ok',
+            status: action === 'IDEMPOTENT' ? 'skipped' : 'ok',
             targetTable: 'clientes',
             targetId,
+            errorMessage: action === 'IDEMPOTENT' ? 'Fila ya aplicada con la misma huella' : null,
           });
         }
       } catch (err: any) {

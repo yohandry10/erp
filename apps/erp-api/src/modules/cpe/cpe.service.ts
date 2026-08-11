@@ -17,10 +17,10 @@ import { CpeCertificateService } from './cpe-certificate.service';
 import { CpeReportingService } from './cpe-reporting.service';
 import { CpeCancellationService } from './cpe-cancellation.service';
 import { CpeDeliveryService } from './cpe-delivery.service';
-import { CpeOperationalDocumentService } from './cpe-operational-document.service';
 import { CpeRegistrationService } from './cpe-registration.service';
 import { DocumentoFiscal } from '../documentos/interfaces/documento-fiscal.interface';
 import { validateColombiaNit } from '../paises/initial-country';
+import { DesktopSignedCpeDto } from './dto/desktop-signed-cpe.dto';
 
 @Injectable()
 export class CpeService {
@@ -30,7 +30,6 @@ export class CpeService {
   private readonly reportingService: CpeReportingService;
   private readonly cancellationService: CpeCancellationService;
   private readonly deliveryService: CpeDeliveryService;
-  private readonly operationalDocumentService: CpeOperationalDocumentService;
   private readonly registrationService: CpeRegistrationService;
   private readonly sunatStatuses = {
     NOT_SENT: 'NOT_SENT',
@@ -54,19 +53,10 @@ export class CpeService {
     this.reportingService = new CpeReportingService(supabaseService);
     this.cancellationService = new CpeCancellationService(supabaseService, auditService);
     this.deliveryService = new CpeDeliveryService(supabaseService, fiscalAdapter, pdfGenerator, this.certificateService);
-    this.operationalDocumentService = new CpeOperationalDocumentService(
-      supabaseService,
-      configService,
-      this.deliveryService,
-      this.xmlBuilder,
-    );
     this.registrationService = new CpeRegistrationService(
       supabaseService,
-      eventBus,
-      auditService,
       cacheInvalidation,
-      this.operationalDocumentService,
-      this.xmlBuilder,
+      this.certificateService,
     );
   }
   /**
@@ -92,6 +82,7 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
 
     let subtotal = 0;
     let totalIgv = 0;
+    let totalIsc = 0;
     let gravadas = 0;
     let exoneradas = 0;
     let inafectas = 0;
@@ -102,6 +93,7 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
       const precioUnitario = sanitizeNumber((item as any).precio_unitario ?? (item as any).precioUnitario);
       const valorVenta = sanitizeNumber((item as any).valor_venta ?? (item as any).valorVenta ?? precioUnitario * cantidad);
       const igvItem = sanitizeNumber((item as any).impuesto_igv ?? (item as any).igv ?? 0);
+      const iscItem = sanitizeNumber((item as any).impuesto_isc ?? 0);
 
       if (cantidad <= 0) {
         throw new BadRequestException('Cada ítem debe tener cantidad > 0');
@@ -112,6 +104,7 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
 
       subtotal += valorVenta;
       totalIgv += igvItem;
+      totalIsc += iscItem;
 
       // El subtotal agrupa todas las bases, pero cada una se declara por separado
       // según su afectación: total_gravadas no puede incluir lo exonerado.
@@ -130,11 +123,12 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
       }
     }
 
-    const total = subtotal + totalIgv;
+    const total = subtotal + totalIgv + totalIsc;
 
     return {
       subtotal: Number(subtotal.toFixed(2)),
       totalIgv: Number(totalIgv.toFixed(2)),
+      totalIsc: Number(totalIsc.toFixed(2)),
       total: Number(total.toFixed(2)),
       gravadas: Number(gravadas.toFixed(2)),
       exoneradas: Number(exoneradas.toFixed(2)),
@@ -148,6 +142,7 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
     calculated: {
       subtotal: number;
       totalIgv: number;
+      totalIsc: number;
       total: number;
       gravadas: number;
       exoneradas: number;
@@ -161,6 +156,7 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
       ['total_inafectas', (dto as any).total_inafectas, calculated.inafectas],
       ['total_exportacion', (dto as any).total_exportacion, calculated.exportacion],
       ['total_igv', (dto as any).total_igv, calculated.totalIgv],
+      ['total_isc', (dto as any).total_isc, calculated.totalIsc],
       ['total_venta', (dto as any).total_venta, calculated.total],
     ];
 
@@ -306,18 +302,6 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
 
 
 
-  /**
-   * Garantiza que exista un documento operativo real e idempotente para el CPE.
-   * No usa el ID del CPE como sustituto de factura/documento.
-   */
-  private async ensureDocumentoParaCpe(cpeRecord: any, tenantId: string): Promise<string | null> {
-    return this.operationalDocumentService.ensureDocumentoParaCpe(cpeRecord, tenantId);
-  }
-
-  private mapCpeEstadoADocumento(cpeEstado?: string | null): string {
-    return this.operationalDocumentService.mapCpeEstadoADocumento(cpeEstado);
-  }
-
 private async getEmpresaEmisorInfo(tenantId: string) {
     return this.deliveryService.getEmpresaEmisorInfo(tenantId);
   }
@@ -326,8 +310,270 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
     return this.registrationService.getEmpresaEmisorInfoStrict(tenantId);
   }
 
-  async create(createFacturaDto: CreateFacturaDto, tenantId: string, userId?: string): Promise<FacturaDto> {
+  private roundAtomicMoney(value: unknown): number {
+    const numeric = Number(value ?? 0);
+    if (!Number.isFinite(numeric)) {
+      throw new BadRequestException('Los importes del comprobante deben ser numéricos');
+    }
+    return Number(numeric.toFixed(2));
+  }
+
+  private calcularAjustePorTasa(total: number, aplica: unknown, tasa: unknown): number {
+    const porcentaje = Number(tasa ?? 0);
+    if (!aplica || !Number.isFinite(porcentaje) || porcentaje <= 0) return 0;
+    return this.roundAtomicMoney(total * (porcentaje / 100));
+  }
+
+  /**
+   * Prepara la proyección financiera antes de abrir la transacción 443. La RPC
+   * vuelve a validar todos los importes; esta lectura sólo resuelve la política
+   * tributaria que debe quedar congelada junto con la factura.
+   */
+  private async prepararCxcAtomica(
+    dto: CreateFacturaDto,
+    tenantId: string,
+    total: number,
+  ): Promise<Record<string, unknown> | null> {
+    const esCredito =
+      (dto as any).condicion_pago === 'CREDITO' || (dto as any).es_credito === true;
+    if (!esCredito) return null;
+
+    const clienteId = String((dto as any).cliente_id ?? '').trim();
+    if (!clienteId) {
+      throw new BadRequestException('Una venta a crédito requiere cliente_id');
+    }
+
+    const client = this.supabaseService.getClient();
+    const [clienteResult, configResult] = await Promise.all([
+      client
+        .from('clientes')
+        .select(
+          'id,sujeto_retencion,retencion_tasa,sujeto_percepcion,percepcion_tasa,sujeto_detraccion,detraccion_tasa',
+        )
+        .eq('tenant_id', tenantId)
+        .eq('id', clienteId)
+        .maybeSingle(),
+      client
+        .from('empresa_config')
+        .select(
+          'aplicar_retencion,retencion_tasa,aplicar_percepcion,percepcion_tasa,aplicar_detraccion,detraccion_tasa,detraccion_codigo',
+        )
+        .eq('tenant_id', tenantId)
+        .maybeSingle(),
+    ]);
+
+    if (clienteResult.error || !clienteResult.data) {
+      throw new BadRequestException('El cliente de la venta a crédito no existe o no pertenece al tenant');
+    }
+    if (configResult.error && configResult.error.code !== 'PGRST116') {
+      throw new BadRequestException('No se pudo resolver la configuración financiera de la empresa');
+    }
+
+    const cliente = clienteResult.data as any;
+    const config = (configResult.data ?? {}) as any;
+    const declarados = ((dto as any).ajustes ?? {}) as Record<string, unknown>;
+
+    const resolveAjuste = (
+      nombre: 'retencion' | 'percepcion' | 'detraccion',
+      sujetoCliente: string,
+      tasaCliente: string,
+      aplicaEmpresa: string,
+      tasaEmpresa: string,
+    ) => {
+      if (declarados[nombre] !== undefined && declarados[nombre] !== null) {
+        return this.roundAtomicMoney(declarados[nombre]);
+      }
+      return this.calcularAjustePorTasa(
+        total,
+        cliente[sujetoCliente] ?? config[aplicaEmpresa] ?? false,
+        cliente[tasaCliente] ?? config[tasaEmpresa] ?? 0,
+      );
+    };
+
+    const retencion = resolveAjuste(
+      'retencion',
+      'sujeto_retencion',
+      'retencion_tasa',
+      'aplicar_retencion',
+      'retencion_tasa',
+    );
+    const percepcion = resolveAjuste(
+      'percepcion',
+      'sujeto_percepcion',
+      'percepcion_tasa',
+      'aplicar_percepcion',
+      'percepcion_tasa',
+    );
+    const detraccion = resolveAjuste(
+      'detraccion',
+      'sujeto_detraccion',
+      'detraccion_tasa',
+      'aplicar_detraccion',
+      'detraccion_tasa',
+    );
+    const anticipo = this.roundAtomicMoney(declarados.anticipo ?? 0);
+
+    if (Math.min(retencion, percepcion, detraccion, anticipo) < 0) {
+      throw new BadRequestException('Los ajustes tributarios no pueden ser negativos');
+    }
+
+    const pendienteSinRedondear = total - retencion - detraccion - anticipo + percepcion;
+    if (pendienteSinRedondear < -0.01) {
+      throw new BadRequestException('Los ajustes tributarios superan el total de la factura');
+    }
+
+    return {
+      cliente_id: clienteId,
+      monto_total: total,
+      monto_pendiente: this.roundAtomicMoney(Math.max(pendienteSinRedondear, 0)),
+      retencion_total: retencion,
+      percepcion_total: percepcion,
+      detraccion_total: detraccion,
+      anticipo_total: anticipo,
+      detraccion_codigo:
+        declarados.detraccion_codigo ?? config.detraccion_codigo ?? null,
+    };
+  }
+
+  private construirDetallesAtomicos(dto: CreateFacturaDto): Array<Record<string, unknown>> {
+    return dto.items.map((item: any, index) => {
+      const valorVenta = this.roundAtomicMoney(item.valor_venta);
+      const impuestoIgv = this.roundAtomicMoney(item.impuesto_igv ?? item.igv ?? 0);
+      const impuestoIsc = this.roundAtomicMoney(item.impuesto_isc ?? 0);
+      return {
+        orden: index + 1,
+        pedido_detalle_id: item.pedido_detalle_id ?? null,
+        producto_id: item.producto_id ?? null,
+        codigo_producto: item.codigo_producto ?? item.codigo,
+        descripcion: item.descripcion,
+        unidad_medida: item.unidad_medida ?? item.unidad,
+        cantidad: Number(item.cantidad),
+        precio_unitario: Number(item.precio_unitario),
+        descuento_unitario: Number(item.descuento_unitario ?? 0),
+        valor_venta: valorVenta,
+        impuesto_igv: impuestoIgv,
+        impuesto_isc: impuestoIsc,
+        total_item: this.roundAtomicMoney(valorVenta + impuestoIgv + impuestoIsc),
+        afectacion_igv: item.afectacion_igv ?? item.tipo_afectacion_igv ?? null,
+      };
+    });
+  }
+
+  private async finalizarPostCommitCpe(
+    cpe: any,
+    dto: CreateFacturaDto,
+    tenantId: string,
+    userId: string | undefined,
+    requiereTransporte: boolean,
+  ): Promise<void> {
+    if (requiereTransporte) {
+      try {
+        await Promise.resolve(
+          this.eventBus.emit(
+            'cpe.requiere_transporte',
+            {
+              cpeId: cpe.id,
+              tenantId,
+              tenant_id: tenantId,
+              clienteId: (dto as any).cliente_id ?? dto.documento_receptor,
+              total: dto.total_venta,
+              productos: dto.items ?? [],
+            },
+            'cpe',
+          ),
+        );
+      } catch (error) {
+        this.logger.warn(`No se pudo publicar la sugerencia de transporte del CPE ${cpe.id}`, error);
+      }
+    }
+
     try {
+      await this.auditService.registrarCambio(
+        'cpe',
+        'INSERT',
+        userId ?? null,
+        {
+          new: {
+            tipo_documento: dto.tipo_documento,
+            serie: dto.serie,
+            numero: dto.numero,
+            total_venta: dto.total_venta,
+            estado: cpe.estado,
+          },
+        },
+        tenantId,
+        cpe.id,
+        { accion: 'CREAR_CPE_ATOMICO', tipo_documento: dto.tipo_documento },
+      );
+    } catch (error) {
+      this.logger.warn(`No se pudo registrar auditoría post-commit del CPE ${cpe.id}`, error);
+    }
+
+    try {
+      await this.cacheInvalidation.onCpeCreated(tenantId);
+    } catch (error) {
+      this.logger.warn(`No se pudo invalidar cache post-commit del CPE ${cpe.id}`, error);
+    }
+  }
+
+  private async validarDocumentoPosReservado(
+    dto: CreateFacturaDto,
+    tenantId: string,
+  ): Promise<void> {
+    const ventaPosId = String((dto as any).venta_pos_id ?? '').trim();
+    const documentoId = String((dto as any).documento_id ?? '').trim();
+    if (!ventaPosId || !documentoId) {
+      throw new BadRequestException(
+        'La finalización CPE POS exige venta_pos_id y documento_id reservados',
+      );
+    }
+
+    const { data: venta, error } = await this.supabaseService
+      .getClient()
+      .from('ventas_pos')
+      .select('id, documento_id, cpe_id, cpe_data, total, cliente_documento, accounting_event_id, atomic_result')
+      .eq('tenant_id', tenantId)
+      .eq('id', ventaPosId)
+      .single();
+    const snapshot = venta?.cpe_data ?? {};
+    const numeroSnapshot = String(snapshot.numero ?? '').padStart(8, '0');
+    const numeroDto = String((dto as any).numero ?? '').padStart(8, '0');
+    if (
+      error || !venta || String(venta.documento_id ?? '') !== documentoId ||
+      String(snapshot.documento_id ?? '') !== documentoId ||
+      !venta.accounting_event_id || !venta.atomic_result ||
+      String(snapshot.serie ?? '').toUpperCase() !== String(dto.serie ?? '').toUpperCase() ||
+      numeroSnapshot !== numeroDto ||
+      Math.abs(Number(venta.total ?? 0) - Number(dto.total_venta ?? 0)) > 0.01 ||
+      String(venta.cliente_documento ?? '').trim() !== String(dto.documento_receptor ?? '').trim()
+    ) {
+      throw new BadRequestException(
+        'El CPE POS no coincide con la venta y el documento reservados atómicamente',
+      );
+    }
+  }
+
+  async create(
+    createFacturaDto: CreateFacturaDto,
+    tenantId: string,
+    userId?: string,
+    options?: { finalizarDocumentoPosReservado?: boolean },
+  ): Promise<FacturaDto> {
+    try {
+      const requestedType = String(createFacturaDto.tipo_documento ?? '').trim();
+      if (['07', '08'].includes(requestedType)) {
+        throw new BadRequestException(
+          'Las notas 07/08 deben crearse desde /cpe/notas-referenciadas para exigir comprobante afectado, motivo y efecto financiero atómico',
+        );
+      }
+      if (!['01', '03'].includes(requestedType)) {
+        throw new BadRequestException(
+          'La frontera genérica CPE sólo admite factura 01 y boleta 03; use el flujo fiscal especializado',
+        );
+      }
+      if (!userId) {
+        throw new BadRequestException('La emisión de un CPE exige un actor autenticado');
+      }
       const supabaseClient = this.supabaseService.getClient();
       const paisCodigo = (await this.fiscalAdapter.obtenerCodigoPais(tenantId)).toUpperCase();
       const eventId = randomUUID();
@@ -335,12 +581,21 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       const issueTime = this.resolveIssueTime((createFacturaDto as any).fecha_emision);
       const dueDate = this.resolveDueDate(emissionDate, (createFacturaDto as any).fecha_vencimiento);
       const totalesCalculados = this.recalculateTotals(createFacturaDto);
-      const { totalIgv, total, gravadas, exoneradas, inafectas, exportacion } = totalesCalculados;
+      const { subtotal, totalIgv, totalIsc, total, gravadas, exoneradas, inafectas, exportacion } =
+        totalesCalculados;
       this.assertProvidedTotalsMatch(createFacturaDto, totalesCalculados);
       this.assertReceptorValido(createFacturaDto, paisCodigo);
       this.assertSerieCoherenteConTipo(createFacturaDto, paisCodigo);
       this.assertFechaEmisionNoFutura(emissionDate, paisCodigo);
       const idempotencyKey = this.resolveIdempotencyKey(createFacturaDto, tenantId);
+      const finalizaDocumentoPosReservado =
+        options?.finalizarDocumentoPosReservado === true;
+      if (finalizaDocumentoPosReservado) {
+        await this.validarDocumentoPosReservado(createFacturaDto, tenantId);
+      }
+      const usaEmisionAtomica = !finalizaDocumentoPosReservado && ['01', '03'].includes(
+        String(createFacturaDto.tipo_documento ?? '').trim(),
+      );
 
       // Reemplazar totales con cálculo servidor. Las bases van separadas por
       // afectación: total_gravadas solo contiene lo que efectivamente paga IGV.
@@ -349,6 +604,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       (createFacturaDto as any).total_inafectas = inafectas;
       (createFacturaDto as any).total_exportacion = exportacion;
       (createFacturaDto as any).total_igv = totalIgv;
+      (createFacturaDto as any).total_isc = totalIsc;
       (createFacturaDto as any).total_venta = total;
 
       (createFacturaDto as any).fecha_emision = emissionDate;
@@ -356,22 +612,8 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       (createFacturaDto as any).fecha_vencimiento = dueDate;
       (createFacturaDto as any).idempotency_key = idempotencyKey;
 
-      const { data: existingCpe, error: existingCpeError } = await supabaseClient
-        .from('cpe')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('idempotency_key', idempotencyKey)
-        .maybeSingle();
-
-      if (existingCpeError && existingCpeError.code && existingCpeError.code !== 'PGRST116') {
-        this.logger.error(`❌ [CPE] Error verificando idempotencia: ${existingCpeError.message}`, existingCpeError);
-        throw new BadRequestException('No se pudo validar idempotencia del comprobante');
-      }
-
-      if (existingCpe) {
-        this.logger.warn(`♻️ [CPE] Solicitud idempotente detectada para ${idempotencyKey}, retornando CPE existente ${existingCpe.id}`);
-        return this.mapToDto(existingCpe);
-      }
+      // 443 y 476 son reparadores: incluso si el CPE ya existe deben recibir
+      // el retry para completar documento, detalles, vínculo POS y outbox.
 
       // ===== PRE-EMISSION VALIDATIONS =====
       this.logger.log(`Starting pre-emission validations for tenant: ${tenantId}`);
@@ -443,6 +685,9 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       // Sign XML with tenant's certificate
       const signedXml = xmlSigner.signXml(xmlContent);
       const hash = xmlSigner.generateHash(signedXml);
+      if (!xmlSigner.validateSignatureStrict(signedXml)) {
+        throw new BadRequestException('La firma XML generada no pudo validarse; no se persistió el CPE');
+      }
 
       // Prepare data for database (con totales recalculados server-side)
       const cpeData = {
@@ -466,7 +711,16 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         total_exportacion: (createFacturaDto as any).total_exportacion ?? 0,
         total_igv: createFacturaDto.total_igv,
         total_venta: createFacturaDto.total_venta,
-        items: createFacturaDto.items,
+        // producto_id queda en documento_detalles. Se excluye del JSON legado
+        // de CPE para que un retry posterior al despliegue pueda reconciliar
+        // comprobantes creados por el payload histórico sin cambiar su huella.
+        items: usaEmisionAtomica
+          ? createFacturaDto.items.map(({
+              producto_id: _productoId,
+              pedido_detalle_id: _pedidoDetalleId,
+              ...item
+            }) => item)
+          : createFacturaDto.items,
         fecha_emision: emissionDate,
         fecha_vencimiento: dueDate,
         idempotency_key: idempotencyKey,
@@ -474,202 +728,124 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         estado: 'FIRMADO',
         hash: hash,
         hash_firma: hash,
-        sunat_status: this.sunatStatuses.NOT_SENT,
+        sunat_status: usaEmisionAtomica
+          ? this.sunatStatuses.READY
+          : this.sunatStatuses.NOT_SENT,
         xml_firmado: signedXml,
       };
 
-      // Insert into database
-      const { data, error } = await supabaseClient
-        .from('cpe')
-        .insert(cpeData)
-        .select()
-        .single();
+      if (usaEmisionAtomica) {
+        const requiereTransporte = this.evaluarSiRequiereTransporte(createFacturaDto, paisCodigo);
+        const detalles = this.construirDetallesAtomicos(createFacturaDto);
+        const cxc = await this.prepararCxcAtomica(createFacturaDto, tenantId, total);
+        const tipoCambio = String(createFacturaDto.moneda ?? 'PEN').toUpperCase() === 'PEN'
+          ? 1
+          : Number((createFacturaDto as any).tipo_cambio ?? 0);
 
-      if (error) {
-        if (error.code === '23505' && String(error.message || '').includes('idempotency')) {
-          const { data: racedCpe, error: racedLookupError } = await supabaseClient
-            .from('cpe')
-            .select('*')
-            .eq('tenant_id', tenantId)
-            .eq('idempotency_key', idempotencyKey)
-            .maybeSingle();
-
-          if (!racedLookupError && racedCpe) {
-            this.logger.warn(
-              `♻️ [CPE] Carrera idempotente detectada para ${idempotencyKey}, retornando CPE existente ${racedCpe.id}`,
-            );
-            return this.mapToDto(racedCpe);
-          }
-        }
-
-        console.error('Database error:', error);
-        throw new BadRequestException('Error creating CPE: ' + error.message);
-      }
-
-      if (!data) {
-        throw new BadRequestException('No data returned from database insert');
-      }
-
-      const createdCpe = Array.isArray(data) ? data[0] : data;
-      const documentoId = await this.ensureDocumentoParaCpe(createdCpe, tenantId);
-
-      if (documentoId) {
-        (createdCpe as any).documento_id = documentoId;
-      }
-
-      // Generar XML firmado (sin enviar a SUNAT todavía)
-      const preparedForSunat = await this.prepareXmlForSunat((createdCpe as any).id, xmlContent, tenantId);
-
-      // ℹ️ NO ENVIAR AUTOMÁTICAMENTE - El usuario debe enviar manualmente desde el módulo CPE
-      console.log('ℹ️ CPE creado y firmado. Estado: FIRMADO (listo para envío manual a SUNAT)');
-
-      // Emitir evento de comprobante creado para finanzas
-      const requiereTransporte = this.evaluarSiRequiereTransporte(createFacturaDto, paisCodigo);
-      const cpeId = (createdCpe as any).id;
-      const documentoReferenciaId = (createdCpe as any).documento_id ?? documentoId ?? null;
-
-      if (!documentoReferenciaId) {
-        throw new BadRequestException(`CPE ${cpeId} no tiene documento operativo asociado`);
-      }
-
-      const comprobanteCreadoEventId = randomUUID();
-      const comprobanteCreadoIdempotencyKey = `cpe.creado:${tenantId}:${cpeId}`;
-
-      await this.eventBus.emitComprobanteCreadoEvent({
-        eventId: comprobanteCreadoEventId,
-        tenantId,
-        idempotencyKey: comprobanteCreadoIdempotencyKey,
-        cpeId: cpeId,
-        tipoDocumento: createFacturaDto.tipo_documento,
-        serie: createFacturaDto.serie,
-        numero: createFacturaDto.numero,
-        clienteId: (createFacturaDto as any).cliente_id ?? createFacturaDto.documento_receptor,
-        total: createFacturaDto.total_venta,
-        esCredito: (createFacturaDto as any).condicion_pago === 'CREDITO' || (createFacturaDto as any).es_credito === true,
-        ventaId: undefined, // Se puede agregar referencia si viene de POS
-        requiereTransporte: requiereTransporte,
-        moneda: createFacturaDto.moneda,
-      });
-
-      const sunatStatusForEvent = preparedForSunat ? this.sunatStatuses.READY : this.sunatStatuses.ERROR;
-
-      await this.eventBus.emitFacturaEmitidaEvent({
-        eventId,
-        tenantId,
-        idempotencyKey,
-        cpeId,
-        facturaId: documentoReferenciaId,
-        serie: createFacturaDto.serie,
-        numero: String(createFacturaDto.numero),
-        clienteId: (createFacturaDto as any).cliente_id ?? createFacturaDto.documento_receptor,
-        subtotal: createFacturaDto.total_gravadas,
-        impuestos: createFacturaDto.total_igv,
-        total: createFacturaDto.total_venta,
-        costoVentas: Number((createFacturaDto as any).costo_ventas ?? 0),
-        moneda: createFacturaDto.moneda,
-        fechaEmision: emissionDate,
-        fechaVencimiento: dueDate,
-        source: 'cpe.api',
-        // Solo las ventas a crédito generan cuenta por cobrar. Una boleta/factura
-        // pagada al contado (POS/efectivo) no es una deuda del cliente.
-        esCredito:
-          (createFacturaDto as any).condicion_pago === 'CREDITO' ||
-          (createFacturaDto as any).es_credito === true,
-        sunatStatus: sunatStatusForEvent,
-        hashFirma: hash,
-        hash: hash,
-      });
-
-      // Evaluar si necesita guía de remisión automática
-      if (requiereTransporte) {
-        console.log(`🚚 [CPE] CPE ${cpeId} requiere transporte (Total: ${createFacturaDto.moneda} ${createFacturaDto.total_venta}), emitiendo evento...`);
-        
-        const eventData = {
-          cpeId: cpeId,
-          tenantId: tenantId,
-          tenant_id: tenantId, // compatibilidad legado
-          clienteId: createFacturaDto.documento_receptor,
-          total: createFacturaDto.total_venta,
-          productos: createFacturaDto.items || []
-        };
-        
-        console.log(`🚚 [CPE] Datos del evento a emitir:`, eventData);
-        
-        this.eventBus.emit('cpe.requiere_transporte', eventData, 'cpe');
-        
-        console.log(`✅ [CPE] Evento cpe.requiere_transporte emitido para CPE ${cpeId}`);
-      } else {
-        console.log(`ℹ️ [CPE] CPE ${cpeId} no requiere transporte (Total: ${createFacturaDto.moneda} ${createFacturaDto.total_venta})`);
-      }
-
-      // Registrar auditoría (el userId se podría obtener del contexto si está disponible)
-      try {
-        await this.auditService.registrarCambio(
-          'cpe',
-          'INSERT',
-          userId ?? null,
-          {
-            new: {
-              tipo_documento: createFacturaDto.tipo_documento,
-              serie: createFacturaDto.serie,
-              numero: createFacturaDto.numero,
-              total_venta: createFacturaDto.total_venta,
-              estado: 'FIRMADO'
-            }
+        const pedidoId = (createFacturaDto as any).pedido_id ?? null;
+        const atomicArgs = {
+          p_tenant_id: tenantId,
+          p_cpe: {
+            ...cpeData,
+            created_by: userId,
+            costo_ventas: Number((createFacturaDto as any).costo_ventas ?? 0),
+            requiere_transporte: requiereTransporte,
           },
-          tenantId,
-          cpeId,
-          { accion: 'CREAR_CPE', tipo_documento: createFacturaDto.tipo_documento }
-        );
-      } catch (error) {
-        console.warn('⚠️ No se pudo registrar auditoría de creación de CPE:', error);
-      }
-
-      // Invalidar cache del dashboard automáticamente
-      try {
-        await this.cacheInvalidation.onCpeCreated(tenantId);
-      } catch (error) {
-        this.logger.warn('⚠️ No se pudo invalidar cache después de crear CPE:', error);
-      }
-
-      let persistedCpeRecord = createdCpe;
-
-      try {
-        const { data: refreshedCpe, error: refreshError } = await supabaseClient
-          .from('cpe')
-          .select('*')
-          .eq('id', cpeId)
-          .single();
-
-        if (!refreshError && refreshedCpe) {
-          persistedCpeRecord = refreshedCpe;
-        } else {
-          persistedCpeRecord = {
-            ...createdCpe,
-            sunat_status: sunatStatusForEvent,
-            hash_firma: hash,
-            fecha_emision: emissionDate,
-            fecha_vencimiento: dueDate,
-            idempotency_key: idempotencyKey,
-            event_id: eventId,
-            documento_id: documentoReferenciaId ?? (createdCpe as any).documento_id ?? null,
-          };
-        }
-      } catch (refreshError) {
-        this.logger.warn(`⚠️ [CPE] No se pudo refrescar CPE ${cpeId} desde Supabase:`, refreshError);
-        persistedCpeRecord = {
-          ...createdCpe,
-          sunat_status: sunatStatusForEvent,
-          hash_firma: hash,
-          fecha_emision: emissionDate,
-          fecha_vencimiento: dueDate,
-          idempotency_key: idempotencyKey,
-          event_id: eventId,
-          documento_id: documentoReferenciaId ?? (createdCpe as any).documento_id ?? null,
+          p_documento: {
+            pedido_id: pedidoId,
+            subtotal,
+            impuesto_igv: totalIgv,
+            impuesto_isc: totalIsc,
+            total,
+            tipo_cambio: tipoCambio,
+            metadata: {
+              source: pedidoId ? 'ventas.pedidos.atomic' : 'cpe.api.atomic',
+              pais: paisCodigo,
+            },
+          },
+          p_detalles: detalles,
+          p_cxc: cxc,
+          p_event_id: eventId,
+          p_idempotency_key: idempotencyKey,
         };
+        const rpcName = pedidoId
+          ? 'facturar_pedido_venta_tx'
+          : 'emitir_factura_cliente_tx';
+        const rpcArgs = pedidoId
+          ? {
+              p_pedido_id: pedidoId,
+              p_actor_id: userId,
+              ...atomicArgs,
+            }
+          : atomicArgs;
+        const { data: atomicResult, error: atomicError } = await supabaseClient.rpc(
+          rpcName,
+          rpcArgs,
+        );
+
+        if (atomicError) {
+          this.logger.error(
+            `No se pudo emitir la factura atómica ${idempotencyKey}: ${atomicError.message}`,
+            atomicError,
+          );
+          throw new BadRequestException(
+            `No se pudo emitir la factura de forma transaccional: ${atomicError.message}`,
+          );
+        }
+
+        const resultPayload = Array.isArray(atomicResult) ? atomicResult[0] : atomicResult;
+        const persistedCpe = resultPayload?.cpe;
+        if (!persistedCpe?.id || !resultPayload?.documento_id) {
+          throw new BadRequestException('La emisión transaccional no devolvió el CPE/documento persistido');
+        }
+
+        const mappedCpe = {
+          ...persistedCpe,
+          documento_id: resultPayload.documento_id,
+          documentoId: resultPayload.documento_id,
+          cxc_id: resultPayload.cxc_id ?? null,
+        };
+
+        await this.finalizarPostCommitCpe(
+          mappedCpe,
+          createFacturaDto,
+          tenantId,
+          userId,
+          requiereTransporte,
+        );
+
+        return this.mapToDto(mappedCpe);
       }
 
-      return this.mapToDto(persistedCpeRecord);
+      if (!finalizaDocumentoPosReservado) {
+        throw new BadRequestException('La emisión CPE no resolvió una frontera transaccional válida');
+      }
+
+      const ventaPosId = String((createFacturaDto as any).venta_pos_id ?? '').trim();
+      const { data: posResult, error: posError } = await supabaseClient.rpc('finalizar_cpe_pos_tx', {
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+        p_venta_id: ventaPosId,
+        p_cpe: {
+          ...cpeData,
+          documento_id: (createFacturaDto as any).documento_id,
+          venta_pos_id: ventaPosId,
+          created_by: userId,
+          metadata: {
+            source: 'pos.atomic.476',
+            venta_pos_id: ventaPosId,
+          },
+        },
+        p_idempotency_key: idempotencyKey,
+      });
+      if (posError) {
+        throw new BadRequestException(`No se pudo finalizar el CPE POS atómicamente: ${posError.message}`);
+      }
+      const finalized = Array.isArray(posResult) ? posResult[0] : posResult;
+      if (!finalized?.cpe?.id || !finalized?.documento_id || !finalized?.venta?.cpe_id) {
+        throw new BadRequestException('El finalizador POS no devolvió sus postcondiciones completas');
+      }
+      return this.mapToDto({ ...finalized.cpe, documento_id: finalized.documento_id });
     } catch (error) {
       console.error('Error in CpeService.create:', error);
       if (error instanceof BadRequestException) {
@@ -737,41 +913,19 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
     return this.create(dto, tenantId, userId);
   }
 
-async registerDesktopSignedXml(payload: any, tenantId: string, userId?: string) {
+async registerDesktopSignedXml(payload: DesktopSignedCpeDto, tenantId: string, userId: string) {
     return this.registrationService.registerDesktopSignedXml(payload, tenantId, userId);
   }
 
 
 
-  async crearCPEDesdeDocumento(documento: DocumentoFiscal, tenantId: string) {
-    const client = this.supabaseService.getClient();
-    const idempotencyKey = `doc.cpe:${documento.id}`;
-    const eventId = randomUUID();
-
-    const { data: existente, error: existenteError } = await client
-      .from('cpe')
-      .select('*')
-      .eq('documento_id', documento.id)
-      .maybeSingle();
-
-    if (existenteError && existenteError.code && existenteError.code !== 'PGRST116') {
-      throw new BadRequestException('No se pudo validar CPE existente para el documento');
+  async crearCPEDesdeDocumento(documento: DocumentoFiscal, tenantId: string, actorId: string) {
+    if (!actorId) {
+      throw new BadRequestException('Crear CPE desde documento exige un actor autenticado');
     }
-
-    if (existente) {
-      return existente;
-    }
-
     const tipoDocumentoSunat = this.normalizeTipoDocumentoSunat(documento.tipo_documento);
     const correlativo = Number(documento.numero);
-    const xmlBase = this.buildXmlFromDocumentoFiscal(documento);
-    const xmlSigner = await this.getXmlSigner(tenantId);
-    const xmlFirmado = xmlSigner.signXml(xmlBase);
-    const hash = xmlSigner.generateHash(xmlFirmado);
-
-    const cpePayload = {
-      tenant_id: tenantId,
-      documento_id: documento.id,
+    const dto = {
       tipo_documento: tipoDocumentoSunat,
       serie: documento.serie,
       numero: Number.isNaN(correlativo) ? 0 : correlativo,
@@ -788,85 +942,24 @@ async registerDesktopSignedXml(payload: any, tenantId: string, userId?: string) 
       total_gravadas: documento.subtotal,
       total_igv: documento.impuesto_igv,
       total_venta: documento.total,
-      items: documento.detalles.map((detalle) => ({
+      items: documento.detalles.map((detalle, index) => ({
+        codigo: (detalle as any).codigo_producto ?? `ITEM-${index + 1}`,
         descripcion: detalle.descripcion,
         cantidad: detalle.cantidad,
         precio_unitario: detalle.precio_unitario,
         valor_venta: detalle.valor_venta,
-        impuesto_igv: detalle.impuesto_igv,
+        igv: detalle.impuesto_igv,
         total: detalle.total_item,
+        unidad: (detalle as any).unidad_medida ?? 'NIU',
+        tipo_afectacion_igv: Number(detalle.impuesto_igv) > 0 ? '10' : '20',
+        producto_id: (detalle as any).producto_id ?? undefined,
       })),
-      event_id: eventId,
-      idempotency_key: idempotencyKey,
-      estado: 'FIRMADO',
-      xml_content: xmlBase,
-      xml_firmado: xmlFirmado,
-      hash,
-      hash_firma: hash,
-      hash_code: hash,
-      sunat_status: this.sunatStatuses.READY,
-      estado_sunat: 'PENDIENTE',
-    };
+      idempotency_key: `doc.cpe:${documento.id}`,
+      condicion_pago: 'CONTADO',
+      es_credito: false,
+    } as unknown as CreateFacturaDto;
 
-    const { data, error } = await client.from('cpe').insert(cpePayload).select().single();
-
-    if (error) {
-      console.error('❌ [CPE] Error creando CPE desde documento:', error);
-      throw new BadRequestException('No se pudo crear el CPE desde el documento');
-    }
-
-    const requiereTransporte = this.evaluarSiRequiereTransporte({
-      total_venta: documento.total,
-    } as CreateFacturaDto);
-
-    const comprobanteCreadoEventId = randomUUID();
-    const comprobanteCreadoIdempotencyKey = `cpe.creado:${tenantId}:${data.id}`;
-
-    await this.eventBus.emitComprobanteCreadoEvent({
-      eventId: comprobanteCreadoEventId,
-      tenantId,
-      idempotencyKey: comprobanteCreadoIdempotencyKey,
-      cpeId: data.id,
-      tipoDocumento: tipoDocumentoSunat,
-      serie: documento.serie,
-      numero: correlativo,
-      clienteId: documento.cliente.numero_documento,
-      total: documento.total,
-      esCredito: true,
-      ventaId: documento.pedido_id ?? undefined,
-      requiereTransporte,
-      moneda: documento.moneda,
-    });
-
-    await this.eventBus.emitFacturaEmitidaEvent({
-      eventId,
-      tenantId,
-      idempotencyKey,
-      cpeId: data.id,
-      facturaId: documento.id,
-      serie: documento.serie,
-      numero: documento.numero,
-      clienteId: documento.cliente.numero_documento,
-      subtotal: documento.subtotal,
-      impuestos: documento.impuesto_igv,
-      total: documento.total,
-      moneda: documento.moneda,
-      fechaEmision: documento.fecha_emision,
-      fechaVencimiento: documento.fecha_vencimiento,
-      source: 'ventas.pedidos',
-      sunatStatus: this.sunatStatuses.READY,
-      hashFirma: hash,
-      hash,
-      pedidoId: documento.pedido_id ?? undefined,
-    });
-
-    try {
-      await this.cacheInvalidation.onCpeCreated(tenantId);
-    } catch (cacheError) {
-      this.logger.warn('⚠️ [CPE] No se pudo invalidar cache tras crear CPE desde documento:', cacheError);
-    }
-
-    return data;
+    return this.create(dto, tenantId, actorId);
   }
 
   async findAll(paginationDto: PaginationDto, tenantId: string): Promise<PaginatedResponseDto<FacturaDto>> {
@@ -918,7 +1011,11 @@ async getSignedXml(id: string, tenantId: string): Promise<string> {
     return this.deliveryService.getSignedXml(id, tenantId);
   }
 
-async resendToOse(id: string, tenantId: string, options?: { idempotencyKey?: string }) {
+async resendToOse(
+    id: string,
+    tenantId: string,
+    options?: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
+  ) {
     const result = await this.deliveryService.resendToOse(id, tenantId, options);
     const anulacion = await this.cancellationService.finalizarAnulacionAceptada(id, tenantId);
     return anulacion ? { ...result, anulacion } : result;
@@ -931,31 +1028,27 @@ async sendToOseManual(
     id: string,
     xmlFirmado: string,
     fileName: string,
-    options?: { idempotencyKey?: string },
-    tenantId?: string,
-  ): Promise<void> {
-    await this.deliveryService.sendToOseManual(id, xmlFirmado, fileName, options);
-    if (tenantId) await this.cancellationService.finalizarAnulacionAceptada(id, tenantId);
+    options: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
+    tenantId: string,
+  ) {
+    const result = await this.deliveryService.sendToOseManual(
+      id,
+      xmlFirmado,
+      fileName,
+      { ...options, tenantId },
+    );
+    await this.cancellationService.finalizarAnulacionAceptada(id, tenantId);
+    return result;
   }
 
-async checkOseStatus(id: string, tenantId: string) {
-    const result = await this.deliveryService.checkOseStatus(id, tenantId);
+async checkOseStatus(
+    id: string,
+    tenantId: string,
+    options?: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
+  ) {
+    const result = await this.deliveryService.checkOseStatus(id, tenantId, options);
     const anulacion = await this.cancellationService.finalizarAnulacionAceptada(id, tenantId);
     return anulacion ? { ...result, anulacion } : result;
-  }
-
-  private buildXmlFromDocumentoFiscal(documento: DocumentoFiscal): string {
-    return this.xmlBuilder.buildXmlFromDocumentoFiscal(documento);
-  }
-
-  /**
-   * Preparar XML firmado para envío a SUNAT (sin enviar todavía)
-   * 
-   * NOTA: El envío automático a SUNAT está DESACTIVADO por ahora.
-   * Para enviar manualmente usar el endpoint: POST /api/cpe/:id/enviar-sunat
-   */
-private async prepareXmlForSunat(cpeId: string, xmlContent: string, tenantId: string): Promise<boolean> {
-    return this.deliveryService.prepareXmlForSunat(cpeId, xmlContent, tenantId);
   }
 
   /**
@@ -963,9 +1056,10 @@ private async prepareXmlForSunat(cpeId: string, xmlContent: string, tenantId: st
    */
 async retrySendToOse(
     cpeId: string,
-    options?: { idempotencyKey?: string },
-  ): Promise<void> {
-    return this.deliveryService.retrySendToOse(cpeId, options);
+    tenantId: string,
+    options?: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
+  ) {
+    return this.deliveryService.retrySendToOse(cpeId, tenantId, options);
   }
 
 
@@ -1099,17 +1193,87 @@ async getStatsFromDatabase(tenantId?: string) {
 
   /**
    * Anular un comprobante CPE
-   * Genera nota de crédito y emite eventos para reversión de operaciones
+   * Solicita la nota 07; los reversos se cierran atómicamente tras ACEPTADO+CDR.
    */
 async anularComprobante(
-    cpeId: string,
-    motivo: string,
-    tenantId: string,
-    userId?: string,
-    tipoNota: string = '01',
-  ): Promise<any> {
-    return this.cancellationService.anularComprobante(cpeId, motivo, tenantId, userId, tipoNota);
-  }
+  cpeId: string,
+  motivo: string,
+  tenantId: string,
+  userId?: string,
+  tipoNota: string = '01',
+  idempotencyKey?: string,
+): Promise<any> {
+    return this.cancellationService.anularComprobante(
+      cpeId,
+      motivo,
+      tenantId,
+      userId,
+      tipoNota,
+      idempotencyKey,
+    );
+}
+
+async obtenerEstadoFinancieroAnulacion(
+  cpeId: string,
+  tenantId: string,
+  userId?: string,
+): Promise<any> {
+  return this.cancellationService.obtenerEstadoFinanciero(
+    cpeId,
+    tenantId,
+    userId,
+  );
+}
+
+async revertirCobroAplicado(
+  cpeId: string,
+  pagoId: string,
+  payload: { motivo: string; sesion_caja_id?: string },
+  tenantId: string,
+  userId?: string,
+  idempotencyKey?: string,
+): Promise<any> {
+  return this.cancellationService.revertirCobroAplicado(
+    cpeId,
+    pagoId,
+    payload,
+    tenantId,
+    userId,
+    idempotencyKey,
+  );
+}
+
+async revertirAjusteAplicado(
+  cpeId: string,
+  operacionId: string,
+  payload: { motivo: string },
+  tenantId: string,
+  userId?: string,
+  idempotencyKey?: string,
+): Promise<any> {
+  return this.cancellationService.revertirAjusteAplicado(
+    cpeId,
+    operacionId,
+    payload,
+    tenantId,
+    userId,
+    idempotencyKey,
+  );
+}
+
+async finalizarAnulacionFinanciera(
+  notaCreditoId: string,
+  tenantId: string,
+  userId?: string,
+  idempotencyKey?: string,
+): Promise<any> {
+  return this.cancellationService.finalizarAnulacionAceptada(
+    notaCreditoId,
+    tenantId,
+    userId,
+    idempotencyKey,
+  );
+}
 
 
 

@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { CheckCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 
 interface StockWarning {
@@ -24,6 +24,7 @@ interface StockWarning {
 
 interface ConfirmarPedidoResponse {
   success: boolean
+  confirmado?: boolean
   warnings?: StockWarning[]
   message?: string
   requiere_aprobacion?: boolean
@@ -44,8 +45,6 @@ export default function ConfirmarPedidoButton({
   const { hasPermission, loading: permissionLoading } = usePermission('ventas', 'confirmar', 'pedidos')
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [showWarningDialog, setShowWarningDialog] = useState(false)
-  const [warnings, setWarnings] = useState<StockWarning[]>([])
   const [confirming, setConfirming] = useState(false)
   const [lastError, setLastError] = useState<string | null>(null)
 
@@ -74,6 +73,7 @@ export default function ConfirmarPedidoButton({
       )
 
       if (response?.requiere_aprobacion) {
+        setLastError(null)
         toast({
           title: 'Pedido pendiente de aprobación',
           description: (() => {
@@ -88,26 +88,18 @@ export default function ConfirmarPedidoButton({
               ? mensajes.join(' • ')
               : 'El pedido requiere aprobación antes de confirmarse.'
           })(),
-          variant: 'destructive'
         })
         onSuccess()
         return
       }
 
       if (response?.success) {
-        // Check if there are stock warnings
-        if (response.warnings && response.warnings.length > 0) {
-          setWarnings(response.warnings)
-          setShowWarningDialog(true)
-          setLastError(null)
-        } else {
-          toast({
-            title: 'Pedido confirmado',
-            description: 'El pedido ha sido confirmado y el stock ha sido reservado',
-          })
-          setLastError(null)
-          onSuccess()
-        }
+        toast({
+          title: 'Pedido confirmado',
+          description: 'El pedido ha sido confirmado y el stock ha sido reservado',
+        })
+        setLastError(null)
+        onSuccess()
       } else {
         throw new Error(response?.message || 'Error al confirmar el pedido')
       }
@@ -115,10 +107,13 @@ export default function ConfirmarPedidoButton({
       console.error('Error confirming pedido:', error)
       const warnings = error?.data?.warnings
       if (warnings?.length) {
-        setWarnings(warnings)
-        setShowWarningDialog(true)
-        setConfirming(false)
-        setLastError(null)
+        const detalle = warnings
+          .map((warning: StockWarning) =>
+            `${warning.producto_nombre || warning.producto_id}: disponible ${warning.disponible}, solicitado ${warning.solicitado}`,
+          )
+          .join(' • ')
+        setLastError(`Stock insuficiente. ${detalle}`)
+        toast({ title: 'Stock insuficiente', description: detalle, variant: 'destructive' })
         return
       }
 
@@ -136,25 +131,6 @@ export default function ConfirmarPedidoButton({
     } finally {
       setConfirming(false)
     }
-  }
-
-  const handleContinueWithWarnings = () => {
-    setShowWarningDialog(false)
-    toast({
-      title: 'Pedido confirmado con advertencias',
-      description: 'El pedido ha sido confirmado a pesar de las advertencias de stock',
-    })
-    setLastError(null)
-    onSuccess()
-  }
-
-  const handleCancelWithWarnings = () => {
-    setShowWarningDialog(false)
-    toast({
-      title: 'Confirmación cancelada',
-      description: 'El pedido no ha sido confirmado',
-      variant: 'destructive'
-    })
   }
 
   return (
@@ -207,65 +183,6 @@ export default function ConfirmarPedidoButton({
         </DialogContent>
       </Dialog>
 
-      {/* Stock Warning Dialog */}
-      <Dialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-400">
-              <AlertTriangle className="w-5 h-5" />
-              Advertencia de Stock Insuficiente
-            </DialogTitle>
-            <DialogDescription>
-              Algunos productos no tienen stock suficiente. ¿Desea continuar de todas formas?
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="my-4">
-            <div className="bg-amber-500/10 border border-yellow-200 rounded-lg p-4">
-              <h4 className="font-semibold text-sm text-amber-400 mb-3">
-                Productos con stock insuficiente:
-              </h4>
-              <div className="space-y-2">
-                {warnings.map((warning, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center text-sm bg-card p-3 rounded border border-yellow-100"
-                  >
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {warning.producto_nombre || `Producto ${warning.producto_id}`}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-foreground/80">
-                        Disponible: <span className="font-semibold text-destructive">{warning.disponible}</span>
-                      </p>
-                      <p className="text-foreground/80">
-                        Solicitado: <span className="font-semibold">{warning.solicitado}</span>
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={handleCancelWithWarnings}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleContinueWithWarnings}
-              className="bg-yellow-600 hover:bg-yellow-700"
-            >
-              Continuar de todas formas
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

@@ -1,4 +1,15 @@
-import { IsUUID, IsArray, IsOptional, IsString, IsNumber, ValidateNested, Min } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -48,6 +59,12 @@ export class ItemDevolucionDto {
 }
 
 export class CreateDevolucionProveedorDto {
+  @ApiProperty({ description: 'Clave estable para reintentos de red de esta devolución' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  idempotency_key: string;
+
   @ApiProperty({ description: 'ID de la recepción cerrada de origen' })
   @IsUUID()
   recepcion_id: string;
@@ -66,6 +83,7 @@ export class CreateDevolucionProveedorDto {
 
   @ApiProperty({ description: 'Items a devolver', type: [ItemDevolucionDto] })
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => ItemDevolucionDto)
   items: ItemDevolucionDto[];
@@ -74,4 +92,12 @@ export class CreateDevolucionProveedorDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+}
+
+export class AnularDevolucionProveedorDto {
+  @ApiPropertyOptional({ description: 'Motivo de anulación del borrador pendiente' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  motivo?: string;
 }

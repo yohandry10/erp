@@ -26,6 +26,9 @@ const isTauriBuild =
   (process.env.TAURI_BUILD === '1' || process.env.npm_lifecycle_event === 'build:tauri')
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002').replace(/\/+$/, '')
 const nextConfig = {
+  // QA visual paralela usa un directorio aislado para que dos servidores Next
+  // no corrompan el mismo manifiesto `.next` ni produzcan 404 intermitentes.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   outputFileTracingRoot: path.join(__dirname, '../..'),
   // Para Tauri necesitamos static export solo en build para producción
   output: isTauriBuild ? 'export' : undefined,

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 
 type Hallazgo = { codigo: string; mensaje: string; empleado_id?: string };
@@ -373,7 +373,33 @@ export class PlanillaElectronicaPeruService {
     return construirPaquetePlanillaElectronicaPeru(await this.fuente(tenantId, planillaId));
   }
 
-  async guardarFicha(tenantId: string, userId: string, empleadoId: string, payload: any) {
+  private async escribirOperacion475(
+    tenantId: string,
+    userId: string,
+    operacion: 'PERU_FICHA_UPSERT' | 'PERU_JORNADA_UPDATE',
+    payload: Record<string, any>,
+    idempotencyKey?: string,
+  ) {
+    const key = String(idempotencyKey || '').trim()
+      || `rrhh-compat-${operacion.toLowerCase()}-${randomUUID()}`;
+    const { data, error } = await this.supabase.getClient().rpc('ejecutar_operacion_rrhh_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: userId,
+      p_operacion: operacion,
+      p_payload: payload,
+      p_idempotency_key: key,
+    });
+    if (error || !data) throw new BadRequestException(error?.message || 'No se pudo guardar RRHH Perú');
+    return data;
+  }
+
+  async guardarFicha(
+    tenantId: string,
+    userId: string,
+    empleadoId: string,
+    payload: any,
+    idempotencyKey?: string,
+  ) {
     const campos = [
       'apellido_paterno','apellido_materno','pais_emisor_documento','nacionalidad_codigo','regimen_laboral_codigo',
       'situacion_educativa_codigo','ocupacion_codigo','discapacidad','cuspp','sctr_pension_codigo','tipo_contrato_codigo',
@@ -385,14 +411,18 @@ export class PlanillaElectronicaPeruService {
       'direccion_referencia','telefono_cldn','metadata',
     ];
     const limpio = Object.fromEntries(Object.entries(payload || {}).filter(([key]) => campos.includes(key)));
-    const { data, error } = await this.supabase.getClient().from('rrhh_peru_fichas_laborales').upsert({
-      ...limpio, tenant_id: tenantId, empleado_id: empleadoId, updated_by: userId, updated_at: new Date().toISOString(),
-    }, { onConflict: 'tenant_id,empleado_id' }).select('*').single();
-    if (error) throw error;
-    return data;
+    return this.escribirOperacion475(
+      tenantId, userId, 'PERU_FICHA_UPSERT', { empleado_id: empleadoId, ...limpio }, idempotencyKey,
+    );
   }
 
-  async guardarJornada(tenantId: string, detalleId: string, payload: any) {
+  async guardarJornada(
+    tenantId: string,
+    userId: string,
+    detalleId: string,
+    payload: any,
+    idempotencyKey?: string,
+  ) {
     const horas = Number(payload?.horas_ordinarias);
     const diasNoLaborados = Number(payload?.dias_no_laborados);
     if (!Number.isFinite(horas) || horas < 0 || horas > 744) {
@@ -401,23 +431,17 @@ export class PlanillaElectronicaPeruService {
     if (!Number.isInteger(diasNoLaborados) || diasNoLaborados < 0 || diasNoLaborados > 31) {
       throw new BadRequestException('Los días no laborados deben ser un entero entre 0 y 31.');
     }
-    const client = this.supabase.getClient();
-    const { data: actual, error: findError } = await client.from('empleado_planilla')
-      .select('id,metadata').eq('tenant_id', tenantId).eq('id', detalleId).maybeSingle();
-    if (findError) throw findError;
-    if (!actual) throw new NotFoundException('Detalle de planilla no encontrado');
-    const { data, error } = await client.from('empleado_planilla').update({
-      metadata: {
-        ...(actual.metadata || {}),
-        plame_horas_ordinarias: Math.round(horas * 100) / 100,
-        plame_dias_no_laborados: diasNoLaborados,
-        plame_jornada_fuente: 'MANUAL_CONTADOR',
-        plame_jornada_actualizada_at: new Date().toISOString(),
+    return this.escribirOperacion475(
+      tenantId,
+      userId,
+      'PERU_JORNADA_UPDATE',
+      {
+        detalle_id: detalleId,
+        horas_ordinarias: Math.round(horas * 100) / 100,
+        dias_no_laborados: diasNoLaborados,
       },
-      updated_at: new Date().toISOString(),
-    }).eq('tenant_id', tenantId).eq('id', detalleId).select('id,metadata').single();
-    if (error) throw error;
-    return data;
+      idempotencyKey,
+    );
   }
 
   async guardarPaquete(tenantId: string, userId: string, planillaId: string, notas?: string) {

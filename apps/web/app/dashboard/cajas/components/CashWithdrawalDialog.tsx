@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { CashDialogFrame } from './CashDialogFrame';
 import { useCountryContext } from '@/hooks/use-country-context';
@@ -10,16 +10,66 @@ interface CashWithdrawalDialogProps {
     sesionId: string;
 }
 
+interface AccountingOption {
+    id: string;
+    codigo: string;
+    nombre: string;
+    aplicable_a?: { boveda?: boolean; gasto?: boolean; ingreso?: boolean };
+}
+
+interface BankOption {
+    id: string;
+    banco?: string;
+    nombre?: string;
+    numero_cuenta?: string;
+    moneda: string;
+}
+
 export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: CashWithdrawalDialogProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-    const { post } = useApi();
+    const { get, post } = useApi();
     const [monto, setMonto] = useState<string>('');
     const [motivo, setMotivo] = useState<string>('DEPOSITO_BANCARIO');
     const [detalle, setDetalle] = useState<string>('');
     const [fotoComprobante, setFotoComprobante] = useState<string>('');
+    const [cuentaBancariaId, setCuentaBancariaId] = useState('');
+    const [cuentaContrapartidaId, setCuentaContrapartidaId] = useState('');
+    const [cuentas, setCuentas] = useState<AccountingOption[]>([]);
+    const [cuentasBancarias, setCuentasBancarias] = useState<BankOption[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const idempotencyKey = useRef('');
+
+    const nextKey = useCallback(() => {
+        if (!idempotencyKey.current) {
+            idempotencyKey.current = `cash-withdraw-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+        return idempotencyKey.current;
+    }, []);
+
+    useEffect(() => {
+        idempotencyKey.current = '';
+    }, [monto, motivo, detalle, fotoComprobante, cuentaBancariaId, cuentaContrapartidaId]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let active = true;
+        idempotencyKey.current = '';
+        setError(null);
+        get('/cajas/opciones-contables').then((response) => {
+            if (!active) return;
+            if (!response?.success) {
+                setError('No se pudieron cargar las cuentas contables de caja');
+                return;
+            }
+            setCuentas(response.data?.cuentas || []);
+            setCuentasBancarias(response.data?.cuentas_bancarias || []);
+        }).catch(() => {
+            if (active) setError('No se pudieron cargar las cuentas contables de caja');
+        });
+        return () => { active = false; };
+    }, [get, isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -38,6 +88,14 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
             setError('Debe ingresar la URL de la foto del comprobante');
             return;
         }
+        if (motivo === 'DEPOSITO_BANCARIO' && !cuentaBancariaId) {
+            setError('Seleccione la cuenta bancaria que recibirá el efectivo');
+            return;
+        }
+        if (motivo !== 'DEPOSITO_BANCARIO' && !cuentaContrapartidaId) {
+            setError('Seleccione la contrapartida contable del retiro');
+            return;
+        }
 
         try {
             setLoading(true);
@@ -46,11 +104,16 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
                 motivo,
                 motivo_detalle: detalle,
                 foto_comprobante: fotoComprobante || undefined,
+                cuenta_bancaria_id: motivo === 'DEPOSITO_BANCARIO' ? cuentaBancariaId : undefined,
+                cuenta_contrapartida_id: motivo !== 'DEPOSITO_BANCARIO' ? cuentaContrapartidaId : undefined,
             };
 
-            const response = await post(`/cajas/retiros/${sesionId}`, payload);
+            const response = await post(`/cajas/retiros/${sesionId}`, payload, {
+                headers: { 'Idempotency-Key': nextKey() },
+            });
 
             if (response?.success) {
+                idempotencyKey.current = '';
                 onSuccess();
                 onClose();
             } else {
@@ -70,7 +133,7 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
             onClose={onClose}
             preventClose={loading}
             title="Retiro de efectivo"
-            description="Registre el monto, el motivo y la autorización del retiro."
+            description="Cada salida exige un destino financiero explícito antes de descontar efectivo."
         >
             <form onSubmit={handleSubmit} className="w-full text-left">
 
@@ -113,18 +176,39 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
                                         <select
                                             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                                             value={motivo}
-                                            onChange={(e) => setMotivo(e.target.value)}
+                                            onChange={(e) => {
+                                                setMotivo(e.target.value);
+                                                setCuentaBancariaId('');
+                                                setCuentaContrapartidaId('');
+                                            }}
                                         >
                                             <option value="DEPOSITO_BANCARIO">Depósito Bancario</option>
                                             <option value="COMPRA_EMERGENCIA">Compra de Emergencia</option>
-                                            <option value="BÓVEDA">Bóveda</option>
+                                            <option value="BOVEDA">Bóveda</option>
                                             <option value="OTRO">Otro</option>
                                         </select>
                                     </div>
 
                                     {motivo === 'DEPOSITO_BANCARIO' && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-foreground/85">URL Foto Comprobante</label>
+                                        <div className="space-y-4 rounded-lg border border-border p-3">
+                                            <div>
+                                                <label className="block text-sm font-medium text-foreground/85">Cuenta bancaria destino</label>
+                                                <select
+                                                    aria-label="Cuenta bancaria destino"
+                                                    className="mt-1 block w-full rounded-md border border-border p-2 text-sm"
+                                                    value={cuentaBancariaId}
+                                                    onChange={(e) => setCuentaBancariaId(e.target.value)}
+                                                >
+                                                    <option value="">Seleccione una cuenta real...</option>
+                                                    {cuentasBancarias.map((cuenta) => (
+                                                        <option key={cuenta.id} value={cuenta.id}>
+                                                            {cuenta.banco || cuenta.nombre} · {cuenta.numero_cuenta} · {cuenta.moneda}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                            <label className="block text-sm font-medium text-foreground/85">URL de evidencia del depósito</label>
                                             <input
                                                 type="text"
                                                 className="mt-1 block w-full sm:text-sm border border-border rounded-md p-2"
@@ -132,6 +216,35 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
                                                 value={fotoComprobante}
                                                 onChange={(e) => setFotoComprobante(e.target.value)}
                                             />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                El sistema registrará Dr banco / Cr caja en el mismo commit. La conciliación con el extracto se completa luego en Bancos.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {motivo !== 'DEPOSITO_BANCARIO' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-foreground/85">
+                                                {motivo === 'BOVEDA' ? 'Cuenta de bóveda / transferencia interna' : 'Cuenta de gasto'}
+                                            </label>
+                                            <select
+                                                aria-label="Contrapartida contable del retiro"
+                                                className="mt-1 block w-full rounded-md border border-border p-2 text-sm"
+                                                value={cuentaContrapartidaId}
+                                                onChange={(e) => setCuentaContrapartidaId(e.target.value)}
+                                            >
+                                                <option value="">Seleccione la contrapartida...</option>
+                                                {cuentas
+                                                    .filter((cuenta) => motivo === 'BOVEDA'
+                                                        ? cuenta.aplicable_a?.boveda
+                                                        : cuenta.aplicable_a?.gasto)
+                                                    .map((cuenta) => (
+                                                        <option key={cuenta.id} value={cuenta.id}>
+                                                            {cuenta.codigo} · {cuenta.nombre}
+                                                        </option>
+                                                    ))}
+                                            </select>
                                         </div>
                                     )}
 

@@ -59,6 +59,9 @@ const normalizePedidos = (raw: unknown): PedidoPendiente[] =>
       : null,
   }))
 
+const estaBloqueadoPorCredito = (pedido: PedidoPendiente) =>
+  String(pedido.estado_credito ?? '').toUpperCase() === 'BLOQUEADO'
+
 export default function AprobacionesPage() {
   const country = useCountryContext()
   const formatCurrency = (value?: number) =>
@@ -103,6 +106,13 @@ export default function AprobacionesPage() {
   }, [loadPendientes])
 
   const handleDecision = async (pedido: PedidoPendiente, decision: 'APROBADO' | 'RECHAZADO') => {
+    if (estaBloqueadoPorCredito(pedido)) {
+      alert(
+        `El pedido ${pedido.numero} está bloqueado por crédito. Regulariza la cuenta del cliente antes de continuar; este bloqueo no admite aprobación comercial.`,
+      )
+      return
+    }
+
     const observaciones = window.prompt(
       `Ingresa una observación para ${decision === 'APROBADO' ? 'aprobar' : 'rechazar'} el pedido ${pedido.numero} (opcional):`,
     )
@@ -287,6 +297,11 @@ export default function AprobacionesPage() {
                       </div>
 
                       {/* Botones de acción */}
+                      {estaBloqueadoPorCredito(pedido) ? (
+                        <div className="max-w-md rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                          Regulariza la cuenta por cobrar o el límite de crédito del cliente. Este bloqueo no se puede aprobar desde la bandeja comercial.
+                        </div>
+                      ) : (
                       <div className="flex gap-3 flex-wrap">
                         <button
                           onClick={() => handleDecision(pedido, 'APROBADO')}
@@ -333,6 +348,7 @@ export default function AprobacionesPage() {
                           Rechazar
                         </button>
                       </div>
+                      )}
                     </div>
 
                     {/* Motivos */}

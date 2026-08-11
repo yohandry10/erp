@@ -82,11 +82,20 @@ export class CxcAbiertasImporter implements Importer {
       if (!nonEmpty(row['serie'])) errs.push({ rowIndex, externalId, field: 'serie', message: 'serie requerida' });
       if (!nonEmpty(row['numero'])) errs.push({ rowIndex, externalId, field: 'numero', message: 'numero requerido' });
 
-      if (!toDateOrNull(row['fecha_emision'])) {
+      const fechaEmision = toDateOrNull(row['fecha_emision']);
+      const fechaVencimiento = toDateOrNull(row['fecha_vencimiento']);
+      if (!fechaEmision) {
         errs.push({ rowIndex, externalId, field: 'fecha_emision', message: 'fecha_emision inválida (YYYY-MM-DD)' });
       }
-      if (!toDateOrNull(row['fecha_vencimiento'])) {
+      if (!fechaVencimiento) {
         errs.push({ rowIndex, externalId, field: 'fecha_vencimiento', message: 'fecha_vencimiento inválida (YYYY-MM-DD)' });
+      } else if (fechaEmision && fechaVencimiento < fechaEmision) {
+        errs.push({
+          rowIndex,
+          externalId,
+          field: 'fecha_vencimiento',
+          message: 'fecha_vencimiento no puede ser anterior a fecha_emision',
+        });
       }
 
       const moneda = String(row['moneda'] || '').toUpperCase().trim();
@@ -96,7 +105,7 @@ export class CxcAbiertasImporter implements Importer {
 
       const total = toNumber(row['monto_total']);
       const saldo = toNumber(row['saldo_pendiente']);
-      if (!Number.isFinite(total) || total < 0) {
+      if (!Number.isFinite(total) || total <= 0) {
         errs.push({ rowIndex, externalId, field: 'monto_total', message: 'monto_total inválido' });
       }
       if (!Number.isFinite(saldo) || saldo < 0) {
@@ -204,35 +213,17 @@ export class CxcAbiertasImporter implements Importer {
       sumaTotal += saldo;
 
       const payload: Record<string, any> = {
-        tenant_id: ctx.tenantId,
-        external_id: externalId,
         cliente_id: clienteId,
         tipo_documento: String(row['tipo_documento']).toUpperCase().trim(),
         serie: row['serie'],
-        numero: toNumber(row['numero']) || null,
+        numero: String(row['numero']).trim(),
         fecha_emision: toDateOrNull(row['fecha_emision']),
         fecha_vencimiento: toDateOrNull(row['fecha_vencimiento']),
         moneda,
         monto_total: monto,
-        monto_original: monto,
-        monto_pendiente: saldo,
-        saldo,
         saldo_pendiente: saldo,
-        dias_mora: 0,
-        retencion_total: 0,
-        percepcion_total: 0,
-        detraccion_total: 0,
-        anticipo_total: 0,
-        estado: saldo > 0 ? 'PENDIENTE' : 'CANCELADO',
-        event_source: 'migracion.apertura',
-        idempotency_key: `migracion_apertura:${externalId}`,
         observaciones: nonEmpty(row['observaciones']),
-        activo: true,
-        metadata: {
-          origen: 'migracion_apertura',
-          fecha_corte: ctx.fechaCorte ?? null,
-          run_id: ctx.runCtx?.runId ?? null,
-        },
+        fecha_corte: ctx.fechaCorte ?? null,
       };
 
       if (ctx.dryRun) {
@@ -241,45 +232,30 @@ export class CxcAbiertasImporter implements Importer {
       }
 
       try {
-        const { data: existing } = await client
-          .from('cuentas_por_cobrar')
-          .select('id')
-          .eq('tenant_id', ctx.tenantId)
-          .eq('external_id', externalId)
-          .maybeSingle();
-
-        let targetId: string | null = null;
-        if (existing?.id) {
-          const { data, error } = await client
-            .from('cuentas_por_cobrar')
-            .update({ ...payload, updated_at: new Date().toISOString() })
-            .eq('id', existing.id)
-            .eq('tenant_id', ctx.tenantId)
-            .select('id')
-            .single();
-          if (error) throw error;
-          targetId = data?.id ?? null;
-          result.updated++;
-        } else {
-          const { data, error } = await client
-            .from('cuentas_por_cobrar')
-            .insert(payload)
-            .select('id')
-            .single();
-          if (error) throw error;
-          targetId = data?.id ?? null;
-          result.created++;
-        }
-        result.okRows++;
+        const { data, error } = await client.rpc('importar_cxc_apertura_tx', {
+          p_tenant_id: ctx.tenantId,
+          p_actor_id: ctx.startedBy,
+          p_run_id: ctx.runCtx?.runId ?? null,
+          p_external_id: externalId,
+          p_cxc: payload,
+        });
+        if (error) throw error;
+        const targetId = data?.id ?? null;
+        const action = String(data?.action ?? '');
+        if (action === 'CREATED') result.created++;
+        else if (action === 'IDEMPOTENT') result.skippedRows++;
+        else result.updated++;
+        if (action !== 'IDEMPOTENT') result.okRows++;
         if (ctx.runCtx) {
           await this.runs.recordRow({
             runId: ctx.runCtx.runId,
             tenantId: ctx.tenantId,
             rowIndex,
             externalId,
-            status: 'ok',
+            status: action === 'IDEMPOTENT' ? 'skipped' : 'ok',
             targetTable: 'cuentas_por_cobrar',
             targetId,
+            errorMessage: action === 'IDEMPOTENT' ? 'Fila ya aplicada con la misma huella' : null,
           });
         }
       } catch (err: any) {

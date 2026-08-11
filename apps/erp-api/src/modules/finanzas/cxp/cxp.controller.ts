@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Put,
@@ -129,8 +130,9 @@ export class CxpController {
     @Body() actualizarCxpDto: ActualizarCxpDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.cxpService.actualizarCuentaPorPagar(tenantId, id, actualizarCxpDto, user?.id);
+    return this.cxpService.actualizarCuentaPorPagar(tenantId, id, actualizarCxpDto, user?.id, idempotencyKey);
   }
 
   @Post(':id/aplicar-pago')
@@ -165,8 +167,9 @@ export class CxpController {
     @Body() anularCxpDto: AnularCxpDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.cxpService.anularCuentaPorPagar(tenantId, id, anularCxpDto, user?.id);
+    return this.cxpService.anularCuentaPorPagar(tenantId, id, anularCxpDto, user?.id, idempotencyKey);
   }
 
   @Get(':id/pagos')

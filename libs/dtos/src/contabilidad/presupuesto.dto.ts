@@ -35,7 +35,7 @@ export class CreatePresupuestoDto {
     minimum: 0
   })
   @IsNumber()
-  @Min(0)
+  @Min(0.01)
   monto_presupuestado: number;
 
   @ApiPropertyOptional({
@@ -64,7 +64,7 @@ export class UpdatePresupuestoDto {
   })
   @IsOptional()
   @IsNumber()
-  @Min(0)
+  @Min(0.01)
   monto_presupuestado?: number;
 
   @ApiPropertyOptional({

@@ -1,4 +1,34 @@
-import { DEMO_PCGE_ACCOUNTS, DemoService } from './demo.service';
+import { DEMO_PCGE_ACCOUNTS, DemoService, PERIODOS_CONTRATO } from './demo.service';
+
+describe('DemoService commercial terms', () => {
+  const service = new DemoService(
+    {} as any,
+    {} as any,
+    { isConfigured: () => false } as any,
+    {} as any,
+    {} as any,
+    {} as any,
+  );
+
+  it('publica únicamente 3, 6 y 12 meses con las bonificaciones prometidas', () => {
+    expect(PERIODOS_CONTRATO).toEqual({
+      trimestral: expect.objectContaining({ meses_pagados: 3, meses_bonificados: 0, meses_servicio: 3 }),
+      semestral: expect.objectContaining({ meses_pagados: 6, meses_bonificados: 3, meses_servicio: 9 }),
+      anual: expect.objectContaining({ meses_pagados: 12, meses_bonificados: 6, meses_servicio: 18 }),
+    });
+
+    const catalogo = service.getPlanes();
+    expect(catalogo.planes).toHaveLength(3);
+    expect(catalogo.periodos.map((periodo) => periodo.id)).toEqual([
+      'trimestral', 'semestral', 'anual',
+    ]);
+    expect(catalogo.planes[0].ofertas).toEqual([
+      expect.objectContaining({ id: 'trimestral', monto: 297, meses_servicio: 3 }),
+      expect.objectContaining({ id: 'semestral', monto: 594, meses_servicio: 9 }),
+      expect.objectContaining({ id: 'anual', monto: 990, meses_servicio: 18 }),
+    ]);
+  });
+});
 
 describe('DemoService operational seed', () => {
   it('incluye todas las cuentas PCGE requeridas por los flujos demo', () => {
@@ -208,5 +238,83 @@ describe('DemoService operational seed', () => {
       regimen_pensionario: 'SIPA',
       estado: 'VIGENTE',
     }));
+  });
+});
+
+describe('DemoService atomic creation', () => {
+  function buildAtomicService() {
+    const rpc = jest.fn().mockResolvedValue({
+      data: {
+        success: true,
+        ready: true,
+        tenant_id: 'tenant-demo-464',
+        user_id: 'user-demo-464',
+        email: 'demo-464@temp.local',
+        password: 'DemoPass464!',
+        expires_at: '2026-08-24T00:00:00.000Z',
+        dias_restantes: 14,
+        aprobador_user_id: 'approver-464',
+        aprobador_email: 'approver-464@temp.local',
+        aprobador_password: 'ApproverPass464!',
+        readiness: { ready: true, productos: 6 },
+        idempotent: false,
+      },
+      error: null,
+    });
+    const login = jest.fn().mockResolvedValue({ access_token: 'session-token-464' });
+    const invalidateAllTenantCache = jest.fn().mockResolvedValue(undefined);
+    const service = new DemoService(
+      { getPublicClient: () => ({ rpc }) } as any,
+      { login } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { invalidateAllTenantCache } as any,
+    );
+    return { service, rpc, login, invalidateAllTenantCache };
+  }
+
+  it('crea y entrega únicamente una demo lista mediante el RPC 464', async () => {
+    const { service, rpc, login, invalidateAllTenantCache } = buildAtomicService();
+
+    const result = await service.createDemoTenant(
+      { nombre: 'Demo Colombia', pais: 'CO', dias_duracion: 14 },
+      'demo-create-atomic-464',
+    );
+
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('create_demo_tenant_ready_tx', {
+      p_nombre: 'Demo Colombia',
+      p_dias_duracion: 14,
+      p_pais_codigo: 'CO',
+      p_idempotency_key: 'demo-create-atomic-464',
+      p_certificado_pfx: null,
+      p_certificado_password: null,
+      p_certificado_expira_en: null,
+      p_rubro: 'COMERCIO',
+    });
+    expect(login).toHaveBeenCalledWith(
+      { email: 'demo-464@temp.local', password: 'DemoPass464!' },
+      'demo-api',
+      'demo-create',
+    );
+    expect(invalidateAllTenantCache).toHaveBeenCalledWith('tenant-demo-464');
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      token: 'session-token-464',
+      pais: 'CO',
+      moneda: 'COP',
+      aprobador_user_id: 'approver-464',
+      idempotent: false,
+    }));
+  });
+
+  it('falla antes de escribir si falta una clave idempotente estable', async () => {
+    const { service, rpc } = buildAtomicService();
+
+    await expect(service.createDemoTenant({ pais: 'PE' })).rejects.toThrow(
+      'Idempotency-Key es obligatorio',
+    );
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

@@ -198,15 +198,19 @@ export class TaxCalculatorService {
         .from('configuracion_fiscal')
         .select(`
           impuesto_principal_porcentaje,
+          tasa_igv,
           impuesto_principal_nombre,
           retencion_renta_porcentaje,
           retencion_iva_porcentaje,
+          tenant_id,
           pais_id,
           paises!inner(codigo_iso, moneda_codigo)
         `)
         .eq('pais_id', paisIdToUse)
         .eq('activo', true)
         .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+        .order('tenant_id', { ascending: false, nullsFirst: false })
+        .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -219,9 +223,20 @@ export class TaxCalculatorService {
 
       // ✅ FIX: paises es un array, acceder al primer elemento
       const paisData = Array.isArray(data?.paises) ? data.paises[0] : data?.paises;
-      
+      const tasaConfigurada = Number(
+        data?.tasa_igv ?? data?.impuesto_principal_porcentaje ?? 0.18,
+      );
+      const tasaNormalizada = tasaConfigurada > 1
+        ? tasaConfigurada / 100
+        : tasaConfigurada;
+
+      if (!Number.isFinite(tasaNormalizada) || tasaNormalizada < 0 || tasaNormalizada > 1) {
+        throw new Error(`Tasa tributaria inválida: ${String(tasaConfigurada)}`);
+      }
+
       const config: TaxConfig = {
-        tasaIgv: data?.impuesto_principal_porcentaje || 0.18,
+        // Cero es una tasa válida; `||` la reemplazaba indebidamente por 18 %.
+        tasaIgv: tasaNormalizada,
         pais: paisData?.codigo_iso || 'PE',
         moneda: paisData?.moneda_codigo || 'PEN',
         nombreImpuesto: data?.impuesto_principal_nombre || 'IGV',

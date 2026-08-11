@@ -57,6 +57,7 @@ describe('WorkerAuthGuard', () => {
       iss: 'pos.worker',
       scope: 'pos.worker',
       tenant_ids: ['tenant-a', 'tenant-b'],
+      actor_id: '11111111-1111-4111-8111-111111111111',
     }, workerSecret);
     const guard = new WorkerAuthGuard(configService);
     const request: any = {
@@ -70,7 +71,7 @@ describe('WorkerAuthGuard', () => {
     expect(guard.canActivate(mockExecutionContext(request))).toBe(true);
     expect(request.tenantId).toBe('tenant-b');
     expect(request.user).toMatchObject({
-      id: 'worker-service',
+      id: '11111111-1111-4111-8111-111111111111',
       tenant_id: 'tenant-b',
       is_worker: true,
     });

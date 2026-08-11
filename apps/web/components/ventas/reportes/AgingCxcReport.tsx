@@ -1,45 +1,69 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
-import { AlertTriangle, Loader2, PiggyBank, TrendingDown } from 'lucide-react'
+import { AlertTriangle, Download, Loader2, PiggyBank, TrendingDown } from 'lucide-react'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { downloadCsv } from '@/lib/csv-export'
+
+type CurrencyTotals = Record<string, number>
 
 interface BucketItem {
+  id: string
   nombre: string
   rango: string
-  monto: number
-  porcentaje: number
+  cuentas: number
+  montoBase: number
+  sinValuacion: number
+  porMoneda: CurrencyTotals
+  porcentajeBase: number
 }
 
 interface ClienteSaldo {
+  clienteId: string
   cliente: string
-  monto: number
-  porcentaje: number
+  clienteDocumento: string | null
+  montoBase: number
+  sinValuacion: number
+  porMoneda: CurrencyTotals
 }
 
-interface CuentaCritica {
+interface CuentaAging {
   id: string
   cliente: string
   documento: string
-  cliente_documento: string | null
-  monto: number
+  clienteDocumento: string | null
+  fechaEmision: string
+  fechaVencimiento: string
+  montoOrigen: number | null
+  moneda: string | null
+  montoBase: number | null
+  monedaBase: string | null
+  tipoCambio: number | null
+  valuacionEstado: string
   diasMora: number
   estado: string
 }
 
 interface AgingResponse {
+  fechaCorte: string
+  monedaBase: string | null
   resumen: {
-    totalPendiente: number
-    totalVencido: number
-    porcentajeVencido: number
+    totalPendienteBase: number
+    totalVencidoBase: number
+    porcentajeVencidoBase: number
     cuentasAnalizadas: number
+    cuentasSinValuacion: number
+    cuentasSinReconstruir: number
+    totalPendientePorMoneda: CurrencyTotals
   }
   buckets: BucketItem[]
-  cuentasCriticas: CuentaCritica[]
+  cuentasCriticas: CuentaAging[]
   saldoPorCliente: ClienteSaldo[]
+  detalle: CuentaAging[]
 }
 
 interface ReportFilters {
@@ -53,55 +77,104 @@ interface Props {
   filters: ReportFilters
 }
 
+const CurrencyBreakdown = ({
+  values,
+  formatMoney,
+}: {
+  values: CurrencyTotals
+  formatMoney: (value: number | null | undefined, currency: string | null) => string
+}) => {
+  const entries = Object.entries(values ?? {})
+  if (entries.length === 0) return <span className="text-muted-foreground">—</span>
+  return (
+    <div className="flex flex-wrap justify-end gap-1.5">
+      {entries.map(([currency, value]) => (
+        <span key={currency} className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
+          {formatMoney(value, currency)}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function AgingCxcReport({ filters }: Props) {
   const { get } = useApi()
   const country = useCountryContext()
-  const currencyFormatter = useMemo(() => new Intl.NumberFormat(
-    country.locale || 'es-PE',
-    { style: 'currency', currency: country.moneda, maximumFractionDigits: 2 }
-  ), [country.locale, country.moneda])
   const [data, setData] = useState<AgingResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
+  const formatMoney = useCallback((value: number | null | undefined, currency: string | null) => {
+    if (value === null || value === undefined) return 'Por valorizar'
+    if (!currency) return `${Number(value).toFixed(2)} (sin moneda)`
+    try {
+      return new Intl.NumberFormat(country.locale || 'es-PE', {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 2,
+      }).format(value)
+    } catch {
+      return `${currency} ${Number(value).toFixed(2)}`
+    }
+  }, [country.locale])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/ventas/reportes/cxc-aging', {
-        params: filters
+        params: {
+          fechaCorte: filters.fechaHasta || undefined,
+          cliente: filters.cliente || undefined,
+        },
       })
 
-      if (response?.success) {
-        setData(response.data)
-      } else {
+      if (!response?.success || !Array.isArray(response.data?.detalle)) {
         throw new Error('Respuesta inválida del servidor')
       }
+      setData(response.data)
     } catch (error) {
       console.error('Error cargando aging CxC:', error)
+      setData(null)
       toast({
         title: 'Error al cargar CxC',
-        description: 'No fue posible obtener la cartera de cuentas por cobrar.',
-        variant: 'destructive'
+        description: 'No fue posible obtener la cartera al corte solicitado.',
+        variant: 'destructive',
       })
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters.cliente, filters.fechaHasta, get])
 
-  const bucketTotales = useMemo(() => data?.buckets ?? [], [data])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const exportCsv = () => {
+    if (!data) return
+    downloadCsv(
+      `cxc-aging-${data.fechaCorte}.csv`,
+      [
+        'Fecha de corte', 'Cliente', 'Documento cliente', 'Comprobante', 'Emisión',
+        'Vencimiento', 'Días mora', 'Estado', 'Moneda origen', 'Saldo origen',
+        'Tipo de cambio snapshot', 'Moneda base', 'Saldo base', 'Estado valuación',
+      ],
+      data.detalle.map((row) => [
+        data.fechaCorte, row.cliente, row.clienteDocumento, row.documento,
+        row.fechaEmision, row.fechaVencimiento, row.diasMora, row.estado,
+        row.moneda, row.montoOrigen, row.tipoCambio, row.monedaBase,
+        row.montoBase, row.valuacionEstado,
+      ]),
+    )
+    toast({ title: 'Reporte exportado', description: 'Se descargó el aging CxC al corte en CSV.' })
+  }
 
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Aging de cuentas por cobrar</CardTitle>
-          <CardDescription className="text-xs leading-snug">Calculando exposición por rangos de vencimiento…</CardDescription>
+          <CardDescription>Calculando la cartera al corte local de la empresa…</CardDescription>
         </CardHeader>
-        <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-foreground/80">
+        <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-foreground/80">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span>Procesando saldos</span>
         </CardContent>
@@ -114,113 +187,113 @@ export default function AgingCxcReport({ filters }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Aging de cuentas por cobrar</CardTitle>
-          <CardDescription className="text-xs leading-snug">No se encontraron registros de cuentas por cobrar</CardDescription>
+          <CardDescription>No se pudo obtener el snapshot de cartera.</CardDescription>
         </CardHeader>
         <CardContent className="py-12 text-center text-muted-foreground">
-          Ajusta los filtros o verifica que existan facturas pendientes en el periodo.
+          Revisa el corte seleccionado o vuelve a intentar.
         </CardContent>
       </Card>
     )
   }
 
   const { resumen } = data
+  const hasPendingValuation = resumen.cuentasSinValuacion > 0 || resumen.cuentasSinReconstruir > 0
+  const baseLabel = data.monedaBase ?? 'sin configurar'
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Cartera al {data.fechaCorte}</h2>
+          <p className="text-sm text-muted-foreground">
+            Corte según fecha local de la empresa. Incluye toda deuda emitida hasta esa fecha.
+          </p>
+        </div>
+        <Button type="button" variant="outline" onClick={exportCsv} disabled={data.detalle.length === 0}>
+          <Download className="mr-2 h-4 w-4" /> Exportar CSV
+        </Button>
+      </div>
+
+      {hasPendingValuation && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-950 dark:text-amber-100">
+          <div className="flex items-start gap-2 font-semibold">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            Totales base incompletos: {resumen.cuentasSinValuacion} cuenta(s) sin tipo de cambio y{' '}
+            {resumen.cuentasSinReconstruir} sin reconstrucción histórica confiable.
+          </div>
+          <p className="mt-1">Los saldos de origen se muestran por moneda; no se suman importes nominales distintos.</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
-          <CardHeader className="pb-2 space-y-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
-              <PiggyBank className="h-4 w-4 shrink-0" />
-              Saldo pendiente total
+          <CardHeader className="space-y-1 pb-2">
+            <CardTitle className="flex items-start gap-2 text-sm font-medium text-muted-foreground">
+              <PiggyBank className="h-4 w-4 shrink-0" /> Saldo pendiente en {baseLabel}
             </CardTitle>
-            <CardDescription className="text-xs leading-snug">
-              Cartera total de cuentas por cobrar analizada
-            </CardDescription>
+            <CardDescription>Sólo cuentas con conversión snapshot disponible</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-semibold">{currencyFormatter.format(resumen.totalPendiente)}</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {resumen.cuentasAnalizadas} cuentas activas
-            </p>
+            <p className="text-4xl font-semibold">{data.monedaBase ? formatMoney(resumen.totalPendienteBase, data.monedaBase) : 'Sin moneda base'}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{resumen.cuentasAnalizadas} cuentas activas</p>
           </CardContent>
         </Card>
 
-        <Card className="flex h-full flex-col">
-          <CardHeader className="pb-2 space-y-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              Monto vencido
+        <Card>
+          <CardHeader className="space-y-1 pb-2">
+            <CardTitle className="flex items-start gap-2 text-sm font-medium text-muted-foreground">
+              <AlertTriangle className="h-4 w-4 shrink-0" /> Vencido en {baseLabel}
             </CardTitle>
-            <CardDescription className="text-xs leading-snug">
-              Suma de cuentas que excedieron la fecha de vencimiento
-            </CardDescription>
+            <CardDescription>Documentos vencidos a la fecha de corte</CardDescription>
           </CardHeader>
-          <CardContent className="mt-auto">
-            <p className="text-4xl font-semibold text-rose-400">{currencyFormatter.format(resumen.totalVencido)}</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {resumen.porcentajeVencido.toFixed(1)}% de la cartera total
-            </p>
+          <CardContent>
+            <p className="text-4xl font-semibold text-rose-500">{data.monedaBase ? formatMoney(resumen.totalVencidoBase, data.monedaBase) : 'Sin moneda base'}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{resumen.porcentajeVencidoBase.toFixed(1)}% del total base valuado</p>
           </CardContent>
         </Card>
 
-        <Card className="flex h-full flex-col">
-          <CardHeader className="pb-2 space-y-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-start gap-2">
-              <TrendingDown className="h-4 w-4 shrink-0" />
-              Riesgo concentrado
+        <Card>
+          <CardHeader className="space-y-1 pb-2">
+            <CardTitle className="flex items-start gap-2 text-sm font-medium text-muted-foreground">
+              <TrendingDown className="h-4 w-4 shrink-0" /> Saldos por moneda origen
             </CardTitle>
-            <CardDescription className="text-xs leading-snug">
-              Principales buckets con exposición relevante
-            </CardDescription>
+            <CardDescription>Sin mezclar valores nominales</CardDescription>
           </CardHeader>
-          <CardContent className="mt-auto">
-            <ul className="space-y-2 text-sm">
-              {bucketTotales
-                .filter((bucket) => bucket.monto > 0)
-                .slice(0, 3)
-                .map((bucket) => (
-                  <li key={bucket.nombre} className="flex justify-between items-center">
-                    <span>{bucket.nombre}</span>
-                    <span className="font-semibold">
-                      {bucket.porcentaje.toFixed(1)}%
-                    </span>
-                  </li>
-                ))}
-              {bucketTotales.filter((bucket) => bucket.monto > 0).length === 0 && (
-                <li className="text-foreground/80">Sin montos significativos</li>
-              )}
-            </ul>
+          <CardContent>
+            <CurrencyBreakdown values={resumen.totalPendientePorMoneda} formatMoney={formatMoney} />
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Distribución por buckets</CardTitle>
-          <CardDescription className="text-xs leading-snug">Saldo pendiente agrupado por días de mora</CardDescription>
+          <CardTitle>Distribución por vencimiento</CardTitle>
+          <CardDescription>Saldo de origen por moneda y equivalente confirmado en {baseLabel}</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border text-sm">
             <thead className="bg-muted/30">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-foreground/80">Bucket</th>
-                <th className="px-3 py-2 text-left font-medium text-foreground/80">Rango</th>
-                <th className="px-3 py-2 text-right font-medium text-foreground/80">Monto</th>
-                <th className="px-3 py-2 text-right font-medium text-foreground/80">% del total</th>
+                <th className="px-3 py-2 text-left">Bucket</th>
+                <th className="px-3 py-2 text-left">Rango</th>
+                <th className="px-3 py-2 text-right">Cuentas</th>
+                <th className="px-3 py-2 text-right">Moneda origen</th>
+                <th className="px-3 py-2 text-right">Base ({baseLabel})</th>
+                <th className="px-3 py-2 text-right">% base</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {bucketTotales.map((bucket) => (
-                <tr key={bucket.nombre} className="bg-card">
-                  <td className="px-3 py-2 text-foreground/85 font-medium">{bucket.nombre}</td>
+              {data.buckets.map((bucket) => (
+                <tr key={bucket.id}>
+                  <td className="px-3 py-2 font-medium">{bucket.nombre}</td>
                   <td className="px-3 py-2 text-muted-foreground">{bucket.rango}</td>
-                  <td className="px-3 py-2 text-right text-foreground/80 font-semibold">
-                    {currencyFormatter.format(bucket.monto)}
+                  <td className="px-3 py-2 text-right">{bucket.cuentas}</td>
+                  <td className="px-3 py-2 text-right"><CurrencyBreakdown values={bucket.porMoneda} formatMoney={formatMoney} /></td>
+                  <td className="px-3 py-2 text-right font-semibold">
+                    {formatMoney(bucket.montoBase, data.monedaBase)}
+                    {bucket.sinValuacion > 0 && <span className="block text-xs text-amber-600">+ {bucket.sinValuacion} pendiente(s)</span>}
                   </td>
-                  <td className="px-3 py-2 text-right text-foreground/80 font-semibold">
-                    {bucket.porcentaje.toFixed(1)}%
-                  </td>
+                  <td className="px-3 py-2 text-right">{bucket.porcentajeBase.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>
@@ -228,41 +301,25 @@ export default function AgingCxcReport({ filters }: Props) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Clientes con mayor exposición</CardTitle>
-            <CardDescription className="text-xs leading-snug">Ranking de clientes según saldo pendiente</CardDescription>
+            <CardDescription>Importes de origen separados y total base confirmado</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium text-foreground/80">Cliente</th>
-                  <th className="px-3 py-2 text-right font-medium text-foreground/80">Saldo</th>
-                  <th className="px-3 py-2 text-right font-medium text-foreground/80">% cartera</th>
-                </tr>
-              </thead>
+              <thead className="bg-muted/30"><tr><th className="px-3 py-2 text-left">Cliente</th><th className="px-3 py-2 text-right">Origen</th><th className="px-3 py-2 text-right">Base</th></tr></thead>
               <tbody className="divide-y divide-border">
                 {data.saldoPorCliente.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-3 py-4 text-center text-muted-foreground">
-                      Sin saldos pendientes en el periodo.
-                    </td>
+                  <tr><td colSpan={3} className="px-3 py-4 text-center text-muted-foreground">Sin saldos pendientes al corte.</td></tr>
+                ) : data.saldoPorCliente.slice(0, 15).map((cliente) => (
+                  <tr key={cliente.clienteId}>
+                    <td className="px-3 py-2"><span className="font-medium">{cliente.cliente}</span><span className="block text-xs text-muted-foreground">{cliente.clienteDocumento || '—'}</span></td>
+                    <td className="px-3 py-2 text-right"><CurrencyBreakdown values={cliente.porMoneda} formatMoney={formatMoney} /></td>
+                    <td className="px-3 py-2 text-right font-semibold">{formatMoney(cliente.montoBase, data.monedaBase)}{cliente.sinValuacion > 0 && <span className="block text-xs text-amber-600">{cliente.sinValuacion} pendiente(s)</span>}</td>
                   </tr>
-                ) : (
-                  data.saldoPorCliente.slice(0, 10).map((cliente) => (
-                    <tr key={cliente.cliente} className="bg-card">
-                      <td className="px-3 py-2 text-foreground/80">{cliente.cliente}</td>
-                      <td className="px-3 py-2 text-right text-foreground/80 font-semibold">
-                        {currencyFormatter.format(cliente.monto)}
-                      </td>
-                      <td className="px-3 py-2 text-right text-foreground/80 font-semibold">
-                        {cliente.porcentaje.toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </CardContent>
@@ -271,44 +328,22 @@ export default function AgingCxcReport({ filters }: Props) {
         <Card>
           <CardHeader>
             <CardTitle>Cuentas críticas</CardTitle>
-            <CardDescription className="text-xs leading-snug">Documentos con mayor monto y días de mora</CardDescription>
+            <CardDescription>Documentos vencidos con importe y tipo de cambio snapshot</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium text-foreground/80">Documento</th>
-                  <th className="px-3 py-2 text-left font-medium text-foreground/80">Cliente</th>
-                  <th className="px-3 py-2 text-right font-medium text-foreground/80">Monto</th>
-                  <th className="px-3 py-2 text-right font-medium text-foreground/80">Días mora</th>
-                  <th className="px-3 py-2 text-left font-medium text-foreground/80">Estado</th>
-                </tr>
-              </thead>
+              <thead className="bg-muted/30"><tr><th className="px-3 py-2 text-left">Documento</th><th className="px-3 py-2 text-left">Cliente</th><th className="px-3 py-2 text-right">Saldo</th><th className="px-3 py-2 text-right">Mora</th></tr></thead>
               <tbody className="divide-y divide-border">
                 {data.cuentasCriticas.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-4 text-center text-muted-foreground">
-                      No se detectaron cuentas vencidas en el periodo.
-                    </td>
+                  <tr><td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">No hay cuentas vencidas al corte.</td></tr>
+                ) : data.cuentasCriticas.map((cuenta) => (
+                  <tr key={cuenta.id}>
+                    <td className="px-3 py-2 font-medium">{cuenta.documento}</td>
+                    <td className="px-3 py-2">{cuenta.cliente}<span className="block text-xs text-muted-foreground">{cuenta.clienteDocumento || '—'}</span></td>
+                    <td className="px-3 py-2 text-right font-semibold">{formatMoney(cuenta.montoOrigen, cuenta.moneda)}<span className="block text-xs text-muted-foreground">{cuenta.montoBase === null ? cuenta.valuacionEstado : `≈ ${formatMoney(cuenta.montoBase, data.monedaBase)} · TC ${cuenta.tipoCambio}`}</span></td>
+                    <td className="px-3 py-2 text-right font-semibold text-destructive">{cuenta.diasMora}</td>
                   </tr>
-                ) : (
-                  data.cuentasCriticas.map((cuenta) => (
-                    <tr key={cuenta.id} className="bg-card">
-                      <td className="px-3 py-2 text-foreground/85 font-medium">{cuenta.documento}</td>
-                      <td className="px-3 py-2 text-foreground/80">
-                        <div>{cuenta.cliente}</div>
-                        <div className="text-xs text-muted-foreground">{cuenta.cliente_documento ?? '—'}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right text-foreground/80 font-semibold">
-                        {currencyFormatter.format(cuenta.monto)}
-                      </td>
-                      <td className="px-3 py-2 text-right text-destructive font-semibold">
-                        {cuenta.diasMora}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">{cuenta.estado}</td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </CardContent>

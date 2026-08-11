@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Param, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Param, ForbiddenException, ParseUUIDPipe } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -8,6 +8,7 @@ import { PosService } from './pos.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { WorkerAuthGuard } from '../../shared/guards/worker-auth.guard';
 import { CreateVentaPosDto } from './dto/create-venta-pos.dto';
+import { CanjearTicketPosDto } from './dto/canjear-ticket-pos.dto';
 
 @Controller('pos')
 export class PosController {
@@ -69,6 +70,18 @@ export class PosController {
   @RequirePermission('pos.vender') // HARDENING: venta rápida requiere permiso.
   async procesarVenta(@Body() ventaData: CreateVentaPosDto, @Req() req: any) {
     return this.posService.procesarVenta(ventaData, req.user);
+  }
+
+  @Post('ventas/:ventaId/canjear-ticket')
+  @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
+  @RequireFeatureFlag('pos')
+  @RequirePermission('pos.ticket.canjear')
+  async canjearTicket(
+    @Param('ventaId', new ParseUUIDPipe({ version: '4' })) ventaId: string,
+    @Body() payload: CanjearTicketPosDto,
+    @Req() req: any,
+  ) {
+    return this.posService.canjearTicket(ventaId, payload, req.user);
   }
 
   @Post('caja/abrir')

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Put, Param, HttpException, HttpStatus, UseGuards, ForbiddenException, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Put, Param, HttpException, HttpStatus, UseGuards, ForbiddenException, Req, BadRequestException, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -8,6 +8,7 @@ import { OseService } from './ose/ose.service';
 import { isProduction } from '../common/feature-flags';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 import { DocumentosService } from './documentos.service';
+import { ConfigurationService } from './configuracion/configuration.service';
 
 /**
  * @deprecated Este controlador está DEPRECADO. 
@@ -28,6 +29,7 @@ export class ConfiguracionController {
     private readonly supabaseService: SupabaseService,
     private readonly oseService: OseService,
     private readonly documentosService: DocumentosService,
+    private readonly configurationService: ConfigurationService,
   ) {}
 
   private resolveTenantOrThrow(req: any): string {
@@ -215,7 +217,12 @@ export class ConfiguracionController {
   @Put('empresa')
   @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Actualizar datos de la empresa' })
-  async updateDatosEmpresa(@Body() datosEmpresa: any, @CurrentTenant() tenantId: string) {
+  async updateDatosEmpresa(
+    @Body() datosEmpresa: any,
+    @CurrentTenant() tenantId: string,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
     try {
       console.log('💼 Actualizando datos de empresa:', datosEmpresa);
       
@@ -246,17 +253,13 @@ export class ConfiguracionController {
       if (datosEmpresa.gre_automatico_habilitado !== undefined) updateData.gre_automatico_habilitado = datosEmpresa.gre_automatico_habilitado;
       if (datosEmpresa.umbral_gre_automatico !== undefined) updateData.umbral_gre_automatico = datosEmpresa.umbral_gre_automatico;
 
-      const { data, error } = await this.supabaseService.getClient()
-        .from('empresa_config')
-        .update(updateData)
-        .eq('tenant_id', tenantId) // HARDENING: aplicar tenant del contexto.
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ Error actualizando empresa:', error);
-        throw error;
-      }
+      const data = await this.configurationService.updateEmpresaPatchAtomic(
+        tenantId,
+        updateData,
+        req?.user?.id,
+        idempotencyKey,
+        'EMPRESA',
+      );
 
       return {
         success: true,
@@ -265,11 +268,7 @@ export class ConfiguracionController {
       };
     } catch (error) {
       console.error('❌ Error actualizando datos empresa:', error);
-      return {
-        success: false,
-        message: error.message,
-        data: null
-      };
+      throw new BadRequestException(error.message);
     }
   }
 
@@ -286,35 +285,25 @@ export class ConfiguracionController {
     @Param('tipo') tipo: string,
     @Body() serieData: any,
     @CurrentTenant() tenantId: string,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     const serie = (serieData.serie || tipo || '').toString().trim();
     if (!serie) {
       throw new BadRequestException('Debe enviar serie');
     }
 
-    const payload = {
-      tenant_id: tenantId,
-      tipo_documento: tipo,
-      serie,
-      correlativo_actual: serieData.correlativo_actual ?? 0,
-      correlativo_maximo: serieData.correlativo_maximo ?? 99999999,
-      activo: serieData.activo !== false,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('documento_series')
-      .upsert(payload, { onConflict: 'tenant_id,tipo_documento,serie' })
-      .select()
-      .single();
-
-    if (error) {
-      throw new HttpException(
-        `Error actualizando serie ${tipo}: ${error.message}`,
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+    const data = await this.configurationService.updateDocumentSeriesAtomic(
+      tenantId,
+      req?.user?.id,
+      idempotencyKey,
+      {
+        tipoDocumento: tipo,
+        serie,
+        correlativoMaximo: serieData.correlativo_maximo,
+        activo: serieData.activo,
+      },
+    );
 
     return {
       success: true,
@@ -374,7 +363,12 @@ export class ConfiguracionController {
   @Put('parametros-facturacion')
   @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Actualizar parámetros de facturación' })
-  async updateParametrosFacturacion(@Body() parametros: any, @CurrentTenant() tenantId: string) {
+  async updateParametrosFacturacion(
+    @Body() parametros: any,
+    @CurrentTenant() tenantId: string,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
     try {
       console.log('⚙️ Actualizando parámetros de facturación:', parametros);
       
@@ -391,14 +385,13 @@ export class ConfiguracionController {
       if (parametros.usarCodigosBarra !== undefined) updateData.usar_codigos_barra = parametros.usarCodigosBarra;
       if (parametros.formatoNumeros) updateData.formato_numeros = parametros.formatoNumeros;
 
-      const { data, error } = await this.supabaseService.getClient()
-        .from('empresa_config')
-        .update(updateData)
-        .eq('tenant_id', tenantId) // HARDENING: actualizar solo registros del tenant.
-        .select()
-        .single();
-
-      if (error) throw error;
+      const data = await this.configurationService.updateEmpresaPatchAtomic(
+        tenantId,
+        updateData,
+        req?.user?.id,
+        idempotencyKey,
+        'PARAMETROS',
+      );
 
       return {
         success: true,
@@ -407,11 +400,7 @@ export class ConfiguracionController {
       };
     } catch (error) {
       console.error('❌ Error actualizando parámetros:', error);
-      return {
-        success: false,
-        message: error.message,
-        data: null
-      };
+      throw new BadRequestException(error.message);
     }
   }
 

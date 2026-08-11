@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useApi } from '@/hooks/use-api';
 import { Button } from '@/components/ui/button';
@@ -71,9 +71,11 @@ export function ContractFormDialog({ isOpen, onClose, onSuccess, empleados }: Co
   const isColombia = country.paisCodigo === 'CO';
   const [form, setForm] = useState(() => createInitialForm('PE'));
   const [loading, setLoading] = useState(false);
+  const createIntent = useRef('');
 
   useEffect(() => {
     if (!isOpen) return;
+    createIntent.current = `rrhh-contract-create:${crypto.randomUUID()}`;
     const initial = createInitialForm(country.paisCodigo);
     setForm(initial);
     if (!isArgentina && !isColombia) return;
@@ -121,8 +123,10 @@ export function ContractFormDialog({ isOpen, onClose, onSuccess, empleados }: Co
         ganancias_retencion_mensual: Number(form.ganancias_retencion_mensual) || 0,
         tasa_comision_afp: Number(form.tasa_comision_afp) || 0,
         tasa_seguro_afp: Number(form.tasa_seguro_afp) || 0,
-        estado: 'activo',
+        estado: 'vigente',
         activo: true,
+      }, {
+        headers: { 'Idempotency-Key': createIntent.current },
       });
       if (response?.success === false) throw new Error(response.message || 'No se pudo crear el contrato');
       toast({ title: 'Contrato creado', description: 'El contrato laboral se registró correctamente.' });

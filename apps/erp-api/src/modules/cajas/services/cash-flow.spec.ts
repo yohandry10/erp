@@ -35,6 +35,7 @@ const createSupabaseMock = () => {
             gte: jest.fn(() => chain),
             lte: jest.fn(() => chain),
             lt: jest.fn(() => chain),
+            is: jest.fn(() => chain),
             limit: jest.fn(() => chain),
 
             single: jest.fn(async () => {
@@ -131,6 +132,22 @@ const createSupabaseMock = () => {
                 return { data: { valido: true, errores: [] }, error: null };
             }
 
+            if (fn === 'cerrar_caja_tx') {
+                const contado = Number(params.p_payload?.monto_contado ?? 0);
+                return {
+                    data: {
+                        sesion_id: params.p_sesion_id,
+                        estado: 'CERRADA',
+                        monto_esperado: 100,
+                        monto_contado: contado,
+                        diferencia: contado - 100,
+                        hash_integridad: 'hash-cierre-451',
+                        accounting_event_id: 'event-cierre-451',
+                    },
+                    error: null,
+                };
+            }
+
             return { data: null, error: null };
         }),
     };
@@ -196,52 +213,18 @@ describe('Cash Operations Flow Integration', () => {
         expect(total).toBe(220);
     });
 
-    it('should calculate balance correctly after movements', async () => {
-        const client = supabaseService.getClient();
-
-        client
-            .from('sesiones_caja')
-            .select()
-            .eq()
-            .single.mockResolvedValue({
-                data: { id: mockSesionId, monto_inicio: 100, estado: 'ABIERTA' },
-                error: null,
-            });
-
-        await movementsService.registrarMovimiento(
-            mockSesionId,
-            TipoMovimiento.VENTA,
-            50,
-            { referencia_documento: 'T001', usuario_id: mockUserId },
-            mockTenantId,
-        );
-
-        await movementsService.registrarMovimiento(
+    it('bloquea el writer aislado que no puede acreditar contrapartida y outbox', async () => {
+        await expect(movementsService.registrarMovimiento(
             mockSesionId,
             TipoMovimiento.RETIRO,
             -20,
             { referencia_documento: 'R001', usuario_id: mockUserId },
             mockTenantId,
-        );
+        )).rejects.toThrow('flujo atómico de negocio');
 
-        const rpcSpy = supabaseService.getClient().rpc;
-
-        expect(rpcSpy).toHaveBeenCalledWith(
+        expect(supabaseService.getClient().rpc).not.toHaveBeenCalledWith(
             'registrar_movimiento_caja',
-            expect.objectContaining({
-                p_sesion_caja_id: mockSesionId,
-                p_tipo_movimiento: 'VENTA',
-                p_monto: 50,
-            }),
-        );
-
-        expect(rpcSpy).toHaveBeenCalledWith(
-            'registrar_movimiento_caja',
-            expect.objectContaining({
-                p_sesion_caja_id: mockSesionId,
-                p_tipo_movimiento: 'RETIRO',
-                p_monto: -20,
-            }),
+            expect.anything(),
         );
     });
 
@@ -308,8 +291,6 @@ describe('Cash Operations Flow Integration', () => {
 
         const denominaciones = { billetes: { '100': 1 }, monedas: {} };
 
-        const updateSpy = client.from('sesiones_caja').update;
-
         await closingService.cerrarCaja(
             mockSesionId,
             {
@@ -321,13 +302,16 @@ describe('Cash Operations Flow Integration', () => {
             mockTenantId,
         );
 
-        expect(updateSpy).toHaveBeenCalledWith(
-            expect.objectContaining({
-                estado: 'CERRADA',
-                monto_cierre: 100,
-                diferencia: 0,
+        expect(client.rpc).toHaveBeenCalledWith('cerrar_caja_tx', {
+            p_tenant_id: mockTenantId,
+            p_sesion_id: mockSesionId,
+            p_actor_id: mockUserId,
+            p_payload: expect.objectContaining({
+                monto_contado: 100,
+                cierre_administrativo: false,
             }),
-        );
+        });
+        expect(client.from('sesiones_caja').update).not.toHaveBeenCalled();
     });
 
     it('should require supervisor if difference exceeds tolerance', async () => {

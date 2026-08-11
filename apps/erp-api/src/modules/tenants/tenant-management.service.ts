@@ -1,7 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
-import { UserManagementService } from '../usuarios/user-management.service';
 import { CreateTenantDto, UpdateTenantDto, TenantFiltersDto, ActivateDemoTenantDto } from './dto';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
@@ -18,7 +17,6 @@ import {
 export class TenantManagementService {
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly userManagementService: UserManagementService,
     private readonly tenantContext: TenantContextService,
   ) { }
 
@@ -31,34 +29,15 @@ export class TenantManagementService {
     }
   }
 
-  private async rollbackTenantCreation(client: any, tenantId: string): Promise<void> {
-    const { error } = await client
-      .from('tenants')
-      .delete()
-      .eq('id', tenantId);
-
-    if (error) {
-      console.error('Error rolling back tenant creation:', error);
-    }
-  }
-
-  private async seedOperationalRbac(client: any, tenantId: string): Promise<void> {
-    const { data, error } = await client
-      .rpc('seed_operational_rbac_for_tenant', { p_tenant_id: tenantId });
-
-    if (error) {
-      console.error('Error seeding operational RBAC for tenant:', error);
-      throw new BadRequestException('Error al sembrar roles y permisos operativos del tenant');
-    }
-
-    console.log('✅ [TENANT-MGMT] RBAC operativo sembrado para tenant:', tenantId, data?.[0] || data);
-  }
-
   /**
    * Create a new tenant with first admin user
    * Requirements: 1.2, 1.3
    */
-  async createTenant(tenantData: CreateTenantDto) {
+  async createTenant(
+    tenantData: CreateTenantDto,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     const client = this.supabase.getClient();
 
     const paisIdInput = Number(tenantData.pais_id);
@@ -92,32 +71,8 @@ export class TenantManagementService {
       throw new BadRequestException(`${label} inválido para ${profile?.nombre || pais}`);
     }
 
-    // ✅ F2: Validar unicidad de RUC por país
-    const { data: existingTenantByRuc } = await client
-      .from('empresa_config')
-      .select('tenant_id, razon_social')
-      .eq('ruc', tenantData.ruc)
-      .eq('pais', pais)
-      .maybeSingle();
-
-    if (existingTenantByRuc) {
-      throw new ConflictException(
-        `Ya existe un tenant con RUC ${tenantData.ruc} en el país ${pais}. Razón Social: ${existingTenantByRuc.razon_social}`
-      );
-    }
-
-    // Validate email uniqueness
-    const { data: existingTenant } = await client
-      .from('empresa_config')
-      .select('tenant_id')
-      .eq('email', tenantData.email)
-      .single();
-
-    if (existingTenant) {
-      throw new ConflictException('El email del tenant ya está registrado');
-    }
-
-    // Generate unique tenant_id
+    // La unicidad y la idempotencia se resuelven bajo locks dentro del RPC.
+    // Un pre-check aquí convertiría un retry exitoso en un falso conflicto.
     const tenantId = crypto.randomUUID();
 
     // Set default values
@@ -126,123 +81,88 @@ export class TenantManagementService {
     const adminNombre = tenantData.admin_nombre || 'Administrador';
     const paisId = Number(paisData.id);
 
-    const { error: canonicalTenantError } = await client
-      .from('tenants')
-      .insert({
-        id: tenantId,
-        nombre: tenantData.razon_social,
-        ruc: tenantData.ruc,
-        pais,
-        plan: 'BASICO',
-        estado: 'ACTIVO',
-        activo: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-    if (canonicalTenantError) {
-      console.error('Error creating canonical tenant:', canonicalTenantError);
-      throw new BadRequestException(`Error al crear tenant canónico: ${canonicalTenantError.message}`);
+    const key = String(idempotencyKey || '').trim();
+    if (!actorId || key.length < 8 || key.length > 255) {
+      throw new BadRequestException(
+        'Idempotency-Key es obligatorio y el actor superadministrador debe estar identificado',
+      );
     }
-
-    // Insert tenant record with sales configuration
-    const { data: newTenant, error: tenantError } = await client
-      .from('empresa_config')
-      .insert({
-        tenant_id: tenantId,
-        razon_social: tenantData.razon_social,
-        nombre_comercial: tenantData.nombre_comercial || tenantData.razon_social,
-        ruc: tenantData.ruc,
-        direccion_fiscal: tenantData.direccion,
-        telefono: tenantData.telefono,
-        email: tenantData.email,
-        pais: pais,
-        moneda_defecto: moneda,
-        estado: 'ACTIVO',
-        plan: 'BASICO',
-        fecha_inicio: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        pais_id: paisId,
-        // Sales configuration
-        tipo_empresa: tenantData.tipo_empresa || 'MICRO',
-        usar_flujo_logistica: tenantData.usar_flujo_logistica ?? false,
-        gre_obligatorio: tenantData.gre_obligatorio ?? false,
-        gre_automatico_habilitado: tenantData.gre_automatico_habilitado ?? false,
-        umbral_gre_automatico: tenantData.umbral_gre_automatico || 700,
-        configuracion_completa: true
-      })
-      .select()
-      .single();
-
-    if (tenantError) {
-      await this.rollbackTenantCreation(client, tenantId);
-      console.error('Error creating tenant:', tenantError);
-      throw new BadRequestException(`Error al crear tenant: ${tenantError.message}`);
+    const temporaryPassword = tenantData.admin_password
+      || `A1!${crypto.randomBytes(18).toString('base64url')}`;
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+    const { data: atomicResult, error: atomicError } = await client.rpc(
+      'crear_tenant_empresa_admin_tx',
+      {
+        p_actor_id: actorId,
+        p_idempotency_key: key,
+        p_tenant_id: tenantId,
+        p_empresa: {
+          razon_social: tenantData.razon_social,
+          nombre_comercial: tenantData.nombre_comercial || tenantData.razon_social,
+          ruc: tenantData.ruc,
+          direccion_fiscal: tenantData.direccion,
+          telefono: tenantData.telefono,
+          email: tenantData.email,
+          pais,
+          pais_id: paisId,
+          moneda_defecto: moneda,
+          plan: 'BASICO',
+          tipo_empresa: tenantData.tipo_empresa || 'MICRO',
+          usar_flujo_logistica: tenantData.usar_flujo_logistica ?? false,
+          gre_obligatorio: tenantData.gre_obligatorio ?? false,
+          gre_automatico_habilitado: tenantData.gre_automatico_habilitado ?? false,
+          umbral_gre_automatico: tenantData.umbral_gre_automatico || 700,
+        },
+        p_admin: {
+          email: adminEmail,
+          nombre: adminNombre,
+          apellido: tenantData.admin_apellido,
+          password_hash: passwordHash,
+        },
+      },
+    );
+    if (atomicError) {
+      if (atomicError.code === '23505') throw new ConflictException(atomicError.message);
+      throw new BadRequestException(`No se pudo crear el tenant: ${atomicError.message}`);
     }
+    const result = atomicResult as any;
+    return {
+      success: true,
+      message: result?.idempotent ? 'El tenant ya había sido creado' : 'Tenant creado exitosamente',
+      data: {
+        tenant: result?.tenant,
+        adminUser: {
+          ...(result?.adminUser || {}),
+          temporaryPassword: result?.idempotent ? undefined : temporaryPassword,
+        },
+      },
+      idempotent: result?.idempotent === true,
+    };
 
-    console.log('✅ [TENANT-MGMT] Tenant creado - ID:', tenantId, 'Razón Social:', tenantData.razon_social);
-
-    // Create first admin user for tenant
-    try {
-      await this.seedOperationalRbac(client, tenantId);
-
-      const { data: adminRole, error: adminRoleError } = await client
-        .from('roles')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('nombre', 'ADMIN')
-        .single();
-
-      if (adminRoleError || !adminRole?.id) {
-        console.error('Error resolving ADMIN role after RBAC seed:', adminRoleError);
-        throw new BadRequestException('Error al resolver rol de administrador');
-      }
-
-      // Create the admin user with custom password if provided
-      const adminUser = await this.userManagementService.createUser(tenantId, {
-        nombre: adminNombre,
-        apellido: tenantData.admin_apellido,
-        email: adminEmail,
-        password: tenantData.admin_password, // Use custom password if provided
-        roles: [adminRole.id]
-      });
-
-      console.log('✅ [TENANT-MGMT] Usuario admin creado - Email:', adminEmail);
-
-      return {
-        success: true,
-        message: 'Tenant creado exitosamente',
-        data: {
-          tenant: newTenant,
-          adminUser: {
-            id: adminUser.id,
-            nombre: adminUser.nombre,
-            email: adminUser.email,
-            temporaryPassword: adminUser.temporaryPassword
-          }
-        }
-      };
-    } catch (error) {
-      // Rollback: tenants cascades to empresa_config, roles, permissions and users.
-      await this.rollbackTenantCreation(client, tenantId);
-
-      console.error('Error creating admin user, tenant rolled back:', error);
-      throw new BadRequestException('Error al crear usuario administrador del tenant');
-    }
   }
 
   /**
    * Update tenant information
    * Requirements: 1.1
    */
-  async updateTenant(tenantId: string, tenantData: UpdateTenantDto) {
+  async updateTenant(
+    tenantId: string,
+    tenantData: UpdateTenantDto,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     const client = this.supabase.getClient();
+    const key = String(idempotencyKey || '').trim();
+    if (!actorId || key.length < 8 || key.length > 255) {
+      throw new BadRequestException(
+        'Idempotency-Key es obligatorio y el actor superadministrador debe estar identificado',
+      );
+    }
 
     // Validate tenant exists
     const { data: existingTenant } = await client
       .from('empresa_config')
-      .select('tenant_id, pais_id')
+      .select('tenant_id, pais_id, pais')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -309,10 +229,36 @@ export class TenantManagementService {
       throw new BadRequestException('Debes configurar el país antes de actualizar el tenant');
     }
 
-    const updatePayload: Record<string, any> = {
-      ...tenantData,
-      updated_at: new Date().toISOString()
-    };
+    const effectiveCountry = resolvedPaisCodigo || existingTenant.pais;
+    if (tenantData.ruc && !validateCountryTaxId(effectiveCountry, tenantData.ruc)) {
+      throw new BadRequestException(`Documento fiscal inválido para ${effectiveCountry}`);
+    }
+
+    const updatePayload: Record<string, unknown> = {};
+    if (tenantData.nombre !== undefined || tenantData.razon_social !== undefined) {
+      updatePayload.razon_social = tenantData.razon_social ?? tenantData.nombre;
+    }
+    if (tenantData.nombre_comercial !== undefined) {
+      updatePayload.nombre_comercial = tenantData.nombre_comercial;
+    }
+    if (tenantData.ruc !== undefined) updatePayload.ruc = tenantData.ruc;
+    if (tenantData.direccion !== undefined) updatePayload.direccion_fiscal = tenantData.direccion;
+    if (tenantData.telefono !== undefined) updatePayload.telefono = tenantData.telefono;
+    if (tenantData.email !== undefined) updatePayload.email = tenantData.email;
+    if (tenantData.moneda !== undefined) updatePayload.moneda_defecto = tenantData.moneda;
+    if (tenantData.estado !== undefined) updatePayload.estado = tenantData.estado;
+    if (tenantData.plan !== undefined) updatePayload.plan = tenantData.plan;
+    if (tenantData.tipo_empresa !== undefined) updatePayload.tipo_empresa = tenantData.tipo_empresa;
+    if (tenantData.usar_flujo_logistica !== undefined) {
+      updatePayload.usar_flujo_logistica = tenantData.usar_flujo_logistica;
+    }
+    if (tenantData.gre_obligatorio !== undefined) updatePayload.gre_obligatorio = tenantData.gre_obligatorio;
+    if (tenantData.gre_automatico_habilitado !== undefined) {
+      updatePayload.gre_automatico_habilitado = tenantData.gre_automatico_habilitado;
+    }
+    if (tenantData.umbral_gre_automatico !== undefined) {
+      updatePayload.umbral_gre_automatico = tenantData.umbral_gre_automatico;
+    }
 
     if (resolvedPaisId) {
       updatePayload.pais_id = resolvedPaisId;
@@ -321,21 +267,21 @@ export class TenantManagementService {
       updatePayload.pais = resolvedPaisCodigo;
     }
 
-    // Update tenant record
-    const { data: updatedTenant, error } = await client
-      .from('empresa_config')
-      .update(updatePayload)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
+    const { data: result, error } = await client.rpc('actualizar_empresa_config_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_idempotency_key: key,
+      p_operation: 'TENANT_UPDATE',
+      p_patch: updatePayload,
+    });
 
     if (error) {
       console.error('Error updating tenant:', error);
-      throw new BadRequestException('Error al actualizar tenant');
+      throw new BadRequestException(`Error al actualizar tenant: ${error.message}`);
     }
 
     console.log('✅ [TENANT-MGMT] Tenant actualizado - ID:', tenantId);
-    return updatedTenant;
+    return (result as any)?.configuracion;
   }
 
   /**
@@ -573,173 +519,91 @@ export class TenantManagementService {
   /**
    * Activate demo mode for an existing tenant and create/update demo user
    */
-  async activateDemoTenant(tenantId: string, dto: ActivateDemoTenantDto, actor?: any) {
+  async activateDemoTenant(
+    tenantId: string,
+    dto: ActivateDemoTenantDto,
+    actor?: any,
+    idempotencyKey?: string,
+  ) {
     const client = this.supabase.getClient();
-
-    const { data: tenant, error: tenantError } = await client
-      .from('empresa_config')
-      .select('tenant_id, razon_social, is_demo, demo_expires_at, demo_created_at')
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (tenantError || !tenant) {
-      throw new NotFoundException('Tenant no encontrado');
-    }
-
-    const dias = dto.dias_duracion ?? 15;
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + dias * 24 * 60 * 60 * 1000);
-    const demoCreatedAt = tenant.demo_created_at ? new Date(tenant.demo_created_at) : now;
-    const demoExtended = Boolean(tenant.is_demo);
-
-    const { error: demoError } = await client
-      .from('empresa_config')
-      .update({
-        is_demo: true,
-        demo_created_at: demoCreatedAt.toISOString(),
-        demo_expires_at: expiresAt.toISOString(),
-        demo_extended: demoExtended,
-        updated_at: now.toISOString(),
-      })
-      .eq('tenant_id', tenantId);
-
-    if (demoError) {
-      console.error('Error activando demo:', demoError);
-      throw new BadRequestException('No se pudo activar el modo demo');
-    }
-
-    // Obtener rol ADMIN para asegurar acceso
-    let adminRoleId: string | null = null;
-    const { data: adminRole } = await client
-      .from('roles')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('nombre', 'ADMIN')
-      .single();
-
-    if (adminRole?.id) {
-      adminRoleId = adminRole.id;
-    }
-
-    const { data: existingUser } = await client
-      .from('usuarios_sistema')
-      .select('id, email, nombre, apellido')
-      .eq('tenant_id', tenantId)
-      .eq('email', dto.email)
-      .maybeSingle();
-
-    const passwordHash = await bcrypt.hash(dto.password, 10);
-    let userId = existingUser?.id || null;
-
-    if (existingUser) {
-      const { error: updateError } = await client
-        .from('usuarios_sistema')
-        .update({
-          password_hash: passwordHash,
-          estado: 'ACTIVO',
-          is_demo_user: true,
-          demo_email_temp: dto.email,
-          nombre: dto.nombre || existingUser.nombre,
-          apellido: dto.apellido || existingUser.apellido,
-          updated_at: now.toISOString(),
-        })
-        .eq('id', existingUser.id)
-        .eq('tenant_id', tenantId);
-
-      if (updateError) {
-        console.error('Error actualizando usuario demo:', updateError);
-        throw new BadRequestException('No se pudo actualizar el usuario demo');
-      }
-    } else {
-      const newUser = await this.userManagementService.createUser(
-        tenantId,
-        {
-          nombre: dto.nombre || 'Demo',
-          apellido: dto.apellido || 'Usuario',
-          email: dto.email,
-          password: dto.password,
-          roles: adminRoleId ? [adminRoleId] : [],
-        },
-        actor?.id || actor?.sub || 'SYSTEM',
+    const actorId = actor?.id || actor?.sub;
+    const key = String(idempotencyKey || '').trim();
+    if (!actorId || key.length < 8 || key.length > 255) {
+      throw new BadRequestException(
+        'Idempotency-Key es obligatorio y el actor superadministrador debe estar identificado',
       );
-
-      userId = newUser.id;
-
-      await client
-        .from('usuarios_sistema')
-        .update({
-          is_demo_user: true,
-          demo_email_temp: dto.email,
-          updated_at: now.toISOString(),
-        })
-        .eq('id', newUser.id)
-        .eq('tenant_id', tenantId);
     }
-
-    if (adminRoleId && userId) {
-      await this.userManagementService.assignRoles(tenantId, userId, [adminRoleId]);
+    const dias = dto.dias_duracion ?? 15;
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordFingerprint = crypto
+      .createHash('sha256')
+      .update(dto.password, 'utf8')
+      .digest('hex');
+    const { data: result, error } = await client.rpc('configurar_demo_tenant_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_idempotency_key: key,
+      p_activo: true,
+      p_dias_duracion: dias,
+      p_email: dto.email,
+      p_password_hash: passwordHash,
+      p_password_fingerprint: passwordFingerprint,
+      p_perfil: {
+        nombre: dto.nombre || 'Demo',
+        apellido: dto.apellido || 'Usuario',
+      },
+    });
+    if (error || !result) {
+      throw new BadRequestException(error?.message || 'No se pudo activar el modo demo');
     }
 
     return {
       success: true,
       tenant_id: tenantId,
-      demo_expires_at: expiresAt.toISOString(),
+      demo_expires_at: (result as any).demo_expires_at,
       dias_duracion: dias,
       user: {
-        id: userId,
+        id: (result as any).user?.id,
         email: dto.email,
         password: dto.password,
       },
+      idempotent: (result as any).idempotent === true,
     };
   }
 
   /**
    * Deactivate demo mode for a tenant
    */
-  async deactivateDemoTenant(tenantId: string, actor?: any) {
+  async deactivateDemoTenant(tenantId: string, actor?: any, idempotencyKey?: string) {
     const client = this.supabase.getClient();
-
-    const { data: tenant } = await client
-      .from('empresa_config')
-      .select('tenant_id, is_demo')
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!tenant) {
-      throw new NotFoundException('Tenant no encontrado');
+    const actorId = actor?.id || actor?.sub;
+    const key = String(idempotencyKey || '').trim();
+    if (!actorId || key.length < 8 || key.length > 255) {
+      throw new BadRequestException(
+        'Idempotency-Key es obligatorio y el actor superadministrador debe estar identificado',
+      );
     }
-
-    const now = new Date();
-    const { error: updateError } = await client
-      .from('empresa_config')
-      .update({
-        is_demo: false,
-        demo_expires_at: null,
-        demo_extended: false,
-        updated_at: now.toISOString(),
-      })
-      .eq('tenant_id', tenantId);
-
-    if (updateError) {
-      console.error('Error desactivando demo:', updateError);
-      throw new BadRequestException('No se pudo desactivar el modo demo');
+    const { data: result, error } = await client.rpc('configurar_demo_tenant_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_idempotency_key: key,
+      p_activo: false,
+      p_dias_duracion: null,
+      p_email: null,
+      p_password_hash: null,
+      p_password_fingerprint: null,
+      p_perfil: {},
+    });
+    if (error || !result) {
+      throw new BadRequestException(error?.message || 'No se pudo desactivar el modo demo');
     }
-
-    await client
-      .from('usuarios_sistema')
-      .update({
-        is_demo_user: false,
-        demo_email_temp: null,
-        updated_at: now.toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .eq('is_demo_user', true);
 
     return {
       success: true,
       tenant_id: tenantId,
       message: 'Modo demo desactivado',
-      actor_id: actor?.id || actor?.sub || null,
+      actor_id: actorId,
+      idempotent: (result as any).idempotent === true,
     };
   }
 
@@ -747,26 +611,28 @@ export class TenantManagementService {
    * Activate tenant and enable user logins
    * Requirements: 1.1
    */
-  async activateTenant(tenantId: string) {
+  async activateTenant(tenantId: string, actorId?: string, idempotencyKey?: string) {
     const client = this.supabase.getClient();
+    const key = String(idempotencyKey || '').trim();
+    if (!actorId || key.length < 8 || key.length > 255) {
+      throw new BadRequestException(
+        'Idempotency-Key es obligatorio y el actor superadministrador debe estar identificado',
+      );
+    }
 
-    // Update estado to 'ACTIVO'
-    const { data: tenant, error } = await client
-      .from('empresa_config')
-      .update({
-        estado: 'ACTIVO',
-        updated_at: new Date().toISOString()
-      })
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
+    const { data: result, error } = await client.rpc('cambiar_estado_tenant_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_idempotency_key: key,
+      p_estado: 'ACTIVO',
+    });
 
-    if (error || !tenant) {
-      throw new NotFoundException('Tenant no encontrado');
+    if (error || !result) {
+      throw new NotFoundException(error?.message || 'Tenant no encontrado');
     }
 
     console.log('✅ [TENANT-MGMT] Tenant activado - ID:', tenantId);
-    return tenant;
+    return (result as any).tenant;
   }
 
   /**
@@ -774,97 +640,27 @@ export class TenantManagementService {
    * Requirements: 1.6
    * 🔴 CRÍTICO FIX: Valida que el tenant tenga al menos un admin antes de desactivar
    */
-  async deactivateTenant(tenantId: string) {
+  async deactivateTenant(tenantId: string, actorId?: string, idempotencyKey?: string) {
     const client = this.supabase.getClient();
-
-    // 🔴 CRÍTICO FIX: Validar que el tenant tenga al menos un admin activo antes de desactivar
-    // Primero obtener el ID del rol ADMIN del tenant
-    const { data: adminRole, error: roleError } = await client
-      .from('roles')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('nombre', 'ADMIN')
-      .single();
-
-    if (roleError || !adminRole) {
-      console.error('Error obteniendo rol ADMIN del tenant:', roleError);
+    const key = String(idempotencyKey || '').trim();
+    if (!actorId || key.length < 8 || key.length > 255) {
       throw new BadRequestException(
-        'No se puede desactivar el tenant porque no se encontró el rol ADMIN. ' +
-        'El tenant podría estar en un estado inconsistente.'
+        'Idempotency-Key es obligatorio y el actor superadministrador debe estar identificado',
       );
     }
 
-    // Obtener usuarios con rol ADMIN y filtrar por tenant_id y estado en JavaScript
-    // (más robusto que filtrar relaciones anidadas en Supabase PostgREST)
-    const { data: adminUserRoles, error: adminError } = await client
-      .from('user_roles')
-      .select(`
-        usuario_sistema_id,
-        usuarios_sistema (
-          id,
-          estado,
-          tenant_id
-        )
-      `)
-      .eq('role_id', adminRole.id);
-
-    if (adminError) {
-      console.error('Error verificando admins del tenant:', adminError);
-      throw new BadRequestException('No se pudo verificar los administradores del tenant');
+    const { data: result, error } = await client.rpc('cambiar_estado_tenant_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_idempotency_key: key,
+      p_estado: 'INACTIVO',
+    });
+    if (error || !result) {
+      throw new BadRequestException(error?.message || 'Tenant no encontrado');
     }
 
-    // Filtrar usuarios activos del tenant con rol ADMIN
-    const activeAdmins = (adminUserRoles || [])
-      .map(ur => ur.usuarios_sistema)
-      .filter((user: any) =>
-        user &&
-        user.tenant_id === tenantId &&
-        user.estado === 'ACTIVO'
-      );
-
-    const activeAdminsCount = activeAdmins.length;
-
-    if (activeAdminsCount === 0) {
-      throw new BadRequestException(
-        'No se puede desactivar el tenant porque no tiene al menos un administrador activo. ' +
-        'El tenant quedaría sin acceso administrativo y no se podría reactivar fácilmente.'
-      );
-    }
-
-    if (activeAdminsCount === 1) {
-      console.warn(
-        `⚠️ [TENANT-MGMT] Tenant ${tenantId} solo tiene 1 admin activo. Desactivar dejará al tenant sin admins.`
-      );
-    }
-
-    // Update estado to 'INACTIVO'
-    const { data: tenant, error } = await client
-      .from('empresa_config')
-      .update({
-        estado: 'INACTIVO',
-        updated_at: new Date().toISOString()
-      })
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-
-    if (error || !tenant) {
-      throw new NotFoundException('Tenant no encontrado');
-    }
-
-    // Revoke all active sessions for tenant users
-    const { error: sessionError } = await client
-      .from('user_sessions')
-      .delete()
-      .eq('tenant_id', tenantId);
-
-    if (sessionError) {
-      console.error('Error revoking tenant sessions:', sessionError);
-      // Continue even if session revocation fails
-    }
-
-    console.log(`🔒 [TENANT-MGMT] Tenant desactivado y sesiones revocadas - ID: ${tenantId} (${activeAdminsCount} admins activos)`);
-    return tenant;
+    console.log(`🔒 [TENANT-MGMT] Tenant desactivado y sesiones revocadas - ID: ${tenantId}`);
+    return (result as any).tenant;
   }
 
   /**

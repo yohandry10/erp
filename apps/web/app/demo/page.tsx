@@ -31,6 +31,14 @@ type DemoCredentials = {
   password: string;
 };
 
+const BUSINESS_SECTORS = [
+  { id: 'COMERCIO', label: 'Comercio' },
+  { id: 'DISTRIBUCION', label: 'Distribución' },
+  { id: 'SERVICIOS', label: 'Servicios' },
+  { id: 'RESTAURANTE', label: 'Restaurante' },
+  { id: 'MANUFACTURA', label: 'Manufactura' },
+] as const;
+
 const features = [
   {
     icon: BarChart3,
@@ -86,6 +94,7 @@ export default function DemoPage() {
   const [pasoActual, setPasoActual] = useState(0);
   const [segundos, setSegundos] = useState(0);
   const [countryCode, setCountryCode] = useState<ActiveCountryCode>('PE');
+  const [businessSector, setBusinessSector] = useState<(typeof BUSINESS_SECTORS)[number]['id']>('COMERCIO');
   // window.location tras montar (no useSearchParams) para no requerir un
   // boundary de Suspense en el prerender ni causar mismatch de hidratación.
   const [demoExpirada, setDemoExpirada] = useState(false);
@@ -123,9 +132,18 @@ export default function DemoPage() {
     setError(null);
 
     try {
+      const intentStorageKey = `demo-create-intent:${countryCode}:${businessSector}`;
+      let idempotencyKey = window.sessionStorage.getItem(intentStorageKey);
+      if (!idempotencyKey) {
+        idempotencyKey = `demo-${countryCode.toLowerCase()}-${window.crypto.randomUUID()}`;
+        window.sessionStorage.setItem(intentStorageKey, idempotencyKey);
+      }
       const response = await fetchApi('/api/demo/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify({
           dias_duracion: 14,
           pais: countryCode,
@@ -135,6 +153,7 @@ export default function DemoPage() {
               : countryCode === 'CO'
                 ? 'DEMO COMERCIAL S.A.S.'
                 : 'DEMO COMERCIAL S.A.C.',
+          rubro: businessSector,
         }),
       });
 
@@ -153,6 +172,7 @@ export default function DemoPage() {
       const data = await response.json();
 
       await signIn(data.email, data.password);
+      window.sessionStorage.removeItem(intentStorageKey);
       localStorage.setItem('selectedCountry', String(selectedCountry.id));
       setCredentials({ email: data.email, password: data.password });
     } catch (err) {
@@ -312,6 +332,24 @@ export default function DemoPage() {
               </option>
             ))}
           </select>
+
+          <label htmlFor="demo-business-sector" className="mt-5 block text-sm font-semibold text-foreground">
+            Rubro de tu empresa
+          </label>
+          <select
+            id="demo-business-sector"
+            value={businessSector}
+            onChange={(event) => setBusinessSector(event.target.value as typeof businessSector)}
+            disabled={loading}
+            className="mt-2 h-11 w-full rounded-md border border-border bg-card px-3 text-sm"
+          >
+            {BUSINESS_SECTORS.map((sector) => (
+              <option key={sector.id} value={sector.id}>{sector.label}</option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            El núcleo de ventas, compras, inventario, caja, contabilidad y RR. HH. es transversal; el rubro queda guardado en tu empresa.
+          </p>
 
           {error && (
             <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">

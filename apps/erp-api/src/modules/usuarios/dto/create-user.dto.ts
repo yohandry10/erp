@@ -1,6 +1,9 @@
-import { IsEmail, IsString, IsOptional, IsArray, IsUUID, IsNotEmpty, MinLength } from 'class-validator';
+import { ArrayMinSize, IsEmail, IsString, IsOptional, IsArray, IsUUID, IsNotEmpty, MinLength } from 'class-validator';
 
 export class CreateUserDto {
+  @IsUUID('4')
+  idempotency_key: string;
+
   @IsString()
   @IsNotEmpty()
   nombre: string;
@@ -31,6 +34,7 @@ export class CreateUserDto {
   departamento?: string;
 
   @IsArray()
+  @ArrayMinSize(1)
   @IsUUID('4', { each: true })
   roles: string[];
 }

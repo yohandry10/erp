@@ -25,11 +25,27 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
+  '1042': {
+    codigo: '1042',
+    nombre: 'Cuentas corrientes para fines específicos - detracciones',
+    tipo: 'ACTIVO',
+    nivel: 4,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
   '12': {
     codigo: '12',
     nombre: 'Cuentas por cobrar comerciales',
     tipo: 'ACTIVO',
     nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '122': {
+    codigo: '122',
+    nombre: 'Anticipos de clientes',
+    tipo: 'PASIVO',
+    nivel: 3,
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
@@ -65,6 +81,14 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
+  '63': {
+    codigo: '63',
+    nombre: 'Gastos de servicios prestados por terceros',
+    tipo: 'GASTO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
   '65': {
     codigo: '65',
     nombre: 'Otros gastos de gestion',
@@ -86,6 +110,22 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
     nombre: 'Tributos por pagar',
     tipo: 'PASIVO',
     nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '40113': {
+    codigo: '40113',
+    nombre: 'IGV - régimen de percepciones',
+    tipo: 'PASIVO',
+    nivel: 5,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '40114': {
+    codigo: '40114',
+    nombre: 'IGV - régimen de retenciones',
+    tipo: 'ACTIVO',
+    nivel: 5,
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
@@ -338,59 +378,12 @@ export class PlanCuentasService {
     if (!cuentaBase) {
       return null;
     }
-
-    const { data: empresa } = await this.supabaseService
-      .getClient()
-      .from('empresa_config')
-      .select('pais')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-    const esArgentina = String(empresa?.pais || 'PE').toUpperCase() === 'AR';
-
-    const payload = {
-      tenant_id: tenantId,
-      codigo: cuentaBase.codigo,
-      nombre: esArgentina
-        ? NOMBRES_CUENTAS_ARGENTINA[codigo] || cuentaBase.nombre
-        : cuentaBase.nombre,
-      tipo: cuentaBase.tipo,
-      tipo_cuenta: cuentaBase.tipo,
-      nivel: cuentaBase.nivel,
-      acepta_movimiento: cuentaBase.acepta_movimiento,
-      activo: true,
-      estado: cuentaBase.estado,
-      metadata: {
-        source: 'runtime_accounting_standard_account',
-        pais_codigo: esArgentina ? 'AR' : 'PE',
-      },
-    };
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('plan_cuentas')
-      .insert(payload)
-      .select('*')
-      .single();
-
-    if (!error && data) {
-      return data as PlanCuenta;
-    }
-
-    if (error?.code === '23505') {
-      const { data: existente, error: findError } = await this.supabaseService
-        .getClient()
-        .from('plan_cuentas')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('codigo', codigo)
-        .single();
-
-      if (!findError && existente) {
-        return existente as PlanCuenta;
-      }
-    }
-
-    console.error(`❌ [PlanCuentas] Error creando cuenta estándar ${codigo}:`, error);
+    // Las cuentas operativas se provisionan al crear/configurar el tenant. Un
+    // listener contable no tiene un actor humano al que atribuir un alta y no
+    // debe convertir una lectura en un writer oculto. Si falta una cuenta, el
+    // evento falla cerrado y el diagnóstico conserva el código esperado.
+    void tenantId;
+    void (NOMBRES_CUENTAS_ARGENTINA[codigo] || cuentaBase.nombre);
     return null;
   }
 

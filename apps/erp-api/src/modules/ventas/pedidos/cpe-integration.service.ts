@@ -175,6 +175,8 @@ export class CPEIntegrationService {
       const precioVenta = valorVenta + igv;
 
       return {
+        pedido_detalle_id: item.id,
+        producto_id: item.producto_id,
         codigo: item.producto_id.substring(0, 8), // Código simplificado
         descripcion: item.descripcion,
         cantidad,
@@ -257,6 +259,7 @@ export class CPEIntegrationService {
       total_igv: desgloseIgv.igv,
       total_venta: desgloseIgv.total,
       condicion_pago: CondicionPago.CREDITO,
+      pedido_id: pedido.id,
     };
 
     (facturaDto as any).costo_ventas = Number(

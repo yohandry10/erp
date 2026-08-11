@@ -28,6 +28,10 @@ describe('CxpService', () => {
     maybeSingle: jest.fn(),
   };
 
+  const mockTesoreriaService = {
+    registrarPago: jest.fn(),
+  };
+
   mockSupabaseClient.rpc.mockImplementation(() => mockSupabaseClient.single());
 
   beforeEach(async () => {
@@ -57,7 +61,7 @@ describe('CxpService', () => {
         },
         {
           provide: TesoreriaService,
-          useValue: null,
+          useValue: mockTesoreriaService,
         },
       ],
     }).compile();
@@ -347,52 +351,27 @@ describe('CxpService', () => {
         observaciones: 'Actualizado',
       };
 
-      const mockCxpExistente = {
+      const mockCxpActualizada = {
         id: cxpId,
         estado: 'PENDIENTE',
-        proveedor_id: 'prov-001',
-        numero_documento: 'F001-00001',
-        saldo: 1180,
-        total: 1180,
-      };
-
-      const mockCxpActualizada = {
-        ...mockCxpExistente,
         observaciones: 'Actualizado',
       };
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: { cuenta: mockCxpActualizada }, error: null });
 
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxpExistente, error: null });
-      mockSupabaseClient.single.mockResolvedValueOnce({ data: mockCxpActualizada, error: null });
-
-      const result = await service.actualizarCuentaPorPagar(tenantId, cxpId, dto, userId);
+      const result = await service.actualizarCuentaPorPagar(tenantId, cxpId, dto, userId, 'cxp-update-test-001');
 
       expect(result.success).toBe(true);
       expect(result.data.observaciones).toBe('Actualizado');
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('gestionar_cxp_tx', expect.objectContaining({
+        p_action: 'UPDATE_TERMS', p_cxp_id: cxpId, p_actor_id: userId,
+        p_idempotency_key: 'cxp-update-test-001',
+      }));
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if CxP does not exist', async () => {
+    it('propaga validaciones transaccionales del writer', async () => {
       const dto = { observaciones: 'Test' };
-
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
-
-      await expect(service.actualizarCuentaPorPagar(tenantId, cxpId, dto, userId)).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw BadRequestException if CxP is PAGADA', async () => {
-      const dto = { observaciones: 'Test' };
-      const mockCxp = { id: cxpId, estado: 'PAGADA' };
-
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxp, error: null });
-
-      await expect(service.actualizarCuentaPorPagar(tenantId, cxpId, dto, userId)).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException if CxP is ANULADA', async () => {
-      const dto = { observaciones: 'Test' };
-      const mockCxp = { id: cxpId, estado: 'ANULADA' };
-
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxp, error: null });
-
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { message: 'CXP_UPDATE_STATE_INVALID:PAGADA' } });
       await expect(service.actualizarCuentaPorPagar(tenantId, cxpId, dto, userId)).rejects.toThrow(BadRequestException);
     });
   });
@@ -402,121 +381,66 @@ describe('CxpService', () => {
     const cxpId = 'cxp-001';
     const userId = 'user-456';
 
-    it('should apply payment and update saldo correctly', async () => {
+    it('delegates payment atomically to TesoreriaService', async () => {
       const dto = {
         monto: 500,
         fecha_pago: '2025-10-25',
         metodo_pago: 'TRANSFERENCIA',
+        cuenta_bancaria_id: '11111111-1111-4111-8111-111111111111',
+        referencia: 'OP-001',
+        idempotency_key: 'cxp-payment-attempt-001',
       };
 
-      const mockCxp = {
-        id: cxpId,
-        estado: 'PENDIENTE',
-        saldo: 1180,
-        total: 1180,
-        moneda: 'PEN',
-        proveedor_id: 'prov-001',
-        numero_documento: 'F001-00001',
+      const writerResult = {
+        success: true,
+        data: { cxp: { id: cxpId, saldo: 680, estado: 'PARCIAL' } },
       };
-
-      const mockCxpActualizada = {
-        ...mockCxp,
-        saldo: 680,
-        estado: 'PARCIAL',
-      };
-
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxp, error: null });
-      mockSupabaseClient.single.mockResolvedValueOnce({ data: mockCxpActualizada, error: null });
+      mockTesoreriaService.registrarPago.mockResolvedValueOnce(writerResult);
 
       const result = await service.aplicarPago(tenantId, cxpId, dto, userId);
 
-      expect(result.success).toBe(true);
-      expect(result.data.cxp.saldo).toBe(680);
-      expect(result.data.cxp.estado).toBe('PARCIAL');
+      expect(result).toBe(writerResult);
+      expect(mockTesoreriaService.registrarPago).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({
+          cxp_id: cxpId,
+          monto: 500,
+          fecha_pago: '2025-10-25',
+          idempotency_key: 'cxp-payment-attempt-001',
+        }),
+        userId,
+      );
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+      expect(eventBusService.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
     });
 
-    it('should mark CxP as PAGADA when saldo reaches 0', async () => {
+    it('propagates writer failures without an event-based fallback', async () => {
       const dto = {
-        monto: 1180,
+        monto: 500,
         fecha_pago: '2025-10-25',
         metodo_pago: 'TRANSFERENCIA',
+        idempotency_key: 'cxp-payment-attempt-002',
       };
+      mockTesoreriaService.registrarPago.mockRejectedValueOnce(new Error('rollback outbox'));
 
-      const mockCxp = {
-        id: cxpId,
-        estado: 'PENDIENTE',
-        saldo: 1180,
-        total: 1180,
-        moneda: 'PEN',
-        proveedor_id: 'prov-001',
-        numero_documento: 'F001-00001',
-      };
-
-      const mockCxpActualizada = {
-        ...mockCxp,
-        saldo: 0,
-        estado: 'PAGADA',
-      };
-
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxp, error: null });
-      mockSupabaseClient.single.mockResolvedValueOnce({ data: mockCxpActualizada, error: null });
-
-      const result = await service.aplicarPago(tenantId, cxpId, dto, userId);
-
-      expect(result.success).toBe(true);
-      expect(result.data.cxp.saldo).toBe(0);
-      expect(result.data.cxp.estado).toBe('PAGADA');
+      await expect(service.aplicarPago(tenantId, cxpId, dto, userId)).rejects.toThrow('rollback outbox');
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+      expect(eventBusService.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException if monto is negative or zero', async () => {
+    it('propagates writer validation for an invalid amount', async () => {
       const dto = {
         monto: 0,
         fecha_pago: '2025-10-25',
         metodo_pago: 'TRANSFERENCIA',
+        idempotency_key: 'cxp-payment-attempt-003',
       };
+      mockTesoreriaService.registrarPago.mockRejectedValueOnce(
+        new BadRequestException('El monto del pago debe ser mayor a 0'),
+      );
 
       await expect(service.aplicarPago(tenantId, cxpId, dto, userId)).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException if monto exceeds saldo', async () => {
-      const dto = {
-        monto: 2000,
-        fecha_pago: '2025-10-25',
-        metodo_pago: 'TRANSFERENCIA',
-      };
-
-      const mockCxp = {
-        id: cxpId,
-        estado: 'PENDIENTE',
-        saldo: 1180,
-        total: 1180,
-        moneda: 'PEN',
-        proveedor_id: 'prov-001',
-        numero_documento: 'F001-00001',
-      };
-
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxp, error: null });
-
-      await expect(service.aplicarPago(tenantId, cxpId, dto, userId)).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException if CxP is ANULADA', async () => {
-      const dto = {
-        monto: 500,
-        fecha_pago: '2025-10-25',
-        metodo_pago: 'TRANSFERENCIA',
-      };
-
-      const mockCxp = {
-        id: cxpId,
-        estado: 'ANULADA',
-        saldo: 1180,
-        total: 1180,
-      };
-
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxp, error: null });
-
-      await expect(service.aplicarPago(tenantId, cxpId, dto, userId)).rejects.toThrow(BadRequestException);
+      expect(mockTesoreriaService.registrarPago).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -531,60 +455,27 @@ describe('CxpService', () => {
         observaciones: 'Factura duplicada',
       };
 
-      const mockCxp = {
-        id: cxpId,
-        estado: 'PENDIENTE',
-        saldo: 1180,
-        total: 1180,
-        tenant_id: tenantId,
-        proveedor_id: 'prov-001',
-        numero_documento: 'F001-00001',
-      };
-
       const mockCxpAnulada = {
-        ...mockCxp,
+        id: cxpId,
         estado: 'ANULADA',
       };
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: { cuenta: mockCxpAnulada }, error: null });
 
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxp, error: null });
-      mockSupabaseClient.single.mockResolvedValueOnce({ data: mockCxpAnulada, error: null });
-      mockSupabaseClient.insert.mockResolvedValueOnce({ error: null });
-
-      const result = await service.anularCuentaPorPagar(tenantId, cxpId, dto, userId);
+      const result = await service.anularCuentaPorPagar(tenantId, cxpId, dto, userId, 'cxp-cancel-test-001');
 
       expect(result.success).toBe(true);
       expect(result.data.estado).toBe('ANULADA');
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('gestionar_cxp_tx', expect.objectContaining({
+        p_action: 'CANCEL', p_cxp_id: cxpId, p_idempotency_key: 'cxp-cancel-test-001',
+      }));
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException if CxP is already ANULADA', async () => {
+    it('propaga rechazo cuando ya está anulada o tiene pagos', async () => {
       const dto = {
         motivo: 'Error en factura',
       };
-
-      const mockCxp = {
-        id: cxpId,
-        estado: 'ANULADA',
-      };
-
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxp, error: null });
-
-      await expect(service.anularCuentaPorPagar(tenantId, cxpId, dto, userId)).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException if CxP has payments applied', async () => {
-      const dto = {
-        motivo: 'Error en factura',
-      };
-
-      const mockCxp = {
-        id: cxpId,
-        estado: 'PARCIAL',
-        saldo: 500,
-        total: 1180,
-      };
-
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: mockCxp, error: null });
-
+      mockSupabaseClient.rpc.mockResolvedValueOnce({ data: null, error: { message: 'CXP_ALREADY_CANCELLED' } });
       await expect(service.anularCuentaPorPagar(tenantId, cxpId, dto, userId)).rejects.toThrow(BadRequestException);
     });
   });
@@ -737,35 +628,9 @@ describe('CxpService', () => {
   });
 
   describe('aplicarDevolucionProveedorEmitida', () => {
-    it('ajusta subtotal/igv/total/saldo cuando la devolución es parcial y no hay pagos', async () => {
+    it('bloquea el writer legacy porque la devolución 450 ya ajusta CxP atómicamente', async () => {
       const tenantId = 'tenant-123';
-
-      mockSupabaseClient.maybeSingle
-        // integration_logs (idempotencia) -> no procesado
-        .mockResolvedValueOnce({ data: null, error: null })
-        // cuentas_por_pagar lookup por recepción
-        .mockResolvedValueOnce({
-          data: {
-            id: 'cxp-1',
-            estado: 'PENDIENTE',
-            saldo: 1180,
-            total: 1180,
-            subtotal: 1000,
-            igv: 180,
-            moneda: 'USD',
-            referencia_id: 'rec-1',
-            observaciones: 'CxP inicial',
-          },
-          error: null,
-        });
-
-      // update cuentas_por_pagar -> retorna cxpActualizada
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: { id: 'cxp-1' },
-        error: null,
-      });
-
-      await service.aplicarDevolucionProveedorEmitida(tenantId, {
+      await expect(service.aplicarDevolucionProveedorEmitida(tenantId, {
         devolucionId: 'dev-1',
         numeroDevolucion: 'DEV-001',
         ordenId: 'oc-1',
@@ -782,16 +647,8 @@ describe('CxpService', () => {
         emitidoEn: new Date().toISOString(),
         tenantId,
         idempotencyKey: 'devolucion:tenant-123:dev-1',
-      });
-
-      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          subtotal: 800,
-          igv: 144,
-          total: 944,
-          saldo: 944,
-        }),
-      );
+      })).rejects.toThrow('RPC atómica de devolución');
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
     });
   });
 });

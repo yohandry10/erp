@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { ValidationService } from '../validations/validation.service';
@@ -38,6 +38,131 @@ export class ConfigurationService {
     private readonly validationService: ValidationService,
     private readonly configService: ConfigService,
   ) {}
+
+  private requireAtomicContext(actorId?: string, idempotencyKey?: string): {
+    actorId: string;
+    idempotencyKey: string;
+  } {
+    const actor = String(actorId || '').trim();
+    const key = String(idempotencyKey || '').trim();
+    if (!actor) {
+      throw new BadRequestException('No se pudo identificar al actor de la operación');
+    }
+    if (key.length < 8 || key.length > 255) {
+      throw new BadRequestException(
+        'Idempotency-Key es obligatorio y debe tener entre 8 y 255 caracteres',
+      );
+    }
+    return { actorId: actor, idempotencyKey: key };
+  }
+
+  private mapWizardProgress(row: any): WizardProgress {
+    return {
+      id: row.id,
+      tenantId: row.tenant_id,
+      pasoActual: row.paso_actual,
+      pasosCompletados: row.pasos_completados || [],
+      configuracionTemporal: row.configuracion_temporal,
+      completado: row.completado,
+      completadoAt: row.completado_at ? new Date(row.completado_at) : undefined,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    };
+  }
+
+  private sanitizeWizardTemporaryConfig(
+    input: Record<string, unknown> | undefined,
+  ): Record<string, unknown> {
+    const sanitized = { ...(input || {}) };
+    const secretOrBinaryKeys = [
+      'certificateBase64',
+      'certificatePassword',
+      'certificateFile',
+      'certificado_pfx',
+      'certificado_password',
+      'logoBase64',
+      'logoFile',
+      'sunat_password',
+      'sunat_gre_client_secret',
+      'ose_password',
+      'ose_api_key',
+      'ose_bearer_token',
+      'dian_password',
+      'dian_software_pin',
+    ];
+    for (const key of secretOrBinaryKeys) delete sanitized[key];
+    return sanitized;
+  }
+
+  private configurationIntentFingerprint(input: unknown): string {
+    const canonicalize = (value: any): any => {
+      if (value === undefined) return null;
+      if (value === null || typeof value !== 'object') return value;
+      if (Buffer.isBuffer(value)) return value.toString('base64');
+      if (value instanceof Date) return value.toISOString();
+      if (Array.isArray(value)) return value.map(canonicalize);
+      return Object.keys(value)
+        .filter((key) => key !== 'certificateFile' && key !== 'logoFile')
+        .sort()
+        .reduce<Record<string, unknown>>((result, key) => {
+          result[key] = canonicalize(value[key]);
+          return result;
+        }, {});
+    };
+    return createHash('sha256')
+      .update(JSON.stringify(canonicalize(input)))
+      .digest('hex');
+  }
+
+  async updateEmpresaPatchAtomic(
+    tenantId: string,
+    patch: Record<string, unknown>,
+    actorId?: string,
+    idempotencyKey?: string,
+    operation: 'EMPRESA' | 'PARAMETROS' | 'GRE' | 'TENANT_UPDATE' = 'EMPRESA',
+  ): Promise<any> {
+    const atomic = this.requireAtomicContext(actorId, idempotencyKey);
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'actualizar_empresa_config_tx',
+      {
+        p_tenant_id: tenantId,
+        p_actor_id: atomic.actorId,
+        p_idempotency_key: atomic.idempotencyKey,
+        p_operation: operation,
+        p_patch: patch,
+      },
+    );
+    if (error) throw error;
+    return (data as any)?.configuracion;
+  }
+
+  async updateDocumentSeriesAtomic(
+    tenantId: string,
+    actorId: string | undefined,
+    idempotencyKey: string | undefined,
+    input: {
+      tipoDocumento: string;
+      serie: string;
+      correlativoMaximo?: number;
+      activo?: boolean;
+    },
+  ): Promise<any> {
+    const atomic = this.requireAtomicContext(actorId, idempotencyKey);
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'actualizar_serie_documento_tx',
+      {
+        p_tenant_id: tenantId,
+        p_actor_id: atomic.actorId,
+        p_idempotency_key: atomic.idempotencyKey,
+        p_tipo_documento: input.tipoDocumento,
+        p_serie: input.serie,
+        p_correlativo_maximo: input.correlativoMaximo ?? 99999999,
+        p_activo: input.activo !== false,
+      },
+    );
+    if (error) throw error;
+    return (data as any)?.serie;
+  }
 
   /**
    * Get configuration status for a tenant
@@ -119,25 +244,38 @@ export class ConfigurationService {
       const typedEmpresaConfig = empresaConfig as any;
       const isDemo = typedEmpresaConfig?.is_demo === true;
 
-      // Build missing items list. Se calcula normalmente para tenants reales;
-      // una demo queda exenta al construir la respuesta final porque ya trae
-      // datos transaccionales y no debe pedir certificado ni onboarding.
-      const missingItems: string[] = [];
-      const addMissingItem = (item: string) => {
-        if (!missingItems.includes(item)) missingItems.push(item);
+      // La preparación base del ERP y la habilitación fiscal son dos fronteras
+      // distintas. El cliente puede operar el ERP sin certificado; la emisión
+      // electrónica seguirá fail-closed hasta que aporte su propia configuración.
+      const coreMissingItems: string[] = [];
+      const fiscalMissingItems: string[] = [];
+      const addCoreMissingItem = (item: string) => {
+        if (!coreMissingItems.includes(item)) coreMissingItems.push(item);
       };
-      
+      const addFiscalMissingItem = (item: string) => {
+        if (!fiscalMissingItems.includes(item)) fiscalMissingItems.push(item);
+      };
+
+      const certificateExists =
+        certificateValidation.errors.length === 0 ||
+        !certificateValidation.errors.some((error) =>
+          error.includes('No se ha cargado') ||
+          error.includes('No se encontró configuración de certificado'),
+        );
+
       if (!certificateValidation.isValid && !isDemo) {
-        missingItems.push('Certificado digital');
+        addFiscalMissingItem('Certificado digital del cliente');
       }
-      
+
       if (rucValidation.missingFields.length > 0) {
-        missingItems.push(...rucValidation.missingFields);
+        rucValidation.missingFields.forEach(addCoreMissingItem);
+      } else if (!rucValidation.isValid && !isDemo) {
+        addCoreMissingItem('Documento fiscal válido');
       }
 
       const rawPaisCodigo = (typedEmpresaConfig?.pais || INITIAL_ACTIVE_COUNTRY_CODE).toString().toUpperCase();
       if (!isInitialActiveCountryCode(rawPaisCodigo)) {
-        missingItems.push(INITIAL_ACTIVE_COUNTRY_MESSAGE);
+        addCoreMissingItem(INITIAL_ACTIVE_COUNTRY_MESSAGE);
       }
       const paisCodigo = isInitialActiveCountryCode(rawPaisCodigo)
         ? rawPaisCodigo
@@ -156,131 +294,103 @@ export class ConfigurationService {
 
       if (requiereOse) {
         if (!oseActivo) {
-          missingItems.push('Activar OSE API');
+          addFiscalMissingItem('Activar OSE API');
         }
         if (!typedEmpresaConfig?.ose_url) {
-          missingItems.push('URL de OSE');
+          addFiscalMissingItem('URL de OSE');
         }
 
         if (oseAuthTipo === 'BASIC') {
-          if (!typedEmpresaConfig?.ose_username) missingItems.push('Usuario OSE');
-          if (!typedEmpresaConfig?.ose_password) missingItems.push('Password OSE');
+          if (!typedEmpresaConfig?.ose_username) addFiscalMissingItem('Usuario OSE');
+          if (!typedEmpresaConfig?.ose_password) addFiscalMissingItem('Password OSE');
         } else if (oseAuthTipo === 'BEARER') {
-          if (!typedEmpresaConfig?.ose_bearer_token) missingItems.push('Bearer token OSE');
+          if (!typedEmpresaConfig?.ose_bearer_token) addFiscalMissingItem('Bearer token OSE');
         } else if (oseAuthTipo === 'API_KEY') {
-          if (!typedEmpresaConfig?.ose_api_key) missingItems.push('API key OSE');
-          if (!typedEmpresaConfig?.ose_api_header) missingItems.push('Header API key OSE');
+          if (!typedEmpresaConfig?.ose_api_key) addFiscalMissingItem('API key OSE');
+          if (!typedEmpresaConfig?.ose_api_header) addFiscalMissingItem('Header API key OSE');
         }
       }
 
       if (requiereSunatDirecto) {
-        if (!typedEmpresaConfig?.sunat_username) addMissingItem('Usuario SOL secundario');
-        if (!typedEmpresaConfig?.sunat_password) addMissingItem('Clave SOL secundaria');
+        if (!typedEmpresaConfig?.sunat_username) addFiscalMissingItem('Usuario SOL secundario');
+        if (!typedEmpresaConfig?.sunat_password) addFiscalMissingItem('Clave SOL secundaria');
         if (sunatGreTransport === 'rest') {
-          if (!typedEmpresaConfig?.sunat_gre_client_id) addMissingItem('Client ID API SUNAT');
-          if (!typedEmpresaConfig?.sunat_gre_client_secret) addMissingItem('Client secret API SUNAT');
+          if (!typedEmpresaConfig?.sunat_gre_client_id) addFiscalMissingItem('Client ID API SUNAT');
+          if (!typedEmpresaConfig?.sunat_gre_client_secret) addFiscalMissingItem('Client secret API SUNAT');
         }
       }
 
       if (sireActivo) {
-        if (!typedEmpresaConfig?.sunat_username) addMissingItem('Usuario SOL secundario');
-        if (!typedEmpresaConfig?.sunat_password) addMissingItem('Clave SOL secundaria');
-        if (!typedEmpresaConfig?.sunat_gre_client_id) addMissingItem('Client ID API SUNAT');
-        if (!typedEmpresaConfig?.sunat_gre_client_secret) addMissingItem('Client secret API SUNAT');
+        if (!typedEmpresaConfig?.sunat_username) addFiscalMissingItem('Usuario SOL secundario');
+        if (!typedEmpresaConfig?.sunat_password) addFiscalMissingItem('Clave SOL secundaria');
+        if (!typedEmpresaConfig?.sunat_gre_client_id) addFiscalMissingItem('Client ID API SUNAT');
+        if (!typedEmpresaConfig?.sunat_gre_client_secret) addFiscalMissingItem('Client secret API SUNAT');
       }
 
       if (requiereArca) {
-        if (!typedEmpresaConfig?.arca_activo) missingItems.push('Activar ARCA WSFE');
-        if (!typedEmpresaConfig?.arca_wsaa_url) missingItems.push('URL WSAA');
-        if (!typedEmpresaConfig?.arca_wsfe_url) missingItems.push('URL WSFEv1');
-        if (!typedEmpresaConfig?.arca_cuit_representada) missingItems.push('CUIT representada');
-        if (!typedEmpresaConfig?.arca_punto_venta) missingItems.push('Punto de venta ARCA');
-        if (!typedEmpresaConfig?.arca_condicion_iva) missingItems.push('Condición frente al IVA');
-        if (!typedEmpresaConfig?.ingresos_brutos) missingItems.push('Inscripción en Ingresos Brutos');
-        if (!typedEmpresaConfig?.fecha_inicio_actividades) missingItems.push('Fecha de inicio de actividades');
-        if (!typedEmpresaConfig?.provincia_fiscal) missingItems.push('Jurisdicción fiscal');
+        if (!typedEmpresaConfig?.arca_activo) addFiscalMissingItem('Activar ARCA WSFE');
+        if (!typedEmpresaConfig?.arca_wsaa_url) addFiscalMissingItem('URL WSAA');
+        if (!typedEmpresaConfig?.arca_wsfe_url) addFiscalMissingItem('URL WSFEv1');
+        if (!typedEmpresaConfig?.arca_cuit_representada) addFiscalMissingItem('CUIT representada');
+        if (!typedEmpresaConfig?.arca_punto_venta) addFiscalMissingItem('Punto de venta ARCA');
+        if (!typedEmpresaConfig?.arca_condicion_iva) addFiscalMissingItem('Condición frente al IVA');
+        if (!typedEmpresaConfig?.ingresos_brutos) addFiscalMissingItem('Inscripción en Ingresos Brutos');
+        if (!typedEmpresaConfig?.fecha_inicio_actividades) addFiscalMissingItem('Fecha de inicio de actividades');
+        if (!typedEmpresaConfig?.provincia_fiscal) addFiscalMissingItem('Jurisdicción fiscal');
       }
 
       if (requiereDian) {
-        if (!dianActivo) missingItems.push('Activar DIAN');
-        if (!typedEmpresaConfig?.dian_url) missingItems.push('URL DIAN');
-        if (!typedEmpresaConfig?.dian_usuario) missingItems.push('Usuario DIAN');
-        if (!typedEmpresaConfig?.dian_password) missingItems.push('Password DIAN');
-        if (!typedEmpresaConfig?.dian_software_id) missingItems.push('Software ID DIAN');
-        if (!typedEmpresaConfig?.dian_software_pin) missingItems.push('Software PIN DIAN');
-        if (!typedEmpresaConfig?.dian_regimen_fiscal) missingItems.push('Régimen fiscal DIAN');
-        if (!typedEmpresaConfig?.dian_tipo_contribuyente) missingItems.push('Tipo contribuyente DIAN');
+        if (!dianActivo) addFiscalMissingItem('Activar DIAN');
+        if (!typedEmpresaConfig?.dian_url) addFiscalMissingItem('URL DIAN');
+        if (!typedEmpresaConfig?.dian_usuario) addFiscalMissingItem('Usuario DIAN');
+        if (!typedEmpresaConfig?.dian_password) addFiscalMissingItem('Password DIAN');
+        if (!typedEmpresaConfig?.dian_software_id) addFiscalMissingItem('Software ID DIAN');
+        if (!typedEmpresaConfig?.dian_software_pin) addFiscalMissingItem('Software PIN DIAN');
+        if (!typedEmpresaConfig?.dian_regimen_fiscal) addFiscalMissingItem('Régimen fiscal DIAN');
+        if (!typedEmpresaConfig?.dian_tipo_contribuyente) addFiscalMissingItem('Tipo contribuyente DIAN');
         if (dianEnvironment === 'HOMOLOGACION' && !typedEmpresaConfig?.dian_test_set_id) {
-          missingItems.push('Test Set ID DIAN');
+          addFiscalMissingItem('Test Set ID DIAN');
         }
-        if (!typedEmpresaConfig?.dian_resolucion_numero) missingItems.push('Resolución DIAN');
-        if (!typedEmpresaConfig?.dian_resolucion_prefijo) missingItems.push('Prefijo DIAN');
-        if (typedEmpresaConfig?.dian_resolucion_desde == null) missingItems.push('Rango inicio DIAN');
-        if (typedEmpresaConfig?.dian_resolucion_hasta == null) missingItems.push('Rango fin DIAN');
-        if (!typedEmpresaConfig?.dian_resolucion_fecha_inicio) missingItems.push('Vigencia inicio DIAN');
-        if (!typedEmpresaConfig?.dian_resolucion_fecha_fin) missingItems.push('Vigencia fin DIAN');
+        if (!typedEmpresaConfig?.dian_resolucion_numero) addFiscalMissingItem('Resolución DIAN');
+        if (!typedEmpresaConfig?.dian_resolucion_prefijo) addFiscalMissingItem('Prefijo DIAN');
+        if (typedEmpresaConfig?.dian_resolucion_desde == null) addFiscalMissingItem('Rango inicio DIAN');
+        if (typedEmpresaConfig?.dian_resolucion_hasta == null) addFiscalMissingItem('Rango fin DIAN');
+        if (!typedEmpresaConfig?.dian_resolucion_fecha_inicio) addFiscalMissingItem('Vigencia inicio DIAN');
+        if (!typedEmpresaConfig?.dian_resolucion_fecha_fin) addFiscalMissingItem('Vigencia fin DIAN');
       }
 
-      // Calculate completion percentage
-      const baseRequirements = 4; // Certificate, RUC, Razon Social, Direccion
-      let sunatRequirements = 0;
-      let oseRequirements = 0;
-      let dianRequirements = 0;
-      let arcaRequirements = 0;
-      const sunatRequiredFields = new Set<string>();
-      if (requiereSunatDirecto || sireActivo) {
-        sunatRequiredFields.add('username');
-        sunatRequiredFields.add('password');
-      }
-      if ((requiereSunatDirecto && sunatGreTransport === 'rest') || sireActivo) {
-        sunatRequiredFields.add('client_id');
-        sunatRequiredFields.add('client_secret');
-      }
-      sunatRequirements = sunatRequiredFields.size;
-      if (requiereOse) {
-        oseRequirements += 1; // ose_activo
-        oseRequirements += 1; // ose_url
-        if (oseAuthTipo === 'BASIC') oseRequirements += 2;
-        if (oseAuthTipo === 'BEARER') oseRequirements += 1;
-        if (oseAuthTipo === 'API_KEY') oseRequirements += 2;
-      }
-      if (requiereDian) {
-        dianRequirements += 1; // dian_activo
-        dianRequirements += 1; // dian_url
-        dianRequirements += 1; // dian_usuario
-        dianRequirements += 1; // dian_password
-        dianRequirements += 1; // dian_software_id
-        dianRequirements += 1; // dian_software_pin
-        dianRequirements += 1; // dian_regimen_fiscal
-        dianRequirements += 1; // dian_tipo_contribuyente
-        if (dianEnvironment === 'HOMOLOGACION') dianRequirements += 1; // dian_test_set_id
-        dianRequirements += 1; // dian_resolucion_numero
-        dianRequirements += 1; // dian_resolucion_prefijo
-        dianRequirements += 1; // dian_resolucion_desde
-        dianRequirements += 1; // dian_resolucion_hasta
-        dianRequirements += 1; // dian_resolucion_fecha_inicio
-        dianRequirements += 1; // dian_resolucion_fecha_fin
-      }
-      if (requiereArca) arcaRequirements = 9;
-      const totalRequirements =
-        baseRequirements + sunatRequirements + oseRequirements + dianRequirements + arcaRequirements;
-      const effectiveMissingItems = isDemo ? [] : missingItems;
-      const completedRequirements = Math.max(totalRequirements - effectiveMissingItems.length, 0);
+      const effectiveCoreMissingItems = isDemo ? [] : coreMissingItems;
+      const baseRequirements = 3; // Documento fiscal, razón social y dirección.
+      const completedRequirements = Math.max(
+        baseRequirements - Math.min(effectiveCoreMissingItems.length, baseRequirements),
+        0,
+      );
       const completionPercentage = isDemo
         ? 100
-        : Math.round((completedRequirements / totalRequirements) * 100);
+        : Math.round((completedRequirements / baseRequirements) * 100);
       const certificateReady = isDemo || certificateValidation.isValid;
       const isComplete = isDemo || (
-        effectiveMissingItems.length === 0 && certificateReady && rucValidation.isValid
+        effectiveCoreMissingItems.length === 0 && rucValidation.isValid
+      );
+      const fiscalEnabled = !isDemo && Boolean(
+        certificateExists ||
+        oseActivo ||
+        sireActivo ||
+        dianActivo ||
+        typedEmpresaConfig?.arca_activo === true ||
+        typedEmpresaConfig?.sunat_username ||
+        typedEmpresaConfig?.sunat_password ||
+        typedEmpresaConfig?.sunat_gre_client_id ||
+        typedEmpresaConfig?.sunat_gre_client_secret,
       );
 
       const status: ConfigurationStatus = {
         isComplete,
         isDemo,
         completionPercentage,
-        missingItems: effectiveMissingItems,
+        missingItems: effectiveCoreMissingItems,
         certificate: {
-          exists: certificateValidation.errors.length === 0 || !certificateValidation.errors.some(e => e.includes('No se ha cargado')),
+          exists: certificateExists,
           isValid: certificateReady,
           expiresAt: certificateValidation.expiresAt,
           rucMatches: certificateValidation.rucMatches,
@@ -292,6 +402,11 @@ export class ConfigurationService {
         ruc: {
           isConfigured: rucValidation.isValid,
           missingFields: rucValidation.missingFields,
+        },
+        fiscal: {
+          isEnabled: fiscalEnabled,
+          isReady: !isDemo && fiscalMissingItems.length === 0 && certificateValidation.isValid,
+          missingItems: isDemo ? [] : fiscalMissingItems,
         },
       };
 
@@ -325,6 +440,8 @@ export class ConfigurationService {
   async updateEmpresaConfig(
     tenantId: string,
     config: UpdateEmpresaConfigDto,
+    actorId?: string,
+    idempotencyKey?: string,
   ): Promise<void> {
     try {
       this.logger.log(`Updating empresa config for tenant: ${tenantId}`);
@@ -424,27 +541,22 @@ export class ConfigurationService {
       // Update timestamp
       updateData.ultima_validacion = new Date().toISOString();
 
-      const { error } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .update(updateData)
-        .eq('tenant_id', tenantId);
+      const atomic = this.requireAtomicContext(actorId, idempotencyKey);
+      const { error } = await this.supabaseService.getClient().rpc(
+        'actualizar_empresa_config_tx',
+        {
+          p_tenant_id: tenantId,
+          p_actor_id: atomic.actorId,
+          p_idempotency_key: atomic.idempotencyKey,
+          p_operation: 'EMPRESA',
+          p_patch: updateData,
+        },
+      );
 
       if (error) {
         this.logger.error(`Error updating empresa config for tenant ${tenantId}:`, error);
         throw error;
       }
-
-      // Update configuration status
-      const status = await this.getConfigurationStatus(tenantId);
-      
-      await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .update({
-          configuracion_completa: status.isComplete,
-        })
-        .eq('tenant_id', tenantId);
 
       this.logger.log(`Empresa config updated successfully for tenant: ${tenantId}`);
     } catch (error) {
@@ -493,18 +605,26 @@ export class ConfigurationService {
   async updateGREThresholds(
     tenantId: string,
     thresholds: UpdateGREThresholdsDto,
+    actorId?: string,
+    idempotencyKey?: string,
   ): Promise<void> {
     try {
       this.logger.log(`Updating GRE thresholds for tenant: ${tenantId}`);
 
-      const { error } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .update({
-          umbral_gre_automatico: thresholds.umbralGREAutomatico,
-          gre_automatico_habilitado: thresholds.greAutomaticoHabilitado,
-        })
-        .eq('tenant_id', tenantId);
+      const atomic = this.requireAtomicContext(actorId, idempotencyKey);
+      const { error } = await this.supabaseService.getClient().rpc(
+        'actualizar_empresa_config_tx',
+        {
+          p_tenant_id: tenantId,
+          p_actor_id: atomic.actorId,
+          p_idempotency_key: atomic.idempotencyKey,
+          p_operation: 'GRE',
+          p_patch: {
+            umbral_gre_automatico: thresholds.umbralGREAutomatico,
+            gre_automatico_habilitado: thresholds.greAutomaticoHabilitado,
+          },
+        },
+      );
 
       if (error) {
         this.logger.error(`Error updating GRE thresholds for tenant ${tenantId}:`, error);
@@ -565,85 +685,33 @@ export class ConfigurationService {
   async saveWizardStep(
     tenantId: string,
     stepData: SaveWizardStepDto,
+    actorId?: string,
+    idempotencyKey?: string,
   ): Promise<WizardProgress> {
     try {
       this.logger.log(`Saving wizard step for tenant: ${tenantId}, step: ${stepData.pasoActual}`);
-
-      // Get existing progress or create new
-      const existingProgress = await this.getWizardProgress(tenantId);
-
-      const pasosCompletados = new Set(existingProgress?.pasosCompletados || []);
-      pasosCompletados.add(stepData.pasoActual);
-
-      const configuracionTemporal = stepData.configuracionTemporal
-        ? {
-            ...(existingProgress?.configuracionTemporal || {}),
-            ...stepData.configuracionTemporal,
-          }
-        : existingProgress?.configuracionTemporal;
-
-      const progressData = {
-        tenant_id: tenantId,
-        paso_actual: stepData.pasoActual,
-        pasos_completados: Array.from(pasosCompletados),
-        configuracion_temporal: configuracionTemporal,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (existingProgress) {
-        // Update existing
-        const { data, error } = await this.supabaseService
-          .getClient()
-          .from('wizard_progress')
-          .update(progressData)
-          .eq('tenant_id', tenantId)
-          .select()
-          .single();
-
-        if (error) {
-          this.logger.error(`Error updating wizard progress for tenant ${tenantId}:`, error);
-          throw error;
-        }
-
-        const typedData = data as any;
-        return {
-          id: typedData.id,
-          tenantId: typedData.tenant_id,
-          pasoActual: typedData.paso_actual,
-          pasosCompletados: typedData.pasos_completados,
-          configuracionTemporal: typedData.configuracion_temporal,
-          completado: typedData.completado,
-          completadoAt: typedData.completado_at ? new Date(typedData.completado_at) : undefined,
-          createdAt: new Date(typedData.created_at),
-          updatedAt: new Date(typedData.updated_at),
-        };
-      } else {
-        // Create new
-        const { data, error } = await this.supabaseService
-          .getClient()
-          .from('wizard_progress')
-          .insert(progressData)
-          .select()
-          .single();
-
-        if (error) {
-          this.logger.error(`Error creating wizard progress for tenant ${tenantId}:`, error);
-          throw error;
-        }
-
-        const typedInsertData = data as any;
-        return {
-          id: typedInsertData.id,
-          tenantId: typedInsertData.tenant_id,
-          pasoActual: typedInsertData.paso_actual,
-          pasosCompletados: typedInsertData.pasos_completados,
-          configuracionTemporal: typedInsertData.configuracion_temporal,
-          completado: typedInsertData.completado,
-          completadoAt: typedInsertData.completado_at ? new Date(typedInsertData.completado_at) : undefined,
-          createdAt: new Date(typedInsertData.created_at),
-          updatedAt: new Date(typedInsertData.updated_at),
-        };
+      const atomic = this.requireAtomicContext(actorId, idempotencyKey);
+      const { data, error } = await this.supabaseService.getClient().rpc(
+        'guardar_paso_wizard_config_tx',
+        {
+          p_tenant_id: tenantId,
+          p_actor_id: atomic.actorId,
+          p_idempotency_key: atomic.idempotencyKey,
+          p_paso_actual: stepData.pasoActual,
+          p_configuracion_temporal: this.sanitizeWizardTemporaryConfig(
+            stepData.configuracionTemporal,
+          ),
+        },
+      );
+      if (error) {
+        this.logger.error(`Error saving wizard progress for tenant ${tenantId}:`, error);
+        throw error;
       }
+      const progress = (data as any)?.progress;
+      if (!progress) {
+        throw new Error('El RPC de wizard no devolvió progreso');
+      }
+      return this.mapWizardProgress(progress);
     } catch (error) {
       this.logger.error(`Error saving wizard step for tenant ${tenantId}:`, error);
       throw error;
@@ -742,7 +810,12 @@ export class ConfigurationService {
   /**
    * Mark wizard as completed
    */
-  async completeWizard(tenantId: string, configOverride?: any): Promise<void> {
+  async completeWizard(
+    tenantId: string,
+    configOverride?: any,
+    actorId?: string,
+    idempotencyKey?: string,
+  ): Promise<void> {
     try {
       this.logger.log(`Completing wizard and saving configuration for tenant: ${tenantId}`);
 
@@ -785,36 +858,53 @@ export class ConfigurationService {
         getActiveCountryByCode(INITIAL_ACTIVE_COUNTRY_CODE)!;
       const paisCodigo = country.codigo;
 
-      if (!config.certificateBase64) {
-        throw new Error('No se encontró el certificado digital en la configuración');
+      if (!String(config.ruc || '').trim() || !String(config.razonSocial || '').trim() || !String(config.direccion || '').trim()) {
+        throw new Error('Documento fiscal, razón social y dirección son obligatorios para habilitar el ERP');
       }
 
-      if (paisCodigo === 'PE' && !/^\d{6}$/.test(String(config.ubigeo || '').trim())) {
+      if (paisCodigo === 'PE' && !/^\d{11}$/.test(String(config.ruc || '').trim())) {
+        throw new Error('Perú requiere un RUC válido de 11 dígitos');
+      }
+      if (
+        paisCodigo === 'PE' &&
+        String(config.ubigeo || '').trim() &&
+        !/^\d{6}$/.test(String(config.ubigeo).trim())
+      ) {
+        throw new Error('El ubigeo, cuando se informa, debe tener 6 dígitos');
+      }
+      if (
+        paisCodigo === 'PE' &&
+        (config.gre_obligatorio === true || config.gre_automatico_habilitado === true) &&
+        !/^\d{6}$/.test(String(config.ubigeo || '').trim())
+      ) {
         throw new Error(
           'La configuración fiscal de Perú requiere un ubigeo de 6 dígitos para emitir GRE',
         );
       }
 
-      if (config.certificatePassword === undefined || config.certificatePassword === null) {
-        throw new Error('La contraseña del certificado digital es requerida');
+      const hasCertificate = Boolean(String(config.certificateBase64 || '').trim());
+      const hasCertificatePassword = Boolean(String(config.certificatePassword || ''));
+      if (hasCertificate !== hasCertificatePassword) {
+        throw new Error(
+          hasCertificate
+            ? 'La contraseña del certificado digital es requerida'
+            : 'No se puede guardar una contraseña sin el certificado digital',
+        );
       }
 
-      const certificateValidation = await this.validateCertificatePayload(tenantId, {
-        certificateBase64: config.certificateBase64,
-        certificatePassword: config.certificatePassword,
-      });
+      const certificateValidation = hasCertificate
+        ? await this.validateCertificatePayload(tenantId, {
+            certificateBase64: config.certificateBase64,
+            certificatePassword: config.certificatePassword,
+          })
+        : null;
+      if (certificateValidation && certificateValidation.daysUntilExpiration < 0) {
+        throw new Error('El certificado digital aportado por el cliente está vencido');
+      }
 
       const emisionModo = (config.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
       const sunatGreTransport = (config.sunat_gre_transport || 'soap').toString().toLowerCase();
-      if (paisCodigo === 'PE' && emisionModo === 'SUNAT_DIRECTO') {
-        if (!config.sunat_username || !config.sunat_password) {
-          throw new Error('SUNAT directo requiere usuario y clave SOL secundaria');
-        }
-        if (sunatGreTransport === 'rest' && (!config.sunat_gre_client_id || !config.sunat_gre_client_secret)) {
-          throw new Error('GRE REST requiere client_id y client_secret SUNAT');
-        }
-      }
-      const sireActivo = paisCodigo === 'PE' && config.sire_activo !== false;
+      const sireActivo = paisCodigo === 'PE' && config.sire_activo === true;
       if (sireActivo && (
         !config.sunat_username
         || !config.sunat_password
@@ -823,149 +913,213 @@ export class ConfigurationService {
       )) {
         throw new Error('SIRE requiere usuario/clave SOL secundaria y client_id/client_secret API SUNAT');
       }
+      if (paisCodigo === 'PE' && config.ose_activo === true) {
+        if (emisionModo !== 'OSE_API' || !config.ose_url) {
+          throw new Error('OSE activo requiere seleccionar OSE API e informar su URL');
+        }
+        const authTipo = String(config.ose_auth_tipo || 'BASIC').toUpperCase();
+        if (authTipo === 'BASIC' && (!config.ose_username || !config.ose_password)) {
+          throw new Error('OSE BASIC requiere usuario y contraseña');
+        }
+        if (authTipo === 'BEARER' && !config.ose_bearer_token) {
+          throw new Error('OSE BEARER requiere el token aportado por el cliente');
+        }
+        if (authTipo === 'API_KEY' && (!config.ose_api_key || !config.ose_api_header)) {
+          throw new Error('OSE API_KEY requiere clave y nombre de cabecera');
+        }
+      }
       if (paisCodigo === 'AR') {
         if (!validateArgentinaCuit(config.ruc)) {
           throw new Error('Argentina requiere un CUIT válido de 11 dígitos');
         }
-        if (!config.arca_punto_venta || Number(config.arca_punto_venta) < 1) {
-          throw new Error('ARCA requiere un punto de venta electrónico habilitado');
-        }
-        if (!config.arca_condicion_iva) {
-          throw new Error('Debes indicar la condición de la empresa frente al IVA');
-        }
-        if (!config.ingresos_brutos || !config.provincia_fiscal) {
-          throw new Error('Debes configurar Ingresos Brutos y la jurisdicción fiscal');
+        if (config.arca_activo === true) {
+          if (!config.arca_wsaa_url || !config.arca_wsfe_url) {
+            throw new Error('ARCA activo requiere las URL WSAA y WSFEv1');
+          }
+          if (!config.arca_punto_venta || Number(config.arca_punto_venta) < 1) {
+            throw new Error('ARCA requiere un punto de venta electrónico habilitado');
+          }
+          if (!config.arca_condicion_iva || !config.ingresos_brutos || !config.provincia_fiscal) {
+            throw new Error('ARCA activo requiere condición IVA, Ingresos Brutos y jurisdicción fiscal');
+          }
+          const existingCertificate = certificateValidation
+            ? { isValid: true }
+            : await this.validationService.validateCertificate(tenantId);
+          if (!existingCertificate.isValid) {
+            throw new Error('ARCA activo requiere el certificado digital vigente aportado por el cliente');
+          }
         }
       }
       if (paisCodigo === 'CO') {
         if (!validateColombiaNit(config.ruc)) {
           throw new Error('Colombia requiere un NIT válido con dígito de verificación');
         }
-        if (!config.dian_resolucion_numero || !config.dian_resolucion_prefijo) {
-          throw new Error('DIAN requiere resolución y prefijo de numeración vigentes');
+        if (config.dian_activo === true) {
+          const requiredDianFields = [
+            config.dian_url,
+            config.dian_usuario,
+            config.dian_password,
+            config.dian_software_id,
+            config.dian_software_pin,
+            config.dian_resolucion_numero,
+            config.dian_resolucion_prefijo,
+          ];
+          if (requiredDianFields.some((value) => !value)) {
+            throw new Error('DIAN activo requiere credenciales, software y resolución aportados por el cliente');
+          }
+          const existingCertificate = certificateValidation
+            ? { isValid: true }
+            : await this.validationService.validateCertificate(tenantId);
+          if (!existingCertificate.isValid) {
+            throw new Error('DIAN activo requiere el certificado digital vigente aportado por el cliente');
+          }
         }
       }
 
-      // 2. Save RUC, company data AND certificate to empresa_config
-      this.logger.log(`Saving all configuration to empresa_config...`);
-      
-      // Convert base64 certificate to Buffer for bytea storage
-      const certificateBuffer = Buffer.from(config.certificateBase64.replace(/\s+/g, ''), 'base64');
-      const encryptedCertificate = encryptBuffer(this.configService, certificateBuffer);
-      const certificateHash = createHash('sha256').update(certificateBuffer).digest('hex');
-      this.logger.log(
-        `Certificate payload size=${certificateBuffer.length}, hash=${certificateHash.substr(0, 16)}...`,
+      // 2. Persiste el alta operativa. Certificados y credenciales son opcionales:
+      // si no vienen en el payload, nunca se borran los que el cliente ya cargó.
+      this.logger.log('Saving ERP configuration through the atomic boundary');
+      let certificateHash: string | undefined;
+      const configurationPatch: Record<string, unknown> = {
+        ruc: String(config.ruc).trim(),
+        razon_social: String(config.razonSocial).trim(),
+        direccion_fiscal: String(config.direccion).trim(),
+        ubigeo: String(config.ubigeo || '').trim() || null,
+        pais: country.codigo,
+        pais_id: country.id,
+        moneda_defecto: country.moneda,
+        configuracion_completa: true,
+        tipo_empresa: config.tipo_empresa || 'MICRO',
+        usar_flujo_logistica: config.usar_flujo_logistica === true,
+        gre_obligatorio: config.gre_obligatorio === true,
+        gre_automatico_habilitado: config.gre_automatico_habilitado === true,
+        umbral_gre_automatico: config.umbral_gre_automatico || 700,
+        igv_porcentaje: config.igv_porcentaje || country.tasaImpuesto * 100,
+        retencion_renta_porcentaje: config.retencion_renta_porcentaje || 0,
+        emision_cpe_modo:
+          paisCodigo === 'AR'
+            ? 'ARCA_WSFE'
+            : paisCodigo === 'CO'
+              ? 'DIAN_DIRECTO'
+              : config.emision_cpe_modo || 'SUNAT_DIRECTO',
+        sunat_environment: config.sunat_environment || 'homologacion',
+        sunat_gre_transport: config.sunat_gre_transport || 'soap',
+        sunat_gre_rest_base_url:
+          config.sunat_gre_rest_base_url || 'https://api-cpe.sunat.gob.pe/v1',
+        sire_activo: paisCodigo === 'PE' && config.sire_activo === true,
+        sunat_cert_expected_ruc: config.sunat_cert_expected_ruc || config.ruc,
+        sunat_cert_ruc_mismatch_confirmed:
+          config.sunat_cert_ruc_mismatch_confirmed === true,
+        ose_auth_tipo: config.ose_auth_tipo || 'BASIC',
+        ose_activo: paisCodigo === 'PE' && config.ose_activo === true,
+        arca_activo: paisCodigo === 'AR' && config.arca_activo === true,
+        arca_environment: config.arca_environment || 'homologacion',
+        dian_activo: paisCodigo === 'CO' && config.dian_activo === true,
+        dian_environment:
+          paisCodigo === 'CO' ? config.dian_environment || 'HOMOLOGACION' : null,
+        _intent_fingerprint: this.configurationIntentFingerprint({
+          tenantId,
+          country: country.codigo,
+          configuration: config,
+        }),
+      };
+
+      const setIfPresent = (
+        key: string,
+        value: unknown,
+        transform: (input: any) => unknown = (input) => input,
+      ) => {
+        if (value !== undefined && value !== null && value !== '') {
+          configurationPatch[key] = transform(value);
+        }
+      };
+
+      setIfPresent('departamento', config.departamento);
+      setIfPresent('provincia', config.provincia);
+      setIfPresent('distrito', config.distrito);
+      setIfPresent('regimen_tributario', config.regimen_tributario);
+      setIfPresent('serie_factura', config.serie_factura);
+      setIfPresent('serie_boleta', config.serie_boleta);
+      setIfPresent('serie_nota_credito', config.serie_nota_credito);
+      setIfPresent('serie_guia_remision', config.serie_guia_remision);
+      setIfPresent('sunat_username', config.sunat_username);
+      setIfPresent('sunat_password', config.sunat_password, (value) =>
+        encryptText(this.configService, value),
       );
-      
-      const { error: empresaError } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .upsert({
-          tenant_id: tenantId,
-          ruc: config.ruc,
-          razon_social: config.razonSocial,
-          direccion_fiscal: config.direccion,
-          ubigeo: config.ubigeo,
-          departamento: config.departamento || null,
-          provincia: config.provincia || null,
-          distrito: config.distrito || null,
-          pais: country.codigo,
-          pais_id: country.id,
-          moneda_defecto: country.moneda,
-          certificado_pfx: toPostgresBytea(encryptedCertificate),
-          certificado_password: encryptText(this.configService, config.certificatePassword),
-          certificado_expira_en: certificateValidation.validTo.toISOString(),
-          configuracion_completa: true,
-          // Configuración de ventas
-          tipo_empresa: config.tipo_empresa || 'MICRO',
-          usar_flujo_logistica: config.usar_flujo_logistica !== undefined ? config.usar_flujo_logistica : false,
-          gre_obligatorio: config.gre_obligatorio !== undefined ? config.gre_obligatorio : false,
-          gre_automatico_habilitado: config.gre_automatico_habilitado !== undefined ? config.gre_automatico_habilitado : false,
-          umbral_gre_automatico: config.umbral_gre_automatico || 700,
-          // Configuración fiscal
-          regimen_tributario: config.regimen_tributario,
-          igv_porcentaje: config.igv_porcentaje || country.tasaImpuesto * 100,
-          retencion_renta_porcentaje: config.retencion_renta_porcentaje || 0,
-          serie_factura: config.serie_factura,
-          serie_boleta: config.serie_boleta,
-          serie_nota_credito: config.serie_nota_credito,
-          serie_guia_remision: config.serie_guia_remision || 'T001',
-          // Configuración OSE (opcional)
-          emision_cpe_modo:
-            paisCodigo === 'AR'
-              ? 'ARCA_WSFE'
-              : paisCodigo === 'CO'
-                ? 'DIAN_DIRECTO'
-                : config.emision_cpe_modo || 'SUNAT_DIRECTO',
-          sunat_environment: config.sunat_environment || 'homologacion',
-          sunat_username: config.sunat_username || null,
-          sunat_password: config.sunat_password ? encryptText(this.configService, config.sunat_password) : null,
-          sunat_cpe_url: config.sunat_cpe_url || null,
-          sunat_summary_url: config.sunat_summary_url || null,
-          sunat_query_url: config.sunat_query_url || null,
-          sunat_gre_url: config.sunat_gre_url || null,
-          sunat_gre_transport: config.sunat_gre_transport || 'soap',
-          sunat_gre_rest_base_url: config.sunat_gre_rest_base_url || 'https://api-cpe.sunat.gob.pe/v1',
-          sunat_gre_auth_url: config.sunat_gre_auth_url || null,
-          sunat_gre_client_id: config.sunat_gre_client_id || null,
-          sunat_gre_client_secret: config.sunat_gre_client_secret
-            ? encryptText(this.configService, config.sunat_gre_client_secret)
-            : null,
-          sire_activo: paisCodigo === 'PE' ? config.sire_activo !== false : false,
-          sunat_cert_expected_ruc: config.sunat_cert_expected_ruc || config.ruc || null,
-          sunat_cert_ruc_mismatch_confirmed: config.sunat_cert_ruc_mismatch_confirmed === true,
-          sunat_cert_ruc_mismatch_reason: config.sunat_cert_ruc_mismatch_reason || null,
-          ose_url: config.ose_url,
-          ose_status_url: config.ose_status_url,
-          ose_username: config.ose_username,
-          ose_password: config.ose_password,
-          ose_auth_tipo: config.ose_auth_tipo || 'BASIC',
-          ose_api_key: config.ose_api_key,
-          ose_api_header: config.ose_api_header,
-          ose_bearer_token: config.ose_bearer_token,
-          ose_activo: config.ose_activo || false,
-          arca_activo: paisCodigo === 'AR' ? config.arca_activo === true : false,
-          arca_environment: config.arca_environment || 'homologacion',
-          arca_wsaa_url: config.arca_wsaa_url || null,
-          arca_wsfe_url: config.arca_wsfe_url || null,
-          arca_cuit_representada: paisCodigo === 'AR'
-            ? config.arca_cuit_representada || config.ruc
-            : null,
-          arca_punto_venta: paisCodigo === 'AR' ? Number(config.arca_punto_venta) : null,
-          arca_condicion_iva: paisCodigo === 'AR' ? config.arca_condicion_iva : null,
-          ingresos_brutos: paisCodigo === 'AR' ? config.ingresos_brutos : null,
-          fecha_inicio_actividades: paisCodigo === 'AR'
-            ? config.fecha_inicio_actividades || null
-            : null,
-          provincia_fiscal: paisCodigo === 'AR' ? config.provincia_fiscal : null,
-          dian_activo: paisCodigo === 'CO' ? config.dian_activo === true : false,
-          dian_url: paisCodigo === 'CO' ? config.dian_url || null : null,
-          dian_usuario: paisCodigo === 'CO' ? config.dian_usuario || null : null,
-          dian_password:
-            paisCodigo === 'CO' && config.dian_password
-              ? encryptText(this.configService, config.dian_password)
-              : null,
-          dian_software_id: paisCodigo === 'CO' ? config.dian_software_id || null : null,
-          dian_software_pin:
-            paisCodigo === 'CO' && config.dian_software_pin
-              ? encryptText(this.configService, config.dian_software_pin)
-              : null,
-          dian_test_set_id: paisCodigo === 'CO' ? config.dian_test_set_id || null : null,
-          dian_environment: paisCodigo === 'CO' ? config.dian_environment || 'HOMOLOGACION' : null,
-          dian_regimen_fiscal: paisCodigo === 'CO' ? config.dian_regimen_fiscal || null : null,
-          dian_tipo_contribuyente: paisCodigo === 'CO' ? config.dian_tipo_contribuyente || null : null,
-          dian_resolucion_numero: paisCodigo === 'CO' ? config.dian_resolucion_numero || null : null,
-          dian_resolucion_prefijo: paisCodigo === 'CO' ? config.dian_resolucion_prefijo || null : null,
-          dian_resolucion_desde: paisCodigo === 'CO' ? Number(config.dian_resolucion_desde) : null,
-          dian_resolucion_hasta: paisCodigo === 'CO' ? Number(config.dian_resolucion_hasta) : null,
-          dian_resolucion_fecha_inicio: paisCodigo === 'CO' ? config.dian_resolucion_fecha_inicio || null : null,
-          dian_resolucion_fecha_fin: paisCodigo === 'CO' ? config.dian_resolucion_fecha_fin || null : null,
-          // Logo de la empresa (multi-tenant)
-          logo_url: config.logoUrl || config.logoBase64 || null,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'tenant_id'
-        });
+      setIfPresent('sunat_cpe_url', config.sunat_cpe_url);
+      setIfPresent('sunat_summary_url', config.sunat_summary_url);
+      setIfPresent('sunat_query_url', config.sunat_query_url);
+      setIfPresent('sunat_gre_url', config.sunat_gre_url);
+      setIfPresent('sunat_gre_auth_url', config.sunat_gre_auth_url);
+      setIfPresent('sunat_gre_client_id', config.sunat_gre_client_id);
+      setIfPresent('sunat_gre_client_secret', config.sunat_gre_client_secret, (value) =>
+        encryptText(this.configService, value),
+      );
+      setIfPresent('sunat_cert_ruc_mismatch_reason', config.sunat_cert_ruc_mismatch_reason);
+      setIfPresent('ose_url', config.ose_url);
+      setIfPresent('ose_status_url', config.ose_status_url);
+      setIfPresent('ose_username', config.ose_username);
+      setIfPresent('ose_password', config.ose_password);
+      setIfPresent('ose_api_key', config.ose_api_key);
+      setIfPresent('ose_api_header', config.ose_api_header);
+      setIfPresent('ose_bearer_token', config.ose_bearer_token);
+      if (paisCodigo === 'AR') {
+        setIfPresent('arca_wsaa_url', config.arca_wsaa_url);
+        setIfPresent('arca_wsfe_url', config.arca_wsfe_url);
+        setIfPresent('arca_cuit_representada', config.arca_cuit_representada || config.ruc);
+        setIfPresent('arca_punto_venta', config.arca_punto_venta, Number);
+        setIfPresent('arca_condicion_iva', config.arca_condicion_iva);
+        setIfPresent('ingresos_brutos', config.ingresos_brutos);
+        setIfPresent('fecha_inicio_actividades', config.fecha_inicio_actividades);
+        setIfPresent('provincia_fiscal', config.provincia_fiscal);
+      }
+      if (paisCodigo === 'CO') {
+        setIfPresent('dian_url', config.dian_url);
+        setIfPresent('dian_usuario', config.dian_usuario);
+        setIfPresent('dian_password', config.dian_password, (value) =>
+          encryptText(this.configService, value),
+        );
+        setIfPresent('dian_software_id', config.dian_software_id);
+        setIfPresent('dian_software_pin', config.dian_software_pin, (value) =>
+          encryptText(this.configService, value),
+        );
+        setIfPresent('dian_test_set_id', config.dian_test_set_id);
+        setIfPresent('dian_regimen_fiscal', config.dian_regimen_fiscal);
+        setIfPresent('dian_tipo_contribuyente', config.dian_tipo_contribuyente);
+        setIfPresent('dian_resolucion_numero', config.dian_resolucion_numero);
+        setIfPresent('dian_resolucion_prefijo', config.dian_resolucion_prefijo);
+        setIfPresent('dian_resolucion_desde', config.dian_resolucion_desde, Number);
+        setIfPresent('dian_resolucion_hasta', config.dian_resolucion_hasta, Number);
+        setIfPresent('dian_resolucion_fecha_inicio', config.dian_resolucion_fecha_inicio);
+        setIfPresent('dian_resolucion_fecha_fin', config.dian_resolucion_fecha_fin);
+      }
+      setIfPresent('logo_url', config.logoUrl || config.logoBase64);
+
+      if (certificateValidation) {
+        const certificateBuffer = Buffer.from(
+          String(config.certificateBase64).replace(/\s+/g, ''),
+          'base64',
+        );
+        certificateHash = createHash('sha256').update(certificateBuffer).digest('hex');
+        configurationPatch.certificado_pfx = toPostgresBytea(
+          encryptBuffer(this.configService, certificateBuffer),
+        );
+        configurationPatch.certificado_password = encryptText(
+          this.configService,
+          config.certificatePassword,
+        );
+        configurationPatch.certificado_expira_en = certificateValidation.validTo.toISOString();
+      }
+      const atomic = this.requireAtomicContext(actorId, idempotencyKey);
+      const { error: empresaError } = await this.supabaseService.getClient().rpc(
+        'completar_wizard_config_tx',
+        {
+          p_tenant_id: tenantId,
+          p_actor_id: atomic.actorId,
+          p_idempotency_key: atomic.idempotencyKey,
+          p_patch: configurationPatch,
+        },
+      );
 
       if (empresaError) {
         this.logger.error(`Error saving empresa_config:`, empresaError);
@@ -974,60 +1128,40 @@ export class ConfigurationService {
       
       this.logger.log(`✅ All configuration saved to empresa_config`);
 
-      // Double-check that the certificate can be read back correctly
-      const { data: verifyData, error: verifyError } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .select('certificado_pfx, certificado_password')
-        .eq('tenant_id', tenantId)
-        .single();
+      if (certificateHash) {
+        // Sólo relee el certificado cuando este intento efectivamente cargó uno.
+        const { data: verifyData, error: verifyError } = await this.supabaseService
+          .getClient()
+          .from('empresa_config')
+          .select('certificado_pfx, certificado_password')
+          .eq('tenant_id', tenantId)
+          .single();
 
-      if (verifyError) {
-        this.logger.error(`Error verifying certificate after save for tenant ${tenantId}:`, verifyError);
-        throw verifyError;
-      }
-
-      const typedVerifyData = verifyData as any;
-      try {
-        const storedBuffer = decryptBuffer(this.configService, typedVerifyData.certificado_pfx);
-        if (!storedBuffer) {
-          throw new Error('El certificado almacenado está vacío');
+        if (verifyError) {
+          this.logger.error(`Error verifying certificate after save for tenant ${tenantId}:`, verifyError);
+          throw verifyError;
         }
-        const storedHash = createHash('sha256').update(storedBuffer).digest('hex');
-        this.logger.log(
-          `✅ Certificate stored for tenant ${tenantId}. Bytes: ${storedBuffer.length}, hash=${storedHash.substr(0, 16)}...`,
-        );
-        if (storedHash !== certificateHash) {
-          this.logger.warn(
-            `Hash mismatch between payload and stored certificate for tenant ${tenantId}`,
+
+        const typedVerifyData = verifyData as any;
+        try {
+          const storedBuffer = decryptBuffer(this.configService, typedVerifyData.certificado_pfx);
+          if (!storedBuffer) throw new Error('El certificado almacenado está vacío');
+          const storedHash = createHash('sha256').update(storedBuffer).digest('hex');
+          if (storedHash !== certificateHash) {
+            throw new Error('El certificado persistido no coincide con el payload validado');
+          }
+          parseCertificateBuffer(
+            storedBuffer,
+            decryptText(this.configService, typedVerifyData.certificado_password),
           );
+        } catch (verifyParseError) {
+          this.logger.error(
+            `Error verifying stored certificate for tenant ${tenantId}:`,
+            verifyParseError,
+          );
+          throw verifyParseError;
         }
-        parseCertificateBuffer(storedBuffer, decryptText(this.configService, typedVerifyData.certificado_password));
-      } catch (verifyParseError) {
-        this.logger.error(
-          `Error verifying stored certificate for tenant ${tenantId}:`,
-          verifyParseError,
-        );
-        throw verifyParseError;
       }
-
-
-      // 4. Mark wizard as completed
-      const { error: wizardError } = await this.supabaseService
-        .getClient()
-        .from('wizard_progress')
-        .update({
-          completado: true,
-          completado_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('tenant_id', tenantId);
-
-      if (wizardError) {
-        this.logger.error(`Error marking wizard as completed:`, wizardError);
-        throw wizardError;
-      }
-
       this.logger.log(`✅ Wizard completed successfully for tenant: ${tenantId}`);
     } catch (error) {
       this.logger.error(`Error completing wizard for tenant ${tenantId}:`, error);
@@ -1038,46 +1172,23 @@ export class ConfigurationService {
   /**
    * Reset wizard progress and mark configuration as incomplete.
    */
-  async resetWizard(tenantId: string): Promise<void> {
+  async resetWizard(
+    tenantId: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ): Promise<void> {
     try {
       this.logger.log(`Resetting wizard for tenant: ${tenantId}`);
-
-      const client = this.supabaseService.getClient();
-
-      const { error: deleteError } = await client
-        .from('wizard_progress')
-        .delete()
-        .eq('tenant_id', tenantId);
-
-      if (deleteError && deleteError.code !== 'PGRST116') {
-        this.logger.error(`Error deleting wizard progress for tenant ${tenantId}:`, deleteError);
-        throw deleteError;
-      }
-
-      const resetPayload = {
-        tenant_id: tenantId,
-        configuracion_completa: false,
-        certificado_pfx: null,
-        certificado_password: null,
-        certificado_expira_en: null,
-        ultima_validacion: null,
-        errores_configuracion: {
-          reason: 'wizard_reset',
-          at: new Date().toISOString(),
+      const atomic = this.requireAtomicContext(actorId, idempotencyKey);
+      const { error } = await this.supabaseService.getClient().rpc(
+        'resetear_wizard_config_tx',
+        {
+          p_tenant_id: tenantId,
+          p_actor_id: atomic.actorId,
+          p_idempotency_key: atomic.idempotencyKey,
         },
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error: empresaError } = await client
-        .from('empresa_config')
-        .upsert(resetPayload, {
-          onConflict: 'tenant_id',
-        });
-
-      if (empresaError) {
-        this.logger.error(`Error resetting empresa_config for tenant ${tenantId}:`, empresaError);
-        throw empresaError;
-      }
+      );
+      if (error) throw error;
 
       this.logger.log(`✅ Wizard reset completed for tenant: ${tenantId}`);
     } catch (error) {

@@ -1,33 +1,32 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { InventarioService } from '../../inventario/inventario.service';
-import { DocumentosService } from '../../documentos.service';
-import { AlmacenesService } from '../../inventario/almacenes/almacenes.service';
-import { esGravado } from '../../../shared/utils/igv-afectacion.util';
 import {
-  CrearRmaDto,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import {
+  AplicarSaldoFavorDto,
   AprobarRmaDto,
-  RecepcionarRmaDto,
+  CrearRmaDto,
   GenerarNotaCreditoDto,
-  RecepcionarRmaItemDto,
+  RecepcionarRmaDto,
+  ReembolsarSaldoFavorDto,
+  RevertirReembolsoSaldoFavorDto,
+  RevertirRecepcionRmaDto,
 } from './dto';
 
-interface ConfigRma {
-  habilitar_rma: boolean;
-  dias_maximos_rma: number;
-  rma_requiere_control_calidad: boolean;
-}
-
+/**
+ * Puerta de aplicación de RMA.
+ *
+ * Las lecturas son tenant-scoped. Toda escritura de negocio cruza una única
+ * RPC 456 SECURITY DEFINER ejecutable sólo por service_role; no se permiten
+ * actualizaciones compensatorias desde TypeScript.
+ */
 @Injectable()
 export class RmaService {
-  private readonly logger = new Logger(RmaService.name);
-
-  constructor(
-    private readonly supabase: SupabaseService,
-    private readonly inventarioService: InventarioService,
-    private readonly documentosService: DocumentosService,
-    private readonly almacenesService: AlmacenesService,
-  ) {}
+  constructor(private readonly supabase: SupabaseService) {}
 
   async listar(tenantId: string, estado?: string) {
     const query = this.supabase
@@ -36,44 +35,50 @@ export class RmaService {
       .select(
         `
         id,
+        pedido_id,
+        cliente_id,
         numero,
         motivo_general,
         tipo,
         estado,
+        documento_origen_id,
+        cpe_origen_id,
+        cxc_origen_id,
         nota_credito_documento_id,
+        nota_credito_cpe_id,
         almacen_retorno_id,
+        created_by,
         aprobado_por,
         aprobado_en,
         recibido_por,
         recibido_en,
         created_at,
         updated_at,
-        clientes:cliente_id(id, razon_social, numero_documento)
+        clientes:cliente_id(id, razon_social, nombre, ruc, numero_documento)
       `,
       )
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
 
-    if (estado) {
-      query.eq('estado', estado);
-    }
-
+    if (estado?.trim()) query.eq('estado', estado.trim().toUpperCase());
     const { data, error } = await query;
-    if (error) {
-      throw new BadRequestException(`Error listando RMA: ${error.message}`);
-    }
-
+    if (error) this.throwReadError(error, 'listar las RMA');
     return data ?? [];
   }
 
   async obtenerPorId(tenantId: string, rmaId: string) {
-    const { data, error } = await this.supabase
-      .getClient()
+    const client = this.supabase.getClient();
+    const { data, error } = await client
       .from('rma_solicitudes')
       .select(
         `
         *,
-        items:rma_items(*),
+        items:rma_items(
+          *,
+          productos:producto_id(id, codigo, nombre, es_servicio, controla_stock),
+          detalle:detalle_id(id, descripcion, cantidad, cantidad_despachada, cantidad_facturada),
+          documento_detalle:documento_detalle_id(id, orden, descripcion, cantidad, total_item)
+        ),
         eventos:rma_eventos(*)
       `,
       )
@@ -81,527 +86,466 @@ export class RmaService {
       .eq('id', rmaId)
       .maybeSingle();
 
-    if (error) {
-      throw new BadRequestException(`Error obteniendo RMA: ${error.message}`);
-    }
-
-    if (!data) {
-      throw new NotFoundException('RMA no encontrada');
-    }
-
-    return data;
-  }
-
-  async crear(tenantId: string, userId: string | null, dto: CrearRmaDto) {
-    const config = await this.obtenerConfig(tenantId);
-    if (!config.habilitar_rma) {
-      throw new BadRequestException('El flujo de RMA no está habilitado para este tenant');
-    }
-
-    if (!dto.items || dto.items.length === 0) {
-      throw new BadRequestException('Debe registrar al menos un item para el RMA');
-    }
-
-    const client = this.supabase.getClient();
-    const pedido = await this.obtenerPedidoConDetalle(tenantId, dto.pedido_id);
-
-    if (!['FACTURADO', 'LISTO_FACTURAR', 'COMPLETADO', 'DESPACHO_PARCIAL'].includes(pedido.estado)) {
-      throw new BadRequestException('Solo se puede crear RMA para pedidos facturados o despachados');
-    }
-
-    const detalleMap = new Map(
-      pedido.detalle.map((item: any) => [item.id, item]),
-    );
-    const detalleIds = dto.items.map((item) => item.detalle_id);
-
-    const { data: rmaPrevias, error: rmaPreviasError } = await client
-      .from('rma_items')
-      .select('detalle_id, cantidad_autorizada, cantidad_devuelta, estado')
+    if (error) this.throwReadError(error, 'obtener la RMA');
+    if (!data) throw new NotFoundException('RMA no encontrada en el tenant');
+    const { data: saldoFavor, error: saldoError } = await client
+      .from('saldos_favor_clientes')
+      .select('*')
       .eq('tenant_id', tenantId)
-      .in('detalle_id', detalleIds);
-
-    if (rmaPreviasError) {
-      throw new BadRequestException(`Error validando historial de RMA: ${rmaPreviasError.message}`);
-    }
-
-    const consumosPrevios = new Map<string, number>();
-    (rmaPrevias ?? []).forEach((registro) => {
-      if (registro.estado === 'RECHAZADO') {
-        return;
-      }
-      const previo = consumosPrevios.get(registro.detalle_id) ?? 0;
-      consumosPrevios.set(registro.detalle_id, previo + Number(registro.cantidad_autorizada ?? 0));
-    });
-
-    const itemsInsert = dto.items.map((item) => {
-      const detalle = detalleMap.get(item.detalle_id);
-      if (!detalle) {
-        throw new BadRequestException(`El detalle ${item.detalle_id} no pertenece al pedido`);
-      }
-
-      const cantidadDespachada = Number(detalle.cantidad_despachada ?? 0);
-      const autorizadaPrevia = consumosPrevios.get(item.detalle_id) ?? 0;
-      const disponible = Math.max(cantidadDespachada - autorizadaPrevia, 0);
-
-      if (disponible <= 0) {
-        throw new BadRequestException(`El item ${detalle.descripcion} no tiene saldo disponible para RMA`);
-      }
-
-      if (item.cantidad > disponible) {
-        throw new BadRequestException(
-          `La cantidad solicitada (${item.cantidad}) excede el saldo pendiente (${disponible}) para ${detalle.descripcion}`,
-        );
-      }
-
-      return {
-        detalle,
-        payload: {
-          detalle_id: item.detalle_id,
-          producto_id: item.producto_id,
-          cantidad_autorizada: item.cantidad,
-          motivo_item: item.motivo_item ?? dto.motivo_general ?? 'DEVOLUCIÓN',
-          lote: item.lote ?? null,
-          fecha_expiracion: item.fecha_expiracion ?? null,
-        },
-      };
-    });
-
-    let almacenRetornoId = dto.almacen_retorno_id ?? null;
-    if (config.habilitar_rma_requiere_almacen ?? true) {
-      if (almacenRetornoId) {
-        await this.almacenesService.obtenerPorId(tenantId, almacenRetornoId);
-      } else {
-        const principal = await this.almacenesService.obtenerPrincipal(tenantId);
-        almacenRetornoId = principal?.id ?? null;
-      }
-    }
-
-    const numero = await this.generarSecuenciaRma(tenantId);
-
-    const { data: rma, error: rmaError } = await client
-      .from('rma_solicitudes')
-      .insert({
-        tenant_id: tenantId,
-        pedido_id: dto.pedido_id,
-        cliente_id: pedido.cliente_id,
-        numero,
-        motivo_general: dto.motivo_general ?? null,
-        tipo: 'DEVOLUCION',
-        estado: 'CREADA',
-        almacen_retorno_id: almacenRetornoId,
-      })
-      .select()
-      .single();
-
-    if (rmaError) {
-      throw new BadRequestException(`No se pudo crear la solicitud de RMA: ${rmaError.message}`);
-    }
-
-    const itemsPayload = itemsInsert.map(({ payload }) => ({
-      tenant_id: tenantId,
-      rma_id: rma.id,
-      ...payload,
-    }));
-
-    const { error: itemsError } = await client.from('rma_items').insert(itemsPayload);
-    if (itemsError) {
-      throw new BadRequestException(`No se pudieron registrar los items del RMA: ${itemsError.message}`);
-    }
-
-    await this.registrarEvento(rma.id, tenantId, 'CREADA', 'RMA creada', { userId, pedidoId: dto.pedido_id });
-
-    return this.obtenerPorId(tenantId, rma.id);
-  }
-
-  async aprobar(tenantId: string, userId: string | null, rmaId: string, dto: AprobarRmaDto) {
-    const rma = await this.obtenerPorId(tenantId, rmaId);
-
-    if (rma.estado !== 'CREADA') {
-      throw new BadRequestException('Solo se pueden aprobar RMA en estado CREADA');
-    }
-
-    const aprobar = dto.aprobar ?? true;
-    const nuevoEstado = aprobar ? 'APROBADA' : 'RECHAZADA';
-
-    const { error } = await this.supabase
-      .getClient()
-      .from('rma_solicitudes')
-      .update({
-        estado: nuevoEstado,
-        aprobado_por: userId,
-        aprobado_en: new Date().toISOString(),
-        notas: dto.notas ?? null,
-      })
-      .eq('tenant_id', tenantId)
-      .eq('id', rmaId);
-
-    if (error) {
-      throw new BadRequestException(`No se pudo actualizar la solicitud de RMA: ${error.message}`);
-    }
-
-    await this.registrarEvento(rmaId, tenantId, 'APROBACION', `RMA ${nuevoEstado}`, { userId });
-
-    return this.obtenerPorId(tenantId, rmaId);
-  }
-
-  async recepcionar(tenantId: string, userId: string | null, rmaId: string, dto: RecepcionarRmaDto) {
-    const rma = await this.obtenerPorId(tenantId, rmaId);
-
-    if (!['APROBADA', 'CREADA'].includes(rma.estado)) {
-      throw new BadRequestException('Solo se pueden recepcionar RMA aprobadas o pendientes');
-    }
-
-    const config = await this.obtenerConfig(tenantId);
-    const itemsPorId = new Map<string, any>((rma.items ?? []).map((item: any) => [item.id, item]));
-
-    const almacenesCache = new Set<string>();
-    const ubicacionesCache = new Set<string>();
-
-    let almacenDefault = dto.almacen_id ?? rma.almacen_retorno_id ?? null;
-    if (config.habilitar_rma_requiere_almacen ?? true) {
-      if (almacenDefault) {
-        await this.almacenesService.obtenerPorId(tenantId, almacenDefault);
-        almacenesCache.add(almacenDefault);
-      } else {
-        const principal = await this.almacenesService.obtenerPrincipal(tenantId);
-        if (!principal) {
-          throw new BadRequestException('Debe configurar un almacén de retorno para recibir RMA');
-        }
-        almacenDefault = principal.id;
-        almacenesCache.add(principal.id);
-      }
-    }
-
-    const movimientos: Array<{ item: any; input: RecepcionarRmaItemDto; almacenId: string }> = [];
-
-    for (const input of dto.items ?? []) {
-      const item = itemsPorId.get(input.rma_item_id);
-      if (!item) {
-        throw new BadRequestException('Se intentó recepcionar un item que no pertenece al RMA');
-      }
-
-      const saldoPendiente = Math.max(Number(item.cantidad_autorizada) - Number(item.cantidad_devuelta ?? 0), 0);
-      if (input.cantidad_recibida > saldoPendiente) {
-        throw new BadRequestException(
-          `La cantidad a recepcionar (${input.cantidad_recibida}) excede el saldo pendiente (${saldoPendiente})`,
-        );
-      }
-
-      const almacenId = input.almacen_id ?? almacenDefault;
-      if (!almacenId) {
-        throw new BadRequestException('Debe indicar un almacén de retorno');
-      }
-      if (!almacenesCache.has(almacenId)) {
-        await this.almacenesService.obtenerPorId(tenantId, almacenId);
-        almacenesCache.add(almacenId);
-      }
-
-      const ubicacionId = input.ubicacion_id ?? dto.ubicacion_id ?? null;
-      if ((config.rma_requiere_control_calidad ?? false) && !ubicacionId) {
-        // El control de calidad requiere ubicación para separar mercadería.
-        throw new BadRequestException('Debe indicar una ubicación de control de calidad para el retorno');
-      }
-      if (ubicacionId) {
-        await this.validarUbicacion(tenantId, ubicacionId, ubicacionesCache);
-      }
-
-      movimientos.push({ item, input, almacenId });
-    }
-
-    for (const movimiento of movimientos) {
-      await this.inventarioService.registrarRetornoRma(movimiento.item.id, movimiento.input.cantidad_recibida, movimiento.almacenId, {
-        ubicacionId: movimiento.input.ubicacion_id ?? dto.ubicacion_id,
-        lote: movimiento.input.lote ?? dto.lote,
-        fechaExpiracion: movimiento.input.fecha_expiracion ?? null,
-      });
-    }
-
-    const { error } = await this.supabase
-      .getClient()
-      .from('rma_solicitudes')
-      .update({
-        estado: 'RECIBIDA',
-        recibido_por: userId,
-        recibido_en: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .eq('id', rmaId);
-
-    if (error) {
-      throw new BadRequestException(`No se pudo actualizar el estado del RMA: ${error.message}`);
-    }
-
-    await this.registrarEvento(rmaId, tenantId, 'RECEPCION', 'Mercadería recibida en almacén', { userId });
-
-    return this.obtenerPorId(tenantId, rmaId);
-  }
-
-  async generarNotaCredito(tenantId: string, userId: string | null, rmaId: string, dto: GenerarNotaCreditoDto) {
-    const rma = await this.obtenerPorId(tenantId, rmaId);
-    if (rma.estado !== 'RECIBIDA') {
-      throw new BadRequestException('Solo se pueden generar notas de crédito para RMA recibidas');
-    }
-    if (rma.nota_credito_documento_id) {
-      throw new BadRequestException('Ya se generó una nota de crédito para este RMA');
-    }
-
-    const client = this.supabase.getClient();
-    const { data: pedido, error: pedidoError } = await client
-      .from('pedidos_venta')
-      .select(
-        `
-        id,
-        numero,
-        cliente_id,
-        clientes:cliente_id(razon_social, numero_documento, documento_tipo),
-        detalle:pedidos_venta_detalle(id, descripcion, precio_unitario, producto_id, cantidad, cantidad_despachada)
-      `,
-      )
-      .eq('tenant_id', tenantId)
-      .eq('id', rma.pedido_id)
+      .eq('rma_id', rmaId)
       .maybeSingle();
-
-    if (pedidoError || !pedido) {
-      throw new BadRequestException('No se pudo obtener el pedido asociado a la RMA');
-    }
-
-    const detalleMap = new Map<string, any>((pedido.detalle ?? []).map((item: any) => [item.id, item]));
-
-    const { data: empresa, error: empresaError } = await client
-      .from('empresa_config')
-      .select('moneda_defecto, igv_porcentaje')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-
-    if (empresaError) {
-      throw new BadRequestException('No se pudo obtener la moneda por defecto de la empresa');
-    }
-
-    const tasaIgv = Number((empresa as any)?.igv_porcentaje) > 0
-      ? Number((empresa as any).igv_porcentaje) / 100
-      : 0.18;
-
-    // Código y afectación reales del producto: el código imprimía el UUID, y sin
-    // la afectación no se puede saber qué parte de lo devuelto llevaba IGV.
-    const productosDevueltos = await this.obtenerProductosDeLaDevolucion(tenantId, rma.items ?? []);
-
-    const detallesNota = [];
-    let subtotalNota = 0;
-    let igvNota = 0;
-
-    for (const item of rma.items ?? []) {
-      const fuente = detalleMap.get(item.detalle_id);
-      if (!fuente) {
-        continue;
-      }
-      const cantidad = Number(item.cantidad_devuelta ?? item.cantidad_autorizada ?? 0);
-      if (cantidad <= 0) {
-        continue;
-      }
-
-      const precioUnitario = Number(fuente.precio_unitario ?? 0);
-      const valorVenta = this.round2(precioUnitario * cantidad);
-      const producto = productosDevueltos.get(fuente.producto_id);
-      const igvItem = esGravado(producto?.afectacion_igv) ? this.round2(valorVenta * tasaIgv) : 0;
-
-      subtotalNota += valorVenta;
-      igvNota += igvItem;
-
-      detallesNota.push({
-        codigo_producto: producto?.codigo ?? fuente.producto_id,
-        descripcion: fuente.descripcion,
-        unidad_medida: 'NIU',
-        cantidad,
-        precio_unitario: precioUnitario,
-        valor_venta: valorVenta,
-        impuesto_igv: igvItem,
-        total_item: this.round2(valorVenta + igvItem),
-      });
-    }
-
-    if (detallesNota.length === 0) {
-      throw new BadRequestException('No hay items devueltos para generar nota de crédito');
-    }
-
-    subtotalNota = this.round2(subtotalNota);
-    igvNota = this.round2(igvNota);
-
-    const documentoData = {
-      tipo_documento: 'NOTA_CREDITO',
-      motivo_nota_credito: dto.motivo ?? 'DEVOLUCION DE MERCADERIA',
-      receptor_numero_doc: (pedido.clientes as any)?.numero_documento ?? '',
-      receptor_razon_social: (pedido.clientes as any)?.razon_social ?? '',
-      receptor_tipo_doc: (pedido.clientes as any)?.documento_tipo ?? '6',
-      moneda: empresa?.moneda_defecto || 'PEN',
-      // Una nota de crédito por devolución revierte también el IGV de lo
-      // devuelto; sin esto el impuesto de esa mercadería seguía declarado.
-      subtotal: subtotalNota,
-      impuesto_igv: igvNota,
-      total: this.round2(subtotalNota + igvNota),
-      serie: dto.serie,
-      detalles: detallesNota,
-    };
-
-    const nota = await this.documentosService.crearDocumento(documentoData, tenantId, userId ?? undefined);
-    if (!nota?.data) {
-      throw new BadRequestException('No se pudo crear la nota de crédito');
-    }
-
-    const { error } = await client
-      .from('rma_solicitudes')
-      .update({
-        nota_credito_documento_id: nota.data.id,
-        estado: 'CERRADA',
-      })
-      .eq('tenant_id', tenantId)
-      .eq('id', rmaId);
-
-    if (error) {
-      throw new BadRequestException(`No se pudo asociar la nota de crédito al RMA: ${error.message}`);
-    }
-
-    await this.registrarEvento(rmaId, tenantId, 'NOTA_CREDITO', 'Nota de crédito generada desde RMA', {
-      userId,
-      documentoId: nota.data.id,
-    });
-
-    return this.obtenerPorId(tenantId, rmaId);
+    if (saldoError) this.throwReadError(saldoError, 'obtener el saldo a favor de la RMA');
+    return { ...data, saldo_favor: saldoFavor ?? null };
   }
 
-  private round2(valor: number): number {
-    return Math.round((Number(valor) + Number.EPSILON) * 100) / 100;
-  }
-
-  /** Código y afectación del IGV de los productos devueltos, por id. */
-  private async obtenerProductosDeLaDevolucion(
-    tenantId: string,
-    items: Array<{ producto_id?: string }>,
-  ): Promise<Map<string, { codigo?: string; afectacion_igv?: string }>> {
-    const mapa = new Map<string, { codigo?: string; afectacion_igv?: string }>();
-    const ids = Array.from(new Set(items.map((item) => item.producto_id).filter(Boolean))) as string[];
-    if (ids.length === 0) return mapa;
-
-    try {
-      const { data, error } = await this.supabase.getClient()
-        .from('productos')
-        .select('id, codigo, afectacion_igv')
+  async listarRecursosRecepcion(tenantId: string) {
+    const client = this.supabase.getClient();
+    const [{ data: config, error: configError }, { data: almacenes, error: almacenesError }] =
+      await Promise.all([
+        client
+          .from('empresa_config')
+          .select('rma_requiere_control_calidad')
+          .eq('tenant_id', tenantId)
+          .maybeSingle(),
+        client
+          .from('almacenes')
+          .select('id, codigo, nombre, es_principal, activo')
+          .eq('tenant_id', tenantId)
+          .eq('activo', true)
+          .order('es_principal', { ascending: false })
+          .order('nombre', { ascending: true }),
+      ]);
+    if (configError) this.throwReadError(configError, 'leer la configuración de recepción RMA');
+    if (almacenesError) this.throwReadError(almacenesError, 'listar almacenes de recepción RMA');
+    const almacenIds = (almacenes ?? []).map((almacen: any) => almacen.id);
+    let ubicaciones: any[] = [];
+    if (almacenIds.length > 0) {
+      const response = await client
+        .from('almacen_ubicaciones')
+        .select('id, almacen_id, codigo, nombre, tipo, estado')
         .eq('tenant_id', tenantId)
-        .in('id', ids);
-
-      if (error) {
-        this.logger.warn(`No se pudo leer los productos devueltos: ${error.message}`);
-        return mapa;
-      }
-
-      for (const producto of data || []) {
-        mapa.set((producto as any).id, {
-          codigo: (producto as any).codigo,
-          afectacion_igv: (producto as any).afectacion_igv,
-        });
-      }
-    } catch (lecturaError: any) {
-      // Sin afectación conocida se asume gravado, que es lo que no deja IGV sin
-      // reversar en la nota de crédito.
-      this.logger.warn(`No se pudo resolver la afectación de la devolución: ${lecturaError?.message ?? lecturaError}`);
+        .in('almacen_id', almacenIds)
+        .order('nombre', { ascending: true });
+      if (response.error) this.throwReadError(response.error, 'listar ubicaciones de recepción RMA');
+      ubicaciones = response.data ?? [];
     }
-
-    return mapa;
-  }
-
-  private async registrarEvento(rmaId: string, tenantId: string, tipo: string, descripcion: string, metadata?: any) {
-    const { error } = await this.supabase
-      .getClient()
-      .from('rma_eventos')
-      .insert({
-        tenant_id: tenantId,
-        rma_id: rmaId,
-        tipo,
-        descripcion,
-        metadata: metadata ?? {},
-      });
-
-    if (error) {
-      console.warn('No se pudo registrar evento de RMA:', error.message);
-    }
-  }
-
-  private async generarSecuenciaRma(tenantId: string): Promise<string> {
-    const { count, error } = await this.supabase
-      .getClient()
-      .from('rma_solicitudes')
-      .select('*', { count: 'exact', head: true })
-      .eq('tenant_id', tenantId);
-
-    if (error) {
-      throw new BadRequestException(`No se pudo calcular la secuencia de RMA: ${error.message}`);
-    }
-
-    const numero = (count ?? 0) + 1;
-    const year = new Date().getFullYear();
-    return `RMA-${year}-${numero.toString().padStart(5, '0')}`;
-  }
-
-  private async obtenerConfig(tenantId: string): Promise<ConfigRma & { habilitar_rma_requiere_almacen: boolean }> {
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('empresa_config')
-      .select('habilitar_rma, dias_maximos_rma, rma_requiere_control_calidad, habilitar_multialmacen')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-
-    if (error || !data) {
-      throw new BadRequestException('No se pudo obtener la configuración de RMA');
-    }
-
     return {
-      habilitar_rma: Boolean(data.habilitar_rma),
-      dias_maximos_rma: Number(data.dias_maximos_rma ?? 0),
-      rma_requiere_control_calidad: Boolean(data.rma_requiere_control_calidad),
-      habilitar_rma_requiere_almacen: Boolean(data.habilitar_multialmacen),
+      control_calidad_requerido: Boolean(config?.rma_requiere_control_calidad),
+      almacenes: almacenes ?? [],
+      ubicaciones,
     };
   }
 
-  private async obtenerPedidoConDetalle(tenantId: string, pedidoId: string) {
-    const { data, error } = await this.supabase
-      .getClient()
+  async listarCandidatos(tenantId: string) {
+    const client = this.supabase.getClient();
+    const { data: pedidos, error: pedidosError } = await client
       .from('pedidos_venta')
+      .select('id, numero, estado, cliente_id, fecha_pedido, moneda, total, clientes:cliente_id(id, razon_social, nombre, ruc, numero_documento)')
+      .eq('tenant_id', tenantId)
+      .in('estado', ['FACTURADO', 'COMPLETADO', 'DESPACHO_PARCIAL', 'LISTO_FACTURAR'])
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (pedidosError) this.throwReadError(pedidosError, 'listar pedidos elegibles para RMA');
+    const pedidoIds = (pedidos ?? []).map((pedido: any) => pedido.id);
+    if (pedidoIds.length === 0) return [];
+
+    const [{ data: detalles, error: detallesError }, { data: documentos, error: documentosError }] =
+      await Promise.all([
+        client
+          .from('pedidos_venta_detalle')
+          .select('id, pedido_id, producto_id, descripcion, cantidad, cantidad_despachada, cantidad_facturada, precio_unitario, productos:producto_id(id, codigo, nombre, es_servicio, controla_stock)')
+          .eq('tenant_id', tenantId)
+          .in('pedido_id', pedidoIds)
+          .order('created_at', { ascending: true }),
+        client
+          .from('documentos')
+          .select('id, pedido_id, tipo_documento, serie, numero, fecha_emision, moneda, total, estado')
+          .eq('tenant_id', tenantId)
+          .in('pedido_id', pedidoIds)
+          .in('tipo_documento', ['FACTURA', 'BOLETA'])
+          .order('created_at', { ascending: false }),
+      ]);
+    if (detallesError) this.throwReadError(detallesError, 'listar líneas elegibles para RMA');
+    if (documentosError) this.throwReadError(documentosError, 'listar documentos origen de RMA');
+
+    const documentoIds = (documentos ?? []).map((documento: any) => documento.id);
+    const detalleIds = (detalles ?? []).map((detalle: any) => detalle.id);
+    const [{ data: cpes, error: cpesError }, { data: usos, error: usosError }] =
+      await Promise.all([
+        documentoIds.length > 0
+          ? client
+              .from('cpe')
+              .select('id, documento_id, tipo_documento, estado, sunat_status')
+              .eq('tenant_id', tenantId)
+              .in('documento_id', documentoIds)
+              .in('tipo_documento', ['01', '03'])
+          : Promise.resolve({ data: [], error: null }),
+        detalleIds.length > 0
+          ? client
+              .from('rma_items')
+              .select('rma_id, detalle_id, cantidad_autorizada, estado')
+              .eq('tenant_id', tenantId)
+              .in('detalle_id', detalleIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+    if (cpesError) this.throwReadError(cpesError, 'validar los CPE origen de RMA');
+    if (usosError) this.throwReadError(usosError, 'calcular cantidades ya devueltas');
+
+    const rmaIds = [...new Set((usos ?? []).map((uso: any) => uso.rma_id).filter(Boolean))];
+    let solicitudes: any[] = [];
+    if (rmaIds.length > 0) {
+      const response = await client
+        .from('rma_solicitudes')
+        .select('id, estado')
+        .eq('tenant_id', tenantId)
+        .in('id', rmaIds);
+      if (response.error) this.throwReadError(response.error, 'validar consumos RMA previos');
+      solicitudes = response.data ?? [];
+    }
+    const estadosActivos = new Set(
+      solicitudes
+        .filter((solicitud: any) => !['RECHAZADA', 'CANCELADA', 'INACTIVO'].includes(String(solicitud.estado).toUpperCase()))
+        .map((solicitud: any) => solicitud.id),
+    );
+    const consumidoPorDetalle = new Map<string, number>();
+    for (const uso of usos ?? []) {
+      if (!estadosActivos.has((uso as any).rma_id)
+          || ['RECHAZADO', 'INACTIVO'].includes(String((uso as any).estado).toUpperCase())) continue;
+      const detalleId = (uso as any).detalle_id;
+      consumidoPorDetalle.set(
+        detalleId,
+        (consumidoPorDetalle.get(detalleId) ?? 0) + Number((uso as any).cantidad_autorizada ?? 0),
+      );
+    }
+
+    const cpesPorDocumento = new Map<string, any[]>();
+    for (const cpe of cpes ?? []) {
+      if (['RECHAZADO', 'ANULADO', 'ERROR'].includes(String((cpe as any).estado).toUpperCase())
+          || ['REJECTED', 'ERROR'].includes(String((cpe as any).sunat_status).toUpperCase())) continue;
+      const group = cpesPorDocumento.get((cpe as any).documento_id) ?? [];
+      group.push(cpe);
+      cpesPorDocumento.set((cpe as any).documento_id, group);
+    }
+
+    const detallesPorPedido = new Map<string, any[]>();
+    for (const detalle of detalles ?? []) {
+      const group = detallesPorPedido.get((detalle as any).pedido_id) ?? [];
+      const product = Array.isArray((detalle as any).productos)
+        ? (detalle as any).productos[0]
+        : (detalle as any).productos;
+      const logical = Boolean(product?.es_servicio) || product?.controla_stock === false;
+      const delivered = logical
+        ? Number((detalle as any).cantidad_facturada ?? (detalle as any).cantidad ?? 0)
+        : Math.min(
+            Number((detalle as any).cantidad_despachada ?? 0),
+            Number((detalle as any).cantidad_facturada ?? (detalle as any).cantidad ?? 0),
+          );
+      const disponible = Math.max(
+        0,
+        Number((delivered - (consumidoPorDetalle.get((detalle as any).id) ?? 0)).toFixed(6)),
+      );
+      group.push({ ...detalle, cantidad_retornable: disponible });
+      detallesPorPedido.set((detalle as any).pedido_id, group);
+    }
+    const documentosPorPedido = new Map<string, any[]>();
+    for (const documento of documentos ?? []) {
+      const group = documentosPorPedido.get((documento as any).pedido_id) ?? [];
+      const state = String((documento as any).estado ?? '').toUpperCase();
+      if (!['ANULADO', 'RECHAZADO'].includes(state)
+          && (cpesPorDocumento.get((documento as any).id)?.length ?? 0) === 1) {
+        group.push(documento);
+      }
+      documentosPorPedido.set((documento as any).pedido_id, group);
+    }
+    return (pedidos ?? [])
+      .map((pedido: any) => ({
+        ...pedido,
+        detalle: (detallesPorPedido.get(pedido.id) ?? []).filter(
+          (detalle: any) => Number(detalle.cantidad_retornable ?? 0) > 0,
+        ),
+        documentos: documentosPorPedido.get(pedido.id) ?? [],
+      }))
+      .filter((pedido: any) => pedido.detalle.length > 0 && pedido.documentos.length > 0);
+  }
+
+  async listarSaldosFavor(tenantId: string, clienteId?: string, estado?: string) {
+    const query = this.supabase
+      .getClient()
+      .from('saldos_favor_clientes')
       .select(
         `
-        id,
-        numero,
-        estado,
-        cliente_id,
-        detalle:pedidos_venta_detalle(id, producto_id, descripcion, cantidad, cantidad_despachada, precio_unitario)
+        *,
+        clientes:cliente_id(id, razon_social, nombre, ruc, numero_documento),
+        rma:rma_id(id, numero, estado)
       `,
       )
       .eq('tenant_id', tenantId)
-      .eq('id', pedidoId)
+      .order('created_at', { ascending: false });
+    if (clienteId?.trim()) query.eq('cliente_id', clienteId.trim());
+    if (estado?.trim()) query.eq('estado', estado.trim().toUpperCase());
+    const { data, error } = await query;
+    if (error) this.throwReadError(error, 'listar los saldos a favor');
+    return data ?? [];
+  }
+
+  async obtenerSaldoFavor(tenantId: string, saldoId: string) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('saldos_favor_clientes')
+      .select(
+        `
+        *,
+        movimientos:saldos_favor_movimientos(*),
+        rma:rma_id(id, numero, estado),
+        clientes:cliente_id(id, razon_social, nombre, ruc, numero_documento)
+      `,
+      )
+      .eq('tenant_id', tenantId)
+      .eq('id', saldoId)
       .maybeSingle();
-
-    if (error || !data) {
-      throw new NotFoundException('Pedido no encontrado para RMA');
-    }
-
+    if (error) this.throwReadError(error, 'obtener el saldo a favor');
+    if (!data) throw new NotFoundException('Saldo a favor no encontrado en el tenant');
     return data;
   }
 
-  private async validarUbicacion(tenantId: string, ubicacionId: string | null, cache: Set<string>) {
-    if (!ubicacionId || cache.has(ubicacionId)) {
-      return;
-    }
-
+  async listarCxcAplicables(tenantId: string, saldoId: string) {
+    const saldo = await this.obtenerSaldoFavor(tenantId, saldoId);
     const { data, error } = await this.supabase
       .getClient()
-      .from('almacen_ubicaciones')
-      .select('id')
+      .from('cuentas_por_cobrar')
+      .select('id, numero_documento, tipo_documento, fecha_emision, fecha_vencimiento, moneda, monto_total, monto_pendiente, saldo, saldo_pendiente, estado')
       .eq('tenant_id', tenantId)
-      .eq('id', ubicacionId)
-      .maybeSingle();
+      .eq('cliente_id', saldo.cliente_id)
+      .eq('moneda', saldo.moneda)
+      .in('estado', ['PENDIENTE', 'PARCIAL', 'VENCIDA', 'VENCIDO'])
+      .order('fecha_vencimiento', { ascending: true });
+    if (error) this.throwReadError(error, 'listar las CxC aplicables al saldo');
+    return (data ?? []).filter((cuenta: any) =>
+      Number(cuenta.monto_pendiente ?? cuenta.saldo_pendiente ?? cuenta.saldo ?? 0) > 0,
+    );
+  }
 
-    if (error || !data) {
-      throw new BadRequestException('La ubicación indicada no existe o no pertenece al tenant');
+  async listarMediosReembolso(tenantId: string, userId?: string | null) {
+    const actorId = this.requireActor(userId);
+    const client = this.supabase.getClient();
+    const [{ data: bancos, error: bancosError }, { data: sesiones, error: sesionesError }] =
+      await Promise.all([
+        client
+          .from('cuentas_bancarias')
+          .select('id, codigo, nombre, banco, numero_cuenta, moneda, saldo, saldo_actual, estado')
+          .eq('tenant_id', tenantId)
+          .eq('estado', 'ACTIVO')
+          .eq('activa', true)
+          .order('nombre', { ascending: true }),
+        client
+          .from('sesiones_caja')
+          .select('id, caja_id, moneda, estado, hora_apertura, cajas:caja_id(id, codigo, nombre)')
+          .eq('tenant_id', tenantId)
+          .eq('estado', 'ABIERTA')
+          .or(`cajero_id.eq.${actorId},usuario_id.eq.${actorId},abierto_por.eq.${actorId},usuario_apertura.eq.${actorId}`)
+          .order('hora_apertura', { ascending: false }),
+      ]);
+    if (bancosError) this.throwReadError(bancosError, 'listar cuentas bancarias para reembolso');
+    if (sesionesError) this.throwReadError(sesionesError, 'listar sesiones de caja para reembolso');
+    return { bancos: bancos ?? [], sesiones_caja: sesiones ?? [] };
+  }
+
+  crear(
+    tenantId: string,
+    userId: string | null | undefined,
+    dto: CrearRmaDto,
+    idempotencyKey?: string,
+  ) {
+    return this.rpc('crear_rma_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: this.requireActor(userId),
+      p_payload: this.normalizePayload(dto),
+      p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
+    });
+  }
+
+  aprobar(
+    tenantId: string,
+    userId: string | null | undefined,
+    rmaId: string,
+    dto: AprobarRmaDto,
+    idempotencyKey?: string,
+  ) {
+    return this.rpc('decidir_rma_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: this.requireActor(userId),
+      p_rma_id: rmaId,
+      p_aprobar: dto.aprobar ?? true,
+      p_notas: dto.notas?.trim() || null,
+      p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
+    });
+  }
+
+  recepcionar(
+    tenantId: string,
+    userId: string | null | undefined,
+    rmaId: string,
+    dto: RecepcionarRmaDto,
+    idempotencyKey?: string,
+  ) {
+    return this.rpc('recepcionar_rma_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: this.requireActor(userId),
+      p_rma_id: rmaId,
+      p_payload: this.normalizePayload(dto),
+      p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
+    });
+  }
+
+  revertirRecepcion(
+    tenantId: string,
+    userId: string | null | undefined,
+    rmaId: string,
+    dto: RevertirRecepcionRmaDto,
+    idempotencyKey?: string,
+  ) {
+    return this.rpc('revertir_recepcion_rma_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: this.requireActor(userId),
+      p_rma_id: rmaId,
+      p_motivo: dto.motivo.trim(),
+      p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
+    });
+  }
+
+  generarNotaCredito(
+    tenantId: string,
+    userId: string | null | undefined,
+    rmaId: string,
+    dto: GenerarNotaCreditoDto,
+    idempotencyKey?: string,
+  ) {
+    return this.rpc('emitir_nota_credito_rma_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: this.requireActor(userId),
+      p_rma_id: rmaId,
+      p_payload: this.normalizePayload(dto),
+      p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
+    });
+  }
+
+  aplicarSaldoFavor(
+    tenantId: string,
+    userId: string | null | undefined,
+    saldoId: string,
+    dto: AplicarSaldoFavorDto,
+    idempotencyKey?: string,
+  ) {
+    return this.rpc('aplicar_saldo_favor_cxc_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: this.requireActor(userId),
+      p_saldo_id: saldoId,
+      p_cxc_id: dto.cxc_id,
+      p_monto: dto.monto,
+      p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
+    });
+  }
+
+  reembolsarSaldoFavor(
+    tenantId: string,
+    userId: string | null | undefined,
+    saldoId: string,
+    dto: ReembolsarSaldoFavorDto,
+    idempotencyKey?: string,
+  ) {
+    return this.rpc('reembolsar_saldo_favor_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: this.requireActor(userId),
+      p_saldo_id: saldoId,
+      p_payload: this.normalizePayload(dto),
+      p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
+    });
+  }
+
+  revertirReembolsoSaldoFavor(
+    tenantId: string,
+    userId: string | null | undefined,
+    saldoId: string,
+    movimientoId: string,
+    dto: RevertirReembolsoSaldoFavorDto,
+    idempotencyKey?: string,
+  ) {
+    return this.rpc('revertir_reembolso_saldo_favor_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: this.requireActor(userId),
+      p_saldo_id: saldoId,
+      p_movimiento_id: movimientoId,
+      p_payload: this.normalizePayload(dto),
+      p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
+    });
+  }
+
+  private requireActor(userId?: string | null): string {
+    const actor = String(userId ?? '').trim();
+    if (!actor) {
+      throw new BadRequestException('La operación RMA requiere un actor autenticado');
     }
+    return actor;
+  }
 
-    cache.add(ubicacionId);
+  private requireIdempotencyKey(value?: string): string {
+    const key = String(value ?? '').trim().toLowerCase();
+    if (key.length < 8 || key.length > 200) {
+      throw new BadRequestException(
+        'El encabezado Idempotency-Key es obligatorio y debe tener entre 8 y 200 caracteres',
+      );
+    }
+    return key;
+  }
+
+  private normalizePayload(value: Record<string, any>): Record<string, any> {
+    const payload: Record<string, any> = {};
+    for (const [key, rawValue] of Object.entries(value ?? {})) {
+      if (rawValue === undefined) continue;
+      if (Array.isArray(rawValue)) {
+        payload[key] = rawValue.map((item) =>
+          item && typeof item === 'object' ? this.normalizePayload(item) : item,
+        );
+      } else if (rawValue instanceof Date) {
+        payload[key] = rawValue.toISOString();
+      } else {
+        payload[key] = rawValue;
+      }
+    }
+    return payload;
+  }
+
+  private async rpc(name: string, params: Record<string, any>): Promise<any> {
+    const { data, error } = await this.supabase.getClient().rpc(name, params);
+    if (error) this.throwRpcError(error, name);
+    const result = Array.isArray(data) ? data[0] : data;
+    if (!result || typeof result !== 'object') {
+      throw new BadRequestException(`La operación atómica ${name} no devolvió resultado`);
+    }
+    return result;
+  }
+
+  private throwReadError(error: any, operation: string): never {
+    throw new BadRequestException(
+      `No se pudo ${operation}: ${String(error?.message ?? error ?? 'error desconocido')}`,
+    );
+  }
+
+  private throwRpcError(error: any, operation: string): never {
+    const message = String(error?.message ?? error ?? 'error desconocido');
+    if (error?.code === '42501') throw new ForbiddenException(message);
+    if (
+      error?.code === '23505' ||
+      error?.code === '40001' ||
+      /IDEMPOTENCY.*CONFLICT|KEY_REUSED|PENDING_RETRY/i.test(message)
+    ) {
+      throw new ConflictException(message);
+    }
+    if (error?.code === 'P0002' || /NOT_FOUND/i.test(message)) {
+      throw new NotFoundException(message);
+    }
+    throw new BadRequestException(
+      `No se pudo completar ${operation} de forma transaccional: ${message}`,
+    );
   }
 }

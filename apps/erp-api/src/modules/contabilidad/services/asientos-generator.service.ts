@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { PeriodosService } from './periodos.service';
-import { PlanCuentasService } from './plan-cuentas.service';
+import { PlanCuenta, PlanCuentasService } from './plan-cuentas.service';
 import { DocumentoFiscalGeneradoEvent } from '../../../shared/events/event-bus.service';
 
 export interface AsientoContable {
@@ -684,24 +684,83 @@ export class AsientosGeneratorService {
 
       const detalles: DetalleAsiento[] = [];
 
-      // Venta al CONTADO (POS o factura contado): el cobro entra a Caja/Bancos
-      // según el método de pago, NO a CxC (12). Evita la "CxC fantasma" de una
-      // venta ya cobrada y hace que el ingreso quede contabilizado UNA sola vez.
-      const esContado = evento.es_contado === true;
-      const cuentaCobro = esContado
-        ? (cuentas.get(evento.cuenta_cobro_codigo) ??
-           cuentas.get('10111') ??
-           cuentas.get('10') ??
-           cuentas.get('12')!)
-        : cuentas.get('12')!;
+      // POS 451 entrega el desglose durable de cobros. Cada porción se debita
+      // en su naturaleza real: caja, tarjeta, banco o CxC. La suma debe cubrir
+      // exactamente el total contable para fallar cerrado ante payload parcial.
+      const cobros = Array.isArray(evento.cobros) ? evento.cobros : [];
+      if (cobros.length > 0) {
+        const agrupados = new Map<string, number>();
+        for (const cobro of cobros) {
+          const tipo = String(cobro?.tipo ?? cobro?.codigo ?? '').toUpperCase();
+          const monto = this.round2(Number(cobro?.monto ?? 0));
+          if (!Number.isFinite(monto) || monto <= 0) {
+            throw new Error('Desglose de cobros POS contiene un monto inválido');
+          }
+          const codigoCuenta = tipo === 'CREDITO'
+            ? '12'
+            : tipo === 'EFECTIVO'
+              ? '10111'
+              : tipo === 'TARJETA'
+                ? '10411'
+                : ['TRANSFERENCIA', 'BILLETERA_DIGITAL', 'YAPE', 'PLIN'].includes(tipo)
+                  ? '10412'
+                  : null;
+          if (!codigoCuenta) {
+            throw new Error(`Tipo de cobro POS no soportado: ${tipo || 'VACIO'}`);
+          }
+          agrupados.set(codigoCuenta, this.round2((agrupados.get(codigoCuenta) ?? 0) + monto));
+        }
 
-      detalles.push({
-        cuenta_id: cuentaCobro.id,
-        debe: montoPendiente,
-        haber: 0,
-        concepto: esContado ? 'Caja/Bancos - Cobro contado' : 'Clientes - Venta',
-        centro_costo_id,
-      });
+        const totalCobros = this.round2(
+          [...agrupados.values()].reduce((sum, monto) => sum + monto, 0),
+        );
+        // `monto_pendiente` representa únicamente el saldo a crédito. El
+        // desglose POS, en cambio, contiene efectivo + medios electrónicos +
+        // crédito y por ello debe cuadrar contra el total íntegro de la venta.
+        if (Math.abs(totalCobros - totalFactura) > 0.01) {
+          throw new Error(
+            `El desglose de cobros POS no cuadra: cobros=${totalCobros}, total=${totalFactura}`,
+          );
+        }
+
+        for (const [codigoCuenta, monto] of agrupados) {
+          const cuentaEspecifica = codigoCuenta === '12'
+            ? cuentas.get('12')!
+            : await this.planCuentasService.buscarCuentaPorCodigoONombre(tenant_id, {
+                codigos: [codigoCuenta],
+              });
+          if (cuentaEspecifica && !cuentaEspecifica.acepta_movimiento) {
+            throw new Error(`La cuenta ${codigoCuenta} no acepta movimientos`);
+          }
+          const cuentaCobro = cuentaEspecifica ?? cuentas.get('10')!;
+          detalles.push({
+            cuenta_id: cuentaCobro.id,
+            debe: monto,
+            haber: 0,
+            concepto: codigoCuenta === '12'
+              ? 'Clientes - Venta a crédito'
+              : `Cobro POS - ${codigoCuenta}`,
+            centro_costo_id,
+          });
+        }
+      } else {
+        // Compatibilidad para eventos previos sin desglose de pagos.
+        const esContado = evento.es_contado === true;
+        const cuentaCobro = esContado
+          ? (cuentas.get(evento.cuenta_cobro_codigo) ??
+             cuentas.get('10111') ??
+             cuentas.get('10') ??
+             cuentas.get('12')!)
+          : cuentas.get('12')!;
+
+        detalles.push({
+          cuenta_id: cuentaCobro.id,
+          debe: montoPendiente,
+          haber: 0,
+          concepto: esContado ? 'Caja/Bancos - Cobro contado' : 'Clientes - Venta',
+          centro_costo_id,
+        });
+      }
 
       if (ajustes.retencion > 0) {
         detalles.push({
@@ -790,13 +849,189 @@ export class AsientosGeneratorService {
     }
   }
 
+  async generarAsientoCierreCaja(evento: any): Promise<AsientoContable | null> {
+    try {
+      const tenantId = evento.tenant_id;
+      const diferencia = this.round2(Number(evento.diferencia ?? 0));
+      if (!Number.isFinite(diferencia)) {
+        throw new Error('La diferencia de cierre de caja no es numérica');
+      }
+      if (Math.abs(diferencia) <= 0.009) {
+        return null;
+      }
+
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenantId,
+        ['10', '65', '75'],
+      );
+      const cuentaCajaEspecifica = await this.planCuentasService.buscarCuentaPorCodigoONombre(
+        tenantId,
+        { codigos: [evento.cuenta_caja_codigo || '10111'] },
+      );
+      if (cuentaCajaEspecifica && !cuentaCajaEspecifica.acepta_movimiento) {
+        throw new Error('La cuenta de caja configurada no acepta movimientos');
+      }
+      const cuentaCaja = cuentaCajaEspecifica ?? cuentas.get('10')!;
+      const monto = Math.abs(diferencia);
+      const detalles: DetalleAsiento[] = diferencia > 0
+        ? [
+            {
+              cuenta_id: cuentaCaja.id,
+              debe: monto,
+              haber: 0,
+              concepto: 'Sobrante en arqueo de caja',
+            },
+            {
+              cuenta_id: cuentas.get('75')!.id,
+              debe: 0,
+              haber: monto,
+              concepto: 'Otros ingresos - sobrante de caja',
+            },
+          ]
+        : [
+            {
+              cuenta_id: cuentas.get('65')!.id,
+              debe: monto,
+              haber: 0,
+              concepto: 'Otros gastos - faltante de caja',
+            },
+            {
+              cuenta_id: cuentaCaja.id,
+              debe: 0,
+              haber: monto,
+              concepto: 'Faltante en arqueo de caja',
+            },
+          ];
+
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        diferencia > 0 ? 'Sobrante de caja' : 'Faltante de caja',
+        detalles,
+        evento.referencia,
+        evento.event_id,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de cierre de caja: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Único dueño contable de los movimientos Caja 474. El evento trae cuentas
+   * postables e importe local congelados por la misma transacción que movió el
+   * efectivo; el worker no vuelve a inferir una contrapartida mutable.
+   */
+  async generarAsientoOperacionCaja474(evento: any): Promise<AsientoContable | null> {
+    try {
+      const tenantId = String(evento.tenant_id ?? '').trim();
+      const eventId = String(evento.event_id ?? evento.eventId ?? '').trim();
+      const tipoEvento = String(evento.tipo_evento ?? '').trim();
+      const tipo = String(evento.tipo ?? '').trim().toUpperCase();
+      const diferencia = this.round2(Number(evento.diferencia ?? evento.diferenciaOrigen ?? 0));
+      const monto = this.round2(Number(evento.monto));
+      const montoOrigen = this.round2(Number(evento.montoOrigen ?? evento.monto_origen ?? monto));
+      const tipoCambio = Number(evento.tipoCambio ?? evento.tipo_cambio ?? 1);
+      const cuentaCajaId = String(evento.cuentaCajaId ?? evento.cuenta_caja_id ?? '').trim();
+      const cuentaCajaCodigo = String(
+        evento.cuentaCajaCodigo ?? evento.cuenta_caja_codigo ?? '',
+      ).trim();
+      const cuentaContrapartidaId = String(
+        evento.cuentaContrapartidaId ?? evento.cuenta_contrapartida_id ?? '',
+      ).trim();
+      const cuentaContrapartidaCodigo = String(
+        evento.cuentaContrapartidaCodigo ?? evento.cuenta_contrapartida_codigo ?? '',
+      ).trim();
+
+      if (evento.accountingHandledByOutbox !== true) {
+        throw new Error('La operación de caja no acredita ownership contable durable');
+      }
+      if (!tenantId || !eventId || ![
+        'caja.movimiento_manual.registrado',
+        'caja.retiro.registrado',
+        'caja.cambio_turno.completado',
+      ].includes(tipoEvento)) {
+        throw new Error('La operación Caja 474 exige tenant, event_id y tipo de evento soportado');
+      }
+      if (tipoEvento === 'caja.cambio_turno.completado' && Math.abs(diferencia) <= 0.009) {
+        return null;
+      }
+      if (
+        !Number.isFinite(monto) || monto <= 0 ||
+        !Number.isFinite(montoOrigen) || montoOrigen <= 0 ||
+        !Number.isFinite(tipoCambio) || tipoCambio <= 0 ||
+        Math.abs(this.round2(montoOrigen * tipoCambio) - monto) > 0.01
+      ) {
+        throw new Error('La valuación local de la operación de caja es inválida');
+      }
+      if (
+        !cuentaCajaId || !cuentaCajaCodigo ||
+        !cuentaContrapartidaId || !cuentaContrapartidaCodigo ||
+        cuentaCajaId === cuentaContrapartidaId
+      ) {
+        throw new Error('Caja y contrapartida deben estar congeladas, válidas y ser distintas');
+      }
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenantId, [
+        cuentaCajaCodigo,
+        cuentaContrapartidaCodigo,
+      ]);
+      if (
+        cuentas.get(cuentaCajaCodigo)?.id !== cuentaCajaId ||
+        cuentas.get(cuentaContrapartidaCodigo)?.id !== cuentaContrapartidaId
+      ) {
+        throw new Error('Las cuentas congeladas no pertenecen al plan contable del tenant');
+      }
+
+      const cashIn = tipoEvento === 'caja.movimiento_manual.registrado'
+        ? tipo === 'INGRESO'
+        : tipoEvento === 'caja.cambio_turno.completado'
+          ? diferencia > 0
+          : false;
+      const concepto = evento.descripcion || (
+        cashIn ? 'Ingreso operativo de caja' : 'Salida operativa de caja'
+      );
+      const detalles: DetalleAsiento[] = cashIn
+        ? [
+            { cuenta_id: cuentaCajaId, debe: monto, haber: 0, concepto },
+            { cuenta_id: cuentaContrapartidaId, debe: 0, haber: monto, concepto },
+          ]
+        : [
+            { cuenta_id: cuentaContrapartidaId, debe: monto, haber: 0, concepto },
+            { cuenta_id: cuentaCajaId, debe: 0, haber: monto, concepto },
+          ];
+
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        concepto,
+        detalles,
+        evento.referencia,
+        eventId,
+      );
+    } catch (error) {
+      const eventId = evento.event_id ?? evento.eventId;
+      if (eventId) {
+        await this.marcarEventoComoFallido(
+          eventId,
+          `Error generando asiento de operación Caja 474: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
   async generarAsientoNotaCredito(evento: any): Promise<AsientoContable> {
     try {
       const { tenant_id, fecha, base_imponible, igv, centro_costo_id } = evento;
 
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
         tenant_id,
-        ['12', '70', '40', '69', '20']
+        ['12', '122', '70', '40', '69', '20']
       );
 
       const ajustes = {
@@ -839,6 +1074,21 @@ export class AsientosGeneratorService {
           ? Math.abs(Number(evento.monto_pendiente))
           : Math.abs(Number(evento.total ?? 0)) - ajustes.retencion - ajustes.detraccion - ajustes.anticipo + ajustes.percepcion
       ), 0);
+      const saldoFavorCliente = Math.max(this.round2(Math.abs(Number(
+        evento.customerCreditBalance ?? evento.customer_credit_balance ?? evento.saldoFavor ?? 0,
+      ))), 0);
+
+      if (evento.customerCreditBalance != null || evento.customer_credit_balance != null || evento.saldoFavor != null) {
+        const totalDebeFinanciero = this.round2(baseAbs + igvAbs + ajustes.percepcion);
+        const totalHaberFinanciero = this.round2(
+          saldoClientes + saldoFavorCliente + ajustes.retencion + ajustes.detraccion + ajustes.anticipo,
+        );
+        if (Math.abs(totalDebeFinanciero - totalHaberFinanciero) > 0.01) {
+          throw new Error(
+            `La distribución de la nota de crédito no cuadra: reversión=${totalDebeFinanciero}, CxC+saldo a favor=${totalHaberFinanciero}`,
+          );
+        }
+      }
 
       const detalles: DetalleAsiento[] = [
         {
@@ -883,12 +1133,23 @@ export class AsientosGeneratorService {
         );
       }
 
-      detalles.push({
-        cuenta_id: cuentas.get('12')!.id,
-        debe: 0,
-        haber: saldoClientes,
-        concepto: 'Reversión clientes',
-      });
+      if (saldoClientes > 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('12')!.id,
+          debe: 0,
+          haber: saldoClientes,
+          concepto: 'Reversión de cuenta por cobrar del cliente',
+        });
+      }
+
+      if (saldoFavorCliente > 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('122')!.id,
+          debe: 0,
+          haber: saldoFavorCliente,
+          concepto: 'Saldo a favor durable del cliente',
+        });
+      }
 
       if (ajustes.retencion > 0) {
         detalles.push({
@@ -936,25 +1197,326 @@ export class AsientosGeneratorService {
     }
   }
 
+  /** Nota de débito comercial: incrementa la cuenta por cobrar sin mover stock. */
+  async generarAsientoNotaDebito(evento: any): Promise<AsientoContable> {
+    try {
+      const tenantId = evento.tenant_id;
+      const base = this.round2(Math.abs(Number(evento.base_imponible ?? evento.subtotal ?? 0)));
+      const impuestos = this.round2(Math.abs(Number(evento.igv ?? evento.impuestos ?? 0)));
+      const total = this.round2(Math.abs(Number(evento.total ?? 0)));
+      if (!tenantId || base < 0 || impuestos < 0 || total <= 0
+          || Math.abs(this.round2(base + impuestos) - total) > 0.01) {
+        throw new Error('Importes inválidos para asiento de nota de débito');
+      }
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenantId, ['12', '70', '40'],
+      );
+      const detalles: DetalleAsiento[] = [
+        {
+          cuenta_id: cuentas.get('12')!.id,
+          debe: total,
+          haber: 0,
+          concepto: 'Incremento de cuenta por cobrar por nota de débito',
+        },
+        {
+          cuenta_id: cuentas.get('70')!.id,
+          debe: 0,
+          haber: base,
+          concepto: 'Ingreso adicional por nota de débito',
+        },
+      ];
+      if (impuestos > 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('40')!.id,
+          debe: 0,
+          haber: impuestos,
+          concepto: 'IGV adicional por nota de débito',
+        });
+      }
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        'Nota de débito',
+        detalles,
+        evento.referencia,
+        evento.event_id,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de nota de débito: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /** Dr 122 / Cr 12, con diferencia de cambio si ambas partidas tienen distinta valuación. */
+  async generarAsientoAplicacionSaldoFavor(evento: any): Promise<AsientoContable> {
+    try {
+      const tenantId = evento.tenant_id;
+      const montoPasivo = this.round2(Number(evento.montoPasivo ?? evento.monto_pasivo ?? evento.monto));
+      const montoCxc = this.round2(Number(evento.montoCxc ?? evento.monto_cxc ?? evento.monto));
+      const diferencia = this.round2(Number(
+        evento.diferenciaCambio ?? evento.diferencia_cambio ?? montoCxc - montoPasivo,
+      ));
+      if (!tenantId || !Number.isFinite(montoPasivo) || !Number.isFinite(montoCxc)
+          || montoPasivo <= 0 || montoCxc <= 0
+          || Math.abs(this.round2(montoCxc - montoPasivo) - diferencia) > 0.01) {
+        throw new Error('Valuación inválida para aplicar saldo a favor');
+      }
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenantId, ['122', '12', '676', '776'],
+      );
+      const detalles: DetalleAsiento[] = [
+        {
+          cuenta_id: cuentas.get('122')!.id,
+          debe: montoPasivo,
+          haber: 0,
+          concepto: 'Aplicación de saldo a favor del cliente',
+        },
+        {
+          cuenta_id: cuentas.get('12')!.id,
+          debe: 0,
+          haber: montoCxc,
+          concepto: 'Cancelación de cuenta por cobrar con saldo a favor',
+        },
+      ];
+      this.appendFxDifference(detalles, cuentas, diferencia);
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        'Aplicación de saldo a favor del cliente',
+        detalles,
+        evento.referencia,
+        evento.event_id,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de aplicación de saldo a favor: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /** Dr 122 / Cr 10, con caja o banco explícito ya materializado por la RPC 456. */
+  async generarAsientoReembolsoSaldoFavor(evento: any): Promise<AsientoContable> {
+    try {
+      const tenantId = evento.tenant_id;
+      const montoPasivo = this.round2(Number(evento.montoPasivo ?? evento.monto_pasivo ?? evento.monto));
+      const montoTesoreria = this.round2(Number(
+        evento.montoTesoreria ?? evento.monto_tesoreria ?? evento.monto,
+      ));
+      const diferencia = this.round2(Number(
+        evento.diferenciaCambio ?? evento.diferencia_cambio ?? montoTesoreria - montoPasivo,
+      ));
+      if (!tenantId || !Number.isFinite(montoPasivo) || !Number.isFinite(montoTesoreria)
+          || montoPasivo <= 0 || montoTesoreria <= 0
+          || Math.abs(this.round2(montoTesoreria - montoPasivo) - diferencia) > 0.01) {
+        throw new Error('Valuación inválida para reembolsar saldo a favor');
+      }
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenantId, ['122', '10', '676', '776'],
+      );
+      const detalles: DetalleAsiento[] = [
+        {
+          cuenta_id: cuentas.get('122')!.id,
+          debe: montoPasivo,
+          haber: 0,
+          concepto: 'Extinción del saldo a favor reembolsado',
+        },
+        {
+          cuenta_id: cuentas.get('10')!.id,
+          debe: 0,
+          haber: montoTesoreria,
+          concepto: `Reembolso por ${String(evento.medio ?? 'tesorería').toLowerCase()}`,
+        },
+      ];
+      this.appendFxDifference(detalles, cuentas, diferencia);
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        'Reembolso de saldo a favor del cliente',
+        detalles,
+        evento.referencia,
+        evento.event_id,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de reembolso de saldo a favor: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /** Inversa exacta de Dr 122 / Cr 10: repone tesorería y el pasivo del cliente. */
+  async generarAsientoReversaReembolsoSaldoFavor(evento: any): Promise<AsientoContable> {
+    try {
+      const tenantId = evento.tenant_id;
+      const montoPasivo = this.round2(Number(
+        evento.montoPasivo ?? evento.monto_pasivo ?? evento.monto,
+      ));
+      const montoTesoreria = this.round2(Number(
+        evento.montoTesoreria ?? evento.monto_tesoreria ?? evento.monto,
+      ));
+      const diferencia = this.round2(Number(
+        evento.diferenciaCambio ?? evento.diferencia_cambio
+          ?? montoTesoreria - montoPasivo,
+      ));
+      if (!tenantId || !Number.isFinite(montoPasivo) || !Number.isFinite(montoTesoreria)
+          || montoPasivo <= 0 || montoTesoreria <= 0
+          || Math.abs(this.round2(montoTesoreria - montoPasivo) - diferencia) > 0.01) {
+        throw new Error('Valuación inválida para revertir el reembolso de saldo a favor');
+      }
+      const codigos = ['122', '10'];
+      if (diferencia > 0) codigos.push('676');
+      if (diferencia < 0) codigos.push('776');
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenantId, codigos,
+      );
+      const detalles: DetalleAsiento[] = [
+        {
+          cuenta_id: cuentas.get('10')!.id,
+          debe: montoTesoreria,
+          haber: 0,
+          concepto: `Reposición por ${String(evento.medio ?? 'tesorería').toLowerCase()}`,
+        },
+        {
+          cuenta_id: cuentas.get('122')!.id,
+          debe: 0,
+          haber: montoPasivo,
+          concepto: 'Reposición del saldo a favor del cliente',
+        },
+      ];
+      if (diferencia > 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('676')!.id,
+          debe: 0,
+          haber: diferencia,
+          concepto: 'Reversa de pérdida por diferencia de cambio',
+        });
+      } else if (diferencia < 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('776')!.id,
+          debe: Math.abs(diferencia),
+          haber: 0,
+          concepto: 'Reversa de ganancia por diferencia de cambio',
+        });
+      }
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        'Reversa de reembolso de saldo a favor del cliente',
+        detalles,
+        evento.referencia,
+        evento.event_id,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de reversa de reembolso: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  private appendFxDifference(
+    detalles: DetalleAsiento[],
+    cuentas: Map<string, PlanCuenta>,
+    diferencia: number,
+  ): void {
+    if (diferencia > 0) {
+      detalles.push({
+        cuenta_id: cuentas.get('676')!.id,
+        debe: diferencia,
+        haber: 0,
+        concepto: 'Pérdida por diferencia de cambio',
+      });
+    } else if (diferencia < 0) {
+      detalles.push({
+        cuenta_id: cuentas.get('776')!.id,
+        debe: 0,
+        haber: Math.abs(diferencia),
+        concepto: 'Ganancia por diferencia de cambio',
+      });
+    }
+  }
+
   /**
    * Genera asiento de cobro CxC
-   * Dr 10 Bancos/Caja [monto]
-   *   Cr 12 Clientes [monto]
+   * Dr 10 Bancos/Caja [monto de liquidación]
+   * Dr 676 Pérdida por diferencia de cambio [si corresponde]
+   *   Cr 12 Clientes [monto contabilizado]
+   *   Cr 776 Ganancia por diferencia de cambio [si corresponde]
    */
   async generarAsientoCobro(evento: any): Promise<AsientoContable> {
     try {
       const { tenant_id, fecha, monto, centro_costo_id } = evento;
 
-      // Obtener cuentas del plan
+      const montoContabilizado = this.round2(
+        Number(evento.montoContabilizado ?? evento.monto_contabilizado ?? monto)
+      );
+      const montoLiquidacion = this.round2(
+        Number(evento.montoLiquidacion ?? evento.monto_liquidacion ?? monto)
+      );
+      const diferenciaCambio = this.round2(
+        Number(evento.diferenciaCambio ?? evento.diferencia_cambio ?? 0)
+      );
+      if (
+        !Number.isFinite(montoContabilizado) ||
+        !Number.isFinite(montoLiquidacion) ||
+        !Number.isFinite(diferenciaCambio) ||
+        montoContabilizado <= 0 ||
+        montoLiquidacion <= 0
+      ) {
+        throw new Error('La valuación del cobro debe contener importes positivos y finitos');
+      }
+      const diferenciaEsperada = this.round2(montoLiquidacion - montoContabilizado);
+      if (Math.abs(diferenciaEsperada - diferenciaCambio) > 0.01) {
+        throw new Error(
+          `Valuación de cobro inconsistente: liquidación ${montoLiquidacion} - contabilizado ${montoContabilizado} != diferencia ${diferenciaCambio}`,
+        );
+      }
+
+      const codigos = ['10', '12'];
+      if (diferenciaCambio < 0) codigos.push('676');
+      if (diferenciaCambio > 0) codigos.push('776');
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
         tenant_id,
-        ['10', '12']
+        codigos
       );
 
       const detalles: DetalleAsiento[] = [
-        { cuenta_id: cuentas.get('10')!.id, debe: monto, haber: 0, concepto: 'Bancos/Caja', centro_costo_id },
-        { cuenta_id: cuentas.get('12')!.id, debe: 0, haber: monto, concepto: 'Clientes', centro_costo_id }
+        { cuenta_id: cuentas.get('10')!.id, debe: montoLiquidacion, haber: 0, concepto: 'Bancos/Caja', centro_costo_id },
+        { cuenta_id: cuentas.get('12')!.id, debe: 0, haber: montoContabilizado, concepto: 'Clientes', centro_costo_id }
       ];
+
+      if (diferenciaCambio < 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('676')!.id,
+          debe: this.round2(-diferenciaCambio),
+          haber: 0,
+          concepto: 'Pérdida por diferencia de cambio',
+          centro_costo_id,
+        });
+      } else if (diferenciaCambio > 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('776')!.id,
+          debe: 0,
+          haber: diferenciaCambio,
+          concepto: 'Ganancia por diferencia de cambio',
+          centro_costo_id,
+        });
+      }
 
       return await this.generarAsiento(
         tenant_id,
@@ -969,6 +1531,504 @@ export class AsientosGeneratorService {
         await this.marcarEventoComoFallido(
           evento.event_id,
           `Error generando asiento de cobro: ${error.message}`
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Inversa exacta del cobro: Dr 12 / Cr 10. La diferencia de cambio usa la
+   * misma valuación durable del cobro original, pero con naturaleza opuesta.
+   */
+  async generarAsientoReversaCobro(evento: any): Promise<AsientoContable> {
+    try {
+      const { tenant_id, fecha, monto, centro_costo_id } = evento;
+      const montoContabilizado = this.round2(Number(
+        evento.montoContabilizado ?? evento.monto_contabilizado ?? monto,
+      ));
+      const montoLiquidacion = this.round2(Number(
+        evento.montoLiquidacion ?? evento.monto_liquidacion ?? monto,
+      ));
+      const diferenciaCambio = this.round2(Number(
+        evento.diferenciaCambio ?? evento.diferencia_cambio ?? 0,
+      ));
+      if (!tenant_id || !Number.isFinite(montoContabilizado)
+          || !Number.isFinite(montoLiquidacion) || !Number.isFinite(diferenciaCambio)
+          || montoContabilizado <= 0 || montoLiquidacion <= 0) {
+        throw new Error('La valuación de la reversa de cobro debe contener importes positivos y finitos');
+      }
+      const diferenciaEsperada = this.round2(montoLiquidacion - montoContabilizado);
+      if (Math.abs(diferenciaEsperada - diferenciaCambio) > 0.01) {
+        throw new Error(
+          `Valuación de reversa de cobro inconsistente: liquidación ${montoLiquidacion} - contabilizado ${montoContabilizado} != diferencia ${diferenciaCambio}`,
+        );
+      }
+      const codigos = ['10', '12'];
+      if (diferenciaCambio < 0) codigos.push('676');
+      if (diferenciaCambio > 0) codigos.push('776');
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenant_id, codigos,
+      );
+      const detalles: DetalleAsiento[] = [
+        {
+          cuenta_id: cuentas.get('12')!.id,
+          debe: montoContabilizado,
+          haber: 0,
+          concepto: 'Restauración de cuenta por cobrar',
+          centro_costo_id,
+        },
+        {
+          cuenta_id: cuentas.get('10')!.id,
+          debe: 0,
+          haber: montoLiquidacion,
+          concepto: 'Reembolso por caja/banco',
+          centro_costo_id,
+        },
+      ];
+      if (diferenciaCambio < 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('676')!.id,
+          debe: 0,
+          haber: Math.abs(diferenciaCambio),
+          concepto: 'Reversa de pérdida por diferencia de cambio',
+          centro_costo_id,
+        });
+      } else if (diferenciaCambio > 0) {
+        detalles.push({
+          cuenta_id: cuentas.get('776')!.id,
+          debe: diferenciaCambio,
+          haber: 0,
+          concepto: 'Reversa de ganancia por diferencia de cambio',
+          centro_costo_id,
+        });
+      }
+      return await this.generarAsiento(
+        tenant_id,
+        new Date(fecha),
+        'Reversa de cobro de factura',
+        detalles,
+        evento.referencia,
+        evento.event_id,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de reversa de cobro: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Contabiliza un movimiento bancario ya confirmado por la RPC 457.
+   * ABONO: Dr banco / Cr contrapartida. CARGO: Dr contrapartida / Cr banco.
+   */
+  async generarAsientoMovimientoBancario(evento: any): Promise<AsientoContable> {
+    try {
+      const tenantId = String(evento.tenant_id ?? '').trim();
+      const eventId = String(evento.event_id ?? evento.eventId ?? '').trim();
+      const tipo = String(evento.tipo ?? '').trim().toUpperCase();
+      const monto = this.round2(Number(evento.monto));
+      const montoOrigen = this.round2(Number(evento.montoOrigen ?? evento.monto_origen ?? monto));
+      const tipoCambio = Number(evento.tipoCambio ?? evento.tipo_cambio ?? 1);
+      const cuentaBancoId = String(evento.cuentaBancoId ?? evento.cuenta_banco_id ?? '').trim();
+      const cuentaBancoCodigo = String(
+        evento.cuentaBancoCodigo ?? evento.cuenta_banco_codigo ?? '',
+      ).trim();
+      const cuentaContrapartidaId = String(
+        evento.cuentaContrapartidaId ?? evento.cuenta_contrapartida_id ?? '',
+      ).trim();
+      const cuentaContrapartidaCodigo = String(
+        evento.cuentaContrapartidaCodigo ?? evento.cuenta_contrapartida_codigo ?? '',
+      ).trim();
+
+      if (evento.accountingHandledByOutbox !== true) {
+        throw new Error('El movimiento bancario no acredita ownership contable durable');
+      }
+      if (!tenantId || !eventId || !['ABONO', 'CARGO'].includes(tipo)) {
+        throw new Error('El movimiento bancario exige tenant, event_id y tipo ABONO/CARGO');
+      }
+      if (
+        !Number.isFinite(monto) || monto <= 0 ||
+        !Number.isFinite(montoOrigen) || montoOrigen <= 0 ||
+        !Number.isFinite(tipoCambio) || tipoCambio <= 0 ||
+        Math.abs(this.round2(montoOrigen * tipoCambio) - monto) > 0.01
+      ) {
+        throw new Error('La valuación local del movimiento bancario es inválida');
+      }
+      if (
+        !cuentaBancoId || !cuentaBancoCodigo ||
+        !cuentaContrapartidaId || !cuentaContrapartidaCodigo ||
+        cuentaBancoId === cuentaContrapartidaId
+      ) {
+        throw new Error('Las cuentas bancarias y de contrapartida deben ser válidas y distintas');
+      }
+
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenantId, [
+        cuentaBancoCodigo,
+        cuentaContrapartidaCodigo,
+      ]);
+      if (
+        cuentas.get(cuentaBancoCodigo)?.id !== cuentaBancoId ||
+        cuentas.get(cuentaContrapartidaCodigo)?.id !== cuentaContrapartidaId
+      ) {
+        throw new Error('Las cuentas del evento bancario no pertenecen al plan contable del tenant');
+      }
+
+      const detalles: DetalleAsiento[] = tipo === 'ABONO'
+        ? [
+            { cuenta_id: cuentaBancoId, debe: monto, haber: 0, concepto: 'Ingreso bancario' },
+            {
+              cuenta_id: cuentaContrapartidaId,
+              debe: 0,
+              haber: monto,
+              concepto: evento.descripcion || 'Contrapartida de ingreso bancario',
+            },
+          ]
+        : [
+            {
+              cuenta_id: cuentaContrapartidaId,
+              debe: monto,
+              haber: 0,
+              concepto: evento.descripcion || 'Contrapartida de salida bancaria',
+            },
+            { cuenta_id: cuentaBancoId, debe: 0, haber: monto, concepto: 'Salida bancaria' },
+          ];
+
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        evento.descripcion || `Movimiento bancario ${tipo}`,
+        detalles,
+        evento.referencia,
+        eventId,
+      );
+    } catch (error) {
+      const eventId = evento.event_id ?? evento.eventId;
+      if (eventId) {
+        await this.marcarEventoComoFallido(
+          eventId,
+          `Error generando asiento de movimiento bancario: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /** Contabiliza la transferencia interna confirmada por 457 sin consultar TC mutable. */
+  async generarAsientoTransferenciaBancaria(evento: any): Promise<AsientoContable> {
+    try {
+      const tenantId = String(evento.tenant_id ?? '').trim();
+      const eventId = String(evento.event_id ?? evento.eventId ?? '').trim();
+      const monto = this.round2(Number(evento.monto));
+      const montoOrigen = this.round2(Number(evento.montoOrigen ?? evento.monto_origen ?? monto));
+      const tipoCambio = Number(evento.tipoCambio ?? evento.tipo_cambio ?? 1);
+      const cuentaOrigenId = String(
+        evento.cuentaOrigenContableId ?? evento.cuenta_origen_contable_id ?? '',
+      ).trim();
+      const cuentaOrigenCodigo = String(
+        evento.cuentaOrigenCodigo ?? evento.cuenta_origen_codigo ?? '',
+      ).trim();
+      const cuentaDestinoId = String(
+        evento.cuentaDestinoContableId ?? evento.cuenta_destino_contable_id ?? '',
+      ).trim();
+      const cuentaDestinoCodigo = String(
+        evento.cuentaDestinoCodigo ?? evento.cuenta_destino_codigo ?? '',
+      ).trim();
+
+      if (evento.accountingHandledByOutbox !== true) {
+        throw new Error('La transferencia bancaria no acredita ownership contable durable');
+      }
+      if (!tenantId || !eventId) {
+        throw new Error('La transferencia bancaria exige tenant y event_id');
+      }
+      if (
+        !Number.isFinite(monto) || monto <= 0 ||
+        !Number.isFinite(montoOrigen) || montoOrigen <= 0 ||
+        !Number.isFinite(tipoCambio) || tipoCambio <= 0 ||
+        Math.abs(this.round2(montoOrigen * tipoCambio) - monto) > 0.01
+      ) {
+        throw new Error('La valuación local de la transferencia bancaria es inválida');
+      }
+      if (
+        !cuentaOrigenId || !cuentaOrigenCodigo ||
+        !cuentaDestinoId || !cuentaDestinoCodigo ||
+        cuentaOrigenId === cuentaDestinoId
+      ) {
+        throw new Error('Las cuentas contables de origen y destino deben ser válidas y distintas');
+      }
+
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenantId, [
+        cuentaOrigenCodigo,
+        cuentaDestinoCodigo,
+      ]);
+      if (
+        cuentas.get(cuentaOrigenCodigo)?.id !== cuentaOrigenId ||
+        cuentas.get(cuentaDestinoCodigo)?.id !== cuentaDestinoId
+      ) {
+        throw new Error('Las cuentas de la transferencia no pertenecen al plan contable del tenant');
+      }
+
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        evento.descripcion || 'Transferencia entre cuentas bancarias',
+        [
+          {
+            cuenta_id: cuentaDestinoId,
+            debe: monto,
+            haber: 0,
+            concepto: 'Ingreso en cuenta bancaria destino',
+          },
+          {
+            cuenta_id: cuentaOrigenId,
+            debe: 0,
+            haber: monto,
+            concepto: 'Salida de cuenta bancaria origen',
+          },
+        ],
+        evento.referencia,
+        eventId,
+      );
+    } catch (error) {
+      const eventId = evento.event_id ?? evento.eventId;
+      if (eventId) {
+        await this.marcarEventoComoFallido(
+          eventId,
+          `Error generando asiento de transferencia bancaria: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Registra ajustes de una CxC que no representan un ingreso de tesorería.
+   * Cada tipo usa su contrapartida económica y nunca la cuenta 10 genérica.
+   */
+  async generarAsientoAjusteCxc(evento: any): Promise<AsientoContable> {
+    try {
+      const tenantId = evento.tenant_id;
+      const tipo = String(evento.tipoMovimiento ?? evento.tipo_movimiento ?? evento.tipo ?? '')
+        .trim()
+        .toUpperCase();
+      const monto = this.round2(
+        Number(evento.montoContabilizado ?? evento.monto_contabilizado ?? evento.monto),
+      );
+      if (!tenantId || !Number.isFinite(monto) || monto <= 0) {
+        throw new Error('El ajuste CxC exige tenant e importe contabilizado positivo');
+      }
+
+      let codigos: string[];
+      let concepto: string;
+      let detalles: DetalleAsiento[];
+
+      switch (tipo) {
+        case 'RETENCION': {
+          codigos = ['40114', '12'];
+          const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenantId, codigos);
+          concepto = 'Aplicación de retención a cuenta por cobrar';
+          detalles = [
+            { cuenta_id: cuentas.get('40114')!.id, debe: monto, haber: 0, concepto: 'IGV retenido por aplicar' },
+            { cuenta_id: cuentas.get('12')!.id, debe: 0, haber: monto, concepto: 'Clientes' },
+          ];
+          break;
+        }
+        case 'DETRACCION': {
+          codigos = ['1042', '12'];
+          const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenantId, codigos);
+          concepto = 'Aplicación de detracción a cuenta por cobrar';
+          detalles = [
+            { cuenta_id: cuentas.get('1042')!.id, debe: monto, haber: 0, concepto: 'Fondos sujetos a detracción' },
+            { cuenta_id: cuentas.get('12')!.id, debe: 0, haber: monto, concepto: 'Clientes' },
+          ];
+          break;
+        }
+        case 'ANTICIPO': {
+          codigos = ['122', '12'];
+          const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenantId, codigos);
+          concepto = 'Aplicación de anticipo de cliente';
+          detalles = [
+            { cuenta_id: cuentas.get('122')!.id, debe: monto, haber: 0, concepto: 'Anticipos de clientes' },
+            { cuenta_id: cuentas.get('12')!.id, debe: 0, haber: monto, concepto: 'Clientes' },
+          ];
+          break;
+        }
+        case 'PERCEPCION': {
+          codigos = ['12', '40113'];
+          const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenantId, codigos);
+          concepto = 'Percepción adicionada a cuenta por cobrar';
+          detalles = [
+            { cuenta_id: cuentas.get('12')!.id, debe: monto, haber: 0, concepto: 'Clientes' },
+            { cuenta_id: cuentas.get('40113')!.id, debe: 0, haber: monto, concepto: 'IGV - régimen de percepciones' },
+          ];
+          break;
+        }
+        case 'NOTA_CREDITO': {
+          codigos = ['70', '40', '12'];
+          const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenantId, codigos);
+          const base = this.round2(Number(evento.baseAjuste ?? evento.base_ajuste ?? 0));
+          const igv = this.round2(Number(evento.igvAjuste ?? evento.igv_ajuste ?? 0));
+          if (!Number.isFinite(base) || !Number.isFinite(igv) || base < 0 || igv < 0
+              || Math.abs(this.round2(base + igv) - monto) > 0.01) {
+            throw new Error('La base e IGV del ajuste por nota de crédito no cuadran');
+          }
+          concepto = 'Aplicación de nota de crédito a cuenta por cobrar';
+          detalles = [
+            ...(base > 0 ? [{ cuenta_id: cuentas.get('70')!.id, debe: base, haber: 0, concepto: 'Reversión de ventas' }] : []),
+            ...(igv > 0 ? [{ cuenta_id: cuentas.get('40')!.id, debe: igv, haber: 0, concepto: 'Reversión de IGV' }] : []),
+            { cuenta_id: cuentas.get('12')!.id, debe: 0, haber: monto, concepto: 'Clientes' },
+          ];
+          break;
+        }
+        default:
+          throw new Error(`Tipo de ajuste CxC no soportado: ${tipo || 'VACIO'}`);
+      }
+
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        concepto,
+        detalles,
+        evento.referencia,
+        evento.event_id,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de ajuste CxC: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /** Asiento exacto opuesto a RETENCION/DETRACCION/ANTICIPO/PERCEPCION CxC. */
+  async generarAsientoReversaAjusteCxc(evento: any): Promise<AsientoContable> {
+    try {
+      const tenantId = evento.tenant_id;
+      const tipo = String(
+        evento.tipoMovimiento ?? evento.tipo_movimiento ?? evento.tipo ?? '',
+      ).trim().toUpperCase();
+      const monto = this.round2(Number(
+        evento.montoContabilizado ?? evento.monto_contabilizado ?? evento.monto,
+      ));
+      if (!tenantId || !Number.isFinite(monto) || monto <= 0) {
+        throw new Error('La reversa de ajuste CxC exige tenant e importe contabilizado positivo');
+      }
+      const mapping: Record<string, { debe: string; haber: string; concepto: string }> = {
+        RETENCION: {
+          debe: '12', haber: '40114',
+          concepto: 'Reversa de retención aplicada a cuenta por cobrar',
+        },
+        DETRACCION: {
+          debe: '12', haber: '1042',
+          concepto: 'Reversa de detracción aplicada a cuenta por cobrar',
+        },
+        ANTICIPO: {
+          debe: '12', haber: '122',
+          concepto: 'Reversa de anticipo aplicado a cuenta por cobrar',
+        },
+        PERCEPCION: {
+          debe: '40113', haber: '12',
+          concepto: 'Reversa de percepción adicionada a cuenta por cobrar',
+        },
+      };
+      const selected = mapping[tipo];
+      if (!selected) {
+        throw new Error(`Tipo de reversa de ajuste CxC no soportado: ${tipo || 'VACIO'}`);
+      }
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenantId, [selected.debe, selected.haber],
+      );
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        selected.concepto,
+        [
+          {
+            cuenta_id: cuentas.get(selected.debe)!.id,
+            debe: monto,
+            haber: 0,
+            concepto: selected.debe === '12' ? 'Restauración de clientes' : selected.concepto,
+          },
+          {
+            cuenta_id: cuentas.get(selected.haber)!.id,
+            debe: 0,
+            haber: monto,
+            concepto: selected.haber === '12' ? 'Reducción de clientes' : selected.concepto,
+          },
+        ],
+        evento.referencia,
+        evento.event_id,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de reversa de ajuste CxC: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /** Ajustes documentales CxP; el pago bancario es un evento distinto. */
+  async generarAsientoAjusteCxp(evento: any): Promise<AsientoContable> {
+    try {
+      const tenantId = evento.tenant_id;
+      const tipo = String(evento.tipoMovimiento ?? evento.tipo_movimiento ?? evento.tipo ?? '')
+        .trim()
+        .toUpperCase();
+      const monto = this.round2(
+        Number(evento.montoContabilizado ?? evento.monto_contabilizado ?? evento.monto),
+      );
+      if (!tenantId || !Number.isFinite(monto) || monto <= 0) {
+        throw new Error('El ajuste CxP exige tenant e importe contabilizado positivo');
+      }
+
+      const mapping: Record<string, { debe: string; haber: string; concepto: string }> = {
+        RETENCION: { debe: '42', haber: '40114', concepto: 'Retención aplicada a cuenta por pagar' },
+        PERCEPCION: { debe: '40113', haber: '42', concepto: 'Percepción adicionada a cuenta por pagar' },
+        DETRACCION: { debe: '42', haber: '421', concepto: 'Detracción reclasificada para depósito' },
+        ANTICIPO: { debe: '42', haber: '422', concepto: 'Anticipo aplicado a cuenta por pagar' },
+      };
+      const selected = mapping[tipo];
+      if (!selected) throw new Error(`Tipo de ajuste CxP no soportado: ${tipo || 'VACIO'}`);
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenantId,
+        [selected.debe, selected.haber],
+      );
+      return await this.generarAsiento(
+        tenantId,
+        new Date(evento.fecha),
+        selected.concepto,
+        [
+          {
+            cuenta_id: cuentas.get(selected.debe)!.id,
+            debe: monto,
+            haber: 0,
+            concepto: selected.debe === '42' ? 'Proveedores' : selected.concepto,
+          },
+          {
+            cuenta_id: cuentas.get(selected.haber)!.id,
+            debe: 0,
+            haber: monto,
+            concepto: selected.haber === '42' ? 'Proveedores' : selected.concepto,
+          },
+        ],
+        evento.referencia,
+        evento.event_id,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de ajuste CxP: ${error.message}`,
         );
       }
       throw error;
@@ -1026,25 +2086,70 @@ export class AsientosGeneratorService {
     }
   }
 
-  /** Recepción física sin factura: Dr 20 / Cr 4699. No reconoce IGV ni CxP. */
+  /**
+   * Recepción sin factura: Dr 20 por bienes físicos, Dr 63 por servicios o
+   * consumos sin stock y Cr 4699 por el total. No reconoce IGV ni CxP.
+   */
   async generarAsientoRecepcion(evento: any): Promise<AsientoContable> {
     const { tenant_id, fecha, costo, centro_costo_id } = evento;
     const monto = Number(costo || 0);
     if (!Number.isFinite(monto) || monto <= 0) {
       throw new Error('La recepción debe tener un costo positivo');
     }
+
+    const tieneClasificacion =
+      evento.mercaderia !== undefined ||
+      evento.servicios !== undefined ||
+      evento.no_stock !== undefined;
+    const mercaderia = tieneClasificacion ? Number(evento.mercaderia ?? 0) : monto;
+    const servicios = tieneClasificacion ? Number(evento.servicios ?? 0) : 0;
+    const noStock = tieneClasificacion ? Number(evento.no_stock ?? 0) : 0;
+    const gastos = servicios + noStock;
+    if (![mercaderia, servicios, noStock].every((valor) => Number.isFinite(valor) && valor >= 0)) {
+      throw new Error('La clasificación contable de la recepción es inválida');
+    }
+    if (Math.abs(mercaderia + gastos - monto) > 0.01) {
+      throw new Error(
+        `La clasificación de recepción (${mercaderia + gastos}) no coincide con el costo (${monto})`,
+      );
+    }
+
+    const codigos = ['4699'];
+    if (mercaderia > 0) codigos.push('20');
+    if (gastos > 0) codigos.push('63');
     const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
       tenant_id,
-      ['20', '4699'],
+      codigos,
     );
-    const detalles: DetalleAsiento[] = [
-      { cuenta_id: cuentas.get('20')!.id, debe: monto, haber: 0, concepto: 'Mercaderías recibidas', centro_costo_id },
-      { cuenta_id: cuentas.get('4699')!.id, debe: 0, haber: monto, concepto: 'Mercaderías recibidas por facturar' },
-    ];
+    const detalles: DetalleAsiento[] = [];
+    if (mercaderia > 0) {
+      detalles.push({
+        cuenta_id: cuentas.get('20')!.id,
+        debe: mercaderia,
+        haber: 0,
+        concepto: 'Mercaderías recibidas',
+        centro_costo_id,
+      });
+    }
+    if (gastos > 0) {
+      detalles.push({
+        cuenta_id: cuentas.get('63')!.id,
+        debe: gastos,
+        haber: 0,
+        concepto: 'Servicios y consumos recibidos',
+        centro_costo_id,
+      });
+    }
+    detalles.push({
+      cuenta_id: cuentas.get('4699')!.id,
+      debe: 0,
+      haber: monto,
+      concepto: 'Bienes y servicios recibidos por facturar',
+    });
     return this.generarAsiento(
       tenant_id,
       new Date(fecha),
-      'Recepción de mercadería pendiente de factura',
+      'Recepción pendiente de factura',
       detalles,
       evento.referencia,
       evento.event_id,
@@ -1057,21 +2162,44 @@ export class AsientosGeneratorService {
    */
   async generarAsientoFacturaProveedor(evento: any): Promise<AsientoContable> {
     const { tenant_id, fecha, subtotal, igv, total, recepcion_id } = evento;
-    const base = Number(subtotal || 0);
-    const impuesto = Number(igv || 0);
-    const importe = Number(total || 0);
-    if (![base, impuesto, importe].every(Number.isFinite) || base < 0 || impuesto < 0 || importe <= 0) {
+    const base = this.round2(Number(subtotal || 0));
+    const impuesto = this.round2(Number(igv || 0));
+    const importe = this.round2(Number(total || 0));
+    const retencion = this.round2(Number(evento.ajustes?.retencion ?? evento.retencion ?? 0));
+    const percepcion = this.round2(Number(evento.ajustes?.percepcion ?? evento.percepcion ?? 0));
+    const detraccion = this.round2(Number(evento.ajustes?.detraccion ?? evento.detraccion ?? 0));
+    const anticipo = this.round2(Number(evento.ajustes?.anticipo ?? evento.anticipo ?? 0));
+    const saldoProveedor = this.round2(Number(
+      evento.saldoProveedor ?? evento.saldo_proveedor
+        ?? importe - retencion - detraccion - anticipo + percepcion,
+    ));
+    if (![base, impuesto, importe, retencion, percepcion, detraccion, anticipo, saldoProveedor]
+      .every(Number.isFinite)
+      || base < 0 || impuesto < 0 || importe <= 0
+      || retencion < 0 || percepcion < 0 || detraccion < 0 || anticipo < 0
+      || saldoProveedor < 0) {
       throw new Error('La factura de proveedor contiene importes inválidos');
     }
-    if (Math.abs(base + impuesto - importe) > 0.01) {
+    if (Math.abs(this.round2(base + impuesto) - importe) > 0.01) {
       throw new Error(
         `Factura de proveedor inconsistente: subtotal ${base} + IGV ${impuesto} no coincide con total ${importe}`,
       );
     }
+    const saldoEsperado = this.round2(importe - retencion - detraccion - anticipo + percepcion);
+    if (Math.abs(saldoEsperado - saldoProveedor) > 0.01) {
+      throw new Error(
+        `Factura de proveedor inconsistente: saldo ${saldoProveedor} no coincide con total y ajustes ${saldoEsperado}`,
+      );
+    }
     const cuentaBase = recepcion_id ? '4699' : '20';
+    const codigos = [cuentaBase, '40', '42'];
+    if (percepcion > 0) codigos.push('40113');
+    if (retencion > 0) codigos.push('40114');
+    if (detraccion > 0) codigos.push('421');
+    if (anticipo > 0) codigos.push('422');
     const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
       tenant_id,
-      [cuentaBase, '40', '42'],
+      codigos,
     );
     const detalles: DetalleAsiento[] = [
       {
@@ -1081,7 +2209,36 @@ export class AsientosGeneratorService {
         concepto: recepcion_id ? 'Aplicación de mercadería recibida por facturar' : 'Mercaderías',
       },
       { cuenta_id: cuentas.get('40')!.id, debe: impuesto, haber: 0, concepto: 'IGV Crédito Fiscal' },
-      { cuenta_id: cuentas.get('42')!.id, debe: 0, haber: importe, concepto: 'Proveedores' },
+      ...(percepcion > 0 ? [{
+        cuenta_id: cuentas.get('40113')!.id,
+        debe: percepcion,
+        haber: 0,
+        concepto: 'Percepción de IGV por aplicar',
+      }] : []),
+      ...(saldoProveedor > 0 ? [{
+        cuenta_id: cuentas.get('42')!.id,
+        debe: 0,
+        haber: saldoProveedor,
+        concepto: 'Proveedores - saldo neto',
+      }] : []),
+      ...(retencion > 0 ? [{
+        cuenta_id: cuentas.get('40114')!.id,
+        debe: 0,
+        haber: retencion,
+        concepto: 'Retención por pagar',
+      }] : []),
+      ...(detraccion > 0 ? [{
+        cuenta_id: cuentas.get('421')!.id,
+        debe: 0,
+        haber: detraccion,
+        concepto: 'Detracción pendiente de depósito',
+      }] : []),
+      ...(anticipo > 0 ? [{
+        cuenta_id: cuentas.get('422')!.id,
+        debe: 0,
+        haber: anticipo,
+        concepto: 'Aplicación de anticipo a proveedor',
+      }] : []),
     ];
     return this.generarAsiento(
       tenant_id,
@@ -1380,6 +2537,95 @@ export class AsientosGeneratorService {
     }
   }
 
+  async generarAsientoDevengoLiquidacion(evento: any): Promise<AsientoContable> {
+    return this.generarAsientoMovimientoLaboral(evento, {
+      cuentaDebe: '621',
+      cuentaHaber: '411',
+      concepto: 'Devengo de liquidación laboral',
+      detalleDebe: 'Beneficios y liquidación del personal',
+      detalleHaber: 'Liquidaciones por pagar',
+    });
+  }
+
+  async generarAsientoPagoLiquidacion(evento: any): Promise<AsientoContable> {
+    return this.generarAsientoMovimientoLaboral(evento, {
+      cuentaDebe: '411',
+      cuentaHaber: '10',
+      concepto: 'Pago de liquidación laboral',
+      detalleDebe: 'Liquidaciones por pagar',
+      detalleHaber: 'Caja y bancos',
+    });
+  }
+
+  async generarAsientoReversaPagoLiquidacion(evento: any): Promise<AsientoContable> {
+    return this.generarAsientoMovimientoLaboral(evento, {
+      cuentaDebe: '10',
+      cuentaHaber: '411',
+      concepto: 'Reversa de pago de liquidación laboral',
+      detalleDebe: 'Caja y bancos',
+      detalleHaber: 'Liquidaciones por pagar restauradas',
+    });
+  }
+
+  async generarAsientoDepositoCts(evento: any): Promise<AsientoContable> {
+    return this.generarAsientoMovimientoLaboral(evento, {
+      cuentaDebe: '621',
+      cuentaHaber: '10',
+      concepto: 'Depósito semestral de CTS',
+      detalleDebe: 'Compensación por tiempo de servicios',
+      detalleHaber: 'Caja y bancos',
+    });
+  }
+
+  private async generarAsientoMovimientoLaboral(
+    evento: any,
+    config: {
+      cuentaDebe: string;
+      cuentaHaber: string;
+      concepto: string;
+      detalleDebe: string;
+      detalleHaber: string;
+    },
+  ): Promise<AsientoContable> {
+    const monto = this.round2(Number(
+      evento.monto
+      ?? evento.totalLiquidacion
+      ?? evento.totalPagado
+      ?? evento.montoRevertido
+      ?? evento.totalDepositado
+      ?? 0,
+    ));
+    if (!Number.isFinite(monto) || monto <= 0) {
+      throw new Error(`${config.concepto}: importe inválido`);
+    }
+    const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+      evento.tenant_id,
+      [config.cuentaDebe, config.cuentaHaber],
+    );
+    const sourceEventId = evento.source_event_id || evento.event_id;
+    return this.generarAsiento(
+      evento.tenant_id,
+      new Date(evento.fecha),
+      config.concepto,
+      [
+        {
+          cuenta_id: cuentas.get(config.cuentaDebe)!.id,
+          debe: monto,
+          haber: 0,
+          concepto: config.detalleDebe,
+        },
+        {
+          cuenta_id: cuentas.get(config.cuentaHaber)!.id,
+          debe: 0,
+          haber: monto,
+          concepto: config.detalleHaber,
+        },
+      ],
+      evento.referencia,
+      sourceEventId,
+    );
+  }
+
   /**
    * Genera asiento de depreciación
    * Dr 68 Depreciación [monto]
@@ -1439,18 +2685,64 @@ export class AsientosGeneratorService {
     referencia?: string;
     event_id?: string;
     centro_costo_id?: string;
+    mercaderia?: number;
+    servicios?: number;
+    no_stock?: number;
+    cuenta_pasivo?: '42' | '4699';
   }): Promise<AsientoContable> {
     try {
-      const { tenant_id, fecha, subtotal, igv, total, referencia, event_id, centro_costo_id } = evento;
+      const { tenant_id, fecha, referencia, event_id, centro_costo_id } = evento;
+      const subtotal = Number(evento.subtotal ?? 0);
+      const igv = Number(evento.igv ?? 0);
+      const total = Number(evento.total ?? 0);
+      const mercaderia = evento.mercaderia == null ? subtotal : Number(evento.mercaderia);
+      const servicios = Number(evento.servicios ?? 0);
+      const noStock = Number(evento.no_stock ?? 0);
+      const cuentaPasivo = evento.cuenta_pasivo ?? '42';
+      if (cuentaPasivo !== '42' && cuentaPasivo !== '4699') {
+        throw new Error(`Cuenta pasivo de devolución no soportada: ${cuentaPasivo}`);
+      }
+      if (![subtotal, igv, total, mercaderia, servicios, noStock].every(Number.isFinite)
+          || subtotal < 0 || igv < 0 || total <= 0
+          || mercaderia < 0 || servicios < 0 || noStock < 0
+          || Math.abs(mercaderia + servicios + noStock - subtotal) > 0.01
+          || Math.abs(subtotal + igv - total) > 0.01) {
+        throw new Error('La devolución a proveedor contiene importes o clasificación inconsistentes');
+      }
 
-      // Obtener cuentas del plan: inventario, IGV crédito fiscal, proveedores
-      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenant_id, ['20', '40', '42']);
+      const codigos: string[] = [cuentaPasivo];
+      if (mercaderia > 0) codigos.push('20');
+      if (servicios + noStock > 0) codigos.push('63');
+      if (igv > 0) codigos.push('40');
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenant_id, codigos);
 
-      const detalles: DetalleAsiento[] = [
-        { cuenta_id: cuentas.get('42')!.id, debe: total, haber: 0, concepto: 'Proveedores', centro_costo_id },
-        { cuenta_id: cuentas.get('20')!.id, debe: 0, haber: subtotal, concepto: 'Mercaderías devueltas', centro_costo_id },
-        { cuenta_id: cuentas.get('40')!.id, debe: 0, haber: igv, concepto: 'Reverso IGV Crédito Fiscal' },
-      ];
+      const detalles: DetalleAsiento[] = [{
+        cuenta_id: cuentas.get(cuentaPasivo)!.id,
+        debe: total,
+        haber: 0,
+        concepto: cuentaPasivo === '42' ? 'Proveedores' : 'Recibido por facturar',
+        centro_costo_id,
+      }];
+      if (mercaderia > 0) detalles.push({
+        cuenta_id: cuentas.get('20')!.id,
+        debe: 0,
+        haber: mercaderia,
+        concepto: 'Mercaderías devueltas',
+        centro_costo_id,
+      });
+      if (servicios + noStock > 0) detalles.push({
+        cuenta_id: cuentas.get('63')!.id,
+        debe: 0,
+        haber: servicios + noStock,
+        concepto: 'Servicios y consumos devueltos',
+        centro_costo_id,
+      });
+      if (igv > 0) detalles.push({
+        cuenta_id: cuentas.get('40')!.id,
+        debe: 0,
+        haber: igv,
+        concepto: 'Reverso IGV Crédito Fiscal',
+      });
 
       return await this.generarAsiento(
         tenant_id,

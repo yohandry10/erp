@@ -190,45 +190,9 @@ export class CashConcurrencyService {
         const sumaMovimientos = (movimientos || []).reduce((sum: number, m: any) => sum + m.monto, 0);
         const saldoEsperado = (sesion.monto_inicio || 0) + sumaMovimientos;
 
-        // Cerrar sesión marcando como cierre administrativo
-        const { error: updateError } = await this.supabase
-            .getClient()
-            .from('sesiones_caja')
-            .update({
-                estado: 'CERRADA',
-                hora_cierre: new Date().toISOString(),
-                cerrado_por: adminId,
-                monto_esperado: saldoEsperado,
-                monto_contado: saldoEsperado, // Asumimos que cuadra
-                diferencia: 0,
-                notas: `CIERRE ADMINISTRATIVO: ${razon}`,
-            })
-            .eq('id', sesionId);
-
-        if (updateError) {
-            throw new BadRequestException('Error cerrando sesión administrativamente');
-        }
-
-        // Registrar en auditoría
-        await this.supabase
-            .getClient()
-            .from('caja_audit_log')
-            .insert([
-                {
-                    evento: 'APERTURA_FORZOSA',
-                    sesion_caja_id: sesionId,
-                    usuario_id: adminId,
-                    parametros: {
-                        razon,
-                        sesion_original: sesion.usuario_id,
-                        saldo_esperado: saldoEsperado,
-                    },
-                    resultado: 'COMPLETADO',
-                    tenant_id: tenantId,
-                },
-            ]);
-
-        this.logger.log(`Cierre administrativo completado: sesión=${sesionId}`);
+        throw new BadRequestException(
+            `Writer legado retirado (saldo calculado ${saldoEsperado}): use cerrar_caja_tx 451 mediante CajasService para un cierre administrativo atómico`,
+        );
     }
 
     /**

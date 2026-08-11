@@ -14,6 +14,7 @@ import {
   EstadoAsiento
 } from '@erp-suite/dtos';
 import { buildDeterministicUuid } from '../../../common/util/deterministic-uuid.util';
+import { createHash } from 'crypto';
 
 /** Cuentas PCGE del ciclo de vida del activo. */
 const CUENTA_ACTIVO = '33';
@@ -187,8 +188,22 @@ export class ActivosFijosService {
   async crear(
     tenantId: string,
     userId: string,
-    dto: CreateActivoFijoDto
+    dto: CreateActivoFijoDto,
+    idempotencyKey?: string,
   ): Promise<ActivoFijoResponseDto> {
+    const valorResidualValidado = dto.valor_residual ?? 0;
+    if (valorResidualValidado > dto.valor_adquisicion) {
+      throw new BadRequestException('El valor residual no puede superar al de adquisición: la base depreciable sería negativa.');
+    }
+    const key=idempotencyKey?.trim()||`asset-create:${createHash('sha256').update(JSON.stringify({tenantId,userId,dto})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_activo_diferido_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_entity:'ASSET',p_action:'CREATE',p_record_id:null,p_payload:dto,p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el activo fijo');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
+    return this.aRespuesta(result.record);
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     const valorResidual = dto.valor_residual ?? 0;
 
     if (valorResidual > dto.valor_adquisicion) {
@@ -239,8 +254,20 @@ export class ActivosFijosService {
   async actualizar(
     tenantId: string,
     activoId: string,
-    dto: UpdateActivoFijoDto
+    dto: UpdateActivoFijoDto,
+    userId: string,
+    idempotencyKey?: string,
   ): Promise<ActivoFijoResponseDto> {
+    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    const key=idempotencyKey?.trim()||`asset-update:${createHash('sha256').update(JSON.stringify({tenantId,activoId,userId,dto})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_activo_diferido_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_entity:'ASSET',p_action:'UPDATE',p_record_id:activoId,p_payload:dto,p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo actualizar el activo fijo');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
+    return this.aRespuesta(result.record);
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     const activo = await this.obtener(tenantId, activoId);
 
     if (activo.situacion !== SituacionActivo.ACTIVO) {
@@ -287,10 +314,9 @@ export class ActivosFijosService {
    * Registra la cuota de depreciación de todos los activos vigentes en un
    * período.
    *
-   * No genera el asiento directamente: inserta las filas en `depreciaciones`,
-   * que es lo que el scheduler ya existente encola hacia el outbox y el
-   * generador convierte en Dr 68 / Cr 39. Esa mitad de la cadena ya funcionaba;
-   * lo que faltaba era quien creara las filas.
+   * No genera el asiento de forma síncrona: la RPC inserta la cuota y el evento
+   * durable `depreciacion.generada` dentro del mismo commit. El consumidor
+   * contable lo convierte después en Dr 68 / Cr 39 sin una ventana de pérdida.
    */
   async depreciarPeriodo(
     tenantId: string,

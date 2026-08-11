@@ -170,6 +170,12 @@ describe('CPE Integration Verification', () => {
 
     it('should successfully generate a CPE and simulate SUNAT acceptance', async () => {
         const tenantId = 'tenant-123';
+        jest.spyOn(cpeService as any, 'getXmlSigner').mockResolvedValue({
+            signXml: jest.fn().mockReturnValue('<xml>signed</xml>'),
+            generateHash: jest.fn().mockReturnValue('hash-123'),
+            validateSignature: jest.fn().mockReturnValue(true),
+            validateSignatureStrict: jest.fn().mockReturnValue(true),
+        });
         const pedido: PedidoVenta & { detalle: PedidoDetalle[] } = {
             id: 'pedido-123',
             tenant_id: tenantId,
@@ -237,10 +243,7 @@ describe('CPE Integration Verification', () => {
             error: null,
         });
 
-        // 6. CpeService: check idempotency
-        mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
-
-        // 7. CpeService: insert CPE
+        // 6. CpeService: resultado de la emisión atómica
         const mockCreatedCpe = {
             id: 'cpe-123',
             tipo_documento: '01',
@@ -261,6 +264,17 @@ describe('CPE Integration Verification', () => {
             hash: 'hash-123',
             tenant_id: tenantId,
         };
+        mockSupabaseClient.rpc.mockResolvedValueOnce({
+            data: {
+                cpe: { ...mockCreatedCpe, documento_id: 'doc-123', sunat_status: 'READY' },
+                cpe_id: 'cpe-123',
+                documento_id: 'doc-123',
+                cxc_id: 'cxc-123',
+                pedido_id: pedido.id,
+                pedido_estado: 'FACTURADO',
+            },
+            error: null,
+        });
         mockSupabaseClient.insert.mockReturnThis();
         mockSupabaseClient.select.mockReturnThis();
         mockSupabaseClient.single.mockResolvedValueOnce({
@@ -268,16 +282,20 @@ describe('CPE Integration Verification', () => {
             error: null,
         });
 
-        // 8. CpeService: ensureDocumentoParaCpe -> no existe documento operativo previo
-        mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
-
-        // 9. CpeService: ensureDocumentoParaCpe -> empresa_config para datos de emisor
+        // 8. CpeService: política financiera del cliente para la CxC atómica
         mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
             data: {
-                ruc: '20987654321',
-                razon_social: 'Mi Empresa SAC',
-                direccion_fiscal: 'Av. Empresa 456',
+                id: 'cliente-123',
+                sujeto_retencion: false,
+                sujeto_percepcion: false,
+                sujeto_detraccion: false,
             },
+            error: null,
+        });
+
+        // 9. CpeService: configuración financiera para la CxC atómica
+        mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+            data: {},
             error: null,
         });
 
@@ -316,6 +334,7 @@ describe('CPE Integration Verification', () => {
           pedido,
           tenantId,
           `ventas.cpe.factura:${tenantId}:${pedido.id}`,
+          '11111111-1111-4111-8111-111111111111',
         );
 
         // Assertions for Creation
@@ -326,17 +345,35 @@ describe('CPE Integration Verification', () => {
         console.log('Result State (Creation):', result.estado);
 
         // Now verify the manual send flow
-        // Mock for sendToOseManual -> sendToOse -> supabase.select(cpe)
-        mockSupabaseClient.single.mockResolvedValueOnce({
-            data: {
+        mockSupabaseClient.single.mockReset();
+        mockSupabaseClient.maybeSingle.mockReset();
+        mockSupabaseClient.rpc.mockReset();
+        const reservedCpe = {
                 ...mockCreatedCpe,
                 tenant_id: tenantId,
                 ruc_emisor: '20987654321',
                 tipo_documento: '01',
                 xml_firmado: '<xml>signed</xml>'
-            },
-            error: null
-        });
+        };
+        mockSupabaseClient.rpc
+            .mockResolvedValueOnce({
+                data: {
+                    claimed: true,
+                    idempotent: false,
+                    cpe: reservedCpe,
+                    operation: { id: 'operation-476', claim_token: 'claim-476' },
+                },
+                error: null,
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    claimed: true,
+                    idempotent: false,
+                    cpe: { ...reservedCpe, estado: 'ACEPTADO', sunat_status: 'ACCEPTED' },
+                    operation: { id: 'operation-476', result_kind: 'ACCEPTED', response_code: '0' },
+                },
+                error: null,
+            });
         mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
             data: {
                 ruc: '20987654321',
@@ -346,15 +383,14 @@ describe('CPE Integration Verification', () => {
             error: null,
         });
 
-        // Mock for sendToOse -> update(ENVIADO)
-        mockSupabaseClient.update.mockReturnThis();
-
-        // Mock for sendToOse -> update(ACEPTADO)
-        mockSupabaseClient.update.mockReturnThis();
+        jest.spyOn((cpeService as any).cancellationService, 'finalizarAnulacionAceptada')
+            .mockResolvedValue(null);
 
         await cpeService.sendToOseManual('cpe-123', '<xml>signed</xml>', 'fileName', {
           idempotencyKey: 'test-idempotency',
-        });
+          actorId: 'actor-1',
+          origin: 'USER',
+        }, tenantId);
 
         expect(mockFiscalAdapter.enviarDocumento).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -366,14 +402,15 @@ describe('CPE Integration Verification', () => {
           }),
           tenantId,
         );
-        expect(mockSupabaseUpdate).toHaveBeenCalledWith(
-          'cpe',
+        expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+          'finalizar_envio_cpe_tx',
           expect.objectContaining({
-            estado: 'ACEPTADO',
-            sunat_status: 'ACCEPTED',
-            cdr_sunat: 'CDR_TEST',
+            p_tenant_id: tenantId,
+            p_operation_id: 'operation-476',
+            p_claim_token: 'claim-476',
+            p_result_kind: 'ACCEPTED',
+            p_cdr: 'CDR_TEST',
           }),
-          { id: 'cpe-123' },
         );
     });
 

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { RetencionesController } from '../../controllers/retenciones.controller';
 import { RetencionesService } from './retenciones.service';
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
-import { EventBusService } from '../../shared/events/event-bus.service';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 

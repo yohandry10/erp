@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { Permission, RolePermission } from './types';
 
@@ -8,7 +8,9 @@ export type { Permission, RolePermission } from './types';
 @Injectable()
 export class PermissionService {
   private permissionCache: Map<string, { permissions: string[]; timestamp: number }> = new Map();
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+  // Correctness beats a process-local cache: role changes must take effect on
+  // every API replica immediately. A distributed/versioned cache can replace it.
+  private readonly CACHE_TTL = 0;
   private readonly actionGroups: string[][] = [
     ['read', 'ver', 'view', 'listar', 'consultar'],
     ['write', 'crear', 'create', 'editar', 'update', 'actualizar', 'modificar', 'registrar', 'generar', 'emitir'],
@@ -106,6 +108,7 @@ export class PermissionService {
       .select('id')
       .eq('id', roleId)
       .eq('tenant_id', tenantId)
+      .eq('activo', true)
       .single();
 
     if (!role) {
@@ -150,64 +153,23 @@ export class PermissionService {
    * Assign a permission to a role
    * Requirements: 5.1
    */
-  async assignPermissionToRole(tenantId: string, roleId: string, permissionId: string): Promise<void> {
-    const client = this.supabase.getClient();
-
-    // Validate role belongs to tenant
-    const { data: role } = await client
-      .from('roles')
-      .select('id')
-      .eq('id', roleId)
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!role) {
-      throw new NotFoundException('Rol no encontrado en este tenant');
-    }
-
-    // Validate permission belongs to tenant
-    const { data: permission } = await client
-      .from('permisos')
-      .select('id')
-      .eq('id', permissionId)
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!permission) {
-      throw new NotFoundException('Permiso no encontrado en este tenant');
-    }
-
-    // Check if permission is already assigned
-    const { data: existing } = await client
-      .from('rol_permisos')
-      .select('id')
-      .eq('role_id', roleId)
-      .eq('permiso_id', permissionId)
-      .single();
-
-    if (existing) {
-      console.log('⚠️ [PERMISSION] Permiso ya asignado al rol');
-      return;
-    }
-
-    // Insert into rol_permisos table
-    const { error } = await client
-      .from('rol_permisos')
-      .insert({
-        role_id: roleId,
-        permiso_id: permissionId,
-        concedido: true,
-        created_at: new Date().toISOString()
-      });
-
-    if (error) {
-      console.error('Error assigning permission to role:', error);
-      throw new BadRequestException('Error al asignar permiso al rol');
-    }
-
-    console.log('✅ [PERMISSION] Permiso asignado - Rol:', roleId, 'Permiso:', permissionId);
-
-    // 🔴 CRÍTICO FIX: Invalidar cache de permisos de usuarios con este rol
+  async assignPermissionToRole(
+    tenantId: string,
+    roleId: string,
+    permissionId: string,
+    actorId?: string,
+  ): Promise<void> {
+    if (!actorId?.trim()) throw new ForbiddenException('Se requiere actor para asignar permisos');
+    const { error } = await this.supabase.getClient().rpc('asignar_permisos_rol_rbac_tx', {
+      p_rol_id: roleId,
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_permission_ids: [permissionId],
+      p_mode: 'ADD',
+    });
+    if (error?.code === '42501') throw new ForbiddenException(error.message);
+    if (error?.code === 'P0002') throw new NotFoundException(error.message);
+    if (error) throw new BadRequestException(error.message || 'Error al asignar permiso al rol');
     await this.invalidateCacheForRoleUsers(roleId, tenantId);
   }
 
@@ -215,36 +177,23 @@ export class PermissionService {
    * Revoke a permission from a role
    * Requirements: 5.5
    */
-  async revokePermissionFromRole(tenantId: string, roleId: string, permissionId: string): Promise<void> {
-    const client = this.supabase.getClient();
-
-    // Validate role belongs to tenant
-    const { data: role } = await client
-      .from('roles')
-      .select('id')
-      .eq('id', roleId)
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!role) {
-      throw new NotFoundException('Rol no encontrado en este tenant');
-    }
-
-    // Delete from rol_permisos table
-    const { error } = await client
-      .from('rol_permisos')
-      .delete()
-      .eq('role_id', roleId)
-      .eq('permiso_id', permissionId);
-
-    if (error) {
-      console.error('Error revoking permission from role:', error);
-      throw new BadRequestException('Error al revocar permiso del rol');
-    }
-
-    console.log('✅ [PERMISSION] Permiso revocado - Rol:', roleId, 'Permiso:', permissionId);
-
-    // 🔴 CRÍTICO FIX: Invalidar cache de permisos de usuarios con este rol
+  async revokePermissionFromRole(
+    tenantId: string,
+    roleId: string,
+    permissionId: string,
+    actorId?: string,
+  ): Promise<void> {
+    if (!actorId?.trim()) throw new ForbiddenException('Se requiere actor para revocar permisos');
+    const { error } = await this.supabase.getClient().rpc('asignar_permisos_rol_rbac_tx', {
+      p_rol_id: roleId,
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_permission_ids: [permissionId],
+      p_mode: 'REMOVE',
+    });
+    if (error?.code === '42501') throw new ForbiddenException(error.message);
+    if (error?.code === 'P0002') throw new NotFoundException(error.message);
+    if (error) throw new BadRequestException(error.message || 'Error al revocar permiso del rol');
     await this.invalidateCacheForRoleUsers(roleId, tenantId);
   }
 
@@ -266,11 +215,16 @@ export class PermissionService {
     // ✅ FIX: Usar maybeSingle() para evitar error PGRST301
     const { data: usuario, error: userError } = await client
       .from('usuarios_sistema')
-      .select('is_super_admin')
+      .select('is_super_admin, activo, estado')
       .eq('id', userId)
+      .eq('tenant_id', tenantId)
       .maybeSingle();
 
-    if (!userError && usuario?.is_super_admin === true) {
+    if (userError || !usuario || usuario.activo !== true || usuario.estado !== 'ACTIVO') {
+      return false;
+    }
+
+    if (usuario.is_super_admin === true) {
       console.log('✅ [PERMISSION] SUPER_ADMIN detected - granting access');
       return true;
     }
@@ -302,7 +256,7 @@ export class PermissionService {
 
     if (!userRoles || userRoles.length === 0) {
       // Cache negative result
-      this.permissionCache.set(cacheKey, { permissions: [], timestamp: Date.now() });
+      if (this.CACHE_TTL > 0) this.permissionCache.set(cacheKey, { permissions: [], timestamp: Date.now() });
       return false;
     }
 
@@ -313,7 +267,8 @@ export class PermissionService {
       .from('roles')
       .select('id, nombre')
       .in('id', roleIds)
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .eq('activo', true);
 
     if (validRolesError) {
       console.error('Error validating roles tenant:', validRolesError);
@@ -322,14 +277,14 @@ export class PermissionService {
 
     if (!validRoles || validRoles.length === 0) {
       // Cache negative result
-      this.permissionCache.set(cacheKey, { permissions: [], timestamp: Date.now() });
+      if (this.CACHE_TTL > 0) this.permissionCache.set(cacheKey, { permissions: [], timestamp: Date.now() });
       return false;
     }
 
     // Bypass global if user tiene rol ADMIN en este tenant
     const isAdmin = validRoles.some(r => (r as any)?.nombre?.toUpperCase() === 'ADMIN');
     if (isAdmin) {
-      this.permissionCache.set(cacheKey, { permissions: [cacheKey], timestamp: Date.now() });
+      if (this.CACHE_TTL > 0) this.permissionCache.set(cacheKey, { permissions: [cacheKey], timestamp: Date.now() });
       return true;
     }
 
@@ -387,10 +342,12 @@ export class PermissionService {
     }) || false;
 
     // Cache result
-    this.permissionCache.set(cacheKey, {
-      permissions: hasPermission ? [cacheKey] : [],
-      timestamp: Date.now()
-    });
+    if (this.CACHE_TTL > 0) {
+      this.permissionCache.set(cacheKey, {
+        permissions: hasPermission ? [cacheKey] : [],
+        timestamp: Date.now()
+      });
+    }
 
     return hasPermission;
   }
@@ -426,7 +383,8 @@ export class PermissionService {
       .from('roles')
       .select('id')
       .in('id', roleIds)
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .eq('activo', true);
 
     if (validRolesError) {
       console.error('Error validating roles tenant:', validRolesError);

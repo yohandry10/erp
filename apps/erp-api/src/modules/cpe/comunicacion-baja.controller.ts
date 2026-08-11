@@ -1,11 +1,16 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { ComunicacionBajaService, ComunicacionBajaDto, ResumenDiarioDto } from './comunicacion-baja.service';
+import { ComunicacionBajaService } from './comunicacion-baja.service';
+import {
+  CrearComunicacionBajaDto,
+  CrearResumenDiarioDto,
+  EnviarResumenFiscalDto,
+} from './dto/resumen-fiscal.dto';
 
 @ApiTags('cpe-baja')
 @Controller('cpe/baja')
@@ -13,6 +18,31 @@ import { ComunicacionBajaService, ComunicacionBajaDto, ResumenDiarioDto } from '
 @ApiBearerAuth()
 export class ComunicacionBajaController {
   constructor(private readonly comunicacionBajaService: ComunicacionBajaService) {}
+
+  @Get('elegibles')
+  @RequirePermission('cpe.comprobantes.anular')
+  @ApiOperation({
+    summary: 'Listar CPE elegibles para baja fiscal RA/RC',
+    description: 'Sólo devuelve CPE cuya reversa comercial 448 ya fue confirmada y que no están en otro lote activo',
+  })
+  async listarElegibles(
+    @Query('tipo') tipo: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.comunicacionBajaService.listarCpeBajaElegibles(tipo, tenantId, userId);
+  }
+
+  @Get('lotes')
+  @RequirePermission('cpe.comprobantes.consultar')
+  @ApiOperation({ summary: 'Listar lotes fiscales RA/RC recientes con ticket y retry durable' })
+  async listarLotes(
+    @Query('tipo') tipo: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.comunicacionBajaService.listarLotesFiscales(tipo, tenantId, userId);
+  }
 
   /**
    * Crear comunicación de baja (RA-) para facturas
@@ -25,7 +55,7 @@ export class ComunicacionBajaController {
   })
   @ApiResponse({ status: 201, description: 'Comunicación de baja creada exitosamente' })
   async crearComunicacionBaja(
-    @Body() dto: ComunicacionBajaDto,
+    @Body() dto: CrearComunicacionBajaDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
   ) {
@@ -44,10 +74,16 @@ export class ComunicacionBajaController {
   @ApiResponse({ status: 200, description: 'Comunicación enviada exitosamente' })
   async enviarComunicacionBaja(
     @Param('id') id: string,
+    @Body() dto: EnviarResumenFiscalDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
   ) {
-    return this.comunicacionBajaService.enviarComunicacionBaja(id, tenantId, userId);
+    return this.comunicacionBajaService.enviarComunicacionBaja(
+      id,
+      tenantId,
+      userId,
+      dto?.idempotencyKey,
+    );
   }
 
   /**
@@ -63,8 +99,9 @@ export class ComunicacionBajaController {
   async consultarEstadoComunicacion(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
   ) {
-    return this.comunicacionBajaService.consultarEstadoComunicacion(id, tenantId);
+    return this.comunicacionBajaService.consultarEstadoComunicacion(id, tenantId, userId);
   }
 
   /**
@@ -78,7 +115,7 @@ export class ComunicacionBajaController {
   })
   @ApiResponse({ status: 201, description: 'Resumen diario creado exitosamente' })
   async crearResumenDiario(
-    @Body() dto: ResumenDiarioDto,
+    @Body() dto: CrearResumenDiarioDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
   ) {
@@ -97,10 +134,16 @@ export class ComunicacionBajaController {
   @ApiResponse({ status: 200, description: 'Resumen enviado exitosamente' })
   async enviarResumenDiario(
     @Param('id') id: string,
+    @Body() dto: EnviarResumenFiscalDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
   ) {
-    return this.comunicacionBajaService.enviarResumenDiario(id, tenantId, userId);
+    return this.comunicacionBajaService.enviarResumenDiario(
+      id,
+      tenantId,
+      userId,
+      dto?.idempotencyKey,
+    );
   }
 
   /**
@@ -116,7 +159,8 @@ export class ComunicacionBajaController {
   async consultarEstadoResumen(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
   ) {
-    return this.comunicacionBajaService.consultarEstadoResumen(id, tenantId);
+    return this.comunicacionBajaService.consultarEstadoResumen(id, tenantId, userId);
   }
 }

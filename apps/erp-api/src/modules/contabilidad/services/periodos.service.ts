@@ -1,6 +1,6 @@
-import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { buildDeterministicUuid } from '../../../common/util/deterministic-uuid.util';
+import { createHash } from 'crypto';
 
 export enum EstadoPeriodo {
   ABIERTO = 'ABIERTO',
@@ -22,11 +22,7 @@ export interface PeriodoContable {
 
 @Injectable()
 export class PeriodosService {
-  constructor(
-    private readonly supabaseService: SupabaseService,
-    @Inject(forwardRef(() => 'EstadosFinancierosService'))
-    private readonly estadosFinancierosService?: any
-  ) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
   /**
    * Valida que el período contable esté abierto para la fecha especificada
@@ -38,10 +34,12 @@ export class PeriodosService {
     const anio = fecha.getFullYear();
     const mes = fecha.getMonth() + 1; // JavaScript months are 0-indexed
 
-    let periodo = await this.obtenerPeriodo(tenantId, anio, mes);
+    const periodo = await this.obtenerPeriodo(tenantId, anio, mes);
 
     if (!periodo) {
-      periodo = await this.asegurarPeriodoAbierto(tenantId, anio, mes);
+      throw new BadRequestException(
+        `El período contable ${anio}-${String(mes).padStart(2,'0')} no existe. Debe crearse explícitamente antes de registrar movimientos.`,
+      );
     }
 
     if (periodo.estado === EstadoPeriodo.CERRADO) {
@@ -59,36 +57,6 @@ export class PeriodosService {
     }
 
     console.log(`✅ [Periodos] Período ${anio}-${mes} está ABIERTO para tenant ${tenantId}`);
-  }
-
-  /** Materializa un período abierto real para que nunca quede implícito e invisible. */
-  private async asegurarPeriodoAbierto(
-    tenantId: string,
-    anio: number,
-    mes: number
-  ): Promise<PeriodoContable> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('periodos_contables')
-      .upsert(
-        { tenant_id: tenantId, anio, mes, estado: EstadoPeriodo.ABIERTO },
-        { onConflict: 'tenant_id,anio,mes', ignoreDuplicates: true }
-      )
-      .select('*')
-      .maybeSingle();
-
-    if (error) {
-      console.error('❌ [Periodos] Error materializando período:', error);
-      throw new Error(`Error creando período contable: ${error.message}`);
-    }
-
-    const periodo = (data as PeriodoContable | null) ||
-      (await this.obtenerPeriodo(tenantId, anio, mes));
-    if (!periodo) {
-      throw new Error(`No se pudo materializar el período contable ${anio}-${String(mes).padStart(2, '0')}`);
-    }
-
-    return periodo;
   }
 
   /**
@@ -182,8 +150,19 @@ export class PeriodosService {
   async crearPeriodo(
     tenantId: string,
     anio: number,
-    mes: number
+    mes:number,
+    userId?:string,
+    idempotencyKey?:string,
   ): Promise<PeriodoContable> {
+    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    const payload={anio,mes}; const key=idempotencyKey?.trim()||`period-create:${createHash('sha256').update(JSON.stringify({tenantId,userId,payload})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_maestro_contable_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_entity:'PERIOD',p_action:'CREATE',p_record_id:null,p_payload:payload,p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el período contable');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData; return result.record as PeriodoContable;
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     // Validar que el mes esté en rango válido
     if (mes < 1 || mes > 12) {
       throw new BadRequestException('El mes debe estar entre 1 y 12');
@@ -311,6 +290,7 @@ export class PeriodosService {
       .getClient()
       .from('outbox_events')
       .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
       .is('processed_at', null)
       .gte('occurred_at', fechaInicio)
       .lte('occurred_at', fechaFin);
@@ -340,223 +320,23 @@ export class PeriodosService {
     mes: number,
     usuarioId: string
   ): Promise<PeriodoContable> {
-    const periodo = await this.obtenerPeriodo(tenantId, anio, mes);
-
-    if (!periodo) {
-      throw new BadRequestException(
-        `El período ${anio}-${String(mes).padStart(2, '0')} no existe`
-      );
-    }
-
-    if (periodo.estado === EstadoPeriodo.CERRADO) {
-      throw new BadRequestException(
-        `El período ${anio}-${String(mes).padStart(2, '0')} ya está cerrado`
-      );
-    }
-
-    // Validar que todos los asientos cuadren
-    const validacionAsientos = await this.validarAsientosCuadran(tenantId, anio, mes);
-    if (!validacionAsientos.valido) {
-      throw new BadRequestException(
-        `No se puede cerrar el período. Hay ${validacionAsientos.asientosDescuadrados.length} asiento(s) descuadrado(s). ` +
-        `Asientos: ${validacionAsientos.asientosDescuadrados.map(a => a.numero_asiento).join(', ')}`
-      );
-    }
-
-    // Validar que no haya eventos pendientes
-    const validacionEventos = await this.validarEventosPendientes(tenantId, anio, mes);
-    if (!validacionEventos.valido) {
-      throw new BadRequestException(
-        `No se puede cerrar el período. Hay ${validacionEventos.eventosPendientes} evento(s) pendiente(s) de procesar.`
-      );
-    }
-
-    // Validar que no queden asientos en borrador sin confirmar
-    const borradores = await this.contarAsientosBorrador(tenantId, anio, mes);
-    if (borradores > 0) {
-      throw new BadRequestException(
-        `No se puede cerrar el período. Hay ${borradores} asiento(s) en BORRADOR sin confirmar. ` +
-        `Confírmelos o anúlelos antes de cerrar.`
-      );
-    }
-
-    // Generar asientos de cierre si es fin de año (diciembre)
-    if (mes === 12) {
-      console.log(`📊 [Periodos] Generando asientos de cierre de año ${anio} para tenant ${tenantId}`);
-      // Si esto falla, el ejercicio quedaría cerrado sin asiento de cierre de
-      // resultados y la única señal sería una línea de log. El cierre debe
-      // fallar entero para que se pueda reintentar tras corregir la causa.
-      await this.generarAsientosCierreAnual(tenantId, anio, usuarioId);
-    }
-
-    // Cerrar el período
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('periodos_contables')
-      .update({
-        estado: EstadoPeriodo.CERRADO,
-        fecha_cierre: new Date().toISOString(),
-        cerrado_por: usuarioId
-      })
-      .eq('id', periodo.id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('❌ [Periodos] Error cerrando período:', error);
-      throw new Error(`Error cerrando período contable: ${error.message}`);
-    }
-
-    // Refrescar vistas materializadas de estados financieros
-    console.log(`🔄 [Periodos] Refrescando vistas materializadas para ${anio}-${mes}`);
-    try {
-      if (this.estadosFinancierosService) {
-        await this.estadosFinancierosService.refrescarEstadosFinancieros(tenantId, anio, mes);
-      }
-    } catch (error) {
-      console.error('❌ [Periodos] Error refrescando vistas materializadas:', error);
-      // No bloqueamos el cierre si falla el refresh
-      console.warn('⚠️ [Periodos] Período cerrado pero las vistas materializadas no se actualizaron');
-    }
-
-    console.log(`🔒 [Periodos] Período ${anio}-${mes} cerrado por usuario ${usuarioId}`);
-    return data as PeriodoContable;
-  }
-
-  /**
-   * Genera asientos de cierre anual (cierre de cuentas de resultados)
-   * @param tenantId - ID del tenant
-   * @param anio - Año a cerrar
-   * @param usuarioId - ID del usuario que cierra
-   */
-  private async generarAsientosCierreAnual(
-    tenantId: string,
-    anio: number,
-    usuarioId: string
-  ): Promise<void> {
-    console.log(`📊 [Periodos] Iniciando generación de asientos de cierre anual ${anio}`);
-
-    // Obtener el resultado del ejercicio (ingresos - gastos)
-    const { data: resultadoData, error: resultadoError } = await this.supabaseService
-      .getClient()
-      .rpc('calcular_resultado_ejercicio', {
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'cerrar_periodo_contable_tx',
+      {
         p_tenant_id: tenantId,
-        p_anio: anio
-      });
+        p_anio: anio,
+        p_mes: mes,
+        p_actor_id: usuarioId,
+      },
+    );
 
-    if (resultadoError) {
-      console.error('❌ [Periodos] Error calculando resultado del ejercicio:', resultadoError);
-      throw new Error(`Error calculando resultado del ejercicio: ${resultadoError.message}`);
-    }
-
-    const resultadoEjercicio = resultadoData || 0;
-    console.log(`💰 [Periodos] Resultado del ejercicio ${anio}: ${resultadoEjercicio}`);
-
-    // Si no hay resultado, no generamos asientos de cierre
-    if (Math.abs(resultadoEjercicio) < 0.01) {
-      console.log(`ℹ️ [Periodos] No hay resultado del ejercicio, omitiendo asientos de cierre`);
-      return;
-    }
-
-    // Obtener cuentas de cierre PCGE: 59 Resultados acumulados y 89 Determinacion del resultado.
-    const { data: cuentasCierre, error: cuentaError } = await this.supabaseService
-      .getClient()
-      .from('plan_cuentas')
-      .select('id, codigo')
-      .eq('tenant_id', tenantId)
-      .in('codigo', ['59', '89']);
-
-    if (cuentaError) {
-      throw new Error(`Error obteniendo cuentas de cierre PCGE: ${cuentaError.message}`);
-    }
-
-    const cuentaResultados = (cuentasCierre || []).find((cuenta: any) => cuenta.codigo === '59');
-    const cuentaDeterminacion = (cuentasCierre || []).find((cuenta: any) => cuenta.codigo === '89');
-    if (!cuentaResultados || !cuentaDeterminacion) {
-      throw new Error(
-        'No se puede cerrar el ejercicio: faltan las cuentas PCGE 59 y/o 89.'
+    if (error || !data?.periodo) {
+      throw new BadRequestException(
+        error?.message || `No se pudo cerrar el período ${anio}-${String(mes).padStart(2, '0')}`,
       );
     }
 
-    // Crear asiento de cierre
-    const fechaCierre = new Date(anio, 11, 31); // 31 de diciembre
-    // source_event_id es uuid con índice único por tenant: la clave lógica del
-    // cierre debe derivarse a un uuid estable, no pasarse como texto.
-    const sourceEventId = buildDeterministicUuid(`cierre-anual:${tenantId}:${anio}`);
-
-    const { data: asientoExistente, error: asientoExistenteError } = await this.supabaseService
-      .getClient()
-      .from('asientos_contables')
-      .select('id, numero_asiento, codigo')
-      .eq('tenant_id', tenantId)
-      .eq('source_event_id', sourceEventId)
-      .maybeSingle();
-
-    if (asientoExistenteError) {
-      throw new Error(`Error validando asiento de cierre existente: ${asientoExistenteError.message}`);
-    }
-
-    if (asientoExistente?.id) {
-      console.log(`ℹ️ [Periodos] Asiento de cierre anual ${anio} ya existe (${asientoExistente.codigo ?? asientoExistente.numero_asiento ?? asientoExistente.id})`);
-      return;
-    }
-
-    const detalles = resultadoEjercicio > 0
-      ? [
-          {
-            cuenta_id: cuentaDeterminacion.id,
-            debe: resultadoEjercicio,
-            haber: 0,
-            concepto: `Determinacion del resultado ${anio}`
-          },
-          {
-            cuenta_id: cuentaResultados.id,
-            debe: 0,
-            haber: resultadoEjercicio,
-            concepto: `Utilidad del ejercicio ${anio}`
-          }
-        ]
-      : [
-          {
-            cuenta_id: cuentaResultados.id,
-            debe: Math.abs(resultadoEjercicio),
-            haber: 0,
-            concepto: `Perdida del ejercicio ${anio}`
-          },
-          {
-            cuenta_id: cuentaDeterminacion.id,
-            debe: 0,
-            haber: Math.abs(resultadoEjercicio),
-            concepto: `Determinacion del resultado ${anio}`
-          }
-        ];
-
-    const { error: asientoError } = await this.supabaseService
-      .getClient()
-      .rpc('crear_asiento_con_detalles_tx', {
-        p_tenant_id: tenantId,
-        p_asiento: {
-          fecha: fechaCierre.toISOString(),
-          concepto: `Asiento de cierre del ejercicio ${anio}`,
-          descripcion: `Asiento de cierre del ejercicio ${anio}`,
-        tipo_asiento: 'CIERRE',
-        origen: 'CIERRE_ANUAL',
-          referencia: `CIERRE-${anio}`,
-          source_event_id: sourceEventId,
-          estado: 'CONFIRMADO',
-          created_by: usuarioId,
-          confirmado_por: usuarioId,
-          confirmado_en: new Date().toISOString()
-        },
-        p_detalles: detalles
-      });
-
-    if (asientoError) {
-      console.error('❌ [Periodos] Error creando asiento de cierre:', asientoError);
-      throw new Error(`Error creando asiento de cierre: ${asientoError?.message}`);
-    }
-
-    console.log(`✅ [Periodos] Asiento de cierre anual ${anio} generado exitosamente`);
+    return data.periodo as PeriodoContable;
   }
 
   /**
@@ -569,41 +349,26 @@ export class PeriodosService {
   async reabrirPeriodo(
     tenantId: string,
     anio: number,
-    mes: number
+    mes: number,
+    usuarioId: string,
   ): Promise<PeriodoContable> {
-    const periodo = await this.obtenerPeriodo(tenantId, anio, mes);
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'reabrir_periodo_contable_tx',
+      {
+        p_tenant_id: tenantId,
+        p_anio: anio,
+        p_mes: mes,
+        p_actor_id: usuarioId,
+      },
+    );
 
-    if (!periodo) {
+    if (error || !data?.periodo) {
       throw new BadRequestException(
-        `El período ${anio}-${String(mes).padStart(2, '0')} no existe`
+        error?.message || `No se pudo reabrir el período ${anio}-${String(mes).padStart(2, '0')}`,
       );
     }
 
-    if (periodo.estado === EstadoPeriodo.ABIERTO) {
-      throw new BadRequestException(
-        `El período ${anio}-${String(mes).padStart(2, '0')} ya está abierto`
-      );
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('periodos_contables')
-      .update({
-        estado: EstadoPeriodo.ABIERTO,
-        fecha_cierre: null,
-        cerrado_por: null
-      })
-      .eq('id', periodo.id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('❌ [Periodos] Error reabriendo período:', error);
-      throw new Error(`Error reabriendo período contable: ${error.message}`);
-    }
-
-    console.log(`🔓 [Periodos] Período ${anio}-${mes} reabierto`);
-    return data as PeriodoContable;
+    return data.periodo as PeriodoContable;
   }
 
   /**
@@ -616,32 +381,25 @@ export class PeriodosService {
   async bloquearPeriodo(
     tenantId: string,
     anio: number,
-    mes: number
+    mes: number,
+    usuarioId: string,
   ): Promise<PeriodoContable> {
-    const periodo = await this.obtenerPeriodo(tenantId, anio, mes);
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'bloquear_periodo_contable_tx',
+      {
+        p_tenant_id: tenantId,
+        p_anio: anio,
+        p_mes: mes,
+        p_actor_id: usuarioId,
+      },
+    );
 
-    if (!periodo) {
+    if (error || !data?.periodo) {
       throw new BadRequestException(
-        `El período ${anio}-${String(mes).padStart(2, '0')} no existe`
+        error?.message || `No se pudo bloquear el período ${anio}-${String(mes).padStart(2, '0')}`,
       );
     }
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('periodos_contables')
-      .update({
-        estado: EstadoPeriodo.BLOQUEADO
-      })
-      .eq('id', periodo.id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('❌ [Periodos] Error bloqueando período:', error);
-      throw new Error(`Error bloqueando período contable: ${error.message}`);
-    }
-
-    console.log(`🚫 [Periodos] Período ${anio}-${mes} bloqueado`);
-    return data as PeriodoContable;
+    return data.periodo as PeriodoContable;
   }
 }

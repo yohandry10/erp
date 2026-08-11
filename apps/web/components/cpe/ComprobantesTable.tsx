@@ -11,7 +11,7 @@ interface CpeDocument {
   clienteRuc: string
   total: number
   moneda: string
-  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO'
+  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'ERROR' | 'RECHAZADO' | 'ANULADO'
   estadoSunat?: string
   observaciones?: string
   fechaCreacion: string
@@ -22,6 +22,8 @@ interface Props {
   onView: (id: string, tipo: string) => void
   onPdf?: (id: string) => void
   onSend: (id: string) => void
+  onSign?: (id: string) => void
+  onCancel?: (doc: CpeDocument) => void
   onGre?: (doc: CpeDocument) => void
   fiscalLabel: string
   canSend: boolean
@@ -31,12 +33,13 @@ const estadoColor: Record<string, string> = {
   ACEPTADO: 'border-cyan-300/30 bg-cyan-300/10 text-primary',
   FIRMADO: 'border-blue-300/30 bg-blue-300/10 text-primary dark:text-blue-200',
   ENVIADO: 'border-sky-300/30 bg-sky-300/10 text-primary dark:text-sky-200',
+  ERROR: 'border-amber-300/30 bg-amber-300/10 text-amber-700 dark:text-amber-200',
   RECHAZADO: 'border-border/30 bg-slate-300/10 text-foreground',
   ANULADO: 'border-border/30 bg-slate-400/10 text-foreground/90',
   BORRADOR: 'border-border/30 bg-slate-400/10 text-foreground/90',
 }
 
-export function ComprobantesTable({ documents, onView, onPdf, onSend, onGre, fiscalLabel, canSend }: Props) {
+export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, onCancel, onGre, fiscalLabel, canSend }: Props) {
   return (
     <div className="overflow-auto rounded-2xl border border-cyan-400/10">
       <table className="min-w-full !bg-card/80 text-sm">
@@ -53,7 +56,11 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onGre, fis
           </tr>
         </thead>
         <tbody className="divide-y divide-cyan-400/10">
-          {documents.map((doc) => (
+          {documents.map((doc) => {
+            const type = String(doc.tipoDocumento || doc.tipoComprobante).toUpperCase()
+            const isNote = ['07', '08'].some((code) => type.includes(code)) || type.includes('NOTA')
+            const canSendDocument = canSend && ['FIRMADO', 'ERROR'].includes(doc.estado)
+            return (
             <tr key={doc.id} className="bg-card/50 text-foreground/90 transition hover:bg-card/80">
               <td className="p-3 font-semibold text-foreground">{doc.tipoComprobante}</td>
               <td className="p-3 font-mono text-foreground">{doc.serie}</td>
@@ -77,21 +84,46 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onGre, fis
                 <div className="flex flex-wrap justify-end gap-2">
                 <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onView(doc.id, doc.tipoDocumento || doc.tipoComprobante)}>Ver</button>
                 <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onPdf?.(doc.id)}>PDF</button>
+                {isNote && doc.estado === 'BORRADOR' && onSign && (
+                  <button
+                    className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-400/15 dark:text-amber-200"
+                    onClick={() => onSign(doc.id)}
+                    data-testid={`sign-note-${doc.id}`}
+                  >
+                    Firmar
+                  </button>
+                )}
                 <button
                   className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-primary dark:text-blue-200 hover:bg-blue-500/15 disabled:opacity-40"
-                  onClick={() => canSend && onSend(doc.id)}
-                  disabled={!canSend}
-                  title={!canSend ? `Envío a ${fiscalLabel} no disponible` : `Enviar a ${fiscalLabel}`}
+                  onClick={() => canSendDocument && onSend(doc.id)}
+                  disabled={!canSendDocument}
+                  title={!canSend
+                    ? `Envío a ${fiscalLabel} no disponible`
+                    : doc.estado === 'RECHAZADO'
+                      ? 'El rechazo fiscal es definitivo y no se reintenta'
+                      : !canSendDocument
+                        ? 'El comprobante no está en un estado enviable'
+                        : `Enviar a ${fiscalLabel}`}
                 >
                   Enviar {fiscalLabel}
                 </button>
                 {onGre && (
                   <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onGre(doc)}>GRE</button>
                 )}
+                {onCancel && doc.estado !== 'ANULADO' && ['01', '03', 'FACTURA', 'BOLETA'].some((tipo) => String(doc.tipoDocumento || doc.tipoComprobante).toUpperCase().includes(tipo)) && (
+                  <button
+                    className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-500/15 dark:text-red-300"
+                    onClick={() => onCancel(doc)}
+                    data-testid={`open-cpe-cancellation-${doc.id}`}
+                  >
+                    Anulación
+                  </button>
+                )}
                 </div>
               </td>
             </tr>
-          ))}
+            )
+          })}
           {documents.length === 0 && (
             <tr className="bg-card/50">
               <td className="p-8 text-center text-muted-foreground" colSpan={8}>

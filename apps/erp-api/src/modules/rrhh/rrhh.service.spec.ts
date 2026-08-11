@@ -5,19 +5,10 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 describe('RrhhService asistencia', () => {
   let service: RrhhService;
   let client: any;
-  const chain = () => {
-    const builder: any = {};
-    builder.select = jest.fn(() => builder);
-    builder.insert = jest.fn(() => builder);
-    builder.update = jest.fn(() => builder);
-    builder.eq = jest.fn(() => builder);
-    builder.single = jest.fn();
-    return builder;
-  };
 
   beforeEach(() => {
     client = {
-      from: jest.fn(),
+      rpc: jest.fn(),
     };
 
     service = new RrhhService({
@@ -26,16 +17,10 @@ describe('RrhhService asistencia', () => {
   });
 
   it('registra entrada con tenant y sincronizacion de asistencia', async () => {
-    const findBuilder = chain();
-    findBuilder.single.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
-    const insertBuilder = chain();
-    insertBuilder.select.mockResolvedValueOnce({
-      data: [{ id: 'asis-1', hora_entrada: '08:00' }],
+    client.rpc.mockResolvedValueOnce({
+      data: { id: 'asis-1', hora_entrada: '08:00' },
       error: null,
     });
-    client.from
-      .mockReturnValueOnce(findBuilder)
-      .mockReturnValueOnce(insertBuilder);
 
     const result = await service.marcarAsistencia(
       'emp-1',
@@ -43,24 +28,30 @@ describe('RrhhService asistencia', () => {
       'entrada',
       '08:00',
       'tenant-1',
+      'actor-1',
+      'attendance-entry-20260514-emp-1',
     );
 
     expect(result.success).toBe(true);
-    expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({
-      id_empleado: 'emp-1',
-      tenant_id: 'tenant-1',
-      fecha: '2026-05-14',
-      hora_entrada: '08:00',
-    }));
+    expect(client.rpc).toHaveBeenCalledWith('ejecutar_operacion_rrhh_tx', {
+      p_tenant_id: 'tenant-1',
+      p_actor_id: 'actor-1',
+      p_operacion: 'ATTENDANCE_MARK',
+      p_payload: {
+        empleado_id: 'emp-1',
+        fecha: '2026-05-14',
+        tipo: 'entrada',
+        hora: '08:00',
+      },
+      p_idempotency_key: 'attendance-entry-20260514-emp-1',
+    });
   });
 
   it('rechaza entrada duplicada como conflicto de negocio, no 500', async () => {
-    const findBuilder = chain();
-    findBuilder.single.mockResolvedValueOnce({
-      data: { id: 'asis-1', hora_entrada: '08:00' },
-      error: null,
+    client.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: '23505', message: 'ATTENDANCE_ENTRY_ALREADY_EXISTS' },
     });
-    client.from.mockReturnValueOnce(findBuilder);
 
     await expect(service.marcarAsistencia(
       'emp-1',
@@ -68,16 +59,16 @@ describe('RrhhService asistencia', () => {
       'entrada',
       '08:05',
       'tenant-1',
+      'actor-1',
+      'attendance-entry-duplicate-emp-1',
     )).rejects.toMatchObject({ status: 409 });
   });
 
   it('rechaza salida anterior a entrada como validacion 400', async () => {
-    const findBuilder = chain();
-    findBuilder.single.mockResolvedValueOnce({
-      data: { id: 'asis-1', hora_entrada: '08:00', hora_salida: null },
-      error: null,
+    client.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: '22023', message: 'ATTENDANCE_EXIT_MUST_FOLLOW_ENTRY' },
     });
-    client.from.mockReturnValueOnce(findBuilder);
 
     await expect(service.marcarAsistencia(
       'emp-1',
@@ -85,6 +76,8 @@ describe('RrhhService asistencia', () => {
       'salida',
       '07:59',
       'tenant-1',
+      'actor-1',
+      'attendance-exit-invalid-emp-1',
     )).rejects.toBeInstanceOf(BadRequestException);
   });
 });
@@ -111,7 +104,7 @@ describe('RrhhService createContrato — normativa laboral peruana', () => {
   };
 
   beforeEach(() => {
-    client = { from: jest.fn() };
+    client = { from: jest.fn(), rpc: jest.fn() };
     service = new RrhhService({ getClient: jest.fn(() => client) } as unknown as SupabaseService);
   });
 
@@ -129,18 +122,24 @@ describe('RrhhService createContrato — normativa laboral peruana', () => {
 
   it('permite remuneracion bajo la RMV en part time', async () => {
     // En part time no se consulta normativa: la RMV completa no es exigible.
-    const insertBuilder: any = {
-      insert: jest.fn(() => insertBuilder),
-      select: jest.fn(async () => ({ data: [{ id: 'ctr-1' }], error: null })),
-    };
-    client.from.mockReturnValueOnce(insertBuilder);
+    client.rpc.mockResolvedValueOnce({ data: { id: 'ctr-1' }, error: null });
 
     const result = await service.createContrato(
       { ...base, jornada_laboral: 'part_time', sueldo_bruto: 700 },
       'tenant-1',
+      'actor-1',
+      'contract-part-time-emp-1',
     );
 
     expect(result.success).toBe(true);
+    expect(client.rpc).toHaveBeenCalledWith(
+      'ejecutar_operacion_rrhh_tx',
+      expect.objectContaining({
+        p_actor_id: 'actor-1',
+        p_operacion: 'CONTRACT_CREATE',
+        p_idempotency_key: 'contract-part-time-emp-1',
+      }),
+    );
   });
 
   it('rechaza contrato sujeto a modalidad mayor a 5 anios', async () => {
@@ -154,15 +153,13 @@ describe('RrhhService createContrato — normativa laboral peruana', () => {
     client.from
       .mockReturnValueOnce(normativaChain(null))
       .mockReturnValueOnce(normativaChain(1130));
-    const insertBuilder: any = {
-      insert: jest.fn(() => insertBuilder),
-      select: jest.fn(async () => ({ data: [{ id: 'ctr-2' }], error: null })),
-    };
-    client.from.mockReturnValueOnce(insertBuilder);
+    client.rpc.mockResolvedValueOnce({ data: { id: 'ctr-2' }, error: null });
 
     const result = await service.createContrato(
       { ...base, tipo_contrato: 'temporal', fecha_fin: '2031-07-01', sueldo_bruto: 2000 },
       'tenant-1',
+      'actor-1',
+      'contract-five-years-emp-1',
     );
 
     expect(result.success).toBe(true);
@@ -176,17 +173,148 @@ describe('RrhhService createContrato — normativa laboral peruana', () => {
   });
 
   it('no exige RMV en locacion de servicios por no ser contrato laboral', async () => {
-    const insertBuilder: any = {
-      insert: jest.fn(() => insertBuilder),
-      select: jest.fn(async () => ({ data: [{ id: 'ctr-3' }], error: null })),
-    };
-    client.from.mockReturnValueOnce(insertBuilder);
+    client.rpc.mockResolvedValueOnce({ data: { id: 'ctr-3' }, error: null });
 
     const result = await service.createContrato(
       { ...base, tipo_contrato: 'locacion_servicios', sueldo_bruto: 500 },
       'tenant-1',
+      'actor-1',
+      'contract-locacion-emp-1',
     );
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe('RrhhService liquidaciones — frontera transaccional', () => {
+  const activeEmployee = {
+    id: 'emp-1',
+    fecha_ingreso: '2024-01-01',
+    contratos: [{
+      id: 'contrato-1',
+      estado: 'en_periodo_prueba',
+      sueldo_bruto: 2_000_000,
+      tipo_contrato: 'indefinido',
+      metadata: {},
+    }],
+  };
+
+  const employeeQuery = () => {
+    const query: any = {};
+    query.select = jest.fn(() => query);
+    query.eq = jest.fn(() => query);
+    query.in = jest.fn(() => query);
+    query.single = jest.fn().mockResolvedValue({ data: activeEmployee, error: null });
+    return query;
+  };
+
+  it('rechaza el cálculo sin actor antes de consultar o escribir RRHH', async () => {
+    const getClient = jest.fn();
+    const service = new RrhhService({ getClient } as any);
+
+    await expect(service.calcularLiquidacion(
+      'emp-1',
+      'renuncia',
+      '2026-08-09',
+      'tenant-1',
+      undefined,
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(getClient).not.toHaveBeenCalled();
+  });
+
+  it.each(['AR', 'CO'] as const)(
+    'calcular para %s no cesa al empleado ni termina el contrato',
+    async (pais) => {
+      const empleadoBuilder = employeeQuery();
+      const rpc = jest.fn().mockResolvedValue({
+        data: { success: true, data: { id: 'liq-1', estado: 'calculada' } },
+        error: null,
+      });
+      const colombiaConfig: any = {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue({
+          data: { salario_minimo: 1_750_905, auxilio_transporte: 249_095 },
+          error: null,
+        }),
+      };
+      const client = {
+        from: jest.fn((table: string) => {
+          if (table === 'empleados') return empleadoBuilder;
+          if (table === 'rrhh_configuracion_colombia') return colombiaConfig;
+          throw new Error(`Tabla inesperada: ${table}`);
+        }),
+        rpc,
+      };
+      const service = new RrhhService(
+        { getClient: jest.fn(() => client) } as any,
+        undefined,
+        { obtenerContexto: jest.fn().mockResolvedValue({ codigo: pais }) } as any,
+      );
+
+      const result = await service.calcularLiquidacion(
+        'emp-1',
+        'renuncia',
+        '2026-08-09',
+        'tenant-1',
+        'actor-1',
+      );
+
+      expect(result).toMatchObject({ success: true, data: { estado: 'calculada' } });
+      expect(empleadoBuilder.in).toHaveBeenCalledWith(
+        'contratos.estado',
+        ['vigente', 'renovado', 'en_periodo_prueba'],
+      );
+      expect(client.from).not.toHaveBeenCalledWith('contratos');
+      expect(client.from).not.toHaveBeenCalledWith('liquidaciones');
+      expect((empleadoBuilder as any).update).toBeUndefined();
+      expect(rpc).toHaveBeenCalledWith(
+        'guardar_liquidacion_calculada_tx',
+        expect.objectContaining({
+          p_tenant_id: 'tenant-1',
+          p_usuario_id: 'actor-1',
+          p_liquidacion: expect.objectContaining({
+            id_empleado: 'emp-1',
+            estado: 'calculada',
+            pais_codigo: pais,
+          }),
+        }),
+      );
+    },
+  );
+
+  it('delega confirmación, pago, reversa y depósito CTS a sus RPC atómicas con actor', async () => {
+    const rpc = jest.fn().mockResolvedValue({ data: { success: true }, error: null });
+    const service = new RrhhService({
+      getClient: jest.fn(() => ({ rpc })),
+    } as any);
+
+    await service.confirmarLiquidacion('liq-1', 'tenant-1', 'actor-1');
+    await service.pagarLiquidacion(
+      'liq-1',
+      { metodo_pago: 'transferencia', cuenta_bancaria_id: 'bank-1', referencia: 'OP-1' },
+      'tenant-1',
+      'actor-1',
+    );
+    await service.revertirPagoLiquidacion('liq-1', 'error bancario', 'tenant-1', 'actor-1');
+    await service.depositarCts(
+      'cts-1',
+      { cuenta_bancaria_id: 'bank-1', referencia: 'CTS-1' },
+      'tenant-1',
+      'actor-1',
+    );
+
+    expect(rpc).toHaveBeenNthCalledWith(1, 'confirmar_liquidacion_tx', expect.objectContaining({
+      p_usuario_id: 'actor-1',
+    }));
+    expect(rpc).toHaveBeenNthCalledWith(2, 'pagar_liquidacion_tx', expect.objectContaining({
+      p_pago: expect.objectContaining({ referencia: 'OP-1' }),
+    }));
+    expect(rpc).toHaveBeenNthCalledWith(3, 'revertir_pago_liquidacion_tx', expect.objectContaining({
+      p_motivo: 'error bancario',
+    }));
+    expect(rpc).toHaveBeenNthCalledWith(4, 'depositar_cts_tx', expect.objectContaining({
+      p_deposito_id: 'cts-1',
+    }));
   });
 });

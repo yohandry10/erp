@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useApi } from "@/hooks/use-api";
 import { ArrowLeft, Package, Save } from "lucide-react";
@@ -9,6 +9,8 @@ import {
   etiquetaNoGravado,
   etiquetaSinImpuesto,
 } from "@/lib/afectacion-labels";
+import { ProductImageField } from "@/components/ProductImageField";
+import { deleteProductImage, uploadProductImage } from "@/lib/product-images";
 
 // Ni las etiquetas ni los campos tenian estilo propio: el navegador los pintaba
 // en linea y el texto de cada label quedaba pegado a su input.
@@ -18,14 +20,22 @@ const camposClass =
 export default function EditarProductoPage() {
   const router = useRouter();
   const params = useParams();
-  const { get, put } = useApi();
+  const { get, put, apiCall } = useApi();
   const country = useCountryContext();
   const productoId = params.id as string | undefined;
+  const intentRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const imageIntentRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const deleteImageIntentRef = useRef<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [categorias, setCategorias] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [productImage, setProductImage] = useState<File | null>(null);
+  const [removeCurrentImage, setRemoveCurrentImage] = useState(false);
   const [formData, setFormData] = useState({
     codigo: "",
     nombre: "",
+    marca: "",
     descripcion: "",
     categoria: "",
     precioVenta: "",
@@ -34,7 +44,6 @@ export default function EditarProductoPage() {
     codigoBarras: "",
     impuesto: "18",
     afectacionIgv: "10",
-    activo: true,
   });
 
   const impuestoNombre = country.paisCodigo === "PE" ? "IGV" : "IVA";
@@ -44,12 +53,25 @@ export default function EditarProductoPage() {
 
     setLoading(true);
     try {
-      const response = await get(`/inventario/productos/${productoId}`);
+      const [response, categoriasResponse] = await Promise.all([
+        get(`/inventario/productos/${productoId}`),
+        get("/inventario/categorias"),
+      ]);
+      if (categoriasResponse?.success && Array.isArray(categoriasResponse.data)) {
+        setCategorias(
+          categoriasResponse.data.map((categoria: any) => ({
+            id: String(categoria.id),
+            nombre: String(categoria.nombre ?? ""),
+          })),
+        );
+      }
       if (response?.success && response.data) {
         const p = response.data;
+        setCurrentImageUrl(p.imagen_url || null);
         setFormData({
           codigo: p.codigo || "",
           nombre: p.nombre || "",
+          marca: p.marca || "",
           descripcion: p.descripcion || "",
           categoria: p.categoria || "",
           precioVenta: p.precio_venta?.toString() || "",
@@ -58,7 +80,6 @@ export default function EditarProductoPage() {
           codigoBarras: p.codigo_barras || "",
           impuesto: p.impuesto?.toString() || String(Math.round(country.impuestoRate * 10000) / 100),
           afectacionIgv: String(p.afectacion_igv || "10"),
-          activo: p.activo !== false,
         });
       }
     } catch (error) {
@@ -83,12 +104,62 @@ export default function EditarProductoPage() {
 
     setIsLoading(true);
     try {
+      const payload = {
+        codigo: formData.codigo.trim(),
+        nombre: formData.nombre.trim(),
+        // En edición, la cadena vacía es intencional: el writer la convierte
+        // en NULL y permite quitar una marca anterior.
+        marca: formData.marca.trim(),
+        descripcion: formData.descripcion.trim() || undefined,
+        categoria: formData.categoria,
+        precio_venta: Number(formData.precioVenta),
+        precio_compra: formData.precioCompra === "" ? 0 : Number(formData.precioCompra),
+        stock_minimo: formData.stockMinimo === "" ? 0 : Number(formData.stockMinimo),
+        codigo_barras: formData.codigoBarras.trim() || undefined,
+        impuesto: formData.impuesto === "" ? 0 : Number(formData.impuesto),
+        afectacion_igv: formData.afectacionIgv,
+      };
+      const fingerprint = JSON.stringify(payload);
+      if (intentRef.current?.fingerprint !== fingerprint) {
+        intentRef.current = {
+          fingerprint,
+          key: `inventory-product-update:${productoId}:${crypto.randomUUID()}`,
+        };
+      }
       const response = await put(
         `/inventario/productos/${params.id}`,
-        formData,
+        { ...payload, idempotency_key: intentRef.current.key },
       );
 
       if (response?.success) {
+        if (productImage) {
+          const imageFingerprint = [
+            productImage.name,
+            productImage.type,
+            productImage.size,
+            productImage.lastModified,
+          ].join(":");
+          if (imageIntentRef.current?.fingerprint !== imageFingerprint) {
+            imageIntentRef.current = {
+              fingerprint: imageFingerprint,
+              key: `inventory-product-image-upload:${productoId}:${crypto.randomUUID()}`,
+            };
+          }
+          await uploadProductImage(
+            apiCall,
+            productoId!,
+            productImage,
+            imageIntentRef.current.key,
+          );
+        } else if (removeCurrentImage && currentImageUrl) {
+          deleteImageIntentRef.current ??=
+            `inventory-product-image-delete:${productoId}:${crypto.randomUUID()}`;
+          await deleteProductImage(
+            apiCall,
+            productoId!,
+            deleteImageIntentRef.current,
+          );
+        }
         alert("✅ Producto actualizado exitosamente");
         router.push("/dashboard/inventario/productos");
       } else {
@@ -107,11 +178,10 @@ export default function EditarProductoPage() {
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >,
   ) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      [name]: value,
     }));
   };
 
@@ -191,6 +261,21 @@ export default function EditarProductoPage() {
           </div>
 
           <div className="mt-4">
+            <label htmlFor="editar-marca">Marca</label>
+            <input id="editar-marca"
+              type="text"
+              name="marca"
+              value={formData.marca}
+              onChange={handleChange}
+              maxLength={120}
+              placeholder="Ej: Acme"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Las ventas futuras congelan esta marca al calcular la comisión.
+            </p>
+          </div>
+
+          <div className="mt-4">
             <label htmlFor="editar-descripcion">Descripción</label>
             <textarea id="editar-descripcion"
               name="descripcion"
@@ -212,26 +297,33 @@ export default function EditarProductoPage() {
               required
             >
               <option value="">Seleccione una categoría</option>
-              <option value="ELECTRONICA">Electrónica</option>
-              <option value="ALIMENTOS">Alimentos</option>
-              <option value="ROPA">Ropa</option>
-              <option value="HOGAR">Hogar</option>
-              <option value="OFICINA">Oficina</option>
-              <option value="OTROS">Otros</option>
+              {categorias.map((categoria) => (
+                <option key={categoria.id} value={categoria.nombre}>
+                  {categoria.nombre}
+                </option>
+              ))}
             </select>
           </div>
+        </div>
 
-          <div className="mt-4">
-            <label htmlFor="editar-activo" className="!mb-0 !flex items-center gap-2 cursor-pointer">
-              <input id="editar-activo"
-                type="checkbox"
-                name="activo"
-                checked={formData.activo}
-                onChange={handleChange}
-              />
-              <span>Producto activo</span>
-            </label>
-          </div>
+        <div className="mb-8">
+          <ProductImageField
+            currentUrl={currentImageUrl}
+            file={productImage}
+            removeCurrent={removeCurrentImage}
+            disabled={isLoading}
+            onFileChange={(file) => {
+              setProductImage(file);
+              setRemoveCurrentImage(false);
+              imageIntentRef.current = null;
+            }}
+            onRemoveCurrent={() => {
+              setProductImage(null);
+              setRemoveCurrentImage(true);
+              imageIntentRef.current = null;
+              deleteImageIntentRef.current = null;
+            }}
+          />
         </div>
 
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">
@@ -307,7 +399,14 @@ export default function EditarProductoPage() {
           <div className="bg-[var(--amber-50)] border p-4 mb-4">
             <p className="m-0 text-[0.875rem] text-[var(--amber-700)]">
               ⚠️ El stock actual no se puede modificar desde aquí. Use
-              movimientos de inventario para ajustar el stock.
+              movimientos de inventario para ajustar el stock.{' '}
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/inventario/operaciones')}
+                className="font-semibold underline"
+              >
+                Abrir ajustes y transferencias
+              </button>
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

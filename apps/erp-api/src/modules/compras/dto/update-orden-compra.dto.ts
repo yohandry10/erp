@@ -1,7 +1,7 @@
-import { IsString, IsUUID, IsDate, IsOptional, IsNumber, IsEnum, IsArray, ValidateNested, Min, IsInt, ArrayMinSize } from 'class-validator';
+import { IsString, IsUUID, IsDate, IsOptional, IsArray, ValidateNested, Min, IsInt, ArrayMinSize } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { EstadoOrdenCompra, OrdenCompraDetalleDto } from './create-orden-compra.dto';
+import { OrdenCompraDetalleDto } from './create-orden-compra.dto';
 
 export class UpdateOrdenCompraDto {
   @ApiPropertyOptional({ description: 'Número de orden de compra', example: 'OC-2024-001' })
@@ -41,14 +41,6 @@ export class UpdateOrdenCompraDto {
   @IsOptional()
   @IsUUID('4', { message: 'El almacen_destino_id debe ser un UUID válido' })
   almacen_destino_id?: string;
-
-  @ApiPropertyOptional({ 
-    description: 'Estado de la orden', 
-    enum: EstadoOrdenCompra
-  })
-  @IsOptional()
-  @IsEnum(EstadoOrdenCompra, { message: 'Estado de orden inválido' })
-  estado?: EstadoOrdenCompra;
 
   @ApiPropertyOptional({ description: 'Observaciones adicionales', example: 'Entregar en horario de oficina' })
   @IsOptional()

@@ -128,8 +128,6 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       switch (value) {
         case '01': newSerie = 'F001'; break
         case '03': newSerie = 'B001'; break
-        case '07': newSerie = 'NC01'; break
-        case '08': newSerie = 'ND01'; break
       }
       setFormData(prev => ({ ...prev, serie: newSerie }))
     }
@@ -221,8 +219,6 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                 >
                   <option value="01">01 - {isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura'}</option>
                   <option value="03">03 - {isArgentina ? 'Factura B' : isColombia ? 'Documento equivalente' : 'Boleta de Venta'}</option>
-                  <option value="07">07 - Nota de Crédito</option>
-                  <option value="08">08 - Nota de Débito</option>
                 </select>
               </div>
 

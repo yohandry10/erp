@@ -11,7 +11,6 @@ import { AFECTACION_IGV, calcularDesgloseIgv, esGravado } from '../../shared/uti
 import { CajasService } from '../cajas/cajas.service';
 import { AbrirCajaDto } from '../cajas/dto/abrir-caja.dto';
 import { CerrarCajaDto } from '../cajas/dto/cerrar-caja.dto';
-import { v4 as uuidv4 } from 'uuid';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 import * as crypto from 'crypto';
 import Decimal from 'decimal.js';
@@ -19,6 +18,7 @@ import { PosAuditService, TipoEventoPOS } from './services/pos-audit.service';
 import { ConfigService } from '@nestjs/config';
 import { toPostgresBytea } from '../../shared/utils/certificate.utils';
 import { validateColombiaNit } from '../paises/initial-country';
+import { CanjearTicketPosDto } from './dto/canjear-ticket-pos.dto';
 
 @Injectable()
 export class PosService {
@@ -428,7 +428,6 @@ export class PosService {
   private async validarProductosVentaPOS(
     items: any[],
     tenantId: string,
-    permiteVentaSinStock: boolean,
   ): Promise<Map<string, any>> {
     const productIds = Array.from(new Set(items.map((item: any) => item.producto_id).filter(Boolean)));
     if (productIds.length === 0) {
@@ -462,17 +461,9 @@ export class PosService {
         throw new Error(`Cantidad inválida para ${producto.nombre || producto.codigo || item.producto_id}`);
       }
 
-      const controlaStock = producto.es_servicio === true ? false : producto.controla_stock !== false;
-      if (controlaStock && !permiteVentaSinStock) {
-        const stockActual = Number(producto.stock_actual ?? producto.stock ?? 0);
-        const stockReservado = Number(producto.stock_reservado ?? 0);
-        const stockDisponible = stockActual - stockReservado;
-        if (stockDisponible < cantidad) {
-          throw new Error(
-            `Stock insuficiente para ${producto.nombre || producto.codigo || item.producto_id}. Disponible=${stockDisponible}, solicitado=${cantidad}`,
-          );
-        }
-      }
+      // `productos.stock_actual` puede ser agregado de varios almacenes y cada
+      // línea aislada no detecta SKU repetidos. La disponibilidad vinculada a
+      // la caja se valida, agregada y bajo lock, dentro de la RPC 451.
     }
 
     return productosMap;
@@ -652,9 +643,43 @@ export class PosService {
 
         if (error) throw error;
 
+        const ventas = Array.isArray(data) ? data : [];
+        const ventaIds = ventas
+          .map((venta: any) => venta?.id)
+          .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+        let canjes: any[] = [];
+
+        if (ventaIds.length > 0) {
+          const { data: canjesData, error: canjesError } = await this.supabase.getClient()
+            .from('pos_ticket_canjes')
+            .select('id, venta_pos_id, documento_fiscal_id, tipo_documento, serie, numero, receptor_cliente_id, receptor_tipo_documento, receptor_documento, receptor_nombre, actor_id, estado, created_at')
+            .eq('tenant_id', user.tenant_id)
+            .in('venta_pos_id', ventaIds);
+
+          if (canjesError) throw canjesError;
+          canjes = Array.isArray(canjesData) ? canjesData : [];
+        }
+
+        const canjePorVenta = new Map(canjes.map((canje: any) => [canje.venta_pos_id, canje]));
+        const ventasConCanje = ventas.map((venta: any) => {
+          const canje = canjePorVenta.get(venta.id) || null;
+          const tipoEmision = venta.tipo_emision || null;
+          const numeroFiscal = canje
+            ? `${canje.serie}-${canje.numero}`
+            : venta.atomic_result?.numero_fiscal || null;
+
+          return {
+            ...venta,
+            tipo_emision: tipoEmision,
+            canje,
+            numero_fiscal: numeroFiscal,
+            canjeable: tipoEmision === 'TICKET' && !canje && !venta.cpe_id,
+          };
+        });
+
         return {
           success: true,
-          data: data || [],
+          data: ventasConCanje,
         };
       } catch (error) {
         this.logger.error('Error obteniendo ventas recientes POS:', error);
@@ -671,11 +696,68 @@ export class PosService {
     return this.runWithTenantContext(user, () => this.procesarVentaInternal(ventaData, user));
   }
 
+  async canjearTicket(ventaId: string, payload: CanjearTicketPosDto, user: any) {
+    return this.runWithTenantContext(user, async () => {
+      try {
+        const idempotencyKey = String(payload?.idempotency_key || '').trim();
+        const { data, error } = await this.supabase.getClient()
+          .rpc('pos_canjear_ticket_tx', {
+            p_tenant_id: user.tenant_id,
+            p_venta_pos_id: ventaId,
+            p_actor_id: user.id,
+            p_idempotency_key: idempotencyKey,
+            p_payload: {
+              tipo_documento: payload.tipo_documento,
+              serie: payload.serie?.trim().toUpperCase() || null,
+              cliente_id: payload.cliente_id || null,
+              cliente_tipo_documento: payload.cliente_tipo_documento.trim().toUpperCase(),
+              cliente_documento: payload.cliente_documento.trim(),
+              cliente_nombre: payload.cliente_nombre.trim(),
+              cliente_direccion: payload.cliente_direccion?.trim() || null,
+            },
+          });
+
+        if (
+          error?.code === 'PGRST202' &&
+          String(error?.details || error?.message || '').includes('pos_canjear_ticket_tx')
+        ) {
+          throw new Error(
+            'POS_TICKET_EXCHANGE_CONTRACT_UNAVAILABLE: falta pos_canjear_ticket_tx; canje bloqueado sin alterar la venta',
+          );
+        }
+        if (error || !data || typeof data !== 'object' || Array.isArray(data)) {
+          throw error || new Error('No se pudo reservar el comprobante fiscal del canje');
+        }
+
+        const result = data as Record<string, any>;
+        return {
+          success: true,
+          ...result,
+          message: result.idempotent
+            ? 'Canje ya reservado; reintento idempotente sin repetir impactos'
+            : 'Canje fiscal reservado sin repetir cobro, inventario, CxC ni contabilidad',
+        };
+      } catch (error) {
+        this.logger.error(`Error canjeando ticket POS venta=${ventaId}:`, error);
+        return {
+          success: false,
+          message: error?.message || 'Error al canjear el ticket POS',
+          error: {
+            tipo: 'POS_TICKET_EXCHANGE_ERROR',
+            codigo: error?.code,
+            mensaje: error?.message || 'Error al canjear el ticket POS',
+          },
+        };
+      }
+    });
+  }
+
   private async procesarVentaInternal(ventaData: any, user: any) {
     const items = Array.isArray(ventaData?.items) ? ventaData.items : [];
+    const emitirCpe = ventaData?.emitir_cpe !== false;
     try {
       this.logger.log(
-        `Procesando venta POS tenant=${user.tenant_id} items=${items.length} tiene_cpe=${Boolean(ventaData?.emitir_cpe)}`
+        `Procesando venta POS tenant=${user.tenant_id} items=${items.length} emitir_cpe=${emitirCpe}`
       );
 
       // ===== PRE-SALE VALIDATIONS =====
@@ -714,6 +796,69 @@ export class PosService {
         };
       }
 
+      // La intención original se conserva separada del precio resuelto. Un
+      // retry confirmado debe devolver la venta ya comprometida aunque la
+      // lista haya vencido o cambiado; la BD compara esta huella antes de
+      // volver a cotizar y vuelve a ejecutar sus postcondiciones canónicas.
+      const commercialRequest = {
+        cliente_id: ventaData.cliente_id || null,
+        cliente_documento: String(ventaData.cliente_documento || '').trim(),
+        cliente_nombre: String(ventaData.cliente_nombre || '').trim(),
+        cliente_direccion: ventaData.cliente_direccion || '',
+        cliente_tipo_documento: ventaData.cliente_tipo_documento || null,
+        moneda: String(ventaData.moneda || 'PEN').toUpperCase(),
+        emitir_cpe: emitirCpe,
+        comprobante: ventaData.comprobante || null,
+        metodo_pago: ventaData.metodo_pago || null,
+        metodo_pago_id: ventaData.metodo_pago_id || null,
+        referencia_pago: ventaData.referencia_pago || null,
+        descuento_global: ventaData.descuento_global || 0,
+        pagos: ventaData.pagos || null,
+        items,
+      };
+      const { data: retryData, error: retryError } = await this.supabase.getClient()
+        .rpc('reintentar_venta_pos_comercial_tx', {
+          p_tenant_id: user.tenant_id,
+          p_usuario_id: user.id,
+          p_idempotency_key: ventaIdempotencyKey,
+          p_intencion: commercialRequest,
+          p_sesion_caja_id: ventaData.sesion_caja_id || null,
+        });
+      if (retryError) {
+        throw retryError;
+      }
+      if (retryData && typeof retryData === 'object' && !Array.isArray(retryData)) {
+        const retry = retryData as Record<string, any>;
+        const tipoEmisionRetry = retry.tipo_emision
+          || (emitirCpe ? 'FISCAL_INMEDIATO' : 'TICKET');
+        return {
+          success: true,
+          venta_id: retry.venta_id,
+          numero_ticket: retry.numero_ticket,
+          estado: 'PAGADA',
+          subtotal: Number(retry.subtotal),
+          impuestos: Number(retry.impuestos),
+          total: Number(retry.total),
+          factura_electronica: Boolean(retry.cpe_id),
+          cpe_id: retry.cpe_id ?? null,
+          cpe_pendiente: Boolean(retry.cpe_pendiente),
+          facturacion_pendiente: Boolean(retry.facturacion_pendiente),
+          tipo_emision: tipoEmisionRetry,
+          canjeable: Boolean(retry.canjeable ?? tipoEmisionRetry === 'TICKET'),
+          numero_fiscal: retry.numero_fiscal ?? null,
+          cuenta_por_cobrar_id: retry.cuenta_por_cobrar_id ?? null,
+          credito_monto: Number(retry.credito_monto ?? 0),
+          accounting_event_id: retry.accounting_event_id,
+          documento_id: retry.documento_id,
+          caja_movimiento_id: retry.caja_movimiento_id ?? null,
+          items_actualizados: retry.items_actualizados ?? [],
+          idempotent: true,
+          message: tipoEmisionRetry === 'TICKET'
+            ? 'Ticket interno ya confirmado; reintento validado sin recalcular la lista'
+            : 'Venta fiscal ya confirmada; reintento validado sin recalcular la lista',
+        };
+      }
+
       // Validar config de empresa antes de crear venta (hard-stop CPE)
       const { data: empresaCfg, error: empresaCfgErr } = await this.supabase.getClient()
         .from('empresa_config')
@@ -741,7 +886,23 @@ export class PosService {
       const tasaIgv = Number.isFinite(tasaIgvEmpresa) && tasaIgvEmpresa >= 0
         ? tasaIgvEmpresa / 100
         : await this.taxCalculator.getTasaIgv(user.tenant_id);
-      const recomputed = items.map((item: any) => {
+      const monedaVenta = String(ventaData?.moneda || empresaCfg.moneda_defecto || 'PEN').toUpperCase();
+      const { data: detalleConPrecios, error: preciosError } = await this.supabase.getClient()
+        .rpc('resolver_precios_venta_tx', {
+          p_tenant_id: user.tenant_id,
+          p_vendedor_id: user.id,
+          p_cliente_id: ventaData.cliente_id || null,
+          p_detalle: items,
+          p_fecha: null,
+          p_moneda: monedaVenta,
+        });
+      if (preciosError || !Array.isArray(detalleConPrecios)
+          || detalleConPrecios.length !== items.length) {
+        throw preciosError || new Error(
+          'COMMERCIAL_PRICING_CONTRACT_INVALID: no se obtuvo un precio verificable para cada línea',
+        );
+      }
+      const recomputed = detalleConPrecios.map((item: any) => {
         const cantidad = Number(item.cantidad ?? 0);
         const precioBase = Number(item.precio_unitario ?? item.precio_original ?? 0);
         // ✅ FIX: Usar Decimal.js para cálculos de descuentos y subtotales
@@ -775,21 +936,6 @@ export class PosService {
       const productosMap = await this.validarProductosVentaPOS(
         recomputed,
         user.tenant_id,
-        ventaData?.permite_venta_sin_stock === true,
-      );
-
-      const costoVentas = parseFloat(
-        recomputed
-          .reduce((totalCosto: number, item: any) => {
-            const producto = productosMap.get(item.producto_id) || {};
-            if (producto.es_servicio === true || producto.controla_stock === false) {
-              return totalCosto;
-            }
-            const costoUnitario = Number(producto.costo ?? producto.precio_compra ?? 0);
-            const cantidad = Number(item.cantidad ?? 0);
-            return totalCosto + (Number.isFinite(costoUnitario) ? costoUnitario : 0) * cantidad;
-          }, 0)
-          .toFixed(2),
       );
 
       const desgloseIgv = calcularDesgloseIgv(
@@ -819,7 +965,7 @@ export class PosService {
       // cajero cobraría la venta y recién después descubriría que le falta el DNI,
       // con el cliente ya fuera de la tienda y la venta sin comprobante.
       const tipoComprobanteSolicitado = String(ventaData?.comprobante?.tipo || '03').trim();
-      if (empresaCfg?.pais === 'PE' && tipoComprobanteSolicitado === '03' && totalCalculado > 700) {
+      if (emitirCpe && empresaCfg?.pais === 'PE' && tipoComprobanteSolicitado === '03' && totalCalculado > 700) {
         const documentoCliente = String(ventaData?.cliente_documento ?? '').trim();
         const nombreCliente = String(ventaData?.cliente_nombre ?? '').trim();
         if (!documentoCliente || /^9+$/.test(documentoCliente) || !nombreCliente) {
@@ -917,7 +1063,7 @@ export class PosService {
           : empresaCfg?.pais === 'CO'
             ? validateColombiaNit(documentoClienteFactura)
             : /^\d{11}$/.test(documentoClienteFactura);
-      if (tipoDocumento === '01' && !documentoFacturaValido) {
+      if (emitirCpe && tipoDocumento === '01' && !documentoFacturaValido) {
         const documentoFiscal = empresaCfg?.pais === 'AR' ? 'CUIT' : empresaCfg?.pais === 'CO' ? 'NIT' : 'RUC';
         return {
           success: false,
@@ -987,95 +1133,106 @@ export class PosService {
         };
       }
 
-      this.deferPosSideEffect('sync-pos-numeracion', async () => {
-        const cajaIdActual = await this.resolveCajaIdForSesion(user.tenant_id, sesionCajaId);
-        await this.syncPosNumeracionConDocumentos(
-          user.tenant_id,
-          ventaData.comprobante?.serie || 'B001',
-          cajaIdActual,
-        );
-      });
-
-      this.deferPosSideEffect('audit-inicio-venta', () => this.posAuditService.registrarEvento(user.tenant_id, sesionCajaId, user.id, {
-        tipo_evento: TipoEventoPOS.INICIO_VENTA,
-        datos: {
-          idempotency_key: ventaIdempotencyKey,
-          items: recomputed.length,
-          total: totalCalculado,
-          metodo_pago: ventaData.metodo_pago_id,
-          pagos: pagosNormalizados || null,
-        },
-      }));
-
-      // RPC transaccional: venta + detalles + stock + caja + outbox
-      const maxDescuentoPct = (() => {
-        const descuentosItems = recomputed.map((item: any) => {
-          const cantidad = Number(item.cantidad ?? 0);
-          const precio = Number(item.precio_unitario ?? 0);
-          const descuento = Number(item.descuento_monto ?? 0);
-          const base = cantidad * precio;
-          if (!Number.isFinite(base) || base <= 0) return 0;
-          return descuento / base;
-        });
-        const descuentoGlobalPct =
-          ventaData?.descuento_global?.tipo === 'PORCENTAJE'
-            ? Number(ventaData?.descuento_global?.valor ?? 0) / 100
-            : 0;
-        const maxPct = Math.max(0, descuentoGlobalPct, ...descuentosItems);
-        if (!Number.isFinite(maxPct)) return 0;
-        return Math.min(0.9, Math.max(0, maxPct));
-      })();
-
       const metodoPagoPrincipal =
         pagosNormalizados && pagosNormalizados.length > 0
           ? (pagosNormalizados.length > 1 ? 'MIXTO' : pagosNormalizados[0].codigo)
           : (ventaData.metodo_pago_id || 'efectivo');
 
-      const rpcPayload: Record<string, any> = {
-        p_tenant_id: user.tenant_id,
-        p_usuario_id: user.id,
-        p_cliente_id: ventaData.cliente_id || null,
-        p_cliente_documento: ventaData.cliente_documento,
-        p_cliente_nombre: ventaData.cliente_nombre,
-        p_metodo_pago: metodoPagoPrincipal,
-        p_items: recomputed,
-        p_serie: ventaData.comprobante?.serie || 'B001',
-        p_sesion_caja_id: sesionCajaId,
-        p_vendedor: user.email || user.username,
-        p_max_descuento_pct: maxDescuentoPct,
-        p_idempotency_key: ventaData.idempotency_key,
-        p_pagos: pagosNormalizados
-          ? pagosNormalizados.map((p) => ({
-            codigo: p.codigo,
-            tipo: p.tipo,
-            monto: p.monto,
-            moneda: p.moneda,
-            referencia: p.referencia,
-            metodo_pago_id: p.metodo_pago_id,
-          }))
+      const tipoComprobante = emitirCpe
+        ? String(ventaData?.comprobante?.tipo || '03').trim()
+        : 'TICKET';
+      const prefijoFiscal = tipoComprobante === '01' ? 'F' : 'B';
+      const serieSolicitada = String(ventaData?.comprobante?.serie ?? '').trim().toUpperCase();
+      const serieConfigurada = String(
+        (tipoComprobante === '01' ? empresaCfg.serie_factura : empresaCfg.serie_boleta) ?? '',
+      ).trim().toUpperCase();
+      const esSerieFiscalValida = (serieFiscal: string) =>
+        /^[A-Z0-9]{4}$/.test(serieFiscal) &&
+        !serieFiscal.startsWith('T') &&
+        (empresaCfg?.pais !== 'PE' || serieFiscal.startsWith(prefijoFiscal));
+      const serieCpe = esSerieFiscalValida(serieSolicitada)
+        ? serieSolicitada
+        : esSerieFiscalValida(serieConfigurada)
+          ? serieConfigurada
+          : `${prefijoFiscal}001`;
+      const docReceptor = String(ventaData.cliente_documento || '').trim();
+      const tipoDocReceptor = this.inferirTipoDocumento(
+        docReceptor,
+        ventaData.cliente_tipo_documento,
+      );
+      if (emitirCpe && tipoComprobante === '01' && tipoDocReceptor !== '6') {
+        throw new Error('Factura requiere RUC válido de 11 dígitos');
+      }
+
+      // Frontera única 469 -> dispatcher 471: la BD aplica una vez venta, CxC,
+      // caja, inventario y outbox. El ticket interno no recibe correlativo fiscal;
+      // una venta fiscal inmediata sí deja CPE durable en la misma transacción.
+      const atomicPayload = {
+        emitir_cpe: emitirCpe,
+        commercial_request: commercialRequest,
+        cliente_id: ventaData.cliente_id || null,
+        cliente_documento: docReceptor,
+        cliente_tipo_documento: tipoDocReceptor,
+        cliente_nombre: String(ventaData.cliente_nombre || '').trim(),
+        metodo_pago: metodoPagoPrincipal,
+        moneda: String(ventaData?.moneda || empresaCfg.moneda_defecto || 'PEN').toUpperCase(),
+        ticket_serie: 'T001',
+        items: recomputed,
+        pagos: pagosNormalizados
+          ? pagosNormalizados.map((pago) => ({
+              codigo: pago.codigo,
+              monto: pago.monto,
+              moneda: pago.moneda,
+              referencia: pago.referencia,
+              metodo_pago_id: pago.metodo_pago_id,
+            }))
           : null,
+        referencia_pago: ventaData.referencia_pago || null,
+        cpe_data: emitirCpe ? {
+          tipo_documento: tipoComprobante,
+          serie: serieCpe,
+          ruc_emisor: empresaCfg.ruc,
+          razon_social_emisor: empresaCfg.razon_social,
+          tipo_documento_receptor: tipoDocReceptor,
+          documento_receptor: docReceptor,
+          razon_social_receptor: String(ventaData.cliente_nombre || '').trim(),
+          direccion_receptor: ventaData.cliente_direccion || '',
+          moneda: String(ventaData?.moneda || empresaCfg.moneda_defecto || 'PEN').toUpperCase(),
+          total_gravadas: desgloseIgv.gravadas,
+          total_exoneradas: desgloseIgv.exoneradas,
+          total_inafectas: desgloseIgv.inafectas,
+          total_exportacion: desgloseIgv.exportacion,
+          total_igv: impuestosCalculados,
+          total_venta: totalCalculado,
+        } : null,
       };
 
-      let txData: any;
-      let txError: any;
-      ({ data: txData, error: txError } = await this.supabase.getClient()
-        .rpc('pos_registrar_venta_full_tx', rpcPayload));
+      const { data: txData, error: txError } = await this.supabase.getClient()
+        .rpc('pos_registrar_venta_comercial_tx', {
+          p_tenant_id: user.tenant_id,
+          p_usuario_id: user.id,
+          p_sesion_caja_id: sesionCajaId,
+          p_idempotency_key: ventaIdempotencyKey,
+          p_payload: atomicPayload,
+        });
 
       if (
         txError?.code === 'PGRST202' &&
-        String(txError?.details || txError?.message || '').includes('pos_registrar_venta_full_tx')
+        String(txError?.details || txError?.message || '').includes('pos_registrar_venta_comercial_tx')
       ) {
         throw new Error(
-          'POS_INVENTORY_CONTRACT_UNAVAILABLE: falta pos_registrar_venta_full_tx; venta bloqueada para evitar saldos divergentes',
+          'POS_ATOMIC_CONTRACT_UNAVAILABLE: falta pos_registrar_venta_comercial_tx; venta bloqueada para evitar saldos divergentes',
         );
       }
 
-      if (txError || !txData || !Array.isArray(txData) || txData.length === 0) {
+      if (txError || !txData || typeof txData !== 'object' || Array.isArray(txData)) {
         this.logger.error('❌ Error transaccional POS:', txError);
         throw txError || new Error('No se pudo registrar la venta (RPC)');
       }
 
-      const ventaTx = txData[0];
+      const ventaTx = txData as Record<string, any>;
+      const tipoEmision = ventaTx.tipo_emision
+        || (emitirCpe ? 'FISCAL_INMEDIATO' : 'TICKET');
       const ventaResult = {
         id: ventaTx.venta_id,
         numero_ticket: ventaTx.numero_ticket,
@@ -1103,404 +1260,8 @@ export class PosService {
 
       if (!impactosAplicadosPorRpc) {
         throw new Error(
-          'POS_INVENTORY_IMPACTS_NOT_ATOMIC: full_tx no confirmó impactos; venta bloqueada',
+          'POS_IMPACTS_NOT_ATOMIC: la frontera 451 no confirmó todos los impactos',
         );
-      }
-
-      // Registrar movimiento de caja (solo efectivo) para calcular saldo esperado correctamente
-      try {
-        if (impactosAplicadosPorRpc) {
-          this.logger.log(`✅ Impactos POS aplicados por RPC full_tx: ${ventaResult.id}`);
-        } else {
-        let montoEfectivo = 0;
-        if (pagosNormalizados && pagosNormalizados.length > 0) {
-          montoEfectivo = pagosNormalizados
-            .filter((p) => p.tipo === 'EFECTIVO')
-            .reduce((sum, p) => sum + p.monto, 0);
-        } else {
-          const metodoPago = ventaData.metodo_pago_id || 'efectivo';
-          const metodoInfo = await this.getMetodoPagoInfo(metodoPago, user.tenant_id);
-          if (metodoInfo.tipo === 'EFECTIVO') {
-            montoEfectivo = ventaResult.total;
-          }
-        }
-
-        if (montoEfectivo > 0 && sesionCajaId) {
-          const { data: movimientoExistente } = await this.supabase.getClient()
-            .from('movimientos_caja')
-            .select('id')
-            .eq('sesion_caja_id', sesionCajaId)
-            .eq('tenant_id', user.tenant_id)
-            .eq('referencia_tipo', 'venta_pos')
-            .eq('referencia_documento', String(ventaResult.id))
-            .maybeSingle();
-
-          if (!movimientoExistente) {
-            await this.supabase.getClient().rpc('registrar_movimiento_caja', {
-              p_sesion_caja_id: sesionCajaId,
-              p_tipo_movimiento: 'VENTA',
-              p_monto: montoEfectivo,
-              p_referencia_documento: String(ventaResult.id),
-              p_referencia_tipo: 'venta_pos',
-              p_motivo: `Venta POS ${ventaResult.numero_ticket}`,
-              p_usuario_id: user.id,
-              p_metadata: {
-                metodo_pago: 'EFECTIVO',
-                metodo_codigo: 'efectivo',
-                pagos_mixtos: pagosNormalizados && pagosNormalizados.length > 0,
-              },
-            });
-          }
-        }
-        }
-      } catch (movError) {
-        this.logger.error('❌ ALERTA: No se pudo registrar movimiento de caja POS (monto esperado será incorrecto al cierre):', movError);
-      }
-
-      // En POS la venta no debe esperar firma/XML/eventos fiscales. Se deja una cola durable
-      // para que el worker de facturación procese el CPE sin bloquear al cajero.
-      let cpeEmitido = false;
-      let cpeId = null;
-      let cpeData: any = null;
-      let cpePendiente = false;
-
-      try {
-        this.logger.log('📄 Programando CPE POS para worker:', ventaResult.id);
-
-        // Tomar tipo/serie/moneda/UOM reales
-        const tipoComprobante = ventaData?.comprobante?.tipo || '03';
-        // La serie FISCAL depende del tipo de comprobante (SUNAT: F### para
-        // facturas, B### para boletas). El ticket del POS usa una serie interna
-        // por caja (T###) que NO es válida ante SUNAT; heredarla hacía que todas
-        // las boletas del POS fueran rechazadas. Solo se acepta la serie recibida
-        // si es coherente con el tipo; si no, se usa la configurada del tenant.
-        const prefijoFiscal = tipoComprobante === '01' ? 'F' : 'B';
-        const serieSolicitada = String(ventaData?.comprobante?.serie ?? '').trim().toUpperCase();
-        const serieConfigurada = String(
-          (tipoComprobante === '01' ? empresaCfg.serie_factura : empresaCfg.serie_boleta) ?? '',
-        ).trim().toUpperCase();
-        const esSerieFiscalValida = (serie: string) =>
-          /^[A-Z0-9]{4}$/.test(serie) && serie.startsWith(prefijoFiscal);
-
-        const serieCpe = esSerieFiscalValida(serieSolicitada)
-          ? serieSolicitada
-          : esSerieFiscalValida(serieConfigurada)
-            ? serieConfigurada
-            : `${prefijoFiscal}001`;
-        const monedaCpe = (ventaData?.moneda || empresaCfg.moneda_defecto || 'PEN').toString();
-
-        // Sanitizar documento del receptor y validar contra tipo de comprobante
-        const docReceptor = (
-          ventaData.cliente_documento || ''
-        ).toString().trim();
-        const tipoDocReceptor = this.inferirTipoDocumento(docReceptor, ventaData.cliente_tipo_documento);
-        if (tipoComprobante === '01' && tipoDocReceptor !== '6') {
-          throw new Error('Factura requiere RUC válido de 11 dígitos');
-        }
-
-        // Numero CPE seguro. El correlativo fiscal pertenece a la serie fiscal y
-        // debe salir de la secuencia canónica (documento_series). El ticket del POS
-        // puede venir de una serie interna por caja (T###) con su propio contador:
-        // heredar ese número emitía comprobantes con correlativos ya usados o
-        // saltados en la serie fiscal. Solo se reutiliza el número del ticket cuando
-        // el POS ya lo reservó sobre la misma serie fiscal.
-        const serieTicket = String(ventaResult.numero_ticket ?? '').split('-')[0].trim().toUpperCase();
-        const numeroCpe = serieTicket === serieCpe
-          ? this.parseCorrelativo(ventaResult.numero_ticket)
-          : await this.reservarCorrelativoFiscal(user.tenant_id, tipoComprobante, serieCpe, ventaResult.id);
-        if (!Number.isFinite(numeroCpe) || numeroCpe <= 0) {
-          throw new Error('No se pudo determinar correlativo numérico para el CPE');
-        }
-
-        cpeData = {
-          tipo_documento: tipoComprobante as any,
-          serie: serieCpe,
-          numero: numeroCpe,
-          // Dedupe de reintentos POS→CPE (mismo idempotency_key de venta, namespaced)
-          idempotency_key: `pos.cpe:${user.tenant_id}:${ventaIdempotencyKey}`,
-          ruc_emisor: empresaCfg.ruc,
-          razon_social_emisor: empresaCfg.razon_social,
-          tipo_documento_receptor: tipoDocReceptor,
-          documento_receptor: docReceptor,
-          razon_social_receptor:
-            ventaData.cliente_nombre ||
-            'Cliente',
-          direccion_receptor: ventaData.cliente_direccion || '',
-          moneda: monedaCpe,
-          // Bases separadas por afectación: declarar todo como gravado haría que
-          // SUNAT reciba IGV sobre bienes exonerados o inafectos.
-          total_gravadas: desgloseIgv.gravadas,
-          total_exoneradas: desgloseIgv.exoneradas,
-          total_inafectas: desgloseIgv.inafectas,
-          total_exportacion: desgloseIgv.exportacion,
-          total_igv: parseFloat(impuestosCalculados.toFixed(2)),
-          total_venta: parseFloat(totalCalculado.toFixed(2)),
-          costo_ventas: costoVentas,
-          items: (recomputed || []).map((item: any) => {
-            const producto = productosMap.get(item.producto_id) || {};
-            const cantidad = parseFloat(item.cantidad) || 1;
-            const baseUnit = parseFloat(item.precio_unitario) || 0; // asumido sin IGV
-            const baseItem = parseFloat(item.subtotal) || 0; // base total
-            const afectacionItem = String(producto.afectacion_igv ?? AFECTACION_IGV.GRAVADO);
-            const tasaItem = esGravado(afectacionItem) ? tasaIgv : 0;
-            const igvItem = parseFloat((baseItem * tasaItem).toFixed(2));
-            const totalItem = parseFloat((baseItem + igvItem).toFixed(2));
-            const uom =
-              item.producto?.unidad_medida_sunat ||
-              item.unidad_medida_sunat ||
-              item.producto?.unidad_medida ||
-              item.unidad_medida ||
-              producto.unidad_medida_sunat ||
-              producto.unidad_medida ||
-              (item.producto?.es_servicio ? 'ZZ' : 'NIU');
-            return {
-              cantidad,
-              codigo_producto: item.producto?.codigo || item.codigo || item.sku || producto.codigo || 'PROD',
-              descripcion: item.producto?.nombre || item.nombre || item.descripcion || producto.nombre || 'Producto',
-              unidad_medida: uom,
-              precio_unitario: parseFloat((baseUnit * (1 + tasaItem)).toFixed(6)), // con IGV
-              valor_unitario: parseFloat(baseUnit.toFixed(6)), // sin IGV
-              precio_venta: totalItem, // con IGV
-              valor_venta: baseItem, // sin IGV
-              igv: igvItem,
-              total_impuestos: igvItem,
-              total: totalItem,
-              tipo_afectacion_igv: afectacionItem,
-            };
-          })
-        };
-
-        this.logger.log(
-          `Datos CPE POS en cola tenant=${user.tenant_id} tipo=${cpeData.tipo_documento} serie=${cpeData.serie} total=${cpeData.total_venta}`
-        );
-
-        const { error: cpeQueueError } = await this.supabase.getClient()
-          .from('ventas_pos')
-          .update({
-            cpe_id: null,
-            cpe_pendiente: true,
-            intentos_facturacion: 0,
-            error_facturacion: null,
-            cpe_data: cpeData,
-            ultimo_intento_facturacion: new Date().toISOString(),
-          })
-          .eq('id', ventaResult.id)
-          .eq('tenant_id', user.tenant_id);
-
-        if (cpeQueueError) {
-          throw cpeQueueError;
-        }
-        cpePendiente = true;
-      } catch (cpeError) {
-        this.logger.error('❌ Error programando CPE POS:', cpeError);
-        this.logger.error('❌ Stack trace:', cpeError.stack);
-
-        // 🔴 TAREA 12: Registrar venta como pendiente de facturación para reintentos
-        await this.registrarVentaPendienteFacturacion(
-          ventaResult.id,
-          user.tenant_id,
-          cpeData,
-          cpeError.message || 'Error desconocido al generar CPE'
-        );
-      }
-
-      // 🔴 CRÍTICO FIX: Si es venta a crédito, crear cuenta por cobrar
-      // Se crea después del CPE para tener el CPE ID real (o usar venta.id si falló el CPE)
-      let creditoMonto = 0;
-      if (pagosNormalizados && pagosNormalizados.length > 0) {
-        creditoMonto = pagosNormalizados
-          .filter((p) => !this.esPagoInmediato(p.tipo))
-          .reduce((sum, p) => sum + p.monto, 0);
-      } else {
-        const metodoPago = ventaData.metodo_pago_id || 'efectivo';
-        const metodoInfoCxC = await this.getMetodoPagoInfo(metodoPago, user.tenant_id);
-        if (!this.esPagoInmediato(metodoInfoCxC.tipo)) {
-          creditoMonto = totalCalculado;
-        }
-      }
-      const esVentaCredito = creditoMonto > 0;
-      let cuentaPorCobrarId: string | null = null;
-
-      if (esVentaCredito) {
-        try {
-          this.logger.log(`💰 [POS] Venta a crédito detectada (monto: ${creditoMonto}), creando cuenta por cobrar...`);
-
-          // Obtener cliente: buscar por cliente_id o por documento
-          let clienteId: string | null = null;
-
-          if (ventaData.cliente_id) {
-            // Verificar que el cliente existe y pertenece al tenant
-            const { data: clienteExistente } = await this.supabase.getClient()
-              .from('clientes')
-              .select('id')
-              .eq('id', ventaData.cliente_id)
-              .eq('tenant_id', user.tenant_id)
-              .maybeSingle();
-
-            if (clienteExistente) {
-              clienteId = clienteExistente.id;
-            }
-          }
-
-          // Si no hay cliente_id, buscar por documento
-          if (!clienteId && ventaData.cliente_documento) {
-            const { data: clientePorDoc } = await this.supabase.getClient()
-              .from('clientes')
-              .select('id')
-              .eq('numero_documento', ventaData.cliente_documento)
-              .eq('tenant_id', user.tenant_id)
-              .maybeSingle();
-
-            if (clientePorDoc) {
-              clienteId = clientePorDoc.id;
-            }
-          }
-
-          // Si aún no hay cliente y se requiere crear CxC, no crear CxC sin cliente válido
-          if (!clienteId) {
-            this.logger.warn(`⚠️ [POS] No se encontró cliente para venta ${ventaResult.id}. Venta a crédito no permitida sin cliente.`);
-            await this.rollbackVenta(ventaResult.id, user.tenant_id);
-            return {
-              success: false,
-              message: 'Venta a crédito requiere cliente registrado con documento válido',
-              error: {
-                tipo: 'VALIDATION_ERROR',
-                codigo: 'CLIENTE_REQUERIDO_CREDITO',
-                mensaje: 'Para ventas a crédito, el cliente debe estar registrado con documento válido',
-              },
-            };
-          } else {
-            // Obtener configuración para días de vencimiento
-            const { data: config } = await this.supabase.getClient()
-              .from('empresa_config')
-              .select('dias_vencimiento_factura')
-              .eq('tenant_id', user.tenant_id)
-              .maybeSingle();
-
-            const diasVencimiento = config?.dias_vencimiento_factura || 30;
-            const fechaEmision = new Date();
-            const fechaVencimiento = new Date();
-            fechaVencimiento.setDate(fechaVencimiento.getDate() + diasVencimiento);
-
-            // Preparar datos del CPE para serie y número (usar datos del CPE si se emitió exitosamente)
-            const serieCpe = cpeData?.serie || 'B001';
-            const numeroCpe =
-              cpeData?.numero != null
-                ? String(cpeData.numero)
-                : ventaResult.numero_ticket?.split('-')[1] || null; // HARDENING: preservar formato del correlativo serializado.
-
-            // Crear FacturaEmitidaEvent para usar el método de CxC
-            const ratio = totalCalculado > 0 ? creditoMonto / totalCalculado : 0;
-            const facturaEvent = {
-              eventId: uuidv4(),
-              tenantId: user.tenant_id,
-              pedidoId: undefined, // HARDENING: POS puede no tener pedido asociado.
-              cpeId: cpeId || ventaResult.id, // Usar CPE ID si existe, sino venta ID
-              facturaId: ventaResult.id,
-              serie: serieCpe,
-              numero: numeroCpe ?? '0',
-              clienteId: clienteId,
-              subtotal: Number((subtotalCalculado * ratio).toFixed(2)),
-              impuestos: Number((impuestosCalculados * ratio).toFixed(2)),
-              total: Number(creditoMonto.toFixed(2)),
-              moneda: empresaCfg.moneda_defecto || 'PEN',
-              fechaEmision: fechaEmision.toISOString(),
-              fechaVencimiento: fechaVencimiento.toISOString(),
-              idempotencyKey: `pos.cxc:${user.tenant_id}:${ventaIdempotencyKey}`,
-              source: 'pos',
-              ajustes: {
-                retencion: 0,
-                percepcion: 0,
-                detraccion: 0,
-                anticipo: 0,
-              },
-            };
-
-            // Crear cuenta por cobrar usando el servicio
-            await this.cxcService.crearCuentaPorCobrarDesdeFactura(facturaEvent as any);
-
-            // Obtener el ID de la cuenta creada
-            const { data: cuentaCreada } = await this.supabase.getClient()
-              .from('cuentas_por_cobrar')
-              .select('id')
-              .eq('tenant_id', user.tenant_id)
-              .eq('documento_id', cpeId || ventaResult.id)
-              .eq('cliente_id', clienteId)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-
-            if (cuentaCreada) {
-              cuentaPorCobrarId = cuentaCreada.id;
-              await this.supabase.getClient()
-                .from('ventas_pos')
-                .update({
-                  cuenta_por_cobrar_id: cuentaPorCobrarId,
-                  cxc_pendiente: false,
-                  cxc_error: null,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', ventaResult.id)
-                .eq('tenant_id', user.tenant_id);
-              this.logger.log(`✅ [POS] Cuenta por cobrar creada: ${cuentaPorCobrarId} para venta ${ventaResult.id}`);
-            } else {
-              this.logger.warn(`⚠️ [POS] No se pudo obtener ID de cuenta por cobrar creada`);
-            }
-          }
-        } catch (error) {
-          this.logger.error(`❌ ALERTA: Error creando CxC para venta ${ventaResult.id} (crédito=${creditoMonto}). Receivable sin tracking:`, error);
-          await this.supabase.getClient()
-            .from('ventas_pos')
-            .update({
-              cxc_pendiente: true,
-              cxc_error: error?.message || 'Error creando cuenta por cobrar',
-              cxc_reintentos: 0,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', ventaResult.id)
-            .eq('tenant_id', user.tenant_id);
-
-          return {
-            success: false,
-            message: 'Venta registrada, pero la cuenta por cobrar no pudo crearse. Requiere regularización antes de cerrar caja/contabilidad.',
-            data: {
-              venta_id: ventaResult.id,
-              numero_ticket: ventaResult.numero_ticket,
-              cxc_pendiente: true,
-              error: error?.message || 'Error creando cuenta por cobrar',
-            },
-            error: {
-              tipo: 'ACCOUNTING_INTEGRATION_ERROR',
-              codigo: 'POS_CREDITO_CXC_PENDIENTE',
-              mensaje: 'No se pudo crear la cuenta por cobrar de la venta a crédito',
-            },
-          };
-        }
-      }
-
-      if (this.eventBus) {
-        this.deferPosSideEffect('event-bus-venta-procesada', () => this.eventBus.emitVentaProcessed({
-          eventId: uuidv4(),
-          tenantId: user.tenant_id,
-          idempotencyKey: `pos.venta:${user.tenant_id}:${ventaIdempotencyKey}`,
-          source: 'pos.venta.registrada',
-          ventaId: ventaResult.id,
-          numeroTicket: String(ventaResult.numero_ticket),
-          clienteId: ventaData.cliente_id || undefined,
-          clienteNombre: ventaData.cliente_nombre || 'Cliente POS',
-          metodoPago: metodoPagoPrincipal,
-          subtotal: subtotalCalculado,
-          impuestos: impuestosCalculados,
-          total: totalCalculado,
-          items: recomputed.map((item: any) => ({
-            productoId: item.producto_id,
-            cantidad: Number(item.cantidad ?? 0),
-            precio: Number(item.precio_unitario ?? 0),
-            total: Number(item.subtotal ?? 0),
-          })),
-          cpeId: cpeId || undefined,
-          inventarioAplicado: true,
-        }));
       }
 
       return {
@@ -1508,35 +1269,28 @@ export class PosService {
         venta_id: ventaResult.id,
         numero_ticket: ventaResult.numero_ticket,
         estado: ventaResult.estado,
-        subtotal: subtotalCalculado,
-        impuestos: impuestosCalculados,
-        total: totalCalculado,
-        factura_electronica: cpeEmitido,
-        cpe_id: cpeId,
-        cpe_pendiente: cpePendiente,
-        facturacion_pendiente: cpePendiente,
-        cuenta_por_cobrar_id: cuentaPorCobrarId,
-        items_actualizados: recomputed.map((item: any) => {
-          const producto = productosMap.get(item.producto_id);
-          const stockActualOriginal = producto ? Number(producto.stock_actual ?? producto.stock ?? 0) : null;
-          const stockReservado = producto ? Number(producto.stock_reservado ?? 0) : 0;
-          const stockActual = stockActualOriginal == null
-            ? null
-            : impactosAplicadosPorRpc
-              ? Math.max(stockActualOriginal - Number(item.cantidad ?? 0), 0)
-              : stockActualOriginal;
-          return {
-            producto_id: item.producto_id,
-            stock_actual: stockActual,
-            stock_disponible: stockActual == null ? null : Math.max(stockActual - stockReservado, 0),
-          };
-        }),
-        message: cpeEmitido
-          ? esVentaCredito
-            ? 'Venta procesada, CPE emitido y cuenta por cobrar creada'
-            : 'Venta procesada y CPE emitido exitosamente'
-          : 'Venta procesada; CPE en cola de facturación'
+        subtotal: Number(ventaTx.subtotal),
+        impuestos: Number(ventaTx.impuestos),
+        total: Number(ventaTx.total),
+        factura_electronica: Boolean(ventaTx.cpe_id),
+        cpe_id: ventaTx.cpe_id ?? null,
+        cpe_pendiente: Boolean(ventaTx.cpe_pendiente),
+        facturacion_pendiente: Boolean(ventaTx.facturacion_pendiente),
+        tipo_emision: tipoEmision,
+        canjeable: Boolean(ventaTx.canjeable ?? tipoEmision === 'TICKET'),
+        numero_fiscal: ventaTx.numero_fiscal ?? null,
+        cuenta_por_cobrar_id: ventaTx.cuenta_por_cobrar_id ?? null,
+        credito_monto: Number(ventaTx.credito_monto ?? 0),
+        accounting_event_id: ventaTx.accounting_event_id,
+        documento_id: ventaTx.documento_id,
+        caja_movimiento_id: ventaTx.caja_movimiento_id ?? null,
+        items_actualizados: ventaTx.items_actualizados ?? [],
+        idempotent: Boolean(ventaTx.idempotent),
+        message: tipoEmision === 'TICKET'
+          ? 'Venta confirmada como ticket interno canjeable; sin correlativo fiscal reservado'
+          : 'Venta confirmada atómicamente; CPE en cola durable',
       };
+
     } catch (error) {
       this.logger.error('❌ Error procesando venta:', error);
       return {
@@ -1827,22 +1581,17 @@ export class PosService {
   async registrarVentaPendienteFacturacion(
     ventaId: string,
     tenantId: string,
-    cpeData: any,
+    _cpeData: any,
     errorMessage: string
   ): Promise<void> {
     try {
-      const { error } = await this.supabase.getClient()
-        .from('ventas_pos')
-        .update({
-          cpe_pendiente: true,
-          intentos_facturacion: 1,
-          ultimo_intento_facturacion: new Date().toISOString(),
-          error_facturacion: errorMessage.substring(0, 500), // Limitar tamaño
-          cpe_data: cpeData
-        })
-        .eq('id', ventaId)
-        .eq('tenant_id', tenantId);
-
+      const failureKey = this.posCpeFailureKey(ventaId, errorMessage);
+      const { error } = await this.supabase.getClient().rpc('registrar_fallo_cpe_pos_tx', {
+        p_tenant_id: tenantId,
+        p_venta_id: ventaId,
+        p_error_message: errorMessage,
+        p_failure_key: failureKey,
+      });
       if (error) {
         this.logger.error('❌ Error registrando venta pendiente:', error);
       } else {
@@ -1866,6 +1615,9 @@ export class PosService {
     cpe_id: string | null;
     cpe_pendiente: boolean;
     factura_electronica: boolean;
+    tipo_emision: string | null;
+    canjeable: boolean;
+    numero_fiscal: string | null;
     intentos_facturacion: number;
     error_facturacion: string | null;
     ultimo_intento_facturacion: string | null;
@@ -1873,7 +1625,7 @@ export class PosService {
     return this.runWithTenantContext(user, async () => {
       const { data: venta, error } = await this.supabase.getClient()
         .from('ventas_pos')
-        .select('id, numero_ticket, cpe_id, cpe_pendiente, intentos_facturacion, error_facturacion, ultimo_intento_facturacion')
+        .select('id, numero_ticket, cpe_id, cpe_pendiente, tipo_emision, atomic_result, cpe_data, intentos_facturacion, error_facturacion, ultimo_intento_facturacion')
         .eq('id', ventaId)
         .eq('tenant_id', user.tenant_id)
         .single();
@@ -1882,12 +1634,18 @@ export class PosService {
         throw new Error('Venta no encontrada para el tenant activo');
       }
 
+      const tipoEmision = venta.tipo_emision || null;
+      const esTicketInterno = tipoEmision === 'TICKET';
+
       return {
         venta_id: venta.id,
         numero_ticket: venta.numero_ticket,
         cpe_id: venta.cpe_id || null,
-        cpe_pendiente: Boolean(venta.cpe_pendiente),
+        cpe_pendiente: !esTicketInterno && Boolean(venta.cpe_pendiente),
         factura_electronica: Boolean(venta.cpe_id),
+        tipo_emision: tipoEmision,
+        canjeable: esTicketInterno && !venta.cpe_id,
+        numero_fiscal: venta.atomic_result?.numero_fiscal || null,
         intentos_facturacion: Number(venta.intentos_facturacion || 0),
         error_facturacion: venta.error_facturacion || null,
         ultimo_intento_facturacion: venta.ultimo_intento_facturacion || null,
@@ -1917,6 +1675,13 @@ export class PosService {
         };
       }
 
+      if (venta.tipo_emision === 'TICKET') {
+        return {
+          success: false,
+          message: 'El ticket interno no tiene una emisión CPE pendiente; use el flujo de canje a factura o boleta',
+        };
+      }
+
       // Verificar máximo de intentos (5 intentos)
       if (Number(venta.intentos_facturacion || 0) >= 5) {
         throw new Error('Máximo de reintentos alcanzado (5 intentos). Contacte al administrador.');
@@ -1934,19 +1699,12 @@ export class PosService {
         (cpeData as any).idempotency_key || `pos.cpe:${user.tenant_id}:${fallbackVentaKey}`;
 
       // Intentar crear CPE nuevamente
-      const cpe = await this.cpeService.create(cpeData, user.tenant_id, user.id);
-
-      // Actualizar venta como facturada
-      await this.supabase.getClient()
-        .from('ventas_pos')
-        .update({
-          cpe_id: cpe.id,
-          cpe_pendiente: false,
-          error_facturacion: null,
-          ultimo_intento_facturacion: new Date().toISOString()
-        })
-        .eq('id', ventaId)
-        .eq('tenant_id', user.tenant_id);
+      const cpe = await this.cpeService.create(
+        cpeData,
+        user.tenant_id,
+        user.id,
+        { finalizarDocumentoPosReservado: true },
+      );
 
       this.logger.log(`✅ Facturación exitosa para venta ${ventaId} en reintento ${venta.intentos_facturacion + 1}`);
 
@@ -1958,25 +1716,11 @@ export class PosService {
     } catch (error) {
       this.logger.error(`❌ Error reintentando facturación para venta ${ventaId}:`, error);
 
-      // Incrementar contador de intentos
-      const { data: venta } = await this.supabase.getClient()
-        .from('ventas_pos')
-        .select('intentos_facturacion')
-        .eq('id', ventaId)
-        .eq('tenant_id', user.tenant_id)
-        .single();
-
-      if (venta) {
-        await this.supabase.getClient()
-          .from('ventas_pos')
-          .update({
-            intentos_facturacion: (venta.intentos_facturacion || 0) + 1,
-            ultimo_intento_facturacion: new Date().toISOString(),
-            error_facturacion: error.message?.substring(0, 500) || 'Error desconocido'
-          })
-          .eq('id', ventaId)
-          .eq('tenant_id', user.tenant_id);
-      }
+      await this.registrarFalloCpePos(
+        ventaId,
+        user.tenant_id,
+        error.message || 'Error desconocido',
+      );
 
       return {
         success: false,
@@ -1996,9 +1740,9 @@ export class PosService {
     try {
       const { data, error } = await this.supabase.getClient()
         .from('ventas_pos')
-        .select('id, numero_venta, numero_ticket, cliente_nombre, total, cpe_id, cpe_pendiente, intentos_facturacion, ultimo_intento_facturacion, error_facturacion, fecha')
+        .select('id, numero_venta, numero_ticket, cliente_nombre, total, cpe_id, cpe_pendiente, tipo_emision, intentos_facturacion, ultimo_intento_facturacion, error_facturacion, fecha')
         .eq('tenant_id', user.tenant_id)
-        .or('cpe_pendiente.eq.true,cpe_id.is.null')
+        .eq('cpe_pendiente', true)
         .order('ultimo_intento_facturacion', { ascending: false })
         .limit(limit);
 
@@ -2042,7 +1786,7 @@ export class PosService {
       let query = this.supabase.getClient()
         .from('ventas_pos')
         .select('*')
-        .or('cpe_pendiente.eq.true,cpe_id.is.null')
+        .eq('cpe_pendiente', true)
         .not('cpe_data', 'is', null)
         .lt('intentos_facturacion', 5)
         .order('ultimo_intento_facturacion', { ascending: true })
@@ -2068,7 +1812,7 @@ export class PosService {
 
       for (const venta of ventasPendientes) {
         try {
-          if (venta.cpe_id) {
+          if (venta.cpe_id || venta.tipo_emision === 'TICKET') {
             continue;
           }
 
@@ -2091,34 +1835,22 @@ export class PosService {
             (cpeData as any).idempotency_key || `pos.cpe:${venta.tenant_id}:${fallbackVentaKey}`;
 
           const cpeActorId = (venta as any).created_by || (venta as any).usuario_id || undefined;
-          const cpe = await this.cpeService.create(cpeData, venta.tenant_id, cpeActorId);
-
-          // Marcar como procesada
-          await this.supabase.getClient()
-            .from('ventas_pos')
-            .update({
-              cpe_id: cpe.id,
-              cpe_pendiente: false,
-              error_facturacion: null,
-              ultimo_intento_facturacion: new Date().toISOString()
-            })
-            .eq('id', venta.id)
-            .eq('tenant_id', venta.tenant_id);
+          await this.cpeService.create(
+            cpeData,
+            venta.tenant_id,
+            cpeActorId,
+            { finalizarDocumentoPosReservado: true },
+          );
 
           procesadas++;
           this.logger.log(`✅ Venta ${venta.id} facturada exitosamente en procesamiento automático`);
         } catch (error) {
           errores++;
-          // Incrementar contador de intentos
-          await this.supabase.getClient()
-            .from('ventas_pos')
-            .update({
-              intentos_facturacion: (venta.intentos_facturacion || 0) + 1,
-              ultimo_intento_facturacion: new Date().toISOString(),
-              error_facturacion: error.message?.substring(0, 500) || 'Error desconocido'
-            })
-            .eq('id', venta.id)
-            .eq('tenant_id', venta.tenant_id);
+          await this.registrarFalloCpePos(
+            venta.id,
+            venta.tenant_id,
+            error.message || 'Error desconocido',
+          );
 
           this.logger.error(`❌ Error procesando venta ${venta.id}:`, error);
         }
@@ -2131,38 +1863,25 @@ export class PosService {
     }
   }
 
-  /**
-   * Elimina venta y detalles para evitar estados inconsistentes cuando falla un paso crítico.
-   */
-  private async rollbackVenta(ventaId: string, tenantId: string): Promise<void> {
-    const errores: string[] = [];
-    const client = this.supabase.getClient();
+  private posCpeFailureKey(ventaId: string, message: string): string {
+    const fingerprint = crypto.createHash('sha256').update(String(message)).digest('hex').slice(0, 24);
+    return `pos.cpe.failure:${ventaId}:${fingerprint}`;
+  }
 
-    // Intentar cada paso individualmente y registrar errores
-    try {
-      await client.from('ventas_pos_pagos').delete().eq('venta_pos_id', ventaId).eq('tenant_id', tenantId);
-    } catch (err) { errores.push(`pagos: ${err?.message ?? err}`); }
-
-    try {
-      await client.from('detalle_ventas_pos').delete().eq('venta_id', ventaId).eq('tenant_id', tenantId);
-    } catch (err) { errores.push(`detalle: ${err?.message ?? err}`); }
-
-    try {
-      await client.from('outbox_events').delete().eq('tenant_id', tenantId).eq('aggregate_type', 'venta_pos').eq('aggregate_id', ventaId);
-    } catch (err) { errores.push(`outbox: ${err?.message ?? err}`); }
-
-    try {
-      await client.from('ventas_pos').delete().eq('id', ventaId).eq('tenant_id', tenantId);
-    } catch (err) { errores.push(`venta: ${err?.message ?? err}`); }
-
-    if (errores.length > 0) {
-      this.logger.error(`ROLLBACK_PARTIAL venta=${ventaId} errores=[${errores.join('; ')}]`);
-      // Marcar como FALLIDA si no se pudo eliminar para que no quede huérfana
-      try {
-        await client.from('ventas_pos').update({ estado: 'ANULADA', observaciones: `Rollback parcial: ${errores.join('; ')}` }).eq('id', ventaId).eq('tenant_id', tenantId);
-      } catch { /* best effort */ }
-    } else {
-      this.logger.warn(`♻️ Venta ${ventaId} revertida completamente`);
+  private async registrarFalloCpePos(
+    ventaId: string,
+    tenantId: string,
+    message: string,
+  ): Promise<void> {
+    const { error } = await this.supabase.getClient().rpc('registrar_fallo_cpe_pos_tx', {
+      p_tenant_id: tenantId,
+      p_venta_id: ventaId,
+      p_error_message: message,
+      p_failure_key: this.posCpeFailureKey(ventaId, message),
+    });
+    if (error) {
+      this.logger.error(`No se pudo registrar el fallo CPE POS ${ventaId}: ${error.message}`);
     }
   }
+
 }

@@ -1,7 +1,5 @@
 ﻿'use client'
 
-'use client'
-
 import { useEffect, useMemo, useState } from 'react'
 import {
   Dialog,
@@ -16,6 +14,13 @@ import { useApi } from '@/hooks/use-api'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+
+const createCollectionIntentKey = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `cxc-cobro:${crypto.randomUUID()}`
+  }
+  return `cxc-cobro:${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
 
 interface CuentaPorCobrarResumen {
   id: string
@@ -49,6 +54,8 @@ interface MetodoPagoResumen {
   codigo?: string
   nombre?: string
   activo?: boolean
+  tipo?: string
+  valor?: string
 }
 
 const formatCurrency = (value: number, currency: string = 'PEN') =>
@@ -72,6 +79,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
   const [loadingMetodosPago, setLoadingMetodosPago] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [idempotencyKey, setIdempotencyKey] = useState(createCollectionIntentKey)
 
   const saldoDisponible = useMemo(() => cuenta?.saldo ?? 0, [cuenta])
 
@@ -91,11 +99,17 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
         setLoadingMetodosPago(true)
         const response = await get('/api/pos/metodos-pago')
         const lista = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : []
-        const activos = lista.filter((item: any) => item.activo !== false)
+        const soportados = new Set(['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'])
+        const activos = lista
+          .filter((item: any) => item.activo !== false)
+          .map((item: MetodoPagoResumen) => ({
+            ...item,
+            valor: String(item.tipo || item.codigo || item.id || item.nombre || '').trim().toUpperCase(),
+          }))
+          .filter((item: MetodoPagoResumen) => item.valor && soportados.has(item.valor))
         setMetodosPago(activos)
         if (activos.length > 0) {
-          const first = activos[0]
-          setMetodoPago((first.codigo || first.id || first.nombre || 'EFECTIVO') as string)
+          setMetodoPago(activos[0].valor || 'EFECTIVO')
         } else {
           setMetodoPago('EFECTIVO')
         }
@@ -129,6 +143,12 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
     loadBancos()
   }, [isOpen, cuenta, saldoDisponible, get])
 
+  useEffect(() => {
+    if (isOpen) {
+      setIdempotencyKey(createCollectionIntentKey())
+    }
+  }, [isOpen, cuenta?.id, monto, fechaPago, metodoPago, cuentaBancariaId, referencia, notas])
+
   const handleClose = () => {
     if (saving) return
     onClose()
@@ -151,24 +171,27 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
       return
     }
 
+    const requiereBanco = metodoPago !== 'EFECTIVO'
+    if (requiereBanco && cuentaBancariaId === 'SIN_CUENTA') {
+      setError('Seleccione una cuenta bancaria para el medio de cobro elegido')
+      return
+    }
+    if (requiereBanco && !referencia.trim()) {
+      setError('Ingrese la referencia de la operacion bancaria')
+      return
+    }
+
     try {
       setSaving(true)
       setError(null)
-      const generateIdempotencyKey = () => {
-        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-          return crypto.randomUUID()
-        }
-        return `cxc-cobro-${Date.now()}`
-      }
-
       const payload = {
         monto: montoNumber,
         fecha_pago: fechaPago,
         metodo_pago: metodoPago,
-        cuenta_bancaria_id: cuentaBancariaId === 'SIN_CUENTA' ? undefined : cuentaBancariaId,
+        cuenta_bancaria_id: requiereBanco && cuentaBancariaId !== 'SIN_CUENTA' ? cuentaBancariaId : undefined,
         referencia: referencia || undefined,
         notas: notas || undefined,
-        idempotency_key: generateIdempotencyKey(),
+        idempotency_key: idempotencyKey,
       }
 
       const response = await post(`/api/finanzas/cxc/${cuenta.id}/pagos`, payload)
@@ -242,7 +265,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
                 {!loadingMetodosPago && metodosPago.length === 0 && <option value="EFECTIVO">Efectivo</option>}
                 {!loadingMetodosPago &&
                   metodosPago.map((metodo) => {
-                    const value = (metodo.codigo || metodo.id || metodo.nombre || '').toString()
+                    const value = metodo.valor || 'EFECTIVO'
                     const label = metodo.nombre || metodo.codigo || metodo.id || 'Método'
                     return (
                       <option key={value} value={value}>
@@ -253,8 +276,8 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
               </select>
             </div>
 
-            <div>
-              <Label htmlFor="cuenta_bancaria_id">Cuenta bancaria (opcional)</Label>
+            {metodoPago !== 'EFECTIVO' && <div>
+              <Label htmlFor="cuenta_bancaria_id">Cuenta bancaria *</Label>
               <select
                 id="cuenta_bancaria_id"
                 value={cuentaBancariaId}
@@ -276,7 +299,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
                     </option>
                   ))}
               </select>
-            </div>
+            </div>}
 
             <div>
               <Label htmlFor="referencia">Referencia</Label>
@@ -285,6 +308,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
                 value={referencia}
                 onChange={(e) => setReferencia(e.target.value)}
                 placeholder="Número de operación, cheque, etc."
+                required={metodoPago !== 'EFECTIVO'}
               />
             </div>
 

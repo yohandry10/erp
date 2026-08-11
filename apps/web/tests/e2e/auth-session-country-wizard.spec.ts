@@ -335,6 +335,7 @@ test.describe('Auth, sesión, país/empresa, wizard y permisos', () => {
     expect(empresaBody.data.pais_id).toBeTruthy();
 
     const adminWrite = await adminApi.put('/api/configuration/empresa', {
+      headers: { 'Idempotency-Key': `configuration-empresa-${Date.now()}` },
       data: {
         pais: empresaBody.data.pais,
         pais_id: empresaBody.data.pais_id,

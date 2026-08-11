@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { unwrapApiArray } from '@/lib/api-contract';
 
@@ -10,6 +10,7 @@ const AsistenciaPage = () => {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
   const { get, post } = useApi();
+  const mutationIntents = useRef(new Map<string, { key: string; hora: string }>());
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
 
   const formatLocalDate = (date: string) => {
@@ -51,13 +52,25 @@ const AsistenciaPage = () => {
   }, [loadData]);
 
   const marcarAsistencia = async (empleadoId: string, tipo: 'entrada' | 'salida') => {
+    const signature = `${empleadoId}:${fecha}:${tipo}`;
+    let intent = mutationIntents.current.get(signature);
+    if (!intent) {
+      intent = {
+        key: `rrhh-attendance:${crypto.randomUUID()}`,
+        hora: new Date().toTimeString().split(' ')[0],
+      };
+      mutationIntents.current.set(signature, intent);
+    }
     try {
       await post('/api/rrhh/asistencias/marcar', {
         empleado_id: empleadoId,
         fecha,
         tipo,
-        hora: new Date().toTimeString().split(' ')[0]
+        hora: intent.hora,
+      }, {
+        headers: { 'Idempotency-Key': intent.key },
       });
+      mutationIntents.current.delete(signature);
       loadData();
     } catch (error) {
       console.error('Error marcando asistencia:', error);

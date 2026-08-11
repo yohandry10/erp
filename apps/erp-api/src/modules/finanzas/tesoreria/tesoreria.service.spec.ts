@@ -151,6 +151,7 @@ describe('TesoreriaService', () => {
         monto: 0,
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
+        idempotency_key: 'tesoreria-test-monto-cero',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -164,6 +165,7 @@ describe('TesoreriaService', () => {
         monto: 100.123,
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
+        idempotency_key: 'tesoreria-test-decimales',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -178,6 +180,7 @@ describe('TesoreriaService', () => {
         monto: 100,
         fecha_pago: '2024-02-31',
         metodo_pago: 'TRANSFERENCIA',
+        idempotency_key: 'tesoreria-test-fecha',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -231,6 +234,7 @@ describe('TesoreriaService', () => {
         monto: 500,
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
+        idempotency_key: 'tesoreria-test-no-encontrada',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -249,6 +253,7 @@ describe('TesoreriaService', () => {
         monto: 500,
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
+        idempotency_key: 'tesoreria-test-anulada',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -267,6 +272,7 @@ describe('TesoreriaService', () => {
         monto: 500,
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
+        idempotency_key: 'tesoreria-test-pagada',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -285,6 +291,7 @@ describe('TesoreriaService', () => {
         monto: 1500,
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
+        idempotency_key: 'tesoreria-test-sobrepago',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -303,6 +310,7 @@ describe('TesoreriaService', () => {
         monto: 2500,
         fecha_pago: '2024-01-15',
         metodo_pago: 'EFECTIVO',
+        idempotency_key: 'tesoreria-test-bancarizacion-efectivo',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -322,6 +330,7 @@ describe('TesoreriaService', () => {
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
         cuenta_bancaria_id: 'cuenta-123',
+        idempotency_key: 'tesoreria-test-bancarizacion-referencia',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -340,6 +349,7 @@ describe('TesoreriaService', () => {
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
         cuenta_bancaria_id: 'cuenta-999',
+        idempotency_key: 'tesoreria-test-banco-inexistente',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -361,6 +371,7 @@ describe('TesoreriaService', () => {
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
         cuenta_bancaria_id: 'cuenta-123',
+        idempotency_key: 'tesoreria-test-moneda',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -382,6 +393,7 @@ describe('TesoreriaService', () => {
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
         cuenta_bancaria_id: 'cuenta-123',
+        idempotency_key: 'tesoreria-test-saldo-banco',
       };
 
       await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
@@ -411,6 +423,7 @@ describe('TesoreriaService', () => {
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
         cuenta_bancaria_id: 'cuenta-123',
+        idempotency_key: 'tesoreria-test-pago-total',
       };
 
       const result = await service.registrarPago(tenantId, dto, userId);
@@ -444,6 +457,7 @@ describe('TesoreriaService', () => {
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
         cuenta_bancaria_id: 'cuenta-123',
+        idempotency_key: 'tesoreria-test-pago-parcial',
       };
 
       const result = await service.registrarPago(tenantId, dto, userId);
@@ -472,6 +486,7 @@ describe('TesoreriaService', () => {
         monto: 1000,
         fecha_pago: '2024-01-15',
         metodo_pago: 'EFECTIVO',
+        idempotency_key: 'tesoreria-test-pago-efectivo',
       };
 
       const result = await service.registrarPago(tenantId, dto, userId);
@@ -681,7 +696,9 @@ describe('TesoreriaService', () => {
         cuenta_bancaria_id: 'cuenta-123',
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
+        referencia_lote: 'lote-vacio-001',
         pagos: [],
+        idempotency_key: 'lote-vacio-001',
       };
 
       await expect(service.registrarPagoLote(tenantId, dto, userId)).rejects.toThrow(
@@ -731,74 +748,47 @@ describe('TesoreriaService', () => {
           { cxp_id: 'cxp-1', monto: 1000 },
           { cxp_id: 'cxp-2', monto: 1000 },
         ],
+        referencia_lote: 'lote-exitoso-001',
+        idempotency_key: 'lote-exitoso-001',
       };
 
       const result = await service.registrarPagoLote(tenantId, dto, userId);
 
       expect(result.success).toBe(true);
       expect(result.data.cantidad_pagos).toBe(2);
-      expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalledTimes(2);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'procesar_pago_lote',
+        expect.objectContaining({ p_idempotency_key: 'lote-exitoso-001' }),
+      );
+      expect(eventBusService.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
     });
 
-    it('should generate lote ID if not provided', async () => {
-      const mockResult = {
-        success: true,
-        total_procesado: 1000,
-        cantidad_pagos: 1,
-        pagos: [
-          {
-            cxp_id: 'cxp-1',
-            numero_documento: 'F001-123',
-            proveedor: 'Proveedor 1',
-            monto: 1000,
-            saldo_anterior: 1000,
-            saldo_nuevo: 0,
-            estado_anterior: 'PENDIENTE',
-            estado_nuevo: 'PAGADA',
-          },
-        ],
-      };
-
-      mockSupabaseClient.rpc.mockResolvedValueOnce({
-        data: mockResult,
-        error: null,
-      });
-
+    it('should reject a batch without a real banking reference', async () => {
       const dto = {
         cuenta_bancaria_id: 'cuenta-123',
         fecha_pago: '2024-01-15',
         metodo_pago: 'TRANSFERENCIA',
+        referencia_lote: '   ',
         pagos: [{ cxp_id: 'cxp-1', monto: 1000 }],
+        idempotency_key: 'lote-sin-referencia-001',
       };
 
-      await service.registrarPagoLote(tenantId, dto, userId);
-
-      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-        'procesar_pago_lote',
-        expect.objectContaining({
-          p_referencia_lote: expect.stringContaining('LOTE-'),
-        }),
+      await expect(service.registrarPagoLote(tenantId, dto, userId)).rejects.toThrow(
+        'La referencia bancaria del lote es obligatoria',
       );
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
     });
 
-    it('should return existing lote movements without reprocessing duplicate reference', async () => {
-      const existingMovements = [
-        {
-          id: 'mov-lote-1',
-          cxp_id: 'cxp-1',
-          monto: 1000,
-          saldo_anterior: 1000,
-          saldo_nuevo: 0,
-          referencia: 'local-payment-batch-1',
-          fecha: '2024-01-15',
+    it('returns the durable RPC replay without querying or emitting in JS', async () => {
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: {
+          success: true,
+          idempotent_replay: true,
+          referencia_lote: 'local-payment-batch-1',
+          pagos: [{ cxp_id: 'cxp-1', movimiento_bancario_id: 'mov-lote-1' }],
         },
-      ];
-      const existingBuilder: any = {
-        select: jest.fn(() => existingBuilder),
-        eq: jest.fn(() => existingBuilder),
-        then: (resolve: any) => resolve({ data: existingMovements, error: null }),
-      };
-      mockSupabaseClient.from.mockReturnValueOnce(existingBuilder);
+        error: null,
+      });
 
       const result = await service.registrarPagoLote(
         tenantId,
@@ -808,6 +798,7 @@ describe('TesoreriaService', () => {
           metodo_pago: 'TRANSFERENCIA',
           referencia_lote: 'local-payment-batch-1',
           pagos: [{ cxp_id: 'cxp-1', monto: 1000 }],
+          idempotency_key: 'local-payment-batch-1',
         },
         userId,
       );
@@ -816,7 +807,8 @@ describe('TesoreriaService', () => {
       expect(result.data.idempotent_replay).toBe(true);
       expect(result.data.referencia_lote).toBe('local-payment-batch-1');
       expect(result.data.pagos).toHaveLength(1);
-      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
       expect(eventBusService.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
     });
   });

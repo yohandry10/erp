@@ -219,7 +219,7 @@ async function createSaleWithCxc(apiContext: APIRequestContext) {
   );
 
   await parseOk<any>(
-    await apiContext.post(api(`/ventas/pedidos/${pedido.id}/confirmar`), { data: { forzar_confirmacion: false } }),
+    await apiContext.post(api(`/ventas/pedidos/${pedido.id}/confirmar`), { data: {} }),
     'confirmar pedido T14',
   );
 
@@ -305,6 +305,7 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
       data: {
         orden_id: orden.id,
+        idempotency_key: `recepcion:${runId}:contabilidad`,
         almacen_id: almacenId,
         observaciones: 'Recepcion Contabilidad T14',
         items: [{ detalle_id: detalleId, cantidad_recibida: 1, calidad: 'OK', almacen_id: almacenId }],
@@ -512,7 +513,7 @@ async function createPayroll(supabase: SupabaseClient, tenantId: string, apiCont
     total_ingresos: 1000,
     total_descuentos: 100,
     total_neto: 900,
-    asientos_generados: false,
+    asientos_generados: 'false',
   });
   expect(planillaError?.message || '', 'crear planilla T14').toBe('');
 
@@ -523,20 +524,24 @@ async function createPayroll(supabase: SupabaseClient, tenantId: string, apiCont
     id_planilla: planillaId,
     total_ingresos: 1000,
     total_descuentos: 100,
+    total_aportes: 100,
     neto_pagar: 900,
+    estado_pago: 'pendiente',
     estado: 'CALCULADA',
   });
   expect(empleadoPlanillaError?.message || '', 'crear empleado_planilla T14').toBe('');
 
   const primera = await parseOk<any>(
-    await apiContext.post(api(`/rrhh/planillas/${planillaId}/generar-asientos`), { data: {} }),
-    'generar asiento RRHH T14',
+    await apiContext.post(api(`/rrhh/planillas/${planillaId}/aprobar`), { data: {} }),
+    'aprobar y encolar devengo RRHH T14',
   );
   const segunda = await parseOk<any>(
-    await apiContext.post(api(`/rrhh/planillas/${planillaId}/generar-asientos`), { data: {} }),
-    'reintentar asiento RRHH T14',
+    await apiContext.post(api(`/rrhh/planillas/${planillaId}/aprobar`), { data: {} }),
+    'reintentar aprobación RRHH T14',
   );
-  expect(segunda.asiento_id ?? segunda.data?.asiento_id).toBe(primera.asiento_id ?? primera.data?.asiento_id);
+  expect(segunda.eventId ?? segunda.data?.eventId).toBe(primera.eventId ?? primera.data?.eventId);
+
+  const asiento = await waitForAsientoByReference(supabase, tenantId, `PLANILLA-${planillaId}`);
 
   const { data: asientos, error: asientosError } = await supabase
     .from('asientos_contables')
@@ -546,7 +551,7 @@ async function createPayroll(supabase: SupabaseClient, tenantId: string, apiCont
   expect(asientosError?.message || '', 'consultar duplicados RRHH T14').toBe('');
   expect(asientos || [], 'reintento RRHH no debe duplicar asiento').toHaveLength(1);
 
-  return { referencia: `PLANILLA-${planillaId}`, periodo, asientoId: primera.asiento_id ?? primera.data?.asiento_id };
+  return { referencia: `PLANILLA-${planillaId}`, periodo, asientoId: asiento.id };
 }
 
 test.describe('T14 Contabilidad completo', () => {

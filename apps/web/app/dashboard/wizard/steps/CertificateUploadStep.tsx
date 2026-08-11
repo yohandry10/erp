@@ -115,7 +115,7 @@ export function CertificateUploadStep() {
       <div className="flex items-center gap-3 mb-6 p-4 bg-[rgba(139,_92,_246,_0.1)] rounded-lg">
         <FileCheck size={24} className="text-[var(--primary-600)]" />
         <p className="text-[0.875rem] text-[var(--primary-700)] m-0">
-          Carga tu certificado digital para firmar comprobantes electrónicos
+          Paso opcional: carga el certificado propio de tu empresa cuando quieras habilitar emisión electrónica
         </p>
       </div>
 
@@ -126,7 +126,8 @@ export function CertificateUploadStep() {
             Importante sobre el certificado
           </p>
           <p className="text-[0.875rem] text-[#92400e] mt-1.5 mr-0 mb-0 ml-0 leading-6">
-            Nosotros usamos tu certificado solo para firmar el XML de tus comprobantes. El certificado lo
+            El ERP funciona sin certificado y este paso se puede omitir. Cuando decidas emitir electrónicamente,
+            nosotros usaremos tu certificado solo para firmar el XML. El certificado lo
             proporciona el cliente (autoridad fiscal, OSE/proveedor o entidad certificadora). No emitimos ni
             generamos certificados. Si tu OSE firma por ti, cargarás el certificado que ellos indiquen o el que
             tu empresa ya usa. Se almacena cifrado y no se comparte con {servicioFiscal}; solo se usa para la firma.
@@ -138,7 +139,7 @@ export function CertificateUploadStep() {
         {/* File Upload */}
         <div>
           <Label className="mb-2 block">
-            Certificado Digital <span className="text-red-500">*</span>
+            Certificado Digital <span className="text-muted-foreground">(opcional)</span>
           </Label>
           
           <input
@@ -207,7 +208,7 @@ export function CertificateUploadStep() {
         {/* Password Input */}
         <div>
           <Label htmlFor="certificatePassword" className="mb-2 block">
-            Contraseña del Certificado <span className="text-red-500">*</span>
+            Contraseña del Certificado <span className="text-muted-foreground">(obligatoria sólo si cargas un archivo)</span>
           </Label>
           <div className="relative">
             <Input
@@ -225,7 +226,7 @@ export function CertificateUploadStep() {
             </button>
           </div>
           <p className="text-xs text-[var(--primary-500)] mt-1">
-            La contraseña que usaste al crear el certificado
+            Déjala vacía si todavía no vas a configurar emisión electrónica
           </p>
         </div>
 

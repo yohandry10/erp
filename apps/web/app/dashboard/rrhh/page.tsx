@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import {
@@ -24,6 +24,7 @@ import { parseDateLocal } from '@/lib/date-utils'
 
 const rrhhModules = [
   { href: '/dashboard/rrhh/planillas', title: 'Planillas', description: 'Cálculo de sueldos y beneficios', icon: BadgeDollarSign },
+  { href: '/dashboard/rrhh/liquidaciones', title: 'Liquidaciones y CTS', description: 'Cese, pago, reversa y depósitos semestrales', icon: FileCheck2 },
   { href: '/dashboard/rrhh/planilla-electronica', title: 'PLAME / T-Registro', description: 'Fuentes PVS, ticket y CIR de SUNAT', icon: FileCheck2 },
   { href: '/dashboard/rrhh/asistencia', title: 'Asistencia', description: 'Control de horarios y marcaciones', icon: CalendarClock },
   { href: '/dashboard/rrhh/contratos', title: 'Contratos', description: 'Gestión de contratos laborales', icon: FileText },
@@ -42,6 +43,14 @@ export default function RrhhPage() {
   const [empleadoEditando, setEmpleadoEditando] = useState<any | null>(null)
   const { get, post, put, delete: del } = useApi()
   const queryClient = useQueryClient()
+  const mutationIntents = useRef(new Map<string, string>())
+  const intentFor = (signature: string) => {
+    const existing = mutationIntents.current.get(signature)
+    if (existing) return existing
+    const key = `rrhh-employee:${crypto.randomUUID()}`
+    mutationIntents.current.set(signature, key)
+    return key
+  }
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean
@@ -109,12 +118,18 @@ export default function RrhhPage() {
   }
 
   const handleSubmitEmpleado = async (empleadoData: any) => {
+    const signature = `${empleadoEditando?.id ? `update:${empleadoEditando.id}` : 'create'}:${JSON.stringify(empleadoData)}`
     try {
       const response = empleadoEditando?.id
-        ? await put(`/rrhh/empleados/${empleadoEditando.id}`, empleadoData)
-        : await post('/rrhh/empleados', empleadoData)
+        ? await put(`/rrhh/empleados/${empleadoEditando.id}`, empleadoData, {
+            headers: { 'Idempotency-Key': intentFor(signature) },
+          })
+        : await post('/rrhh/empleados', empleadoData, {
+            headers: { 'Idempotency-Key': intentFor(signature) },
+          })
 
       if (response) {
+        mutationIntents.current.delete(signature)
         setIsModalOpen(false)
         setEmpleadoEditando(null)
         loadData()
@@ -245,9 +260,13 @@ export default function RrhhPage() {
                                 message: `¿Está seguro de inactivar a ${empleado.nombres} ${empleado.apellidos}?\n\nEl historial se conserva para planillas, pagos y contabilidad.`,
                                 variant: 'warning',
                                 onConfirm: async () => {
+                                  const signature = `deactivate:${empleado.id}`
                                   try {
-                                    const response = await del(`/rrhh/empleados/${empleado.id}`)
+                                    const response = await del(`/rrhh/empleados/${empleado.id}`, {
+                                      headers: { 'Idempotency-Key': intentFor(signature) },
+                                    })
                                     if (response) {
+                                      mutationIntents.current.delete(signature)
                                       loadData()
                                       alert('Empleado inactivado exitosamente')
                                     } else {

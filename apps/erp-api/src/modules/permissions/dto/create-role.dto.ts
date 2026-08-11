@@ -1,6 +1,9 @@
 import { IsString, IsOptional, IsArray, IsUUID, IsNotEmpty } from 'class-validator';
 
 export class CreateRoleDto {
+  @IsUUID('4')
+  idempotency_key: string;
+
   @IsString()
   @IsNotEmpty()
   nombre: string;

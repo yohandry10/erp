@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { parseDateLocal } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api';
 import { fetchApi } from '@/lib/api-fetch';
@@ -439,8 +439,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
   });
 
   const [loading, setLoading] = useState(false);
+  const mutationIntent = useRef('');
 
   useEffect(() => {
+    mutationIntent.current = `rrhh-candidate-${candidato?.id ? 'update' : 'create'}:${crypto.randomUUID()}`;
     if (candidato) {
       setFormData({
         id_vacante: candidato.id_vacante || '',
@@ -497,7 +499,10 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
 
       const response = await fetchApi(candidato?.id ? `/api/rrhh/candidatos/${candidato.id}` : '/api/rrhh/candidatos', {
         method: candidato?.id ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': mutationIntent.current,
+        },
         body: JSON.stringify(candidatoData),
       });
 

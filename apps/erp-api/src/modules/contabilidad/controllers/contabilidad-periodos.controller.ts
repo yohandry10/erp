@@ -6,6 +6,7 @@ import {
   Param,
   UseGuards,
   BadRequestException,
+  Headers,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { SupabaseService } from "../../../shared/supabase/supabase.service";
@@ -39,7 +40,9 @@ export class ContabilidadPeriodosController {
   })
   async crearPeriodo(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId:string,
     @Body() createPeriodoDto: CreatePeriodoDto,
+    @Headers('idempotency-key') idempotencyKey?:string,
   ): Promise<{ success: boolean; data: PeriodoResponseDto; message: string }> {
     try {
       console.log(
@@ -50,6 +53,8 @@ export class ContabilidadPeriodosController {
         tenantId,
         createPeriodoDto.anio,
         createPeriodoDto.mes,
+        userId,
+        idempotencyKey,
       );
 
       return {
@@ -290,6 +295,7 @@ export class ContabilidadPeriodosController {
   })
   async reabrirPeriodo(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
     @Param("id") periodoId: string,
   ): Promise<{ success: boolean; data: PeriodoResponseDto; message: string }> {
     try {
@@ -316,6 +322,7 @@ export class ContabilidadPeriodosController {
         tenantId,
         periodoData.anio,
         periodoData.mes,
+        userId,
       );
 
       return {
@@ -347,6 +354,7 @@ export class ContabilidadPeriodosController {
   })
   async bloquearPeriodo(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
     @Param("id") periodoId: string,
   ): Promise<{ success: boolean; data: PeriodoResponseDto; message: string }> {
     try {
@@ -373,6 +381,7 @@ export class ContabilidadPeriodosController {
         tenantId,
         periodoData.anio,
         periodoData.mes,
+        userId,
       );
 
       return {
@@ -411,7 +420,7 @@ export class ContabilidadPeriodosController {
       tenantId,
       anio,
       mes,
-      user?.id || "system",
+      user?.id,
     );
 
     return {

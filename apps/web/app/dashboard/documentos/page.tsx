@@ -6,12 +6,14 @@ import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { parseDateLocal } from '@/lib/date-utils'
 import DocumentoModal from '@/components/modals/DocumentoModal'
+import FiscalBajaPanel from '@/components/documentos/FiscalBajaPanel'
 import { apiSucceeded, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
+import { buildApiUrl } from '@/lib/api-url'
 
 interface Documento {
   id: string
@@ -71,6 +73,7 @@ export default function DocumentosPage() {
   const country = useCountryContext()
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
+  const isPeru = country.paisCodigo === 'PE'
   const { toast } = useToast()
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [stats, setStats] = useState<DocumentoStats | null>(null)
@@ -141,39 +144,48 @@ export default function DocumentosPage() {
   }
 
   const enviarFiscal = async (documentoId: string) => {
-    const response = await postDocumentoAction(`/api/documentos/${documentoId}/enviar-sunat`)
-    if (apiSucceeded(response)) {
-      loadDocumentos()
-      showSuccessToast(`Documento enviado a ${country.servicioFiscal} correctamente`)
-    } else {
-      showErrorToast(response?.message || `Error al enviar documento a ${country.servicioFiscal}`)
+    try {
+      const response = await postDocumentoAction(`/api/documentos/${documentoId}/enviar-sunat`, {
+        idempotency_key: `document-send:${documentoId}`,
+      })
+      if (apiSucceeded(response)) {
+        await loadDocumentos()
+        showSuccessToast(`Documento enviado a ${country.servicioFiscal} correctamente`)
+      }
+    } catch (error) {
+      await loadDocumentos()
+      showErrorToast(error instanceof Error ? error.message : `Error al enviar documento a ${country.servicioFiscal}`)
     }
   }
 
   const generarXML = async (documentoId: string) => {
-    const response = await postDocumentoAction(`/api/documentos/${documentoId}/generar-xml`)
-    if (apiSucceeded(response)) {
-      loadDocumentos()
-      showSuccessToast('XML generado correctamente')
-    } else {
-      showErrorToast(response?.message || 'Error al generar XML')
+    try {
+      const response = await postDocumentoAction(`/api/documentos/${documentoId}/generar-xml`, {
+        idempotency_key: `document-emit:${documentoId}`,
+      })
+      if (apiSucceeded(response)) {
+        await loadDocumentos()
+        showSuccessToast('CPE creado y XML firmado correctamente')
+      }
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : 'Error al firmar el XML')
     }
   }
 
   const descargarPDF = async (documentoId: string, filename: string) => {
     const response = await getDocumentos(`/api/documentos/${documentoId}/descargar-pdf`)
-    const pdf = unwrapApiData<string | Blob | null>(response, null)
-    if (apiSucceeded(response) && pdf) {
-      const blob = new Blob([pdf], { type: 'application/pdf' })
-      const url = window.URL.createObjectURL(blob)
+    const resolver = unwrapApiData<{ pdf_endpoint?: string } | null>(response, null)
+    if (apiSucceeded(response) && resolver?.pdf_endpoint) {
+      const target = buildApiUrl(resolver.pdf_endpoint)
       const a = document.createElement('a')
-      a.href = url
+      a.href = target
       a.download = filename
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
       document.body.appendChild(a)
       a.click()
-      window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
-      showSuccessToast('PDF descargado correctamente')
+      showSuccessToast('Representación impresa solicitada')
     }
   }
 
@@ -201,13 +213,16 @@ export default function DocumentosPage() {
     try {
       const response = await postDocumentoAction(
         `/api/documentos/${documentoAAnular.id}/anular`,
-        { motivo: motivoAnulacion.trim() },
+        {
+          motivo: motivoAnulacion.trim(),
+          idempotency_key: `document-cancel:${documentoAAnular.id}`,
+        },
       )
       if (apiSucceeded(response)) {
         setDocumentoAAnular(null)
         setMotivoAnulacion('')
         await loadData()
-        showSuccessToast('Documento y operaciones relacionadas anulados correctamente')
+        showSuccessToast('Borrador anulado correctamente')
       } else {
         showErrorToast(response?.message || response?.error || 'Error al anular documento')
       }
@@ -377,6 +392,8 @@ export default function DocumentosPage() {
           </CardContent>
         </Card>
 
+        {isPeru && <FiscalBajaPanel onChanged={loadData} />}
+
         <Card className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20">
           <CardHeader className="flex flex-col gap-3 border-b border-cyan-400/10 px-5 py-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -439,7 +456,7 @@ export default function DocumentosPage() {
                           <div className="flex flex-wrap justify-end gap-2">
                             {documento.estado === 'BORRADOR' && (
                               <>
-                                {!isArgentina && (
+                                {!isArgentina && ['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
                                   <Button type="button" size="sm" onClick={() => generarXML(documento.id)} className="gap-1 bg-blue-600 text-white hover:bg-blue-500">
                                     <FileText className="h-4 w-4" />
                                     XML
@@ -461,10 +478,20 @@ export default function DocumentosPage() {
                               </>
                             )}
                             {documento.estado === 'EMITIDO' && (
-                              <Button type="button" size="sm" onClick={() => enviarFiscal(documento.id)} className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500">
-                                <Send className="h-4 w-4" />
-                                Enviar
-                              </Button>
+                              <>
+                                {['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
+                                  <Button type="button" size="sm" onClick={() => enviarFiscal(documento.id)} className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500">
+                                    <Send className="h-4 w-4" />
+                                    Enviar
+                                  </Button>
+                                )}
+                                {!isArgentina && ['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
+                                  <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
+                                    <Download className="h-4 w-4" />
+                                    XML firmado
+                                  </Button>
+                                )}
+                              </>
                             )}
                             {['ENVIADO_SUNAT', 'ACEPTADO'].includes(documento.estado) && (
                               <>
@@ -480,7 +507,7 @@ export default function DocumentosPage() {
                                 )}
                               </>
                             )}
-                            {!['ANULADO'].includes(documento.estado) && (
+                            {documento.estado === 'BORRADOR' && (
                               <Button
                                 type="button"
                                 size="sm"
@@ -493,6 +520,19 @@ export default function DocumentosPage() {
                               >
                                 <XCircle className="h-4 w-4" />
                                 Anular
+                              </Button>
+                            )}
+                            {!['BORRADOR', 'ANULADO'].includes(documento.estado)
+                              && ['FACTURA', 'BOLETA', 'NOTA_CREDITO', 'NOTA_DEBITO'].includes(documento.tipo_documento) && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => window.location.assign('/dashboard/cpe/')}
+                                variant="outline"
+                                className="gap-1 border-amber-300/25 bg-amber-300/10 text-amber-400 hover:bg-amber-300/15 dark:text-amber-200"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                Anular en CPE
                               </Button>
                             )}
                           </div>
@@ -521,8 +561,8 @@ export default function DocumentosPage() {
             <DialogTitle>Anular documento fiscal</DialogTitle>
             <DialogDescription>
               {documentoAAnular
-                ? `Se generará la nota de crédito y se revertirán contabilidad, caja, inventario y cuentas relacionadas de ${documentoAAnular.serie}-${documentoAAnular.numero}.`
-                : 'Se ejecutará la anulación fiscal integral.'}
+                ? `Se anulará el borrador ${documentoAAnular.serie}-${documentoAAnular.numero}; no se generarán movimientos fiscales ni comerciales.`
+                : 'Sólo los borradores sin CPE pueden anularse desde esta pantalla.'}
             </DialogDescription>
           </DialogHeader>
 

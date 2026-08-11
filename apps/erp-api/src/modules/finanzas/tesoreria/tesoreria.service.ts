@@ -7,9 +7,6 @@ import { TiposCambioService } from '../../contabilidad/services/tipos-cambio.ser
 import { RevaluacionService } from '../../contabilidad/services/revaluacion.service';
 import { LadoTipoCambio } from '@erp-suite/dtos';
 
-const BANCARIZACION_PEN_MIN = 2000;
-const BANCARIZACION_USD_MIN = 500;
-
 /** Valuación en moneda local de un pago, más la diferencia de cambio realizada. */
 export interface ValuacionPago {
   /** Importe en moneda local con el que estaba contabilizada la deuda cancelada. */
@@ -122,12 +119,18 @@ export class TesoreriaService {
       throw new BadRequestException('El monto del pago debe ser mayor a 0');
     }
 
+    if (!userId) {
+      throw new BadRequestException('El actor autenticado es obligatorio para registrar el pago');
+    }
+
+    if (!dto.idempotency_key) {
+      throw new BadRequestException('La llave de idempotencia es obligatoria para registrar el pago');
+    }
+
     const client = this.supabase.getClient();
-    const submittedIdempotencyKey = dto.idempotency_key ?? null;
     const pagoId = uuidv4();
     const eventId = uuidv4();
-    const idempotencyKey = submittedIdempotencyKey
-      ?? `tesoreria:pago:${tenantId}:${dto.cxp_id}:${pagoId}`;
+    const idempotencyKey = dto.idempotency_key;
     const { data: resultadoPago, error: errorPago } = await client.rpc(
       'aplicar_pago_cxp_tx',
       {
@@ -139,7 +142,7 @@ export class TesoreriaService {
           event_id: eventId,
           idempotency_key: idempotencyKey,
         },
-        p_usuario_id: userId || null,
+        p_usuario_id: userId,
       },
     );
 
@@ -165,380 +168,6 @@ export class TesoreriaService {
         },
       },
     };
-
-    /* istanbul ignore next -- implementación pre-RPC conservada temporalmente para trazabilidad */
-    if (submittedIdempotencyKey) {
-      const { data: pagoExistente, error: errorPagoExistente } = await client
-        .from('movimientos_bancarios')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('idempotency_key', submittedIdempotencyKey)
-        .maybeSingle();
-
-      if (errorPagoExistente) {
-        throw new BadRequestException('No se pudo verificar la idempotencia del pago');
-      }
-
-      if (pagoExistente) {
-        const { data: cxpActual, error: errorCxpActual } = await client
-          .from('cuentas_por_pagar')
-          .select('*')
-          .eq('tenant_id', tenantId)
-          .eq('id', dto.cxp_id)
-          .maybeSingle();
-
-        if (errorCxpActual || !cxpActual) {
-          throw new NotFoundException('Cuenta por pagar no encontrada');
-        }
-
-        return {
-          success: true,
-          data: {
-            cxp: cxpActual,
-            pago: {
-              monto: this.round2(Number(pagoExistente.monto ?? 0)),
-              fecha_pago: pagoExistente.fecha,
-              metodo_pago: pagoExistente.metodo_pago,
-              referencia: pagoExistente.referencia,
-              cuenta_bancaria_id: pagoExistente.cuenta_bancaria_id,
-              pago_id: pagoExistente.id,
-              idempotent_replay: true,
-            },
-            movimiento_bancario: pagoExistente,
-          },
-        };
-      }
-    }
-
-    // Validar que el monto sea positivo
-    if (dto.monto <= 0) {
-      throw new BadRequestException('El monto del pago debe ser mayor a 0');
-    }
-
-    // Obtener la CxP actual
-    const { data: cxp, error: errorCxp } = await client
-      .from('cuentas_por_pagar')
-      .select(`
-        id,
-        estado,
-        saldo,
-        total,
-        moneda,
-        tipo_cambio_origen,
-        proveedor_id,
-        numero_documento,
-        proveedor:proveedores!cuentas_por_pagar_proveedor_id_fkey(
-          id,
-          razon_social,
-          ruc
-        )
-      `)
-      .eq('tenant_id', tenantId)
-      .eq('id', dto.cxp_id)
-      .maybeSingle();
-
-    if (errorCxp || !cxp) {
-      throw new NotFoundException('Cuenta por pagar no encontrada');
-    }
-
-    const proveedorNombre: string | null =
-      (cxp as any)?.proveedor?.razon_social ?? null;
-
-    // Validar que no esté anulada
-    if (cxp.estado === 'ANULADA') {
-      throw new BadRequestException('No se puede aplicar pago a una cuenta por pagar anulada');
-    }
-
-    // Validar que no esté completamente pagada
-    if (cxp.estado === 'PAGADA' || cxp.saldo <= 0) {
-      throw new BadRequestException('La cuenta por pagar ya está completamente pagada');
-    }
-
-    // Validar que el monto no exceda el saldo pendiente
-    if (dto.monto > cxp.saldo) {
-      throw new BadRequestException(
-        `El monto del pago (${dto.monto}) no puede ser mayor al saldo pendiente (${cxp.saldo})`,
-      );
-    }
-
-    const requiereBancarizacion = this.validarBancarizacionPago({
-      moneda: cxp.moneda,
-      montoPago: dto.monto,
-      totalOperacion: cxp.total,
-      metodoPago: dto.metodo_pago,
-      cuentaBancariaId: dto.cuenta_bancaria_id,
-      referencia: dto.referencia,
-    });
-
-    // Valuación en moneda local antes de tocar nada: si falta la cotización, el
-    // pago se rechaza aquí y no deja escrituras a medias.
-    const valuacion = await this.valuarPago({
-      tenantId,
-      moneda: cxp.moneda,
-      monto: dto.monto,
-      fechaPago: dto.fecha_pago,
-      tipoCambioOrigen: (cxp as any).tipo_cambio_origen,
-    });
-
-    // Si se especificó cuenta bancaria, validar que existe y tiene saldo suficiente
-    let cuentaBancaria: any = null;
-    let saldoCuentaAnterior: number | null = null;
-    let saldoCuentaNuevo: number | null = null;
-    if (dto.cuenta_bancaria_id) {
-      const { data: cuenta, error: errorCuenta } = await client
-        .from('cuentas_bancarias')
-        .select('id, nombre, saldo, moneda, permite_sobregiro')
-        .eq('tenant_id', tenantId)
-        .eq('id', dto.cuenta_bancaria_id)
-        .maybeSingle();
-
-      if (errorCuenta || !cuenta) {
-        throw new BadRequestException('Cuenta bancaria no encontrada');
-      }
-
-      cuentaBancaria = cuenta;
-
-      // Validar que la moneda coincida
-      if (cuenta.moneda !== cxp.moneda) {
-        throw new BadRequestException(
-          `La moneda de la cuenta bancaria (${cuenta.moneda}) no coincide con la moneda de la CxP (${cxp.moneda})`,
-        );
-      }
-
-      // ✅ VALIDACIÓN DE SALDO NEGATIVO (CONFIGURABLE)
-      // Si la cuenta NO permite sobregiro, validar saldo suficiente antes del pago
-      if (!cuenta.permite_sobregiro && cuenta.saldo < dto.monto) {
-        throw new BadRequestException(
-          `Saldo insuficiente en la cuenta bancaria. Saldo disponible: ${cuenta.saldo}, Monto requerido: ${dto.monto}`,
-        );
-      }
-    }
-
-    // Iniciar transacción: actualizar CxP, crear movimiento bancario, actualizar saldo cuenta
-    try {
-      // 1. Calcular nuevo saldo de la CxP
-      const nuevoSaldo = this.round2(cxp.saldo - dto.monto);
-
-      // 2. Determinar nuevo estado de la CxP
-      let nuevoEstado: string;
-      if (nuevoSaldo === 0) {
-        nuevoEstado = 'PAGADA';
-      } else if (nuevoSaldo < cxp.total) {
-        nuevoEstado = 'PARCIAL';
-      } else {
-        nuevoEstado = cxp.estado;
-      }
-
-      // 3. HARDENING: Optimistic concurrency — si otro pago ya cambio el saldo, falla
-      const saldoAnterior = cxp.saldo;
-      const updateCxpData: Record<string, any> = {
-        saldo: nuevoSaldo,
-        estado: nuevoEstado,
-        ultimo_pago: dto.fecha_pago,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (requiereBancarizacion) {
-        updateCxpData.bancarizacion_requerida = true;
-        updateCxpData.bancarizacion_validada = true;
-        updateCxpData.bancarizacion_medio_pago = dto.metodo_pago;
-        updateCxpData.bancarizacion_referencia = dto.referencia?.trim() ?? null;
-      }
-
-      const { data: cxpActualizada, error: errorActualizar } = await client
-        .from('cuentas_por_pagar')
-        .update(updateCxpData)
-        .eq('tenant_id', tenantId)
-        .eq('id', dto.cxp_id)
-        .eq('saldo', saldoAnterior)
-        .select()
-        .single();
-
-      if (errorActualizar) {
-        // PGRST116 = no rows returned — means another payment already changed the saldo
-        if (errorActualizar.code === 'PGRST116') {
-          throw new BadRequestException(
-            'Conflicto de concurrencia: el saldo de la CxP fue modificado por otro pago simultáneo. Intente de nuevo.'
-          );
-        }
-        console.error('Error actualizando cuenta por pagar:', errorActualizar);
-        throw new BadRequestException('No se pudo aplicar el pago a la cuenta por pagar');
-      }
-
-      // 4. Si hay cuenta bancaria, crear movimiento bancario y actualizar saldo
-      let movimientoBancario: any = null;
-      const descripcionPago = `Pago a proveedor ${proveedorNombre ?? cxp.proveedor_id} - Doc: ${cxp.numero_documento}`;
-
-      if (dto.cuenta_bancaria_id && cuentaBancaria) {
-        const saldoActualCuenta = this.round2(Number(cuentaBancaria.saldo ?? 0));
-        saldoCuentaAnterior = saldoActualCuenta;
-        const nuevoSaldoBanco = this.round2(saldoActualCuenta - dto.monto);
-        saldoCuentaNuevo = nuevoSaldoBanco;
-
-        const { data: movimiento, error: errorMovimiento } = await client
-          .from('movimientos_bancarios')
-          .insert({
-            tenant_id: tenantId,
-            cuenta_bancaria_id: dto.cuenta_bancaria_id,
-            tipo: 'CARGO',
-            monto: this.round2(dto.monto),
-            fecha: dto.fecha_pago,
-            descripcion: descripcionPago,
-            referencia: dto.referencia || null,
-            metodo_pago: dto.metodo_pago,
-            cxp_id: dto.cxp_id,
-            proveedor_id: cxp.proveedor_id,
-            idempotency_key: submittedIdempotencyKey,
-            conciliado: false,
-            saldo_anterior: saldoCuentaAnterior,
-            saldo_nuevo: saldoCuentaNuevo,
-            created_by: userId || null,
-            created_at: new Date().toISOString(),
-          })
-          .select(
-            `*,
-             proveedores:proveedores!movimientos_bancarios_proveedor_id_fkey(id, razon_social, ruc)`
-          )
-          .single();
-
-        if (errorMovimiento) {
-          console.error('Error creando movimiento bancario:', errorMovimiento);
-          await client
-            .from('cuentas_por_pagar')
-            .update({
-              saldo: cxp.saldo,
-              estado: cxp.estado,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('tenant_id', tenantId)
-            .eq('id', dto.cxp_id);
-          throw new BadRequestException('No se pudo crear el movimiento bancario');
-        }
-
-        movimientoBancario = movimiento;
-
-        const { error: errorSaldoBanco } = await client
-          .from('cuentas_bancarias')
-          .update({
-            saldo: nuevoSaldoBanco,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('tenant_id', tenantId)
-          .eq('id', dto.cuenta_bancaria_id);
-
-        if (errorSaldoBanco) {
-          console.error('Error actualizando saldo de cuenta bancaria:', errorSaldoBanco);
-          await client.from('movimientos_bancarios').delete().eq('id', movimiento.id);
-          await client
-            .from('cuentas_por_pagar')
-            .update({
-              saldo: cxp.saldo,
-              estado: cxp.estado,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('tenant_id', tenantId)
-            .eq('id', dto.cxp_id);
-
-          throw new BadRequestException('No se pudo actualizar el saldo de la cuenta bancaria');
-        }
-
-        try {
-          this.eventBus.emitMovimientoBancarioRegistrado({
-            tenantId,
-            movimientoId: movimiento.id,
-            cuentaBancariaId: dto.cuenta_bancaria_id,
-            cuentaBancariaNombre: cuentaBancaria.nombre,
-            tipo: 'CARGO',
-            monto: this.round2(dto.monto),
-            moneda: cuentaBancaria.moneda,
-            fecha: dto.fecha_pago,
-            descripcion: descripcionPago,
-            referencia: dto.referencia || null,
-            metodoPago: dto.metodo_pago,
-            proveedorId: cxp.proveedor_id,
-            proveedorNombre: proveedorNombre ?? movimiento.proveedores?.razon_social ?? null,
-            cxpId: dto.cxp_id,
-            saldoAnterior: saldoCuentaAnterior,
-            saldoNuevo: saldoCuentaNuevo,
-            createdBy: userId || undefined,
-          });
-        } catch (errorMovimientoEvento) {
-          console.error('❌ Error emitiendo evento MovimientoBancarioRegistrado:', errorMovimientoEvento);
-        }
-      }
-
-      // 5. Emitir evento PagoProveedorRegistrado endurecido
-      try {
-        const pagoId = movimientoBancario?.id ?? uuidv4();
-        const eventId = uuidv4();
-        const idempotencyKey =
-          dto.idempotency_key ??
-          `tesoreria:pago:${tenantId}:${dto.cxp_id}:${pagoId}`;
-
-        this.eventBus.emitPagoProveedorRegistrado({
-          tenantId,
-          eventId,
-          idempotencyKey,
-          cxpId: dto.cxp_id,
-          pagoId,
-          proveedorId: cxp.proveedor_id,
-          proveedorNombre: proveedorNombre ?? cxp.proveedor_id,
-          numeroDocumento: cxp.numero_documento,
-          monto: this.round2(dto.monto),
-          moneda: cxp.moneda,
-          // Valuación en moneda local: el asiento se arma con estos importes,
-          // no con el monto en moneda del documento.
-          tipoCambio: valuacion.tipoCambio,
-          montoContabilizado: valuacion.montoContabilizado,
-          montoLiquidacion: valuacion.montoLiquidacion,
-          diferenciaCambio: valuacion.diferenciaCambio,
-          fecha: dto.fecha_pago,
-          metodoPago: dto.metodo_pago,
-          cuentaBancariaId: dto.cuenta_bancaria_id ?? null,
-          cuentaBancariaNombre: cuentaBancaria?.nombre ?? null,
-          referencia: dto.referencia ?? null,
-          observaciones: dto.observaciones ?? null,
-          saldoAnterior: cxp.saldo,
-          saldoNuevo: nuevoSaldo,
-          estadoAnterior: cxp.estado,
-          estadoNuevo: nuevoEstado,
-          createdBy: userId ?? null,
-          movimientoBancarioId: movimientoBancario?.id ?? null,
-          cuentaSaldoAnterior: saldoCuentaAnterior,
-          cuentaSaldoNuevo: saldoCuentaNuevo,
-          source: 'tesoreria.registrarPago',
-        });
-        console.log('✅ Evento PagoProveedorRegistrado emitido exitosamente');
-      } catch (errorEvento) {
-        console.error('❌ Error emitiendo evento PagoProveedorRegistrado:', errorEvento);
-        // No fallar la operación si el evento no se pudo emitir
-      }
-
-      return {
-        success: true,
-        data: {
-          cxp: cxpActualizada,
-          pago: {
-            monto: this.round2(dto.monto),
-            fecha_pago: dto.fecha_pago,
-            metodo_pago: dto.metodo_pago,
-            referencia: dto.referencia,
-            cuenta_bancaria_id: dto.cuenta_bancaria_id,
-            saldo_anterior: cxp.saldo,
-            saldo_nuevo: nuevoSaldo,
-            estado_anterior: cxp.estado,
-            estado_nuevo: nuevoEstado,
-            pago_id: movimientoBancario?.id ?? null,
-            cuenta_saldo_anterior: saldoCuentaAnterior,
-            cuenta_saldo_nuevo: saldoCuentaNuevo,
-          },
-          movimiento_bancario: movimientoBancario,
-        },
-      };
-    } catch (error) {
-      console.error('Error en transacción de pago:', error);
-      throw error;
-    }
   }
 
   async listarPagos(
@@ -768,8 +397,18 @@ export class TesoreriaService {
       throw new BadRequestException('Debe incluir al menos un pago en el lote');
     }
 
-    // Generar ID de lote si no se proporciona referencia
-    const loteId = dto.referencia_lote || dto.idempotency_key || `LOTE-${new Date().getTime()}`;
+    const idempotencyKey = dto.idempotency_key?.trim();
+    if (!userId) {
+      throw new BadRequestException('El actor autenticado es obligatorio para registrar el lote');
+    }
+    if (!idempotencyKey) {
+      throw new BadRequestException('La llave de idempotencia es obligatoria para registrar el lote');
+    }
+
+    const loteId = dto.referencia_lote?.trim();
+    if (!loteId) {
+      throw new BadRequestException('La referencia bancaria del lote es obligatoria');
+    }
     if (String(dto.metodo_pago || '').trim().toUpperCase() === 'EFECTIVO') {
       throw new BadRequestException('Los pagos en lote a proveedores deben registrarse con medio de pago bancarizado');
     }
@@ -781,46 +420,7 @@ export class TesoreriaService {
     }));
 
     try {
-      const { data: movimientosExistentes, error: existingError } = await client
-        .from('movimientos_bancarios')
-        .select('id, cxp_id, monto, saldo_anterior, saldo_nuevo, referencia, fecha')
-        .eq('tenant_id', tenantId)
-        .eq('cuenta_bancaria_id', dto.cuenta_bancaria_id)
-        .eq('referencia', loteId)
-        .eq('tipo', 'CARGO');
-
-      if (existingError) {
-        console.error('Error verificando idempotencia de lote de pagos:', existingError);
-        throw new BadRequestException(existingError.message || 'Error verificando lote de pagos existente');
-      }
-
-      if (Array.isArray(movimientosExistentes) && movimientosExistentes.length > 0) {
-        return {
-          success: true,
-          data: {
-            success: true,
-            idempotent_replay: true,
-            referencia_lote: loteId,
-            total_procesado: movimientosExistentes.reduce(
-              (sum: number, movimiento: any) => sum + Number(movimiento.monto || 0),
-              0,
-            ),
-            cantidad_pagos: movimientosExistentes.length,
-            pagos: movimientosExistentes.map((movimiento: any) => ({
-              cxp_id: movimiento.cxp_id,
-              movimiento_bancario_id: movimiento.id,
-              monto: Number(movimiento.monto || 0),
-              saldo_anterior: movimiento.saldo_anterior,
-              saldo_nuevo: movimiento.saldo_nuevo,
-              referencia: movimiento.referencia,
-              fecha: movimiento.fecha,
-            })),
-          },
-        };
-      }
-
-      // Llamar a la función de PostgreSQL que procesa el lote en una transacción atómica
-      const { data, error } = await client.rpc('procesar_pago_lote', {
+      const { data: rpcData, error: rpcError } = await client.rpc('procesar_pago_lote', {
         p_tenant_id: tenantId,
         p_cuenta_bancaria_id: dto.cuenta_bancaria_id,
         p_fecha_pago: dto.fecha_pago,
@@ -828,146 +428,18 @@ export class TesoreriaService {
         p_referencia_lote: loteId,
         p_observaciones: dto.observaciones || null,
         p_pagos: pagosArray,
-        p_created_by: userId || null,
+        p_created_by: userId,
+        p_idempotency_key: idempotencyKey,
       });
 
-      if (error) {
-        console.error('Error procesando lote de pagos:', error);
-        throw new BadRequestException(error.message || 'Error procesando lote de pagos');
+      if (rpcError) {
+        throw new BadRequestException(rpcError.message || 'Error procesando lote de pagos');
       }
-
-      if (!data || !data.success) {
+      if (!rpcData?.success) {
         throw new BadRequestException('Error procesando lote de pagos');
       }
 
-      // Emitir eventos para cada pago procesado
-      if (data.pagos && Array.isArray(data.pagos) && data.pagos.length > 0) {
-        const cxpIds = Array.from(new Set(data.pagos.map((p: any) => p.cxp_id)));
-        const cxpDetallesMap = new Map<string, any>();
-
-        if (cxpIds.length > 0) {
-          const { data: cxpDetalles, error: errorDetalles } = await client
-            .from('cuentas_por_pagar')
-            .select(`
-              id,
-              proveedor_id,
-              numero_documento,
-              moneda,
-              proveedor:proveedores!cuentas_por_pagar_proveedor_id_fkey(
-                id,
-                razon_social
-              )
-            `)
-            .eq('tenant_id', tenantId)
-            .in('id', cxpIds);
-
-          if (errorDetalles) {
-            console.error('❌ Error obteniendo detalles de CxP para eventos de lote:', errorDetalles);
-          } else if (cxpDetalles) {
-            for (const detalle of cxpDetalles) {
-              cxpDetallesMap.set(detalle.id, detalle);
-            }
-          }
-        }
-
-        let cuentaSaldoCursor =
-          data?.cuenta_bancaria?.saldo_anterior !== undefined
-            ? this.round2(Number(data.cuenta_bancaria.saldo_anterior))
-            : null;
-
-        for (const pago of data.pagos) {
-          const cxpDetalle = cxpDetallesMap.get(pago.cxp_id) || {};
-          const proveedorId = cxpDetalle.proveedor_id ?? null;
-          const proveedorNombrePago =
-            pago.proveedor ??
-            cxpDetalle?.proveedor?.razon_social ??
-            proveedorId;
-          const numeroDocumento = cxpDetalle.numero_documento ?? pago.numero_documento ?? null;
-          const monedaPago = cxpDetalle.moneda ?? 'PEN';
-
-          const movimientoId = pago.movimiento_bancario_id ?? null;
-          const pagoId = movimientoId ?? uuidv4();
-          const eventId = uuidv4();
-          const idempotencyKey = `tesoreria:pago-lote:${tenantId}:${loteId}:${pago.cxp_id}:${pagoId}`;
-
-          const cuentaSaldoAnteriorPago = cuentaSaldoCursor;
-          const cuentaSaldoNuevoPago =
-            cuentaSaldoAnteriorPago !== null
-              ? this.round2(cuentaSaldoAnteriorPago - pago.monto)
-              : null;
-
-          if (cuentaSaldoCursor !== null && cuentaSaldoNuevoPago !== null) {
-            cuentaSaldoCursor = cuentaSaldoNuevoPago;
-          }
-
-          try {
-            this.eventBus.emitPagoProveedorRegistrado({
-              tenantId,
-              eventId,
-              idempotencyKey,
-              cxpId: pago.cxp_id,
-              pagoId,
-              proveedorId,
-              proveedorNombre: proveedorNombrePago ?? proveedorId ?? null,
-              numeroDocumento: numeroDocumento ?? undefined,
-              monto: this.round2(pago.monto),
-              moneda: monedaPago,
-              fecha: dto.fecha_pago,
-              metodoPago: dto.metodo_pago,
-              cuentaBancariaId: dto.cuenta_bancaria_id,
-              cuentaBancariaNombre: data?.cuenta_bancaria?.nombre ?? null,
-              referencia: loteId,
-              observaciones: dto.observaciones ?? null,
-              saldoAnterior: pago.saldo_anterior,
-              saldoNuevo: pago.saldo_nuevo,
-              estadoAnterior: pago.estado_anterior,
-              estadoNuevo: pago.estado_nuevo,
-              createdBy: userId ?? null,
-              movimientoBancarioId: movimientoId,
-              cuentaSaldoAnterior: cuentaSaldoAnteriorPago,
-              cuentaSaldoNuevo: cuentaSaldoNuevoPago,
-              loteId,
-              source: 'tesoreria.registrarPagoLote',
-            });
-          } catch (errorEvento) {
-            console.error('❌ Error emitiendo evento PagoProveedorRegistrado:', errorEvento);
-          }
-
-          if (movimientoId) {
-            try {
-              const descripcionMovimiento =
-                `${loteId} - Pago a ${proveedorNombrePago ?? proveedorId ?? pago.cxp_id}`;
-
-              this.eventBus.emitMovimientoBancarioRegistrado({
-                tenantId,
-                movimientoId,
-                cuentaBancariaId: dto.cuenta_bancaria_id,
-                cuentaBancariaNombre: data?.cuenta_bancaria?.nombre ?? null,
-                tipo: 'CARGO',
-                monto: this.round2(pago.monto),
-                moneda: monedaPago,
-                fecha: dto.fecha_pago,
-                descripcion: descripcionMovimiento,
-                referencia: loteId,
-                metodoPago: dto.metodo_pago,
-                proveedorId,
-                proveedorNombre: proveedorNombrePago ?? null,
-                cxpId: pago.cxp_id,
-                saldoAnterior: cuentaSaldoAnteriorPago ?? this.round2(pago.saldo_anterior ?? 0),
-                saldoNuevo: cuentaSaldoNuevoPago ?? this.round2(pago.saldo_nuevo ?? 0),
-                createdBy: userId ?? undefined,
-              });
-            } catch (errorMovimientoEvento) {
-              console.error('❌ Error emitiendo evento MovimientoBancarioRegistrado (lote):', errorMovimientoEvento);
-            }
-          }
-        }
-      }
-
-      return {
-        success: true,
-        data: data,
-      };
+      return { success: true, data: rpcData };
     } catch (error) {
       console.error('Error en transacción de pago en lote:', error);
 
@@ -1261,51 +733,6 @@ export class TesoreriaService {
     return Math.round(value * 100) / 100;
   }
 
-  private validarBancarizacionPago(input: {
-    moneda: string;
-    montoPago: number;
-    totalOperacion?: number | null;
-    metodoPago?: string | null;
-    cuentaBancariaId?: string | null;
-    referencia?: string | null;
-  }): boolean {
-    const moneda = String(input.moneda || 'PEN').trim().toUpperCase();
-    const montoBase = Math.max(
-      Number(input.montoPago || 0),
-      Number(input.totalOperacion || 0),
-    );
-    const umbral =
-      moneda === 'PEN'
-        ? BANCARIZACION_PEN_MIN
-        : moneda === 'USD'
-          ? BANCARIZACION_USD_MIN
-          : null;
-
-    if (umbral === null || montoBase < umbral) {
-      return false;
-    }
-
-    const metodoPago = String(input.metodoPago || '').trim().toUpperCase();
-    if (metodoPago === 'EFECTIVO') {
-      throw new BadRequestException(
-        `La operación ${moneda} ${montoBase.toFixed(2)} supera el umbral de bancarización (${moneda} ${umbral.toFixed(2)}); no puede pagarse en efectivo`,
-      );
-    }
-
-    if (!input.cuentaBancariaId) {
-      throw new BadRequestException(
-        `La operación ${moneda} ${montoBase.toFixed(2)} requiere cuenta bancaria por bancarización`,
-      );
-    }
-
-    if (!input.referencia?.trim()) {
-      throw new BadRequestException(
-        `La operación ${moneda} ${montoBase.toFixed(2)} requiere referencia bancaria por bancarización`,
-      );
-    }
-
-    return true;
-  }
 
   private normalizarMontoPago(value: number): number {
     const amount = Number(value);

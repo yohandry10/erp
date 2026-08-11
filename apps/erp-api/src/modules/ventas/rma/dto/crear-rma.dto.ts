@@ -6,7 +6,9 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 
@@ -14,8 +16,9 @@ export class CrearRmaItemDto {
   @IsUUID('4', { message: 'detalle_id debe ser un UUID válido' })
   detalle_id!: string;
 
+  @IsOptional()
   @IsUUID('4', { message: 'producto_id debe ser un UUID válido' })
-  producto_id!: string;
+  producto_id?: string;
 
   @IsNumber({}, { message: 'La cantidad debe ser numérica' })
   @Min(0.01, { message: 'La cantidad debe ser mayor a cero' })
@@ -23,6 +26,7 @@ export class CrearRmaItemDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   motivo_item?: string;
 
   @IsOptional()
@@ -38,9 +42,14 @@ export class CrearRmaDto {
   @IsUUID('4', { message: 'pedido_id debe ser un UUID válido' })
   pedido_id!: string;
 
-  @IsOptional()
   @IsString()
-  motivo_general?: string;
+  @MinLength(3)
+  @MaxLength(1000)
+  motivo_general!: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: 'documento_origen_id debe ser un UUID válido' })
+  documento_origen_id?: string;
 
   @IsOptional()
   @IsUUID('4', { message: 'almacen_retorno_id debe ser un UUID válido' })

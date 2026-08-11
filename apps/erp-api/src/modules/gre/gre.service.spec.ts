@@ -8,7 +8,6 @@ function buildService() {
     { on: jest.fn(), emit: jest.fn(), eventEmitter: { eventNames: () => [] } } as any,
     {} as any,
     {} as any,
-    {} as any,
   );
 }
 
@@ -29,6 +28,64 @@ function validGre(overrides: Partial<CreateGuiaRemisionDto> = {}): CreateGuiaRem
 }
 
 describe('GreService validaciones de creación', () => {
+  it('aplica modalidad y fechas canónicas al listar GRE', async () => {
+    const response = { data: [], error: null };
+    const chain: any = {
+      select: jest.fn(), eq: jest.fn(), order: jest.fn(), limit: jest.fn(),
+      gte: jest.fn(), lte: jest.fn(), or: jest.fn(),
+      then: (resolve: (value: any) => void) => Promise.resolve(response).then(resolve),
+    };
+    for (const method of ['select', 'eq', 'order', 'limit', 'gte', 'lte', 'or']) {
+      chain[method].mockReturnValue(chain);
+    }
+    const service = new GreService(
+      { getClient: jest.fn(() => ({ from: jest.fn(() => chain) })) } as any,
+      { on: jest.fn(), emit: jest.fn(), eventEmitter: { eventNames: () => [] } } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.findAllGuias('tenant-1', {
+      modalidad: 'TRANSPORTE_PRIVADO', desde: '2026-08-01', hasta: '2026-08-31',
+    });
+
+    expect(chain.eq).toHaveBeenCalledWith('modalidad', 'TRANSPORTE_PRIVADO');
+    expect(chain.gte).toHaveBeenCalledWith('fecha_traslado', '2026-08-01');
+    expect(chain.lte).toHaveBeenCalledWith('fecha_traslado', '2026-08-31');
+  });
+
+  it('devuelve métricas consumibles por la pantalla GRE', async () => {
+    const today = new Date().toISOString();
+    const response = {
+      data: [
+        { estado: 'FIRMADO', peso_total: 2, created_at: today },
+        { estado: 'ENVIADO', peso_total: 3, created_at: today },
+        { estado: 'ACEPTADO', peso_total: 4, created_at: '2026-01-01T00:00:00.000Z' },
+      ],
+      error: null,
+    };
+    const chain: any = {
+      select: jest.fn(), eq: jest.fn(),
+      then: (resolve: (value: any) => void) => Promise.resolve(response).then(resolve),
+    };
+    chain.select.mockReturnValue(chain);
+    chain.eq.mockReturnValue(chain);
+    const service = new GreService(
+      { getClient: jest.fn(() => ({ from: jest.fn(() => chain) })) } as any,
+      { on: jest.fn(), emit: jest.fn(), eventEmitter: { eventNames: () => [] } } as any,
+      {} as any,
+      {} as any,
+    );
+
+    await expect(service.getStats('tenant-1')).resolves.toEqual(expect.objectContaining({
+      totalGre: 3,
+      greEmitidas: 2,
+      enTransito: 2,
+      completados: 1,
+      pesoTotal: 9,
+    }));
+  });
+
   it('rechaza GRE sin datos obligatorios', () => {
     const service = buildService() as any;
 
@@ -47,39 +104,37 @@ describe('GreService validaciones de creación', () => {
       .toThrow(/peso total/i);
   });
 
-  it('rechaza GRE sin ubigeo de destino SUNAT válido', () => {
+  it('permite alta interna sin ubigeo y difiere la validación UBL hasta firmar', () => {
     const service = buildService() as any;
 
     expect(() => service.assertCreateGreDataValida(validGre({ ubigeoDestino: '' })))
-      .toThrow(/ubigeo de destino/i);
-    expect(() => service.assertCreateGreDataValida(validGre({ ubigeoDestino: '15010' })))
-      .toThrow(/6 dígitos/i);
+      .not.toThrow();
   });
 
-  it('exige transportista para transporte público y placa/licencia para privado', () => {
+  it('permite BORRADOR sin credenciales de transporte y valida el UBL al firmar', () => {
     const service = buildService() as any;
 
     expect(() => service.assertCreateGreDataValida(validGre({ transportista: '' })))
-      .toThrow(/transportista/i);
+      .not.toThrow();
     expect(() => service.assertCreateGreDataValida(validGre({
       modalidad: 'TRANSPORTE_PRIVADO',
       transportista: undefined,
       transportistaDocumento: undefined,
       placaVehiculo: '',
       licenciaConducir: 'Q12345678',
-    }))).toThrow(/placa/i);
+    }))).not.toThrow();
     expect(() => service.assertCreateGreDataValida(validGre({
       modalidad: 'TRANSPORTE_PRIVADO',
       transportista: undefined,
       transportistaDocumento: undefined,
       placaVehiculo: 'ABC123',
       licenciaConducir: '',
-    }))).toThrow(/licencia/i);
+    }))).not.toThrow();
     expect(() => service.assertCreateGreDataValida(validGre({
       modalidad: 'TRANSPORTE_PUBLICO',
       transportista: 'Transportes Auditados SAC',
       transportistaDocumento: '',
-    }))).toThrow(/RUC válido del transportista/i);
+    }))).not.toThrow();
   });
 
   it('acepta GRE manual válida', () => {
@@ -108,7 +163,6 @@ describe('GreService validaciones de creación', () => {
     const service = new GreService(
       { getClient: jest.fn(() => ({ from: jest.fn(() => chain) })) } as any,
       { on: jest.fn(), emit: jest.fn(), eventEmitter: { eventNames: () => [] } } as any,
-      {} as any,
       {} as any,
       {} as any,
     );

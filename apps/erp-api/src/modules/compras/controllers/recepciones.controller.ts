@@ -15,13 +15,13 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { RecepcionesService } from '../services/recepciones.service';
-import { CreateRecepcionDto, CerrarRecepcionDto } from '../dto';
+import { CreateRecepcionDto, CerrarRecepcionDto, UpdateRecepcionDto } from '../dto';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 
 /**
  * RecepcionesController
- * Controlador para gestionar recepciones de mercancía de órdenes de compra
+ * Controlador para gestionar recepciones de bienes y servicios de órdenes de compra
  * Requirements: TASK 2.5 - Implementar Módulo Recepciones (Backend)
  */
 @ApiTags('Compras - Recepciones')
@@ -78,7 +78,7 @@ export class RecepcionesController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Crear recepción',
-    description: 'Crea una nueva recepción de mercancía en estado BORRADOR para una orden de compra',
+    description: 'Crea una nueva recepción de bienes o servicios en estado BORRADOR para una orden de compra',
   })
   @ApiResponse({ status: 201, description: 'Recepción creada exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos o estado de orden no válido' })
@@ -110,7 +110,7 @@ export class RecepcionesController {
   @ApiResponse({ status: 404, description: 'Recepción no encontrada' })
   async actualizarRecepcion(
     @Param('id') recepcionId: string,
-    @Body() updateDto: Partial<CreateRecepcionDto>,
+    @Body() updateDto: UpdateRecepcionDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
@@ -126,10 +126,10 @@ export class RecepcionesController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Cerrar recepción',
-    description: 'Cierra una recepción, actualiza el inventario y el estado de la orden de compra',
+    description: 'Cierra una recepción, actualiza el cumplimiento y mueve inventario sólo cuando corresponde',
   })
   @ApiResponse({ status: 200, description: 'Recepción cerrada exitosamente' })
-  @ApiResponse({ status: 400, description: 'Solo se pueden cerrar recepciones en estado BORRADOR' })
+  @ApiResponse({ status: 400, description: 'Recepción inválida o cierre rechazado' })
   @ApiResponse({ status: 404, description: 'Recepción no encontrada' })
   async cerrarRecepcion(
     @Param('id') recepcionId: string,

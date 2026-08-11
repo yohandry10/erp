@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/use-api";
 import { useCountryContext } from "@/hooks/use-country-context";
@@ -11,6 +12,7 @@ type Producto = {
   id: string;
   codigo: string;
   nombre: string;
+  marca?: string;
   descripcion?: string;
   categoria?: string;
   precio_venta: number;
@@ -24,6 +26,7 @@ type Producto = {
   activo: boolean;
   created_at: string;
   updated_at: string;
+  imagen_url?: string;
 };
 
 type Filters = {
@@ -74,7 +77,11 @@ export default function ProductosPage() {
     if (!confirm(`¿Está seguro de eliminar el producto "${nombre}"?`)) return;
 
     try {
-      const response = await del(`/inventario/productos/${id}`);
+      const response = await del(`/inventario/productos/${id}`, {
+        headers: {
+          "Idempotency-Key": `inventory-product-deactivate:${id}:${crypto.randomUUID()}`,
+        },
+      });
       if (response?.success) {
         alert("✅ Producto eliminado exitosamente");
         loadProductos();
@@ -107,6 +114,7 @@ export default function ProductosPage() {
       const term = filters.search.toLowerCase();
       return (
         p.nombre.toLowerCase().includes(term) ||
+        p.marca?.toLowerCase().includes(term) ||
         p.codigo?.toLowerCase().includes(term) ||
         p.codigo_barras?.toLowerCase().includes(term)
       );
@@ -156,7 +164,7 @@ export default function ProductosPage() {
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, search: e.target.value }))
               }
-              placeholder="Código, nombre o código de barras"
+              placeholder="Código, nombre, marca o código de barras"
               className="w-[100%]"
             />
           </div>
@@ -292,14 +300,34 @@ export default function ProductosPage() {
                         )}
                       </td>
                       <td>
-                        <div>
-                          <strong>{producto.nombre}</strong>
-                          {producto.descripcion && (
-                            <div className="text-[0.875rem] text-[var(--primary-600)]">
-                              {producto.descripcion.substring(0, 50)}
-                              {producto.descripcion.length > 50 && "..."}
-                            </div>
-                          )}
+                        <div className="flex min-w-56 items-center gap-3">
+                          <div className="relative size-12 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/30">
+                            {producto.imagen_url ? (
+                              <Image
+                                src={producto.imagen_url}
+                                alt={`Imagen de ${producto.nombre}`}
+                                fill
+                                unoptimized
+                                className="object-contain"
+                              />
+                            ) : (
+                              <Package className="absolute inset-0 m-auto text-muted-foreground" size={22} />
+                            )}
+                          </div>
+                          <div>
+                            <strong>{producto.nombre}</strong>
+                            {producto.marca && (
+                              <div className="text-xs font-medium text-primary">
+                                Marca: {producto.marca}
+                              </div>
+                            )}
+                            {producto.descripcion && (
+                              <div className="text-[0.875rem] text-[var(--primary-600)]">
+                                {producto.descripcion.substring(0, 50)}
+                                {producto.descripcion.length > 50 && "..."}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td>{producto.categoria || "—"}</td>

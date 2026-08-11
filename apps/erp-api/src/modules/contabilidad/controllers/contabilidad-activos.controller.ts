@@ -6,6 +6,7 @@ import {
   Body,
   Query,
   Param,
+  Headers,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
@@ -79,8 +80,9 @@ export class ContabilidadActivosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
     @Body() dto: CreateActivoFijoDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.activosService.crear(tenantId, userId, dto);
+    const data = await this.activosService.crear(tenantId, userId, dto, idempotencyKey);
     return { success: true, data, message: `Activo ${data.codigo} registrado` };
   }
 
@@ -95,10 +97,12 @@ export class ContabilidadActivosController {
   @ApiResponse({ status: 200, type: ActivoFijoResponseDto })
   async actualizar(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
     @Param("id") activoId: string,
     @Body() dto: UpdateActivoFijoDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.activosService.actualizar(tenantId, activoId, dto);
+    const data = await this.activosService.actualizar(tenantId, activoId, dto, userId, idempotencyKey);
     return { success: true, data, message: `Activo ${data.codigo} actualizado` };
   }
 

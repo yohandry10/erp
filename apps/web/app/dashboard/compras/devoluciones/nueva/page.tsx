@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, Search, Plus, Trash2, AlertCircle, PackageX } from 'lucide-react'
@@ -67,6 +67,9 @@ interface DevolucionItem {
 export default function NuevaDevolucionPage() {
   const router = useRouter()
   const { get, post } = useApi()
+  const idempotencyKeyRef = useRef(
+    globalThis.crypto?.randomUUID?.() ?? `supplier-return-${Date.now()}`,
+  )
 
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -186,6 +189,7 @@ export default function NuevaDevolucionPage() {
       setFormError(null)
 
       const payload = {
+        idempotency_key: idempotencyKeyRef.current,
         recepcion_id: selectedRecepcion.id,
         orden_id: selectedRecepcion.orden_id,
         proveedor_id: selectedRecepcion.orden?.proveedor?.id,

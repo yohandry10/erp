@@ -167,7 +167,7 @@ describe('PlanCuentasService', () => {
       ).rejects.toThrow('No se encontraron las siguientes cuentas: 98, 99');
     });
 
-    it('debe crear cuentas operativas estándar faltantes para eventos contables', async () => {
+    it('falla cerrado si una cuenta operativa estándar no fue provisionada', async () => {
       const mockCuentas = [
         {
           id: '1',
@@ -180,103 +180,30 @@ describe('PlanCuentasService', () => {
           estado: 'ACTIVO'
         }
       ];
-      const cuentaClientes = {
-        id: '12-id',
-        tenant_id: 'tenant-1',
-        codigo: '12',
-        nombre: 'Cuentas por cobrar comerciales',
-        tipo: 'ACTIVO',
-        nivel: 2,
-        acepta_movimiento: true,
-        estado: 'ACTIVO'
-      };
-
       mockSupabaseClient.in.mockResolvedValueOnce({
         data: mockCuentas,
         error: null
       });
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: cuentaClientes,
-        error: null
-      });
-
-      const result = await service.obtenerCuentasPorCodigos('tenant-1', ['10', '12']);
-
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant_id: 'tenant-1',
-          codigo: '12',
-          acepta_movimiento: true,
-          estado: 'ACTIVO',
-        })
-      );
-      expect(result.get('12')).toEqual(cuentaClientes);
+      await expect(service.obtenerCuentasPorCodigos('tenant-1', ['10', '12']))
+        .rejects.toThrow('No se encontraron las siguientes cuentas: 12');
+      expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
 
-    it('reconoce la cuenta PCGE 18 requerida por gastos diferidos', async () => {
-      const cuentaAnticipada = {
-        id: '18-id',
-        tenant_id: 'tenant-1',
-        codigo: '18',
-        nombre: 'Servicios y otros contratados por anticipado',
-        tipo: 'ACTIVO',
-        nivel: 2,
-        acepta_movimiento: true,
-        estado: 'ACTIVO'
-      };
-
+    it('no crea implícitamente la cuenta PCGE 18 durante un evento', async () => {
       mockSupabaseClient.in.mockResolvedValueOnce({ data: [], error: null });
-      mockSupabaseClient.single.mockResolvedValueOnce({ data: cuentaAnticipada, error: null });
-
-      const result = await service.obtenerCuentasPorCodigos('tenant-1', ['18']);
-
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant_id: 'tenant-1',
-          codigo: '18',
-          tipo: 'ACTIVO',
-          nombre: 'Servicios y otros contratados por anticipado'
-        })
-      );
-      expect(result.get('18')).toEqual(cuentaAnticipada);
+      await expect(service.obtenerCuentasPorCodigos('tenant-1', ['18']))
+        .rejects.toThrow('No se encontraron las siguientes cuentas: 18');
+      expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
 
-    it('debe crear la cuenta operativa con nomenclatura argentina para un tenant AR', async () => {
-      const cuentaArgentina = {
-        id: '12-ar-id',
-        tenant_id: 'tenant-ar',
-        codigo: '12',
-        nombre: 'Créditos por ventas',
-        tipo: 'ACTIVO',
-        nivel: 2,
-        acepta_movimiento: true,
-        estado: 'ACTIVO',
-      };
-
+    it('no improvisa una cuenta argentina faltante durante el asiento', async () => {
       mockSupabaseClient.in.mockResolvedValueOnce({
         data: [],
         error: null,
       });
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
-        data: { pais: 'AR' },
-        error: null,
-      });
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: cuentaArgentina,
-        error: null,
-      });
-
-      const result = await service.obtenerCuentasPorCodigos('tenant-ar', ['12']);
-
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant_id: 'tenant-ar',
-          codigo: '12',
-          nombre: 'Créditos por ventas',
-          metadata: expect.objectContaining({ pais_codigo: 'AR' }),
-        }),
-      );
-      expect(result.get('12')).toEqual(cuentaArgentina);
+      await expect(service.obtenerCuentasPorCodigos('tenant-ar', ['12']))
+        .rejects.toThrow('No se encontraron las siguientes cuentas: 12');
+      expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
 
     it('debe lanzar error si alguna cuenta no acepta movimientos', async () => {

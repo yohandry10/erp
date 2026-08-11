@@ -1,15 +1,20 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { EventBusService } from '../../../shared/events/event-bus.service';
-import { CrearCuentaBancariaDto, ActualizarCuentaBancariaDto, ListarMovimientosQueryDto, CrearMovimientoBancarioDto } from './dto';
-import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
+import { CrearCuentaBancariaDto, ActualizarCuentaBancariaDto, ListarMovimientosQueryDto, CrearMovimientoBancarioDto, TransferirCuentasBancariasDto } from './dto';
 
 @Injectable()
 export class BancosService {
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly eventBus: EventBusService,
   ) {}
+
+  private bankIntent(prefix: string, value: unknown, supplied?: string): string {
+    const explicit = String(supplied ?? '').trim().toLowerCase();
+    if (explicit) return explicit;
+    const digest = createHash('sha256').update(JSON.stringify(value)).digest('hex');
+    return `${prefix}:${digest}`;
+  }
 
   private toRuntimeBoolean(value: unknown): boolean | undefined {
     if (value === undefined || value === null || value === '') return undefined;
@@ -37,7 +42,26 @@ export class BancosService {
     tenantId: string,
     dto: CrearCuentaBancariaDto,
     userId?: string,
+    idempotencyKey?: string,
   ): Promise<{ success: boolean; data: any }> {
+    if (!userId) throw new BadRequestException('La cuenta bancaria requiere un actor autenticado');
+    if (Number(dto.saldo ?? 0) !== 0) {
+      throw new BadRequestException('El saldo inicial se registra mediante el flujo contable de apertura');
+    }
+    const { data: atomicResult, error: atomicError } = await this.supabase.getClient().rpc(
+      'gestionar_cuenta_bancaria_tx',
+      {
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+        p_cuenta_id: null,
+        p_payload: dto,
+        p_idempotency_key: this.bankIntent(`bank-create:${tenantId}`, dto, idempotencyKey),
+      },
+    );
+    if (atomicError) throw new BadRequestException(atomicError.message || 'No se pudo crear la cuenta bancaria');
+    return { success: true, data: atomicResult?.cuenta ?? atomicResult };
+
+    /* istanbul ignore next -- writer legado inalcanzable, se retira tras ventana de compatibilidad */
     const client = this.supabase.getClient();
     const { data: empresaConfig } = await client
       .from('empresa_config')
@@ -79,6 +103,10 @@ export class BancosService {
       tipo_cuenta: dto.tipo_cuenta ?? 'CORRIENTE',
       moneda: dto.moneda ?? monedaDefecto,
       saldo: this.round2(saldoInicial),
+      saldo_inicial: this.round2(saldoInicial),
+      saldo_actual: this.round2(saldoInicial),
+      saldo_contable: this.round2(saldoInicial),
+      cuenta_contable_id: dto.cuenta_contable_id,
       permite_sobregiro: permiteSobregiro,
       activa: dto.activa ?? true,
       created_at: new Date().toISOString(),
@@ -158,7 +186,23 @@ export class BancosService {
     id: string,
     dto: ActualizarCuentaBancariaDto,
     userId?: string,
+    idempotencyKey?: string,
   ): Promise<{ success: boolean; data: any }> {
+    if (!userId) throw new BadRequestException('La cuenta bancaria requiere un actor autenticado');
+    const { data: atomicResult, error: atomicError } = await this.supabase.getClient().rpc(
+      'gestionar_cuenta_bancaria_tx',
+      {
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+        p_cuenta_id: id,
+        p_payload: dto,
+        p_idempotency_key: this.bankIntent(`bank-update:${tenantId}:${id}`, dto, idempotencyKey),
+      },
+    );
+    if (atomicError) throw new BadRequestException(atomicError.message || 'No se pudo actualizar la cuenta bancaria');
+    return { success: true, data: atomicResult?.cuenta ?? atomicResult };
+
+    /* istanbul ignore next -- writer legado inalcanzable, se retira tras ventana de compatibilidad */
     const client = this.supabase.getClient();
 
     // Verificar que la cuenta existe
@@ -318,233 +362,61 @@ export class BancosService {
     };
   }
 
-  /**
-   * Crea un movimiento bancario manual (ABONO o CARGO).
-   * 
-   * VALIDACIÓN DE SALDO NEGATIVO (CONFIGURABLE):
-   * - Si la cuenta NO permite sobregiro (permite_sobregiro = false):
-   *   * Los movimientos CARGO que dejen el saldo negativo serán RECHAZADOS
-   *   * Se lanza BadRequestException con mensaje de saldo insuficiente
-   * - Si la cuenta SÍ permite sobregiro (permite_sobregiro = true):
-   *   * Los movimientos CARGO pueden dejar el saldo negativo
-   *   * No hay restricción en el saldo mínimo
-   * - Los movimientos ABONO (ingresos) SIEMPRE se permiten sin restricción
-   * 
-   * Esta validación está implementada en 3 niveles:
-   * 1. Base de datos: CHECK constraint en la tabla cuentas_bancarias
-   * 2. Aplicación (BancosService): Validación antes de crear movimiento
-   * 3. Aplicación (TesoreriaService): Validación antes de procesar pagos
-   */
+  /** Alias compatible: todas las escrituras pasan por la única RPC atómica 457. */
   async crearMovimientoBancario(
     tenantId: string,
     dto: CrearMovimientoBancarioDto,
     userId?: string,
   ): Promise<{ success: boolean; data: any }> {
-    const client = this.supabase.getClient();
+    return this.registrarMovimientoBancarioAtomico(tenantId, dto, userId);
+  }
 
-    // Validar que el monto sea positivo
-    if (dto.monto <= 0) {
-      throw new BadRequestException('El monto del movimiento debe ser mayor a 0');
+  async registrarMovimientoBancarioAtomico(
+    tenantId: string,
+    dto: CrearMovimientoBancarioDto,
+    userId?: string,
+  ): Promise<{ success: boolean; data: any }> {
+    if (!userId) {
+      throw new BadRequestException('El actor autenticado es obligatorio');
     }
-
-    // Verificar que la cuenta bancaria existe y pertenece al tenant
-    const { data: cuenta, error: errorCuenta } = await client
-      .from('cuentas_bancarias')
-      .select('id, nombre, saldo, moneda, permite_sobregiro, activa')
-      .eq('tenant_id', tenantId)
-      .eq('id', dto.cuenta_bancaria_id)
-      .maybeSingle();
-
-    if (errorCuenta) {
-      console.error('Error verificando cuenta bancaria:', errorCuenta);
-      throw new BadRequestException('No se pudo verificar la cuenta bancaria');
-    }
-
-    if (!cuenta) {
-      throw new NotFoundException(`Cuenta bancaria con ID ${dto.cuenta_bancaria_id} no encontrada`);
-    }
-
-    if (!cuenta.activa) {
-      throw new BadRequestException('No se pueden crear movimientos en una cuenta bancaria inactiva');
-    }
-
-    // Si es un proveedor, verificar que existe
-    if (dto.proveedor_id) {
-      const { data: proveedor, error: errorProveedor } = await client
-        .from('proveedores')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('id', dto.proveedor_id)
-        .maybeSingle();
-
-      if (errorProveedor || !proveedor) {
-        throw new BadRequestException('Proveedor no encontrado');
-      }
-    }
-
-    // Calcular el nuevo saldo de la cuenta bancaria
-    const montoRedondeado = this.round2(dto.monto);
-    let nuevoSaldo: number;
-
-    if (dto.tipo === 'ABONO') {
-      // ABONO = ingreso, suma al saldo
-      nuevoSaldo = this.round2(cuenta.saldo + montoRedondeado);
-    } else {
-      // CARGO = egreso, resta del saldo
-      nuevoSaldo = this.round2(cuenta.saldo - montoRedondeado);
-
-      // ✅ VALIDACIÓN DE SALDO NEGATIVO (CONFIGURABLE)
-      // Si la cuenta NO permite sobregiro, validar que el saldo no quede negativo
-      if (!cuenta.permite_sobregiro && nuevoSaldo < 0) {
-        throw new BadRequestException(
-          `Saldo insuficiente en la cuenta bancaria. Saldo disponible: ${cuenta.saldo}, Monto requerido: ${montoRedondeado}`,
-        );
-      }
-    }
-
-    // Crear el movimiento bancario
-    const movimientoData = {
-      tenant_id: tenantId,
-      cuenta_bancaria_id: dto.cuenta_bancaria_id,
-      tipo: dto.tipo,
-      monto: montoRedondeado,
-      fecha: dto.fecha,
-      descripcion: dto.descripcion,
-      referencia: dto.referencia || null,
-      metodo_pago: dto.metodo_pago || null,
-      proveedor_id: dto.proveedor_id || null,
-      cxp_id: null, // Los movimientos manuales no están vinculados a CxP
-      conciliado: false,
-      created_by: userId || null,
-      created_at: new Date().toISOString(),
-    };
-
-    const { data: movimiento, error: errorMovimiento } = await client
-      .from('movimientos_bancarios')
-      .insert(movimientoData)
-      .select('*, proveedores(id, razon_social, ruc)')
-      .single();
-
-    if (errorMovimiento) {
-      console.error('Error creando movimiento bancario:', errorMovimiento);
-      throw new BadRequestException('No se pudo crear el movimiento bancario');
-    }
-
-    // Actualizar el saldo de la cuenta bancaria
-    const { error: errorActualizarSaldo } = await client
-      .from('cuentas_bancarias')
-      .update({
-        saldo: nuevoSaldo,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .eq('id', dto.cuenta_bancaria_id);
-
-    if (errorActualizarSaldo) {
-      console.error('Error actualizando saldo de cuenta bancaria:', errorActualizarSaldo);
-      
-      // Revertir el movimiento bancario creado
-      await client
-        .from('movimientos_bancarios')
-        .delete()
-        .eq('id', movimiento.id);
-
-      throw new BadRequestException('No se pudo actualizar el saldo de la cuenta bancaria');
-    }
-
-    // Emitir evento MovimientoBancarioRegistrado
-    try {
-      this.eventBus.emitMovimientoBancarioRegistrado({
-        tenantId,
-        movimientoId: movimiento.id,
-        cuentaBancariaId: dto.cuenta_bancaria_id,
-        cuentaBancariaNombre: cuenta.nombre,
-        tipo: dto.tipo,
-        monto: montoRedondeado,
-        moneda: cuenta.moneda,
-        fecha: dto.fecha,
-        descripcion: dto.descripcion,
-        referencia: dto.referencia,
-        metodoPago: dto.metodo_pago,
-        proveedorId: dto.proveedor_id,
-        proveedorNombre: movimiento.proveedores?.razon_social,
-        cxpId: null, // Movimientos manuales no están vinculados a CxP
-        saldoAnterior: cuenta.saldo,
-        saldoNuevo: nuevoSaldo,
-        createdBy: userId,
-      });
-      console.log('✅ Evento MovimientoBancarioRegistrado emitido exitosamente');
-    } catch (errorEvento) {
-      console.error('❌ Error emitiendo evento MovimientoBancarioRegistrado:', errorEvento);
-      // No fallar la operación si el evento no se pudo emitir
-    }
-
-    // Insertar en outbox_events para procesamiento asíncrono
-    const eventoPayload = {
-      tenant_id: tenantId,
-      movimiento_id: movimiento.id,
-      cuenta_bancaria_id: dto.cuenta_bancaria_id,
-      cuenta_bancaria_nombre: cuenta.nombre,
-      tipo: dto.tipo,
-      monto: montoRedondeado,
-      moneda: cuenta.moneda,
-      fecha: dto.fecha,
-      descripcion: dto.descripcion,
-      referencia: dto.referencia || null,
-      metodo_pago: dto.metodo_pago || null,
-      proveedor_id: dto.proveedor_id || null,
-      proveedor_nombre: movimiento.proveedores?.razon_social || null,
-      cxp_id: null,
-      saldo_anterior: cuenta.saldo,
-      saldo_nuevo: nuevoSaldo,
-      created_by: userId || null,
-    };
-
-    const eventToInsert = OutboxEventBuilder.build({
-      tenantId,
-      eventType: 'MovimientoBancarioRegistrado',
-      aggregateType: 'MovimientoBancario',
-      aggregateId: movimiento.id,
-      idempotencyKey: `bancos.movimiento:${tenantId}:${movimiento.id}`,
-      eventData: eventoPayload,
-    });
-
-    const { error: errorOutbox } = await client
-      .from('outbox_events')
-      .insert(eventToInsert);
-
-    if (errorOutbox) {
-      console.error('Error insertando evento en outbox:', errorOutbox);
-      await client
-        .from('cuentas_bancarias')
-        .update({
-          saldo: cuenta.saldo,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('tenant_id', tenantId)
-        .eq('id', dto.cuenta_bancaria_id);
-
-      await client
-        .from('movimientos_bancarios')
-        .delete()
-        .eq('id', movimiento.id)
-        .eq('tenant_id', tenantId);
-
-      throw new BadRequestException('No se pudo registrar el evento contable del movimiento bancario');
-    }
-
-    return {
-      success: true,
-      data: {
-        ...movimiento,
-        cuenta_bancaria: {
-          id: cuenta.id,
-          nombre: cuenta.nombre,
-          saldo_anterior: cuenta.saldo,
-          saldo_nuevo: nuevoSaldo,
-        },
+    const { idempotency_key, ...payload } = dto;
+    const { data, error } = await this.supabase.getClient().rpc(
+      'registrar_movimiento_bancario_tx',
+      {
+        p_tenant_id: tenantId,
+        p_payload: payload,
+        p_actor_id: userId,
+        p_idempotency_key: idempotency_key,
       },
-    };
+    );
+    if (error) {
+      throw new BadRequestException(error.message || 'No se pudo registrar el movimiento bancario');
+    }
+    return { success: true, data };
+  }
+
+  async transferirEntreCuentas(
+    tenantId: string,
+    dto: TransferirCuentasBancariasDto,
+    userId?: string,
+  ): Promise<{ success: boolean; data: any }> {
+    if (!userId) {
+      throw new BadRequestException('El actor autenticado es obligatorio');
+    }
+    const { idempotency_key, ...payload } = dto;
+    const { data, error } = await this.supabase.getClient().rpc(
+      'transferir_entre_cuentas_bancarias_tx',
+      {
+        p_tenant_id: tenantId,
+        p_payload: payload,
+        p_actor_id: userId,
+        p_idempotency_key: idempotency_key,
+      },
+    );
+    if (error) {
+      throw new BadRequestException(error.message || 'No se pudo transferir entre cuentas');
+    }
+    return { success: true, data };
   }
 
   async obtenerSaldosConsolidados(

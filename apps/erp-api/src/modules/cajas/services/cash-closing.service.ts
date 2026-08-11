@@ -1,7 +1,6 @@
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { CashMovementsService, MovimientoCaja } from './cash-movements.service';
+import { CashMovementsService } from './cash-movements.service';
 import {
     CashReconciliationService,
     Denominaciones,
@@ -104,6 +103,7 @@ export class CashClosingService {
             .getClient()
             .from('ventas_pos')
             .select('id, numero_ticket')
+            .eq('tenant_id', tenantId)
             .eq('sesion_caja_id', sesionId)
             .eq('cpe_pendiente', true)
             .limit(5);
@@ -122,16 +122,17 @@ export class CashClosingService {
             .getClient()
             .from('ventas_pos')
             .select('id, numero_ticket, cpe_id')
+            .eq('tenant_id', tenantId)
             .eq('sesion_caja_id', sesionId)
-            .eq('cpe_id', null)
+            .is('cpe_id', null)
             .eq('cpe_pendiente', false)
             .limit(10);
 
         if (!ventasSinCpeError && ventasSinCpe && ventasSinCpe.length > 0) {
-            warnings.push(
+            errores.push(
                 `Hay ${ventasSinCpe.length} ventas sin comprobante electrónico asociado. ` +
                 `Tickets: ${ventasSinCpe.slice(0, 5).map(v => v.numero_ticket).join(', ')}${ventasSinCpe.length > 5 ? '...' : ''}. ` +
-                `Se recomienda verificar antes del cierre.`,
+                'Debe completar la emisión antes del cierre.',
             );
         }
 
@@ -146,6 +147,7 @@ export class CashClosingService {
             .getClient()
             .from('cambios_turno')
             .select('id')
+            .eq('tenant_id', tenantId)
             .eq('sesion_caja_id', sesionId)
             .eq('estado', 'EN_PROCESO')
             .maybeSingle();
@@ -159,6 +161,7 @@ export class CashClosingService {
             .getClient()
             .from('retiros_caja')
             .select('id, monto')
+            .eq('tenant_id', tenantId)
             .eq('sesion_caja_id', sesionId)
             .eq('estado_conciliacion', 'PENDIENTE');
 
@@ -236,117 +239,59 @@ export class CashClosingService {
             }
         }
 
-        // Obtener todos los movimientos para calcular hash
-        const movimientos = await this.movementsService.obtenerMovimientos(sesionId, tenantId);
-
-        // Obtener datos actuales de sesión
-        const { data: sesionActual } = await this.supabase
-            .getClient()
-            .from('sesiones_caja')
-            .select('*')
-            .eq('id', sesionId)
-            .eq('tenant_id', tenantId)
-            .single();
-
-        if (!sesionActual) {
-            throw new NotFoundException('Sesión no encontrada');
-        }
-
-        // Calcular hash de integridad
-        const hashIntegridad = this.calcularHashIntegridad(sesionActual, movimientos, datos);
-
-        // Preparar datos de cierre
-        const horaCierre = new Date().toISOString();
-        const datosCierre = {
-            estado: 'CERRADA',
-            hora_cierre: horaCierre,
-            cerrado_por: userId,
-            monto_esperado: resultadoCierre.saldo_teorico,
-            monto_contado: datos.monto_contado,
-            monto_cierre: datos.monto_contado, // Por compatibilidad
-            diferencia: resultadoCierre.diferencia,
-            denominaciones_cierre: datos.denominaciones,
-            supervisor_cierre_id: supervisorId || null,
-            razon_autorizacion: resultadoCierre.requiere_supervisor
-                ? `Diferencia de ${moneda} ${Math.abs(resultadoCierre.diferencia).toFixed(2)} (${resultadoCierre.tipo_diferencia})`
-                : null,
-            hash_integridad: hashIntegridad,
-            notas: datos.notas || null,
-            updated_at: horaCierre,
-        };
-
-        // Cerrar sesión
         const { data: sesionCerrada, error: cierreError } = await this.supabase
             .getClient()
-            .from('sesiones_caja')
-            .update(datosCierre)
-            .eq('id', sesionId)
-            .eq('tenant_id', tenantId)
-            .select()
-            .single();
+            .rpc('cerrar_caja_tx', {
+                p_tenant_id: tenantId,
+                p_sesion_id: sesionId,
+                p_actor_id: userId,
+                p_payload: {
+                    monto_contado: datos.monto_contado,
+                    denominaciones: datos.denominaciones || {},
+                    notas: datos.notas || null,
+                    supervisor_id: supervisorId || null,
+                    cierre_administrativo: false,
+                },
+            });
 
-        if (cierreError) {
-            this.logger.error(`Error cerrando sesión: ${cierreError.message}`, cierreError);
-            throw new BadRequestException(`Error al cerrar caja: ${cierreError.message}`);
+        if (cierreError || !sesionCerrada) {
+            this.logger.error(`Error cerrando sesión: ${cierreError?.message}`, cierreError);
+            throw new BadRequestException(
+                `Error al cerrar caja: ${cierreError?.message || 'respuesta vacía'}`,
+            );
         }
 
-        // Registrar en auditoría
-        await this.auditService.registrarEvento(
-            CashAuditEvent.INTENTO_CIERRE_FALLIDO, // Cambiar a EXITO en producción
-            tenantId,
-            userId,
-            sesionId,
-            {
-                parametros: {
-                    monto_esperado: resultadoCierre.saldo_teorico,
-                    monto_contado: datos.monto_contado,
-                    diferencia: resultadoCierre.diferencia,
-                    tipo_diferencia: resultadoCierre.tipo_diferencia,
-                    hash_integridad: hashIntegridad,
-                    supervisor_id: supervisorId,
-                },
-                resultado: 'COMPLETADO',
-            },
-        );
+        if (Math.abs(Number(sesionCerrada.diferencia ?? 0)) > 0.009) {
+            try {
+                await this.auditService.registrarEvento(
+                    CashAuditEvent.DIFERENCIA_DETECTADA,
+                    tenantId,
+                    userId,
+                    sesionId,
+                    {
+                        parametros: {
+                            monto_esperado: sesionCerrada.monto_esperado,
+                            monto_contado: sesionCerrada.monto_contado,
+                            diferencia: sesionCerrada.diferencia,
+                            hash_integridad: sesionCerrada.hash_integridad,
+                            supervisor_id: supervisorId,
+                        },
+                        resultado: 'COMPLETADO',
+                    },
+                );
+            } catch (auditError) {
+                this.logger.warn(
+                    `Cierre ${sesionId} confirmado, pero falló auditoría auxiliar: ${auditError?.message}`,
+                );
+            }
+        }
 
         this.logger.log(
-            `Caja cerrada exitosamente: sesión=${sesionId}, diferencia=${moneda} ${resultadoCierre.diferencia.toFixed(2)}, hash=${hashIntegridad.substring(0, 16)}...`,
+            `Caja cerrada atómicamente: sesión=${sesionId}, diferencia=${moneda} ${Number(sesionCerrada.diferencia).toFixed(2)}`,
         );
 
         return sesionCerrada as SesionCajaCerrada;
     }
-
-    /**
-     * Calcula hash SHA-256 de integridad de toda la sesión
-     * Incluye: sesión_id, apertura, todos los movimientos, cierre
-     */
-    private calcularHashIntegridad(
-        sesion: any,
-        movimientos: MovimientoCaja[],
-        datosCierre: DatosCierre,
-    ): string {
-        // Construir string de datos para hashear
-        const datosParaHash = [
-            `SESION:${sesion.id}`,
-            `APERTURA:${sesion.hora_apertura}`,
-            `MONTO_INICIO:${sesion.monto_inicio}`,
-            `CAJERO:${sesion.cajero_id || sesion.usuario_id}`,
-            // Todos los movimientos en orden
-            ...movimientos.map(
-                (m) =>
-                    `MOV:${m.secuencia}:${m.tipo_movimiento}:${m.monto}:${m.saldo_nuevo}:${m.timestamp}`,
-            ),
-            `CIERRE:${new Date().toISOString()}`,
-            `MONTO_CONTADO:${datosCierre.monto_contado}`,
-            `DENOMINACIONES:${JSON.stringify(datosCierre.denominaciones)}`,
-        ].join('|');
-
-        // Calcular SHA-256
-        const hash = createHash('sha256').update(datosParaHash).digest('hex');
-
-        return hash;
-    }
-
     /**
      * Verifica la integridad criptográfica de una sesión cerrada
      * Recalcula el hash y lo compara con el almacenado
@@ -376,25 +321,26 @@ export class CashClosingService {
             return false;
         }
 
-        // Obtener movimientos
-        const movimientos = await this.movementsService.obtenerMovimientos(sesionId, tenantId);
-
-        // Reconstruir datos de cierre
-        const datosCierre: DatosCierre = {
-            monto_contado: sesion.monto_contado,
-            denominaciones: sesion.denominaciones_cierre || { billetes: {}, monedas: {} },
-            notas: sesion.notas,
-        };
-
-        // Recalcular hash
-        const hashCalculado = this.calcularHashIntegridad(sesion, movimientos, datosCierre);
-
-        // Comparar
-        const integro = hashCalculado === sesion.hash_integridad;
+        const actorId = sesion.cajero_id || sesion.usuario_id || sesion.abierto_por;
+        if (!actorId) {
+            this.logger.error(`Sesión ${sesionId} sin actor de apertura verificable`);
+            return false;
+        }
+        const { data: integro, error } = await this.supabase.getClient().rpc(
+            'verificar_integridad_caja',
+            {
+                p_tenant_id: tenantId,
+                p_sesion_id: sesionId,
+                p_actor_id: actorId,
+            },
+        );
+        if (error) {
+            throw new BadRequestException(`No se pudo verificar la integridad: ${error.message}`);
+        }
 
         if (!integro) {
             this.logger.error(
-                `¡INTEGRIDAD COMPROMETIDA! Sesión ${sesionId}: hash almacenado=${sesion.hash_integridad.substring(0, 16)}..., hash calculado=${hashCalculado.substring(0, 16)}...`,
+                `¡INTEGRIDAD COMPROMETIDA! Sesión ${sesionId}: sesión, corte, outbox o ledger no coinciden.`,
             );
 
             // Registrar alerta crítica en auditoría
@@ -407,14 +353,13 @@ export class CashClosingService {
                     parametros: {
                         tipo: 'INTEGRIDAD_COMPROMETIDA',
                         hash_almacenado: sesion.hash_integridad,
-                        hash_calculado: hashCalculado,
                     },
                     resultado: 'ALERTA_CRITICA',
                 },
             );
         }
 
-        return integro;
+        return Boolean(integro);
     }
 
     /**
@@ -483,61 +428,11 @@ export class CashClosingService {
         razon: string,
         tenantId: string,
     ): Promise<void> {
-        this.logger.warn(`REABRIENDO SESIÓN CERRADA: ${sesionId}, admin=${adminId}, razón=${razon}`);
-
-        // Validar que adminId tenga rol ADMIN
-        const { data: adminRoles } = await this.supabase
-            .getClient()
-            .from('user_roles')
-            .select('roles(nombre)')
-            .eq('usuario_sistema_id', adminId)
-            .eq('tenant_id', tenantId);
-
-        const roleNames = (adminRoles || [])
-            .map((ur: any) => (ur.roles as any)?.nombre?.toUpperCase())
-            .filter(Boolean);
-
-        if (!roleNames.includes('ADMIN')) {
-            throw new ForbiddenException('Solo usuarios con rol ADMIN pueden reabrir sesiones cerradas');
-        }
-
-        const { data: sesion } = await this.supabase
-            .getClient()
-            .from('sesiones_caja')
-            .select('*')
-            .eq('id', sesionId)
-            .eq('tenant_id', tenantId)
-            .single();
-
-        if (!sesion) {
-            throw new NotFoundException('Sesión no encontrada');
-        }
-
-        if (sesion.estado !== 'CERRADA') {
-            throw new BadRequestException('Solo se pueden reabrir sesiones cerradas');
-        }
-
-        // Reabrir sesión (elimina hash, marca como modificada)
-        await this.supabase
-            .getClient()
-            .from('sesiones_caja')
-            .update({
-                estado: 'ABIERTA',
-                hash_integridad: null, // Se invalidará al volver a cerrar
-                notas: `${sesion.notas || ''}\n\nREABIERTA POR ADMIN (${adminId}): ${razon}`,
-            })
-            .eq('id', sesionId);
-
-        // Registrar en auditoría
-        await this.auditService.registrarEvento(
-            CashAuditEvent.APERTURA_FORZOSA,
-            tenantId,
-            adminId,
-            sesionId,
-            {
-                parametros: { razon, sesion_original: sesion },
-                resultado: 'REABIERTA',
-            },
+        this.logger.warn(
+            `Intento de reapertura bloqueado: sesión=${sesionId}, admin=${adminId}, tenant=${tenantId}, razón=${razon}`,
+        );
+        throw new BadRequestException(
+            'Los cierres 451 son inmutables porque sellan corte y outbox contable. Abra una nueva sesión y registre un ajuste autorizado.',
         );
     }
 }

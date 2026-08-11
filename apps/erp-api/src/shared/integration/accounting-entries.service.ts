@@ -539,28 +539,6 @@ export class AccountingEntriesService {
 
     const client = this.supabase.getClient();
 
-    if (asiento.sourceEventId) {
-      const { data: asientosExistentes, error: errorExistente } = await client
-        .from('asientos_contables')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('source_event_id', asiento.sourceEventId)
-        .order('created_at', { ascending: true })
-        .limit(1);
-
-      if (errorExistente) {
-        throw errorExistente;
-      }
-
-      const asientoExistente = Array.isArray(asientosExistentes) ? asientosExistentes[0] : asientosExistentes;
-      if (asientoExistente?.id) {
-        this.logger.warn(
-          `⚠️ [AccountingEntries] Asiento ya registrado para evento ${asiento.sourceEventId} (tenant ${tenantId}).`,
-        );
-        return asientoExistente.id;
-      }
-    }
-
     const totalDebe = asiento.detalles.reduce((s, d) => s + d.debe, 0);
     const totalHaber = asiento.detalles.reduce((s, d) => s + d.haber, 0);
 
@@ -568,138 +546,42 @@ export class AccountingEntriesService {
       throw new Error(`Asiento desbalanceado: Debe=${totalDebe}, Haber=${totalHaber}`);
     }
 
-    let asientoCreado: { id: string; numero_asiento?: number | string | null; codigo?: string | null } | null = null;
+    const actorId = this.tenantContext.getUserId();
+    const { data: asientoCreado, error } = await client.rpc('crear_asiento_con_detalles_tx', {
+      p_tenant_id: tenantId,
+      p_asiento: {
+        fecha: fechaAsiento.toISOString(),
+        concepto: this.clampText(asiento.concepto, 50),
+        descripcion: this.clampText(asiento.concepto, 50),
+        referencia: asiento.referencia ? this.clampText(asiento.referencia, 50) : null,
+        estado: 'CONFIRMADO',
+        source_event_id: asiento.sourceEventId ?? null,
+        origen: 'INTEGRACION_LEGACY',
+        created_by: actorId ?? null,
+        confirmado_por: actorId ?? null,
+        confirmado_en: new Date().toISOString(),
+      },
+      p_detalles: asiento.detalles.map((detalle) => ({
+        cuenta_id: detalle.cuentaId,
+        debe: detalle.debe,
+        haber: detalle.haber,
+        concepto: this.clampText(detalle.descripcion, 50),
+      })),
+    });
 
-    const conceptoClampSequence = [50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
-    let ultimoConceptoFinal: string | null = asiento.concepto;
-    let ultimaReferenciaFinal: string | null = asiento.referencia ?? null;
-
-    for (let intento = 0; intento < conceptoClampSequence.length; intento++) {
-      const clampLength = conceptoClampSequence[intento];
-      const conceptoFinal = this.clampText(asiento.concepto, clampLength);
-      const referenciaFinal = asiento.referencia ? this.clampText(asiento.referencia, clampLength) : null;
-      ultimoConceptoFinal = conceptoFinal;
-      ultimaReferenciaFinal = referenciaFinal;
-      const { data, error } = await client
-        .from('asientos_contables')
-        .insert({
-          tenant_id: tenantId, // HARDENING: cada asiento queda ligado al tenant autenticado.
-          fecha: asiento.fecha,
-          concepto: conceptoFinal,
-          referencia: referenciaFinal,
-          total_debe: totalDebe,
-          total_haber: totalHaber,
-          estado: 'CONFIRMADO',
-          source_event_id: asiento.sourceEventId ?? null,
-        })
-        .select('id, numero_asiento, codigo')
-        .single();
-
-      if (!error && data) {
-        asientoCreado = data as { id: string; numero_asiento?: number | string | null; codigo?: string | null };
-        break;
+    if (error) {
+      if (error.code === '23505' && asiento.sourceEventId) {
+        const { data: asientoExistente, error: findExistingError } = await client
+          .from('asientos_contables')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('source_event_id', asiento.sourceEventId)
+          .maybeSingle();
+        if (!findExistingError && asientoExistente?.id) return asientoExistente.id;
       }
-
-      if (error?.code === '23505') {
-        if (asiento.sourceEventId) {
-          const { data: asientoExistente, error: findExistingError } = await client
-            .from('asientos_contables')
-            .select('id, numero_asiento, codigo')
-            .eq('tenant_id', tenantId)
-            .eq('source_event_id', asiento.sourceEventId)
-            .maybeSingle();
-
-          if (findExistingError) {
-            throw findExistingError;
-          }
-
-          if (asientoExistente?.id) {
-            this.logger.warn(
-              `⚠️ [AccountingEntries] Inserción idempotente detectó asiento existente para evento ${asiento.sourceEventId} (tenant ${tenantId}).`,
-            );
-            return asientoExistente.id;
-          }
-        }
-
-        throw error;
-      }
-      if (error?.code === '22001') {
-        const conceptoStats = this.getTextMetrics(conceptoFinal);
-        const referenciaStats = this.getTextMetrics(referenciaFinal);
-        if (intento < conceptoClampSequence.length - 1) {
-          this.logger.warn(
-            `⚠️ [AccountingEntries] Texto excede límite permitido. Intento ${
-              intento + 1
-            }, clamp=${clampLength}, concepto=${conceptoStats.bytes}b/${conceptoStats.chars}c, referencia=${referenciaStats.bytes}b/${referenciaStats.chars}c (tenant ${tenantId}).`,
-          );
-          continue;
-        }
-        this.logger.error(
-          `❌ [AccountingEntries] No se pudo truncar concepto/referencia por debajo del límite tras ${conceptoClampSequence.length} intentos (tenant ${tenantId}, clamp=${clampLength}, concepto=${conceptoStats.bytes}b/${conceptoStats.chars}c, referencia=${referenciaStats.bytes}b/${referenciaStats.chars}c).`,
-          error,
-        );
-        throw error;
-      }
-
-      if (error) throw error;
+      throw error;
     }
-
-    if (!asientoCreado) {
-      throw new Error(
-        `No se pudo crear el asiento contable tras aplicar truncado de concepto/referencia (concepto=${ultimoConceptoFinal ?? ''}, referencia=${ultimaReferenciaFinal ?? ''})`,
-      );
-    }
-
-    const asientoId = asientoCreado.id;
-    let detallesInsertados = false;
-    const detalleClampSequence = [50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
-    for (let intentoDetalle = 0; intentoDetalle < detalleClampSequence.length && !detallesInsertados; intentoDetalle++) {
-      const detalleClamp = detalleClampSequence[intentoDetalle];
-      const detallesParaInsertar = asiento.detalles.map((d) => ({
-        asiento_id: asientoId,
-        cuenta_id: d.cuentaId,
-        debe: d.debe,
-        haber: d.haber,
-        concepto: this.clampText(d.descripcion, detalleClamp),
-      }));
-
-      const { error: errorDetalles } = await client
-        .from('detalle_asientos')
-        .insert(detallesParaInsertar);
-
-      if (!errorDetalles) {
-        detallesInsertados = true;
-        break;
-      }
-
-      if (errorDetalles?.code === '22001' && intentoDetalle < detalleClampSequence.length - 1) {
-        const detalleMetrics = detallesParaInsertar
-          .map((detalle, index) => {
-            const stats = this.getTextMetrics(detalle.concepto);
-            return `#${index + 1}:${stats.bytes}b/${stats.chars}c`;
-          })
-          .join(', ');
-        this.logger.warn(
-          `⚠️ [AccountingEntries] Conceptos de detalle exceden límite. Reintentando con truncado adicional (tenant ${tenantId}, intento ${intentoDetalle + 1}, clamp=${detalleClamp}, metrics=${detalleMetrics}).`,
-        );
-        continue;
-      }
-
-      if (errorDetalles?.code === '22001' && intentoDetalle === detalleClampSequence.length - 1) {
-        const detalleMetrics = detallesParaInsertar
-          .map((detalle, index) => {
-            const stats = this.getTextMetrics(detalle.concepto);
-            return `#${index + 1}:${stats.bytes}b/${stats.chars}c`;
-          })
-          .join(', ');
-        this.logger.error(
-          `❌ [AccountingEntries] Conceptos de detalle siguen excediendo el límite después de varios intentos (tenant ${tenantId}, clamp=${detalleClamp}, metrics=${detalleMetrics}).`,
-          errorDetalles,
-        );
-      }
-
-      throw errorDetalles;
-    }
+    if (!asientoCreado?.id) throw new Error('La RPC contable no devolvió un asiento válido');
 
     this.logger.log(
       `✅ [AccountingEntries] Asiento ${asientoCreado.codigo ?? asientoCreado.numero_asiento ?? asientoCreado.id} creado para tenant ${tenantId} (ID: ${asientoCreado.id})`,
@@ -785,14 +667,6 @@ export class AccountingEntriesService {
     }
 
     return normalized.slice(0, end);
-  }
-
-  private getTextMetrics(value: string | null | undefined): { chars: number; bytes: number } {
-    const normalized = value ?? '';
-    return {
-      chars: normalized.length,
-      bytes: Buffer.byteLength(normalized, 'utf8'),
-    };
   }
 
   private normalizeAsiento(asiento: AsientoContable): AsientoContable {

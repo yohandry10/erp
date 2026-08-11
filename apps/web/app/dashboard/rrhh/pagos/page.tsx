@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { parseDateLocal } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { fetchApi } from '@/lib/api-fetch';
 import { Banknote, CheckCircle2, Clock3, Receipt, RefreshCw } from 'lucide-react';
 import { Label } from '@/components/ui/label';
@@ -34,22 +33,7 @@ const PagosPage = () => {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroPeriodo, setFiltroPeriodo] = useState('todos');
   const [loading, setLoading] = useState(true);
-  const { get, put } = useApi();
-
-  // Estado para diálogo de confirmación
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean
-    title: string
-    message: string
-    onConfirm: () => void | Promise<void>
-    variant?: 'default' | 'danger' | 'warning'
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-    variant: 'default'
-  });
+  const { get } = useApi();
 
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED !== 'false';
 
@@ -101,23 +85,6 @@ const PagosPage = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  const procesarPago = async (pagoId: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Procesar Pago',
-      message: '¿Confirmar el pago?\n\nEsta acción no se puede deshacer.',
-      variant: 'warning',
-      onConfirm: async () => {
-        try {
-          await put(`/api/rrhh/pagos/${pagoId}/procesar`);
-          loadData();
-        } catch (error) {
-          console.error('Error procesando pago:', error);
-        }
-      }
-    });
-  };
 
   const generarComprobante = async (pagoId: string) => {
     try {
@@ -341,15 +308,6 @@ const PagosPage = () => {
                   </td>
                   <td>
                     <div className="flex gap-2">
-                      {paymentStatus(pago) === 'pendiente' && (
-                        <button
-                          onClick={() => procesarPago(pago.id)}
-                          className="action-btn bg-green-500 hover:bg-green-600 text-white"
-                          title="Procesar Pago"
-                        >
-                          💰 Pagar
-                        </button>
-                      )}
                       {paymentStatus(pago) === 'procesado' && (
                         <button
                           onClick={() => generarComprobante(pago.id)}
@@ -445,14 +403,6 @@ MONTO NETO: ${currencySymbol} ${paymentAmount(pago.monto_neto).toLocaleString(lo
         </div>
       </div>
 
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-        onConfirm={confirmDialog.onConfirm}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        variant={confirmDialog.variant}
-      />
     </div>
   );
 };

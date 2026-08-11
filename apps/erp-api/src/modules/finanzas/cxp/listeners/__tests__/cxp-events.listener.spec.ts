@@ -1,12 +1,7 @@
 import { CxpEventsListener } from '../cxp-events.listener';
-import { CxpService } from '../../cxp.service';
-import { DevolucionProveedorEmitidaEvent, RecepcionRegistradaEvent } from '../../../../../shared/events/event-bus.service';
+import { RecepcionRegistradaEvent } from '../../../../../shared/events/event-bus.service';
 
 describe('CxpEventsListener', () => {
-  const crearCuentaPorPagar = jest.fn();
-  const aplicarDevolucionProveedorEmitida = jest.fn();
-  const cxpService = { crearCuentaPorPagar, aplicarDevolucionProveedorEmitida } as unknown as CxpService;
-
   const onRecepcionRegistrada = jest.fn();
   const onDevolucionProveedorEmitida = jest.fn();
   const eventBus = { onRecepcionRegistrada, onDevolucionProveedorEmitida } as any;
@@ -16,7 +11,7 @@ describe('CxpEventsListener', () => {
   });
 
   it('no crea una CxP hasta que se registre la factura del proveedor', async () => {
-    const listener = new CxpEventsListener(eventBus, cxpService);
+    const listener = new CxpEventsListener(eventBus);
     listener.onModuleInit();
 
     // Capturar el callback registrado
@@ -52,37 +47,12 @@ describe('CxpEventsListener', () => {
 
     await callback({ data: recepcionEvent });
 
-    expect(crearCuentaPorPagar).not.toHaveBeenCalled();
+    expect(onDevolucionProveedorEmitida).not.toHaveBeenCalled();
   });
 
-  it('aplica reversa en CxP cuando llega devolucion.proveedor.emitida', async () => {
-    const listener = new CxpEventsListener(eventBus, cxpService);
+  it('no registra un writer post-commit para devoluciones ya resueltas por 450', () => {
+    const listener = new CxpEventsListener(eventBus);
     listener.onModuleInit();
-
-    expect(onDevolucionProveedorEmitida).toHaveBeenCalledTimes(1);
-    const callback = onDevolucionProveedorEmitida.mock.calls[0][0];
-
-    const devolucionEvent: DevolucionProveedorEmitidaEvent = {
-      devolucionId: 'dev-1',
-      numeroDevolucion: 'DEV-001',
-      ordenId: 'oc-1',
-      recepcionId: 'rec-1',
-      proveedorId: 'prov-1',
-      proveedorNombre: 'Proveedor SA',
-      fechaDevolucion: '2025-11-16',
-      motivo: 'CANCELACION_OC',
-      subtotal: 100,
-      igv: 18,
-      total: 118,
-      moneda: 'USD',
-      items: [],
-      emitidoEn: new Date().toISOString(),
-      tenantId: 'tenant-1',
-      idempotencyKey: 'devolucion:tenant-1:dev-1',
-    };
-
-    await callback({ data: devolucionEvent });
-
-    expect(aplicarDevolucionProveedorEmitida).toHaveBeenCalledWith('tenant-1', devolucionEvent);
+    expect(onDevolucionProveedorEmitida).not.toHaveBeenCalled();
   });
 });

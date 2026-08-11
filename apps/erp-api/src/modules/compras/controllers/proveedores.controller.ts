@@ -229,8 +229,12 @@ export class ProveedoresController {
     description: "Proveedor desactivado exitosamente",
   })
   @ApiResponse({ status: 404, description: "Proveedor no encontrado" })
-  async remove(@Param("id") id: string, @CurrentTenant() tenantId: string) {
-    const proveedor = await this.proveedoresService.softDelete(id, tenantId);
+  async remove(
+    @Param("id") id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    const proveedor = await this.proveedoresService.softDelete(id, tenantId, user?.id);
     return {
       success: true,
       message: "Proveedor desactivado exitosamente",

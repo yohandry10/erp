@@ -86,7 +86,7 @@ export function ProveedorForm({
       contacto: initialData?.contacto || '',
       condiciones_pago: initialData?.condiciones_pago || 'CONTADO',
       limite_credito: initialData?.limite_credito || 0,
-      dias_credito: 0
+      dias_credito: initialData?.dias_credito || 0
     }
   })
 

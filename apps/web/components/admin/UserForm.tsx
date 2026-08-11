@@ -53,6 +53,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
   const [roles, setRoles] = useState<Role[]>([])
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [loadingRoles, setLoadingRoles] = useState(true)
+  const [idempotencyKey] = useState(() => crypto.randomUUID())
 
   const {
     register,
@@ -126,6 +127,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
       const payload = {
         ...data,
         roles: selectedRoles,
+        ...(!user ? { idempotency_key: idempotencyKey } : {}),
       }
 
       if (user) {

@@ -38,6 +38,13 @@ export class AplicarPagoCxpDto {
   @IsUUID('4', { message: 'El ID de cuenta bancaria debe ser un UUID válido' })
   cuenta_bancaria_id?: string;
 
+  @ApiPropertyOptional({
+    description: 'Sesion de caja abierta para pagos en efectivo; si se omite se resuelve la unica sesion del actor',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'El ID de sesion de caja debe ser un UUID valido' })
+  sesion_caja_id?: string;
+
   @ApiProperty({
     description: 'Número de referencia del pago (número de operación, cheque, etc.)',
     example: 'OP-2025-001234',
@@ -56,11 +63,11 @@ export class AplicarPagoCxpDto {
   @IsString({ message: 'Las observaciones deben ser una cadena de texto' })
   observaciones?: string;
 
-  @ApiPropertyOptional({
-    description: 'Llave de idempotencia para asegurar pagos idempotentes',
+  @ApiProperty({
+    description: 'Llave de idempotencia estable del intento de pago',
     example: 'cxp-pago-tenant-123-cxp-456-20251025',
   })
-  @IsOptional()
+  @IsNotEmpty({ message: 'La llave de idempotencia es requerida' })
   @IsString({ message: 'La llave de idempotencia debe ser una cadena de texto' })
-  idempotency_key?: string;
+  idempotency_key: string;
 }

@@ -6,11 +6,12 @@ import {
   Body,
   Query,
   Param,
+  Headers,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
-import { CurrentTenant } from "../../../common";
+import { CurrentTenant, CurrentUser } from "../../../common";
 import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import { CentrosCostoService } from "../services/centros-costo.service";
@@ -103,7 +104,9 @@ export class ContabilidadCentrosCostoController {
   })
   async crearCentroCosto(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId:string,
     @Body() body: { codigo: string; nombre: string; descripcion?: string },
+    @Headers('idempotency-key') idempotencyKey?:string,
   ): Promise<{ success: boolean; data: any; message: string }> {
     try {
       console.log(
@@ -115,6 +118,8 @@ export class ContabilidadCentrosCostoController {
         body.codigo,
         body.nombre,
         body.descripcion,
+        userId,
+        idempotencyKey,
       );
 
       return {
@@ -145,6 +150,7 @@ export class ContabilidadCentrosCostoController {
   })
   async actualizarCentroCosto(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId:string,
     @Param("id") id: string,
     @Body()
     body: {
@@ -153,6 +159,7 @@ export class ContabilidadCentrosCostoController {
       descripcion?: string;
       activo?: boolean;
     },
+    @Headers('idempotency-key') idempotencyKey?:string,
   ): Promise<{ success: boolean; data: any; message: string }> {
     try {
       console.log(
@@ -163,6 +170,8 @@ export class ContabilidadCentrosCostoController {
         tenantId,
         id,
         body,
+        userId,
+        idempotencyKey,
       );
 
       return {

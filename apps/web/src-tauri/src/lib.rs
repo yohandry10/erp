@@ -848,6 +848,7 @@ fn normalize_fiscal_sync_items(items: &[Value]) -> Vec<Value> {
                 "codigo": value_string(item, "codigo")
                     .or_else(|| value_string(item, "codigo_producto"))
                     .unwrap_or_else(|| format!("ITEM-{}", index + 1)),
+                "producto_id": value_string(item, "producto_id"),
                 "descripcion": descripcion,
                 "cantidad": cantidad,
                 "unidad": value_string(item, "unidad")
@@ -864,6 +865,76 @@ fn normalize_fiscal_sync_items(items: &[Value]) -> Vec<Value> {
             })
         })
         .collect()
+}
+
+fn validate_offline_fiscal_snapshot(input: &OfflineFiscalDocumentInput) -> Result<(), String> {
+    let document_type = document_type_code(&input.document_type);
+    if !matches!(document_type, "01" | "03") {
+        return Err("Desktop offline solo sincroniza factura 01 o boleta 03; las notas 07/08 usan el flujo referenciado 472".to_string());
+    }
+    let serie = input.serie.as_deref().unwrap_or("").trim().to_uppercase();
+    if serie.is_empty()
+        || (document_type == "01" && !serie.starts_with('F'))
+        || (document_type == "03" && !serie.starts_with('B'))
+    {
+        return Err("La serie fiscal desktop no corresponde al tipo 01/03".to_string());
+    }
+    let receiver = input.cliente_ruc.as_deref().unwrap_or("").trim();
+    let receiver_name = input.cliente_nombre.as_deref().unwrap_or("").trim();
+    let currency = input.moneda.as_deref().unwrap_or("").trim();
+    let source_type = input.source_type.as_deref().unwrap_or("").trim();
+    if !(6..=20).contains(&receiver.len())
+        || receiver_name.is_empty()
+        || currency.len() != 3
+        || source_type.is_empty()
+        || input.items.is_empty()
+        || input.total <= 0.0
+    {
+        return Err("El snapshot fiscal desktop requiere receptor, moneda, origen, total e items completos".to_string());
+    }
+
+    let normalized = normalize_fiscal_sync_items(&input.items);
+    let mut subtotal = 0.0_f64;
+    let mut igv = 0.0_f64;
+    let mut total = 0.0_f64;
+    for (index, item) in normalized.iter().enumerate() {
+        let original = &input.items[index];
+        let code = value_string(original, "codigo")
+            .or_else(|| value_string(original, "codigo_producto"))
+            .unwrap_or_default();
+        let description = value_string(original, "descripcion")
+            .or_else(|| value_string(original, "nombre"))
+            .unwrap_or_default();
+        let unit = value_string(original, "unidad")
+            .or_else(|| value_string(original, "unidad_medida"))
+            .unwrap_or_default();
+        let quantity = value_number(item, "cantidad");
+        let item_subtotal = value_number(item, "valor_venta");
+        let item_igv = value_number(item, "igv");
+        let item_total = value_number(item, "precio_venta");
+        if code.trim().is_empty()
+            || description.trim().is_empty()
+            || unit.trim().is_empty()
+            || quantity <= 0.0
+            || item_subtotal < 0.0
+            || item_igv < 0.0
+            || item_total <= 0.0
+            || (item_total - item_subtotal - item_igv).abs() > 0.01
+        {
+            return Err(format!("El item fiscal desktop {} esta incompleto o no cuadra", index + 1));
+        }
+        subtotal += item_subtotal;
+        igv += item_igv;
+        total += item_total;
+    }
+    if (subtotal - input.subtotal).abs() > 0.01
+        || (igv - input.igv).abs() > 0.01
+        || (total - input.total).abs() > 0.01
+        || (input.total - input.subtotal - input.igv).abs() > 0.01
+    {
+        return Err("Los totales del snapshot fiscal desktop no coinciden con sus items".to_string());
+    }
+    Ok(())
 }
 
 fn escape_xml(value: &str) -> String {
@@ -982,41 +1053,44 @@ fn build_local_ubl_xml(
 ) -> String {
     let document_type = document_type_code(&input.document_type);
     let id = format!("{serie}-{:08}", numero);
-    let moneda = input.moneda.as_deref().unwrap_or("PEN");
-    let cliente_ruc = input.cliente_ruc.as_deref().unwrap_or("00000000");
-    let cliente_nombre = input.cliente_nombre.as_deref().unwrap_or("Cliente");
+    let moneda = input.moneda.as_deref().unwrap_or("");
+    let cliente_ruc = input.cliente_ruc.as_deref().unwrap_or("");
+    let cliente_nombre = input.cliente_nombre.as_deref().unwrap_or("");
+    let cliente_scheme = if cliente_ruc.len() == 11 { "6" } else { "1" };
     let issue_date = current_utc_date();
     let mut lines = String::new();
+    let normalized_items = normalize_fiscal_sync_items(&input.items);
 
-    for (index, item) in input.items.iter().enumerate() {
-        let cantidad = item.get("cantidad").and_then(Value::as_f64).unwrap_or(1.0);
-        let descripcion = value_string(item, "descripcion")
-            .or_else(|| value_string(item, "nombre"))
-            .unwrap_or_else(|| "Producto/servicio".to_string());
-        let precio = item
-            .get("precio_unitario")
-            .or_else(|| item.get("precio"))
-            .and_then(Value::as_f64)
-            .unwrap_or(0.0);
-        let total = item
-            .get("total")
-            .or_else(|| item.get("subtotal"))
-            .and_then(Value::as_f64)
-            .unwrap_or(cantidad * precio);
+    for (index, item) in normalized_items.iter().enumerate() {
+        let cantidad = value_number(item, "cantidad");
+        let descripcion = value_string(item, "descripcion").unwrap_or_default();
+        let codigo = value_string(item, "codigo").unwrap_or_default();
+        let unidad = value_string(item, "unidad").unwrap_or_default();
+        let precio = value_number(item, "precio_unitario");
+        let valor_venta = value_number(item, "valor_venta");
+        let igv = value_number(item, "igv");
         lines.push_str(&format!(
             r#"
   <cac:InvoiceLine>
     <cbc:ID>{}</cbc:ID>
-    <cbc:InvoicedQuantity unitCode="NIU">{:.2}</cbc:InvoicedQuantity>
+    <cbc:InvoicedQuantity unitCode="{}">{:.6}</cbc:InvoicedQuantity>
     <cbc:LineExtensionAmount currencyID="{}">{:.2}</cbc:LineExtensionAmount>
-    <cac:Item><cbc:Description>{}</cbc:Description></cac:Item>
+    <cac:TaxTotal><cbc:TaxAmount currencyID="{}">{:.2}</cbc:TaxAmount></cac:TaxTotal>
+    <cac:Item>
+      <cbc:Description>{}</cbc:Description>
+      <cac:SellersItemIdentification><cbc:ID>{}</cbc:ID></cac:SellersItemIdentification>
+    </cac:Item>
     <cac:Price><cbc:PriceAmount currencyID="{}">{:.2}</cbc:PriceAmount></cac:Price>
   </cac:InvoiceLine>"#,
             index + 1,
+            escape_xml(&unidad),
             cantidad,
             moneda,
-            total,
+            valor_venta,
+            moneda,
+            igv,
             escape_xml(&descripcion),
+            escape_xml(&codigo),
             moneda,
             precio,
         ));
@@ -1040,7 +1114,7 @@ fn build_local_ubl_xml(
   </cac:AccountingSupplierParty>
   <cac:AccountingCustomerParty>
     <cac:Party>
-      <cac:PartyIdentification><cbc:ID>{}</cbc:ID></cac:PartyIdentification>
+      <cac:PartyIdentification><cbc:ID schemeID="{}">{}</cbc:ID></cac:PartyIdentification>
       <cac:PartyLegalEntity><cbc:RegistrationName>{}</cbc:RegistrationName></cac:PartyLegalEntity>
     </cac:Party>
   </cac:AccountingCustomerParty>
@@ -1056,6 +1130,7 @@ fn build_local_ubl_xml(
         moneda,
         escape_xml(&config.ruc),
         escape_xml(&config.razon_social),
+        cliente_scheme,
         escape_xml(cliente_ruc),
         escape_xml(cliente_nombre),
         moneda,
@@ -5259,6 +5334,7 @@ fn create_local_fiscal_document_with_conn(
     if config.ruc.trim().is_empty() || config.razon_social.trim().is_empty() {
         return Err("Configura RUC y razon social en desktop antes de emitir offline".to_string());
     }
+    validate_offline_fiscal_snapshot(&document)?;
     let serie = document
         .serie
         .clone()
@@ -5299,52 +5375,52 @@ fn create_local_fiscal_document_with_conn(
     save_local_fiscal_document(conn, &result, &document, tenant_id.as_deref())?;
     let sync_items = normalize_fiscal_sync_items(&document.items);
 
-    let queued_body = serde_json::to_string(&serde_json::json!({
-        "local_fiscal_id": result.id,
-        "idempotency_key": format!("desktop.offline.cpe:{}", result.id),
-        "document_type": result.document_type,
-        "tipo_documento": result.document_type,
-        "serie": result.serie,
-        "numero": result.numero,
-        "estado": result.estado,
-        "xml_content": result.xml_content,
-        "signed_xml": result.signed_xml,
-        "hash": result.hash,
-        "source_type": document.source_type.clone(),
-        "source_id": document.source_id.clone(),
-        "cliente_ruc": document.cliente_ruc.clone(),
-        "clienteRuc": document.cliente_ruc.clone(),
-        "documento_receptor": document.cliente_ruc.clone(),
-        "cliente_nombre": document.cliente_nombre.clone(),
-        "clienteNombre": document.cliente_nombre.clone(),
-        "razon_social_receptor": document.cliente_nombre.clone(),
-        "moneda": document.moneda.clone(),
-        "items": sync_items,
-        "subtotal": document.subtotal,
-        "total_gravadas": document.subtotal,
-        "igv": document.igv,
-        "total_igv": document.igv,
-        "total": document.total,
-        "total_venta": document.total,
-        "tenant_id": tenant_id.clone(),
-        "user_id": user_id.clone()
-    }))
-    .map_err(|e| format!("No se pudo serializar documento fiscal para sync: {e}"))?;
-    let queued = LocalFirstWriteInput {
-        endpoint: "/api/cpe/desktop/signed".to_string(),
-        method: "POST".to_string(),
-        url: "/api/cpe/desktop/signed".to_string(),
-        headers: offline_sync_headers(
-            access_token.as_deref(),
-            tenant_id.as_deref(),
-            &result.id,
-            "fiscal_document",
-        ),
-        body: Some(queued_body),
-        tenant_id,
-        user_id,
-    };
-    enqueue_offline_request_with_conn(conn, &queued)?;
+    if let Some(signed_xml) = result.signed_xml.clone() {
+        if tenant_id.as_deref().unwrap_or("").trim().is_empty()
+            || user_id.as_deref().unwrap_or("").trim().is_empty()
+            || access_token.as_deref().unwrap_or("").trim().is_empty()
+        {
+            return Err("El CPE fue guardado localmente, pero no puede encolarse sin tenant, actor y sesion autenticada".to_string());
+        }
+        let receiver = document.cliente_ruc.clone().unwrap_or_default();
+        let receiver_type = if receiver.len() == 11 { "6" } else { "1" };
+        let queued_body = serde_json::to_string(&serde_json::json!({
+            "local_fiscal_id": result.id,
+            "idempotency_key": format!("desktop.offline.cpe:{}", result.id),
+            "tipo_documento": result.document_type,
+            "serie": result.serie,
+            "numero": result.numero,
+            "signed_xml": signed_xml,
+            "hash": result.hash,
+            "fecha_emision": current_utc_date(),
+            "source_type": document.source_type.clone().unwrap_or_default(),
+            "source_id": document.source_id.clone(),
+            "documento_receptor": receiver,
+            "tipo_documento_receptor": receiver_type,
+            "razon_social_receptor": document.cliente_nombre.clone().unwrap_or_default(),
+            "moneda": document.moneda.clone().unwrap_or_default(),
+            "items": sync_items,
+            "total_gravadas": document.subtotal,
+            "total_igv": document.igv,
+            "total_venta": document.total
+        }))
+        .map_err(|e| format!("No se pudo serializar documento fiscal para sync: {e}"))?;
+        let queued = LocalFirstWriteInput {
+            endpoint: "/api/cpe/desktop/signed".to_string(),
+            method: "POST".to_string(),
+            url: "/api/cpe/desktop/signed".to_string(),
+            headers: offline_sync_headers(
+                access_token.as_deref(),
+                tenant_id.as_deref(),
+                &result.id,
+                "fiscal_document",
+            ),
+            body: Some(queued_body),
+            tenant_id,
+            user_id,
+        };
+        enqueue_offline_request_with_conn(conn, &queued)?;
+    }
     Ok(result)
 }
 
@@ -5416,8 +5492,8 @@ async fn send_to_sunat(
     app: AppHandle,
     signed_xml: String,
     tenant_id: Option<String>,
-    user_id: Option<String>,
-    access_token: Option<String>,
+    _user_id: Option<String>,
+    _access_token: Option<String>,
 ) -> Result<String, String> {
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
@@ -5434,37 +5510,52 @@ async fn send_to_sunat(
             |row| row.get(0),
         )
         .ok();
-    let idempotency_key = local_fiscal_id
-        .as_ref()
-        .map(|id| format!("desktop.offline.cpe:{id}"))
-        .unwrap_or_else(|| format!("desktop.signed:{hash}"));
-    let body = serde_json::to_string(&serde_json::json!({
-        "signed_xml": signed_xml,
-        "hash": hash.clone(),
-        "local_fiscal_id": local_fiscal_id,
-        "idempotency_key": idempotency_key,
-        "estado": "PENDIENTE_ENVIO",
-        "origen": "desktop_offline",
-        "tenant_id": tenant_id.clone(),
-        "user_id": user_id.clone()
-    }))
-    .map_err(|e| format!("No se pudo serializar envio SUNAT pendiente: {e}"))?;
-    let queued = LocalFirstWriteInput {
-        endpoint: "/api/cpe/desktop/signed".to_string(),
-        method: "POST".to_string(),
-        url: "/api/cpe/desktop/signed".to_string(),
-        headers: offline_sync_headers(
-            access_token.as_deref(),
-            tenant_id.as_deref(),
-            &hash,
-            "fiscal_send",
-        ),
-        body: Some(body),
-        tenant_id,
-        user_id,
-    };
-    enqueue_offline_request_with_conn(&conn, &queued)?;
-    Ok("PENDIENTE_ENVIO: XML firmado guardado localmente; SUNAT/OSE se enviara al reconectar".to_string())
+    let local_fiscal_id = local_fiscal_id.ok_or_else(|| {
+        "No se puede sincronizar un XML aislado: no existe su documento fiscal local completo".to_string()
+    })?;
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT body, status
+            FROM offline_requests
+            WHERE endpoint = '/api/cpe/desktop/signed'
+              AND tenant_id = ?1
+              AND body IS NOT NULL
+            ORDER BY created_at DESC
+            "#,
+        )
+        .map_err(|e| format!("No se pudo inspeccionar la cola fiscal local: {e}"))?;
+    let rows = stmt
+        .query_map(params![tenant_scope(tenant)], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| format!("No se pudo leer la cola fiscal local: {e}"))?;
+    for row in rows {
+        let (body, status) = row.map_err(|e| format!("Entrada fiscal local invalida: {e}"))?;
+        let Ok(payload) = serde_json::from_str::<Value>(&body) else {
+            continue;
+        };
+        let has_full_items = payload
+            .get("items")
+            .and_then(Value::as_array)
+            .is_some_and(|items| !items.is_empty());
+        if value_string(&payload, "local_fiscal_id").as_deref() == Some(local_fiscal_id.as_str())
+            && value_string(&payload, "hash").as_deref() == Some(hash.as_str())
+            && value_string(&payload, "signed_xml").as_deref() == Some(signed_xml.as_str())
+            && has_full_items
+            && value_string(&payload, "idempotency_key").is_some()
+            && value_string(&payload, "documento_receptor").is_some()
+        {
+            return Ok(format!(
+                "{}: se reutiliza la intencion fiscal local completa; no se creo una cola parcial",
+                status.to_uppercase()
+            ));
+        }
+    }
+    Err(
+        "No se puede sincronizar el XML sin su snapshot fiscal completo (receptor, totales e items); regenere el documento local"
+            .to_string(),
+    )
 }
 
 #[tauri::command]

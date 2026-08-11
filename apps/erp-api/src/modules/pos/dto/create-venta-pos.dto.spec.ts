@@ -45,4 +45,32 @@ describe('CreateVentaPosDto rolling-deploy compatibility', () => {
 
     expect(errors).toEqual([]);
   });
+
+  it('preserva la intención explícita de ticket interno sin CPE', async () => {
+    const dto = plainToInstance(CreateVentaPosDto, {
+      idempotency_key: 'pos-ticket-interno-1',
+      cliente_documento: '00000000',
+      cliente_tipo_documento: '0',
+      cliente_nombre: 'Consumidor final',
+      emitir_cpe: false,
+      items: [{
+        producto_id: 'producto-demo',
+        cantidad: 1,
+        precio_unitario: 20,
+      }],
+      comprobante: {
+        tipo: 'TICKET',
+        serie: 'T001',
+      },
+    });
+
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    expect(errors).toEqual([]);
+    expect(dto.emitir_cpe).toBe(false);
+    expect(dto.comprobante?.tipo).toBe('TICKET');
+  });
 });

@@ -82,10 +82,11 @@ export class ContabilidadPlantillasController {
   @ApiResponse({ status: 200, type: PlantillaAsientoResponseDto })
   async actualizar(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
     @Param("id") plantillaId: string,
     @Body() dto: UpdatePlantillaAsientoDto,
   ) {
-    const data = await this.plantillasService.actualizar(tenantId, plantillaId, dto);
+    const data = await this.plantillasService.actualizar(tenantId, userId, plantillaId, dto);
     return { success: true, data, message: `Plantilla "${data.nombre}" actualizada` };
   }
 
@@ -98,9 +99,10 @@ export class ContabilidadPlantillasController {
   })
   async eliminar(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
     @Param("id") plantillaId: string,
   ) {
-    await this.plantillasService.eliminar(tenantId, plantillaId);
+    await this.plantillasService.eliminar(tenantId, userId, plantillaId);
     return { success: true, message: "Plantilla eliminada" };
   }
 

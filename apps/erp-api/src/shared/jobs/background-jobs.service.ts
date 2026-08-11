@@ -733,6 +733,13 @@ export class BackgroundJobsService {
     if (process.env.BACKGROUND_JOBS_ASISTENCIAS_ENABLED !== 'true') {
       return;
     }
+    const actorId = String(process.env.BACKGROUND_JOBS_ACTOR_ID || '').trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(actorId)) {
+      console.error(
+        '❌ [BackgroundJobs] Asistencias bloqueadas: BACKGROUND_JOBS_ACTOR_ID debe ser un UUID explícito, activo y autorizado en cada tenant.',
+      );
+      return;
+    }
     try {
       const nowLima = this.nowInLima();
       const hoy = nowLima.toISOString().split('T')[0];
@@ -763,42 +770,27 @@ export class BackgroundJobsService {
         .from('empleados')
         .select('id')
         .eq('estado', 'ACTIVO')
+        .eq('activo', true)
         .eq('tenant_id', tenantId);
 
-      const asistenciasQuery = client
-        .from('asistencias')
-        .select('empleado_id, estado')
-        .eq('tenant_id', tenantId)
-        .eq('fecha', hoy);
-
-      const [
-        { data: empleados, error: empleadosError },
-        { data: asistenciasHoy, error: asistenciasError }
-      ] = await Promise.all([empleadosQuery, asistenciasQuery]);
-
+      const { data: empleados, error: empleadosError } = await empleadosQuery;
       if (empleadosError) throw empleadosError;
-      if (asistenciasError) throw asistenciasError;
 
-      const empleadosConAsistencia = new Set(asistenciasHoy?.map(a => a.empleado_id) || []);
-      const empleadosSinAsistencia = empleados?.filter(emp => !empleadosConAsistencia.has(emp.id)) || [];
-
-      for (const empleado of empleadosSinAsistencia) {
-        // Insertar asistencia ausente (idempotente por empleado/fecha)
-        try {
-          await client
-            .from('asistencias')
-            .insert({
-              empleado_id: empleado.id,
-              tenant_id: tenantId,
-              fecha: hoy,
-              estado: 'AUSENTE',
-              horas_trabajadas: 0,
-              hora_entrada: null,
-              hora_salida: null,
-            });
-        } catch (err: any) {
-          console.warn(`⚠️ [BackgroundJobs] No se pudo insertar ausencia para empleado ${empleado.id}:`, err?.message || err);
+      for (const empleado of empleados || []) {
+        const { data, error } = await client.rpc('ejecutar_operacion_rrhh_tx', {
+          p_tenant_id: tenantId,
+          p_actor_id: actorId,
+          p_operacion: 'ATTENDANCE_ABSENCE_MARK',
+          p_payload: { empleado_id: empleado.id, fecha: hoy },
+          p_idempotency_key: `rrhh-absence:${hoy}:${empleado.id}`,
+        });
+        if (error) {
+          console.error(
+            `❌ [BackgroundJobs] Ausencia bloqueada para empleado ${empleado.id}: ${error.message || error.code || 'RPC_ERROR'}`,
+          );
+          continue;
         }
+        if (data?.action !== 'CREATED') continue;
 
         this.eventBus.emitEmpleadoAsistencia({
           empleadoId: empleado.id,

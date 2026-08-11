@@ -5,8 +5,6 @@ import { NotificationType, NotificationSeverity } from '../../notifications/noti
 import { AuditService } from '../../audit/audit.service';
 import { PedidoLockService } from '../../../shared/locks/pedido-lock.service';
 import { EstadoPedido } from '../../ventas/pedidos/entities';
-import { AlmacenesService } from '../almacenes/almacenes.service';
-import { EventBusService } from '../../../shared/events/event-bus.service';
 import {
   PrepararPedidoDto,
   ConfirmarDespachoDto,
@@ -32,8 +30,6 @@ export class LogisticaService {
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
     private readonly pedidoLockService: PedidoLockService,
-    private readonly almacenesService: AlmacenesService,
-    private readonly eventBus: EventBusService,
   ) {}
 
   /**
@@ -327,381 +323,86 @@ export class LogisticaService {
     tenantId: string,
     dto: ConfirmarDespachoDto,
     userId?: string,
-  ): Promise<{ success: boolean }> {
-    const config = await this.obtenerConfiguracion(tenantId);
-
-    if (!config.usar_flujo_logistica) {
-      throw new BadRequestException('El flujo logístico no está habilitado para este tenant');
+  ): Promise<{ success: boolean; data: Record<string, any> }> {
+    if (!userId) {
+      throw new BadRequestException('No se pudo determinar el actor del despacho');
     }
 
     return this.pedidoLockService.runWithLock(tenantId, pedidoId, async () => {
-      const client = this.supabase.getClient();
+      // Se consulta antes del commit únicamente para mensajes de auditoría. La
+      // RPC vuelve a validar y bloquear el pedido como autoridad transaccional.
       const pedido = await this.obtenerPedidoBasico(pedidoId, tenantId);
+      const items = (dto.items_despachados ?? []).map((item) => ({
+        detalle_id: item.detalle_id,
+        cantidad: item.cantidad,
+        almacen_id: item.almacen_id,
+        ubicacion_id: item.ubicacion_id,
+        lote: item.lote,
+      }));
+      const datosLogisticos = {
+        almacen_id: dto.almacen_id,
+        ubicacion_id: dto.ubicacion_id,
+        lote: dto.lote,
+        bultos: dto.bultos,
+        peso_total: dto.peso_total,
+        volumen_total: dto.volumen_total,
+        transportista: dto.transportista,
+        placa: dto.placa,
+        conductor: dto.conductor,
+      };
 
-      if (![EstadoPedido.LISTO_DESPACHO, EstadoPedido.DESPACHO_PARCIAL].includes(pedido.estado as EstadoPedido)) {
-        throw new BadRequestException(`No se puede confirmar despacho de un pedido en estado ${pedido.estado}`);
-      }
-
-      const { data: detalle, error: detalleError } = await client
-        .from('pedidos_venta_detalle')
-        .select('id, producto_id, descripcion, cantidad, cantidad_despachada, estado_item')
-        .eq('pedido_id', pedidoId);
-
-      if (detalleError || !detalle) {
-        throw new BadRequestException('Error al obtener detalle del pedido');
-      }
-
-      const despachoPlan = this.normalizarItemsDespachados(detalle, dto.items_despachados);
-      let totalDespachado = 0;
-      const timestamp = new Date().toISOString();
-
-      const detalleActualizado: Array<{ id: string; cantidad_despachada: number; cantidad_enviada: number; estado_item: string }> = [];
-      const despachosInsert: any[] = [];
-      const backorderUpserts: any[] = [];
-      const backorderDeletes: string[] = [];
-
-      const almacenesCache = new Set<string>();
-      const ubicacionesCache = new Set<string>();
-      let almacenPorDefecto = dto.almacen_id ?? null;
-      const ubicacionPorDefecto = dto.ubicacion_id ?? null;
-      const lotePorDefecto = dto.lote ?? null;
-
-      if (config.habilitar_multialmacen) {
-        if (almacenPorDefecto) {
-          await this.asegurarAlmacen(tenantId, almacenPorDefecto, almacenesCache);
-        } else {
-          const principal = await this.almacenesService.obtenerPrincipal(tenantId);
-          if (!principal) {
-            throw new BadRequestException('Debe configurar al menos un almacén antes de confirmar despachos.');
-          }
-          almacenPorDefecto = principal.id;
-          almacenesCache.add(principal.id);
-        }
-      }
-
-      if (config.requiere_ubicaciones_inventario && ubicacionPorDefecto) {
-        await this.validarUbicacion(tenantId, ubicacionPorDefecto, ubicacionesCache);
-      }
-
-      for (const item of detalle) {
-        const cantidadTotal = Number(item.cantidad);
-        const cantidadDespachadaActual = Number(item.cantidad_despachada ?? 0);
-        const cantidadPendiente = Math.max(cantidadTotal - cantidadDespachadaActual, 0);
-        const cantidadSolicitada = despachoPlan.has(item.id)
-          ? despachoPlan.get(item.id)!
-          : (dto.items_despachados && dto.items_despachados.length > 0 ? 0 : cantidadPendiente);
-
-        if (cantidadSolicitada < 0) {
-          throw new BadRequestException(`Cantidad inválida para el item ${item.descripcion}`);
-        }
-
-        if (cantidadSolicitada === 0) {
-          continue;
-        }
-
-        if (cantidadSolicitada > cantidadPendiente) {
-          throw new BadRequestException(
-            `Cantidad solicitada (${cantidadSolicitada}) supera el saldo pendiente (${cantidadPendiente}) para ${item.descripcion}`,
-          );
-        }
-
-        const itemInput = this.buscarInputItem(dto.items_despachados, item.id);
-        let itemAlmacenId: string | null = null;
-        let itemUbicacionId: string | null = null;
-        let itemLote: string | null = null;
-
-        // Obtener stock actual antes de mover para calcular métricas de evento
-        const { data: productoDatos } = await client
-          .from('productos')
-          .select('id, stock_actual, stock_reservado, precio_compra')
-          .eq('tenant_id', tenantId)
-          .eq('id', item.producto_id)
-          .maybeSingle();
-        const stockAntes = Number((productoDatos as any)?.stock_actual ?? 0);
-        const reservadoAntes = Number(productoDatos?.stock_reservado ?? 0);
-        const valorUnitario = Number(productoDatos?.precio_compra ?? 0);
-
-        if (config.habilitar_multialmacen) {
-          itemAlmacenId = itemInput?.almacen_id ?? almacenPorDefecto;
-
-          if (!itemAlmacenId) {
-            throw new BadRequestException('Debe especificar un almacén para cada despacho cuando multialmacén está habilitado.');
-          }
-
-          await this.asegurarAlmacen(tenantId, itemAlmacenId, almacenesCache);
-
-          itemUbicacionId = itemInput?.ubicacion_id ?? ubicacionPorDefecto ?? null;
-          if (config.requiere_ubicaciones_inventario && !itemUbicacionId) {
-            throw new BadRequestException('Debe especificar una ubicación de almacén para completar el despacho.');
-          }
-          await this.validarUbicacion(tenantId, itemUbicacionId, ubicacionesCache);
-
-          itemLote = itemInput?.lote ?? lotePorDefecto ?? null;
-          if (config.requiere_lotes_series && !itemLote) {
-            throw new BadRequestException('Debe especificar el lote o serie para completar el despacho.');
-          }
-
-          const { data: existenciaAlmacen, error: existenciaError } = await client
-            .from('producto_existencias')
-            .select('stock_reservado')
-            .eq('tenant_id', tenantId)
-            .eq('producto_id', item.producto_id)
-            .eq('almacen_id', itemAlmacenId)
-            .single();
-          if (existenciaError || !existenciaAlmacen) {
-            throw new BadRequestException('No existe saldo físico del producto en el almacén seleccionado');
-          }
-
-          const reservadoEnAlmacen = Number(existenciaAlmacen.stock_reservado ?? 0);
-          const { error: movimientoError } = await client.rpc('despachar_stock_en_almacen_tx', {
-            p_tenant_id: tenantId,
-            p_producto_id: item.producto_id,
-            p_almacen_id: itemAlmacenId,
-            p_cantidad: cantidadSolicitada,
-            p_cantidad_reservada: Math.min(cantidadSolicitada, reservadoEnAlmacen),
-            p_referencia_tipo: 'PEDIDO',
-            p_referencia_id: pedidoId,
-            p_notas: `Salida por despacho de pedido ${pedido.numero}`,
-            p_ubicacion_id: itemUbicacionId,
-            p_lote: itemLote,
-            p_metadata: { pedido_id: pedidoId, source: 'logistica' },
-          });
-
-          if (movimientoError) {
-            console.error('Error registrando movimiento de almacén:', movimientoError);
-            throw new BadRequestException('No se pudo confirmar el despacho por error de inventario');
-          }
-        } else {
-          const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
-            p_producto_id: item.producto_id,
-            p_cantidad: cantidadSolicitada,
-            p_referencia_tipo: 'PEDIDO',
-            p_referencia_id: pedidoId,
-            p_notas: `Salida por despacho de pedido ${pedido.numero}`,
-          });
-
-          if (salidaError) {
-            console.error('Error descontando stock en despacho:', salidaError);
-            throw new BadRequestException('No se pudo confirmar el despacho por error de inventario');
-          }
-        }
-
-        const nuevoDespachado = cantidadDespachadaActual + cantidadSolicitada;
-        const nuevoEstadoItem = nuevoDespachado >= cantidadTotal ? 'DESPACHADO' : 'PARCIAL';
-        const stockDespues = Math.max(stockAntes - cantidadSolicitada, 0);
-        const reservadoDespues = Math.max(reservadoAntes - cantidadSolicitada, 0);
-
-        // Emitir evento de salida de stock para contabilidad/integraciones
-        try {
-          await this.eventBus.emitMovimientoStock(
-            {
-              productoId: item.producto_id,
-              tipoMovimiento: 'SALIDA',
-              cantidad: cantidadSolicitada,
-              stockAnterior: stockAntes,
-              stockNuevo: stockDespues,
-              motivo: `Despacho pedido ${pedido.numero}`,
-              valor: this.round2(valorUnitario * cantidadSolicitada),
-              ventaId: pedidoId,
-              tenantId,
-            },
-            tenantId,
-          );
-        } catch (emitError) {
-          console.error('⚠️ Error emitiendo evento stock.movimiento en despacho:', emitError);
-        }
-
-        detalleActualizado.push({
-          id: item.id,
-          cantidad_despachada: nuevoDespachado,
-          cantidad_enviada: cantidadSolicitada,
-          estado_item: nuevoEstadoItem,
-        });
-
-        despachosInsert.push({
-          tenant_id: tenantId,
-          pedido_id: pedidoId,
-          detalle_id: item.id,
-          producto_id: item.producto_id,
-          cantidad: cantidadSolicitada,
-          registrado_por: userId ?? null,
-          notas: dto.notas ?? null,
-          almacen_id: itemAlmacenId ?? null,
-          ubicacion_id: itemUbicacionId ?? null,
-          lote: itemLote ?? null,
-        });
-
-        const restante = Math.max(cantidadTotal - nuevoDespachado, 0);
-        if (restante > 0) {
-          backorderUpserts.push({
-            tenant_id: tenantId,
-            pedido_id: pedidoId,
-            detalle_id: item.id,
-            producto_id: item.producto_id,
-            cantidad_comprometida: cantidadTotal,
-            cantidad_despachada: nuevoDespachado,
-            cantidad_pendiente: restante,
-            estado: nuevoEstadoItem === 'PARCIAL' ? 'PARCIAL' : 'PENDIENTE',
-            updated_at: timestamp,
-            almacen_id: itemAlmacenId ?? null,
-          });
-        } else {
-          backorderDeletes.push(item.id);
-        }
-
-        item.cantidad_despachada = nuevoDespachado;
-        item.estado_item = nuevoEstadoItem;
-        totalDespachado += cantidadSolicitada;
-      }
-
-      if (totalDespachado <= 0) {
-        throw new BadRequestException('Debe registrar al menos un item para despachar');
-      }
-
-      for (const update of detalleActualizado) {
-        const { error: detalleUpdateError } = await client
-          .from('pedidos_venta_detalle')
-          .update({
-            cantidad_despachada: update.cantidad_despachada,
-            estado_item: update.estado_item,
-          })
-          .eq('id', update.id);
-
-        if (detalleUpdateError) {
-          console.error('Error actualizando detalle de pedido:', detalleUpdateError);
-          throw new BadRequestException('No se pudo actualizar el detalle del pedido despachado');
-        }
-      }
-
-      if (despachosInsert.length > 0) {
-        const { error: despachosError } = await client
-          .from('pedido_despachos')
-          .insert(despachosInsert);
-        if (despachosError) {
-          console.error('Error registrando histórico de despachos:', despachosError);
-        }
-      }
-
-      if (backorderUpserts.length > 0) {
-        const { error: backorderError } = await client
-          .from('pedido_backorders')
-          .upsert(backorderUpserts, { onConflict: 'detalle_id' });
-        if (backorderError) {
-          console.error('Error actualizando backorders:', backorderError);
-          throw new BadRequestException('No se pudieron actualizar los backorders del pedido');
-        }
-      }
-
-      if (backorderDeletes.length > 0) {
-        const { error: backorderDeleteError } = await client
-          .from('pedido_backorders')
-          .delete()
-          .in('detalle_id', backorderDeletes);
-        if (backorderDeleteError) {
-          console.error('Error eliminando backorders:', backorderDeleteError);
-          throw new BadRequestException('No se pudieron sincronizar los backorders del pedido');
-        }
-      }
-
-      const allDespachado = detalle.every(
-        (itemDetalle) => Number(itemDetalle.cantidad_despachada ?? 0) >= Number(itemDetalle.cantidad),
+      const { data, error } = await this.supabase.getClient().rpc(
+        'despachar_pedido_parcial_tx',
+        {
+          p_pedido_id: pedidoId,
+          p_tenant_id: tenantId,
+          p_idempotency_key: dto.idempotency_key,
+          p_items: items,
+          p_notas: dto.notas ?? null,
+          p_registrado_por: userId,
+          p_datos_logisticos: datosLogisticos,
+        },
       );
-      const nuevoEstado = allDespachado ? EstadoPedido.LISTO_FACTURAR : EstadoPedido.DESPACHO_PARCIAL;
 
-      const { error: updateError } = await client
-        .from('pedidos_venta')
-        .update({
-          estado: nuevoEstado,
-          tracking_estado: 'EN_TRANSITO',
-          tracking_actualizado_en: timestamp,
-          tracking_notas: dto.notas ?? null,
-          updated_at: timestamp,
-        })
-        .eq('id', pedidoId)
-        .eq('tenant_id', tenantId);
-
-      if (updateError) {
-        console.error('Error updating pedido estado:', updateError);
-        throw new BadRequestException('Error al cambiar estado del pedido');
+      if (error || !data) {
+        console.error('Error en despacho atómico:', error);
+        throw new BadRequestException(
+          error?.message || 'No se pudo confirmar el despacho',
+        );
       }
 
-      if (dto.notas) {
-        const notasActualizadas = await this.concatenarNotas(
+      const resultado = data as Record<string, any>;
+      const nuevoEstado = String(resultado.estado ?? EstadoPedido.DESPACHO_PARCIAL);
+      const tipoNotificacion = nuevoEstado === EstadoPedido.LISTO_FACTURAR
+        ? NotificationType.PEDIDO_LISTO_FACTURAR
+        : NotificationType.PEDIDO_DESPACHO_PARCIAL;
+
+      // Auditoría y notificación no son proyecciones financieras. Un fallo
+      // posterior al commit no debe convertir un despacho confirmado en 500.
+      await Promise.allSettled([
+        this.registrarAuditoria(
           pedidoId,
           tenantId,
-          `[DESPACHO] ${dto.notas}`,
-        );
-
-        await client
-          .from('pedidos_venta')
-          .update({ notas: notasActualizadas })
-          .eq('id', pedidoId)
-          .eq('tenant_id', tenantId);
-      }
-
-      await this.registrarEventoLogistico(
-        tenantId,
-        pedidoId,
-        'DESPACHO',
-        {
-          notas: dto.notas ?? null,
-          items_despachados: detalleActualizado.map((item) => ({
-            detalle_id: item.id,
-            cantidad_enviada: item.cantidad_enviada,
-            cantidad_total_despachada: item.cantidad_despachada,
-          })),
-          bultos: dto.bultos ?? null,
-          peso_total: dto.peso_total ?? null,
-          volumen_total: dto.volumen_total ?? null,
-          transportista: dto.transportista ?? null,
-          placa: dto.placa ?? null,
-          conductor: dto.conductor ?? null,
-        },
-        userId,
-      );
-
-      await this.registrarEventoLogistico(
-        tenantId,
-        pedidoId,
-        'TRANSITO',
-        {
-          estado: 'EN_TRANSITO',
-        },
-        userId,
-      );
-
-      await this.registrarAuditoria(
-        pedidoId,
-        tenantId,
-        userId,
-        {
-          estado: nuevoEstado,
-          tracking_estado: 'EN_TRANSITO',
-        },
-        'confirmar_despacho',
-      );
-
-      if (nuevoEstado === EstadoPedido.LISTO_FACTURAR) {
-        await this.enviarNotificacion(tenantId, {
-          type: NotificationType.PEDIDO_LISTO_FACTURAR,
-          severity: NotificationSeverity.INFO,
-          title: 'Pedido listo para facturar',
-          message: `El pedido ${pedido.numero} ha sido despachado en su totalidad`,
+          userId,
+          { estado: nuevoEstado, tracking_estado: 'EN_TRANSITO' },
+          'confirmar_despacho',
+        ),
+        this.enviarNotificacion(tenantId, {
+          type: tipoNotificacion,
+          severity: nuevoEstado === EstadoPedido.LISTO_FACTURAR
+            ? NotificationSeverity.INFO
+            : NotificationSeverity.WARNING,
+          title: nuevoEstado === EstadoPedido.LISTO_FACTURAR
+            ? 'Pedido listo para facturar'
+            : 'Pedido con despacho parcial',
+          message: nuevoEstado === EstadoPedido.LISTO_FACTURAR
+            ? `El pedido ${pedido.numero} fue despachado en su totalidad`
+            : `El pedido ${pedido.numero} tiene unidades pendientes de despacho`,
           usuario_id: userId,
-        });
-      } else {
-        await this.enviarNotificacion(tenantId, {
-          type: NotificationType.PEDIDO_DESPACHO_PARCIAL,
-          severity: NotificationSeverity.WARNING,
-          title: 'Pedido con despacho parcial',
-          message: `El pedido ${pedido.numero} tiene unidades pendientes de despacho`,
-          usuario_id: userId,
-        });
-      }
+        }),
+      ]);
 
-      console.log(`✅ [LogisticaService] Despacho registrado para pedido ${pedidoId} (estado: ${nuevoEstado})`);
-
-      return { success: true };
+      return { success: true, data: resultado };
     });
   }
 
@@ -1012,96 +713,6 @@ export class LogisticaService {
     });
   }
 
-  private buscarInputItem(items: Array<any> | undefined, detalleId: string) {
-    if (!Array.isArray(items)) {
-      return null;
-    }
-    return (
-      items.find((raw) => {
-        if (!raw) {
-          return false;
-        }
-        const id = raw.detalle_id ?? raw.detalleId ?? raw.id;
-        return id === detalleId;
-      }) ?? null
-    );
-  }
-
-  private async asegurarAlmacen(tenantId: string, almacenId: string | null, cache: Set<string>): Promise<void> {
-    if (!almacenId || cache.has(almacenId)) {
-      return;
-    }
-    await this.almacenesService.obtenerPorId(tenantId, almacenId);
-    cache.add(almacenId);
-  }
-
-  private async validarUbicacion(tenantId: string, ubicacionId: string | null, cache: Set<string>): Promise<void> {
-    if (!ubicacionId || cache.has(ubicacionId)) {
-      return;
-    }
-
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('almacen_ubicaciones')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('id', ubicacionId)
-      .maybeSingle();
-
-    if (error || !data) {
-      throw new BadRequestException('La ubicación seleccionada no existe o no pertenece al tenant.');
-    }
-
-    cache.add(ubicacionId);
-  }
-
-  private normalizarItemsDespachados(
-    detalle: Array<{ id: string; cantidad: number; cantidad_despachada?: number }>,
-    items?: Array<any>,
-  ): Map<string, number> {
-    const plan = new Map<string, number>();
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return plan;
-    }
-
-    for (const raw of items) {
-      if (raw === null || raw === undefined) {
-        continue;
-      }
-
-      if (typeof raw === 'string') {
-        const item = detalle.find((d) => d.id === raw);
-        if (!item) {
-          continue;
-        }
-        const pendiente = Math.max(Number(item.cantidad) - Number(item.cantidad_despachada ?? 0), 0);
-        plan.set(item.id, pendiente);
-        continue;
-      }
-
-      if (typeof raw === 'object') {
-        const detalleId = raw.detalle_id ?? raw.detalleId ?? raw.id;
-        if (!detalleId) {
-          continue;
-        }
-        const item = detalle.find((d) => d.id === detalleId);
-        if (!item) {
-          continue;
-        }
-        const pendiente = Math.max(Number(item.cantidad) - Number(item.cantidad_despachada ?? 0), 0);
-        const cantidadRaw =
-          raw.cantidad ?? raw.cantidad_enviada ?? raw.cantidadDespachada ?? raw.qty ?? pendiente;
-        const cantidad = Number(cantidadRaw);
-        if (Number.isFinite(cantidad) && cantidad >= 0) {
-          plan.set(item.id, cantidad);
-        }
-      }
-    }
-
-    return plan;
-  }
-
   // =====================================================
   // Helpers
   // =====================================================
@@ -1246,7 +857,4 @@ export class LogisticaService {
     return nuevaNota;
   }
 
-  private round2(value: number): number {
-    return Math.round(Number(value || 0) * 100) / 100;
-  }
 }

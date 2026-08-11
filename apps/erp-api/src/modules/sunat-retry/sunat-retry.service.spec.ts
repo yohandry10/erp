@@ -50,23 +50,32 @@ describe('SunatRetryService', () => {
     jest.clearAllMocks();
   });
 
-  it('retryCpe: no cambia estado a ENVIADO y pasa idempotencyKey determinístico', async () => {
+  it('retryCpe: delega al owner durable SYSTEM sin DML ni contador paralelo', async () => {
     mockSupabaseClient.single.mockResolvedValueOnce({
-      data: { id: 'cpe-1', estado: 'RECHAZADO', retry_count: 0, next_retry_at: null },
+      data: { id: 'cpe-1', estado: 'ERROR', retry_count: 0, next_retry_at: null },
       error: null,
     });
 
     await (service as any).retryCpe('cpe-1', 'tenant-1', 0);
 
-    expect(mockSupabaseClient.update).toHaveBeenCalledWith(
-      expect.not.objectContaining({ estado: 'ENVIADO' }),
-    );
-    expect(cpeService.retrySendToOse).toHaveBeenCalledWith('cpe-1', {
+    expect(mockSupabaseClient.update).not.toHaveBeenCalled();
+    expect(cpeService.retrySendToOse).toHaveBeenCalledWith('cpe-1', 'tenant-1', {
       idempotencyKey: 'cpe.send:tenant-1:cpe-1',
+      origin: 'SYSTEM',
     });
   });
 
-  it('retryGre: no cambia estado a ENVIADO y pasa idempotencyKey determinístico', async () => {
+  it('solo selecciona CPE técnicos ERROR/ERROR; nunca RECHAZADO', async () => {
+    mockSupabaseClient.limit.mockResolvedValueOnce({ data: [], error: null });
+
+    await (service as any).processFailedCpes();
+
+    expect(mockSupabaseClient.eq).toHaveBeenCalledWith('estado', 'ERROR');
+    expect(mockSupabaseClient.eq).toHaveBeenCalledWith('sunat_status', 'ERROR');
+    expect(mockSupabaseClient.eq).not.toHaveBeenCalledWith('estado', 'RECHAZADO');
+  });
+
+  it('retryGre: delega el intento al claim 463 sin DML directo', async () => {
     mockSupabaseClient.single.mockResolvedValueOnce({
       data: { id: 'gre-1', estado: 'RECHAZADO', retry_count: 0, next_retry_at: null },
       error: null,
@@ -74,9 +83,7 @@ describe('SunatRetryService', () => {
 
     await (service as any).retryGre('gre-1', 'tenant-1', 0);
 
-    expect(mockSupabaseClient.update).toHaveBeenCalledWith(
-      expect.not.objectContaining({ estado: 'ENVIADO' }),
-    );
+    expect(mockSupabaseClient.update).not.toHaveBeenCalled();
     expect(greService.retryProcesarEnvioSunat).toHaveBeenCalledWith('gre-1', 'tenant-1', {
       idempotencyKey: 'gre.send:tenant-1:gre-1',
     });

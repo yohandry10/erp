@@ -97,6 +97,7 @@ export default function DevolucionDetallePage() {
   const [devolucion, setDevolucion] = useState<Devolucion | null>(null)
   const [loading, setLoading] = useState(true)
   const [emitiendo, setEmitiendo] = useState(false)
+  const [anulando, setAnulando] = useState(false)
   const [pageMessage, setPageMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const devolucionId = params.id as string | undefined
@@ -143,9 +144,32 @@ export default function DevolucionDetallePage() {
       }
     } catch (error) {
       console.error('Error emitiendo devolucion:', error)
-      setPageMessage({ type: 'error', text: 'No se pudo emitir la devolución.' })
+      setPageMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo emitir la devolución.',
+      })
     } finally {
       setEmitiendo(false)
+    }
+  }
+
+  const handleAnular = async () => {
+    if (!devolucion || devolucion.estado !== 'PENDIENTE' || anulando) return
+    try {
+      setAnulando(true)
+      setPageMessage(null)
+      await post(`/api/compras/devoluciones/${devolucion.id}/anular`, {
+        motivo: 'Borrador descartado por el usuario',
+      })
+      setPageMessage({ type: 'success', text: 'Devolución pendiente anulada.' })
+      await loadDevolucion()
+    } catch (error) {
+      setPageMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo anular la devolución.',
+      })
+    } finally {
+      setAnulando(false)
     }
   }
 
@@ -225,10 +249,16 @@ export default function DevolucionDetallePage() {
           </div>
 
           {devolucion.estado === 'PENDIENTE' && (
-            <button onClick={handleEmitir} disabled={emitiendo} className={primaryActionClass}>
-              <CheckCircle size={18} />
-              {emitiendo ? 'Emitiendo...' : 'Emitir Devolución'}
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button onClick={handleAnular} disabled={anulando || emitiendo} className={secondaryActionClass}>
+                <XCircle size={18} />
+                {anulando ? 'Anulando...' : 'Anular borrador'}
+              </button>
+              <button onClick={handleEmitir} disabled={emitiendo || anulando} className={primaryActionClass}>
+                <CheckCircle size={18} />
+                {emitiendo ? 'Emitiendo...' : 'Emitir Devolución'}
+              </button>
+            </div>
           )}
         </div>
       </div>

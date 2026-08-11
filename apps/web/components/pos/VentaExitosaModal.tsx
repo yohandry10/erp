@@ -1,36 +1,43 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, Eye, Printer, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, Eye, FileText, Printer, RefreshCw } from 'lucide-react'
 import { printTicket } from './TicketPrint'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
+interface VentaExitosaData {
+  venta_id: string | number
+  numero_ticket: string
+  total: number
+  subtotal: number
+  impuestos: number
+  tipo_comprobante?: 'TICKET' | '01' | '03'
+  tipo_emision?: 'TICKET' | 'FISCAL_INMEDIATO' | 'TICKET_CANJEADO'
+  canjeable?: boolean
+  estado: string
+  factura_electronica: boolean
+  facturacion_pendiente?: boolean
+  cpe_id?: string
+  cliente_nombre?: string
+  cliente_id?: string
+  cliente_documento?: string
+  fecha?: string
+  items?: Array<{
+    nombre: string
+    cantidad: number
+    precio: number
+    subtotal: number
+  }>
+}
+
 interface VentaExitosaModalProps {
   isOpen: boolean
   onClose: () => void
-  ventaData: {
-    venta_id: string | number
-    numero_ticket: string
-    total: number
-    subtotal: number
-    impuestos: number
-    tipo_comprobante?: '01' | '03'
-    estado: string
-    factura_electronica: boolean
-    facturacion_pendiente?: boolean
-    cpe_id?: string
-    cliente_nombre?: string
-    fecha?: string
-    items?: Array<{
-      nombre: string
-      cantidad: number
-      precio: number
-      subtotal: number
-    }>
-  } | null
+  onCanjearTicket?: (venta: VentaExitosaData) => void
+  ventaData: VentaExitosaData | null
   empresaData?: {
     nombre: string
     ruc: string
@@ -69,7 +76,13 @@ interface CpePrintData {
   }>
 }
 
-export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaData }: VentaExitosaModalProps) {
+export default function VentaExitosaModal({
+  isOpen,
+  onClose,
+  onCanjearTicket,
+  ventaData,
+  empresaData,
+}: VentaExitosaModalProps) {
   const country = useCountryContext()
   const { get, post } = useApi({ showErrorToast: false, retries: 1, timeoutMs: 15000 })
   const [currentCpeId, setCurrentCpeId] = useState<string | null>(null)
@@ -90,15 +103,18 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
       : ventaData?.tipo_comprobante === '03'
         ? 'BOLETA'
         : 'TICKET'
+  const ticketCanjeable = Boolean(
+    ventaData?.canjeable || ventaData?.tipo_emision === 'TICKET' || ventaData?.tipo_comprobante === 'TICKET',
+  )
 
   useEffect(() => {
     if (!isOpen || !ventaData) return
 
     setCurrentCpeId(ventaData.cpe_id || null)
-    setFacturacionPendiente(Boolean(ventaData.facturacion_pendiente && !ventaData.cpe_id))
+    setFacturacionPendiente(Boolean(!ticketCanjeable && ventaData.facturacion_pendiente && !ventaData.cpe_id))
     setFacturacionError(null)
     setCpePrintData(null)
-  }, [isOpen, ventaData])
+  }, [isOpen, ticketCanjeable, ventaData])
 
   const loadCpePrintData = useCallback(async (cpeId: string): Promise<CpePrintData | null> => {
     const result = await get(`/api/cpe/comprobantes/${encodeURIComponent(cpeId)}`)
@@ -111,7 +127,7 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
   }, [get])
 
   useEffect(() => {
-    if (!isOpen || !ventaData?.venta_id || ventaData.cpe_id) return
+    if (!isOpen || !ventaData?.venta_id || ventaData.cpe_id || ticketCanjeable) return
 
     let cancelled = false
     let attempts = 0
@@ -145,7 +161,7 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [get, isOpen, ventaData])
+  }, [get, isOpen, ticketCanjeable, ventaData])
 
   useEffect(() => {
     if (!isOpen || !currentCpeId) {
@@ -225,7 +241,7 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
   const formatCurrency = (value: number) => `${currencySymbol} ${formatMoney(value)}`
 
   const cpeListo = Boolean(currentCpeId)
-  const puedeEmitirCpe = !cpeListo && Boolean(ventaData.venta_id)
+  const puedeEmitirCpe = !ticketCanjeable && !cpeListo && Boolean(ventaData.venta_id)
 
   return (
     <div
@@ -278,14 +294,22 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
           </div>
 
           <div className="flex items-center gap-3 rounded-xl border border-cyan-300/15 bg-cyan-400/10 p-4 text-sm text-primary">
-            {cpeListo ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Clock3 className="h-5 w-5 text-primary" />}
+            {cpeListo
+              ? <CheckCircle2 className="h-5 w-5 text-primary" />
+              : ticketCanjeable
+                ? <FileText className="h-5 w-5 text-primary" />
+                : <Clock3 className="h-5 w-5 text-primary" />}
             <div>
               <p className="font-semibold">
-                {cpeListo ? 'Comprobante electrónico generado' : 'Comprobante pendiente de emisión fiscal'}
+                {cpeListo
+                  ? 'Comprobante electrónico generado'
+                  : ticketCanjeable ? 'Ticket interno listo para canje' : 'Comprobante pendiente de emisión fiscal'}
               </p>
               <p className="text-xs text-cyan-100/75">
                 {cpeListo
                   ? 'Disponible para revisión fiscal.'
+                  : ticketCanjeable
+                    ? 'La venta, el cobro y el stock ya quedaron confirmados. El correlativo fiscal se reservará sólo cuando elijas factura o boleta.'
                   : facturacionPendiente || checkingStatus
                     ? 'La venta ya quedó registrada. Puedes emitir/reintentar el CPE ahora o continuar vendiendo mientras el worker fiscal lo procesa.'
                     : 'La venta quedó registrada, pero el estado fiscal debe verificarse antes de cerrar el control diario.'}
@@ -308,7 +332,17 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
               <Printer className="h-4 w-4" />
               {cpeListo ? 'Imprimir CPE' : 'Imprimir ticket'}
             </Button>
-            {cpeListo ? (
+            {ticketCanjeable && onCanjearTicket ? (
+              <Button
+                type="button"
+                onClick={() => onCanjearTicket(ventaData)}
+                variant="outline"
+                className="h-12 gap-2 border-amber-300/30 bg-card text-amber-700 hover:bg-muted dark:text-amber-200"
+              >
+                <FileText className="h-4 w-4" />
+                Canjear ticket
+              </Button>
+            ) : cpeListo ? (
               <Button
                 type="button"
                 onClick={handleVerComprobante}

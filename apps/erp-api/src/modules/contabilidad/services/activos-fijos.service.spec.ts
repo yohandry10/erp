@@ -71,6 +71,11 @@ describe('ActivosFijosService', () => {
     actualizaciones = [];
     rpcs = [];
     resultadosRpc = {
+      gestionar_activo_diferido_tx: {
+        data: { record: { id: 'af-1', codigo: 'AF-1', nombre: 'Equipo', fecha_adquisicion: '2026-03-15',
+          fecha_inicio_depreciacion: '2026-03-15', valor_adquisicion: 1000, valor_residual: 0,
+          vida_util_meses: 12, depreciacion_acumulada: 0, situacion: 'ACTIVO' } }, error: null,
+      },
       registrar_depreciacion_tx: { data: { depreciacion: { id: 'dep-1' } }, error: null },
       dar_baja_activo_tx: {
         data: {
@@ -241,8 +246,6 @@ describe('ActivosFijosService', () => {
     });
 
     it('arranca la depreciación en la fecha de adquisición si no se indica otra', async () => {
-      tablas['activos_fijos'] = { data: { id: 'af-1', codigo: 'AF-1', valor_adquisicion: 1000 }, error: null };
-
       await service.crear(TENANT, USER, {
         codigo: 'AF-1',
         nombre: 'Equipo',
@@ -251,8 +254,11 @@ describe('ActivosFijosService', () => {
         vida_util_meses: 12
       });
 
-      expect(inserciones[0].payload.fecha_inicio_depreciacion).toBe('2026-03-15');
-      expect(inserciones[0].payload.situacion).toBe('ACTIVO');
+      expect(rpcs).toContainEqual(expect.objectContaining({
+        funcion: 'gestionar_activo_diferido_tx',
+        parametros: expect.objectContaining({ p_entity: 'ASSET', p_action: 'CREATE' }),
+      }));
+      expect(inserciones).toHaveLength(0);
     });
   });
 

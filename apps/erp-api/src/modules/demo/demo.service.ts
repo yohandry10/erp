@@ -121,6 +121,57 @@ const PLANES = {
   },
 };
 
+export const PERIODOS_CONTRATO = {
+  trimestral: {
+    id: "trimestral",
+    nombre: "3 meses",
+    meses_pagados: 3,
+    meses_bonificados: 0,
+    meses_servicio: 3,
+  },
+  semestral: {
+    id: "semestral",
+    nombre: "6 meses + 3 gratis",
+    meses_pagados: 6,
+    meses_bonificados: 3,
+    meses_servicio: 9,
+  },
+  anual: {
+    id: "anual",
+    nombre: "12 meses + 6 gratis",
+    meses_pagados: 12,
+    meses_bonificados: 6,
+    meses_servicio: 18,
+  },
+} as const;
+
+type PlanComercial = (typeof PLANES)[keyof typeof PLANES];
+type PeriodoContratoId = keyof typeof PERIODOS_CONTRATO;
+
+function resolverOferta(plan: PlanComercial, periodoId: PeriodoContratoId) {
+  const periodo = PERIODOS_CONTRATO[periodoId];
+  const monto = periodoId === "anual"
+    ? plan.precio_anual
+    : plan.precio_mensual * periodo.meses_pagados;
+  return {
+    ...periodo,
+    monto: Number(monto.toFixed(2)),
+    moneda: plan.moneda,
+    oferta_version: 1,
+  };
+}
+
+function planesConOfertas() {
+  return Object.values(PLANES).map((plan) => ({
+    ...plan,
+    facturas_mes: plan.facturas_mes === -1 ? "Ilimitado" : plan.facturas_mes,
+    usuarios: plan.usuarios === -1 ? "Ilimitado" : plan.usuarios,
+    ofertas: Object.keys(PERIODOS_CONTRATO).map((periodo) =>
+      resolverOferta(plan, periodo as PeriodoContratoId),
+    ),
+  }));
+}
+
 interface ConversionCompletionContext {
   solicitudId?: string;
   aprobadoPor?: string;
@@ -144,39 +195,34 @@ export class DemoService {
     return this.supabase.getPublicClient();
   }
 
-  async createDemoTenant(dto: CreateDemoTenantDto = {}) {
+  async createDemoTenant(dto: CreateDemoTenantDto = {}, idempotencyKey?: string) {
     const diasDuracion = dto.dias_duracion || 14;
     const countryCode = (dto.pais || "PE") as ActiveCountryCode;
     const country = DEMO_COUNTRY_PROFILES[countryCode];
     const nombre = dto.nombre || country.razonSocial;
-    let createdTenantId: string | null = null;
+    const key = String(idempotencyKey || dto.idempotency_key || "").trim();
+    if (key.length < 8 || key.length > 255) {
+      throw new BadRequestException(
+        "Idempotency-Key es obligatorio para crear una demo y debe tener entre 8 y 255 caracteres",
+      );
+    }
 
     try {
-      const { data, error } = await this.client.rpc("create_demo_tenant", {
+      const { data, error } = await this.client.rpc("create_demo_tenant_ready_tx", {
         p_nombre: nombre,
         p_dias_duracion: diasDuracion,
         p_pais_codigo: countryCode,
+        p_idempotency_key: key,
+        p_certificado_pfx: null,
+        p_certificado_password: null,
+        p_certificado_expira_en: null,
+        p_rubro: dto.rubro || "COMERCIO",
       });
 
       if (error) throw new Error(error.message);
-      if (!data || !data.success)
-        throw new Error("No se pudo crear el tenant demo");
-      createdTenantId = data.tenant_id;
-
-      // La demo es una empresa lista para explorar, no un onboarding. El RPC
-      // crea tenant + empresa + admin y esta fase exige la semilla completa. Si
-      // algo requerido falla, no se entregan credenciales de una demo parcial.
-      // Como /api/demo/create es Public (sin auth), no hay tenant context en
-      // AsyncLocalStorage. Lo seteamos explícitamente para que el guard de
-      // tablas multi-tenant deje pasar los inserts.
-      const seedResult = await this.tenantContext.run(
-        {
-          tenantId: data.tenant_id,
-          userId: data.user_id,
-          isSuperAdmin: true, // seed system-level
-        },
-        () => this.seedDemoOperationalData(data.tenant_id, data.user_id, country),
-      );
+      if (!data || !data.success || data.ready !== true) {
+        throw new Error("No se pudo crear una demo operacional completa");
+      }
 
       // El dashboard puede consultar sus métricas apenas inicia la sesión. Si
       // algún dato quedó cacheado durante la hidratación, lo descartamos antes
@@ -208,23 +254,14 @@ export class DemoService {
         autoridad_fiscal: country.autoridadFiscal,
         // Segundo user para flujos que requieren segregación de funciones
         // (e.g., aprobar OC que tú no creaste).
-        aprobador_user_id: seedResult.aprobadorUserId,
-        aprobador_email: seedResult.aprobadorEmail,
-        aprobador_password: seedResult.aprobadorPassword,
+        aprobador_user_id: data.aprobador_user_id,
+        aprobador_email: data.aprobador_email,
+        aprobador_password: data.aprobador_password,
+        idempotent: data.idempotent === true,
+        readiness: data.readiness,
+        rubro: data.rubro || dto.rubro || "COMERCIO",
       };
     } catch (error) {
-      if (createdTenantId) {
-        const { error: rollbackError } = await this.supabase
-          .getAdminClient()
-          .rpc("rollback_failed_demo_tenant", {
-            p_tenant_id: createdTenantId,
-          });
-        if (rollbackError) {
-          this.logger.error(
-            `[demo seed] no se pudo revertir tenant fallido ${createdTenantId}: ${rollbackError.message}`,
-          );
-        }
-      }
       throw new BadRequestException(
         `Error creando tenant demo: ${error.message}`,
       );
@@ -1324,7 +1361,7 @@ export class DemoService {
       created_at: data.demo_created_at,
       dias_restantes: Math.max(0, diasRestantes),
       conversion_attempted: data.demo_conversion_attempted,
-      planes_disponibles: Object.values(PLANES),
+      planes_disponibles: planesConOfertas(),
       stripe_enabled: this.stripeService.isConfigured(),
       pais: data.pais,
       pais_id: data.pais_id,
@@ -1334,11 +1371,8 @@ export class DemoService {
 
   getPlanes() {
     return {
-      planes: Object.values(PLANES).map((p) => ({
-        ...p,
-        facturas_mes: p.facturas_mes === -1 ? "Ilimitado" : p.facturas_mes,
-        usuarios: p.usuarios === -1 ? "Ilimitado" : p.usuarios,
-      })),
+      planes: planesConOfertas(),
+      periodos: Object.values(PERIODOS_CONTRATO),
       stripe_enabled: this.stripeService.isConfigured(),
     };
   }
@@ -1353,6 +1387,8 @@ export class DemoService {
 
     const plan = PLANES[dto.plan_id || "basico"];
     if (!plan) throw new BadRequestException("Plan no válido");
+    const periodoId = (dto.periodo || "trimestral") as PeriodoContratoId;
+    const oferta = resolverOferta(plan, periodoId);
 
     const countryCode = String(status.pais || "PE").toUpperCase() as ActiveCountryCode;
     if (!validateCountryTaxId(countryCode, dto.ruc)) {
@@ -1388,8 +1424,7 @@ export class DemoService {
       })
       .eq("tenant_id", tenantId);
 
-    const monto =
-      dto.periodo === "anual" ? plan.precio_anual : plan.precio_mensual;
+    const monto = oferta.monto;
 
     // Si Stripe está configurado, crear sesión de checkout
     if (this.stripeService.isConfigured()) {
@@ -1398,7 +1433,12 @@ export class DemoService {
         {
           tenantId,
           planId: dto.plan_id || "basico",
-          periodo: dto.periodo || "mensual",
+          periodo: periodoId,
+          monto,
+          moneda: plan.moneda,
+          mesesPagados: oferta.meses_pagados,
+          mesesBonificados: oferta.meses_bonificados,
+          mesesServicio: oferta.meses_servicio,
           email: dto.email,
           razonSocial: dto.razon_social,
           ruc: dto.ruc,
@@ -1408,7 +1448,7 @@ export class DemoService {
       );
 
       // Guardar datos para completar después del pago
-      await this.client.from("demo_conversiones_pendientes").insert({
+      await this.client.from("demo_conversiones_pendientes").upsert({
         tenant_id: tenantId,
         stripe_session_id: sessionId,
         razon_social: dto.razon_social,
@@ -1417,14 +1457,30 @@ export class DemoService {
         password_hash: await bcrypt.hash(dto.password, 10),
         telefono: dto.telefono,
         plan_id: dto.plan_id || "basico",
-        periodo: dto.periodo || "mensual",
+        periodo: periodoId,
         monto,
+        moneda: plan.moneda,
+        meses_pagados: oferta.meses_pagados,
+        meses_bonificados: oferta.meses_bonificados,
+        meses_servicio: oferta.meses_servicio,
+        oferta_version: oferta.oferta_version,
+        oferta_snapshot: {
+          plan_id: plan.id,
+          plan_nombre: plan.nombre,
+          periodo: periodoId,
+          periodo_nombre: oferta.nombre,
+          monto,
+          moneda: plan.moneda,
+          meses_pagados: oferta.meses_pagados,
+          meses_bonificados: oferta.meses_bonificados,
+          meses_servicio: oferta.meses_servicio,
+        },
         // La elección viaja con la conversión pendiente: el webhook reconstruye
         // el DTO desde aquí, y sin este campo el cliente que pidió empezar de
         // cero se encontraba la cuenta con todo lo del demo dentro.
         conservar_datos: dto.conservar_datos !== false,
         estado: "PENDIENTE",
-      });
+      }, { onConflict: "tenant_id" });
 
       return {
         success: true,
@@ -1433,6 +1489,7 @@ export class DemoService {
         plan: plan.nombre,
         monto,
         moneda: plan.moneda,
+        oferta,
       };
     }
 
@@ -1457,8 +1514,24 @@ export class DemoService {
           password_hash: await bcrypt.hash(dto.password, 10),
           telefono: dto.telefono,
           plan_id: dto.plan_id || "basico",
-          periodo: dto.periodo || "mensual",
+          periodo: periodoId,
           monto,
+          moneda: plan.moneda,
+          meses_pagados: oferta.meses_pagados,
+          meses_bonificados: oferta.meses_bonificados,
+          meses_servicio: oferta.meses_servicio,
+          oferta_version: oferta.oferta_version,
+          oferta_snapshot: {
+            plan_id: plan.id,
+            plan_nombre: plan.nombre,
+            periodo: periodoId,
+            periodo_nombre: oferta.nombre,
+            monto,
+            moneda: plan.moneda,
+            meses_pagados: oferta.meses_pagados,
+            meses_bonificados: oferta.meses_bonificados,
+            meses_servicio: oferta.meses_servicio,
+          },
           conservar_datos: dto.conservar_datos !== false,
           // Marca el medio de pago: sin esto la fila pasa por el normalizador
           // como si fuera un checkout de Stripe al que le falta la sesión, y
@@ -1491,9 +1564,10 @@ export class DemoService {
       solicitud_id: solicitud?.id,
       plan: plan.nombre,
       plan_id: plan.id,
-      periodo: dto.periodo || "mensual",
+      periodo: periodoId,
       monto,
       moneda: plan.moneda,
+      oferta,
       datos_empresa: {
         razon_social: dto.razon_social,
         ruc: dto.ruc,
@@ -1535,7 +1609,7 @@ export class DemoService {
     const { data, error } = await this.adminClient
       .from("demo_conversiones_pendientes")
       .select(
-        "id, tenant_id, razon_social, ruc, email, telefono, plan_id, periodo, monto, conservar_datos, estado, created_at",
+        "id, tenant_id, razon_social, ruc, email, telefono, plan_id, periodo, monto, moneda, meses_pagados, meses_bonificados, meses_servicio, oferta_snapshot, conservar_datos, estado, created_at",
       )
       .eq("estado", "PENDIENTE")
       .order("created_at", { ascending: true });
@@ -1719,6 +1793,7 @@ export class DemoService {
         tenant_id: tenantId,
         email: dto.email,
         plan: dto.plan_id || "basico",
+        periodo: dto.periodo || "trimestral",
       };
     } catch (error) {
       throw new BadRequestException(`Error activando cuenta: ${error.message}`);
