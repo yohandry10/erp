@@ -122,8 +122,6 @@ correctivo probado. Nunca improvisarlo sobre PROD.
 
 ## Bloqueantes actuales
 
-- Completar el despliegue de la API en Render desde el SHA vigente y verificar
-  health/logs; no confundir el servicio anterior saludable con el release nuevo.
 - Certificado productivo compatible con el RUC.
 - Credenciales GRE REST si el cliente usa guías.
 - Secretos finales y smoke productivo autorizado.

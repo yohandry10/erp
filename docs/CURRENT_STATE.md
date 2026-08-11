@@ -8,8 +8,9 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- El código core está en estado **release candidate promovido**, pendiente del
-  cierre operativo del despliegue API en Render.
+- El código core está en estado **release candidate promovido**. La API está
+  desplegada en Render sobre `a650700`, Web está activa en Vercel y ambos
+  healthchecks productivos responden `ready`.
 - El alcance operativo activo es Perú (`PE`, `pais_id=1`, `PEN`, SUNAT),
   Argentina (`AR`, `pais_id=5`, `ARS`, ARCA) y Colombia (`CO`, `pais_id=2`,
   `COP`, DIAN).
@@ -25,6 +26,15 @@ migraciones verificados, prevalece la implementación actual.
   y finanzas; el menú financiero expone CxC, CxP, bancos, tesorería,
   conciliación y reportes según permiso, sin trazas de objetos operativos en la
   consola del navegador.
+- El smoke productivo autorizado del 2026-08-11 creó demos temporales mediante
+  el endpoint público y verificó, sin transmitir a SUNAT, el selector de cinco
+  rubros, rol personalizado tenant-scoped, CPE `01/03/07/08`, GRE, SIRE, POS
+  con ticket canjeable, listas por vendedor/producto/marca, comisiones,
+  consolidado de hasta diez ventas, aging CxC y kardex valorizado. La imagen de
+  producto se subió por la API real a `product-images`, devolvió URL pública
+  legible y se retiró mediante el writer idempotente; el producto quedó sin URL.
+  La conversión mostró las ofertas 3 meses, 6+3 y 12+6, sin crear un pago
+  ficticio ni habilitar fiscalmente al demo.
 - Los cálculos de nómina PE/AR/CO conservan cobertura automatizada sin depender
   de una base remota. Las pruebas con escritura no se ejecutan en PROD.
 - Factura `01`, boleta `03`, nota de crédito `07`, nota de débito `08`, RA y RC
@@ -267,11 +277,6 @@ productivo autorizado.
 
 ### Antes de completar el go-live
 
-- Corregir en Render la fuente de despliegue de `erp-api`: el servicio continúa
-  intentando el SHA histórico `091e552` aunque `main` y la rama configurada ya
-  apuntan a `bc81f6b`. El Docker actual construye localmente y Web/Vercel está
-  listo, pero la API nueva no se declara desplegada hasta que Render complete el
-  release y su healthcheck responda sobre esa revisión.
 - Reconciliar el historial consolidado de `003..382` y la deriva previa de 13
   funciones y dos políticas antes de usar un `db push --include-all` sobre todo
   el directorio. La contabilidad `383..394` ya está promovida.
@@ -303,8 +308,6 @@ productivo autorizado.
 ### Producto y riesgo residual
 
 - Decidir si `modo_venta_rapida` tendrá comportamiento real o se retirará.
-- Convertir la anulación fiscal completa en una única transacción; actualmente
-  encadena mutaciones con validaciones previas.
 - Resolver etiquetas de formulario ambiguas restantes sin codemod automático.
 - Ejecutar PVS con datos reales de cada empleador, corregir su reporte y cargar
   en SOL el ZIP generado por PVS antes de considerar presentada una planilla;
