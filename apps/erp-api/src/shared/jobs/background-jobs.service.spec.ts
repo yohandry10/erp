@@ -127,7 +127,9 @@ describe('BackgroundJobsService - asistencias RRHH 475', () => {
       eventBus as any,
       { run: jest.fn() } as any,
     ) as any;
-    service.nowInLima = jest.fn(() => new Date('2026-08-11T00:00:00.000Z'));
+    // 23:00 UTC es 18:00 en Lima y conserva la misma fecha en ambos husos.
+    // Así la prueba no depende del TZ del runner (GitHub usa UTC).
+    service.nowInLima = jest.fn(() => new Date('2026-08-11T23:00:00.000Z'));
 
     await service.procesarAsistenciasPendientes(tenantId);
 
