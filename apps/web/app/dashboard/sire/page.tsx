@@ -88,6 +88,9 @@ export default function SIREPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null)
   const [activeSunatSendId, setActiveSunatSendId] = useState<string | null>(null)
+  const [pendingAcceptanceId, setPendingAcceptanceId] = useState<string | null>(null)
+  const sendKeysRef = useRef<Record<string, string>>({})
+  const queryKeysRef = useRef<Record<string, string>>({})
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [operations, setOperations] = useState<SireOperation[]>([])
   const [filters, setFiltersState] = useState<SireFilters>({
@@ -213,11 +216,19 @@ export default function SIREPage() {
 
   const sendToSunat = async (reportId: string) => {
     if (activeSunatSendId) return
-    if (!window.confirm('Esta acción aceptará la propuesta oficial RVIE/RCE del período en SUNAT. ¿Deseas continuar?')) return
+    setPendingAcceptanceId(null)
     setActiveSunatSendId(reportId)
     try {
-      const response = await post(`/api/sire/reportes/${reportId}/enviar-sunat`)
+      const key = sendKeysRef.current[reportId]
+        ?? `sire-accept:${reportId}:${crypto.randomUUID()}`
+      sendKeysRef.current[reportId] = key
+      const response = await post(
+        `/api/sire/reportes/${reportId}/enviar-sunat`,
+        {},
+        { headers: { 'Idempotency-Key': key } },
+      )
       if (apiSucceeded(response)) {
+        delete sendKeysRef.current[reportId]
         await loadReports(filtersRef.current)
         await loadStats()
       }
@@ -230,8 +241,16 @@ export default function SIREPage() {
     if (activeSunatSendId) return
     setActiveSunatSendId(reportId)
     try {
-      const response = await post(`/api/sire/reportes/${reportId}/consultar-ticket`)
+      const key = queryKeysRef.current[reportId]
+        ?? `sire-query:${reportId}:${crypto.randomUUID()}`
+      queryKeysRef.current[reportId] = key
+      const response = await post(
+        `/api/sire/reportes/${reportId}/consultar-ticket`,
+        {},
+        { headers: { 'Idempotency-Key': key } },
+      )
       if (apiSucceeded(response)) {
+        delete queryKeysRef.current[reportId]
         await loadReports(filtersRef.current)
         await loadStats()
       }
@@ -461,7 +480,7 @@ export default function SIREPage() {
                                 <Button
                                   type="button"
                                   size="sm"
-                                  onClick={() => sendToSunat(report.id)}
+                                  onClick={() => setPendingAcceptanceId(report.id)}
                                   disabled={activeSunatSendId === report.id}
                                   className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500"
                                 >
@@ -568,6 +587,38 @@ export default function SIREPage() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleReportGenerated}
       />
+
+      {pendingAcceptanceId ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sire-accept-title"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-cyan-400/25 bg-card p-6 text-foreground shadow-2xl shadow-cyan-950/40">
+            <h2 id="sire-accept-title" className="text-xl font-semibold">Aceptar propuesta SIRE</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Esta acción enviará la aceptación de la propuesta oficial RVIE/RCE a SUNAT. La generación final del libro seguirá realizándose en SOL.
+            </p>
+            <div className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-800 dark:text-amber-100">
+              {(() => {
+                const report = reports.find(item => item.id === pendingAcceptanceId)
+                return report
+                  ? `${report.tipo_display || report.tipoReporte} · período ${report.periodo}`
+                  : 'Reporte seleccionado'
+              })()}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setPendingAcceptanceId(null)}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={() => sendToSunat(pendingAcceptanceId)}>
+                Confirmar aceptación
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

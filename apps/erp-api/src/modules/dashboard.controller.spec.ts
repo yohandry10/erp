@@ -6,7 +6,7 @@ describe('DashboardController', () => {
     const dashboardMetrics = {
       getStats: jest.fn().mockRejectedValue(new Error('database unavailable')),
     };
-    const controller = new DashboardController({} as any, dashboardMetrics as any);
+    const controller = new DashboardController(dashboardMetrics as any);
 
     await expect(controller.getStats('tenant-dashboard')).rejects.toBeInstanceOf(InternalServerErrorException);
   });

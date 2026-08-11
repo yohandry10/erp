@@ -9,6 +9,7 @@ import {
   Max,
   MaxLength,
   IsISO8601,
+  IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -27,6 +28,14 @@ export enum CondicionPago {
 }
 
 export class ItemFacturaDto {
+  @IsOptional()
+  @IsUUID()
+  pedido_detalle_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  producto_id?: string;
+
   @IsString()
   codigo: string;
 
@@ -55,6 +64,24 @@ export class ItemFacturaDto {
   @IsNumber()
   @Min(0)
   precio_venta: number;
+
+  @IsOptional()
+  @IsString()
+  tipo_afectacion_igv?: string;
+
+  @IsOptional()
+  @IsString()
+  afectacion_igv?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  impuesto_isc?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  descuento_unitario?: number;
 }
 
 export class CreateFacturaDto {
@@ -108,6 +135,11 @@ export class CreateFacturaDto {
   @Min(0)
   total_igv: number;
 
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  total_isc?: number;
+
   @IsNumber()
   @Min(0)
   total_venta: number;
@@ -149,6 +181,24 @@ export class CreateFacturaDto {
   @IsOptional()
   @IsEnum(CondicionPago)
   condicion_pago?: CondicionPago;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.000001)
+  tipo_cambio?: number;
+
+  @IsOptional()
+  @IsUUID()
+  pedido_id?: string;
+
+  @IsOptional()
+  ajustes?: {
+    retencion?: number;
+    percepcion?: number;
+    detraccion?: number;
+    anticipo?: number;
+    detraccion_codigo?: string;
+  };
 
   @IsOptional()
   @IsString()

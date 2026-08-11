@@ -145,6 +145,7 @@ async function crearRecepcionCerradaParaDevolucion(page: Page): Promise<{ numero
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
       data: {
         orden_id: orden.id,
+        idempotency_key: `recepcion:${run}:devolucion`,
         almacen_id: almacenId,
         observaciones: 'Recepción setup UI devolución',
         items: [

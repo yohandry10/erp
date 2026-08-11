@@ -155,46 +155,71 @@ describe('PedidosService (cancelación)', () => {
     jest.clearAllMocks();
   });
 
-  it('debe ser idempotente liberando reserva si falla updateEstado y se reintenta', async () => {
-    jest.spyOn(service as any, 'findOne').mockResolvedValue({
-      id: 'pedido-1',
-      numero: 'PV-0001',
-      estado: 'CONFIRMADO',
-      observaciones: null,
-      detalle: [
-        {
-          id: 'det-1',
-          producto_id: 'prod-1',
-          cantidad: 2,
-        },
-      ],
+  it('delega toda la cancelación y el retorno físico a una sola RPC 467', async () => {
+    mockSupabaseClient.rpc.mockResolvedValue({
+      data: {
+        pedido_id: 'pedido-1',
+        numero: 'PV-0001',
+        estado: 'CANCELADO',
+        event_id: 'event-1',
+        movimientos_retorno: [{ reverse_movement_id: 'mov-reverse-1' }],
+        idempotent: false,
+      },
+      error: null,
     });
 
-    const updateEstadoSpy = jest
-      .spyOn(service as any, 'updateEstado')
-      .mockRejectedValueOnce(new Error('db error'))
-      .mockResolvedValueOnce(undefined);
+    await expect(
+      service.cancelarPedido(
+        'pedido-1',
+        'tenant-1',
+        'Mercadería retornada',
+        'user-1',
+        'cancel-key-1',
+        true,
+      ),
+    ).resolves.toEqual(expect.objectContaining({
+      success: true,
+      estado: 'CANCELADO',
+      event_id: 'event-1',
+      movimientos_retorno: [{ reverse_movement_id: 'mov-reverse-1' }],
+    }));
 
-    mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: null });
-
-    await expect(service.cancelarPedido('pedido-1', 'tenant-1', 'motivo')).rejects.toBeInstanceOf(Error);
-    await expect(service.cancelarPedido('pedido-1', 'tenant-1', 'motivo')).resolves.toEqual({ success: true });
-
-    expect(updateEstadoSpy).toHaveBeenCalledTimes(2);
-    expect(mockSupabaseClient.__spies.insert).not.toHaveBeenCalled();
-    expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(2);
-    expect(mockSupabaseClient.rpc).toHaveBeenNthCalledWith(1, 'liberar_reservas_pedido_tx', expect.any(Object));
-    expect(mockSupabaseClient.rpc).toHaveBeenNthCalledWith(2, 'liberar_reservas_pedido_tx', expect.any(Object));
+    expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
+    expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('cancelar_pedido_venta_tx', {
+      p_pedido_id: 'pedido-1',
+      p_tenant_id: 'tenant-1',
+      p_actor_id: 'user-1',
+      p_motivo: 'Mercadería retornada',
+      p_idempotency_key: 'cancel-key-1',
+      p_confirmar_retorno_fisico: true,
+    });
+    expect(mockSupabaseClient.from).not.toHaveBeenCalled();
   });
 
-  it('bloquea cancelar pedidos facturados', async () => {
-    jest.spyOn(service as any, 'findOne').mockResolvedValue({
-      id: 'pedido-1',
-      numero: 'PV-0001',
-      estado: 'FACTURADO',
-      detalle: [],
+  it('expone como requisito de dominio el retorno físico antes de cancelar', async () => {
+    mockSupabaseClient.rpc.mockResolvedValue({
+      data: null,
+      error: { message: 'ORDER_CANCELLATION_REQUIRES_PHYSICAL_RETURN' },
     });
 
-    await expect(service.cancelarPedido('pedido-1', 'tenant-1')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.cancelarPedido(
+        'pedido-1', 'tenant-1', 'Cancelación logística',
+        'user-1', 'cancel-key-2', false,
+      ),
+    ).rejects.toThrow('devolución física');
+  });
+
+  it('exige actor, motivo e idempotency key antes de invocar la base', async () => {
+    await expect(
+      service.cancelarPedido('pedido-1', 'tenant-1', 'motivo', undefined, 'cancel-key'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.cancelarPedido('pedido-1', 'tenant-1', 'x', 'user-1', 'cancel-key'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.cancelarPedido('pedido-1', 'tenant-1', 'motivo', 'user-1', 'short'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
   });
 });

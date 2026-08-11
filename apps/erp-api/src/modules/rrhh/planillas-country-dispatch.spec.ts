@@ -20,19 +20,153 @@ const thenableQuery = (result: any) => {
 };
 
 describe('PlanillasService approval persistence', () => {
-  it('no anuncia aprobación cuando el trigger devuelve la planilla como calculada', async () => {
-    const query: any = {
-      update: jest.fn(() => query),
-      eq: jest.fn(() => query),
-      select: jest.fn().mockResolvedValue({ data: [{ id: 'plan-1', estado: 'calculada' }], error: null }),
-    };
+  it('crea siempre en borrador y descarta campos de ciclo/totales enviados por el cliente', async () => {
+    const select = jest.fn().mockResolvedValue({
+      data: [{ id: 'plan-1', estado: 'borrador' }],
+      error: null,
+    });
+    const insert = jest.fn().mockReturnValue({ select });
     const service = new PlanillasService(
-      { getClient: () => ({ from: () => query }) } as any,
+      { getClient: () => ({ from: () => ({ insert }) }) } as any,
       {} as any,
     );
 
-    await expect(service.updatePlanilla('plan-1', { estado: 'aprobada' }, 'tenant-1'))
+    await expect(service.crearPlanilla({
+      periodo: '2026-08',
+      estado: 'pagada',
+      estado_pago: 'pagado',
+      total_neto: 9999,
+      total_pagado: 9999,
+      asientos_generados: 'true',
+      metodo_pago: 'efectivo',
+      observaciones: 'Alta segura',
+    }, 'tenant-1')).resolves.toMatchObject({ id: 'plan-1' });
+
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      tenant_id: 'tenant-1',
+      periodo: '2026-08',
+      estado: 'borrador',
+      estado_pago: 'pendiente',
+      total_neto: 0,
+      total_pagado: 0,
+      asientos_generados: 'false',
+      metadata: { observaciones: 'Alta segura' },
+    }));
+    const payload = insert.mock.calls[0][0];
+    expect(payload.metodo_pago).toBeUndefined();
+  });
+
+  it('delega el alias PUT a la RPC que aprueba y deja el devengo durable', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: {
+        success: true,
+        eventId: '44444444-4444-4444-8444-444444444444',
+        idempotent: false,
+      },
+      error: null,
+    });
+    const service = new PlanillasService(
+      { getClient: () => ({ rpc }) } as any,
+      {} as any,
+    );
+
+    await expect(service.updatePlanilla(
+      'plan-1',
+      { estado: 'aprobada' },
+      'tenant-1',
+      'user-1',
+    )).resolves.toMatchObject({ success: true, data: { eventId: expect.any(String) } });
+    expect(rpc).toHaveBeenCalledWith('aprobar_planilla_tx', {
+      p_tenant_id: 'tenant-1',
+      p_planilla_id: 'plan-1',
+      p_usuario_id: 'user-1',
+    });
+  });
+
+  it('rechaza saltos de estado distintos del alias de aprobación', async () => {
+    const service = new PlanillasService({} as any, {} as any);
+    await expect(service.updatePlanilla('plan-1', { estado: 'pagada' }, 'tenant-1'))
       .rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('retira pagos parciales del alias legado y delega el conjunto completo', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: { success: true, totalPagado: 2640, empleadosPagados: 2 },
+      error: null,
+    });
+    const detallesQuery = thenableQuery({
+      data: [{ id: 'detalle-1' }, { id: 'detalle-2' }],
+      error: null,
+    });
+    const service = new PlanillasService(
+      {
+        getClient: () => ({
+          from: jest.fn(() => detallesQuery),
+          rpc,
+        }),
+      } as any,
+      {} as any,
+    );
+
+    await expect(service.pagarEmpleadosSeleccionados(
+      'plan-1',
+      { empleados_ids: ['detalle-1'], metodo_pago: 'transferencia' },
+      'tenant-1',
+      'user-1',
+    )).rejects.toBeInstanceOf(ConflictException);
+    expect(rpc).not.toHaveBeenCalled();
+
+    await expect(service.pagarEmpleadosSeleccionados(
+      'plan-1',
+      { empleados_ids: [], metodo_pago: 'transferencia' },
+      'tenant-1',
+      'user-1',
+    )).rejects.toBeInstanceOf(ConflictException);
+    expect(rpc).not.toHaveBeenCalled();
+
+    await expect(service.pagarEmpleadosSeleccionados(
+      'plan-1',
+      { empleados_ids: ['detalle-1', 'detalle-2'], metodo_pago: 'transferencia' },
+      'tenant-1',
+      'user-1',
+    )).resolves.toMatchObject({ success: true, data: { empleadosPagados: 2 } });
+    expect(rpc).toHaveBeenCalledWith('pagar_planilla_completa_tx', {
+      p_tenant_id: 'tenant-1',
+      p_planilla_id: 'plan-1',
+      p_metodo_pago: 'transferencia',
+      p_usuario_id: 'user-1',
+    });
+  });
+
+  it('delega /pagos/:id/procesar a la planilla vinculada', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: { success: true, totalPagado: 900, empleadosPagados: 1 },
+      error: null,
+    });
+    const pagoQuery: any = {
+      select: jest.fn(() => pagoQuery),
+      eq: jest.fn(() => pagoQuery),
+      maybeSingle: jest.fn().mockResolvedValue({
+        data: {
+          id: 'pago-1',
+          planilla_id: 'plan-1',
+          metodo_pago: 'transferencia',
+        },
+        error: null,
+      }),
+    };
+    const service = new PlanillasService(
+      { getClient: () => ({ from: () => pagoQuery, rpc }) } as any,
+      {} as any,
+    );
+
+    await expect(service.procesarPagoLegado('pago-1', 'tenant-1', 'user-1'))
+      .resolves.toMatchObject({ success: true });
+    expect(rpc).toHaveBeenCalledWith('pagar_planilla_completa_tx', expect.objectContaining({
+      p_planilla_id: 'plan-1',
+      p_metodo_pago: 'transferencia',
+      p_usuario_id: 'user-1',
+    }));
   });
 });
 

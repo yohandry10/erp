@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import * as crypto from 'crypto';
 
 export enum CashAuditEvent {
     CONSULTA_SALDO = 'CONSULTA_SALDO',
@@ -67,22 +68,37 @@ export class CashAuditService {
         metadata: Record<string, any> = {},
     ): Promise<void> {
         this.logger.log(`Registrando evento de auditoría: ${evento}`);
-
-        const { error } = await this.supabase
-            .getClient()
-            .from('caja_audit_log')
-            .insert([
-                {
-                    evento,
-                    sesion_caja_id: sesionCajaId || null,
-                    usuario_id: userId || null,
-                    ip_address: metadata.ip || null,
-                    user_agent: metadata.userAgent || null,
-                    parametros: metadata.parametros || null,
+        if (!userId) {
+            this.logger.warn(`Auditoría ${evento} omitida: no existe actor autenticado`);
+            return;
+        }
+        const canonical = JSON.stringify({
+            evento,
+            tenantId,
+            userId,
+            sesionCajaId: sesionCajaId || null,
+            parametros: metadata.parametros || {},
+            resultado: metadata.resultado || null,
+        });
+        const idempotencyKey = `cash-audit-474:${crypto
+            .createHash('sha256')
+            .update(canonical)
+            .digest('hex')}`;
+        const { error } = await this.supabase.getClient().rpc(
+            'registrar_auditoria_caja_tx',
+            {
+                p_tenant_id: tenantId,
+                p_event: evento,
+                p_actor_id: userId,
+                p_session_id: sesionCajaId || null,
+                p_metadata: {
+                    parametros: metadata.parametros || {},
                     resultado: metadata.resultado || null,
-                    tenant_id: tenantId,
+                    riesgo: metadata.riesgo || 'BAJO',
                 },
-            ]);
+                p_idempotency_key: idempotencyKey,
+            },
+        );
 
         if (error) {
             this.logger.error(`Error registrando evento de auditoría: ${error.message}`, error);
@@ -312,28 +328,10 @@ export class CashAuditService {
      * Debe ejecutarse periódicamente (cron job)
      */
     async limpiarEventosAntiguos(tenantId: string): Promise<number> {
-        const fechaLimite = new Date();
-        fechaLimite.setDate(fechaLimite.getDate() - this.RETENCION_DIAS);
-
-        const { data, error } = await this.supabase
-            .getClient()
-            .from('caja_audit_log')
-            .delete()
-            .eq('tenant_id', tenantId)
-            .lt('timestamp', fechaLimite.toISOString())
-            .select('id');
-
-        if (error) {
-            this.logger.error(`Error limpiando eventos antiguos: ${error.message}`);
-            return 0;
-        }
-
-        const eliminados = data?.length || 0;
-        if (eliminados > 0) {
-            this.logger.log(`Eventos antiguos eliminados: ${eliminados}`);
-        }
-
-        return eliminados;
+        this.logger.warn(
+            `Retención read-only para ${tenantId}: no se borran eventos desde runtime (${this.RETENCION_DIAS} días configurados)`,
+        );
+        return 0;
     }
 
     /**

@@ -11,7 +11,7 @@ interface TicketPrintProps {
     total: number
     subtotal: number
     impuestos: number
-    tipo_comprobante?: '01' | '03'
+    tipo_comprobante?: 'TICKET' | '01' | '03'
     cliente_nombre?: string
     cliente_documento?: string
     cliente_tipo_documento?: string

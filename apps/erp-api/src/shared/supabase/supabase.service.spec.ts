@@ -82,6 +82,16 @@ describe('SupabaseService', () => {
     expect(service).toBeDefined();
   });
 
+  it('permite sólo el RPC atómico de alta demo y retira el writer parcial', () => {
+    const { service } = buildService();
+    const publicClient = service.getPublicClient();
+
+    expect(() => publicClient.rpc('create_demo_tenant_ready_tx')).not.toThrow();
+    expect(() => publicClient.rpc('create_demo_tenant')).toThrow(
+      /Public Supabase client blocked for RPC "create_demo_tenant"/,
+    );
+  });
+
   it('rechaza RPC no permitido en cliente público', () => {
     const { service } = buildService();
     const publicClient = service.getPublicClient();

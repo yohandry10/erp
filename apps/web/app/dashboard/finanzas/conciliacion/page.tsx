@@ -469,6 +469,9 @@ function NewConciliacionForm({
   });
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState(
+    () => `recon-create:${crypto.randomUUID()}`,
+  );
 
   useEffect(() => {
     if (!formData.cuenta_bancaria_id && cuentasBancarias[0]?.id) {
@@ -497,7 +500,10 @@ function NewConciliacionForm({
     try {
       setSubmitting(true);
       setErrorMessage("");
-      const response = await post("/api/finanzas/conciliacion", formData);
+      const response = await post("/api/finanzas/conciliacion", {
+        ...formData,
+        idempotency_key: idempotencyKey,
+      });
 
       if (response?.success) {
         alert("✅ Conciliación creada exitosamente");
@@ -526,7 +532,10 @@ function NewConciliacionForm({
           <Label htmlFor="nueva-conciliacion-cuenta">Cuenta bancaria *</Label>
           <Select
             value={formData.cuenta_bancaria_id}
-            onValueChange={(value) => setFormData({ ...formData, cuenta_bancaria_id: value })}
+            onValueChange={(value) => {
+              setFormData({ ...formData, cuenta_bancaria_id: value });
+              setIdempotencyKey(`recon-create:${crypto.randomUUID()}`);
+            }}
           >
             <SelectTrigger id="nueva-conciliacion-cuenta" aria-label="Cuenta bancaria" className="h-11 rounded-xl bg-background">
               <SelectValue placeholder="Selecciona una cuenta" />
@@ -547,9 +556,10 @@ function NewConciliacionForm({
             id="nueva-conciliacion-periodo"
             type="month"
             value={formData.periodo}
-            onChange={(e) =>
-              setFormData({ ...formData, periodo: e.target.value })
-            }
+            onChange={(e) => {
+              setFormData({ ...formData, periodo: e.target.value });
+              setIdempotencyKey(`recon-create:${crypto.randomUUID()}`);
+            }}
             placeholder="AAAA-MM"
             required
           />
@@ -561,9 +571,10 @@ function NewConciliacionForm({
             id="nueva-conciliacion-desde"
             type="date"
             value={formData.fecha_desde}
-            onChange={(e) =>
-              setFormData({ ...formData, fecha_desde: e.target.value })
-            }
+            onChange={(e) => {
+              setFormData({ ...formData, fecha_desde: e.target.value });
+              setIdempotencyKey(`recon-create:${crypto.randomUUID()}`);
+            }}
             required
           />
         </div>
@@ -574,9 +585,10 @@ function NewConciliacionForm({
             id="nueva-conciliacion-hasta"
             type="date"
             value={formData.fecha_hasta}
-            onChange={(e) =>
-              setFormData({ ...formData, fecha_hasta: e.target.value })
-            }
+            onChange={(e) => {
+              setFormData({ ...formData, fecha_hasta: e.target.value });
+              setIdempotencyKey(`recon-create:${crypto.randomUUID()}`);
+            }}
             required
           />
         </div>

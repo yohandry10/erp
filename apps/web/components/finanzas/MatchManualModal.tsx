@@ -141,6 +141,7 @@ export default function MatchManualModal({
           body: JSON.stringify({
             movimiento_sistema_id: selectedSistema,
             movimiento_extracto_id: selectedExtracto,
+            idempotency_key: `recon-match:${conciliacionId}:${selectedSistema}:${selectedExtracto}`,
           }),
         }
       );
@@ -195,7 +196,10 @@ export default function MatchManualModal({
   const canMatch = () => {
     const sistema = getSelectedSistemaMovimiento();
     const extracto = getSelectedExtractoMovimiento();
-    return sistema && extracto && sistema.tipo === extracto.tipo;
+    return Boolean(
+      sistema && extracto && sistema.tipo === extracto.tipo &&
+      Number(sistema.monto).toFixed(2) === Number(extracto.monto).toFixed(2),
+    );
   };
 
   return (
@@ -353,7 +357,7 @@ export default function MatchManualModal({
             </div>
             {!canMatch() && (
               <div className="mt-3 text-sm text-destructive">
-                ⚠️ Los tipos de movimiento no coinciden. No se puede realizar el match.
+                Los tipos y montos deben coincidir exactamente. Registre primero un ajuste contable explícito si existe una diferencia.
               </div>
             )}
           </div>

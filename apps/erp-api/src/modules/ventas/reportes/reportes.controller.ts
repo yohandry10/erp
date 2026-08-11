@@ -238,10 +238,17 @@ export class ReportesController {
   })
   async getAging(
     @CurrentTenant() tenantId: string,
-    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaCorte') fechaCorte?: string,
     @Query('fechaHasta') fechaHasta?: string,
+    @Query('cliente') cliente?: string,
   ) {
-    const data = await this.reportesService.getAgingCxc(tenantId, fechaDesde, fechaHasta);
+    // fechaHasta se conserva como alias para clientes anteriores. Un aging es
+    // un snapshot al corte: una fecha inicial excluiría deuda histórica aún viva.
+    const data = await this.reportesService.getAgingCxc(
+      tenantId,
+      fechaCorte || fechaHasta,
+      cliente,
+    );
     return { success: true, data };
   }
 

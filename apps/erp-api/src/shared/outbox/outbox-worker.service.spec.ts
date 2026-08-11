@@ -45,6 +45,9 @@ describe('OutboxWorker', () => {
     'factura.emitida',
     'factura.proveedor.registrada',
     'FacturaProveedorRegistrada',
+    'cobro.revertido',
+    'saldo_favor.reembolso_revertido',
+    'cxc.ajuste.revertido',
   ])('deja %s al ContabilidadEventsListener para evitar carreras contables', async (eventType) => {
     const pendingEvent = {
       id: 'outbox-row-1',

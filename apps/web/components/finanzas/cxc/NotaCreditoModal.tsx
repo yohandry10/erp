@@ -1,8 +1,6 @@
 ﻿'use client'
 
-'use client'
-
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -50,6 +48,7 @@ export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCre
   const [notas, setNotas] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const retryIntent = useRef<{ fingerprint: string; key: string } | null>(null)
 
   useEffect(() => {
     if (!isOpen || !cuenta) {
@@ -87,14 +86,7 @@ export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCre
     try {
       setSubmitting(true)
       setError(null)
-      const generateIdempotencyKey = () => {
-        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-          return crypto.randomUUID()
-        }
-        return `cxc-nota-credito-${Date.now()}`
-      }
-
-      const payload = {
+      const basePayload = {
         monto: montoNumber,
         fecha_emision: fechaEmision,
         serie: serie || undefined,
@@ -102,11 +94,21 @@ export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCre
         motivo: motivo || undefined,
         referencia: referencia || undefined,
         notas: notas || undefined,
-        idempotency_key: generateIdempotencyKey(),
+        codigo_motivo: '10',
       }
+
+      const fingerprint = JSON.stringify(basePayload)
+      if (!retryIntent.current || retryIntent.current.fingerprint !== fingerprint) {
+        retryIntent.current = {
+          fingerprint,
+          key: `cxc-note-ui:${crypto.randomUUID()}`,
+        }
+      }
+      const payload = { ...basePayload, idempotency_key: retryIntent.current.key }
 
       const response = await post(`/api/finanzas/cxc/${cuenta.id}/notas-credito`, payload)
       if (response) {
+        retryIntent.current = null
         onSuccess()
         onClose()
       }

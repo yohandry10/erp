@@ -133,6 +133,7 @@ async function createTenant(context: APIRequestContext, label: string, password:
   const slug = `${label.toLowerCase()}-${runId}`.replace(/[^a-z0-9-]/g, '');
   const adminEmail = `admin.${slug}@erp.local`;
   const response = await context.post(api('/tenants'), {
+    headers: { 'Idempotency-Key': `tenant-create-${slug}` },
     data: {
       ruc: uniqueRuc(),
       razon_social: `QA Tenant ${label} ${runId} SAC`,

@@ -58,7 +58,7 @@ const createInitialState = (): WizardState => ({
       title: 'Certificado Digital',
       description: 'Carga de certificado digital',
       isComplete: false,
-      isRequired: true,
+      isRequired: false,
     },
     {
       id: 'fiscal',
@@ -72,7 +72,7 @@ const createInitialState = (): WizardState => ({
       title: 'Autoridad Fiscal',
       description: 'Conexión con la autoridad fiscal del país',
       isComplete: false,
-      isRequired: true,
+      isRequired: false,
     },
     {
       id: 'validation',
@@ -128,7 +128,7 @@ const createInitialState = (): WizardState => ({
     sunat_gre_auth_url: '',
     sunat_gre_client_id: '',
     sunat_gre_client_secret: '',
-    sire_activo: true,
+    sire_activo: false,
     sunat_cert_expected_ruc: '',
     sunat_cert_ruc_mismatch_confirmed: false,
     sunat_cert_ruc_mismatch_reason: '',

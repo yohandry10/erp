@@ -20,6 +20,8 @@ import {
 } from 'lucide-react'
 import MovimientosBancariosTable from '@/components/finanzas/MovimientosBancariosTable'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { MovimientoBancarioModal } from '@/components/finanzas/MovimientoBancarioModal'
+import { TransferenciaBancariaModal } from '@/components/finanzas/TransferenciaBancariaModal'
 
 interface CuentaBancaria {
   id: string
@@ -33,6 +35,7 @@ interface CuentaBancaria {
   activa: boolean
   created_at: string
   updated_at: string
+  cuenta_contable_id?: string
 }
 
 interface MovimientoBancario {
@@ -85,6 +88,7 @@ const normalizeCuenta = (raw: any): CuentaBancaria => ({
   activa: raw?.activa ?? raw?.estado !== 'INACTIVA',
   created_at: raw?.created_at || '',
   updated_at: raw?.updated_at || '',
+  cuenta_contable_id: raw?.cuenta_contable_id || undefined,
 })
 
 export default function CuentaBancariaDetallePage() {
@@ -99,6 +103,8 @@ export default function CuentaBancariaDetallePage() {
   const [loading, setLoading] = useState(true)
   const [loadingMovimientos, setLoadingMovimientos] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
+  const [showMovementModal, setShowMovementModal] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
   const [filters, setFilters] = useState<Filters>({})
   const [pagination, setPagination] = useState({
     page: 1,
@@ -298,6 +304,22 @@ export default function CuentaBancariaDetallePage() {
         </div>
         <div className="flex gap-4 items-center">
           <button
+            onClick={() => setShowTransferModal(true)}
+            disabled={!cuenta.cuenta_contable_id}
+            title={!cuenta.cuenta_contable_id ? 'Configure primero la cuenta contable bancaria' : undefined}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+          >
+            Transferir
+          </button>
+          <button
+            onClick={() => setShowMovementModal(true)}
+            disabled={!cuenta.cuenta_contable_id}
+            title={!cuenta.cuenta_contable_id ? 'Configure primero la cuenta contable bancaria' : undefined}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold disabled:opacity-50"
+          >
+            Nuevo movimiento
+          </button>
+          <button
             onClick={() => {
               loadCuenta()
               loadMovimientos(pagination.page)
@@ -309,6 +331,27 @@ export default function CuentaBancariaDetallePage() {
           </button>
         </div>
       </div>
+
+      <MovimientoBancarioModal
+        open={showMovementModal}
+        cuenta={cuenta}
+        onClose={() => setShowMovementModal(false)}
+        onSuccess={() => {
+          setShowMovementModal(false)
+          loadCuenta()
+          loadMovimientos(1)
+        }}
+      />
+      <TransferenciaBancariaModal
+        open={showTransferModal}
+        origen={cuenta}
+        onClose={() => setShowTransferModal(false)}
+        onSuccess={() => {
+          setShowTransferModal(false)
+          loadCuenta()
+          loadMovimientos(1)
+        }}
+      />
 
       {/* Cuenta Info Card */}
       <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-8">

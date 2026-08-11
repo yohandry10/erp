@@ -258,10 +258,10 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cerrar sesión' })
   @ApiResponse({ status: 200, description: 'Sesión cerrada' })
-  async logout(@Request() req, @NestResponse({ passthrough: true }) response: ExpressResponse, @Body('sessionToken') sessionToken?: string) {
-    const tokenToRevoke = sessionToken || req.user?.session_token;
+  async logout(@Request() req, @NestResponse({ passthrough: true }) response: ExpressResponse) {
+    const tokenToRevoke = req.user?.session_token;
     if (tokenToRevoke) {
-      await this.authService.revokeSession(tokenToRevoke);
+      await this.authService.revokeSession(tokenToRevoke, req.user.id);
     }
     this.clearAuthCookie(response);
     return { message: 'Sesión cerrada exitosamente' };

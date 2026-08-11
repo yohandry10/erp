@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Briefcase, Loader2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api-fetch';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,7 @@ export default function VacanteModal({
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const mutationIntents = useRef(new Map<string, string>());
 
   useEffect(() => {
     if (!isOpen) {
@@ -92,20 +93,27 @@ export default function VacanteModal({
     if (!validateForm()) return;
 
     setLoading(true);
+    const payload = {
+      ...formData,
+      salario_minimo: formData.salario_minimo ? parseFloat(formData.salario_minimo) : null,
+      salario_maximo: formData.salario_maximo ? parseFloat(formData.salario_maximo) : null,
+    };
+    const signature = JSON.stringify(payload);
+    const existing = mutationIntents.current.get(signature);
+    const intent = existing || `rrhh-vacancy:${crypto.randomUUID()}`;
+    mutationIntents.current.set(signature, intent);
     try {
       const response = await fetchApi('/api/rrhh/vacantes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Idempotency-Key': intent,
         },
-        body: JSON.stringify({
-          ...formData,
-          salario_minimo: formData.salario_minimo ? parseFloat(formData.salario_minimo) : null,
-          salario_maximo: formData.salario_maximo ? parseFloat(formData.salario_maximo) : null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
+        mutationIntents.current.delete(signature);
         onSuccess();
         onClose();
       } else {

@@ -1,7 +1,6 @@
-import { IsString, IsUUID, IsOptional, IsArray, ValidateNested, IsDateString, IsEnum, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import { IsString, IsUUID, IsOptional, IsArray, ValidateNested, IsDateString, ArrayMinSize, ArrayMaxSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CotizacionDetalleDto } from './cotizacion-detalle.dto';
-import { EstadoCotizacion } from '../entities/cotizacion.entity';
 
 /**
  * UpdateCotizacionDto
@@ -16,10 +15,6 @@ export class UpdateCotizacionDto {
   @IsOptional()
   @IsDateString({}, { message: 'La fecha de vencimiento debe ser una fecha válida' })
   fecha_vencimiento?: string;
-
-  @IsOptional()
-  @IsEnum(EstadoCotizacion, { message: 'El estado debe ser válido' })
-  estado?: EstadoCotizacion;
 
   @IsOptional()
   @IsArray({ message: 'El detalle debe ser un array' })

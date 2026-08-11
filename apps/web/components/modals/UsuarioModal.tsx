@@ -39,6 +39,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
   })
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<any>({})
+  const [idempotencyKey, setIdempotencyKey] = useState('')
   const { toast } = useToast()
   const { post, put } = useApi()
 
@@ -65,6 +66,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
         rol_id: '',
         estado: 'ACTIVO'
       })
+      if (isOpen) setIdempotencyKey(crypto.randomUUID())
     }
     setErrors({})
   }, [usuario, isOpen])
@@ -122,6 +124,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
         telefono: formData.telefono,
         rol_id: formData.rol_id,
         estado: formData.estado,
+        ...(!isEdit ? { idempotency_key: idempotencyKey } : {}),
         ...(formData.password && !isEdit ? { password: formData.password } : {})
       }
 

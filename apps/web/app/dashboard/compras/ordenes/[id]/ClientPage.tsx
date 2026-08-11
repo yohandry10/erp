@@ -66,15 +66,28 @@ interface OrdenCompra {
   updated_at: string
 }
 
-type EstadoOrden = 'BORRADOR' | 'APROBACION' | 'APROBADA' | 'PARCIAL' | 'RECIBIDA' | 'CERRADA' | 'ANULADA'
+type EstadoOrden =
+  | 'BORRADOR'
+  | 'PENDIENTE'
+  | 'APROBACION'
+  | 'APROBADA'
+  | 'PARCIAL'
+  | 'RECIBIDA'
+  | 'ENTREGADO'
+  | 'ENTREGADA'
+  | 'RECHAZADA'
+  | 'ANULADA'
 
 const ESTADOS_CONFIG: Record<EstadoOrden, { label: string; icon: any; className: string }> = {
   BORRADOR: { label: 'Borrador', icon: Edit, className: 'bg-muted/80 text-foreground ring-slate-500/40' },
+  PENDIENTE: { label: 'Pendiente', icon: Clock, className: 'bg-blue-500/20 text-primary dark:text-blue-200 ring-blue-400/40' },
   APROBACION: { label: 'En Aprobación', icon: Clock, className: 'bg-blue-500/20 text-primary dark:text-blue-200 ring-blue-400/40' },
   APROBADA: { label: 'Aprobada', icon: CheckCircle, className: 'bg-blue-500/25 text-primary dark:text-blue-200 ring-blue-300/40' },
   PARCIAL: { label: 'Parcial', icon: Package, className: 'bg-cyan-500/20 text-primary ring-cyan-300/40' },
   RECIBIDA: { label: 'Recibida', icon: CheckCircle, className: 'bg-cyan-500/25 text-primary ring-cyan-300/40' },
-  CERRADA: { label: 'Cerrada', icon: FileText, className: 'bg-muted/80 text-foreground ring-slate-500/40' },
+  ENTREGADO: { label: 'Entregada', icon: CheckCircle, className: 'bg-cyan-500/25 text-primary ring-cyan-300/40' },
+  ENTREGADA: { label: 'Entregada', icon: CheckCircle, className: 'bg-cyan-500/25 text-primary ring-cyan-300/40' },
+  RECHAZADA: { label: 'Rechazada', icon: XCircle, className: 'bg-muted text-foreground ring-slate-500/40' },
   ANULADA: { label: 'Anulada', icon: XCircle, className: 'bg-muted text-foreground ring-slate-500/40' }
 }
 
@@ -102,6 +115,7 @@ export default function OrdenCompraDetallePage() {
   const [error, setError] = useState<string | null>(null)
   const [showAprobarModal, setShowAprobarModal] = useState(false)
   const [showRechazarModal, setShowRechazarModal] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
 
   const ordenId = params.id as string | undefined
 
@@ -215,6 +229,26 @@ export default function OrdenCompraDetallePage() {
     }
   }
 
+  const handleCancelar = async () => {
+    const motivo = prompt('Ingrese el motivo de la cancelación:')?.trim()
+    if (!motivo) return
+    try {
+      setActionLoading(true)
+      const response = await post(`/api/compras/ordenes/${params.id}/cancelar`, {
+        motivo_cancelacion: motivo,
+      })
+      if (!response?.success) {
+        throw new Error(response?.message || 'No se pudo cancelar la orden')
+      }
+      await loadOrden()
+      toast.success('Orden de compra cancelada')
+    } catch (err: any) {
+      toast.error(`Error: ${err.message || 'No se pudo cancelar la orden'}`)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className={pageClass}>
@@ -264,11 +298,15 @@ export default function OrdenCompraDetallePage() {
               <RefreshCw size={16} />
               Actualizar
             </button>
-            {orden.estado === 'BORRADOR' && (
-              <ProtectedComponent modulo="compras" accion="update" recurso="ordenes" fallback={null}>
-                <button onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/editar`)} className={primaryActionClass}>
-                  <Edit size={16} />
-                  Editar
+            {['BORRADOR', 'PENDIENTE', 'APROBACION', 'APROBADA'].includes(orden.estado) && (
+              <ProtectedComponent modulo="compras" accion="cancelar" recurso="ordenes" fallback={null}>
+                <button
+                  onClick={handleCancelar}
+                  disabled={actionLoading}
+                  className={secondaryActionClass}
+                >
+                  <XCircle size={16} />
+                  Cancelar
                 </button>
               </ProtectedComponent>
             )}

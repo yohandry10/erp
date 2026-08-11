@@ -1,16 +1,6 @@
-import { IsString, IsUUID, IsDate, IsOptional, IsNumber, IsEnum, IsArray, ValidateNested, Min, IsInt, ArrayMinSize } from 'class-validator';
+import { IsString, IsUUID, IsDate, IsOptional, IsNumber, IsArray, ValidateNested, Min, IsInt, ArrayMinSize, IsNotEmpty, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-
-export enum EstadoOrdenCompra {
-  BORRADOR = 'BORRADOR',
-  APROBACION = 'APROBACION',
-  APROBADA = 'APROBADA',
-  PARCIAL = 'PARCIAL',
-  RECIBIDA = 'RECIBIDA',
-  CERRADA = 'CERRADA',
-  ANULADA = 'ANULADA'
-}
 
 export class OrdenCompraDetalleDto {
   @ApiProperty({ description: 'ID del producto', example: '550e8400-e29b-41d4-a716-446655440001' })
@@ -31,14 +21,18 @@ export class OrdenCompraDetalleDto {
   @Min(0, { message: 'El precio unitario no puede ser negativo' })
   precio_unitario: number;
 
-  @ApiPropertyOptional({ description: 'Cantidad recibida', example: 0, default: 0 })
-  @IsOptional()
-  @IsNumber({}, { message: 'La cantidad recibida debe ser un número' })
-  @Min(0, { message: 'La cantidad recibida no puede ser negativa' })
-  cantidad_recibida?: number;
 }
 
 export class CreateOrdenCompraDto {
+  @ApiProperty({
+    description: 'Clave única del intento de creación para reintentos seguros',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  idempotency_key: string;
+
   @ApiProperty({ description: 'Número de orden de compra', example: 'OC-2024-001' })
   @IsString()
   numero: string;
@@ -46,11 +40,6 @@ export class CreateOrdenCompraDto {
   @ApiProperty({ description: 'ID del proveedor', example: '550e8400-e29b-41d4-a716-446655440002' })
   @IsUUID('4', { message: 'El proveedor_id debe ser un UUID válido' })
   proveedor_id: string;
-
-  @ApiPropertyOptional({ description: 'ID de la cotización origen', example: '550e8400-e29b-41d4-a716-446655440003' })
-  @IsOptional()
-  @IsUUID('4', { message: 'El cotizacion_id debe ser un UUID válido' })
-  cotizacion_id?: string;
 
   @ApiPropertyOptional({ description: 'Fecha de la orden', example: '2024-10-24' })
   @IsOptional()
@@ -79,15 +68,6 @@ export class CreateOrdenCompraDto {
   @IsOptional()
   @IsUUID('4', { message: 'El almacen_destino_id debe ser un UUID válido' })
   almacen_destino_id?: string;
-
-  @ApiPropertyOptional({ 
-    description: 'Estado de la orden', 
-    enum: EstadoOrdenCompra,
-    default: EstadoOrdenCompra.BORRADOR 
-  })
-  @IsOptional()
-  @IsEnum(EstadoOrdenCompra, { message: 'Estado de orden inválido' })
-  estado?: EstadoOrdenCompra;
 
   @ApiPropertyOptional({ description: 'Observaciones adicionales', example: 'Entregar en horario de oficina' })
   @IsOptional()

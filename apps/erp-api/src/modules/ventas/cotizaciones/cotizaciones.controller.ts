@@ -138,7 +138,8 @@ export class CotizacionesController {
     @Body() updateCotizacionDto: UpdateCotizacionDto,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.cotizacionesService.update(id, updateCotizacionDto, tenantId);
+    const data = await this.cotizacionesService.update(id, updateCotizacionDto, tenantId);
+    return { success: true, data };
   }
 
   /**
@@ -164,6 +165,50 @@ export class CotizacionesController {
     };
   }
 
+  @Post(':id/enviar')
+  @RequirePermission('ventas.cotizaciones.editar')
+  @ApiOperation({ summary: 'Marcar cotización como enviada' })
+  async enviar(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.cotizacionesService.cambiarEstado(
+      id, tenantId, EstadoCotizacion.ENVIADA, user?.id,
+    );
+    return { success: true, data };
+  }
+
+  @Post(':id/aprobar')
+  @RequirePermission('ventas.cotizaciones.approve')
+  @ApiOperation({ summary: 'Aprobar cotización con actor segregado' })
+  async aprobar(
+    @Param('id') id: string,
+    @Body() body: { motivo?: string },
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.cotizacionesService.cambiarEstado(
+      id, tenantId, EstadoCotizacion.APROBADA, user?.id, body?.motivo,
+    );
+    return { success: true, data };
+  }
+
+  @Post(':id/rechazar')
+  @RequirePermission('ventas.cotizaciones.approve')
+  @ApiOperation({ summary: 'Rechazar cotización con actor segregado' })
+  async rechazar(
+    @Param('id') id: string,
+    @Body() body: { motivo?: string },
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.cotizacionesService.cambiarEstado(
+      id, tenantId, EstadoCotizacion.RECHAZADA, user?.id, body?.motivo,
+    );
+    return { success: true, data };
+  }
+
   /**
    * POST /api/ventas/cotizaciones/:id/convertir-pedido - Convertir cotización a pedido
    * Requirements: 4.1, 4.2, 4.3, 4.6, 14.3
@@ -172,7 +217,7 @@ export class CotizacionesController {
   @RequirePermission('ventas.cotizaciones.convertir_pedido')
   @ApiOperation({
     summary: 'Convertir cotización a pedido',
-    description: 'Convierte una cotización aprobada en un pedido de venta',
+    description: 'Convierte una cotización vigente y elegible en un pedido de venta',
   })
   @ApiResponse({ status: 200, description: 'Cotización convertida exitosamente' })
   @ApiResponse({ status: 400, description: 'No se puede convertir la cotización' })

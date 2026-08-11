@@ -767,18 +767,24 @@ export class CashReportsService {
             integridad_hash: datos.sesion.hash_integridad ?? null,
         };
 
-        const { error } = await this.supabase
+        const { data: corte, error } = await this.supabase
             .getClient()
             .from('cortes_caja')
-            .insert([payload]);
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .eq('sesion_caja_id', sesionId)
+            .maybeSingle();
 
         if (error) {
-            this.logger.error(`No se pudo registrar corte de caja: ${error.message}`);
+            this.logger.error(`No se pudo consultar el corte de caja: ${error.message}`);
             throw error;
         }
-
-        this.logger.log(`✅ Corte de caja registrado para sesión ${sesionId}`);
-        return payload;
+        if (!corte) {
+            throw new BadRequestException(
+                'El corte no puede registrarse fuera de cerrar_caja_tx; no existe un cierre atómico para esta sesión',
+            );
+        }
+        return corte;
     }
 
     /**
@@ -887,12 +893,11 @@ export class CashReportsService {
             usuario_id: datos.sesion.cajero_id ?? datos.sesion.abierto_por ?? null,
         };
 
-        const { data: asiento, error: asientoError } = await this.supabase
-            .getClient()
-            .from('asientos_contables')
-            .insert([asientoPayload])
-            .select()
-            .single();
+        // Código legado deliberadamente no escritor. El return null superior
+        // es el contrato vigente: el asiento pertenece al evento por venta y la
+        // diferencia al outbox de caja; nunca se crea desde reportes.
+        const asiento = asientoExistente;
+        const asientoError = null;
 
         if (asientoError) {
             this.logger.error(`No se pudo registrar asiento de cierre: ${asientoError.message}`);
@@ -921,10 +926,7 @@ export class CashReportsService {
             return asiento;
         }
 
-        const { error: detalleError } = await this.supabase
-            .getClient()
-            .from('detalle_asientos')
-            .insert(detallesInsert);
+        const detalleError = null;
 
         if (detalleError) {
             this.logger.error(`No se pudieron insertar detalles de cierre: ${detalleError.message}`);
@@ -957,45 +959,9 @@ export class CashReportsService {
 
         const faltantes = codigos.filter((codigo) => !map[codigo] && POS_CUENTAS_RUNTIME[codigo]);
         for (const codigo of faltantes) {
-            const cuenta = POS_CUENTAS_RUNTIME[codigo];
-            const { data: creada, error: createError } = await this.supabase
-                .getClient()
-                .from('plan_cuentas')
-                .insert({
-                    tenant_id: tenantId,
-                    codigo,
-                    nombre: cuenta.nombre,
-                    tipo: cuenta.tipo,
-                    tipo_cuenta: cuenta.tipo,
-                    nivel: cuenta.nivel,
-                    acepta_movimiento: true,
-                    activo: true,
-                    estado: 'ACTIVO',
-                    metadata: {
-                        source: 'runtime_pos_close_standard_account',
-                    },
-                })
-                .select('id, codigo')
-                .single();
-
-            if (!createError && creada?.id) {
-                map[codigo] = creada.id;
-                continue;
-            }
-
-            if (createError?.code === '23505') {
-                const { data: existente } = await this.supabase
-                    .getClient()
-                    .from('plan_cuentas')
-                    .select('id, codigo')
-                    .eq('tenant_id', tenantId)
-                    .eq('codigo', codigo)
-                    .maybeSingle();
-
-                if (existente?.id) {
-                    map[codigo] = existente.id;
-                }
-            }
+            this.logger.warn(
+                `Cuenta ${codigo} ausente: reportes de caja son read-only y no crean plan contable en runtime`,
+            );
         }
         return map;
     }

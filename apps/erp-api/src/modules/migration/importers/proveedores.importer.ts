@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { ImporterResult, ImporterRowError } from '../dto/import.dto';
 import { ParsedCsv, nonEmpty, toBoolean, toNumber, validateHeaders } from '../util/csv-parser.util';
-import { toSafeIntegerDocumento, validateDocumento } from '../util/peru-doc.util';
+import { validateDocumento } from '../util/peru-doc.util';
 import { Importer, ImporterContext, emptyResult } from './importer.interface';
 import { MigrationRunsService } from '../migration-runs.service';
 
@@ -91,9 +91,20 @@ export class ProveedoresImporter implements Importer {
       } else if (TIPOS_DOC.has(tipoDoc)) {
         const docErr = validateDocumento(tipoDoc, numDoc);
         if (docErr) errs.push({ rowIndex, externalId, field: 'numero_documento', message: docErr });
+        else if (numDoc.length < 9 || numDoc.length > 20) {
+          errs.push({
+            rowIndex,
+            externalId,
+            field: 'numero_documento',
+            message: 'numero_documento debe tener entre 9 y 20 caracteres para el maestro de proveedores',
+          });
+        }
       }
       if (!nonEmpty(row['razon_social'])) {
         errs.push({ rowIndex, externalId, field: 'razon_social', message: 'razon_social requerido' });
+      }
+      if (!nonEmpty(row['email']) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row['email'])) {
+        errs.push({ rowIndex, externalId, field: 'email', message: 'email válido requerido por el maestro de proveedores' });
       }
       ['detraccion_tasa', 'retencion_tasa'].forEach((f) => {
         if (row[f]) {
@@ -149,27 +160,17 @@ export class ProveedoresImporter implements Importer {
 
       const tipoDoc = String(row['tipo_documento']).toUpperCase().trim();
       const numDocTexto = String(row['numero_documento']).trim();
-      const numDocInt = toSafeIntegerDocumento(numDocTexto);
-
       const payload: Record<string, any> = {
-        tenant_id: ctx.tenantId,
-        external_id: externalId,
-        tipo: String(row['tipo']).toUpperCase().trim(),
-        tipo_documento: tipoDoc,
         documento_tipo: tipoDoc,
-        numero_documento: numDocInt,
-        documento_numero: numDocInt,
+        documento_identidad: numDocTexto,
+        documento_numero: numDocTexto,
         razon_social: row['razon_social'],
-        nombre: row['razon_social'],
-        codigo: numDocTexto,
-        ruc: tipoDoc === 'RUC' ? numDocTexto : null,
         direccion: nonEmpty(row['direccion']),
         email: nonEmpty(row['email']),
+        telefono: nonEmpty(row['telefono']),
         pais: nonEmpty(row['pais']) ?? 'PE',
         sujeto_detraccion: toBoolean(row['sujeto_detraccion'], false),
         sujeto_retencion: toBoolean(row['sujeto_retencion'], false),
-        activo: true,
-        estado: 'ACTIVO',
       };
 
       const dt = toNumber(row['detraccion_tasa']);
@@ -177,54 +178,36 @@ export class ProveedoresImporter implements Importer {
       const rt = toNumber(row['retencion_tasa']);
       if (Number.isFinite(rt) && rt > 0) payload.retencion_tasa = rt;
 
-      const tel = nonEmpty(row['telefono']);
-      if (tel) payload.metadata = { telefono: tel };
-
       if (ctx.dryRun) {
         result.okRows++;
         continue;
       }
 
       try {
-        const { data: existing } = await client
-          .from('proveedores')
-          .select('id')
-          .eq('tenant_id', ctx.tenantId)
-          .eq('external_id', externalId)
-          .maybeSingle();
-
-        let targetId: string | null = null;
-        if (existing?.id) {
-          const { data, error } = await client
-            .from('proveedores')
-            .update({ ...payload, updated_at: new Date().toISOString() })
-            .eq('id', existing.id)
-            .eq('tenant_id', ctx.tenantId)
-            .select('id')
-            .single();
-          if (error) throw error;
-          targetId = data?.id ?? null;
-          result.updated++;
-        } else {
-          const { data, error } = await client
-            .from('proveedores')
-            .insert(payload)
-            .select('id')
-            .single();
-          if (error) throw error;
-          targetId = data?.id ?? null;
-          result.created++;
-        }
-        result.okRows++;
+        const { data, error } = await client.rpc('importar_proveedor_historico_tx', {
+          p_tenant_id: ctx.tenantId,
+          p_actor_id: ctx.startedBy,
+          p_run_id: ctx.runCtx?.runId ?? null,
+          p_external_id: externalId,
+          p_proveedor: payload,
+        });
+        if (error) throw error;
+        const targetId = data?.id ?? null;
+        const action = String(data?.action ?? '');
+        if (action === 'CREATED') result.created++;
+        else if (action === 'IDEMPOTENT') result.skippedRows++;
+        else result.updated++;
+        if (action !== 'IDEMPOTENT') result.okRows++;
         if (ctx.runCtx) {
           await this.runs.recordRow({
             runId: ctx.runCtx.runId,
             tenantId: ctx.tenantId,
             rowIndex,
             externalId,
-            status: 'ok',
+            status: action === 'IDEMPOTENT' ? 'skipped' : 'ok',
             targetTable: 'proveedores',
             targetId,
+            errorMessage: action === 'IDEMPOTENT' ? 'Fila ya aplicada con la misma huella' : null,
           });
         }
       } catch (err: any) {

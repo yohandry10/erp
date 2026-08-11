@@ -74,7 +74,10 @@ export class WorkerAuthGuard implements CanActivate {
 
             // Set user/context for the request
             request.user = {
-                id: 'worker-service',
+                // Las escrituras transaccionales guardan un actor real del
+                // tenant. El token worker debe atestiguarlo explícitamente;
+                // otros endpoints read/send conservan el principal técnico.
+                id: decoded.actor_id || decoded.user_id || decoded.sub || 'worker-service',
                 role: 'service_role',
                 tenant_id: effectiveTenant,
                 is_worker: true

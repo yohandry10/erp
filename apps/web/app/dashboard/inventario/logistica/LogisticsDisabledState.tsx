@@ -21,12 +21,23 @@ export function LogisticsDisabledState({ icon: Icon, title, description }: Logis
   const activateLogistics = async () => {
     try {
       setActivating(true)
-      const response = await put('/configuration/empresa', { usar_flujo_logistica: true })
+      const intentStorageKey = 'configuration-logistics-enable-intent'
+      let idempotencyKey = window.sessionStorage.getItem(intentStorageKey)
+      if (!idempotencyKey) {
+        idempotencyKey = `configuration-logistics-${window.crypto.randomUUID()}`
+        window.sessionStorage.setItem(intentStorageKey, idempotencyKey)
+      }
+      const response = await put(
+        '/configuration/empresa',
+        { usar_flujo_logistica: true },
+        { headers: { 'Idempotency-Key': idempotencyKey } },
+      )
 
       if (!response?.success) {
         throw new Error(response?.message || 'No se pudo activar el flujo logístico')
       }
 
+      window.sessionStorage.removeItem(intentStorageKey)
       await refreshConfig()
       toast({
         title: 'Flujo logístico activado',

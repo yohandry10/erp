@@ -1,5 +1,5 @@
 import { Type, Transform } from 'class-transformer';
-import { IsOptional, IsString, IsArray, IsUUID, IsNumber, Min, ValidateNested } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsUUID, IsNumber, Min, MinLength, MaxLength, ValidateNested } from 'class-validator';
 
 export class ItemDespachadoDto {
   @IsUUID('4', { message: 'detalle_id debe ser un UUID válido' })
@@ -7,7 +7,7 @@ export class ItemDespachadoDto {
 
   @IsOptional()
   @IsNumber({}, { message: 'La cantidad debe ser numérica' })
-  @Min(0, { message: 'La cantidad debe ser mayor o igual a cero' })
+  @Min(0.01, { message: 'La cantidad debe ser mayor a cero' })
   cantidad?: number;
 
   @IsOptional()
@@ -29,6 +29,11 @@ export class ItemDespachadoDto {
  * Requirements: 9.3, 9.4, 9.5, 21.7, 21.8
  */
 export class ConfirmarDespachoDto {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(200)
+  idempotency_key!: string;
+
   @IsOptional()
   @IsString()
   notas?: string;

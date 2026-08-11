@@ -91,7 +91,13 @@ describe('RevaluacionService', () => {
         {
           provide: SupabaseService,
           useValue: {
-            getClient: jest.fn(() => ({ from: jest.fn((tabla: string) => construirQuery(tabla)) }))
+            getClient: jest.fn(() => ({
+              from: jest.fn((tabla: string) => construirQuery(tabla)),
+              rpc: jest.fn(async (nombre: string, payload: any) => {
+                inserciones.push({ tabla: `rpc:${nombre}`, payload });
+                return { data: { id: 'asiento-reval', numero_asiento: 99 }, error: null };
+              })
+            }))
           }
         },
         { provide: PeriodosService, useValue: periodos },
@@ -236,8 +242,9 @@ describe('RevaluacionService', () => {
 
       await service.ejecutar(TENANT, USER, '2026-08-31');
 
-      const cabecera = inserciones.find(i => i.tabla === 'asientos_contables')!.payload;
-      const lineas = inserciones.find(i => i.tabla === 'detalle_asientos')!.payload;
+      const llamada = inserciones.find(i => i.tabla === 'rpc:crear_asiento_con_detalles_tx')!.payload;
+      const cabecera = llamada.p_asiento;
+      const lineas = llamada.p_detalles;
 
       const totalDebe = lineas.reduce((s: number, l: any) => s + l.debe, 0);
       const totalHaber = lineas.reduce((s: number, l: any) => s + l.haber, 0);
@@ -264,7 +271,7 @@ describe('RevaluacionService', () => {
 
       await service.ejecutar(TENANT, USER, '2026-08-31');
 
-      const cabecera = inserciones.find(i => i.tabla === 'asientos_contables')!.payload;
+      const cabecera = inserciones.find(i => i.tabla === 'rpc:crear_asiento_con_detalles_tx')!.payload.p_asiento;
       expect(cabecera.source_event_id).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
       );

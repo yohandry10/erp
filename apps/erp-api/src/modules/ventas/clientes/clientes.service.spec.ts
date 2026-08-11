@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ClientesService } from './clientes.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { AuditService } from '../../audit/audit.service';
 import { CreateClienteDto, UpdateClienteDto } from './dto';
 
 describe('ClientesService', () => {
@@ -25,6 +24,7 @@ describe('ClientesService', () => {
     mock.ilike = jest.fn().mockReturnValue(mock);
     mock.single = jest.fn();
     mock.maybeSingle = jest.fn();
+    mock.rpc = jest.fn();
     return mock;
   };
 
@@ -38,12 +38,6 @@ describe('ClientesService', () => {
           provide: SupabaseService,
           useValue: {
             getClient: jest.fn().mockReturnValue(mockSupabaseClient),
-          },
-        },
-        {
-          provide: AuditService,
-          useValue: {
-            registrarCambio: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -130,12 +124,7 @@ describe('ClientesService', () => {
         telefono: '+51999999999',
       };
 
-      mockSupabaseClient.maybeSingle.mockResolvedValue({
-        data: null,
-        error: null,
-      });
-
-      mockSupabaseClient.single.mockResolvedValue({
+      mockSupabaseClient.rpc.mockResolvedValue({
         data: {
           id: 'cliente-1',
           tenant_id: tenantA,
@@ -145,18 +134,13 @@ describe('ClientesService', () => {
       });
 
       const nuevo = await service.create(createDto, tenantA, 'user-1');
-      const insertPayload = mockSupabaseClient.insert.mock.calls[0][0];
 
       expect(nuevo).toBeDefined();
-      expect(insertPayload).toMatchObject({
-        tenant_id: tenantA,
-        numero_documento: null,
-        documento_tipo: createDto.documento_tipo,
-        codigo: createDto.documento_numero,
-        ruc: createDto.documento_numero,
-        telefono: '+51999999999',
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('crear_cliente_maestro_tx', {
+        p_tenant_id: tenantA,
+        p_actor_id: 'user-1',
+        p_cliente: createDto,
       });
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', tenantA);
     });
 
     it('create mantiene DNI seguro en columnas numéricas', async () => {
@@ -168,12 +152,7 @@ describe('ClientesService', () => {
         razon_social: 'Cliente DNI',
       };
 
-      mockSupabaseClient.maybeSingle.mockResolvedValue({
-        data: null,
-        error: null,
-      });
-
-      mockSupabaseClient.single.mockResolvedValue({
+      mockSupabaseClient.rpc.mockResolvedValue({
         data: {
           id: 'cliente-2',
           tenant_id: tenantA,
@@ -183,14 +162,10 @@ describe('ClientesService', () => {
       });
 
       await service.create(createDto, tenantA, 'user-1');
-      const insertPayload = mockSupabaseClient.insert.mock.calls[0][0];
-
-      expect(insertPayload).toMatchObject({
-        tenant_id: tenantA,
-        numero_documento: 12345678,
-        documento_numero: 12345678,
-        codigo: '12345678',
-        ruc: null,
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('crear_cliente_maestro_tx', {
+        p_tenant_id: tenantA,
+        p_actor_id: 'user-1',
+        p_cliente: createDto,
       });
     });
 
@@ -221,38 +196,50 @@ describe('ClientesService', () => {
         telefono: '+51999990000',
       };
 
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: {
-            id: 'cliente-1',
-            tenant_id: tenantA,
-            razon_social: 'Cliente original',
-            documento_tipo: 'DNI',
-            codigo: '12345678',
-          },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: {
-            id: 'cliente-1',
-            tenant_id: tenantA,
-            razon_social: 'Cliente editado',
-            nombre: 'Cliente editado',
-            direccion: 'Av. Runtime 123',
-          },
-          error: null,
-        });
+      mockSupabaseClient.single.mockResolvedValue({
+        data: {
+          id: 'cliente-1',
+          tenant_id: tenantA,
+          razon_social: 'Cliente original',
+          documento_tipo: 'DNI',
+          codigo: '12345678',
+        },
+        error: null,
+      });
+      mockSupabaseClient.rpc.mockResolvedValue({
+        data: {
+          id: 'cliente-1',
+          tenant_id: tenantA,
+          razon_social: 'Cliente editado',
+          nombre: 'Cliente editado',
+          direccion: 'Av. Runtime 123',
+        },
+        error: null,
+      });
 
       await service.update('cliente-1', dto, tenantA, 'user-1');
-      const updatePayload = mockSupabaseClient.update.mock.calls[0][0];
-
-      expect(updatePayload).toMatchObject({
-        razon_social: 'Cliente editado',
-        nombre: 'Cliente editado',
-        nombre_comercial: 'Marca Cliente',
-        direccion: 'Av. Runtime 123',
-        telefono: '+51999990000',
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('actualizar_cliente_maestro_tx', {
+        p_cliente_id: 'cliente-1',
+        p_tenant_id: tenantA,
+        p_actor_id: 'user-1',
+        p_cambios: dto,
       });
+    });
+
+    it('delete delega la desactivación idempotente al RPC con actor y tenant', async () => {
+      mockSupabaseClient.rpc.mockResolvedValue({
+        data: { id: 'cliente-1', activo: false, idempotent: false },
+        error: null,
+      });
+
+      await service.delete('cliente-1', 'tenant-a', 'user-1');
+
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('desactivar_cliente_maestro_tx', {
+        p_cliente_id: 'cliente-1',
+        p_tenant_id: 'tenant-a',
+        p_actor_id: 'user-1',
+      });
+      expect(mockSupabaseClient.delete).not.toHaveBeenCalled();
     });
 
     it('validarRUC solo confirma el dígito verificador y no inventa datos SUNAT', async () => {

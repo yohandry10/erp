@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Label } from '../ui/label';
@@ -52,13 +52,21 @@ interface PagoLoteWizardProps {
     fecha_pago: string;
     metodo_pago: string;
     cuenta_bancaria_id: string;
-    referencia_lote?: string;
+    referencia_lote: string;
+    idempotency_key: string;
     observaciones?: string;
   }) => Promise<void>;
   onCancel: () => void;
 }
 
 type WizardStep = 'seleccion-cuenta' | 'seleccion-cxp' | 'confirmacion';
+
+const createBatchIntentKey = () => {
+  const suffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `cxp-lote:${suffix}`;
+};
 
 export function PagoLoteWizard({
   cuentasBancarias,
@@ -77,10 +85,25 @@ export function PagoLoteWizard({
   const [metodoPago, setMetodoPago] = useState<string>('TRANSFERENCIA');
   const [referenciaLote, setReferenciaLote] = useState<string>('');
   const [observaciones, setObservaciones] = useState<string>('');
+  const [idempotencyKey, setIdempotencyKey] = useState(createBatchIntentKey);
 
   // Selección de CxPs
   const [selectedCxpIds, setSelectedCxpIds] = useState<string[]>([]);
   const [montosParciales, setMontosParciales] = useState<Record<string, number>>({});
+
+  const semanticIntent = useMemo(() => JSON.stringify({
+    cuentaBancariaId,
+    fechaPago,
+    metodoPago,
+    referenciaLote: referenciaLote.trim(),
+    observaciones: observaciones.trim(),
+    selectedCxpIds,
+    montosParciales,
+  }), [cuentaBancariaId, fechaPago, metodoPago, referenciaLote, observaciones, selectedCxpIds, montosParciales]);
+
+  useEffect(() => {
+    setIdempotencyKey(createBatchIntentKey());
+  }, [semanticIntent]);
 
   // Obtener cuenta bancaria seleccionada
   const cuentaSeleccionada = cuentasBancarias.find((c) => c.id === cuentaBancariaId);
@@ -111,7 +134,7 @@ export function PagoLoteWizard({
 
   // Manejar envío del formulario
   const handleSubmit = async () => {
-    if (!cuentaBancariaId || selectedCxpIds.length === 0) {
+    if (!cuentaBancariaId || !referenciaLote.trim() || selectedCxpIds.length === 0) {
       return;
     }
 
@@ -128,7 +151,8 @@ export function PagoLoteWizard({
         fecha_pago: fechaPago,
         metodo_pago: metodoPago,
         cuenta_bancaria_id: cuentaBancariaId,
-        referencia_lote: referenciaLote || undefined,
+        referencia_lote: referenciaLote.trim(),
+        idempotency_key: idempotencyKey,
         observaciones: observaciones || undefined,
       });
     } catch (error) {
@@ -212,19 +236,20 @@ export function PagoLoteWizard({
               <SelectContent>
                 <SelectItem value="TRANSFERENCIA">Transferencia</SelectItem>
                 <SelectItem value="CHEQUE">Cheque</SelectItem>
-                <SelectItem value="EFECTIVO">Efectivo</SelectItem>
+                <SelectItem value="TARJETA">Tarjeta</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
         <div>
-          <Label htmlFor="referencia-lote">Referencia del Lote (Opcional)</Label>
+          <Label htmlFor="referencia-lote">Referencia bancaria del lote *</Label>
           <Input
             id="referencia-lote"
             placeholder="Ej: LOTE-2025-001"
             value={referenciaLote}
             onChange={(e) => setReferenciaLote(e.target.value)}
+            required
           />
         </div>
       </div>
@@ -236,7 +261,7 @@ export function PagoLoteWizard({
         <Button
           type="button"
           onClick={() => setCurrentStep('seleccion-cxp')}
-          disabled={!cuentaBancariaId}
+          disabled={!cuentaBancariaId || !referenciaLote.trim()}
         >
           Siguiente: Seleccionar CxP
         </Button>

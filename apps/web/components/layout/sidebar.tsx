@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronRight,
   CheckCircle,
+  RotateCcw,
   DollarSign,
   HelpCircle,
   WifiOff
@@ -159,6 +160,16 @@ const menuItems: MenuItem[] = [
         }
       },
       {
+        title: 'Ajustes y transferencias',
+        href: '/dashboard/inventario/operaciones',
+        icon: FileSpreadsheet,
+        permission: {
+          modulo: 'inventario',
+          accion: 'crear',
+          recurso: 'movimientos'
+        }
+      },
+      {
         title: 'Órdenes de Preparación',
         href: '/dashboard/inventario/logistica/ordenes-pendientes',
         icon: Package,
@@ -268,6 +279,16 @@ const menuItems: MenuItem[] = [
           accion: 'aprobar',
           recurso: 'pedidos'
         }
+      },
+      {
+        title: 'RMA y devoluciones',
+        href: '/dashboard/ventas/rma',
+        icon: RotateCcw,
+        permission: {
+          modulo: 'ventas',
+          accion: 'ver',
+          recurso: 'rma'
+        }
       }
     ]
   },
@@ -365,6 +386,16 @@ const menuItems: MenuItem[] = [
       modulo: 'rrhh',
       accion: 'read',
       recurso: 'planilla_electronica'
+    }
+  },
+  {
+    title: 'Liquidaciones y CTS',
+    href: '/dashboard/rrhh/liquidaciones',
+    icon: FileSpreadsheet,
+    permission: {
+      modulo: 'rrhh',
+      accion: 'access',
+      recurso: '__global__'
     }
   },
   {

@@ -9,6 +9,7 @@ import MatchManualModal from '@/components/finanzas/MatchManualModal';
 import { ImportarExtractoCSV, ConciliacionTable, ConciliacionWizard, ConciliacionGuide } from '@/components/finanzas';
 import { formatCurrency, formatDateLong } from '@/lib/format-utils';
 import { fetchApi } from '@/lib/api-fetch';
+import { MovimientoBancarioModal } from '@/components/finanzas/MovimientoBancarioModal';
 
 interface Conciliacion {
   id: string;
@@ -24,6 +25,7 @@ interface Conciliacion {
     banco: string;
     numero_cuenta: string;
     moneda: string;
+    cuenta_contable_id?: string;
   };
 }
 
@@ -57,6 +59,7 @@ const normalizeConciliacion = (raw: any): Conciliacion => ({
     banco: raw?.cuentas_bancarias?.banco || raw?.banco || 'Banco',
     numero_cuenta: raw?.cuentas_bancarias?.numero_cuenta || raw?.numero_cuenta || 'N/A',
     moneda: raw?.cuentas_bancarias?.moneda || raw?.moneda || 'PEN',
+    cuenta_contable_id: raw?.cuentas_bancarias?.cuenta_contable_id || undefined,
   },
 });
 
@@ -70,6 +73,7 @@ export default function ConciliacionDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [selectedSistemaId, setSelectedSistemaId] = useState<string | null>(null);
   const [selectedExtractoId, setSelectedExtractoId] = useState<string | null>(null);
   const [showCloseModal, setShowCloseModal] = useState(false);
@@ -77,6 +81,12 @@ export default function ConciliacionDetailPage() {
   const [loadingDiferencias, setLoadingDiferencias] = useState(false);
   const [closingConciliacion, setClosingConciliacion] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [autoMatchKey, setAutoMatchKey] = useState(
+    () => `recon-auto:${crypto.randomUUID()}`,
+  );
+  const [closeKey, setCloseKey] = useState(
+    () => `recon-close:${crypto.randomUUID()}`,
+  );
 
   const loadMovimientos = useCallback(async (conciliacionData: Conciliacion) => {
     try {
@@ -171,7 +181,7 @@ export default function ConciliacionDetailPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tolerancia_dias: 2 }),
+          body: JSON.stringify({ tolerancia_dias: 2, idempotency_key: autoMatchKey }),
         },
       );
 
@@ -182,7 +192,7 @@ export default function ConciliacionDetailPage() {
 
       const cuerpo = await response.json().catch(() => ({}));
       const datos = cuerpo?.data ?? cuerpo;
-      const conciliados = Number(datos?.movimientos_conciliados ?? datos?.conciliados ?? 0);
+      const conciliados = Number(datos?.matches_realizados ?? datos?.movimientos_conciliados ?? datos?.conciliados ?? 0);
 
       toast({
         title: conciliados > 0 ? 'Conciliación automática completada' : 'Sin coincidencias',
@@ -192,6 +202,7 @@ export default function ConciliacionDetailPage() {
             : 'Ningún movimiento del extracto coincide con los del sistema. Revísalos manualmente.',
       });
 
+      setAutoMatchKey(`recon-auto:${crypto.randomUUID()}`);
       loadConciliacion();
     } catch (error) {
       toast({
@@ -223,6 +234,7 @@ export default function ConciliacionDetailPage() {
           body: JSON.stringify({
             movimiento_sistema_id: sistemaId,
             movimiento_extracto_id: extractoId,
+            idempotency_key: `recon-drag:${conciliacionId}:${sistemaId}:${extractoId}`,
           }),
         }
       );
@@ -266,7 +278,7 @@ export default function ConciliacionDetailPage() {
     }
   };
 
-  const handleCerrarConciliacion = async (forzarCierre: boolean = false) => {
+  const handleCerrarConciliacion = async () => {
     setClosingConciliacion(true);
 
     try {
@@ -278,9 +290,7 @@ export default function ConciliacionDetailPage() {
             'Content-Type': 'application/json',
           },
           credentials: 'include',
-          body: JSON.stringify({
-            forzar_cierre: forzarCierre,
-          }),
+          body: JSON.stringify({ idempotency_key: closeKey }),
         }
       );
 
@@ -291,6 +301,7 @@ export default function ConciliacionDetailPage() {
 
       // Success - reload data and close modal
       await loadConciliacion();
+      setCloseKey(`recon-close:${crypto.randomUUID()}`);
       setShowCloseModal(false);
       alert('Conciliación cerrada exitosamente');
     } catch (error: any) {
@@ -442,6 +453,13 @@ export default function ConciliacionDetailPage() {
               Match Manual
             </Button>
             <Button
+              onClick={() => setShowAdjustmentModal(true)}
+              disabled={conciliacion.estado === 'CERRADA' || !conciliacion.cuentas_bancarias?.cuenta_contable_id}
+              variant="outline"
+            >
+              Registrar ajuste
+            </Button>
+            <Button
               onClick={handleOpenCloseModal}
               disabled={conciliacion.estado === 'CERRADA'}
               className="bg-green-600 hover:bg-green-700 ml-auto"
@@ -488,6 +506,17 @@ export default function ConciliacionDetailPage() {
         onClose={() => setShowMatchModal(false)}
         conciliacionId={conciliacionId}
         onMatchSuccess={handleMatchSuccess}
+      />
+
+      <MovimientoBancarioModal
+        open={showAdjustmentModal}
+        cuenta={conciliacion.cuentas_bancarias}
+        conciliacionId={conciliacionId}
+        onClose={() => setShowAdjustmentModal(false)}
+        onSuccess={() => {
+          setShowAdjustmentModal(false);
+          loadConciliacion();
+        }}
       />
 
       {/* Close Confirmation Modal */}
@@ -703,8 +732,8 @@ export default function ConciliacionDetailPage() {
                         ⚠️ Advertencia: Movimientos Pendientes
                       </h4>
                       <p className="text-sm text-amber-400 mb-3">
-                        Hay movimientos sin conciliar. Se recomienda conciliar todos los movimientos
-                        antes de cerrar. Si continúa, estos movimientos quedarán sin conciliar.
+                        Hay movimientos sin conciliar. El cierre permanecerá bloqueado hasta
+                        conciliarlos o registrar un ajuste bancario explícito con su contracuenta.
                       </p>
                       {reporteDiferencias.movimientos_sistema.pendientes_detalle.length > 0 && (
                         <div className="mb-3">
@@ -776,18 +805,8 @@ export default function ConciliacionDetailPage() {
                     >
                       Cancelar
                     </Button>
-                    {(reporteDiferencias.movimientos_sistema.pendientes > 0 ||
-                      reporteDiferencias.movimientos_extracto.pendientes > 0) && (
-                      <Button
-                        onClick={() => handleCerrarConciliacion(true)}
-                        disabled={closingConciliacion}
-                        className="bg-yellow-600 hover:bg-yellow-700"
-                      >
-                        {closingConciliacion ? 'Cerrando...' : 'Forzar Cierre'}
-                      </Button>
-                    )}
                     <Button
-                      onClick={() => handleCerrarConciliacion(false)}
+                      onClick={handleCerrarConciliacion}
                       disabled={
                         closingConciliacion ||
                         reporteDiferencias.movimientos_sistema.pendientes > 0 ||

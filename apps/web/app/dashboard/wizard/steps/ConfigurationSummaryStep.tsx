@@ -115,11 +115,18 @@ export function ConfigurationSummaryStep() {
     setMessage(null)
 
     try {
+      const intentStorageKey = 'configuration-logo-intent'
+      let idempotencyKey = window.sessionStorage.getItem(intentStorageKey)
+      if (!idempotencyKey) {
+        idempotencyKey = `configuration-logo-${window.crypto.randomUUID()}`
+        window.sessionStorage.setItem(intentStorageKey, idempotencyKey)
+      }
       const response = await fetchApi('/api/configuration/empresa', {
         method: 'PUT',
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
         },
         body: JSON.stringify({ logoUrl })
       })
@@ -128,6 +135,7 @@ export function ConfigurationSummaryStep() {
 
       const data = await response.json()
       if (data.success) {
+        window.sessionStorage.removeItem(intentStorageKey)
         setEmpresaConfig(prev => prev ? { ...prev, logoUrl } : null)
         setMessage({ type: 'success', text: 'Logo URL guardado correctamente' })
       } else {

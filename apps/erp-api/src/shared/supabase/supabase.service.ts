@@ -28,7 +28,7 @@ export class SupabaseService {
 
   private readonly publicRpcAllowlist = new Set([
     'pgrst_reload_schema',
-    'create_demo_tenant',
+    'create_demo_tenant_ready_tx',
     'acquire_job_lock',
     'release_job_lock',
   ]);

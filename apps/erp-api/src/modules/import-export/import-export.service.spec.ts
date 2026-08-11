@@ -14,6 +14,7 @@ describe('ImportExportService', () => {
     eq: jest.fn().mockReturnThis(),
     maybeSingle: jest.fn(),
     single: jest.fn(),
+    rpc: jest.fn(),
   };
 
   beforeEach(() => {
@@ -61,6 +62,7 @@ describe('ImportExportService', () => {
       expect(result.content).toContain('controla_stock');
       expect(result.content).toContain('afectacion_igv');
       expect(result.content).toContain('precio_venta');
+      expect(result.content).not.toContain('imagen_url');
     });
 
     it('debe incluir fila de ejemplo', () => {
@@ -222,44 +224,72 @@ PROD-001,Producto Test,false,true,10,100.00,PEN,abc`;
       expect(result.success).toBe(false);
       expect(result.errors.some(e => e.includes('stock_inicial inválido'))).toBe(true);
     });
-  });
 
+    it('rechaza URLs de imagen importadas fuera del flujo Storage', () => {
+      const csv = `codigo,nombre,es_servicio,controla_stock,afectacion_igv,precio_venta,moneda,imagen_url
+PROD-001,Producto Test,false,true,10,100.00,PEN,https://externo.invalid/foto.png`;
+
+      const result = service.validateCatalogoCsv(csv);
+
+      expect(result.success).toBe(false);
+      expect(result.errors.some(e => e.includes('imagen_url no se importa'))).toBe(true);
+    });
+  });
   describe('importCatalogo', () => {
     const tenantId = 'tenant-123';
+    const actorId = 'actor-123';
+    const intent = 'catalog-import-stable-key';
 
     it('debe crear producto nuevo cuando no existe', async () => {
       const csv = `codigo,nombre,es_servicio,controla_stock,afectacion_igv,precio_venta,moneda
 PROD-001,Producto Test,false,true,10,100.00,PEN`;
 
       mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null, error: null });
-      mockSupabaseClient.single.mockResolvedValue({ data: { id: 'prod-uuid' }, error: null });
+      mockSupabaseClient.rpc.mockResolvedValue({ data: { id: 'prod-uuid' }, error: null });
 
-      const result = await service.importCatalogo(csv, tenantId);
+      const result = await service.importCatalogo(csv, tenantId, actorId, intent);
 
       expect(result.success).toBe(true);
       expect(result.created).toBe(1);
       expect(result.updated).toBe(0);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_producto_maestro_tx',
+        expect.objectContaining({
+          p_tenant_id: tenantId,
+          p_actor_id: actorId,
+          p_idempotency_key: expect.stringMatching(/^catalog:[0-9a-f]{64}:create$/),
+        }),
+      );
+      expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.update).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.upsert).not.toHaveBeenCalled();
     });
 
     it('debe actualizar producto existente', async () => {
       const csv = `codigo,nombre,es_servicio,controla_stock,afectacion_igv,precio_venta,moneda
 PROD-001,Producto Actualizado,false,true,10,150.00,PEN`;
 
-      mockSupabaseClient.maybeSingle.mockResolvedValue({ data: { id: 'existing-id' }, error: null });
-      mockSupabaseClient.single.mockResolvedValue({ data: { id: 'existing-id' }, error: null });
+      mockSupabaseClient.maybeSingle
+        .mockResolvedValueOnce({ data: { id: 'existing-id' }, error: null })
+        .mockResolvedValueOnce({ data: null, error: null });
+      mockSupabaseClient.rpc.mockResolvedValue({ data: { id: 'existing-id' }, error: null });
 
-      const result = await service.importCatalogo(csv, tenantId);
+      const result = await service.importCatalogo(csv, tenantId, actorId, intent);
 
       expect(result.success).toBe(true);
       expect(result.created).toBe(0);
       expect(result.updated).toBe(1);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'actualizar_producto_maestro_tx',
+        expect.objectContaining({ p_producto_id: 'existing-id', p_actor_id: actorId }),
+      );
     });
 
     it('debe fallar validación antes de importar', async () => {
       const csv = `codigo,nombre
 PROD-001,Producto`; // Faltan headers obligatorios
 
-      const result = await service.importCatalogo(csv, tenantId);
+      const result = await service.importCatalogo(csv, tenantId, actorId, intent);
 
       expect(result.success).toBe(false);
       expect(result.errors.some(e => e.includes('Falta columna obligatoria'))).toBe(true);
@@ -271,9 +301,9 @@ PROD-001,Producto`; // Faltan headers obligatorios
 PROD-001,Producto Test,false,true,10,100.00,PEN`;
 
       mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null, error: null });
-      mockSupabaseClient.single.mockResolvedValue({ data: null, error: { message: 'DB Error' } });
+      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: { message: 'DB Error' } });
 
-      const result = await service.importCatalogo(csv, tenantId);
+      const result = await service.importCatalogo(csv, tenantId, actorId, intent);
 
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
@@ -287,9 +317,9 @@ PROD-002,Producto 2,true,false,10,200.00,PEN
 PROD-003,Producto 3,false,true,10,300.00,PEN`;
 
       mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null, error: null });
-      mockSupabaseClient.single.mockResolvedValue({ data: { id: 'new-id' }, error: null });
+      mockSupabaseClient.rpc.mockResolvedValue({ data: { id: 'new-id' }, error: null });
 
-      const result = await service.importCatalogo(csv, tenantId);
+      const result = await service.importCatalogo(csv, tenantId, actorId, intent);
 
       expect(result.totalRows).toBe(3);
       expect(result.created).toBe(3);
@@ -300,9 +330,9 @@ PROD-003,Producto 3,false,true,10,300.00,PEN`;
 SERV-001,Servicio Test,true,false,10,500.00,PEN`;
 
       mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null, error: null });
-      mockSupabaseClient.single.mockResolvedValue({ data: { id: 'serv-id' }, error: null });
+      mockSupabaseClient.rpc.mockResolvedValue({ data: { id: 'serv-id' }, error: null });
 
-      const result = await service.importCatalogo(csv, tenantId);
+      const result = await service.importCatalogo(csv, tenantId, actorId, intent);
 
       expect(result.success).toBe(true);
       expect(result.created).toBe(1);

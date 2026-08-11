@@ -2,7 +2,6 @@ import { PERMISSION_KEY } from '../common/decorators/require-permission.decorato
 import { ConfiguracionController } from './configuracion.controller';
 import { ConfiguracionFiscalController } from './configuracion/configuracion-fiscal.controller';
 import { ConfigurationController } from './configuracion/configuration.controller';
-import { CotizacionesController } from './cotizaciones.controller';
 import { FinanzasController } from './finanzas.controller';
 
 describe('Legacy ERP controllers security metadata', () => {
@@ -26,7 +25,6 @@ describe('Legacy ERP controllers security metadata', () => {
     expect(getClassPermission(ConfiguracionController)?.raw).toBe('configuracion.read');
     expect(getClassPermission(ConfiguracionFiscalController)?.raw).toBe('configuracion.read');
     expect(getClassPermission(ConfigurationController)?.raw).toBe('configuracion.read');
-    expect(getClassPermission(CotizacionesController)?.raw).toBe('ventas.cotizaciones.read');
     expect(getClassPermission(FinanzasController)?.raw).toBe('finanzas.read');
   });
 
@@ -57,24 +55,6 @@ describe('Legacy ERP controllers security metadata', () => {
         'configuracion.write',
       );
     });
-  });
-
-  it('declara permisos de escritura/aprobacion en handlers mutables de cotizaciones', () => {
-    expect(getHandlerPermission(CotizacionesController, 'createCotizacion')?.raw).toBe(
-      'ventas.cotizaciones.write',
-    );
-    expect(getHandlerPermission(CotizacionesController, 'actualizarCotizacion')?.raw).toBe(
-      'ventas.cotizaciones.write',
-    );
-    expect(getHandlerPermission(CotizacionesController, 'aprobarCotizacion')?.raw).toBe(
-      'ventas.cotizaciones.approve',
-    );
-    expect(getHandlerPermission(CotizacionesController, 'rechazarCotizacion')?.raw).toBe(
-      'ventas.cotizaciones.approve',
-    );
-    expect(getHandlerPermission(CotizacionesController, 'convertirEnVenta')?.raw).toBe(
-      'ventas.cotizaciones.convert',
-    );
   });
 
   it('declara permiso de escritura para analisis de credito', () => {

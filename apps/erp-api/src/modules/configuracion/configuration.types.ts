@@ -1,4 +1,5 @@
 export interface ConfigurationStatus {
+  /** Preparación del ERP. No implica habilitación ni transmisión fiscal. */
   isComplete: boolean;
   /** Las demos ya vienen listas y no requieren onboarding fiscal. */
   isDemo: boolean;
@@ -16,6 +17,12 @@ export interface ConfigurationStatus {
   ruc: {
     isConfigured: boolean;
     missingFields: string[];
+  };
+  /** Estado independiente de la integración fiscal aportada por el cliente. */
+  fiscal: {
+    isEnabled: boolean;
+    isReady: boolean;
+    missingItems: string[];
   };
 }
 

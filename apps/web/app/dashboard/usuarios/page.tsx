@@ -24,6 +24,7 @@ export default function UsuariosPage() {
   const { user: currentUser } = useTenant()
   const { hasPermission: canViewUsers, loading: permissionLoading } = usePermission('configuracion', 'ver', 'usuarios')
   const { hasPermission: canCreateUsers } = usePermission('configuracion', 'crear', 'usuarios')
+  const { hasPermission: canManageRoles } = usePermission('users', 'manage', '')
   const queryClient = useQueryClient()
 
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -177,7 +178,7 @@ export default function UsuariosPage() {
       </Card>
 
       {/* Roles Section */}
-      <RolesSection roles={roles} />
+      <RolesSection roles={roles} canManage={canManageRoles} onRoleCreated={fetchData} />
 
       {/* Modal */}
       <UsuarioModal

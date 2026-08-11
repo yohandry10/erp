@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsEmail, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsEmail, IsNumber, IsBoolean } from 'class-validator';
 
 export enum TenantEstado {
   ACTIVO = 'ACTIVO',
@@ -11,6 +11,14 @@ export class UpdateTenantDto {
   @IsString()
   @IsOptional()
   nombre?: string;
+
+  @IsString()
+  @IsOptional()
+  razon_social?: string;
+
+  @IsString()
+  @IsOptional()
+  nombre_comercial?: string;
 
   @IsString()
   @IsOptional()
@@ -47,4 +55,24 @@ export class UpdateTenantDto {
   @IsString()
   @IsOptional()
   plan?: string;
+
+  @IsString()
+  @IsOptional()
+  tipo_empresa?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  usar_flujo_logistica?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  gre_obligatorio?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  gre_automatico_habilitado?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  umbral_gre_automatico?: number;
 }

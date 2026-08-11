@@ -9,16 +9,17 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
-  BadRequestException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import { CotizacionesCompraService } from "../services/cotizaciones-compra.service";
 import { CreateCotizacionCompraDto } from "../dto/create-cotizacion-compra.dto";
 import { UpdateCotizacionCompraDto } from "../dto/update-cotizacion-compra.dto";
+import { RechazarCotizacionDto } from "../dto/rechazar-cotizacion.dto";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import { CurrentTenant } from "../../../common/decorators/current-tenant.decorator";
+import { CurrentUser } from "../../auth/current-user.decorator";
 
 @ApiTags("compras/cotizaciones")
 @Controller("compras/cotizaciones")
@@ -41,11 +42,13 @@ export class CotizacionesCompraController {
   async create(
     @Body() createDto: CreateCotizacionCompraDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     // HARDENING: el tenant proviene del contexto, no del body.
     const cotizacion = await this.cotizacionesService.create(
       createDto,
       tenantId,
+      user?.id,
     );
 
     return {
@@ -61,11 +64,6 @@ export class CotizacionesCompraController {
   @ApiResponse({
     status: 200,
     description: "Cotizaciones obtenidas exitosamente",
-  })
-  @ApiQuery({
-    name: "tenant_id",
-    required: false,
-    description: "ID del tenant",
   })
   @ApiQuery({
     name: "estado",
@@ -177,12 +175,14 @@ export class CotizacionesCompraController {
     @Param("id") id: string,
     @Body() updateDto: UpdateCotizacionCompraDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     // HARDENING: ignoramos tenant externo; usamos contexto autenticado.
     const cotizacion = await this.cotizacionesService.update(
       id,
       updateDto,
       tenantId,
+      user?.id,
     );
 
     return {
@@ -206,11 +206,11 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.OK)
   async enviar(
     @Param("id") id: string,
-    @Body() body: Record<string, any>,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     // HARDENING: ignoramos tenant proporcionado en body.
-    const cotizacion = await this.cotizacionesService.enviar(id, tenantId);
+    const cotizacion = await this.cotizacionesService.enviar(id, tenantId, user?.id);
 
     return {
       success: true,
@@ -233,11 +233,11 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.OK)
   async aprobar(
     @Param("id") id: string,
-    @Body() body: Record<string, any>,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     // HARDENING: se fuerza tenant del contexto autenticado.
-    const cotizacion = await this.cotizacionesService.aprobar(id, tenantId);
+    const cotizacion = await this.cotizacionesService.aprobar(id, tenantId, user?.id);
 
     return {
       success: true,
@@ -263,13 +263,15 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.OK)
   async rechazar(
     @Param("id") id: string,
-    @Body() body: { motivo?: string },
+    @Body() body: RechazarCotizacionDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     const cotizacion = await this.cotizacionesService.rechazar(
       id,
       tenantId,
       body.motivo,
+      user?.id,
     );
 
     return {
@@ -299,20 +301,15 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.CREATED)
   async convertirAOrdenCompra(
     @Param("id") id: string,
-    @Body() body: { numero_oc: string },
+    @Body() body: { numero_oc?: string },
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
-    // Validar que se proporcionó el número de OC
-    if (!body.numero_oc) {
-      throw new BadRequestException(
-        "Debe proporcionar el número de orden de compra (numero_oc)",
-      );
-    }
-
     const ordenCompra = await this.cotizacionesService.convertirAOrdenCompra(
       id,
       tenantId,
-      body.numero_oc,
+      body?.numero_oc,
+      user?.id,
     );
 
     return {

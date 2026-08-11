@@ -100,7 +100,7 @@ export class VentaPosComprobanteDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(5)
+  @MaxLength(10)
   tipo?: string;
 
   @IsOptional()

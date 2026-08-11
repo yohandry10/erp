@@ -1,14 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
-import { AlertCircle, CheckCircle, Plus, Trash2, X } from 'lucide-react'
+import { AlertCircle, Plus, Trash2, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { normalizeTaxId, validateCountryTaxId } from '@/lib/country-tax-id'
@@ -32,6 +30,26 @@ interface DetalleTipo {
   total_item: number
 }
 
+function createRequestKey(prefix: string) {
+  const randomPart = globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  return `${prefix}:${randomPart}`
+}
+
+function calculateLines(lines: DetalleTipo[], taxRate: number) {
+  return lines.map((line) => {
+    const unitNet = Math.max(Number(line.precio_unitario) - Number(line.descuento_unitario || 0), 0)
+    const base = Math.round(Number(line.cantidad) * unitNet * 100) / 100
+    const tax = Math.round(base * taxRate * 100) / 100
+    return {
+      ...line,
+      valor_venta: base,
+      impuesto_igv: tax,
+      total_item: Math.round((base + tax) * 100) / 100,
+    }
+  })
+}
+
 const fieldClass =
   'border-cyan-400/20 bg-card/60 text-foreground placeholder:text-muted-foreground focus-visible:ring-cyan-400/40'
 
@@ -45,6 +63,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
   const defaultRecipientType = isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC'
   const fiscalDocument = country.documentoFiscal || defaultRecipientType
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
+  const requestKeyRef = useRef('')
   const [formData, setFormData] = useState({
     tipo_documento: 'FACTURA',
     serie: '',
@@ -56,6 +75,8 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
     fecha_emision: new Date().toISOString().slice(0, 10),
     fecha_vencimiento: '',
     moneda: defaultCurrency,
+    tipo_cambio: 1,
+    condicion_pago: 'CONTADO',
     subtotal: 0,
     descuentos: 0,
     impuesto_igv: 0,
@@ -96,6 +117,8 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
         fecha_emision: documento.fecha_emision?.slice(0, 10) || new Date().toISOString().slice(0, 10),
         fecha_vencimiento: documento.fecha_vencimiento?.slice(0, 10) || '',
         moneda: documento.moneda || defaultCurrency,
+        tipo_cambio: documento.tipo_cambio || 1,
+        condicion_pago: documento.metodo_pago || 'CONTADO',
         subtotal: documento.subtotal || 0,
         descuentos: documento.descuentos || 0,
         impuesto_igv: documento.impuesto_igv || 0,
@@ -130,6 +153,8 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
         fecha_emision: new Date().toISOString().slice(0, 10),
         fecha_vencimiento: '',
         moneda: defaultCurrency,
+        tipo_cambio: 1,
+        condicion_pago: 'CONTADO',
         subtotal: 0,
         descuentos: 0,
         impuesto_igv: 0,
@@ -148,7 +173,10 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
         total_item: 0
       }])
     }
-  }, [defaultCurrency, defaultRecipientType, documento])
+    if (isOpen) {
+      requestKeyRef.current = createRequestKey(documento ? `document-update:${documento.id}` : 'document-create')
+    }
+  }, [defaultCurrency, defaultRecipientType, documento, isOpen])
 
   // Validar el identificador fiscal del país automáticamente.
   const validarIdentificacionFiscal = async (value: string) => {
@@ -192,53 +220,63 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
     }
   }
 
-  // Calcular totales manualmente cuando sea necesario
-  const calcularTotales = () => {
-    const subtotalCalculado = detalles.reduce((sum, detalle) => {
-      const valorVenta = (detalle.cantidad * detalle.precio_unitario) - detalle.descuento_unitario
-      return sum + valorVenta
-    }, 0)
-
-    const igvCalculado = subtotalCalculado * tasaIgv
-    const totalCalculado = subtotalCalculado + igvCalculado
-
-    setFormData(prev => ({
-      ...prev,
-      subtotal: subtotalCalculado,
-      impuesto_igv: igvCalculado,
-      total: totalCalculado
+  const applyLines = (rawLines: DetalleTipo[]) => {
+    const calculated = calculateLines(rawLines, tasaIgv)
+    const subtotal = calculated.reduce((sum, line) => sum + line.valor_venta, 0)
+    const tax = calculated.reduce((sum, line) => sum + line.impuesto_igv, 0)
+    const discounts = calculated.reduce(
+      (sum, line) => sum + Number(line.cantidad) * Number(line.descuento_unitario || 0),
+      0,
+    )
+    setDetalles(calculated)
+    setFormData((current) => ({
+      ...current,
+      subtotal: Math.round(subtotal * 100) / 100,
+      descuentos: Math.round(discounts * 100) / 100,
+      impuesto_igv: Math.round(tax * 100) / 100,
+      total: Math.round((subtotal + tax) * 100) / 100,
     }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validar documento antes de enviar
-    const datosParaValidar = {
-      ...formData,
-      detalles: detalles
+    const payload: Record<string, unknown> = {
+      tipo_documento: formData.tipo_documento,
+      receptor_tipo_doc: formData.receptor_tipo_doc,
+      receptor_numero_doc: formData.receptor_numero_doc.trim(),
+      receptor_razon_social: formData.receptor_razon_social.trim(),
+      fecha_emision: formData.fecha_emision,
+      moneda: formData.moneda,
+      tipo_cambio: Number(formData.tipo_cambio),
+      condicion_pago: formData.condicion_pago,
+      detalles: detalles.map(({ valor_venta: _valor, impuesto_igv: _igv, total_item: _total, ...line }) => line),
+      idempotency_key: requestKeyRef.current,
     }
+    if (formData.serie.trim()) payload.serie = formData.serie.trim().toUpperCase()
+    if (formData.fecha_vencimiento) payload.fecha_vencimiento = formData.fecha_vencimiento
+    if (formData.receptor_direccion.trim()) payload.receptor_direccion = formData.receptor_direccion.trim()
+    if (formData.receptor_email.trim()) payload.receptor_email = formData.receptor_email.trim()
+    if (formData.observaciones.trim()) payload.observaciones = formData.observaciones.trim()
 
-    const validationResponse = await api.post('/api/documentos/validar-documento', datosParaValidar)
+    const validationResponse = await api.post('/api/documentos/validar-documento', payload)
 
-    if (validationResponse && !validationResponse.data.valido) {
-      setErroresValidacion(validationResponse.data.errores)
-      showErrorToast(`Errores de validación: ${validationResponse.data.errores.join(', ')}`)
+    const validationData = api.unwrap(validationResponse) as { valido?: boolean; errores?: string[] } | null
+    if (validationData && validationData.valido === false) {
+      const errors = validationData.errores ?? ['Documento inválido']
+      setErroresValidacion(errors)
+      showErrorToast(`Errores de validación: ${errors.join(', ')}`)
       return
     }
 
     setErroresValidacion([])
 
     // Crear o actualizar documento
-    console.log('📊 Enviando datos del documento:', { ...formData, detalles })
-
     let response
     if (documento) {
-      // Actualizar documento existente
-      response = await api.put(`/api/documentos/${documento.id}`, { ...formData, detalles })
+      response = await api.put(`/api/documentos/${documento.id}`, payload)
     } else {
-      // Crear nuevo documento
-      response = await api.post('/api/documentos/crear', { ...formData, detalles })
+      response = await api.post('/api/documentos/crear', payload)
     }
 
     if (response && response.success) {
@@ -255,10 +293,10 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
   }
 
   const agregarDetalle = () => {
-    setDetalles([...detalles, {
+    applyLines([...detalles, {
       codigo_producto: '',
       descripcion: '',
-      unidad_medida: 'UND',
+      unidad_medida: 'NIU',
       cantidad: 1,
       precio_unitario: 0,
       descuento_unitario: 0,
@@ -266,36 +304,18 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
       impuesto_igv: 0,
       total_item: 0
     }])
-
-    // Calcular totales después de agregar
-    setTimeout(() => {
-      calcularTotales()
-    }, 0)
   }
 
   const eliminarDetalle = (index: number) => {
     if (detalles.length > 1) {
-      setDetalles(detalles.filter((_, i) => i !== index))
-
-      // Calcular totales después de eliminar
-      setTimeout(() => {
-        calcularTotales()
-      }, 0)
+      applyLines(detalles.filter((_, i) => i !== index))
     }
   }
 
   const actualizarDetalle = (index: number, campo: string, valor: any) => {
     const nuevosDetalles = [...detalles]
     nuevosDetalles[index] = { ...nuevosDetalles[index], [campo]: valor }
-    setDetalles(nuevosDetalles)
-
-    // Calcular totales automáticamente cuando cambien valores relevantes
-    if (campo === 'cantidad' || campo === 'precio_unitario' || campo === 'descuento_unitario') {
-      // Usar setTimeout para asegurar que el estado se actualice primero
-      setTimeout(() => {
-        calcularTotales()
-      }, 0)
-    }
+    applyLines(nuevosDetalles)
   }
 
   const showSuccessToast = (message: string) => {
@@ -373,8 +393,6 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                 >
                   <option value="FACTURA">{isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura'}</option>
                   <option value="BOLETA">{isArgentina ? 'Factura B' : isColombia ? 'Documento equivalente' : 'Boleta'}</option>
-                  <option value="NOTA_CREDITO">Nota de Crédito</option>
-                  <option value="NOTA_DEBITO">Nota de Débito</option>
                   <option value="CONTRATO">Contrato</option>
                 </select>
               </Field>
@@ -425,7 +443,35 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                   <option value="EUR">Euros (EUR)</option>
                 </select>
               </Field>
+
+              <Field label="Condición de pago">
+                <select
+                  value={formData.condicion_pago}
+                  onChange={(e) => setFormData(prev => ({ ...prev, condicion_pago: e.target.value }))}
+                  className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
+                >
+                  <option value="CONTADO">Contado</option>
+                  <option value="CREDITO">Crédito</option>
+                </select>
+              </Field>
+
+              {formData.moneda !== defaultCurrency && (
+                <Field label="Tipo de cambio *">
+                  <input
+                    type="number"
+                    min="0.000001"
+                    step="0.000001"
+                    value={formData.tipo_cambio}
+                    onChange={(e) => setFormData(prev => ({ ...prev, tipo_cambio: Number(e.target.value) }))}
+                    required
+                    className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
+                  />
+                </Field>
+              )}
             </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Las notas de crédito y débito se crean desde el comprobante original para conservar la referencia fiscal y evitar anulaciones parciales incorrectas.
+            </p>
           </section>
 
           <section className="rounded-lg border border-cyan-400/15 bg-card/50 p-4">
@@ -587,11 +633,11 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                   <Field label="Cantidad *">
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.0001"
                       value={detalle.cantidad}
                       onChange={(e) => actualizarDetalle(index, 'cantidad', parseFloat(e.target.value) || 0)}
                       required
-                      min="0"
+                      min="0.0001"
                       className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
                     />
                   </Field>
@@ -615,6 +661,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
                       value={detalle.descuento_unitario}
                       onChange={(e) => actualizarDetalle(index, 'descuento_unitario', parseFloat(e.target.value) || 0)}
                       min="0"
+                      max={detalle.precio_unitario}
                       className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
                     />
                   </Field>
@@ -656,18 +703,16 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
               <Field label="Descuentos">
                 <input
                   type="number"
-                  step="0.01"
-                  value={formData.descuentos}
-                  onChange={(e) => setFormData(prev => ({ ...prev, descuentos: parseFloat(e.target.value) || 0 }))}
-                  min="0"
-                  className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
+                  value={formData.descuentos.toFixed(2)}
+                  readOnly
+                  className={cn('h-10 w-full rounded-md px-3 text-sm', readOnlyClass)}
                 />
               </Field>
 
               <Field label="Total final">
                 <input
                   type="number"
-                  value={(formData.total - formData.descuentos).toFixed(2)}
+                  value={formData.total.toFixed(2)}
                   readOnly
                   className="h-10 w-full rounded-md border border-cyan-300/40 bg-cyan-400/10 px-3 text-sm font-semibold text-primary"
                 />

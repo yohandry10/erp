@@ -1,4 +1,9 @@
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { FacturaDto } from '@erp-suite/dtos';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { FiscalAdapterService } from './fiscal-adapter.service';
@@ -20,6 +25,10 @@ export class CpeDeliveryService {
     private readonly pdfGenerator: PdfGeneratorService,
     private readonly certificateService: CpeCertificateService,
   ) {}
+
+  private readonly defaultDeliveryOptions = {
+    origin: 'USER' as const,
+  };
 
   private getXmlSigner(tenantId: string) {
     return this.certificateService.getXmlSigner(tenantId);
@@ -156,198 +165,111 @@ async getSignedXml(id: string, tenantId: string): Promise<string> {
     return cpe.xml_firmado;
   }
 
-async resendToOse(id: string, tenantId: string, options?: { idempotencyKey?: string }) {
-    const cpe = await this.findOne(id, tenantId);
-    
-    // Obtener XML firmado del CPE
-    const fileName = `${cpe.ruc_emisor}-${cpe.tipo_documento}-${cpe.serie}-${cpe.numero}`;
-    
-    await this.sendToOse(id, cpe.xml_firmado, fileName, options);
-    
-    return { message: 'CPE resent to OSE successfully' };
+async resendToOse(
+    id: string,
+    tenantId: string,
+    options?: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
+  ) {
+    return this.sendToOse(id, tenantId, options);
   }
 
 async sendToOseManual(
     id: string,
-    xmlFirmado: string,
-    fileName: string,
-    options?: { idempotencyKey?: string },
-  ): Promise<void> {
-    console.log(`🚀 [CPE] Enviando manualmente CPE ${id} a SUNAT...`);
-    await this.sendToOse(id, xmlFirmado, fileName, options);
+    _xmlFirmado: string,
+    _fileName: string,
+    options: {
+      tenantId: string;
+      idempotencyKey?: string;
+      actorId?: string;
+      origin?: 'USER' | 'WORKER' | 'SYSTEM';
+    },
+  ) {
+    return this.sendToOse(id, options.tenantId, options);
   }
 
-async checkOseStatus(id: string, tenantId: string) {
-    const cpe = await this.findOne(id, tenantId);
-    
-    // 🌍 Consultar estado en servicio fiscal correcto (SUNAT o DIAN)
-    const servicioFiscal = await this.fiscalAdapter.obtenerNombreServicioFiscal(tenantId);
-    console.log(`🔍 Consultando estado en ${servicioFiscal} para CPE ${id}`);
-    
-    const response = await this.fiscalAdapter.consultarEstado(
-      tenantId,
-      cpe.tipo_documento,
-      cpe.serie,
-      cpe.numero.toString(),
-      cpe.hash
-    );
-    
-    // Actualizar estado en BD si es necesario
-    if (response.success) {
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'ACEPTADO',
-          sunat_status: this.sunatStatuses.ACCEPTED,
-          cdr_sunat: response.cdr || 'CDR_RECEIVED',
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpe.id }
-      );
-    } else {
-      await this.supabaseService.update(
-        'cpe',
-        {
-          sunat_status: this.sunatStatuses.REJECTED,
-          error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpe.id }
-      );
+async checkOseStatus(
+    id: string,
+    tenantId: string,
+    options?: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
+  ) {
+    const origin = options?.origin ?? this.defaultDeliveryOptions.origin;
+    const idempotencyKey = String(options?.idempotencyKey ?? '').trim()
+      || `cpe.query:${tenantId}:${id}:${Math.floor(Date.now() / 300_000)}`;
+    const claim = await this.reserveOperation('reservar_consulta_cpe_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: options?.actorId ?? null,
+      p_cpe_id: id,
+      p_idempotency_key: idempotencyKey,
+      p_origin: origin,
+    });
+    if (!claim.claimed) {
+      return this.deliveryResult(claim);
     }
-    
-    return {
-      id: cpe.id,
-      estado: response.success ? 'ACEPTADO' : cpe.estado,
-      codigoSunat: response.codigoRespuesta,
-      descripcionSunat: response.descripcionRespuesta,
-      timestamp: new Date(),
-    };
-  }
 
-async prepareXmlForSunat(cpeId: string, xmlContent: string, tenantId: string): Promise<boolean> {
+    const cpe = claim.cpe;
     try {
-      console.log(`📄 [CPE] Preparando XML para CPE ${cpeId}...`);
-      
-      // Obtener el XmlSigner configurado para el tenant
-      const xmlSigner = await this.getXmlSigner(tenantId);
-      console.log('📜 [CPE] Certificado configurado');
-      
-      // Firmar el XML con certificado real
-      const xmlSigned = xmlSigner.signXml(xmlContent);
-      const hash = xmlSigner.generateHash(xmlSigned);
-
-      // Validar la firma generada
-      const isValid = xmlSigner.validateSignature(xmlSigned);
-      if (!isValid) {
-        console.warn('⚠️ [CPE] La firma generada no pasó la validación');
+      const response = await this.fiscalAdapter.consultarEstado(
+        tenantId,
+        cpe.tipo_documento,
+        cpe.serie,
+        String(cpe.numero),
+        cpe.hash,
+      );
+      const resultKind = response.success
+        ? (String(response.cdr ?? '').trim() ? 'ACCEPTED' : 'PENDING')
+        : (this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta)
+          ? 'TECHNICAL_ERROR'
+          : 'REJECTED');
+      const finalized = await this.finalizeOperation('finalizar_consulta_cpe_tx', claim, resultKind, response);
+      if (resultKind === 'REJECTED') {
+        throw new BadRequestException(
+          `SUNAT/OSE rechazó la consulta: ${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
+        );
       }
-
-      // Actualizar CPE con XML firmado
-      console.log('🔧 [CPE] Actualizando estado a: FIRMADO');
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'FIRMADO', // Estado que indica listo para SUNAT
-          hash: hash,
-          hash_firma: hash,
-          xml_firmado: xmlSigned,
-          sunat_status: this.sunatStatuses.READY,
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpeId }
-      );
-
-      console.log(`✅ [CPE] XML firmado para CPE ${cpeId}`);
-      console.log(`📊 [CPE] Hash: ${hash}`);
-      console.log(`📊 [CPE] Firma válida: ${isValid ? '✅' : '⚠️'}`);
-      console.log(`📊 [CPE] Modo certificado: DEMO`);
-
-      return true;
+      if (resultKind === 'TECHNICAL_ERROR') {
+        throw new ServiceUnavailableException(response.descripcionRespuesta || 'Consulta fiscal temporalmente no disponible');
+      }
+      return this.deliveryResult(finalized);
     } catch (error) {
-      console.error(`❌ [CPE] Error preparando XML para CPE ${cpeId}:`, error);
-      
-      // Marcar como ERROR
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'RECHAZADO',
-          sunat_status: this.sunatStatuses.ERROR,
-          error_message: `Error preparando XML: ${error.message}`,
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpeId }
-      );
-
-      return false;
+      if (error instanceof BadRequestException || error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+      await this.finalizeTechnicalException('finalizar_consulta_cpe_tx', claim, error);
+      throw new ServiceUnavailableException(`No se pudo consultar SUNAT/OSE: ${this.errorMessage(error)}`);
     }
   }
 
 async retrySendToOse(
     cpeId: string,
-    options?: { idempotencyKey?: string },
-  ): Promise<void> {
-    return this.sendToOse(cpeId, undefined, undefined, options);
+    tenantId: string,
+    options?: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
+  ) {
+    return this.sendToOse(cpeId, tenantId, options);
   }
 
-private async sendToOse(
+  async sendToOse(
     cpeId: string,
-    xmlContent?: string,
-    fileName?: string,
-    options?: { idempotencyKey?: string },
-  ): Promise<void> {
+    tenantId: string,
+    options?: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
+  ) {
+    const origin = options?.origin ?? this.defaultDeliveryOptions.origin;
+    const idempotencyKey = String(options?.idempotencyKey ?? '').trim()
+      || `cpe.send:${tenantId}:${cpeId}`;
+    const claim = await this.reserveOperation('reservar_envio_cpe_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: options?.actorId ?? null,
+      p_cpe_id: cpeId,
+      p_idempotency_key: idempotencyKey,
+      p_origin: origin,
+    });
+    if (!claim.claimed) {
+      return this.deliveryResult(claim);
+    }
+
+    const cpeData = claim.cpe;
     try {
-      // 🔍 PASO 1: Obtener datos del CPE incluyendo tenant_id
-      const { data: cpeData, error: cpeError } = await this.supabaseService.getClient()
-        .from('cpe')
-        .select('*, tenant_id, xml_firmado, ruc_emisor, tipo_documento, serie, numero')
-        .eq('id', cpeId)
-        .single();
-
-      if (cpeError || !cpeData) {
-        throw new Error('No se pudo obtener datos del CPE');
-      }
-
-      const tenantId = cpeData.tenant_id;
-      const effectiveIdempotencyKey =
-        String(options?.idempotencyKey ?? '').trim() ||
-        String((cpeData as any).idempotency_key ?? '').trim() ||
-        `cpe.send:${tenantId}:${cpeId}`;
-
-      // HARDENING: evitar doble envío concurrente si ya está en flight.
-      if (
-        (cpeData as any).estado === 'ENVIADO' &&
-        (cpeData as any).sunat_status === this.sunatStatuses.SENDING
-      ) {
-        this.logger.warn(
-          `♻️ [CPE] Envío ya en progreso para ${cpeId} (idempotencyKey=${effectiveIdempotencyKey}); omitiendo duplicado.`,
-        );
-        return;
-      }
-      
-      // 🌍 PASO 2: Detectar servicio fiscal según país del tenant
       const servicioFiscal = await this.fiscalAdapter.obtenerNombreServicioFiscal(tenantId);
-      console.log(`📤 [CPE] Enviando CPE ${cpeId} a ${servicioFiscal}...`);
-      
-      // PASO 3: Marcar como ENVIADO
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'ENVIADO',
-          sunat_status: this.sunatStatuses.SENDING,
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpeId }
-      );
-
-      // PASO 4: Preparar XML si no se proporcionó
-      if (!xmlContent || !fileName) {
-        xmlContent = cpeData.xml_firmado;
-        fileName = `${cpeData.ruc_emisor}-${cpeData.tipo_documento}-${cpeData.serie}-${cpeData.numero}`;
-      }
-
-      // 🚀 PASO 5: ENVIAR AL SERVICIO FISCAL CORRECTO (SUNAT o DIAN)
-      // Construir documento electrónico desde CPE
+      this.logger.log(`Enviando CPE ${cpeId} a ${servicioFiscal} (claim ${claim.operation.id})`);
       const paisCodigo = (await this.fiscalAdapter.obtenerCodigoPais(tenantId)).toUpperCase();
       const fiscalConfig = await this.fiscalAdapter.obtenerConfiguracionFiscal(tenantId);
       const emisorInfo = await this.getEmpresaEmisorInfo(tenantId);
@@ -402,67 +324,102 @@ private async sendToOse(
         importeTotal: totalValue,
         tasaImpuesto: fiscalConfig?.tasaImpuesto,
         items: cpeData.items || [],
-        xmlContent: xmlContent
+        xmlContent: cpeData.xml_firmado,
       };
 
       const response = await this.fiscalAdapter.enviarDocumento(documento, tenantId);
-
-      if (response.success) {
-        console.log(`✅ [CPE] CPE ${cpeId} enviado exitosamente a ${servicioFiscal}`);
-        
-        // Actualizar como ACEPTADO
-        await this.supabaseService.update(
-          'cpe',
-          {
-            estado: 'ACEPTADO',
-            sunat_status: this.sunatStatuses.ACCEPTED,
-            cdr_sunat: response.cdr || 'CDR_RECEIVED',
-            hash: response.hash || response.numeroComprobante || null,
-            hash_firma: response.hash || null,
-            numero_comprobante_sunat: response.numeroComprobante,
-            updated_at: new Date().toISOString(),
-          },
-          { id: cpeId }
-        );
-      } else {
-        console.error(`❌ [CPE] Error enviando CPE ${cpeId} a ${servicioFiscal}: ${response.descripcionRespuesta}`);
-        
-        // 🔴 CRÍTICO FIX: Determinar si es error técnico recuperable o error de validación
-        const isTechnicalError = this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta);
-        
-        // Marcar como RECHAZADO
-        await this.supabaseService.update(
-          'cpe',
-          {
-            estado: 'RECHAZADO',
-            sunat_status: isTechnicalError ? this.sunatStatuses.ERROR : this.sunatStatuses.REJECTED,
-            error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
-            retry_count: isTechnicalError ? 0 : null, // Solo reintentar errores técnicos
-            next_retry_at: null,
-            updated_at: new Date().toISOString(),
-          },
-          { id: cpeId }
+      const resultKind = response.success
+        ? (String(response.cdr ?? '').trim() ? 'ACCEPTED' : 'PENDING')
+        : (this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta)
+          ? 'TECHNICAL_ERROR'
+          : 'REJECTED');
+      const finalized = await this.finalizeOperation('finalizar_envio_cpe_tx', claim, resultKind, response);
+      if (resultKind === 'REJECTED') {
+        throw new BadRequestException(
+          `${servicioFiscal} rechazó el comprobante: ${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
         );
       }
-
+      if (resultKind === 'TECHNICAL_ERROR') {
+        throw new ServiceUnavailableException(response.descripcionRespuesta || `${servicioFiscal} no está disponible`);
+      }
+      return this.deliveryResult(finalized);
     } catch (error) {
-      console.error(`❌ [CPE] Error técnico enviando CPE ${cpeId}:`, error);
-      
-      // 🔴 CRÍTICO FIX: Marcar como RECHAZADO con información de reintento
-      const retryCount = 0; // Primera vez que falla
-      await this.supabaseService.update(
-        'cpe',
-        {
-          estado: 'RECHAZADO',
-          sunat_status: this.sunatStatuses.ERROR,
-          error_message: `Error técnico: ${error.message}`,
-          retry_count: retryCount,
-          next_retry_at: null, // El servicio de reintentos lo programará
-          updated_at: new Date().toISOString(),
-        },
-        { id: cpeId }
-      );
+      if (error instanceof BadRequestException || error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+      await this.finalizeTechnicalException('finalizar_envio_cpe_tx', claim, error);
+      throw new ServiceUnavailableException(`No se pudo enviar a SUNAT/OSE: ${this.errorMessage(error)}`);
     }
+  }
+
+  private async reserveOperation(rpc: string, args: Record<string, unknown>): Promise<any> {
+    const { data, error } = await this.supabaseService.getClient().rpc(rpc, args);
+    if (error) {
+      throw new BadRequestException(`No se pudo reservar la operación fiscal: ${error.message}`);
+    }
+    const claim = Array.isArray(data) ? data[0] : data;
+    if (!claim?.cpe || (claim.claimed && (!claim.operation?.id || !claim.operation?.claim_token))) {
+      throw new BadRequestException('La reserva fiscal devolvió una respuesta incompleta');
+    }
+    return claim;
+  }
+
+  private async finalizeOperation(
+    rpc: string,
+    claim: any,
+    resultKind: 'ACCEPTED' | 'PENDING' | 'TECHNICAL_ERROR' | 'REJECTED',
+    response: any,
+  ): Promise<any> {
+    const { data, error } = await this.supabaseService.getClient().rpc(rpc, {
+      p_tenant_id: claim.cpe.tenant_id,
+      p_operation_id: claim.operation.id,
+      p_claim_token: claim.operation.claim_token,
+      p_result_kind: resultKind,
+      p_response_code: String(response?.codigoRespuesta ?? (resultKind === 'PENDING' ? 'PENDING' : 'UNKNOWN')),
+      p_description: String(response?.descripcionRespuesta ?? resultKind),
+      p_cdr: response?.cdr ?? null,
+      p_external_hash: response?.hash ?? null,
+      p_external_number: response?.numeroComprobante ?? null,
+      p_response_summary: {
+        success: Boolean(response?.success),
+        hasCdr: Boolean(String(response?.cdr ?? '').trim()),
+        resultKind,
+      },
+    });
+    if (error) {
+      throw new Error(`No se pudo finalizar la operación fiscal: ${error.message}`);
+    }
+    return Array.isArray(data) ? data[0] : data;
+  }
+
+  private async finalizeTechnicalException(rpc: string, claim: any, error: unknown): Promise<void> {
+    await this.finalizeOperation(rpc, claim, 'TECHNICAL_ERROR', {
+      success: false,
+      codigoRespuesta: 'EXTERNAL_EXCEPTION',
+      descripcionRespuesta: this.errorMessage(error),
+    });
+  }
+
+  private deliveryResult(payload: any) {
+    const operation = payload?.operation ?? null;
+    const cpe = payload?.cpe ?? null;
+    return {
+      success: true,
+      claimed: Boolean(payload?.claimed),
+      idempotent: Boolean(payload?.idempotent),
+      reason: payload?.reason ?? null,
+      operationId: operation?.id ?? null,
+      resultKind: operation?.result_kind ?? null,
+      cpe,
+      estado: cpe?.estado ?? null,
+      codigoSunat: operation?.response_code ?? null,
+      descripcionSunat: operation?.error_message ?? null,
+      timestamp: new Date(),
+    };
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error ?? 'Error fiscal desconocido');
   }
 
 private isTechnicalError(codigoRespuesta: string, descripcionRespuesta: string): boolean {

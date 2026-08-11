@@ -10,9 +10,14 @@ import { CashReconciliationService, Denominaciones } from './services/cash-recon
 import { CashReportsService } from './services/cash-reports.service';
 import { CashMovementsService } from './services/cash-movements.service';
 import { CashClosingService, DatosCierre } from './services/cash-closing.service';
-import { CashWithdrawalsService, MotivoRetiro, RetiroMetadata } from './services/cash-withdrawals.service';
-import { CashShiftChangesService, FirmasDigitales } from './services/cash-shift-changes.service';
-import { TipoMovimiento } from './services/cash-movements.service';
+import { CashWithdrawalsService } from './services/cash-withdrawals.service';
+import { CashShiftChangesService } from './services/cash-shift-changes.service';
+import {
+  CompletarCambioTurnoCajaDto,
+  ConciliarRetiroCajaDto,
+  MovimientoManualCajaDto,
+  SolicitarRetiroCajaDto,
+} from './dto/cash-operations.dto';
 
 @Injectable()
 export class CajasService {
@@ -40,57 +45,61 @@ export class CajasService {
     return data || [];
   }
 
-  async crearCaja(tenantId: string, dto: CreateCajaDto, userId?: string) {
-    const nueva = {
-      tenant_id: tenantId,
-      nombre: dto.nombre,
-      descripcion: dto.descripcion ?? null,
-      sucursal_id: dto.sucursal_id ?? null,
-      almacen_id: dto.almacen_id,
-      dispositivo: dto.dispositivo ?? null,
-      tipo: dto.tipo ?? 'TIENDA',
-      estado: 'ACTIVO',
-      creado_por: userId ?? null,
-    };
-    const { data, error } = await this.supabase.getClient()
-      .from('cajas')
-      .insert([nueva])
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  async crearCaja(
+    tenantId: string,
+    dto: CreateCajaDto,
+    userId: string | undefined,
+    idempotencyKey: string,
+  ) {
+    if (!userId) {
+      throw new ForbiddenException('La creación de caja requiere un actor autenticado');
+    }
+    const { data, error } = await this.supabase.getClient().rpc('crear_caja_tx', {
+      p_tenant_id: tenantId,
+      p_payload: dto,
+      p_actor_id: userId,
+      p_idempotency_key: idempotencyKey,
+    });
+    if (error) {
+      throw new BadRequestException(error.message || 'No se pudo crear la caja');
+    }
+    return (data as any)?.caja ?? data;
   }
 
-  async actualizarCaja(tenantId: string, id: string, dto: UpdateCajaDto) {
-    const { data: existing, error: findError } = await this.supabase.getClient()
-      .from('cajas')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('id', id)
-      .single();
-    if (findError || !existing) {
-      throw new NotFoundException('Caja no encontrada');
+  async actualizarCaja(
+    tenantId: string,
+    id: string,
+    dto: UpdateCajaDto,
+    userId: string | undefined,
+    idempotencyKey: string,
+  ) {
+    if (!userId) {
+      throw new ForbiddenException('La actualización de caja requiere un actor autenticado');
     }
+    const { data, error } = await this.supabase.getClient().rpc('actualizar_caja_tx', {
+      p_tenant_id: tenantId,
+      p_caja_id: id,
+      p_payload: dto,
+      p_actor_id: userId,
+      p_idempotency_key: idempotencyKey,
+    });
+    if (error) {
+      throw new BadRequestException(error.message || 'No se pudo actualizar la caja');
+    }
+    return (data as any)?.caja ?? data;
+  }
 
-    const updateData = {
-      nombre: dto.nombre ?? undefined,
-      descripcion: dto.descripcion ?? undefined,
-      sucursal_id: dto.sucursal_id ?? undefined,
-      almacen_id: dto.almacen_id ?? undefined,
-      dispositivo: dto.dispositivo ?? undefined,
-      tipo: dto.tipo ?? undefined,
-      estado: dto.estado ?? undefined,
-      // No tocar updated_at si la columna no existe en esta tabla
-    };
-
-    const { data, error } = await this.supabase.getClient()
-      .from('cajas')
-      .update(updateData)
-      .eq('tenant_id', tenantId)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
+  async obtenerOpcionesContables(tenantId: string, userId?: string) {
+    if (!userId) {
+      throw new ForbiddenException('La consulta contable de caja requiere un actor autenticado');
+    }
+    const { data, error } = await this.supabase.getClient().rpc(
+      'obtener_opciones_contables_caja',
+      { p_tenant_id: tenantId, p_actor_id: userId },
+    );
+    if (error) {
+      throw new BadRequestException(error.message || 'No se pudieron obtener las opciones contables');
+    }
     return data;
   }
 
@@ -211,50 +220,11 @@ export class CajasService {
       .maybeSingle();
 
     if (sesionCajaAbierta) {
-      // Si la sesión abierta es de días anteriores, cerrarla automáticamente (cierre administrativo) y continuar
-      const aperturaIso = sesionCajaAbierta.hora_apertura || sesionCajaAbierta.fecha_apertura || sesionCajaAbierta.created_at;
-      const apertura = aperturaIso ? new Date(aperturaIso) : null;
-      const hoy = new Date();
-      const esMismoDia =
-        !!apertura &&
-        apertura.getFullYear() === hoy.getFullYear() &&
-        apertura.getMonth() === hoy.getMonth() &&
-        apertura.getDate() === hoy.getDate();
-
-      if (!esMismoDia) {
-        const ahoraIso = new Date().toISOString();
-        try {
-          await this.supabase.getClient()
-            .from('sesiones_caja')
-            .update(
-              await this.construirCierreAdministrativo(
-                tenantId,
-                sesionCajaAbierta.id,
-                ahoraIso,
-                userId ?? sesionCajaAbierta.cajero_id ?? null,
-              ),
-            )
-            .eq('tenant_id', tenantId)
-            .eq('id', sesionCajaAbierta.id);
-          this.logger.warn(
-            `⚠️ Sesión antigua auto-cerrada para abrir nueva: Caja=${caja.nombre}, Sesión=${sesionCajaAbierta.id}, Apertura=${aperturaIso}`,
-          );
-        } catch (cerrarError) {
-          this.logger.error(
-            `❌ No se pudo cerrar la sesión antigua ${sesionCajaAbierta.id}: ${cerrarError.message}`,
-          );
-          throw new BadRequestException(
-            `No se pudo cerrar la sesión anterior (${sesionCajaAbierta.id}). Intente cierre administrativo manual.`,
-          );
-        }
-      } else {
-        throw new BadRequestException(
-          `La caja "${caja.nombre}" ya tiene una sesión abierta desde ${new Date(sesionCajaAbierta.fecha_apertura).toLocaleString()}. ` +
-          `ID de sesión: ${sesionCajaAbierta.id}. Debe cerrarla antes de abrir una nueva.`,
-        );
-      }
+      throw new BadRequestException(
+        `La caja "${caja.nombre}" ya tiene una sesión abierta (${sesionCajaAbierta.id}). ` +
+        'Debe cerrarla explícitamente; la apertura nunca auto-cierra ni inventa un arqueo.',
+      );
     }
-
     const cajeroId = dto.cajero_id ?? userId;
 
     // Validación 3: Usuario no tiene otra sesión abierta en NINGUNA caja
@@ -270,57 +240,13 @@ export class CajasService {
         .maybeSingle();
 
       if (sesionUsuarioAbierta) {
-        const aperturaIso =
-          (sesionUsuarioAbierta as any).hora_apertura ||
-          (sesionUsuarioAbierta as any).fecha_apertura ||
-          (sesionUsuarioAbierta as any).created_at;
-        const apertura = aperturaIso ? new Date(aperturaIso) : null;
-        const hoy = new Date();
-        const esMismoDia =
-          !!apertura &&
-          apertura.getFullYear() === hoy.getFullYear() &&
-          apertura.getMonth() === hoy.getMonth() &&
-          apertura.getDate() === hoy.getDate();
-
-        if (!esMismoDia) {
-          // Cerrar automáticamente la sesión colgada del usuario y continuar
-          const ahoraIso = new Date().toISOString();
-          try {
-            await this.supabase.getClient()
-              .from('sesiones_caja')
-              .update(
-                await this.construirCierreAdministrativo(
-                  tenantId,
-                  sesionUsuarioAbierta.id,
-                  ahoraIso,
-                  userId ?? cajeroId ?? null,
-                ),
-              )
-              .eq('tenant_id', tenantId)
-              .eq('id', sesionUsuarioAbierta.id);
-            this.logger.warn(
-              `⚠️ Sesión antigua auto-cerrada para usuario ${cajeroId}: Sesión=${sesionUsuarioAbierta.id}, Apertura=${aperturaIso}`,
-            );
-          } catch (cerrarError) {
-            this.logger.error(
-              `❌ No se pudo cerrar la sesión antigua del usuario ${cajeroId} (${sesionUsuarioAbierta.id}): ${cerrarError.message}`,
-            );
-            throw new BadRequestException(
-              `No se pudo cerrar la sesión anterior del usuario (${sesionUsuarioAbierta.id}). Intente cierre administrativo manual.`,
-            );
-          }
-        } else {
-          const cajaAnterior = sesionUsuarioAbierta.cajas as any;
-          throw new BadRequestException(
-            `Ya tiene una caja abierta: "${cajaAnterior?.nombre || 'Caja desconocida'}" desde ${new Date(sesionUsuarioAbierta.fecha_apertura).toLocaleString()}. ` +
-            `ID de sesión: ${sesionUsuarioAbierta.id}. ` +
-            `Debe cerrarla antes de abrir otra. ` +
-            `Si la sesión quedó colgada (ej: corte de luz), use el endpoint de cierre administrativo.`,
-          );
-        }
+        const cajaAnterior = sesionUsuarioAbierta.cajas as any;
+        throw new BadRequestException(
+          `Ya tiene una caja abierta: "${cajaAnterior?.nombre || 'Caja desconocida'}" ` +
+          `(${sesionUsuarioAbierta.id}). Ciérrela explícitamente antes de abrir otra.`,
+        );
       }
     }
-
     // Validación 4: Terminal no tiene otra sesión abierta (si se especifica)
     if (dto.dispositivo) {
       const { data: sesionTerminalAbierta } = await this.supabase
@@ -444,79 +370,48 @@ export class CajasService {
       );
     }
 
-    // ✅ Todas las validaciones pasaron - Crear nueva sesión
-    const nuevaSesion: any = {
-      caja_id: cajaId,
-      tenant_id: tenantId,
-      cajero_id: cajeroId ?? null,
-      abierto_por: userId ?? cajeroId ?? null,
-      monto_inicio: dto.monto_inicio,
-      moneda: dto.moneda ?? 'PEN',
-      dispositivo: dto.dispositivo ?? null,
-      estado: 'ABIERTA',
-      // Campos de autorización
-      requirio_autorizacion: requirioAutorizacion,
-      autorizacion_supervisor_id: supervisorIdFinal,
-      razon_autorizacion: razonAutorizacionFinal,
-      // Campos de denominaciones (si se proporcionaron)
-      denominaciones_apertura: dto.denominaciones_apertura || null,
-      // Q13: Campos de trazabilidad forense
-      ip_address: dto.ip_address || null,
-      geolocalizacion: dto.geolocalizacion || null,
-      foto_apertura: dto.foto_apertura || null,
-      user_agent: dto.user_agent || null,
-    };
+    const actorId = userId ?? cajeroId;
+    if (!actorId || !cajeroId) {
+      throw new ForbiddenException('La apertura requiere un cajero autenticado');
+    }
 
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('sesiones_caja')
-      .insert([nuevaSesion])
-      .select()
-      .single();
+    // La sesión y su autorización se confirman en una sola transacción. La
+    // RPC vuelve a comprobar caja/almacén/actor y serializa caja, usuario y
+    // terminal para cerrar la ventana TOCTOU de las validaciones de UX.
+    const { data, error } = await this.supabase.getClient().rpc('abrir_caja_tx', {
+      p_tenant_id: tenantId,
+      p_caja_id: cajaId,
+      p_actor_id: actorId,
+      p_payload: {
+        cajero_id: cajeroId,
+        monto_inicio: dto.monto_inicio,
+        moneda: dto.moneda ?? 'PEN',
+        dispositivo: dto.dispositivo ?? null,
+        requirio_autorizacion: requirioAutorizacion,
+        supervisor_id: supervisorIdFinal,
+        razon_autorizacion: razonAutorizacionFinal,
+        tipo_autorizacion: validacionMonto.tipo === 'MONTO_BAJO'
+          ? 'APERTURA_MONTO_BAJO'
+          : 'APERTURA_MONTO_ALTO',
+        monto_min_configurado: config.monto_apertura_min,
+        monto_max_configurado: config.monto_apertura_max,
+        denominaciones_apertura: dto.denominaciones_apertura ?? null,
+        ip_address: ipAddress || dto.ip_address || null,
+        geolocalizacion: dto.geolocalizacion ?? null,
+        foto_apertura: dto.foto_apertura ?? null,
+        user_agent: dto.user_agent ?? null,
+      },
+    });
 
-    if (error) {
-      // TOCTOU guard: unique partial index prevents duplicate ABIERTA sessions
-      if (error.code === '23505') {
+    if (error || !data) {
+      if (error?.code === '23505') {
         throw new BadRequestException(
-          'Conflicto de concurrencia: otra sesión fue abierta simultáneamente para esta caja o cajero. Intente de nuevo.',
+          'Conflicto de concurrencia: ya existe una sesión abierta para la caja, cajero o terminal.',
         );
       }
-      this.logger.error(`Error al abrir sesión de caja: ${error.message}`, error);
-      throw new BadRequestException(`Error al abrir caja: ${error.message}`);
+      this.logger.error(`Error al abrir sesión de caja: ${error?.message}`, error);
+      throw new BadRequestException(`Error al abrir caja: ${error?.message || 'respuesta vacía'}`);
     }
-
-    // Si hubo autorización, registrarla en la tabla de autorizaciones
-    if (requirioAutorizacion && supervisorIdFinal && razonAutorizacionFinal) {
-      try {
-        await this.autorizacionesService.registrarAutorizacion(tenantId, {
-          sesion_caja_id: data.id,
-          tipo_autorizacion:
-            validacionMonto.tipo === 'MONTO_BAJO'
-              ? 'APERTURA_MONTO_BAJO'
-              : 'APERTURA_MONTO_ALTO',
-          monto_solicitado: dto.monto_inicio,
-          monto_min_configurado: config.monto_apertura_min,
-          monto_max_configurado: config.monto_apertura_max,
-          supervisor_id: supervisorIdFinal,
-          solicitante_id: cajeroId || userId || supervisorIdFinal,
-          razon_autorizacion: razonAutorizacionFinal,
-          ip_address: ipAddress || null,
-          dispositivo: dto.dispositivo || null,
-        });
-
-        this.logger.log(
-          `✅ Autorización registrada para sesión ${data.id}`,
-        );
-      } catch (authError) {
-        this.logger.error(
-          `Error al registrar autorización: ${authError.message}`,
-          authError,
-        );
-        // No lanzamos error - la sesión ya está creada
-        // Solo logueamos el problema para investigar
-      }
-    }
-
     const mensajeLog = requirioAutorizacion
       ? `Sesión de caja abierta con autorización de supervisor: Caja=${caja.nombre}, Cajero=${cajeroId}, Monto=$${dto.monto_inicio}, Supervisor=${supervisorIdFinal}`
       : `Sesión de caja abierta: Caja=${caja.nombre}, Cajero=${cajeroId}, Monto=$${dto.monto_inicio}`;
@@ -567,34 +462,20 @@ export class CajasService {
       );
     }
 
-    // Calcular duración de la sesión
-    const horaApertura = new Date(sesion.fecha_apertura);
-    const horaCierre = new Date();
-    const duracionHoras = Math.round(
-      (horaCierre.getTime() - horaApertura.getTime()) / (1000 * 60 * 60),
-    );
-
     const caja = sesion.cajas as any;
-
-    // Preparar datos de cierre administrativo
-    const cierre = {
-      estado: 'CERRADA',
-      fecha_cierre: horaCierre.toISOString(),
-      cerrado_por: userId,
-      cierre_administrativo: true,
-      razon_cierre_administrativo: razonCierre,
-      duracion_horas: duracionHoras,
-    };
-
-    // Cerrar sesión con marcador de cierre administrativo
-    const { data, error } = await this.supabase
-      .getClient()
-      .from('sesiones_caja')
-      .update(cierre)
-      .eq('id', sesionId)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
+    const montoEsperado = await this.resolveMontoEsperadoCierre(tenantId, sesion);
+    const { data, error } = await this.supabase.getClient().rpc('cerrar_caja_tx', {
+      p_tenant_id: tenantId,
+      p_sesion_id: sesionId,
+      p_actor_id: userId,
+      p_payload: {
+        monto_contado: montoEsperado,
+        cierre_administrativo: true,
+        razon_cierre_administrativo: razonCierre.trim(),
+        notas: `Cierre administrativo: ${razonCierre.trim()}`,
+        denominaciones: {},
+      },
+    });
 
     if (error) {
       this.logger.error(
@@ -629,45 +510,28 @@ export class CajasService {
     const { data: sesion, error: findError } = await query.single();
     if (findError || !sesion) throw new NotFoundException('Sesión de caja no encontrada o ya cerrada');
 
-    const esperado = await this.resolveMontoEsperadoCierre(tenantId, sesion);
     const contado = dto.monto_cierre ?? dto.monto_contado ?? sesion.monto_contado ?? 0;
-    const cierre: any = {
-      estado: 'CERRADA',
-      fecha_cierre: new Date().toISOString(),
-      monto_esperado: esperado,
-      monto_contado: contado,
-      diferencia: contado - esperado,
-      usuario_cierre: userId ?? sesion.usuario_id ?? null,
-      notas: dto.notas ?? sesion.notas ?? null,
-    };
-    // Campo "resumen" no existe en todos los entornos; evitar error de schema cache si no está presente
-    if (dto.resumen) {
-      cierre.resumen = dto.resumen;
+    const actorId = userId ?? sesion.cajero_id ?? sesion.usuario_id;
+    if (!actorId) {
+      throw new ForbiddenException('El cierre requiere un usuario autenticado');
+    }
+    const { data, error } = await this.supabase.getClient().rpc('cerrar_caja_tx', {
+      p_tenant_id: tenantId,
+      p_sesion_id: sesion.id,
+      p_actor_id: actorId,
+      p_payload: {
+        monto_contado: contado,
+        notas: dto.notas ?? sesion.notas ?? null,
+        resumen: dto.resumen ?? null,
+        denominaciones: {},
+        cierre_administrativo: false,
+      },
+    });
+    if (error || !data) {
+      throw new BadRequestException(error?.message || 'No se pudo confirmar el cierre de caja');
     }
 
-    const { data, error } = await this.supabase.getClient()
-      .from('sesiones_caja')
-      .update(cierre)
-      .eq('id', sesion.id)
-      .eq('tenant_id', tenantId)
-      .eq('estado', 'ABIERTA')
-      .select()
-      .single();
-    if (error) throw error;
-
-    // Registrar corte y asiento contable de cierre (no bloquea el cierre si falla)
-    let advertenciaCierre: string | null = null;
-    try {
-      await this.cashReportsService.registrarCorte(tenantId, data.id);
-      await this.cashReportsService.registrarAsientoCierre(tenantId, data.id);
-    } catch (registrarError) {
-      advertenciaCierre = `Corte/asiento de cierre no registrado: ${registrarError?.message}`;
-      this.logger.error(
-        `CIERRE_CORTE_FALLIDO sesion=${data.id} tenant=${tenantId}: ${registrarError?.message}. Requiere registro manual.`,
-      );
-    }
-
-    return { ...data, ...(advertenciaCierre ? { advertencia: advertenciaCierre } : {}) };
+    return data;
   }
 
   private async resolveMontoEsperadoCierre(tenantId: string, sesion: any): Promise<number> {
@@ -790,37 +654,33 @@ export class CajasService {
   async solicitarRetiro(
     tenantId: string,
     sesionId: string,
-    monto: number,
-    motivo: MotivoRetiro,
+    dto: SolicitarRetiroCajaDto,
     userId: string,
-    metadata: RetiroMetadata,
-    supervisorId?: string,
-    codigoAutorizacion?: string,
+    idempotencyKey: string,
   ) {
     return this.withdrawalsService.solicitarRetiro(
-      sesionId,
-      monto,
-      motivo,
-      userId,
       tenantId,
-      metadata,
-      supervisorId,
-      codigoAutorizacion,
+      sesionId,
+      dto,
+      userId,
+      idempotencyKey,
     );
   }
 
   async conciliarRetiro(
     tenantId: string,
     retiroId: string,
-    data: {
-      banco_destino: string;
-      numero_operacion: string;
-      fecha_conciliacion: string;
-      comprobante_url?: string;
-    },
+    data: ConciliarRetiroCajaDto,
     userId: string,
+    idempotencyKey: string,
   ) {
-    return this.withdrawalsService.conciliarRetiro(retiroId, data, userId, tenantId);
+    return this.withdrawalsService.conciliarRetiro(
+      tenantId,
+      retiroId,
+      data,
+      userId,
+      idempotencyKey,
+    );
   }
 
   async iniciarCambioTurno(
@@ -828,30 +688,30 @@ export class CajasService {
     sesionId: string,
     usuarioSalienteId: string,
     usuarioEntranteId: string,
+    idempotencyKey: string,
   ) {
     return this.shiftChangesService.iniciarCambioTurno(
+      tenantId,
       sesionId,
       usuarioSalienteId,
       usuarioEntranteId,
-      tenantId,
+      idempotencyKey,
     );
   }
 
   async completarCambioTurno(
     tenantId: string,
     cambioId: string,
-    saldoContado: number,
-    denominaciones: any,
-    fotoArqueo: string,
-    firmas: FirmasDigitales,
+    dto: CompletarCambioTurnoCajaDto,
+    userId: string,
+    idempotencyKey: string,
   ) {
     return this.shiftChangesService.completarCambioTurno(
-      cambioId,
-      saldoContado,
-      denominaciones,
-      fotoArqueo,
-      firmas,
       tenantId,
+      cambioId,
+      dto,
+      userId,
+      idempotencyKey,
     );
   }
 
@@ -860,12 +720,14 @@ export class CajasService {
     cambioId: string,
     razon: string,
     userId: string,
+    idempotencyKey: string,
   ) {
     return this.shiftChangesService.cancelarCambioTurno(
+      tenantId,
       cambioId,
       razon,
       userId,
-      tenantId,
+      idempotencyKey,
     );
   }
 
@@ -876,56 +738,24 @@ export class CajasService {
   async registrarMovimientoManual(
     tenantId: string,
     sesionId: string,
-    tipo: 'INGRESO' | 'GASTO',
-    monto: number,
-    motivo: string,
+    dto: MovimientoManualCajaDto,
     userId: string,
-    idempotencyKey?: string,
+    idempotencyKey: string,
   ) {
-    if (!monto || monto <= 0) {
-      throw new BadRequestException('Monto inválido');
-    }
-    if (!motivo || !motivo.trim()) {
-      throw new BadRequestException('Motivo requerido');
-    }
-
-    const movimientoTipo = tipo === 'INGRESO' ? TipoMovimiento.INGRESO : TipoMovimiento.AJUSTE;
-    const montoAplicado = tipo === 'INGRESO' ? monto : -monto;
-    const referenciaDocumento = idempotencyKey?.trim() || tipo;
-
-    if (idempotencyKey?.trim()) {
-      const { data: existente, error } = await this.supabase
-        .getClient()
-        .from('movimientos_caja')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('sesion_caja_id', sesionId)
-        .eq('referencia_tipo', 'MANUAL')
-        .eq('referencia_documento', referenciaDocumento)
-        .maybeSingle();
-
-      if (error) {
-        throw new BadRequestException(`Error verificando movimiento de caja existente: ${error.message}`);
-      }
-
-      if (existente) {
-        return existente;
-      }
-    }
-
-    return this.movementsService.registrarMovimiento(
-      sesionId,
-      movimientoTipo,
-      montoAplicado,
+    const { data, error } = await this.supabase.getClient().rpc(
+      'registrar_movimiento_manual_caja_tx',
       {
-        usuario_id: userId,
-        motivo: `${tipo}: ${motivo}`,
-        referencia_tipo: 'MANUAL',
-        referencia_documento: referenciaDocumento,
-        idempotency_key: idempotencyKey?.trim() || undefined,
+        p_tenant_id: tenantId,
+        p_session_id: sesionId,
+        p_payload: dto,
+        p_actor_id: userId,
+        p_idempotency_key: idempotencyKey,
       },
-      tenantId,
     );
+    if (error) {
+      throw new BadRequestException(error.message || 'No se pudo registrar el movimiento manual');
+    }
+    return (data as any)?.movimiento ?? data;
   }
 
   /**

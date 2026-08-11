@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Body,
+  Headers,
   HttpException,
   HttpStatus,
   Logger,
@@ -13,11 +14,10 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
-import { ConfigurationService, TOTAL_WIZARD_STEPS } from './configuration.service';
+import { ConfigurationService } from './configuration.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { User } from '../auth/user.interface';
-import { AuditService } from '../audit/audit.service';
 import {
   SaveWizardStepDto,
   UpdateGREThresholdsDto,
@@ -47,7 +47,6 @@ export class ConfigurationController {
   constructor(
     private readonly configurationService: ConfigurationService,
     private readonly supabaseService: SupabaseService,
-    private readonly auditService: AuditService,
     private readonly configService: ConfigService,
     private readonly dianFiscalService: DianFiscalService,
     private readonly cacheInvalidation: CacheInvalidationService,
@@ -260,6 +259,7 @@ export class ConfigurationController {
     @CurrentUser() user: User | undefined,
     @Body() stepData: SaveWizardStepDto,
     @CurrentTenant() tenantId?: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     try {
       if (!tenantId) {
@@ -283,7 +283,12 @@ export class ConfigurationController {
         );
       }
 
-      const progress = await this.configurationService.saveWizardStep(tenantId, stepData);
+      const progress = await this.configurationService.saveWizardStep(
+        tenantId,
+        stepData,
+        user?.id,
+        idempotencyKey,
+      );
 
       const completionPercentage = this.configurationService.calculateWizardCompletionPercentage(
         progress.pasosCompletados,
@@ -326,6 +331,7 @@ export class ConfigurationController {
   async resetWizard(
     @CurrentUser() user: User | undefined,
     @CurrentTenant() tenantId?: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     try {
       if (!tenantId) {
@@ -338,7 +344,7 @@ export class ConfigurationController {
         );
       }
 
-      await this.configurationService.resetWizard(tenantId);
+      await this.configurationService.resetWizard(tenantId, user?.id, idempotencyKey);
 
       return {
         success: true,
@@ -376,6 +382,7 @@ export class ConfigurationController {
     @CurrentUser() user: User | undefined,
     @Body() body: { configuration: any },
     @CurrentTenant() tenantId?: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     try {
       if (!tenantId) {
@@ -388,18 +395,13 @@ export class ConfigurationController {
         );
       }
       this.logger.log(`Completing configuration for tenant: ${tenantId}`);
-      this.logger.log(`Configuration data received:`, body.configuration);
-
-      // Save the final configuration to wizard_progress before completing
-      if (body.configuration) {
-        await this.configurationService.saveWizardStep(tenantId, {
-          pasoActual: TOTAL_WIZARD_STEPS,
-          configuracionTemporal: body.configuration,
-        });
-      }
-
-      // Complete wizard (this will save to empresa_config and certificados_digitales)
-      await this.configurationService.completeWizard(tenantId, body.configuration);
+      // Una sola frontera SQL guarda empresa y marca el wizard completo.
+      await this.configurationService.completeWizard(
+        tenantId,
+        body.configuration,
+        user?.id,
+        idempotencyKey,
+      );
 
       return {
         success: true,
@@ -440,6 +442,7 @@ export class ConfigurationController {
     @CurrentUser() user: User | undefined,
     @Body() thresholds: UpdateGREThresholdsDto,
     @CurrentTenant() tenantId?: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     try {
       if (!tenantId) {
@@ -464,7 +467,12 @@ export class ConfigurationController {
         );
       }
 
-      await this.configurationService.updateGREThresholds(tenantId, thresholds);
+      await this.configurationService.updateGREThresholds(
+        tenantId,
+        thresholds,
+        user?.id,
+        idempotencyKey,
+      );
 
       return {
         success: true,
@@ -695,6 +703,7 @@ export class ConfigurationController {
     @Body() datosEmpresa: any,
     @CurrentTenant() tenantId?: string,
     @CurrentUser() user?: User,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     try {
       if (!tenantId) {
@@ -705,13 +714,6 @@ export class ConfigurationController {
       }
 
       this.logger.log(`Updating empresa data for tenant: ${tenantId}`);
-      const { data: existingEmpresa } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-
       const updateData: any = {};
       let resolvedPaisId: number | null = null;
       let resolvedPaisCodigo: string | null = null;
@@ -907,32 +909,12 @@ export class ConfigurationController {
       if (datosEmpresa.dianResolucionFechaInicio !== undefined) updateData.dian_resolucion_fecha_inicio = datosEmpresa.dianResolucionFechaInicio;
       if (datosEmpresa.dianResolucionFechaFin !== undefined) updateData.dian_resolucion_fecha_fin = datosEmpresa.dianResolucionFechaFin;
 
-      updateData.updated_at = new Date().toISOString();
-
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .update(updateData)
-        .eq('tenant_id', tenantId)
-        .select()
-        .single();
-
-      if (error) {
-        this.logger.error('Error updating empresa:', error);
-        throw error;
-      }
-
-      await this.auditService.registrarCambio(
-        'empresa_config',
-        'UPDATE',
-        user?.id || 'SYSTEM',
-        {
-          old: existingEmpresa || undefined,
-          new: data,
-        },
+      const data = await this.configurationService.updateEmpresaPatchAtomic(
         tenantId,
-        data?.id,
-        { accion: 'ACTUALIZAR_CONFIGURACION_EMPRESA' },
+        updateData,
+        user?.id,
+        idempotencyKey,
+        'EMPRESA',
       );
 
       // El contexto de país/empresa se cachea para el bootstrap del dashboard.

@@ -3,7 +3,6 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AuditService } from '../../audit/audit.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
-import { PedidosService } from '../pedidos/pedidos.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EstadoCotizacion } from './entities';
 
@@ -13,7 +12,6 @@ describe('CotizacionesService', () => {
   let notificationsService: jest.Mocked<NotificationsService>;
   let auditService: jest.Mocked<AuditService>;
   let taxCalculator: jest.Mocked<TaxCalculatorService>;
-  let pedidosService: jest.Mocked<PedidosService>;
 
   const tenantId = 'tenant-123';
   const userId = 'user-123';
@@ -65,16 +63,11 @@ describe('CotizacionesService', () => {
       getTasaIgv: jest.fn().mockResolvedValue(0.18),
     } as any;
 
-    pedidosService = {
-      create: jest.fn(),
-    } as any;
-
     service = new CotizacionesService(
       supabaseService,
       notificationsService,
       auditService,
       taxCalculator,
-      pedidosService,
     );
   });
 
@@ -83,7 +76,7 @@ describe('CotizacionesService', () => {
   });
 
   describe('create', () => {
-    it('crea detalles con el contrato runtime de cotizacion_detalles', async () => {
+    it('crea cabecera y detalle por RPC con tenant y actor explícitos, sin reservar stock', async () => {
       const mockClient = supabaseService.getClient() as any;
       const createDto = {
         cliente_id: 'cliente-123',
@@ -98,38 +91,72 @@ describe('CotizacionesService', () => {
       };
 
       mockClient.maybeSingle.mockResolvedValue({
-        data: { stock_actual: 10, stock_reservado: 0 },
+        data: { moneda_defecto: 'PEN' },
         error: null,
       });
       mockClient.single
         .mockResolvedValueOnce({ data: { id: 'cliente-123' }, error: null })
         .mockResolvedValueOnce({
-          data: {
+          data: { nombre: 'Ana', apellido: 'Vendedora', email: 'ana@example.com' },
+          error: null,
+        });
+      mockClient.rpc.mockResolvedValue({
+        data: {
+          cotizacion: {
             id: 'cot-123',
             tenant_id: tenantId,
             numero: 'COT-2026-0001',
           },
-          error: null,
-        });
-      mockClient.rpc.mockResolvedValue({ data: { success: true }, error: null });
+          detalle: [{
+            id: 'det-123',
+            tenant_id: tenantId,
+            cotizacion_id: 'cot-123',
+            producto_id: 'prod-123',
+            descripcion: 'Producto venta',
+            cantidad: 2,
+            precio_unitario: 100,
+            subtotal: 200,
+            orden: 1,
+          }],
+        },
+        error: null,
+      });
 
-      await service.create(createDto as any, tenantId);
+      const result = await service.create(createDto as any, tenantId, userId);
 
-      const detalleInsert = mockClient.insert.mock.calls.find(([payload]) => Array.isArray(payload))?.[0];
-
-      expect(detalleInsert).toEqual([
+      expect(mockClient.rpc).toHaveBeenCalledWith(
+        'crear_cotizacion_comercial_tx',
         expect.objectContaining({
-          tenant_id: tenantId,
-          cotizacion_id: 'cot-123',
-          producto_id: 'prod-123',
-          descripcion: 'Producto venta',
-          cantidad: 2,
-          precio_unitario: 100,
-          subtotal: 200,
-          orden: 1,
+          p_tenant_id: tenantId,
+          p_created_by: userId,
+          p_cliente_id: 'cliente-123',
+          p_vendedor: 'Ana Vendedora',
+          p_detalle: [expect.objectContaining({
+            producto_id: 'prod-123',
+            descripcion: 'Producto venta',
+            cantidad: 2,
+            precio_unitario: 100,
+            orden: 1,
+          })],
         }),
-      ]);
-      expect(detalleInsert?.[0]).not.toHaveProperty('producto_codigo');
+      );
+      expect(result).toEqual(expect.objectContaining({
+        id: 'cot-123',
+        detalle: [expect.objectContaining({ id: 'det-123' })],
+      }));
+      expect(mockClient.select).toHaveBeenCalledWith('id, afectacion_igv');
+      expect(mockClient.select).not.toHaveBeenCalledWith(expect.stringContaining('stock_actual'));
+      expect(mockClient.from).not.toHaveBeenCalledWith('movimientos_almacen');
+    });
+
+    it('rechaza crear una cotización sin actor antes de tocar la base', async () => {
+      const mockClient = supabaseService.getClient() as any;
+
+      await expect(service.create({ cliente_id: 'cliente-123', detalle: [] } as any, tenantId))
+        .rejects.toThrow('No se pudo identificar al creador de la cotización');
+
+      expect(mockClient.from).not.toHaveBeenCalled();
+      expect(mockClient.rpc).not.toHaveBeenCalled();
     });
   });
 
@@ -159,7 +186,7 @@ describe('CotizacionesService', () => {
 
       expect(result.success).toBe(true);
       expect(result.data.pedido_id).toBe('ped-123');
-      expect(mockClient.rpc).toHaveBeenCalledWith('convertir_cotizacion_a_pedido', expect.objectContaining({
+      expect(mockClient.rpc).toHaveBeenCalledWith('convertir_cotizacion_comercial_a_pedido_tx', expect.objectContaining({
         p_cotizacion_id: 'cot-123',
         p_tenant_id: tenantId,
       }));
@@ -198,8 +225,9 @@ describe('CotizacionesService', () => {
         .rejects.toThrow('Solo se pueden convertir cotizaciones en estado BORRADOR, ENVIADA o APROBADA');
     });
 
-    it('debe rechazar cotización con fecha de vencimiento pasada aunque siga en borrador', async () => {
+    it('delega al RPC la vigencia según la fecha local del tenant', async () => {
       const yesterday = new Date(Date.now() - 86400000).toISOString();
+      const mockClient = supabaseService.getClient() as any;
 
       jest.spyOn(service, 'findOne').mockResolvedValue({
         id: 'cot-123',
@@ -207,9 +235,17 @@ describe('CotizacionesService', () => {
         fecha_vencimiento: yesterday,
         detalle: [{ id: 'det-1' }],
       } as any);
+      mockClient.rpc.mockResolvedValue({
+        data: null,
+        error: { message: 'No se puede convertir una cotización vencida' },
+      });
 
       await expect(service.convertirAPedido('cot-123', convertirDto, tenantId, userId))
         .rejects.toThrow('No se puede convertir una cotización vencida');
+      expect(mockClient.rpc).toHaveBeenCalledWith(
+        'convertir_cotizacion_comercial_a_pedido_tx',
+        expect.objectContaining({ p_cotizacion_id: 'cot-123', p_tenant_id: tenantId }),
+      );
     });
 
     it('debe rechazar cotización sin detalle', async () => {
@@ -241,30 +277,66 @@ describe('CotizacionesService', () => {
         .rejects.toThrow('Error en transacción');
     });
 
-    it('genera número de pedido usando solo el sufijo correlativo real', async () => {
-      const year = new Date().getFullYear();
-      const query = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        like: jest.fn().mockReturnThis(),
-        order: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue({
-          data: [
-            { numero: `PED-${year}-2026` },
-            { numero: `PED-${year}-0009` },
-          ],
-          error: null,
+    it('no reporta fallo si la conversión hizo commit y sólo falla la hidratación posterior', async () => {
+      const mockClient = supabaseService.getClient() as any;
+      const cotizacionAntes = {
+        id: 'cot-123',
+        numero: 'COT-2025-0001',
+        estado: EstadoCotizacion.APROBADA,
+        cliente_id: 'cli-123',
+        detalle: [{ id: 'det-1', producto_id: 'prod-1', cantidad: 1, precio_unitario: 100 }],
+      };
+      jest.spyOn(service, 'findOne')
+        .mockResolvedValueOnce(cotizacionAntes as any)
+        .mockRejectedValueOnce(new Error('timeout de lectura post-commit'));
+      mockClient.rpc.mockResolvedValue({
+        data: { success: true, pedido_id: 'ped-123', pedido_numero: 'PED-2025-0001' },
+        error: null,
+      });
+
+      const result = await service.convertirAPedido('cot-123', convertirDto, tenantId, userId);
+
+      expect(result).toEqual(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({
+          pedido_id: 'ped-123',
+          cotizacion: expect.objectContaining({
+            id: 'cot-123',
+            estado: EstadoCotizacion.CONVERTIDA,
+            pedido_id: 'ped-123',
+          }),
         }),
-      };
-      const client = {
-        from: jest.fn().mockReturnValue(query),
-      };
-      supabaseService.getClient.mockReturnValueOnce(client as any);
+      }));
+      expect(notificationsService.createNotification).toHaveBeenCalled();
+    });
 
-      const numero = await (service as any).generarNumeroPedidoSeguro(tenantId);
+  });
 
-      expect(numero).toBe(`PED-${year}-2027`);
-      expect(query.like).toHaveBeenCalledWith('numero', `PED-${year}-%`);
+  describe('cambiarEstado', () => {
+    it('devuelve el estado confirmado si falla sólo la hidratación post-commit', async () => {
+      const mockClient = supabaseService.getClient() as any;
+      mockClient.rpc.mockResolvedValue({
+        data: { success: true, cotizacion_id: 'cot-123' },
+        error: null,
+      });
+      jest.spyOn(service, 'findOne').mockRejectedValue(
+        new Error('lectura temporalmente no disponible'),
+      );
+
+      const result = await service.cambiarEstado(
+        'cot-123',
+        tenantId,
+        EstadoCotizacion.ENVIADA,
+        userId,
+      );
+
+      expect(result).toEqual(expect.objectContaining({
+        id: 'cot-123',
+        tenant_id: tenantId,
+        estado: EstadoCotizacion.ENVIADA,
+        detalle: [],
+      }));
+      expect(mockClient.rpc).toHaveBeenCalledTimes(1);
     });
   });
 

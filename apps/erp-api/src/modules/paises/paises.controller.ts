@@ -8,7 +8,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  ParseIntPipe
+  ParseIntPipe,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -172,14 +173,17 @@ export class PaisesController {
   @ApiResponseWrapper(UsuarioConfiguracionDto)
   async actualizarConfiguracionUsuario(
     @Req() req: Request,
-    @Body() configuracion: UpdateUsuarioConfiguracionDto
+    @Body() configuracion: UpdateUsuarioConfiguracionDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<ResponseDto<UsuarioConfiguracionDto>> {
     const user = (req as any).user;
     const configuracionActualizada = await this.paisesService.actualizarConfiguracionUsuario(
-      user.id, 
-      configuracion
+      user.id,
+      configuracion,
+      user.id,
+      idempotencyKey,
     );
-    
+
     return {
       success: true,
       data: configuracionActualizada,

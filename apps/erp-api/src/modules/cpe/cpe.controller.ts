@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -23,6 +24,14 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { User } from '../auth/user.interface';
+import {
+  RevertirAjusteCxcDto,
+  RevertirCobroCxcDto,
+  SolicitarAnulacionCpeDto,
+} from './dto/cpe-cancellation.dto';
+import { CrearNotaReferenciadaDto } from './dto/referenced-note.dto';
+import { ReferencedNotesService } from './referenced-notes.service';
+import { DesktopSignedCpeDto } from './dto/desktop-signed-cpe.dto';
 
 @ApiTags('cpe')
 @Controller('cpe')
@@ -31,6 +40,7 @@ export class CpeController {
   constructor(
     private readonly cpeService: CpeService,
     private readonly cpeHelper: CpeHelperService,
+    private readonly referencedNotes: ReferencedNotesService,
   ) { }
 
   @Post('worker/create')
@@ -40,8 +50,12 @@ export class CpeController {
   async createFromWorker(
     @Body() createFacturaDto: CreateFacturaDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId?: string,
   ): Promise<FacturaDto> {
-    return this.cpeService.create(createFacturaDto, tenantId, 'worker-service');
+    if (!actorId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(actorId)) {
+      throw new BadRequestException('El token worker debe incluir actor_id UUID del tenant para emitir');
+    }
+    return this.cpeService.create(createFacturaDto, tenantId, actorId);
   }
 
   @Post('worker/:id/enviar-sunat')
@@ -51,9 +65,14 @@ export class CpeController {
   async enviarSunatWorker(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.cpeService.resendToOse(id, tenantId, { idempotencyKey });
+    return this.cpeService.resendToOse(id, tenantId, {
+      idempotencyKey,
+      actorId,
+      origin: 'WORKER',
+    });
   }
 
   @Get('worker/:id/status')
@@ -63,8 +82,14 @@ export class CpeController {
   async checkStatusWorker(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.cpeService.checkOseStatus(id, tenantId);
+    return this.cpeService.checkOseStatus(id, tenantId, {
+      idempotencyKey,
+      actorId,
+      origin: 'WORKER',
+    });
   }
 
   @Get('worker/comprobantes/:id/pdf')
@@ -116,6 +141,47 @@ export class CpeController {
     return this.cpeService.findAll(paginationDto, tenantId);
   }
 
+  @Get('notas-referenciadas/origenes')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.comprobantes.ver')
+  @ApiOperation({ summary: 'Listar facturas/boletas elegibles para NC o ND referenciada' })
+  async listarOrigenesNota(
+    @CurrentTenant() tenantId: string,
+    @Query('search') search?: string,
+  ) {
+    return this.referencedNotes.listarOrigenes(tenantId, search);
+  }
+
+  @Post('notas-referenciadas')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.comprobantes.emitir')
+  @ApiOperation({
+    summary: 'Crear NC/ND referenciada con efecto financiero atómico, sin exigir certificado',
+  })
+  async crearNotaReferenciada(
+    @Body() dto: CrearNotaReferenciadaDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.referencedNotes.crear(dto, tenantId, userId, idempotencyKey);
+  }
+
+  @Post('notas-referenciadas/:id/firmar')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.comprobantes.emitir')
+  @ApiOperation({
+    summary: 'Firmar una NC/ND ya creada cuando el cliente configure su certificado',
+  })
+  async firmarNotaReferenciada(
+    @Param('id') id: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.referencedNotes.firmar(id, tenantId, userId, idempotencyKey);
+  }
+
   @Get('stats')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.reportes.ver')
@@ -155,9 +221,9 @@ export class CpeController {
   @RequirePermission('cpe.comprobantes.emitir')
   @ApiOperation({ summary: 'Registrar XML firmado desde desktop offline' })
   async registerDesktopSignedXml(
-    @Body() payload: any,
+    @Body() payload: DesktopSignedCpeDto,
     @CurrentTenant() tenantId: string,
-    @CurrentUser('id') userId?: string,
+    @CurrentUser('id') userId: string,
   ) {
     return this.cpeService.registerDesktopSignedXml(payload, tenantId, userId);
   }
@@ -268,33 +334,104 @@ export class CpeController {
   async enviarSunat(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    try {
-      console.log(`📡 Enviando CPE a autoridad fiscal: ${id}`);
+    const fiscalAuthority = await this.cpeHelper.getFiscalAuthorityName(tenantId);
+    const result = await this.cpeService.resendToOse(id, tenantId, {
+      idempotencyKey,
+      actorId,
+      origin: 'USER',
+    });
+    return {
+      success: true,
+      message: `Operación CPE procesada por ${fiscalAuthority}`,
+      data: result,
+    };
+  }
 
-      const fiscalAuthority = await this.cpeHelper.getFiscalAuthorityName(tenantId);
-      const result = await this.cpeService.resendToOse(id, tenantId, { idempotencyKey });
+  @Get(':id/anulacion-financiera')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('finanzas.cxc.cobros.revertir')
+  @ApiOperation({
+    summary: 'Consultar cobros y estado financiero de una anulación CPE',
+  })
+  async obtenerAnulacionFinanciera(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.cpeService.obtenerEstadoFinancieroAnulacion(
+      id,
+      tenantId,
+      userId,
+    );
+  }
 
-      return {
-        success: true,
-        message: `CPE enviado a ${fiscalAuthority} exitosamente`,
-        data: result
-      };
-    } catch (error) {
-      console.error('❌ Error enviando a autoridad fiscal:', error);
+  @Post(':id/cobros/:pagoId/revertir')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('finanzas.cxc.cobros.revertir')
+  @ApiOperation({
+    summary: 'Revertir un cobro aplicado y continuar la anulación CPE',
+  })
+  async revertirCobroAplicado(
+    @Param('id') id: string,
+    @Param('pagoId') pagoId: string,
+    @Body() dto: RevertirCobroCxcDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.cpeService.revertirCobroAplicado(
+      id,
+      pagoId,
+      dto,
+      tenantId,
+      userId,
+      idempotencyKey,
+    );
+  }
 
-      let fiscalAuthority = 'autoridad fiscal';
-      try {
-        fiscalAuthority = await this.cpeHelper.getFiscalAuthorityName(tenantId);
-      } catch { }
+  @Post(':id/ajustes/:operacionId/revertir')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('finanzas.cxc.cobros.revertir')
+  @ApiOperation({
+    summary: 'Revertir un ajuste fiscal aplicado y continuar la anulación CPE',
+  })
+  async revertirAjusteAplicado(
+    @Param('id') id: string,
+    @Param('operacionId') operacionId: string,
+    @Body() dto: RevertirAjusteCxcDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.cpeService.revertirAjusteAplicado(
+      id,
+      operacionId,
+      dto,
+      tenantId,
+      userId,
+      idempotencyKey,
+    );
+  }
 
-      return {
-        success: false,
-        message: `Error enviando CPE a ${fiscalAuthority}`,
-        error: error.message
-      };
-    }
+  @Post(':id/anulacion/finalizar')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.comprobantes.anular')
+  @ApiOperation({ summary: 'Reintentar el cierre operativo de la anulación' })
+  async finalizarAnulacion(
+    @Param('id') notaCreditoId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.cpeService.finalizarAnulacionFinanciera(
+      notaCreditoId,
+      tenantId,
+      userId,
+      idempotencyKey,
+    );
   }
 
   @Get(':id')
@@ -334,9 +471,14 @@ export class CpeController {
   async resend(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.cpeService.resendToOse(id, tenantId, { idempotencyKey });
+    return this.cpeService.resendToOse(id, tenantId, {
+      idempotencyKey,
+      actorId,
+      origin: 'USER',
+    });
   }
 
   @Get(':id/status')
@@ -346,8 +488,14 @@ export class CpeController {
   async checkStatus(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.cpeService.checkOseStatus(id, tenantId);
+    return this.cpeService.checkOseStatus(id, tenantId, {
+      idempotencyKey,
+      actorId,
+      origin: 'USER',
+    });
   }
 
   @Post(':id/enviar-sunat')
@@ -358,38 +506,15 @@ export class CpeController {
   async enviarManualmenteSunat(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    console.log(`🚀 [CPE] Envío manual a SUNAT solicitado para CPE ${id}`);
-
-    try {
-      // Verificar que el CPE esté en estado FIRMADO
-      const cpe = await this.cpeService.findOne(id, tenantId);
-
-      if ((cpe.estado as string) !== 'FIRMADO') {
-        return {
-          success: false,
-          message: `CPE debe estar en estado FIRMADO para enviar a SUNAT. Estado actual: ${cpe.estado}`
-        };
-      }
-
-      // Enviar a SUNAT usando el método existente
-      const fileName = `${cpe.ruc_emisor}-${cpe.tipo_documento}-${cpe.serie}-${cpe.numero}`;
-      await this.cpeService.sendToOseManual(id, cpe.xml_firmado, fileName, { idempotencyKey }, tenantId);
-
-      return {
-        success: true,
-        message: 'CPE enviado a SUNAT exitosamente',
-        data: { id, estado: 'ENVIADO', timestamp: new Date() }
-      };
-
-    } catch (error) {
-      console.error(`❌ Error enviando CPE ${id} a SUNAT:`, error);
-      return {
-        success: false,
-        message: `Error enviando CPE a SUNAT: ${error.message}`
-      };
-    }
+    const data = await this.cpeService.resendToOse(id, tenantId, {
+      idempotencyKey,
+      actorId,
+      origin: 'USER',
+    });
+    return { success: true, message: 'Operación de envío CPE procesada', data };
   }
 
   /**
@@ -417,10 +542,18 @@ export class CpeController {
   })
   async anularCPE(
     @Param('id') id: string,
-    @Body() anularDto: { motivo: string; tipo_nota?: string },
+    @Body() anularDto: SolicitarAnulacionCpeDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: User,
   ) {
-    return this.cpeService.anularComprobante(id, anularDto.motivo, tenantId, user?.id, anularDto.tipo_nota);
+    return this.cpeService.anularComprobante(
+      id,
+      anularDto.motivo,
+      tenantId,
+      user?.id,
+      anularDto.tipo_nota,
+      idempotencyKey,
+    );
   }
 }

@@ -5,6 +5,7 @@ import {
   BarChart3,
   Building2,
   Landmark,
+  FileText,
   Scale,
   WalletCards,
 } from "lucide-react";
@@ -29,6 +30,13 @@ const financialSurfaces = [
     description: "Bancos, monedas, saldos y movimientos por cuenta financiera.",
     href: "/dashboard/finanzas/bancos",
     icon: Landmark,
+  },
+  {
+    title: "Ajustes fiscales y anticipos",
+    description:
+      "Retenciones, percepciones, detracciones y anticipos enlazados a CxC, CxP y bancos.",
+    href: "/dashboard/finanzas/ajustes-fiscales",
+    icon: FileText,
   },
   {
     title: "Tesorería",

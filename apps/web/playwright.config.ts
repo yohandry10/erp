@@ -19,7 +19,15 @@ for (const candidate of [
   path.resolve(process.cwd(), '../erp-api/.env'),
 ]) {
   if (!fs.existsSync(candidate)) continue;
-  for (const line of fs.readFileSync(candidate, 'utf8').split(/\r?\n/)) {
+  let contents = '';
+  try {
+    contents = fs.readFileSync(candidate, 'utf8');
+  } catch {
+    // Algunos runners montan archivos de secretos sin permiso de lectura. La
+    // preflight sigue validando las URLs suministradas explícitamente.
+    continue;
+  }
+  for (const line of contents.split(/\r?\n/)) {
     const match = line.match(/^\s*(?:SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL)\s*=\s*(.+)\s*$/);
     if (match) configuredSupabaseUrls.push(match[1].replace(/^['"]|['"]$/g, ''));
   }
@@ -59,7 +67,10 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(process.env.PLAYWRIGHT_SYSTEM_CHROME === '1' ? { channel: 'chrome' } : {}),
+      },
     },
   ],
 

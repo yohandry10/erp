@@ -84,9 +84,12 @@ export class ComprobantesHistoricoImporter implements Importer {
       if (!TIPOS_DOC.has(tipoDoc)) {
         errs.push({ rowIndex, externalId, field: 'tipo_documento', message: `tipo_documento inválido: ${tipoDoc}` });
       }
-      if (!nonEmpty(row['serie'])) errs.push({ rowIndex, externalId, field: 'serie', message: 'serie requerida' });
-      const numero = toNumber(row['numero']);
-      if (!Number.isFinite(numero) || numero <= 0) {
+      const serie = String(row['serie'] ?? '').trim().toUpperCase();
+      if (!/^[A-Z0-9]{1,4}$/.test(serie)) {
+        errs.push({ rowIndex, externalId, field: 'serie', message: 'serie debe tener 1 a 4 caracteres alfanuméricos' });
+      }
+      const numero = String(row['numero'] ?? '').trim();
+      if (!/^[0-9]{1,8}$/.test(numero) || Number(numero) <= 0) {
         errs.push({ rowIndex, externalId, field: 'numero', message: 'numero inválido' });
       }
       if (!toDateOrNull(row['fecha_emision'])) {
@@ -108,7 +111,7 @@ export class ComprobantesHistoricoImporter implements Importer {
       if (!Number.isFinite(igv) || igv < 0) {
         errs.push({ rowIndex, externalId, field: 'igv', message: 'igv inválido' });
       }
-      if (!Number.isFinite(total) || total < 0) {
+      if (!Number.isFinite(total) || total <= 0) {
         errs.push({ rowIndex, externalId, field: 'total', message: 'total inválido' });
       }
       if (Number.isFinite(subtotal) && Number.isFinite(igv) && Number.isFinite(total)) {
@@ -144,11 +147,11 @@ export class ComprobantesHistoricoImporter implements Importer {
     const externalCliIds = Array.from(
       new Set(parsed.rows.map((r) => nonEmpty(r['external_id_cliente'])).filter((v): v is string => !!v)),
     );
-    const clienteMap = new Map<string, { id: string; razon: string; numDoc: string; tipoDoc: string }>();
+    const clienteMap = new Map<string, string>();
     if (externalCliIds.length > 0 && !ctx.dryRun) {
       const { data: clientes, error: cliErr } = await client
         .from('clientes')
-        .select('id, external_id, razon_social, codigo, ruc, tipo_documento')
+        .select('id, external_id')
         .eq('tenant_id', ctx.tenantId)
         .in('external_id', externalCliIds);
       if (cliErr) {
@@ -158,12 +161,7 @@ export class ComprobantesHistoricoImporter implements Importer {
       }
       (clientes ?? []).forEach((c: any) => {
         if (c.external_id) {
-          clienteMap.set(c.external_id, {
-            id: c.id,
-            razon: c.razon_social ?? '',
-            numDoc: c.ruc ?? c.codigo ?? '',
-            tipoDoc: c.tipo_documento ?? 'RUC',
-          });
+          clienteMap.set(c.external_id, c.id);
         }
       });
     }
@@ -192,8 +190,8 @@ export class ComprobantesHistoricoImporter implements Importer {
       }
 
       const externalCli = nonEmpty(row['external_id_cliente'])!;
-      const cliente = ctx.dryRun ? null : clienteMap.get(externalCli);
-      if (!ctx.dryRun && !cliente) {
+      const clienteId = ctx.dryRun ? null : clienteMap.get(externalCli);
+      if (!ctx.dryRun && !clienteId) {
         const msg = `cliente con external_id="${externalCli}" no existe. Importa clientes primero.`;
         result.errors.push({ rowIndex, externalId, message: msg });
         result.errorRows++;
@@ -213,38 +211,21 @@ export class ComprobantesHistoricoImporter implements Importer {
       }
 
       const tipoDoc = String(row['tipo_documento']).toUpperCase().trim();
-      const numero = toNumber(row['numero']);
       const subtotal = toNumber(row['subtotal']);
       const igv = toNumber(row['igv']);
       const total = toNumber(row['total']);
 
       const payload: Record<string, any> = {
-        tenant_id: ctx.tenantId,
         tipo_documento: tipoDoc,
         serie: row['serie'],
-        numero,
+        numero: String(row['numero']).trim(),
         fecha_emision: toDateOrNull(row['fecha_emision']),
         moneda: String(row['moneda']).toUpperCase().trim(),
-        tipo_cambio: 1,
-        cliente_id: cliente?.id ?? null,
-        documento_receptor: cliente?.numDoc ?? null,
-        tipo_documento_receptor: cliente?.tipoDoc ?? null,
-        razon_social_receptor: cliente?.razon ?? null,
-        total_gravadas: subtotal,
-        total_igv: igv,
-        total_venta: total,
+        cliente_id: clienteId ?? null,
         subtotal,
         igv,
         total,
-        estado: 'MIGRADO',
-        metadata: {
-          origen: 'migracion_historica',
-          external_id: externalId,
-          run_id: ctx.runCtx?.runId ?? null,
-          observaciones: nonEmpty(row['observaciones']),
-          no_sunat: true,
-          no_evento_factura: true,
-        },
+        observaciones: nonEmpty(row['observaciones']),
       };
 
       if (ctx.dryRun) {
@@ -253,45 +234,30 @@ export class ComprobantesHistoricoImporter implements Importer {
       }
 
       try {
-        // Idempotencia: dedup por metadata.external_id (cpe no tiene columna external_id en este release;
-        // si se agrega en una migración futura, cambiar este path por la columna directa).
-        const { data: existing } = await client
-          .from('cpe')
-          .select('id')
-          .eq('tenant_id', ctx.tenantId)
-          .eq('tipo_documento', tipoDoc)
-          .eq('serie', row['serie'])
-          .eq('numero', numero)
-          .maybeSingle();
-
-        let targetId: string | null = null;
-        if (existing?.id) {
-          const { data, error } = await client
-            .from('cpe')
-            .update({ ...payload, updated_at: new Date().toISOString() })
-            .eq('id', existing.id)
-            .eq('tenant_id', ctx.tenantId)
-            .select('id')
-            .single();
-          if (error) throw error;
-          targetId = data?.id ?? null;
-          result.updated++;
-        } else {
-          const { data, error } = await client.from('cpe').insert(payload).select('id').single();
-          if (error) throw error;
-          targetId = data?.id ?? null;
-          result.created++;
-        }
-        result.okRows++;
+        const { data, error } = await client.rpc('importar_cpe_historico_tx', {
+          p_tenant_id: ctx.tenantId,
+          p_actor_id: ctx.startedBy,
+          p_run_id: ctx.runCtx?.runId ?? null,
+          p_external_id: externalId,
+          p_cpe: payload,
+        });
+        if (error) throw error;
+        const targetId = data?.id ?? null;
+        const action = String(data?.action ?? '');
+        if (action === 'CREATED') result.created++;
+        else if (action === 'IDEMPOTENT') result.skippedRows++;
+        else result.updated++;
+        if (action !== 'IDEMPOTENT') result.okRows++;
         if (ctx.runCtx) {
           await this.runs.recordRow({
             runId: ctx.runCtx.runId,
             tenantId: ctx.tenantId,
             rowIndex,
             externalId,
-            status: 'ok',
+            status: action === 'IDEMPOTENT' ? 'skipped' : 'ok',
             targetTable: 'cpe',
             targetId,
+            errorMessage: action === 'IDEMPOTENT' ? 'Fila ya aplicada con la misma huella' : null,
           });
         }
       } catch (err: any) {

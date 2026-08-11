@@ -144,7 +144,7 @@ describe('AuthService', () => {
         });
 
         it('logLoginAttempt debe persistir estado coherente con success', async () => {
-            const mockClient = supabaseService.getPublicClient() as any;
+            const mockClient = supabaseService.getAdminClient() as any;
 
             await (service as any).logLoginAttempt({
                 email: 'test@example.com',
@@ -154,13 +154,15 @@ describe('AuthService', () => {
                 tenantId: 'tenant-123',
             });
 
-            expect(mockClient.from).toHaveBeenCalledWith('auth_login_attempts');
-            expect(mockClient.insert).toHaveBeenCalledWith(expect.objectContaining({
-                user_email: 'test@example.com',
-                success: true,
-                estado: 'EXITOSO',
-                tenant_id: 'tenant-123',
-            }));
+            expect(mockClient.rpc).toHaveBeenCalledWith('registrar_intento_login_auth_tx', {
+                p_email: 'test@example.com',
+                p_ip_address: '127.0.0.1',
+                p_user_agent: 'jest',
+                p_success: true,
+                p_failed_reason: null,
+                p_tenant_id: 'tenant-123',
+            });
+            expect(mockClient.insert).not.toHaveBeenCalled();
         });
 
         it('rate-limit de login debe bloquear por email (no por IP/user-agent para prevenir bypass)', async () => {
@@ -184,7 +186,6 @@ describe('AuthService', () => {
         it('login con contraseña correcta no debe quedar bloqueado por intentos fallidos previos del mismo cliente', async () => {
             jest.spyOn(service as any, 'checkFailedAttemptsLimit').mockResolvedValue(true);
             jest.spyOn(service, 'validateUser').mockResolvedValue(mockUser);
-            jest.spyOn(service as any, 'updateLastAccess').mockResolvedValue(undefined);
             jest.spyOn(service as any, 'createSession').mockResolvedValue('session-token');
             jest.spyOn(service as any, 'logLoginAttempt').mockResolvedValue(undefined);
 
@@ -198,6 +199,26 @@ describe('AuthService', () => {
             expect((service as any).logLoginAttempt).toHaveBeenCalledWith(expect.objectContaining({
                 email: 'test@example.com',
                 success: true,
+            }));
+        });
+
+        it('login inválido normaliza el email y registra exactamente un intento', async () => {
+            jest.spyOn(service as any, 'checkFailedAttemptsLimit').mockResolvedValue(false);
+            jest.spyOn(service, 'validateUser').mockResolvedValue(null);
+            const logAttempt = jest.spyOn(service as any, 'logLoginAttempt').mockResolvedValue(undefined);
+
+            await expect(service.login(
+                { email: '  TEST@Example.COM ', password: 'incorrecta' },
+                '127.0.0.1',
+                'jest-agent',
+            )).rejects.toThrow(UnauthorizedException);
+
+            expect(service.validateUser).toHaveBeenCalledWith('test@example.com', 'incorrecta');
+            expect(logAttempt).toHaveBeenCalledTimes(1);
+            expect(logAttempt).toHaveBeenCalledWith(expect.objectContaining({
+                email: 'test@example.com',
+                success: false,
+                failedReason: 'Credenciales inválidas',
             }));
         });
     });
@@ -303,6 +324,10 @@ describe('AuthService', () => {
         it('should return user for valid token', async () => {
             const mockClient = supabaseService.getPublicClient() as any;
             mockClient.single.mockResolvedValueOnce({ data: { ...mockUser, activo: true }, error: null });
+            (jwtService.verify as jest.Mock).mockReturnValueOnce({
+                sub: 'user-123', email: 'test@example.com', tenant_id: 'tenant-123', session_token: 'session-123',
+            });
+            jest.spyOn(service, 'validateSession').mockResolvedValueOnce(true);
 
             const result = await service.validateToken('valid-token');
 
@@ -325,8 +350,22 @@ describe('AuthService', () => {
         it('should throw UnauthorizedException when user not found', async () => {
             const mockClient = supabaseService.getPublicClient() as any;
             mockClient.single.mockResolvedValueOnce({ data: null, error: null });
+            (jwtService.verify as jest.Mock).mockReturnValueOnce({
+                sub: 'user-123', email: 'test@example.com', tenant_id: 'tenant-123', session_token: 'session-123',
+            });
+            jest.spyOn(service, 'validateSession').mockResolvedValueOnce(true);
 
             await expect(service.validateToken('valid-token'))
+                .rejects.toThrow(UnauthorizedException);
+        });
+
+        it('should reject a validly signed token whose session was revoked', async () => {
+            (jwtService.verify as jest.Mock).mockReturnValueOnce({
+                sub: 'user-123', email: 'test@example.com', tenant_id: 'tenant-123', session_token: 'revoked-session',
+            });
+            jest.spyOn(service, 'validateSession').mockResolvedValueOnce(false);
+
+            await expect(service.validateToken('signed-but-revoked'))
                 .rejects.toThrow(UnauthorizedException);
         });
     });
@@ -366,14 +405,8 @@ describe('AuthService', () => {
     describe('refreshToken', () => {
         it('should return new access token with correct payload', async () => {
             const mockClient = supabaseService.getPublicClient() as any;
+            mockClient.rpc.mockResolvedValueOnce({ data: { valid: true }, error: null });
             mockClient.single
-                .mockResolvedValueOnce({
-                    data: {
-                        session_token: 'session-123',
-                        expires_at: new Date(Date.now() + 3600000).toISOString(),
-                    },
-                    error: null,
-                })
                 .mockResolvedValueOnce({ data: mockUser, error: null });
 
             const result = await service.refreshToken({ ...mockUser, session_token: 'session-123' });
@@ -393,14 +426,8 @@ describe('AuthService', () => {
         it('should include is_super_admin in payload', async () => {
             const superAdmin = { ...mockUser, is_super_admin: true };
             const mockClient = supabaseService.getPublicClient() as any;
+            mockClient.rpc.mockResolvedValueOnce({ data: { valid: true }, error: null });
             mockClient.single
-                .mockResolvedValueOnce({
-                    data: {
-                        session_token: 'session-123',
-                        expires_at: new Date(Date.now() + 3600000).toISOString(),
-                    },
-                    error: null,
-                })
                 .mockResolvedValueOnce({ data: superAdmin, error: null });
 
             await service.refreshToken({ ...superAdmin, session_token: 'session-123' });
@@ -564,11 +591,9 @@ describe('AuthService', () => {
             mockClient.single
                 .mockResolvedValueOnce({ data: userWithToken, error: null })
                 .mockResolvedValueOnce({ data: userWithToken, error: null });
-            mockClient.select.mockImplementation((columns: string) => {
-                if (columns === 'id') {
-                    return Promise.resolve({ data: [], error: null });
-                }
-                return mockClient;
+            mockClient.rpc.mockResolvedValueOnce({
+                data: null,
+                error: { code: '42501', message: 'AUTH_RESET_TOKEN_INVALID_OR_CONSUMED' },
             });
 
             await expect(service.resetPassword('test@example.com', token, 'newPassword123!'))
@@ -660,38 +685,76 @@ describe('AuthService', () => {
 
     // ==================== SESSION MANAGEMENT ====================
     describe('Session Management', () => {
+        describe('createSession', () => {
+            it('should delegate user, tenant-state validation and session creation to one RPC', async () => {
+                const mockClient = supabaseService.getAdminClient() as any;
+                mockClient.rpc.mockResolvedValueOnce({ data: { session_id: 'session-id' }, error: null });
+
+                const token = await (service as any).createSession('user-123');
+
+                expect(token).toHaveLength(64);
+                expect(mockClient.rpc).toHaveBeenCalledWith('crear_sesion_login_auth_tx', {
+                    p_usuario_id: 'user-123',
+                    p_session_token: token,
+                    p_expires_at: expect.any(String),
+                });
+                expect(mockClient.insert).not.toHaveBeenCalled();
+            });
+
+            it('should fail closed when the user or tenant became inactive before session commit', async () => {
+                const mockClient = supabaseService.getAdminClient() as any;
+                mockClient.rpc.mockResolvedValueOnce({
+                    data: null,
+                    error: { code: '42501', message: 'AUTH_TENANT_INACTIVE_OR_NOT_FOUND' },
+                });
+
+                await expect((service as any).createSession('user-123'))
+                    .rejects.toThrow(UnauthorizedException);
+            });
+        });
+
         describe('validateSession', () => {
             it('should return true for valid session', async () => {
-                const validSession = {
-                    session_token: 'valid-session',
-                    expires_at: new Date(Date.now() + 3600000).toISOString(),
-                };
-
-                const mockClient = supabaseService.getPublicClient() as any;
-                mockClient.single.mockResolvedValueOnce({ data: validSession, error: null });
+                const mockClient = supabaseService.getAdminClient() as any;
+                mockClient.rpc.mockResolvedValueOnce({ data: { valid: true }, error: null });
 
                 const result = await service.validateSession('valid-session');
 
                 expect(result).toBe(true);
+                expect(mockClient.rpc).toHaveBeenCalledWith('validar_sesion_auth_tx', {
+                    p_session_token: 'valid-session',
+                });
+                expect(mockClient.update).not.toHaveBeenCalled();
             });
 
             it('should return false for expired session', async () => {
-                const expiredSession = {
-                    session_token: 'expired-session',
-                    expires_at: new Date(Date.now() - 3600000).toISOString(),
-                };
-
-                const mockClient = supabaseService.getPublicClient() as any;
-                mockClient.single.mockResolvedValueOnce({ data: expiredSession, error: null });
+                const mockClient = supabaseService.getAdminClient() as any;
+                mockClient.rpc.mockResolvedValueOnce({
+                    data: { valid: false, reason: 'SESSION_EXPIRED' }, error: null,
+                });
 
                 const result = await service.validateSession('expired-session');
 
                 expect(result).toBe(false);
             });
 
+            it('should reject a session revoked by an administrative RPC immediately', async () => {
+                const mockClient = supabaseService.getAdminClient() as any;
+                const cacheService = testingModule.get<CacheService>(CacheService) as any;
+                mockClient.rpc.mockResolvedValueOnce({
+                    data: { valid: false, reason: 'SESSION_REVOKED' }, error: null,
+                });
+
+                await expect(service.validateSession('revoked-session')).resolves.toBe(false);
+                expect(cacheService.del).toHaveBeenCalledWith('auth:session:revoked-session');
+                expect(mockClient.update).not.toHaveBeenCalled();
+            });
+
             it('should return false for non-existent session', async () => {
-                const mockClient = supabaseService.getPublicClient() as any;
-                mockClient.single.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
+                const mockClient = supabaseService.getAdminClient() as any;
+                mockClient.rpc.mockResolvedValueOnce({
+                    data: { valid: false, reason: 'SESSION_NOT_FOUND' }, error: null,
+                });
 
                 const result = await service.validateSession('non-existent');
 
@@ -700,9 +763,15 @@ describe('AuthService', () => {
         });
 
         describe('revokeSession', () => {
-            it('should revoke session without throwing', async () => {
-                await expect(service.revokeSession('session-token'))
+            it('should revoke only the authenticated user session through the guarded RPC', async () => {
+                const mockClient = supabaseService.getAdminClient() as any;
+                await expect(service.revokeSession('session-token', 'user-123'))
                     .resolves.not.toThrow();
+                expect(mockClient.rpc).toHaveBeenCalledWith('revocar_sesion_auth_tx', {
+                    p_session_token: 'session-token',
+                    p_usuario_id: 'user-123',
+                    p_reason: 'LOGOUT',
+                });
             });
         });
 
@@ -712,7 +781,7 @@ describe('AuthService', () => {
                     .resolves.not.toThrow();
             });
 
-            it('should invalidate cached positive sessions before deleting them', async () => {
+            it('should invalidate cached positive sessions before revoking them', async () => {
                 const mockClient = supabaseService.getAdminClient() as any;
                 const cacheService = testingModule.get<CacheService>(CacheService) as any;
                 const originalEq = mockClient.eq.getMockImplementation();
@@ -741,7 +810,9 @@ describe('AuthService', () => {
 
                 expect(cacheService.del).toHaveBeenCalledWith('auth:session:session-a');
                 expect(cacheService.del).toHaveBeenCalledWith('auth:session:session-b');
-                expect(mockClient.delete).toHaveBeenCalled();
+                expect(mockClient.rpc).toHaveBeenCalledWith('revocar_sesiones_usuario_auth_tx', {
+                    p_usuario_id: 'user-123', p_reason: 'LOGOUT_ALL',
+                });
             });
         });
 

@@ -462,9 +462,64 @@ export class ContabilidadEventsListener implements OnModuleInit {
             await this.handleVentaFacturada(evento);
             break;
 
+          case 'caja.cerrada':
+            await this.handleCajaCerrada(evento);
+            break;
+
+          case 'caja.movimiento_manual.registrado':
+          case 'caja.retiro.registrado':
+          case 'caja.cambio_turno.completado':
+            await this.handleOperacionCaja474(evento);
+            break;
+
+          case 'banco.movimiento.registrado':
+            await this.handleMovimientoBancario(evento);
+            break;
+
+          case 'banco.transferencia.registrada':
+            await this.handleTransferenciaBancaria(evento);
+            break;
+
           case 'cobro.registrado':
           case 'CobroRegistrado':
             await this.handleCobroRegistrado(evento);
+            break;
+
+          case 'cobro.revertido':
+            await this.handleCobroRevertido(evento);
+            break;
+
+          case 'cxc.ajuste.registrado':
+          case 'CxcAjusteRegistrado':
+            await this.handleAjusteCxcRegistrado(evento);
+            break;
+
+          case 'cxc.ajuste.revertido':
+            await this.handleAjusteCxcRevertido(evento);
+            break;
+
+          case 'cxp.ajuste.registrado':
+            await this.handleAjusteCxpRegistrado(evento);
+            break;
+
+          case 'nota_credito.emitida':
+            await this.handleNotaCreditoEmitida(evento);
+            break;
+
+          case 'nota_debito.emitida':
+            await this.handleNotaDebitoEmitida(evento);
+            break;
+
+          case 'saldo_favor.aplicado':
+            await this.handleSaldoFavorAplicado(evento);
+            break;
+
+          case 'saldo_favor.reembolsado':
+            await this.handleSaldoFavorReembolsado(evento);
+            break;
+
+          case 'saldo_favor.reembolso_revertido':
+            await this.handleSaldoFavorReembolsoRevertido(evento);
             break;
 
           case 'recepcion.registrada':
@@ -505,6 +560,22 @@ export class ContabilidadEventsListener implements OnModuleInit {
           case 'planilla.pagada':
           case 'PlanillaPagada':
             await this.handlePlanillaPagada(evento);
+            break;
+
+          case 'liquidacion.aprobada':
+            await this.handleLiquidacionAprobada(evento);
+            break;
+
+          case 'liquidacion.pagada':
+            await this.handleLiquidacionPagada(evento);
+            break;
+
+          case 'liquidacion.pago.revertido':
+            await this.handlePagoLiquidacionRevertido(evento);
+            break;
+
+          case 'cts.depositado':
+            await this.handleCtsDepositado(evento);
             break;
 
       case 'depreciacion.generada':
@@ -675,9 +746,15 @@ export class ContabilidadEventsListener implements OnModuleInit {
       const eventoAsiento = {
         tenant_id: tenantId,
         fecha: evento.event_data?.fechaDevolucion || evento.event_data?.fecha || new Date().toISOString(),
-        subtotal: Number(evento.event_data?.subtotal ?? 0),
-        igv: Number(evento.event_data?.igv ?? 0),
-        total: Number(evento.event_data?.total ?? 0),
+        subtotal: Number(evento.event_data?.subtotalContable ?? evento.event_data?.subtotal ?? 0),
+        igv: Number(evento.event_data?.igvContable ?? evento.event_data?.igv ?? 0),
+        total: Number(evento.event_data?.totalContable ?? evento.event_data?.total ?? 0),
+        mercaderia: Number(
+          evento.event_data?.mercaderia ?? evento.event_data?.subtotalContable ?? evento.event_data?.subtotal ?? 0,
+        ),
+        servicios: Number(evento.event_data?.servicios ?? 0),
+        no_stock: Number(evento.event_data?.noStock ?? evento.event_data?.no_stock ?? 0),
+        cuenta_pasivo: evento.event_data?.cuentaPasivo ?? evento.event_data?.cuenta_pasivo ?? '42',
         referencia: evento.event_data?.numeroDevolucion || evento.event_data?.referencia,
         event_id: evento.event_id,
       };
@@ -982,7 +1059,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
       
       // Preparar datos para el generador de asientos
       const referenciaVenta = this.normalizarReferenciaComprobante(
-        eventData.numeroTicket || eventData.numeroFactura || eventData.cpeId,
+        eventData.numeroFiscal || eventData.numeroFactura || eventData.numeroTicket || eventData.cpeId,
       );
 
       // Idempotencia cruzada: factura.emitida y cxc.creada emiten la misma venta;
@@ -995,12 +1072,28 @@ export class ContabilidadEventsListener implements OnModuleInit {
         return;
       }
 
-      // Determinar si la venta fue al CONTADO (POS es siempre contado; factura según
-      // condición de pago). Si es contado, el asiento debita Caja/Bancos en vez de CxC.
-      const esContado =
-        eventData.source === 'pos.venta.registrada' ||
-        eventData.esCredito === false ||
-        String(eventData.condicionPago ?? eventData.condicion_pago ?? '').toUpperCase() === 'CONTADO';
+      const cobros = Array.isArray(eventData.pagos)
+        ? eventData.pagos.map((pago: any) => ({
+            tipo: String(pago?.tipo ?? pago?.metodo_pago_tipo ?? pago?.codigo ?? '').toUpperCase(),
+            codigo: String(pago?.codigo ?? pago?.metodo_pago_codigo ?? '').toLowerCase(),
+            monto: Number(pago?.monto ?? 0),
+            moneda: String(pago?.moneda ?? eventData.moneda ?? 'PEN').toUpperCase(),
+            cuenta_codigo: pago?.cuentaCodigo ?? pago?.cuenta_codigo ?? null,
+          }))
+        : undefined;
+      const montoCredito = Number(
+        eventData.montoCredito ??
+        cobros?.filter((pago: any) => pago.tipo === 'CREDITO')
+          .reduce((sum: number, pago: any) => sum + pago.monto, 0) ??
+        0,
+      );
+
+      // POS puede ser contado, crédito o mixto. El desglose durable de pagos
+      // manda sobre la etiqueta general del método de pago.
+      const esContado = cobros
+        ? montoCredito <= 0.01
+        : eventData.esCredito === false ||
+          String(eventData.condicionPago ?? eventData.condicion_pago ?? '').toUpperCase() === 'CONTADO';
       const cuentaCobroCodigo = this.mapMetodoPagoACuentaCaja(
         eventData.metodoPago ?? eventData.metodo_pago,
       );
@@ -1017,6 +1110,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
         event_id: evento.event_id || eventData.eventId,
         es_contado: esContado,
         cuenta_cobro_codigo: cuentaCobroCodigo,
+        cobros,
+        // En POS el total pendiente es el saldo a crédito explícito; para el
+        // resto de ventas dejamos que el generador derive el saldo histórico.
+        monto_pendiente: cobros && cobros.length > 0 ? montoCredito : undefined,
       };
 
       const eventId = ventaData.event_id;
@@ -1061,6 +1158,145 @@ export class ContabilidadEventsListener implements OnModuleInit {
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleVentaFacturada:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Un arqueo con diferencia cambia el efectivo real y debe quedar en libros.
+   * Diferencia positiva: Dr Caja / Cr Otros ingresos.
+   * Diferencia negativa: Dr Otros gastos / Cr Caja.
+   */
+  private async handleCajaCerrada(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'caja.cerrada');
+    const diferencia = Number(eventData.diferencia ?? 0);
+
+    if (!Number.isFinite(diferencia)) {
+      throw new Error('Evento caja.cerrada con diferencia inválida');
+    }
+    if (Math.abs(diferencia) <= 0.009) {
+      this.logger.log(
+        `ℹ️ [ContabilidadEventsListener] Cierre ${eventData.sesionCajaId ?? evento.event_id} sin diferencia; no requiere asiento.`,
+      );
+      return;
+    }
+
+    const cierreData = {
+      tenant_id: tenantId,
+      fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
+      diferencia,
+      referencia:
+        eventData.referencia || `CIERRE-CAJA-${eventData.sesionCajaId ?? evento.aggregate_id}`,
+      event_id: evento.event_id || eventData.eventId,
+      cuenta_caja_codigo: eventData.cuentaCajaCodigo || '10111',
+      sesion_caja_id: eventData.sesionCajaId,
+      caja_id: eventData.cajaId,
+    };
+
+    const asientoCreado = await this.asientosGenerator.generarAsientoCierreCaja(cierreData);
+    if (cierreData.event_id) {
+      const asientoVerificado = await this.verificarAsientoCreado(
+        tenantId,
+        cierreData.event_id,
+        cierreData.referencia,
+      );
+      if (!asientoVerificado) {
+        throw new Error(
+          `Asiento de diferencia de caja no verificable para evento ${cierreData.event_id}`,
+        );
+      }
+    } else if (!asientoCreado?.id) {
+      throw new Error('Asiento de diferencia de caja no retornó ID válido');
+    }
+  }
+
+  /** Procesa exclusivamente el payload contable congelado por Caja 474. */
+  private async handleOperacionCaja474(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, evento.event_type);
+    const diferencia = Number(eventData.diferencia ?? eventData.diferenciaOrigen ?? 0);
+    if (
+      evento.event_type === 'caja.cambio_turno.completado' &&
+      Number.isFinite(diferencia) &&
+      Math.abs(diferencia) <= 0.009
+    ) {
+      this.logger.log(
+        `ℹ️ [ContabilidadEventsListener] Cambio ${eventData.cambioTurnoId ?? evento.aggregate_id} sin diferencia; no requiere asiento.`,
+      );
+      return;
+    }
+
+    const operationData = {
+      ...eventData,
+      tenant_id: tenantId,
+      event_id: evento.event_id || eventData.eventId,
+      tipo_evento: evento.event_type,
+      fecha: eventData.fecha || evento.created_at || new Date().toISOString(),
+      referencia: eventData.referencia || `CAJA-474-${evento.aggregate_id}`,
+    };
+    const asiento = await this.asientosGenerator.generarAsientoOperacionCaja474(operationData);
+    if (!operationData.event_id) {
+      throw new Error(`Evento ${evento.event_type} sin source_event_id durable`);
+    }
+    const asientoVerificado = await this.verificarAsientoCreado(
+      tenantId,
+      operationData.event_id,
+      operationData.referencia,
+    );
+    if (!asientoVerificado || (!asiento?.id && !asientoVerificado.id)) {
+      throw new Error(
+        `Asiento Caja 474 no verificable para evento ${operationData.event_id}`,
+      );
+    }
+  }
+
+  /**
+   * Dueño contable único de movimientos bancarios manuales/conciliatorios.
+   * El payload 457 lleva las cuentas postables y el importe local congelados.
+   */
+  private async handleMovimientoBancario(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'banco.movimiento.registrado');
+    const eventId = evento.event_id || eventData.eventId;
+    const referencia = eventData.referencia || `BANCO:${eventData.operacionId ?? evento.aggregate_id}`;
+    const asiento = await this.asientosGenerator.generarAsientoMovimientoBancario({
+      ...eventData,
+      tenant_id: tenantId,
+      event_id: eventId,
+      referencia,
+    });
+
+    if (eventId) {
+      const verificado = await this.verificarAsientoCreado(tenantId, eventId, referencia);
+      if (!verificado) {
+        throw new Error(`Asiento bancario no verificable para evento ${eventId}`);
+      }
+    } else if (!asiento?.id) {
+      throw new Error('El movimiento bancario no retornó un asiento válido');
+    }
+  }
+
+  /** Transferencia interna: Dr banco destino / Cr banco origen por importe local. */
+  private async handleTransferenciaBancaria(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'banco.transferencia.registrada');
+    const eventId = evento.event_id || eventData.eventId;
+    const referencia =
+      eventData.referencia || `TRANSFER:${eventData.operacionId ?? evento.aggregate_id}`;
+    const asiento = await this.asientosGenerator.generarAsientoTransferenciaBancaria({
+      ...eventData,
+      tenant_id: tenantId,
+      event_id: eventId,
+      referencia,
+    });
+
+    if (eventId) {
+      const verificado = await this.verificarAsientoCreado(tenantId, eventId, referencia);
+      if (!verificado) {
+        throw new Error(`Asiento de transferencia bancaria no verificable para evento ${eventId}`);
+      }
+    } else if (!asiento?.id) {
+      throw new Error('La transferencia bancaria no retornó un asiento válido');
     }
   }
 
@@ -1162,6 +1398,14 @@ export class ContabilidadEventsListener implements OnModuleInit {
         tenant_id: tenantId,
         fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
         monto: eventData.monto,
+        tipoMovimiento: eventData.tipoMovimiento ?? eventData.tipo_movimiento ?? eventData.tipo,
+        medio: eventData.medio ?? eventData.metodo_pago,
+        // La RPC de tesorería valúa la cuenta por cobrar al tipo de cambio de
+        // origen y el ingreso a caja/banco al tipo de liquidación. Mantener los
+        // tres importes evita que contabilidad vuelva a consultar un TC mutable.
+        montoContabilizado: eventData.montoContabilizado ?? eventData.monto_contabilizado,
+        montoLiquidacion: eventData.montoLiquidacion ?? eventData.monto_liquidacion,
+        diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroDocumento || eventData.referencia,
         event_id: evento.event_id || eventData.eventId
@@ -1189,6 +1433,305 @@ export class ContabilidadEventsListener implements OnModuleInit {
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleCobroRegistrado:`, error);
       throw error;
+    }
+  }
+
+  /** Reversa exacta del cobro original: Dr 12 / Cr 10 y FX opuesto. */
+  private async handleCobroRevertido(evento: OutboxEvent): Promise<void> {
+    try {
+      const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'cobro.revertido');
+      const asientoData = {
+        tenant_id: tenantId,
+        fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
+        monto: eventData.monto,
+        montoContabilizado: eventData.montoContabilizado ?? eventData.monto_contabilizado,
+        montoLiquidacion: eventData.montoLiquidacion ?? eventData.monto_liquidacion,
+        diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
+        medio: eventData.medio ?? eventData.metodoPago ?? eventData.metodo_pago,
+        referencia: eventData.referencia ?? eventData.cobroId ?? eventData.cobro_id,
+        event_id: evento.event_id || eventData.eventId,
+      };
+      const asiento = await this.asientosGenerator.generarAsientoReversaCobro(asientoData);
+      if (asientoData.event_id) {
+        const verificado = await this.verificarAsientoCreado(
+          tenantId, asientoData.event_id, asientoData.referencia,
+        );
+        if (!verificado) {
+          throw new Error(`Asiento de reversa de cobro no verificable para ${asientoData.event_id}`);
+        }
+      } else if (!asiento?.id) {
+        throw new Error('Asiento de reversa de cobro no retornó ID válido');
+      }
+    } catch (error) {
+      this.logger.error('❌ [ContabilidadEventsListener] Error en handleCobroRevertido:', error);
+      throw error;
+    }
+  }
+
+  /** Procesa ajustes de CxC sin tratarlos como entradas de caja o banco. */
+  private async handleAjusteCxcRegistrado(evento: OutboxEvent): Promise<void> {
+    try {
+      const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'cxc.ajuste.registrado');
+      const ajusteData = {
+        tenant_id: tenantId,
+        fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
+        monto: eventData.monto,
+        tipoMovimiento: eventData.tipoMovimiento ?? eventData.tipo_movimiento ?? eventData.tipo,
+        montoContabilizado: eventData.montoContabilizado ?? eventData.monto_contabilizado,
+        baseAjuste: eventData.baseAjuste ?? eventData.base_ajuste,
+        igvAjuste: eventData.igvAjuste ?? eventData.igv_ajuste,
+        referencia: eventData.numeroDocumento || eventData.referencia,
+        event_id: evento.event_id || eventData.eventId,
+      };
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoAjusteCxc(ajusteData);
+      if (ajusteData.event_id) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          ajusteData.event_id,
+          ajusteData.referencia,
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento de ajuste CxC no se pudo verificar para evento ${ajusteData.event_id}`,
+          );
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento de ajuste CxC no retornó ID válido');
+      }
+    } catch (error) {
+      this.logger.error('❌ [ContabilidadEventsListener] Error en handleAjusteCxcRegistrado:', error);
+      throw error;
+    }
+  }
+
+  /** Reversa fiscal no monetaria: asiento exactamente opuesto al ajuste CxC. */
+  private async handleAjusteCxcRevertido(evento: OutboxEvent): Promise<void> {
+    try {
+      const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'cxc.ajuste.revertido');
+      const originalEventId = String(
+        eventData.eventoOriginalId ?? eventData.evento_original_id ?? '',
+      ).trim();
+      if (!originalEventId) {
+        throw new Error('La reversa de ajuste CxC no conserva eventoOriginalId');
+      }
+      const asientoOriginal = await this.verificarAsientoCreado(
+        tenantId, originalEventId,
+      );
+      if (!asientoOriginal) {
+        throw new Error(
+          `El ajuste CxC original ${originalEventId} aún no tiene asiento verificable`,
+        );
+      }
+      const ajusteData = {
+        tenant_id: tenantId,
+        fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
+        monto: eventData.monto,
+        tipoMovimiento: eventData.tipoMovimiento ?? eventData.tipo_movimiento ?? eventData.tipo,
+        montoContabilizado: eventData.montoContabilizado ?? eventData.monto_contabilizado,
+        referencia: eventData.referencia ?? eventData.operacionId ?? eventData.operacion_id,
+        event_id: evento.event_id || eventData.eventId,
+      };
+      const asiento = await this.asientosGenerator.generarAsientoReversaAjusteCxc(ajusteData);
+      if (ajusteData.event_id) {
+        const verificado = await this.verificarAsientoCreado(
+          tenantId, ajusteData.event_id, ajusteData.referencia,
+        );
+        if (!verificado) {
+          throw new Error(`Asiento de reversa de ajuste CxC no verificable para ${ajusteData.event_id}`);
+        }
+      } else if (!asiento?.id) {
+        throw new Error('Asiento de reversa de ajuste CxC no retornó ID válido');
+      }
+    } catch (error) {
+      this.logger.error('❌ [ContabilidadEventsListener] Error en handleAjusteCxcRevertido:', error);
+      throw error;
+    }
+  }
+
+  /** Procesa ajustes de CxP sin simular un pago o un movimiento de tesorería. */
+  private async handleAjusteCxpRegistrado(evento: OutboxEvent): Promise<void> {
+    try {
+      const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'cxp.ajuste.registrado');
+      const ajusteData = {
+        tenant_id: tenantId,
+        fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
+        monto: eventData.monto,
+        montoContabilizado: eventData.montoContabilizado ?? eventData.monto_contabilizado,
+        tipoMovimiento: eventData.tipoMovimiento ?? eventData.tipo_movimiento ?? eventData.tipo,
+        referencia: eventData.numeroDocumento || eventData.referencia,
+        event_id: evento.event_id || eventData.eventId,
+      };
+      const asientoCreado = await this.asientosGenerator.generarAsientoAjusteCxp(ajusteData);
+      if (ajusteData.event_id) {
+        const verificado = await this.verificarAsientoCreado(
+          tenantId,
+          ajusteData.event_id,
+          ajusteData.referencia,
+        );
+        if (!verificado) {
+          throw new Error(`Asiento de ajuste CxP no se pudo verificar para evento ${ajusteData.event_id}`);
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento de ajuste CxP no retornó ID válido');
+      }
+    } catch (error) {
+      this.logger.error('❌ [ContabilidadEventsListener] Error en handleAjusteCxpRegistrado:', error);
+      throw error;
+    }
+  }
+
+  /** Dueño contable único de la NC: revierte venta/impuesto y, sólo en RMA, costo. */
+  private async handleNotaCreditoEmitida(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'nota_credito.emitida');
+    const referencia = this.normalizarReferenciaComprobante(
+      eventData.serie && eventData.numero
+        ? `${eventData.serie}-${eventData.numero}`
+        : eventData.notaCreditoId ?? eventData.nota_credito_id,
+    );
+    const asientoData = {
+      tenant_id: tenantId,
+      fecha: eventData.fechaEmision ?? eventData.fecha_emision ?? eventData.fecha,
+      base_imponible: eventData.base_imponible ?? eventData.subtotal,
+      igv: eventData.igv ?? eventData.impuestos,
+      total: eventData.total,
+      monto_pendiente: eventData.cxcReduction ?? eventData.monto_pendiente ?? 0,
+      customerCreditBalance:
+        eventData.customerCreditBalance ?? eventData.customer_credit_balance ?? eventData.saldoFavor ?? 0,
+      costo_ventas: eventData.costoVentas ?? eventData.costo_ventas ?? 0,
+      referencia,
+      event_id: evento.event_id || eventData.eventId,
+    };
+    const asiento = await this.asientosGenerator.generarAsientoNotaCredito(asientoData);
+    if (asientoData.event_id) {
+      const verificado = await this.verificarAsientoCreado(
+        tenantId, asientoData.event_id, referencia,
+      );
+      if (!verificado) {
+        throw new Error(`Asiento de nota de crédito no verificable para ${asientoData.event_id}`);
+      }
+    } else if (!asiento?.id) {
+      throw new Error('Asiento de nota de crédito no retornó ID válido');
+    }
+  }
+
+  /** Una ND comercial incrementa la CxC: Dr 12 / Cr 70 + Cr 40, sin stock. */
+  private async handleNotaDebitoEmitida(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'nota_debito.emitida');
+    const referencia = this.normalizarReferenciaComprobante(
+      eventData.serie && eventData.numero
+        ? `${eventData.serie}-${eventData.numero}`
+        : eventData.notaDocumentoId ?? eventData.nota_documento_id,
+    );
+    const asientoData = {
+      tenant_id: tenantId,
+      fecha: eventData.fechaEmision ?? eventData.fecha_emision ?? eventData.fecha,
+      base_imponible: eventData.base_imponible ?? eventData.subtotal,
+      igv: eventData.igv ?? eventData.impuestos,
+      total: eventData.total,
+      referencia,
+      event_id: evento.event_id || eventData.eventId,
+    };
+    const asiento = await this.asientosGenerator.generarAsientoNotaDebito(asientoData);
+    if (asientoData.event_id) {
+      const verificado = await this.verificarAsientoCreado(
+        tenantId, asientoData.event_id, referencia,
+      );
+      if (!verificado) {
+        throw new Error(`Asiento de nota de débito no verificable para ${asientoData.event_id}`);
+      }
+    } else if (!asiento?.id) {
+      throw new Error('Asiento de nota de débito no retornó ID válido');
+    }
+  }
+
+  /** Aplicar saldo no es cobro: Dr 122 / Cr 12, sin movimiento de tesorería. */
+  private async handleSaldoFavorAplicado(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'saldo_favor.aplicado');
+    const asientoData = {
+      tenant_id: tenantId,
+      fecha: eventData.fecha,
+      monto: eventData.monto,
+      montoPasivo: eventData.montoPasivo ?? eventData.monto_pasivo,
+      montoCxc: eventData.montoCxc ?? eventData.monto_cxc,
+      diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
+      referencia: eventData.referencia ?? eventData.saldoFavorId,
+      event_id: evento.event_id || eventData.eventId,
+    };
+    const asiento = await this.asientosGenerator.generarAsientoAplicacionSaldoFavor(asientoData);
+    if (asientoData.event_id) {
+      const verificado = await this.verificarAsientoCreado(
+        tenantId, asientoData.event_id, asientoData.referencia,
+      );
+      if (!verificado) {
+        throw new Error(`Asiento de aplicación de saldo no verificable para ${asientoData.event_id}`);
+      }
+    } else if (!asiento?.id) {
+      throw new Error('Asiento de aplicación de saldo no retornó ID válido');
+    }
+  }
+
+  /** Reembolso real: Dr 122 / Cr 10; la RPC exige caja o banco explícito. */
+  private async handleSaldoFavorReembolsado(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'saldo_favor.reembolsado');
+    const asientoData = {
+      tenant_id: tenantId,
+      fecha: eventData.fecha,
+      monto: eventData.monto,
+      montoPasivo: eventData.montoPasivo ?? eventData.monto_pasivo,
+      montoTesoreria: eventData.montoTesoreria ?? eventData.monto_tesoreria,
+      diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
+      medio: eventData.medio,
+      referencia: eventData.referencia ?? eventData.saldoFavorId,
+      event_id: evento.event_id || eventData.eventId,
+    };
+    const asiento = await this.asientosGenerator.generarAsientoReembolsoSaldoFavor(asientoData);
+    if (asientoData.event_id) {
+      const verificado = await this.verificarAsientoCreado(
+        tenantId, asientoData.event_id, asientoData.referencia,
+      );
+      if (!verificado) {
+        throw new Error(`Asiento de reembolso de saldo no verificable para ${asientoData.event_id}`);
+      }
+    } else if (!asiento?.id) {
+      throw new Error('Asiento de reembolso de saldo no retornó ID válido');
+    }
+  }
+
+  /** Reversa del egreso RMA: Dr 10 / Cr 122 y FX exactamente opuesto. */
+  private async handleSaldoFavorReembolsoRevertido(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'saldo_favor.reembolso_revertido');
+    const asientoData = {
+      tenant_id: tenantId,
+      fecha: eventData.fecha,
+      monto: eventData.monto,
+      montoPasivo: eventData.montoPasivo ?? eventData.monto_pasivo,
+      montoTesoreria: eventData.montoTesoreria ?? eventData.monto_tesoreria,
+      diferenciaCambio: eventData.diferenciaCambio ?? eventData.diferencia_cambio,
+      medio: eventData.medio,
+      referencia: eventData.referencia ?? eventData.saldoFavorId,
+      event_id: evento.event_id || eventData.eventId,
+    };
+    const asiento = await this.asientosGenerator
+      .generarAsientoReversaReembolsoSaldoFavor(asientoData);
+    if (asientoData.event_id) {
+      const verificado = await this.verificarAsientoCreado(
+        tenantId, asientoData.event_id, asientoData.referencia,
+      );
+      if (!verificado) {
+        throw new Error(`Asiento de reversa de reembolso no verificable para ${asientoData.event_id}`);
+      }
+    } else if (!asiento?.id) {
+      throw new Error('Asiento de reversa de reembolso no retornó ID válido');
     }
   }
 
@@ -1308,6 +1851,9 @@ export class ContabilidadEventsListener implements OnModuleInit {
         tenant_id: tenantId,
         fecha: eventData.fechaRecepcion || eventData.fecha || new Date().toISOString(),
         costo: costoRecepcion,
+        mercaderia: eventData.mercaderiaParcial,
+        servicios: eventData.serviciosParcial,
+        no_stock: eventData.noStockParcial,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroRecepcion || eventData.numeroOrden,
         event_id: evento.event_id || eventData.eventId
@@ -1348,6 +1894,13 @@ export class ContabilidadEventsListener implements OnModuleInit {
       subtotal: eventData.subtotal,
       igv: eventData.igv,
       total: eventData.total,
+      saldoProveedor: eventData.saldoProveedor ?? eventData.saldo_proveedor,
+      ajustes: {
+        retencion: eventData.retencion ?? 0,
+        percepcion: eventData.percepcion ?? 0,
+        detraccion: eventData.detraccion ?? 0,
+        anticipo: eventData.anticipo ?? 0,
+      },
       recepcion_id: eventData.recepcionId ?? null,
       referencia: eventData.numeroDocumento ?? eventData.facturaProvId,
       event_id: eventId,
@@ -1529,6 +2082,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         fecha: eventData.fecha || new Date().toISOString(),
         sueldos: eventData.totalIngresos || eventData.sueldos,
         retenciones: eventData.totalDescuentos || eventData.retenciones || 0,
+        aportes: eventData.totalAportes ?? eventData.aportes ?? eventData.total_aportes ?? 0,
         neto: eventData.totalNeto || eventData.neto,
         centro_costo_id: eventData.centro_costo_id,
         planilla_id: eventData.planillaId,
@@ -1555,6 +2109,22 @@ export class ContabilidadEventsListener implements OnModuleInit {
         }
       } else if (!asientoCreado?.id) {
         throw new Error('Asiento contable de planilla no retornó ID válido después de creación');
+      }
+
+      if (planillaData.planilla_id) {
+        const { error: flagError } = await this.supabaseService.getClient()
+          .from('planillas')
+          .update({
+            asientos_generados: 'true',
+            fecha_asientos: new Date().toISOString(),
+          })
+          .eq('id', planillaData.planilla_id)
+          .eq('tenant_id', tenantId);
+        if (flagError) {
+          throw new Error(
+            `El asiento existe pero no se pudo sincronizar el flag de planilla: ${flagError.message}`,
+          );
+        }
       }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handlePlanillaLiquidada:`, error);
@@ -1601,6 +2171,94 @@ export class ContabilidadEventsListener implements OnModuleInit {
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handlePlanillaPagada:`, error);
       throw error;
+    }
+  }
+
+  private async handleLiquidacionAprobada(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'liquidacion.aprobada');
+    const eventId = evento.event_id || eventData.eventId;
+    const referencia = `LIQUIDACION-${eventData.liquidacionId}`;
+    const asiento = await this.asientosGenerator.generarAsientoDevengoLiquidacion({
+      tenant_id: tenantId,
+      fecha: eventData.fecha || eventData.fechaTerminacion || new Date().toISOString(),
+      monto: eventData.totalLiquidacion,
+      liquidacion_id: eventData.liquidacionId,
+      referencia,
+      source_event_id: eventId,
+      event_id: eventId,
+    });
+    if (eventId) {
+      const verificado = await this.verificarAsientoCreado(tenantId, eventId, referencia);
+      if (!verificado) throw new Error(`No se pudo verificar el devengo de liquidación ${eventId}`);
+    } else if (!asiento?.id) {
+      throw new Error('El devengo de liquidación no retornó un asiento válido');
+    }
+  }
+
+  private async handleLiquidacionPagada(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'liquidacion.pagada');
+    const eventId = evento.event_id || eventData.eventId;
+    const referencia = `PAGO-LIQUIDACION-${eventData.liquidacionId}`;
+    const asiento = await this.asientosGenerator.generarAsientoPagoLiquidacion({
+      tenant_id: tenantId,
+      fecha: eventData.fechaPago || new Date().toISOString(),
+      monto: eventData.totalPagado,
+      liquidacion_id: eventData.liquidacionId,
+      referencia,
+      source_event_id: eventId,
+      event_id: eventId,
+    });
+    if (eventId) {
+      const verificado = await this.verificarAsientoCreado(tenantId, eventId, referencia);
+      if (!verificado) throw new Error(`No se pudo verificar el pago de liquidación ${eventId}`);
+    } else if (!asiento?.id) {
+      throw new Error('El pago de liquidación no retornó un asiento válido');
+    }
+  }
+
+  private async handlePagoLiquidacionRevertido(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'liquidacion.pago.revertido');
+    const eventId = evento.event_id || eventData.eventId;
+    const referencia = `REVERSA-PAGO-LIQUIDACION-${eventData.liquidacionId}`;
+    const asiento = await this.asientosGenerator.generarAsientoReversaPagoLiquidacion({
+      tenant_id: tenantId,
+      fecha: eventData.fechaReversion || new Date().toISOString(),
+      monto: eventData.montoRevertido,
+      liquidacion_id: eventData.liquidacionId,
+      referencia,
+      source_event_id: eventId,
+      event_id: eventId,
+    });
+    if (eventId) {
+      const verificado = await this.verificarAsientoCreado(tenantId, eventId, referencia);
+      if (!verificado) throw new Error(`No se pudo verificar la reversa de liquidación ${eventId}`);
+    } else if (!asiento?.id) {
+      throw new Error('La reversa de liquidación no retornó un asiento válido');
+    }
+  }
+
+  private async handleCtsDepositado(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'cts.depositado');
+    const eventId = evento.event_id || eventData.eventId;
+    const referencia = `CTS-${eventData.depositoId}`;
+    const asiento = await this.asientosGenerator.generarAsientoDepositoCts({
+      tenant_id: tenantId,
+      fecha: eventData.fechaDeposito || new Date().toISOString(),
+      monto: eventData.totalDepositado,
+      deposito_id: eventData.depositoId,
+      referencia,
+      source_event_id: eventId,
+      event_id: eventId,
+    });
+    if (eventId) {
+      const verificado = await this.verificarAsientoCreado(tenantId, eventId, referencia);
+      if (!verificado) throw new Error(`No se pudo verificar el depósito CTS ${eventId}`);
+    } else if (!asiento?.id) {
+      throw new Error('El depósito CTS no retornó un asiento válido');
     }
   }
 
@@ -1669,17 +2327,31 @@ export class ContabilidadEventsListener implements OnModuleInit {
       // Generar asiento de nota de crédito con montos positivos y cuentas invertidas.
       // El generador de ventas no acepta importes negativos porque rompe el cuadre.
       const totalAnulado = Math.abs(Number(eventData.total || 0));
-      let baseImponible = 0;
-      let igvAnulado = 0;
+      const baseDurable = Number(eventData.base_imponible);
+      const igvDurable = Number(eventData.igv);
+      const costoVentasDurable = Number(eventData.costo_ventas);
+      const hasBaseDurable = eventData.base_imponible != null
+        && Number.isFinite(baseDurable)
+        && baseDurable >= 0;
+      const hasIgvDurable = eventData.igv != null
+        && Number.isFinite(igvDurable)
+        && igvDurable >= 0;
+      let baseImponible = hasBaseDurable ? Math.abs(baseDurable) : 0;
+      let igvAnulado = hasIgvDurable ? Math.abs(igvDurable) : 0;
 
-      if (eventData.total) {
+      // Los cierres transaccionales publican el snapshot fiscal original. El
+      // cálculo por tasa queda únicamente como compatibilidad para eventos
+      // históricos que no conservan base/IGV.
+      if (!hasBaseDurable && hasIgvDurable) {
+        baseImponible = Math.max(totalAnulado - igvAnulado, 0);
+      } else if (!hasBaseDurable && totalAnulado > 0) {
         const subtotalCalculado = await this.taxCalculator.calcularSubtotalDesdeTotal(
           totalAnulado,
           tenantId
         );
         baseImponible = subtotalCalculado;
-        igvAnulado = totalAnulado - baseImponible;
       }
+      if (!hasIgvDurable) igvAnulado = Math.max(totalAnulado - baseImponible, 0);
 
       const reversoData = {
         tenant_id: tenantId,
@@ -1687,7 +2359,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
         total: totalAnulado,
         base_imponible: baseImponible,
         igv: igvAnulado,
-        costo_ventas: 0, // No revertir costo si no hay información
+        costo_ventas: Number.isFinite(costoVentasDurable)
+          ? Math.abs(costoVentasDurable)
+          : 0,
+        ajustes: eventData.ajustes ?? {},
         centro_costo_id: eventData.centro_costo_id,
         referencia: `REV-${referencia}`, // Prefijo REV para identificar reversiones
         event_id: evento.event_id || eventData.eventId,

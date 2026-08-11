@@ -20,15 +20,31 @@ describe("ContabilidadEventsListener", () => {
     const mockAsientosGenerator = {
       generarAsientoVenta: jest.fn(),
       generarAsientoCobro: jest.fn(),
+      generarAsientoReversaCobro: jest.fn(),
+      generarAsientoAjusteCxc: jest.fn(),
+      generarAsientoReversaAjusteCxc: jest.fn(),
+      generarAsientoAjusteCxp: jest.fn(),
       generarAsientoCompra: jest.fn(),
       generarAsientoRecepcion: jest.fn(),
       generarAsientoFacturaProveedor: jest.fn(),
       generarAsientoPago: jest.fn(),
       generarAsientoAjusteInventario: jest.fn(),
       generarAsientoPlanilla: jest.fn(),
+      generarAsientoPagoPlanilla: jest.fn(),
+      generarAsientoDevengoLiquidacion: jest.fn(),
+      generarAsientoPagoLiquidacion: jest.fn(),
+      generarAsientoReversaPagoLiquidacion: jest.fn(),
+      generarAsientoDepositoCts: jest.fn(),
       generarAsientoDepreciacion: jest.fn(),
       generarAsientoDevolucionProveedor: jest.fn(),
       generarAsientoNotaCredito: jest.fn(),
+      generarAsientoNotaDebito: jest.fn(),
+      generarAsientoAplicacionSaldoFavor: jest.fn(),
+      generarAsientoReembolsoSaldoFavor: jest.fn(),
+      generarAsientoReversaReembolsoSaldoFavor: jest.fn(),
+      generarAsientoCierreCaja: jest.fn(),
+      generarAsientoMovimientoBancario: jest.fn(),
+      generarAsientoTransferenciaBancaria: jest.fn(),
       marcarEventoComoProcesado: jest.fn(),
       marcarEventoComoFallido: jest.fn(),
     };
@@ -153,6 +169,165 @@ describe("ContabilidadEventsListener", () => {
     expect(
       (listener as any).variantesReferenciaComprobante("F001-00000001"),
     ).toEqual(expect.arrayContaining(["F001-00000001", "F001-1"]));
+  });
+
+  it("clasifica POS mixto por sus pagos durables y conserva sólo el saldo a crédito", async () => {
+    const evento: OutboxEvent = {
+      id: "outbox-pos-mixto",
+      event_id: "evt-pos-mixto",
+      correlation_id: "pos:venta-1",
+      aggregate_type: "venta_pos",
+      aggregate_id: "venta-1",
+      event_type: "pos.venta.registrada",
+      event_data: {
+        tenantId: "tenant-001",
+        fecha: "2026-08-09T10:00:00Z",
+        numeroFiscal: "B001-42",
+        subtotal: 100,
+        impuestos: 18,
+        total: 118,
+        metodoPago: "MIXTO",
+        montoCredito: 30,
+        pagos: [
+          { tipo: "EFECTIVO", codigo: "efectivo", monto: 40, moneda: "PEN" },
+          { tipo: "TARJETA", codigo: "tarjeta", monto: 48, moneda: "PEN" },
+          { tipo: "CREDITO", codigo: "credito", monto: 30, moneda: "PEN" },
+        ],
+      },
+      event_version: 1,
+      created_at: "2026-08-09T10:00:00Z",
+      processed_at: null,
+      retry_count: 0,
+      status: "PENDING",
+      error_message: null,
+    };
+    asientosGenerator.generarAsientoVenta.mockResolvedValue({ id: "asiento-pos-1" } as any);
+
+    await (listener as any).handleVentaFacturada(evento);
+
+    expect(asientosGenerator.generarAsientoVenta).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenant_id: "tenant-001",
+        referencia: "B001-00000042",
+        es_contado: false,
+        monto_pendiente: 30,
+        cobros: [
+          expect.objectContaining({ tipo: "EFECTIVO", monto: 40 }),
+          expect.objectContaining({ tipo: "TARJETA", monto: 48 }),
+          expect.objectContaining({ tipo: "CREDITO", monto: 30 }),
+        ],
+      }),
+    );
+  });
+
+  it("genera asiento para diferencia de arqueo y omite cierres cuadrados", async () => {
+    const baseEvento: OutboxEvent = {
+      id: "outbox-close-1",
+      event_id: "evt-close-1",
+      correlation_id: "caja:sesion-1",
+      aggregate_type: "sesion_caja",
+      aggregate_id: "sesion-1",
+      event_type: "caja.cerrada",
+      event_data: {
+        tenantId: "tenant-001",
+        sesionCajaId: "sesion-1",
+        cajaId: "caja-1",
+        fecha: "2026-08-09T18:00:00Z",
+        montoEsperado: 100,
+        montoContado: 94.75,
+        diferencia: -5.25,
+        referencia: "CIERRE-CAJA-sesion-1",
+        cuentaCajaCodigo: "10111",
+      },
+      event_version: 1,
+      created_at: "2026-08-09T18:00:00Z",
+      processed_at: null,
+      retry_count: 0,
+      status: "PENDING",
+      error_message: null,
+    };
+    asientosGenerator.generarAsientoCierreCaja.mockResolvedValue({ id: "asiento-close-1" } as any);
+
+    await (listener as any).handleCajaCerrada(baseEvento);
+    await (listener as any).handleCajaCerrada({
+      ...baseEvento,
+      event_id: "evt-close-zero",
+      event_data: { ...baseEvento.event_data, diferencia: 0 },
+    });
+
+    expect(asientosGenerator.generarAsientoCierreCaja).toHaveBeenCalledTimes(1);
+    expect(asientosGenerator.generarAsientoCierreCaja).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenant_id: "tenant-001",
+        diferencia: -5.25,
+        cuenta_caja_codigo: "10111",
+        event_id: "evt-close-1",
+      }),
+    );
+  });
+
+  it("enruta movimiento y transferencia bancarios con tenant y event_id durables", async () => {
+    jest.spyOn(listener as any, "verificarAsientoCreado").mockResolvedValue(true);
+    asientosGenerator.generarAsientoMovimientoBancario.mockResolvedValue({
+      id: "asiento-banco-1",
+    } as any);
+    asientosGenerator.generarAsientoTransferenciaBancaria.mockResolvedValue({
+      id: "asiento-transfer-1",
+    } as any);
+
+    const base: Omit<OutboxEvent, "event_type" | "event_data" | "event_id"> = {
+      id: "outbox-bank-1",
+      correlation_id: "bank:op-1",
+      aggregate_type: "operacion_bancaria",
+      aggregate_id: "op-1",
+      event_version: 1,
+      created_at: "2026-08-09T12:00:00Z",
+      processed_at: null,
+      retry_count: 0,
+      status: "PENDING",
+      error_message: null,
+    };
+
+    await (listener as any).handleMovimientoBancario({
+      ...base,
+      event_id: "evt-bank-1",
+      event_type: "banco.movimiento.registrado",
+      event_data: {
+        tenantId: "tenant-001",
+        eventId: "evt-payload-ignored",
+        operacionId: "op-1",
+        tipo: "CARGO",
+        monto: 12.5,
+        referencia: "BANCO-001",
+      },
+    } as OutboxEvent);
+    await (listener as any).handleTransferenciaBancaria({
+      ...base,
+      event_id: "evt-transfer-1",
+      event_type: "banco.transferencia.registrada",
+      event_data: {
+        tenantId: "tenant-001",
+        operacionId: "op-2",
+        monto: 100,
+        referencia: "TRANSFER-001",
+      },
+    } as OutboxEvent);
+
+    expect(asientosGenerator.generarAsientoMovimientoBancario).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenant_id: "tenant-001",
+        event_id: "evt-bank-1",
+        referencia: "BANCO-001",
+      }),
+    );
+    expect(asientosGenerator.generarAsientoTransferenciaBancaria).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenant_id: "tenant-001",
+        event_id: "evt-transfer-1",
+        referencia: "TRANSFER-001",
+      }),
+    );
+    expect((listener as any).verificarAsientoCreado).toHaveBeenCalledTimes(2);
   });
 
   describe("procesarEventosPendientes", () => {
@@ -457,6 +632,11 @@ describe("ContabilidadEventsListener", () => {
           subtotal: 100,
           igv: 18,
           total: 118,
+          retencion: 3,
+          percepcion: 2,
+          detraccion: 10,
+          anticipo: 20,
+          saldoProveedor: 87,
           recepcionId: "rec-1",
         },
         event_version: 1,
@@ -478,6 +658,13 @@ describe("ContabilidadEventsListener", () => {
           subtotal: 100,
           igv: 18,
           total: 118,
+          saldoProveedor: 87,
+          ajustes: {
+            retencion: 3,
+            percepcion: 2,
+            detraccion: 10,
+            anticipo: 20,
+          },
           recepcion_id: "rec-1",
         }),
       );
@@ -498,6 +685,11 @@ describe("ContabilidadEventsListener", () => {
             tenantId: "tenant-001",
             fecha: "2025-01-15",
             monto: 100,
+            tipoMovimiento: "PAGO",
+            medio: "TRANSFERENCIA",
+            montoContabilizado: 370,
+            montoLiquidacion: 380,
+            diferenciaCambio: 10,
             numeroDocumento: "COB-001",
           },
           event_version: 1,
@@ -530,9 +722,94 @@ describe("ContabilidadEventsListener", () => {
         expect.objectContaining({
           tenant_id: "tenant-001",
           monto: 100,
+          tipoMovimiento: "PAGO",
+          medio: "TRANSFERENCIA",
+          montoContabilizado: 370,
+          montoLiquidacion: 380,
+          diferenciaCambio: 10,
           event_id: "evt-003",
         }),
       );
+    });
+
+    it("routes CxC adjustments without invoking the cash collection journal", async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: "adj-1",
+          event_id: "evt-adj-1",
+          correlation_id: "corr-adj-1",
+          aggregate_type: "cxc_ajuste",
+          aggregate_id: "pago-adj-1",
+          event_type: "cxc.ajuste.registrado",
+          event_data: {
+            tenantId: "tenant-001",
+            fecha: "2026-08-09",
+            monto: 18,
+            montoContabilizado: 18,
+            tipoMovimiento: "RETENCION",
+            numeroDocumento: "F001-1",
+          },
+          event_version: 1,
+          created_at: "2026-08-09T10:00:00Z",
+          processed_at: null,
+          retry_count: 0,
+          status: "PENDING",
+          error_message: null,
+        },
+      ];
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      asientosGenerator.generarAsientoAjusteCxc.mockResolvedValue({ id: "asiento-adj-1" } as any);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoAjusteCxc).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: "tenant-001",
+          tipoMovimiento: "RETENCION",
+          montoContabilizado: 18,
+          event_id: "evt-adj-1",
+        }),
+      );
+      expect(asientosGenerator.generarAsientoCobro).not.toHaveBeenCalled();
+    });
+
+    it("routes a supplier adjustment through its own verified journal", async () => {
+      const event: OutboxEvent = {
+        id: "cxp-adj-1",
+        event_id: "evt-cxp-adj-1",
+        correlation_id: "corr-cxp-adj-1",
+        aggregate_type: "cxp_ajuste",
+        aggregate_id: "cxp-1",
+        event_type: "cxp.ajuste.registrado",
+        event_data: {
+          tenantId: "tenant-001",
+          fecha: "2026-08-10",
+          monto: 40,
+          montoContabilizado: 40,
+          tipoMovimiento: "DETRACCION",
+          referencia: "F001-20",
+        },
+        event_version: 1,
+        created_at: "2026-08-10T10:00:00Z",
+        processed_at: null,
+        retry_count: 0,
+        status: "PENDING",
+        error_message: null,
+      };
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue([event]);
+      asientosGenerator.generarAsientoAjusteCxp.mockResolvedValue({ id: "asiento-cxp-adj" } as any);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoAjusteCxp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: "tenant-001",
+          tipoMovimiento: "DETRACCION",
+          montoContabilizado: 40,
+          event_id: "evt-cxp-adj-1",
+        }),
+      );
+      expect(asientosGenerator.generarAsientoPago).not.toHaveBeenCalled();
     });
 
     it("should handle recepcion registrada event", async () => {
@@ -605,6 +882,9 @@ describe("ContabilidadEventsListener", () => {
             totalParcial: 118,
             subtotalParcial: 100,
             igvParcial: 18,
+            mercaderiaParcial: 60,
+            serviciosParcial: 30,
+            noStockParcial: 10,
             numeroRecepcion: "REC-001",
           },
           event_version: 1,
@@ -637,6 +917,9 @@ describe("ContabilidadEventsListener", () => {
         expect.objectContaining({
           tenant_id: "tenant-001",
           costo: 100,
+          mercaderia: 60,
+          servicios: 30,
+          no_stock: 10,
           event_id: "evt-004-partial",
         }),
       );
@@ -774,6 +1057,13 @@ describe("ContabilidadEventsListener", () => {
             subtotal: 150,
             igv: 27,
             total: 177,
+            subtotalContable: 150,
+            igvContable: 27,
+            totalContable: 177,
+            mercaderia: 50,
+            servicios: 70,
+            noStock: 30,
+            cuentaPasivo: '42',
             numeroDevolucion: "DEV-001",
           },
           event_version: 1,
@@ -803,6 +1093,10 @@ describe("ContabilidadEventsListener", () => {
           subtotal: 150,
           igv: 27,
           total: 177,
+          mercaderia: 50,
+          servicios: 70,
+          no_stock: 30,
+          cuenta_pasivo: '42',
           referencia: "DEV-001",
           event_id: "evt-011",
         }),
@@ -871,7 +1165,7 @@ describe("ContabilidadEventsListener", () => {
             eventId: "payload-event-should-not-own-accounting-id",
             fecha: "2025-01-31",
             sueldos: 1000,
-            aportes: 200,
+            totalAportes: 200,
             retenciones: 150,
             neto: 850,
           },
@@ -899,12 +1193,82 @@ describe("ContabilidadEventsListener", () => {
           tenant_id: "tenant-001",
           sueldos: 1000,
           retenciones: 150,
+          aportes: 200,
           neto: 850,
           referencia: "PLANILLA-plan-001",
           source_event_id: "evt-008",
           event_id: "evt-008",
         }),
       );
+      const client = testingModule.get(SupabaseService).getClient() as any;
+      expect(client.update).toHaveBeenCalledWith(expect.objectContaining({
+        asientos_generados: 'true',
+        fecha_asientos: expect.any(String),
+      }));
+    });
+
+    it.each([
+      {
+        tipo: 'liquidacion.aprobada',
+        payload: { liquidacionId: 'liq-1', totalLiquidacion: 1200, fechaTerminacion: '2026-08-09' },
+        metodo: 'generarAsientoDevengoLiquidacion',
+        monto: 1200,
+        referencia: 'LIQUIDACION-liq-1',
+        fecha: '2026-08-09',
+      },
+      {
+        tipo: 'liquidacion.pagada',
+        payload: { liquidacionId: 'liq-1', totalPagado: 1200, fechaPago: '2026-08-10' },
+        metodo: 'generarAsientoPagoLiquidacion',
+        monto: 1200,
+        referencia: 'PAGO-LIQUIDACION-liq-1',
+        fecha: '2026-08-10',
+      },
+      {
+        tipo: 'liquidacion.pago.revertido',
+        payload: { liquidacionId: 'liq-1', montoRevertido: 1200, fechaReversion: '2026-08-11' },
+        metodo: 'generarAsientoReversaPagoLiquidacion',
+        monto: 1200,
+        referencia: 'REVERSA-PAGO-LIQUIDACION-liq-1',
+        fecha: '2026-08-11',
+      },
+      {
+        tipo: 'cts.depositado',
+        payload: { depositoId: 'cts-1', totalDepositado: 500, fechaDeposito: '2026-05-15' },
+        metodo: 'generarAsientoDepositoCts',
+        monto: 500,
+        referencia: 'CTS-cts-1',
+        fecha: '2026-05-15',
+      },
+    ])('procesa $tipo con el asiento laboral canónico', async ({ tipo, payload, metodo, monto, referencia, fecha }) => {
+      const eventId = `evt-${tipo}`;
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue([{
+        id: eventId,
+        event_id: eventId,
+        correlation_id: eventId,
+        aggregate_type: 'rrhh',
+        aggregate_id: String((payload as any).liquidacionId || (payload as any).depositoId),
+        event_type: tipo,
+        event_data: { tenantId: 'tenant-001', ...payload },
+        event_version: 1,
+        created_at: '2026-08-09T10:00:00Z',
+        processed_at: null,
+        retry_count: 0,
+        status: 'PENDING',
+        error_message: null,
+      } as OutboxEvent]);
+      (asientosGenerator as any)[metodo].mockResolvedValue({ id: `asiento-${tipo}` });
+
+      await listener.procesarEventosPendientes();
+
+      expect((asientosGenerator as any)[metodo]).toHaveBeenCalledWith(expect.objectContaining({
+        tenant_id: 'tenant-001',
+        fecha,
+        monto,
+        referencia,
+        source_event_id: eventId,
+        event_id: eventId,
+      }));
     });
 
     it("should handle depreciacion generada event", async () => {
@@ -963,6 +1327,10 @@ describe("ContabilidadEventsListener", () => {
           event_data: {
             tenantId: "tenant-001",
             total: 118,
+            base_imponible: 100,
+            igv: 18,
+            costo_ventas: 60,
+            ajustes: { retencion: 3, percepcion: 0, detraccion: 5, anticipo: 0 },
             serie: "F001",
             numero: "000123",
             motivo: "Cliente solicitó",
@@ -991,6 +1359,10 @@ describe("ContabilidadEventsListener", () => {
         expect.objectContaining({
           tenant_id: "tenant-001",
           total: 118,
+          base_imponible: 100,
+          igv: 18,
+          costo_ventas: 60,
+          ajustes: { retencion: 3, percepcion: 0, detraccion: 5, anticipo: 0 },
           referencia: "REV-F001-000123",
           event_id: "evt-010",
         }),
@@ -1072,6 +1444,143 @@ describe("ContabilidadEventsListener", () => {
         asientosGenerator.generarAsientoNotaCredito,
       ).not.toHaveBeenCalled();
       expect(asientosGenerator.marcarEventoComoFallido).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('eventos RMA 456', () => {
+    beforeEach(() => {
+      jest.spyOn(listener as any, 'verificarAsientoCreado').mockResolvedValue(true);
+    });
+
+    it('procesa nota_credito.emitida como dueño contable único con reparto 12/122', async () => {
+      asientosGenerator.generarAsientoNotaCredito.mockResolvedValue({ id: 'asiento-nc' } as any);
+      await (listener as any).handleNotaCreditoEmitida({
+        event_id: 'evt-rma-nc',
+        event_data: {
+          tenantId: 'tenant-001', fechaEmision: '2026-08-09',
+          serie: 'FC01', numero: '00000001', subtotal: 100, igv: 18,
+          total: 118, cxcReduction: 40, customerCreditBalance: 78,
+          costoVentas: 30,
+        },
+      });
+      expect(asientosGenerator.generarAsientoNotaCredito).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event_id: 'evt-rma-nc', monto_pendiente: 40,
+          customerCreditBalance: 78, costo_ventas: 30,
+        }),
+      );
+    });
+
+    it('procesa nota_debito.emitida por su handler y no como venta o cobro genérico', async () => {
+      asientosGenerator.generarAsientoNotaDebito.mockResolvedValue({ id: 'asiento-nd' } as any);
+      await (listener as any).handleNotaDebitoEmitida({
+        event_id: 'evt-nd-472',
+        event_data: {
+          tenantId: 'tenant-001', fechaEmision: '2026-08-10',
+          serie: 'FD01', numero: '00000001', subtotal: 100,
+          igv: 18, total: 118,
+        },
+      });
+      expect(asientosGenerator.generarAsientoNotaDebito).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-001', event_id: 'evt-nd-472',
+          referencia: 'FD01-00000001', base_imponible: 100,
+          igv: 18, total: 118,
+        }),
+      );
+      expect(asientosGenerator.generarAsientoVenta).not.toHaveBeenCalled();
+      expect(asientosGenerator.generarAsientoCobro).not.toHaveBeenCalled();
+    });
+
+    it('aplica saldo por handler propio y nunca por generarAsientoCobro', async () => {
+      asientosGenerator.generarAsientoAplicacionSaldoFavor.mockResolvedValue({ id: 'asiento-apply' } as any);
+      await (listener as any).handleSaldoFavorAplicado({
+        event_id: 'evt-saldo-apply',
+        event_data: {
+          tenantId: 'tenant-001', fecha: '2026-08-09', monto: 20,
+          montoPasivo: 20, montoCxc: 20, diferenciaCambio: 0,
+          referencia: 'SALDO-1',
+        },
+      });
+      expect(asientosGenerator.generarAsientoAplicacionSaldoFavor).toHaveBeenCalled();
+      expect(asientosGenerator.generarAsientoCobro).not.toHaveBeenCalled();
+    });
+
+    it('reembolsa saldo por handler propio con medio explícito', async () => {
+      asientosGenerator.generarAsientoReembolsoSaldoFavor.mockResolvedValue({ id: 'asiento-refund' } as any);
+      await (listener as any).handleSaldoFavorReembolsado({
+        event_id: 'evt-saldo-refund',
+        event_data: {
+          tenantId: 'tenant-001', fecha: '2026-08-09', monto: 20,
+          montoPasivo: 20, montoTesoreria: 20, diferenciaCambio: 0,
+          medio: 'BANCO', referencia: 'SALDO-1',
+        },
+      });
+      expect(asientosGenerator.generarAsientoReembolsoSaldoFavor).toHaveBeenCalledWith(
+        expect.objectContaining({ medio: 'BANCO', event_id: 'evt-saldo-refund' }),
+      );
+    });
+
+    it('revierte el cobro por handler propio sin duplicar la nota de crédito', async () => {
+      asientosGenerator.generarAsientoReversaCobro.mockResolvedValue({ id: 'asiento-cobro-reversa' } as any);
+      await (listener as any).handleCobroRevertido({
+        event_id: 'evt-cobro-reversa-466',
+        event_data: {
+          tenantId: 'tenant-001', fecha: '2026-08-10', monto: 100,
+          montoContabilizado: 370, montoLiquidacion: 380,
+          diferenciaCambio: 10, medio: 'BANCO', referencia: 'F001-1',
+        },
+      });
+      expect(asientosGenerator.generarAsientoReversaCobro).toHaveBeenCalledWith(
+        expect.objectContaining({
+          montoContabilizado: 370, montoLiquidacion: 380,
+          diferenciaCambio: 10, event_id: 'evt-cobro-reversa-466',
+        }),
+      );
+      expect(asientosGenerator.generarAsientoNotaCredito).not.toHaveBeenCalled();
+      expect(asientosGenerator.generarAsientoCobro).not.toHaveBeenCalled();
+    });
+
+    it('repone saldo y tesorería por el handler inverso del reembolso', async () => {
+      asientosGenerator.generarAsientoReversaReembolsoSaldoFavor.mockResolvedValue({ id: 'asiento-refund-reversa' } as any);
+      await (listener as any).handleSaldoFavorReembolsoRevertido({
+        event_id: 'evt-saldo-refund-reversa-466',
+        event_data: {
+          tenantId: 'tenant-001', fecha: '2026-08-10', monto: 20,
+          montoPasivo: 74, montoTesoreria: 76, diferenciaCambio: 2,
+          medio: 'CAJA', referencia: 'REV-SALDO-1',
+        },
+      });
+      expect(
+        asientosGenerator.generarAsientoReversaReembolsoSaldoFavor,
+      ).toHaveBeenCalledWith(expect.objectContaining({
+        medio: 'CAJA', montoPasivo: 74, montoTesoreria: 76,
+        diferenciaCambio: 2, event_id: 'evt-saldo-refund-reversa-466',
+      }));
+      expect(asientosGenerator.generarAsientoReembolsoSaldoFavor).not.toHaveBeenCalled();
+    });
+
+    it('revierte un ajuste CxC sin simular cobro ni tocar el asiento de NC', async () => {
+      asientosGenerator.generarAsientoReversaAjusteCxc.mockResolvedValue({ id: 'asiento-ajuste-reversa' } as any);
+      await (listener as any).handleAjusteCxcRevertido({
+        event_id: 'evt-ajuste-reversa-466',
+        event_data: {
+          tenantId: 'tenant-001', fecha: '2026-08-10', monto: 18,
+          montoContabilizado: 18, tipoMovimiento: 'RETENCION',
+          referencia: 'F001-1', eventoOriginalId: 'evt-ajuste-original-465',
+        },
+      });
+      expect((listener as any).verificarAsientoCreado).toHaveBeenCalledWith(
+        'tenant-001', 'evt-ajuste-original-465',
+      );
+      expect(asientosGenerator.generarAsientoReversaAjusteCxc).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipoMovimiento: 'RETENCION', montoContabilizado: 18,
+          event_id: 'evt-ajuste-reversa-466',
+        }),
+      );
+      expect(asientosGenerator.generarAsientoCobro).not.toHaveBeenCalled();
+      expect(asientosGenerator.generarAsientoNotaCredito).not.toHaveBeenCalled();
     });
   });
 });

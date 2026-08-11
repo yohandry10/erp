@@ -118,8 +118,9 @@ export class UserManagementController {
   async deleteUser(
     @CurrentTenant() tenantId: string,
     @Param('id') userId: string,
+    @CurrentUser('id') actorId?: string,
   ) {
-    await this.userManagementService.deleteUser(tenantId, userId);
+    await this.userManagementService.deleteUser(tenantId, userId, actorId);
     return { message: 'Usuario eliminado exitosamente' };
   }
 
@@ -136,8 +137,9 @@ export class UserManagementController {
   async activateUser(
     @CurrentTenant() tenantId: string,
     @Param('id') userId: string,
+    @CurrentUser('id') actorId?: string,
   ) {
-    return this.userManagementService.activateUser(tenantId, userId);
+    return this.userManagementService.activateUser(tenantId, userId, actorId);
   }
 
   /**
@@ -153,8 +155,9 @@ export class UserManagementController {
   async deactivateUser(
     @CurrentTenant() tenantId: string,
     @Param('id') userId: string,
+    @CurrentUser('id') actorId?: string,
   ) {
-    return this.userManagementService.deactivateUser(tenantId, userId);
+    return this.userManagementService.deactivateUser(tenantId, userId, actorId);
   }
 
   /**
@@ -163,8 +166,8 @@ export class UserManagementController {
    */
   @Post(':id/reset-password')
   @RequirePermission('users.manage') // HARDENING: resetear contraseñas.
-  @ApiOperation({ summary: 'Resetear contraseña', description: 'Genera un token de reseteo de contraseña para el usuario' })
-  @ApiResponse({ status: 200, description: 'Token de reseteo generado exitosamente' })
+  @ApiOperation({ summary: 'Resetear contraseña', description: 'Genera y envía una solicitud de reseteo sin exponer el token en la respuesta' })
+  @ApiResponse({ status: 200, description: 'Solicitud de reseteo generada exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
@@ -173,7 +176,7 @@ export class UserManagementController {
     @Param('id') userId: string,
     @CurrentUser('id') currentUserId?: string,
   ) {
-    return this.userManagementService.resetPassword(tenantId, userId);
+    return this.userManagementService.resetPassword(tenantId, userId, currentUserId);
   }
 
   /**
@@ -210,8 +213,9 @@ export class UserManagementController {
     @CurrentTenant() tenantId: string,
     @Param('id') userId: string,
     @Body() assignRolesDto: AssignRolesDto,
+    @CurrentUser('id') actorId?: string,
   ) {
-    await this.userManagementService.assignRoles(tenantId, userId, assignRolesDto.roleIds);
+    await this.userManagementService.assignRoles(tenantId, userId, assignRolesDto.roleIds, actorId);
     return { message: 'Roles asignados exitosamente' };
   }
 
@@ -230,8 +234,9 @@ export class UserManagementController {
     @CurrentTenant() tenantId: string,
     @Param('id') userId: string,
     @Param('roleId') roleId: string,
+    @CurrentUser('id') actorId?: string,
   ) {
-    await this.userManagementService.removeRoles(tenantId, userId, [roleId]);
+    await this.userManagementService.removeRoles(tenantId, userId, [roleId], actorId);
     return { message: 'Rol removido exitosamente' };
   }
 

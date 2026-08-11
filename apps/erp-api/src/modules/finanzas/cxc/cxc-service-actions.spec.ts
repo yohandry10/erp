@@ -5,7 +5,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
-import { AplicarNotaCreditoDto, TipoMovimientoCxc } from './dto';
+import { AplicarNotaCreditoDto } from './dto';
 
 describe('CxcService - acciones complementarias', () => {
   let service: CxcService;
@@ -66,60 +66,68 @@ describe('CxcService - acciones complementarias', () => {
   });
 
   describe('aplicarNotaCredito', () => {
-    it('delega en registrarPago con los metadatos de nota de crédito', async () => {
-      const registrarPagoSpy = jest
-        .spyOn(service, 'registrarPago')
-        .mockResolvedValue({ success: true, data: { id: 'pago-001' } as any });
+    it('crea la nota fiscal referenciada mediante la RPC atómica 472', async () => {
+      jest.spyOn(service, 'obtenerCuentaPorCobrar').mockResolvedValue({
+        id: 'cxc-1',
+        documento_id: '11111111-1111-4111-8111-111111111111',
+      } as any);
+      mockSupabaseClient.rpc = jest.fn().mockResolvedValue({
+        data: { documento_id: 'nota-doc-1', cpe_id: 'nota-cpe-1' },
+        error: null,
+      });
 
       const dto: AplicarNotaCreditoDto = {
         monto: 150,
         fecha_emision: '2025-10-10',
-        serie: 'NC01',
-        numero: '000123',
-        documento_id: 'nc-uuid-1',
+        motivo: 'Ajuste comercial documentado',
+        codigo_motivo: '10',
+        idempotency_key: 'cxc-note:test-1',
       };
 
-      await service.aplicarNotaCredito('tenant-1', 'cxc-1', dto, 'user-1');
-
-      expect(registrarPagoSpy).toHaveBeenCalledWith(
-        'tenant-1',
-        'cxc-1',
-        expect.objectContaining({
-          monto: dto.monto,
-          fecha_pago: dto.fecha_emision,
-          metodo_pago: 'NOTA_CREDITO',
-          tipo: TipoMovimientoCxc.NOTA_CREDITO,
-          idempotency_key: `cxc.nota_credito:tenant-1:${dto.documento_id}`,
-        }),
-        'user-1',
+      const result = await service.aplicarNotaCredito(
+        'tenant-1', 'cxc-1', dto, '22222222-2222-4222-8222-222222222222',
       );
+
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_nota_referenciada_tx',
+        {
+          p_tenant_id: 'tenant-1',
+          p_actor_id: '22222222-2222-4222-8222-222222222222',
+          p_documento_origen_id: '11111111-1111-4111-8111-111111111111',
+          p_tipo_documento: '07',
+          p_codigo_motivo: '10',
+          p_motivo: 'Ajuste comercial documentado',
+          p_monto_total: 150,
+          p_idempotency_key: 'cxc-note:test-1',
+        },
+      );
+      expect(result).toEqual({
+        success: true,
+        data: { documento_id: 'nota-doc-1', cpe_id: 'nota-cpe-1' },
+      });
     });
 
-    it('genera idempotency key basada en serie-numero cuando no hay documento_id', async () => {
-      const registrarPagoSpy = jest
-        .spyOn(service, 'registrarPago')
-        .mockResolvedValue({ success: true, data: { id: 'pago-002' } as any });
-
+    it('falla cerrado sin actor, documento origen o llave idempotente', async () => {
       const dto: AplicarNotaCreditoDto = {
         monto: 99.9,
         fecha_emision: '2025-10-11',
-        serie: 'NC02',
-        numero: '000001',
         motivo: 'Ajuste',
+        idempotency_key: 'cxc-note:test-2',
       };
 
-      await service.aplicarNotaCredito('tenant-2', 'cxc-2', dto);
+      await expect(
+        service.aplicarNotaCredito('tenant-2', 'cxc-2', dto),
+      ).rejects.toThrow('actor autenticado');
 
-      expect(registrarPagoSpy).toHaveBeenCalledWith(
-        'tenant-2',
-        'cxc-2',
-        expect.objectContaining({
-          metodo_pago: 'NOTA_CREDITO',
-          tipo: TipoMovimientoCxc.NOTA_CREDITO,
-          idempotency_key: 'cxc.nota_credito:tenant-2:NC02-000001',
-        }),
-        undefined,
-      );
+      jest.spyOn(service, 'obtenerCuentaPorCobrar').mockResolvedValue({
+        id: 'cxc-2', documento_id: null,
+      } as any);
+      await expect(
+        service.aplicarNotaCredito(
+          'tenant-2', 'cxc-2', dto, '33333333-3333-4333-8333-333333333333',
+        ),
+      ).rejects.toThrow('documento fiscal origen');
+      expect(mockSupabaseClient.rpc).toBeUndefined();
     });
   });
 
@@ -127,24 +135,10 @@ describe('CxcService - acciones complementarias', () => {
     const tenantId = 'tenant-xyz';
     const cuentaId = 'cxc-xyz';
 
-    it('actualiza fecha de vencimiento y registra auditoría', async () => {
-      const cuentaAntes = { fecha_vencimiento: '2025-01-10' };
+    it('delega la reprogramación a una única RPC atómica', async () => {
       const cuentaDespues = { id: cuentaId, fecha_vencimiento: '2099-12-31' };
-
-      const obtenerSpy = jest
-        .spyOn(service, 'obtenerCuentaPorCobrar')
-        .mockResolvedValueOnce(cuentaAntes as any)
-        .mockResolvedValueOnce(cuentaDespues as any);
-
-      const updateEq2 = jest.fn().mockResolvedValue({ error: null });
-      const updateEq1 = jest.fn().mockReturnValue({ eq: updateEq2 });
-      const updateMock = jest.fn().mockReturnValue({ eq: updateEq1 });
-
-      mockSupabaseClient.from.mockImplementation((table: string) => {
-        if (table === 'cuentas_por_cobrar') {
-          return { update: updateMock };
-        }
-        throw new Error(`Unexpected table ${table}`);
+      mockSupabaseClient.rpc = jest.fn().mockResolvedValue({
+        data: { cuenta: cuentaDespues, idempotent: false }, error: null,
       });
 
       const result = await service.reprogramarCuentaPorCobrar(
@@ -156,32 +150,14 @@ describe('CxcService - acciones complementarias', () => {
           comentarios: 'Aprobado por tesorería',
         },
         'user-99',
+        'reprogramacion-cxc-001',
       );
-
-      expect(obtenerSpy).toHaveBeenCalledTimes(2);
-      expect(updateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          fecha_vencimiento: '2099-12-31',
-          dias_mora: 0,
-        }),
-      );
-      expect(updateEq1).toHaveBeenCalledWith('tenant_id', tenantId);
-      expect(updateEq2).toHaveBeenCalledWith('id', cuentaId);
-      expect(auditService.registrarCambio).toHaveBeenCalledWith(
-        'cuentas_por_cobrar',
-        'UPDATE',
-        'user-99',
-        expect.objectContaining({
-          old: { fecha_vencimiento: cuentaAntes.fecha_vencimiento },
-          new: expect.objectContaining({ fecha_vencimiento: '2099-12-31' }),
-        }),
-        tenantId,
-        cuentaId,
-        expect.objectContaining({
-          accion: 'REPROGRAMAR_VENCIMIENTO',
-          motivo: 'Extensión de plazo',
-        }),
-      );
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('reprogramar_cxc_tx', expect.objectContaining({
+        p_tenant_id: tenantId, p_cxc_id: cuentaId, p_actor_id: 'user-99',
+        p_idempotency_key: 'reprogramacion-cxc-001',
+      }));
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+      expect(auditService.registrarCambio).not.toHaveBeenCalled();
       expect(result).toEqual({
         success: true,
         data: cuentaDespues,
@@ -189,9 +165,9 @@ describe('CxcService - acciones complementarias', () => {
     });
 
     it('lanza excepción cuando la fecha es inválida', async () => {
-      jest
-        .spyOn(service, 'obtenerCuentaPorCobrar')
-        .mockResolvedValueOnce({ fecha_vencimiento: '2025-01-10' } as any);
+      mockSupabaseClient.rpc = jest.fn().mockResolvedValue({
+        data: null, error: { message: 'invalid input syntax for type date' },
+      });
 
       await expect(
         service.reprogramarCuentaPorCobrar(

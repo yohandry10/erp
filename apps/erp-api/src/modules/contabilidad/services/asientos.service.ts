@@ -615,35 +615,6 @@ export class AsientosService {
     return { totalDebe, totalHaber };
   }
 
-  private async insertarDetalles(
-    asientoId: string,
-    detalles: Array<{
-      cuenta_id: string;
-      debe: number;
-      haber: number;
-      concepto: string;
-      centro_costo_id?: string;
-    }>
-  ): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('detalle_asientos')
-      .insert(
-        detalles.map(detalle => ({
-          asiento_id: asientoId,
-          cuenta_id: detalle.cuenta_id,
-          debe: detalle.debe,
-          haber: detalle.haber,
-          concepto: detalle.concepto,
-          centro_costo_id: detalle.centro_costo_id
-        }))
-      );
-
-    if (error) {
-      throw new Error(`Error creando detalles del asiento: ${error.message}`);
-    }
-  }
-
   /**
    * Obtiene estadísticas de asientos generados por tipo
    * @param tenantId - ID del tenant

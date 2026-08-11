@@ -27,6 +27,7 @@ export function ValidationStep() {
       ])
 
       const certificateValid = !!certificateResponse?.data?.isValid
+      const certificateConfigured = certificateResponse?.data?.isConfigured === true
       const rucValid = !!rucResponse?.data?.isValid
 
       if (certificateValid && rucValid) {
@@ -34,6 +35,7 @@ export function ValidationStep() {
           hasSavedProgressRef.current = true
           await saveStepProgress('validation', {
             certificateValid: true,
+            certificateConfigured,
             rucValid: true,
             validatedAt: new Date().toISOString(),
             certificateMetadata: certificateResponse?.data?.certificate,
@@ -69,6 +71,7 @@ export function ValidationStep() {
   const certificateResult = state.validationResults.certificate
   const rucResult = state.validationResults.ruc
 
+  const certificateConfigured = certificateResult?.isConfigured === true
   const allValid = certificateResult?.isValid && rucResult?.isValid
 
   return (
@@ -120,8 +123,10 @@ export function ValidationStep() {
           {/* Certificate Validation Result */}
           <div className="p-5 rounded-lg">
             <div className="flex items-center gap-3 mb-3">
-              {certificateResult?.isValid ? (
+              {certificateConfigured ? (
                 <CheckCircle size={24} className="text-[var(--success-600)]" />
+              ) : certificateResult?.isValid ? (
+                <AlertTriangle size={24} className="text-[var(--warning-600)]" />
               ) : (
                 <XCircle size={24} className="text-[var(--error-600)]" />
               )}
@@ -130,7 +135,7 @@ export function ValidationStep() {
               </h4>
             </div>
 
-            {certificateResult?.isValid ? (
+            {certificateResult?.isValid && certificateConfigured ? (
               <div className="pl-8">
                 <p className="text-[0.875rem] text-[var(--success-700)] mt-0 mr-0 mb-2 ml-0">
                   ✓ Certificado válido y activo
@@ -170,6 +175,12 @@ export function ValidationStep() {
                     ))}
                   </div>
                 )}
+              </div>
+            ) : certificateResult?.isValid ? (
+              <div className="pl-8">
+                <p className="m-0 text-[0.875rem] text-[var(--warning-700)]">
+                  Emisión electrónica pendiente (opcional). El ERP puede operar y podrás cargar tu certificado después.
+                </p>
               </div>
             ) : (
               <div className="pl-8">
@@ -251,7 +262,7 @@ export function ValidationStep() {
       {allValid && (
         <div className="mt-6 p-4 bg-[rgba(16,_185,_129,_0.1)] rounded-lg border">
           <p className="text-[0.875rem] text-[var(--success-700)] m-0 leading-6">
-            <strong>✓ Todo listo:</strong> Puedes continuar al siguiente paso para finalizar la configuración.
+            <strong>✓ ERP listo:</strong> Puedes finalizar ahora. La integración fiscal se habilita sólo con los datos que aporte tu empresa.
           </p>
         </div>
       )}

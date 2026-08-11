@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Put,
@@ -15,7 +16,7 @@ import { RequirePermission } from '../../../common/decorators/require-permission
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { BancosService } from './bancos.service';
-import { CrearCuentaBancariaDto, ActualizarCuentaBancariaDto, ListarMovimientosQueryDto, CrearMovimientoBancarioDto } from './dto';
+import { CrearCuentaBancariaDto, ActualizarCuentaBancariaDto, ListarMovimientosQueryDto, CrearMovimientoBancarioDto, TransferirCuentasBancariasDto } from './dto';
 
 @ApiTags('Finanzas - Bancos')
 @ApiBearerAuth()
@@ -66,8 +67,9 @@ export class BancosController {
     @Body() crearCuentaDto: CrearCuentaBancariaDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.bancosService.crearCuentaBancaria(tenantId, crearCuentaDto, user?.id);
+    return this.bancosService.crearCuentaBancaria(tenantId, crearCuentaDto, user?.id, idempotencyKey);
   }
 
   @Put('cuentas/:id')
@@ -84,8 +86,9 @@ export class BancosController {
     @Body() actualizarCuentaDto: ActualizarCuentaBancariaDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.bancosService.actualizarCuentaBancaria(tenantId, id, actualizarCuentaDto, user?.id);
+    return this.bancosService.actualizarCuentaBancaria(tenantId, id, actualizarCuentaDto, user?.id, idempotencyKey);
   }
 
   @Get('cuentas/:id/movimientos')
@@ -119,7 +122,18 @@ export class BancosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
-    return this.bancosService.crearMovimientoBancario(tenantId, crearMovimientoDto, user?.id);
+    return this.bancosService.registrarMovimientoBancarioAtomico(tenantId, crearMovimientoDto, user?.id);
+  }
+
+  @Post('transferencias')
+  @RequirePermission('finanzas.bancos.gestionar')
+  @ApiOperation({ summary: 'Transferir fondos entre dos cuentas como par inseparable' })
+  async transferirEntreCuentas(
+    @Body() dto: TransferirCuentasBancariasDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.bancosService.transferirEntreCuentas(tenantId, dto, user?.id);
   }
 
   @Get('saldos')

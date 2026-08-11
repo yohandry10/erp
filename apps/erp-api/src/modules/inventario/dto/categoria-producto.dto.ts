@@ -2,6 +2,7 @@ import { PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  Equals,
   IsArray,
   IsBoolean,
   IsIn,
@@ -43,6 +44,11 @@ export class CampoExtraProductoDto {
 
 export class CreateCategoriaProductoDto {
   @IsString()
+  @MinLength(8)
+  @MaxLength(180)
+  idempotency_key!: string;
+
+  @IsString()
   @MinLength(1)
   @MaxLength(120)
   nombre!: string;
@@ -71,7 +77,12 @@ export class CreateCategoriaProductoDto {
 }
 
 export class UpdateCategoriaProductoDto extends PartialType(CreateCategoriaProductoDto) {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(180)
+  idempotency_key!: string;
+
   @IsOptional()
-  @IsBoolean()
-  activo?: boolean;
+  @Equals(true, { message: 'La desactivación requiere DELETE y su permiso específico' })
+  activo?: true;
 }

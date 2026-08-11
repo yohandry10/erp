@@ -16,5 +16,15 @@ BEGIN
      OR NOT has_function_privilege('service_role', v_evidencia, 'EXECUTE') THEN
     RAISE EXCEPTION 'service_role necesita ejecutar los puentes RPC PLAME';
   END IF;
+  IF has_function_privilege('service_role',
+       'app.guardar_rrhh_peru_presentacion_tx(uuid,uuid,jsonb)', 'EXECUTE')
+     OR has_function_privilege('service_role',
+       'app.registrar_rrhh_peru_evidencia_tx(uuid,uuid,uuid,text,text,text,timestamp with time zone)', 'EXECUTE')
+     OR has_table_privilege('service_role',
+       'public.rrhh_peru_presentaciones_planilla', 'INSERT')
+     OR has_table_privilege('service_role',
+       'public.rrhh_peru_presentaciones_planilla', 'UPDATE') THEN
+    RAISE EXCEPTION 'Los writers internos PLAME no quedaron cerrados';
+  END IF;
 END
 $$;

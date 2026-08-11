@@ -1,4 +1,16 @@
-import { IsUUID, IsArray, IsOptional, IsString, IsNumber, IsEnum, ValidateNested, Min } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -15,7 +27,7 @@ export class ItemRecepcionDto {
 
   @ApiProperty({ description: 'Cantidad recibida' })
   @IsNumber()
-  @Min(0)
+  @Min(0.01)
   cantidad_recibida: number;
 
   @ApiProperty({ description: 'Calidad de la recepción', enum: CalidadRecepcion })
@@ -60,9 +72,19 @@ export class CreateRecepcionDto {
 
   @ApiProperty({ description: 'Items recibidos', type: [ItemRecepcionDto] })
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => ItemRecepcionDto)
   items: ItemRecepcionDto[];
+
+  @ApiProperty({
+    description: 'Clave estable para reintentar la creación sin duplicar la recepción',
+    example: 'recepcion:550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  idempotency_key: string;
 
   @ApiPropertyOptional({ description: 'Observaciones generales de la recepción' })
   @IsOptional()

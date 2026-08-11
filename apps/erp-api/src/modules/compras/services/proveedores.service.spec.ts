@@ -1,422 +1,199 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ProveedoresService } from './proveedores.service';
 import { ProveedoresRepository } from '../repositories/proveedores.repository';
-import { CreateProveedorDto, CondicionesPago } from '../dto/create-proveedor.dto';
-import { UpdateProveedorDto } from '../dto/update-proveedor.dto';
-import { AuditService } from '../../audit/audit.service';
+import { CondicionesPago, CreateProveedorDto } from '../dto/create-proveedor.dto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
-describe('ProveedoresService', () => {
+describe('ProveedoresService - contrato maestro atómico 459', () => {
   let service: ProveedoresService;
   let repository: jest.Mocked<ProveedoresRepository>;
+  let client: any;
   let countryCode: 'PE' | 'AR' | 'CO';
 
-  const mockProveedor = {
-    id: 'test-id-123',
-    tenant_id: 'tenant-123',
+  const proveedor = {
+    id: 'proveedor-1',
+    tenant_id: 'tenant-1',
     ruc: '20100070970',
-    razon_social: 'Test Company SAC',
-    nombre_comercial: 'Test Company',
-    direccion: 'Av. Test 123',
-    telefono: '987654321',
-    email: 'contacto@testcompany.com',
-    contacto: 'Juan Perez',
-    condiciones_pago: 'CONTADO',
-    limite_credito: 10000,
-    dias_credito: 30,
-    estado: 'ACTIVO',
+    razon_social: 'Proveedor Demo SAC',
+    email: 'proveedor@demo.test',
     activo: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+  };
+
+  const validDto: CreateProveedorDto = {
+    ruc: '20100070970',
+    razon_social: 'Proveedor Demo SAC',
+    email: 'proveedor@demo.test',
+    condiciones_pago: CondicionesPago.CONTADO,
+    limite_credito: 1000,
+    dias_credito: 30,
   };
 
   beforeEach(async () => {
     countryCode = 'PE';
-    const mockRepository = {
+    client = {
+      rpc: jest.fn(),
+      from: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockImplementation(async () => ({
+        data: { pais: countryCode },
+        error: null,
+      })),
+    };
+    const repositoryMock = {
       findAll: jest.fn(),
       findById: jest.fn(),
       findByRuc: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      softDelete: jest.fn()
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProveedoresService,
-        {
-          provide: ProveedoresRepository,
-          useValue: mockRepository
-        },
-        {
-          provide: AuditService,
-          useValue: {
-            registrarCambio: jest.fn().mockResolvedValue(undefined),
-          },
-        },
+        { provide: ProveedoresRepository, useValue: repositoryMock },
         {
           provide: SupabaseService,
-          useValue: {
-            getClient: () => ({
-              from: () => ({
-                select: () => ({
-                  eq: () => ({
-                    maybeSingle: async () => ({ data: { pais: countryCode }, error: null }),
-                  }),
-                }),
-              }),
-            }),
-          },
+          useValue: { getClient: jest.fn(() => client) },
         },
-      ]
+      ],
     }).compile();
 
-    service = module.get<ProveedoresService>(ProveedoresService);
+    service = module.get(ProveedoresService);
     repository = module.get(ProveedoresRepository);
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  afterEach(() => jest.clearAllMocks());
+
+  it('mantiene las lecturas tenant-scoped en el repositorio', async () => {
+    repository.findAll.mockResolvedValue([proveedor] as any);
+    repository.findById.mockResolvedValue(proveedor as any);
+    repository.findByRuc.mockResolvedValue(proveedor as any);
+
+    await expect(service.findAll('tenant-1', { activo: true })).resolves.toEqual([proveedor]);
+    await expect(service.findById('proveedor-1', 'tenant-1')).resolves.toEqual(proveedor);
+    await expect(service.findByRuc('20100070970', 'tenant-1')).resolves.toEqual(proveedor);
+
+    expect(repository.findAll).toHaveBeenCalledWith('tenant-1', { activo: true });
+    expect(repository.findById).toHaveBeenCalledWith('proveedor-1', 'tenant-1');
+    expect(repository.findByRuc).toHaveBeenCalledWith('20100070970', 'tenant-1');
   });
 
-  describe('findAll', () => {
-    it('should return all proveedores for a tenant', async () => {
-      const proveedores = [mockProveedor];
-      repository.findAll.mockResolvedValue(proveedores);
-
-      const result = await service.findAll('tenant-123');
-
-      expect(result).toEqual(proveedores);
-      expect(repository.findAll).toHaveBeenCalledWith('tenant-123', undefined);
-    });
-
-    it('should apply filters when provided', async () => {
-      const filters = { activo: true, search: 'Test' };
-      repository.findAll.mockResolvedValue([mockProveedor]);
-
-      await service.findAll('tenant-123', filters);
-
-      expect(repository.findAll).toHaveBeenCalledWith('tenant-123', filters);
-    });
+  it('rechaza una lectura inexistente', async () => {
+    repository.findById.mockResolvedValue(null as any);
+    await expect(service.findById('missing', 'tenant-1')).rejects.toThrow(NotFoundException);
   });
 
-  describe('findById', () => {
-    it('should return a proveedor by id', async () => {
-      repository.findById.mockResolvedValue(mockProveedor);
+  it('crea mediante una única RPC con actor, tenant y payload validado', async () => {
+    client.rpc.mockResolvedValue({ data: { ...proveedor, idempotent: false }, error: null });
 
-      const result = await service.findById('test-id-123', 'tenant-123');
+    await expect(service.create(validDto, 'tenant-1', 'user-1')).resolves.toMatchObject(proveedor);
 
-      expect(result).toEqual(mockProveedor);
-      expect(repository.findById).toHaveBeenCalledWith('test-id-123', 'tenant-123');
+    expect(client.rpc).toHaveBeenCalledWith('crear_proveedor_maestro_tx', {
+      p_tenant_id: 'tenant-1',
+      p_actor_id: 'user-1',
+      p_proveedor: { ...validDto, documento_tipo: 'RUC' },
     });
-
-    it('should throw NotFoundException when proveedor not found', async () => {
-      repository.findById.mockResolvedValue(null);
-
-      await expect(service.findById('non-existent', 'tenant-123'))
-        .rejects.toThrow(NotFoundException);
-    });
+    expect(repository.findByRuc).not.toHaveBeenCalled();
   });
 
-  describe('findByRuc', () => {
-    it('should return a proveedor by RUC', async () => {
-      repository.findByRuc.mockResolvedValue(mockProveedor);
-
-      const result = await service.findByRuc('20100070970', 'tenant-123');
-
-      expect(result).toEqual(mockProveedor);
-      expect(repository.findByRuc).toHaveBeenCalledWith('20100070970', 'tenant-123');
-    });
+  it('exige actor para crear', async () => {
+    await expect(service.create(validDto, 'tenant-1')).rejects.toThrow(BadRequestException);
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 
-  describe('create', () => {
-    const validDto: CreateProveedorDto = {
-      ruc: '20100070970',
-      razon_social: 'Test Company SAC',
-      email: 'contacto@testcompany.com',
-      condiciones_pago: CondicionesPago.CONTADO,
-      limite_credito: 10000,
-      dias_credito: 30
-    };
+  it('normaliza y valida NIT colombiano antes de la RPC', async () => {
+    countryCode = 'CO';
+    client.rpc.mockResolvedValue({ data: { ...proveedor, ruc: '900123456-8' }, error: null });
 
-    it('should create a proveedor with valid data', async () => {
-      repository.findByRuc.mockResolvedValue(null);
-      repository.create.mockResolvedValue(mockProveedor);
+    await service.create({ ...validDto, ruc: '9001234568' }, 'tenant-1', 'user-1');
 
-      const result = await service.create(validDto, 'tenant-123');
+    expect(client.rpc).toHaveBeenCalledWith(
+      'crear_proveedor_maestro_tx',
+      expect.objectContaining({
+        p_proveedor: expect.objectContaining({
+          ruc: '900123456-8',
+          documento_tipo: 'NIT',
+        }),
+      }),
+    );
+  });
 
-      expect(result).toEqual(mockProveedor);
-      expect(repository.findByRuc).toHaveBeenCalledWith('20100070970', 'tenant-123');
-      expect(repository.create).toHaveBeenCalledWith(validDto, 'tenant-123', undefined);
-    });
+  it.each([
+    [{ ...validDto, ruc: '123' }, 'identidad fiscal inválida'],
+    [{ ...validDto, email: 'sin-arroba' }, 'email inválido'],
+    [{ ...validDto, limite_credito: -1 }, 'crédito negativo'],
+  ])('rechaza %s antes de escribir (%s)', async (dto) => {
+    await expect(service.create(dto as CreateProveedorDto, 'tenant-1', 'user-1'))
+      .rejects.toThrow(BadRequestException);
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
 
-    it('should throw ConflictException when RUC already exists', async () => {
-      repository.findByRuc.mockResolvedValue(mockProveedor);
+  it('actualiza mediante una única RPC sin writer fragmentado', async () => {
+    client.rpc.mockResolvedValue({ data: { ...proveedor, razon_social: 'Editado SAC' }, error: null });
 
-      await expect(service.create(validDto, 'tenant-123'))
-        .rejects.toThrow(ConflictException);
-    });
+    const result = await service.update(
+      'proveedor-1',
+      { razon_social: 'Editado SAC', email: 'editado@demo.test' },
+      'tenant-1',
+      'user-1',
+    );
 
-    it('should throw BadRequestException for invalid RUC (not numeric)', async () => {
-      const invalidDto = { ...validDto, ruc: '2012345678A' };
-
-      await expect(service.create(invalidDto, 'tenant-123'))
-        .rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException for invalid RUC length', async () => {
-      const invalidDto = { ...validDto, ruc: '123456' };
-
-      await expect(service.create(invalidDto, 'tenant-123'))
-        .rejects.toThrow(BadRequestException);
-    });
-
-    it('should accept valid Peru RUC (11 digits)', async () => {
-      repository.findByRuc.mockResolvedValue(null);
-      repository.create.mockResolvedValue(mockProveedor);
-
-      await service.create(validDto, 'tenant-123');
-
-      expect(repository.create).toHaveBeenCalled();
-    });
-
-    it('should reject an incomplete tax identifier', async () => {
-      const colombiaDto = { ...validDto, ruc: '123456789' };
-      repository.findByRuc.mockResolvedValue(null);
-
-      await expect(service.create(colombiaDto, 'tenant-123'))
-        .rejects.toThrow(BadRequestException);
-    });
-
-    it('should validate and persist a Colombia NIT with verification digit', async () => {
-      countryCode = 'CO';
-      repository.findByRuc.mockResolvedValue(null);
-      repository.create.mockImplementation(async (dto: any) => ({ ...mockProveedor, ...dto }));
-
-      const result = await service.create({ ...validDto, ruc: '9001234568' }, 'tenant-123');
-
-      expect(repository.findByRuc).toHaveBeenCalledWith('900123456-8', 'tenant-123');
-      expect(repository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ ruc: '900123456-8' }),
-        'tenant-123',
-        undefined,
-      );
-      expect(result.ruc).toBe('900123456-8');
-    });
-
-    it('should throw BadRequestException for invalid email', async () => {
-      const invalidDto = { ...validDto, email: 'invalid-email' };
-
-      await expect(service.create(invalidDto, 'tenant-123'))
-        .rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException for negative limite_credito', async () => {
-      const invalidDto = { ...validDto, limite_credito: -1000 };
-
-      await expect(service.create(invalidDto, 'tenant-123'))
-        .rejects.toThrow(BadRequestException);
-    });
-
-    it('should accept zero limite_credito', async () => {
-      const dtoWithZero = { ...validDto, limite_credito: 0 };
-      repository.findByRuc.mockResolvedValue(null);
-      repository.create.mockResolvedValue({ ...mockProveedor, limite_credito: 0 });
-
-      await service.create(dtoWithZero, 'tenant-123');
-
-      expect(repository.create).toHaveBeenCalled();
+    expect(result.razon_social).toBe('Editado SAC');
+    expect(client.rpc).toHaveBeenCalledWith('actualizar_proveedor_maestro_tx', {
+      p_proveedor_id: 'proveedor-1',
+      p_tenant_id: 'tenant-1',
+      p_actor_id: 'user-1',
+      p_cambios: { razon_social: 'Editado SAC', email: 'editado@demo.test' },
     });
   });
 
-  describe('update', () => {
-    const updateDto: UpdateProveedorDto = {
-      razon_social: 'Updated Company SAC',
-      email: 'updated@testcompany.com'
-    };
-
-    it('should update a proveedor', async () => {
-      repository.findById.mockResolvedValue(mockProveedor);
-      repository.update.mockResolvedValue({ ...mockProveedor, ...updateDto });
-
-      const result = await service.update('test-id-123', updateDto, 'tenant-123');
-
-      expect(result.razon_social).toBe(updateDto.razon_social);
-      expect(repository.findById).toHaveBeenCalledWith('test-id-123', 'tenant-123');
-      expect(repository.update).toHaveBeenCalledWith('test-id-123', updateDto, 'tenant-123');
+  it('mapea colisión de identidad a ConflictException', async () => {
+    client.rpc.mockResolvedValue({
+      data: null,
+      error: { code: '23505', message: 'COMMERCIAL_SUPPLIER_IDENTITY_CONFLICT' },
     });
 
-    it('should throw NotFoundException when proveedor not found', async () => {
-      repository.findById.mockResolvedValue(null);
+    await expect(service.update(
+      'proveedor-1',
+      { razon_social: 'Editado SAC' },
+      'tenant-1',
+      'user-1',
+    )).rejects.toThrow(ConflictException);
+  });
 
-      await expect(service.update('non-existent', updateDto, 'tenant-123'))
-        .rejects.toThrow(NotFoundException);
+  it('mapea ausencia tenant-scoped a NotFoundException', async () => {
+    client.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0002', message: 'COMMERCIAL_SUPPLIER_NOT_FOUND' },
     });
 
-    it('should validate RUC when updating', async () => {
-      const invalidDto = { ruc: '123' };
-      repository.findById.mockResolvedValue(mockProveedor);
+    await expect(service.update(
+      'missing',
+      { razon_social: 'Editado SAC' },
+      'tenant-1',
+      'user-1',
+    )).rejects.toThrow(NotFoundException);
+  });
 
-      await expect(service.update('test-id-123', invalidDto, 'tenant-123'))
-        .rejects.toThrow(BadRequestException);
+  it('desactiva de forma idempotente mediante RPC y conserva el registro', async () => {
+    client.rpc.mockResolvedValue({
+      data: { ...proveedor, activo: false, idempotent: false },
+      error: null,
     });
 
-    it('should throw ConflictException when updating to existing RUC', async () => {
-      const dtoWithRuc = { ruc: '20987654326' };
-      repository.findById.mockResolvedValue(mockProveedor);
-      repository.findByRuc.mockResolvedValue({ ...mockProveedor, id: 'different-id' });
+    const result = await service.softDelete('proveedor-1', 'tenant-1', 'user-1');
 
-      await expect(service.update('test-id-123', dtoWithRuc, 'tenant-123'))
-        .rejects.toThrow(ConflictException);
-    });
-
-    it('should allow updating to same RUC', async () => {
-      const dtoWithSameRuc = { ruc: '20100070970' };
-      repository.findById.mockResolvedValue(mockProveedor);
-      repository.findByRuc.mockResolvedValue(mockProveedor);
-      repository.update.mockResolvedValue(mockProveedor);
-
-      await service.update('test-id-123', dtoWithSameRuc, 'tenant-123');
-
-      expect(repository.update).toHaveBeenCalled();
-    });
-
-    it('should validate email when updating', async () => {
-      const invalidDto = { email: 'invalid-email' };
-      repository.findById.mockResolvedValue(mockProveedor);
-
-      await expect(service.update('test-id-123', invalidDto, 'tenant-123'))
-        .rejects.toThrow(BadRequestException);
-    });
-
-    it('should validate limite_credito when updating', async () => {
-      const invalidDto = { limite_credito: -500 };
-      repository.findById.mockResolvedValue(mockProveedor);
-
-      await expect(service.update('test-id-123', invalidDto, 'tenant-123'))
-        .rejects.toThrow(BadRequestException);
+    expect(result.activo).toBe(false);
+    expect(client.rpc).toHaveBeenCalledWith('desactivar_proveedor_maestro_tx', {
+      p_proveedor_id: 'proveedor-1',
+      p_tenant_id: 'tenant-1',
+      p_actor_id: 'user-1',
     });
   });
 
-  describe('softDelete', () => {
-    it('should soft delete a proveedor', async () => {
-      repository.findById.mockResolvedValue(mockProveedor);
-      repository.softDelete.mockResolvedValue({ ...mockProveedor, activo: false });
-
-      const result = await service.softDelete('test-id-123', 'tenant-123');
-
-      expect(result.activo).toBe(false);
-      expect(repository.findById).toHaveBeenCalledWith('test-id-123', 'tenant-123');
-      expect(repository.softDelete).toHaveBeenCalledWith('test-id-123', 'tenant-123');
-    });
-
-    it('should throw NotFoundException when proveedor not found', async () => {
-      repository.findById.mockResolvedValue(null);
-
-      await expect(service.softDelete('non-existent', 'tenant-123'))
-        .rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('Email validation', () => {
-    it('should accept valid email formats', async () => {
-      const validEmails = [
-        'test@example.com',
-        'user.name@example.com',
-        'user+tag@example.co.uk',
-        'user_name@sub.example.com'
-      ];
-
-      repository.findByRuc.mockResolvedValue(null);
-      repository.create.mockResolvedValue(mockProveedor);
-
-      for (const email of validEmails) {
-        const dto: CreateProveedorDto = {
-          ruc: '20100070970',
-          razon_social: 'Test',
-          email,
-          condiciones_pago: CondicionesPago.CONTADO,
-          limite_credito: 0,
-          dias_credito: 0
-        };
-
-        await expect(service.create(dto, 'tenant-123')).resolves.toBeDefined();
-      }
-    });
-
-    it('should reject invalid email formats', async () => {
-      const invalidEmails = [
-        'invalid',
-        'invalid@',
-        '@example.com',
-        'invalid@example',
-        'invalid @example.com',
-        ''
-      ];
-
-      for (const email of invalidEmails) {
-        const dto: CreateProveedorDto = {
-          ruc: '20100070970',
-          razon_social: 'Test',
-          email,
-          condiciones_pago: CondicionesPago.CONTADO,
-          limite_credito: 0,
-          dias_credito: 0
-        };
-
-        await expect(service.create(dto, 'tenant-123'))
-          .rejects.toThrow(BadRequestException);
-      }
-    });
-  });
-
-  describe('RUC validation', () => {
-    it('should accept valid RUC formats', async () => {
-      const validRucs = [
-        '20100070970', // Peru (11 digits)
-      ];
-
-      repository.findByRuc.mockResolvedValue(null);
-      repository.create.mockResolvedValue(mockProveedor);
-
-      for (const ruc of validRucs) {
-        const dto: CreateProveedorDto = {
-          ruc,
-          razon_social: 'Test',
-          email: 'test@example.com',
-          condiciones_pago: CondicionesPago.CONTADO,
-          limite_credito: 0,
-          dias_credito: 0
-        };
-
-        await expect(service.create(dto, 'tenant-123')).resolves.toBeDefined();
-      }
-    });
-
-    it('should reject invalid RUC formats', async () => {
-      const invalidRucs = [
-        '123',           // Too short
-        '123456789',     // Colombia NIT length is roadmap, not active
-        '12345678901234', // Too long
-        '2012345678A',   // Contains letters
-        '201234567 89',  // Contains spaces
-        ''               // Empty
-      ];
-
-      for (const ruc of invalidRucs) {
-        const dto: CreateProveedorDto = {
-          ruc,
-          razon_social: 'Test',
-          email: 'test@example.com',
-          condiciones_pago: CondicionesPago.CONTADO,
-          limite_credito: 0,
-          dias_credito: 0
-        };
-
-        await expect(service.create(dto, 'tenant-123'))
-          .rejects.toThrow(BadRequestException);
-      }
-    });
+  it('exige actor para editar y desactivar', async () => {
+    await expect(service.update('proveedor-1', {}, 'tenant-1')).rejects.toThrow(BadRequestException);
+    await expect(service.softDelete('proveedor-1', 'tenant-1')).rejects.toThrow(BadRequestException);
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,6 @@ import { EstadoPedido } from '../src/modules/ventas/pedidos/entities/pedido.enti
 import { PedidosService } from '../src/modules/ventas/pedidos/pedidos.service'
 import { ReportesService } from '../src/modules/ventas/reportes/reportes.service'
 import { TenantMiddleware } from '../src/common/middleware/tenant.middleware'
-import { LogisticaService } from '../src/modules/inventario/logistica/logistica.service'
 import { IntegrationAlertsService } from '../src/modules/notifications/integration-alerts.service'
 import { PedidoLockService } from '../src/shared/locks/pedido-lock.service'
 import { NotificationSeverity, NotificationType } from '../src/modules/notifications/notification.types'
@@ -494,33 +493,6 @@ test('PedidoLockService – permite paralelismo entre pedidos distintos', async 
   )
 
   assert.ok(maxConcurrentes >= 2, 'Debería existir paralelismo entre pedidos distintos')
-})
-
-test('LogisticaService – normalizarItemsDespachados respeta pendientes', () => {
-  const service = new LogisticaService(
-    {} as any,
-    { createNotification: noop } as any,
-    { logAction: noop } as any,
-    new PedidoLockService(),
-    {} as any
-  )
-  const detalle = [
-    { id: 'detalle-1', cantidad: 10, cantidad_despachada: 4 },
-    { id: 'detalle-2', cantidad: 5, cantidad_despachada: 0 }
-  ]
-
-  const planPendiente = (service as any).normalizarItemsDespachados(detalle, ['detalle-1'])
-  assert.strictEqual(planPendiente.get('detalle-1'), 6)
-
-  const planParcial = (service as any).normalizarItemsDespachados(detalle, [
-    { detalle_id: 'detalle-2', cantidad: 3 }
-  ])
-  assert.strictEqual(planParcial.get('detalle-2'), 3)
-
-  const planInvalido = (service as any).normalizarItemsDespachados(detalle, [
-    { detalle_id: 'detalle-2', cantidad: -5 }
-  ])
-  assert.strictEqual(planInvalido.has('detalle-2'), false)
 })
 
 test('Finanzas – Crear CxC y registrar pago con RLS habilitado', async () => {

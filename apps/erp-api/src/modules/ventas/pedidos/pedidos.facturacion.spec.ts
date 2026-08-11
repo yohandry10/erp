@@ -264,7 +264,7 @@ describe('PedidosService (facturación)', () => {
     expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
   });
 
-  it('descuenta stock después de obtener CPE idempotente en flujo simplificado', async () => {
+  it('delega stock, pedido, CPE y outbox a la frontera atómica sin segundo writer', async () => {
     mockSupabaseClient = createMockSupabaseClient({
       empresa_config: {
         single: [
@@ -341,10 +341,19 @@ describe('PedidosService (facturación)', () => {
     const result = await service.generarFactura('pedido-1', 'tenant-1', 'user-1');
 
     expect(result).toEqual({ success: true, factura_id: 'cpe-1', sugerir_gre: false });
-    expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('descontar_stock_y_liberar_reserva', expect.any(Object));
-    expect(
-      cpeIntegrationService.generarFacturaDesdePedido.mock.invocationCallOrder[0],
-    ).toBeLessThan(mockSupabaseClient.rpc.mock.invocationCallOrder[0]);
+    expect(cpeIntegrationService.generarFacturaDesdePedido).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'pedido-1' }),
+      'tenant-1',
+      'ventas.cpe.factura:tenant-1:pedido-1',
+      'user-1',
+    );
+    expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.__spies.update).not.toHaveBeenCalledWith(
+      'pedidos_venta',
+      expect.any(Object),
+    );
+    expect((service as any).eventBus.emitFacturaEmitidaEvent).not.toHaveBeenCalled();
+    expect((service as any).eventBus.emitVentaProcessed).not.toHaveBeenCalled();
   });
 
   it('repara cantidad_facturada al reintentar un pedido que ya tiene factura', async () => {

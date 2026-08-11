@@ -22,6 +22,7 @@ interface CuentaBancaria {
   saldo: number
   permite_sobregiro: boolean
   activa: boolean
+  cuenta_contable_id?: string
 }
 
 export default function EditarCuentaBancariaPage() {
@@ -45,6 +46,8 @@ export default function EditarCuentaBancariaPage() {
   const [tipoCuenta, setTipoCuenta] = useState('CORRIENTE')
   const [permiteSobregiro, setPermiteSobregiro] = useState(false)
   const [activa, setActiva] = useState(true)
+  const [cuentasContables, setCuentasContables] = useState<any[]>([])
+  const [cuentaContableId, setCuentaContableId] = useState('')
 
   const loadCuenta = useCallback(async () => {
     try {
@@ -64,6 +67,7 @@ export default function EditarCuentaBancariaPage() {
         setTipoCuenta(data.tipo_cuenta || 'CORRIENTE')
         setPermiteSobregiro(data.permite_sobregiro || false)
         setActiva(data.activa !== undefined ? data.activa : true)
+        setCuentaContableId(data.cuenta_contable_id || '')
       } else {
         throw new Error('Cuenta bancaria no encontrada')
       }
@@ -80,6 +84,21 @@ export default function EditarCuentaBancariaPage() {
       loadCuenta()
     }
   }, [params.id, loadCuenta])
+
+  useEffect(() => {
+    let active = true
+    get('/api/contabilidad/plan-cuentas')
+      .then((response) => {
+        if (!active) return
+        setCuentasContables((Array.isArray(response?.data) ? response.data : []).filter((row: any) =>
+          String(row.codigo || '').startsWith('10') &&
+          Boolean(row.acepta_movimiento) &&
+          String(row.estado || 'ACTIVO').toUpperCase() === 'ACTIVO',
+        ))
+      })
+      .catch(() => active && setCuentasContables([]))
+    return () => { active = false }
+  }, [get])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -101,6 +120,11 @@ export default function EditarCuentaBancariaPage() {
       return
     }
 
+    if (!cuentaContableId) {
+      setError('Seleccione la cuenta contable bancaria')
+      return
+    }
+
     setSubmitting(true)
 
     try {
@@ -111,6 +135,7 @@ export default function EditarCuentaBancariaPage() {
         tipo_cuenta: tipoCuenta,
         permite_sobregiro: permiteSobregiro,
         activa,
+        cuenta_contable_id: cuentaContableId,
       }
 
       const response = await put(`/api/finanzas/bancos/cuentas/${params.id}`, payload)
@@ -292,6 +317,27 @@ export default function EditarCuentaBancariaPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label htmlFor="bank-ledger-account" className="block text-sm font-medium text-foreground/85 mb-2">
+                    Cuenta contable bancaria *
+                  </label>
+                  <select
+                    id="bank-ledger-account"
+                    value={cuentaContableId}
+                    onChange={(event) => setCuentaContableId(event.target.value)}
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Seleccione</option>
+                    {cuentasContables.map((row) => (
+                      <option key={row.id} value={row.id}>{row.codigo} - {row.nombre}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Esta cuenta se usa como débito o crédito en los asientos bancarios.
+                  </p>
                 </div>
               </div>
             </div>

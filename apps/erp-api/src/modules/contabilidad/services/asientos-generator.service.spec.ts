@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { AsientosGeneratorService } from './asientos-generator.service';
+import { AsientoContable, AsientosGeneratorService } from './asientos-generator.service';
 import { PeriodosService, EstadoPeriodo } from './periodos.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { PlanCuentasService, PlanCuenta } from './plan-cuentas.service';
@@ -83,7 +83,8 @@ describe('AsientosGeneratorService', () => {
         {
           provide: PlanCuentasService,
           useValue: {
-            obtenerCuentasPorCodigos: jest.fn()
+            obtenerCuentasPorCodigos: jest.fn(),
+            buscarCuentaPorCodigoONombre: jest.fn().mockResolvedValue(null)
           }
         }
       ]
@@ -607,6 +608,90 @@ describe('AsientosGeneratorService', () => {
       expect(resultado).toBeDefined();
       expect(resultado.id).toBe('asiento-venta-2');
     });
+
+    it('distribuye una venta POS mixta entre caja, tarjeta y CxC sin tratar todo como contado', async () => {
+      const evento = {
+        tenant_id: 'test-tenant-id',
+        fecha: '2026-08-09',
+        total: 118,
+        base_imponible: 100,
+        igv: 18,
+        monto_pendiente: 30,
+        referencia: 'B001-00000042',
+        es_contado: false,
+        cobros: [
+          { tipo: 'EFECTIVO', monto: 40 },
+          { tipo: 'TARJETA', monto: 48 },
+          { tipo: 'CREDITO', monto: 30 },
+        ],
+      };
+      periodosService.validarPeriodoAbierto.mockResolvedValue();
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['12', createMockPlanCuenta('12', 'Clientes', 'ACTIVO')],
+        ['70', createMockPlanCuenta('70', 'Ventas', 'INGRESO')],
+        ['40', createMockPlanCuenta('40', 'IGV', 'PASIVO')],
+        ['69', createMockPlanCuenta('69', 'Costo de Ventas', 'GASTO')],
+        ['20', createMockPlanCuenta('20', 'Mercaderías', 'ACTIVO')],
+        ['10', createMockPlanCuenta('10', 'Caja y bancos', 'ACTIVO')],
+      ]));
+      planCuentasService.buscarCuentaPorCodigoONombre.mockImplementation(
+        async (_tenantId, criteria: any) =>
+          createMockPlanCuenta(criteria.codigos[0], `Cuenta ${criteria.codigos[0]}`, 'ACTIVO'),
+      );
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { id: 'asiento-pos-mixto', total_debe: 118, total_haber: 118 },
+        error: null,
+      });
+
+      const resultado = await service.generarAsientoVenta(evento);
+
+      expect(resultado.id).toBe('asiento-pos-mixto');
+      const rpc = mockSupabaseClient.rpc.mock.calls.find(
+        ([fn]: [string]) => fn === 'crear_asiento_con_detalles_tx',
+      );
+      expect(rpc?.[1].p_detalles).toEqual(expect.arrayContaining([
+        expect.objectContaining({ cuenta_id: 'cuenta-10111', debe: 40, haber: 0 }),
+        expect.objectContaining({ cuenta_id: 'cuenta-10411', debe: 48, haber: 0 }),
+        expect.objectContaining({ cuenta_id: 'cuenta-12', debe: 30, haber: 0 }),
+        expect.objectContaining({ cuenta_id: 'cuenta-70', debe: 0, haber: 100 }),
+        expect.objectContaining({ cuenta_id: 'cuenta-40', debe: 0, haber: 18 }),
+      ]));
+    });
+  });
+
+  describe('generarAsientoCierreCaja', () => {
+    it('contabiliza un faltante debitando resultado y acreditando la caja física', async () => {
+      periodosService.validarPeriodoAbierto.mockResolvedValue();
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['10', createMockPlanCuenta('10', 'Caja y bancos', 'ACTIVO')],
+        ['65', createMockPlanCuenta('65', 'Otros gastos', 'GASTO')],
+        ['75', createMockPlanCuenta('75', 'Otros ingresos', 'INGRESO')],
+      ]));
+      planCuentasService.buscarCuentaPorCodigoONombre.mockResolvedValue(
+        createMockPlanCuenta('10111', 'Caja principal', 'ACTIVO'),
+      );
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { id: 'asiento-cierre-1', total_debe: 5.25, total_haber: 5.25 },
+        error: null,
+      });
+
+      const resultado = await service.generarAsientoCierreCaja({
+        tenant_id: 'test-tenant-id',
+        fecha: '2026-08-09T18:00:00Z',
+        diferencia: -5.25,
+        referencia: 'CIERRE-CAJA-sesion-1',
+        cuenta_caja_codigo: '10111',
+      });
+
+      expect(resultado?.id).toBe('asiento-cierre-1');
+      const rpc = mockSupabaseClient.rpc.mock.calls.find(
+        ([fn]: [string]) => fn === 'crear_asiento_con_detalles_tx',
+      );
+      expect(rpc?.[1].p_detalles).toEqual(expect.arrayContaining([
+        expect.objectContaining({ cuenta_id: 'cuenta-65', debe: 5.25, haber: 0 }),
+        expect.objectContaining({ cuenta_id: 'cuenta-10111', debe: 0, haber: 5.25 }),
+      ]));
+    });
   });
 
   describe('generarAsientoCobro', () => {
@@ -766,6 +851,121 @@ describe('AsientosGeneratorService', () => {
       const totalDebe = evento.costo + evento.igv;
       expect(totalDebe).toBe(evento.total);
       expect(resultado.total_debe).toBe(totalDebe);
+    });
+  });
+
+  describe('generarAsientoRecepcion', () => {
+    it('clasifica bienes físicos y servicios sin reconocer IGV ni CxP', async () => {
+      const cuentas = new Map([
+        ['20', createMockPlanCuenta('20', 'Mercaderías', 'ACTIVO')],
+        ['63', createMockPlanCuenta('63', 'Servicios', 'GASTO')],
+        ['4699', createMockPlanCuenta('4699', 'Recibido por facturar', 'PASIVO')],
+      ]);
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(cuentas);
+      const asiento = {
+        id: 'asiento-recepcion-mixta',
+        numero_asiento: 'A-202410-0099',
+        total_debe: 180,
+        total_haber: 180,
+      } as any;
+      const generarSpy = jest.spyOn(service, 'generarAsiento').mockResolvedValue(asiento);
+
+      await expect(service.generarAsientoRecepcion({
+        tenant_id: 'test-tenant-id',
+        fecha: '2024-10-15',
+        costo: 180,
+        mercaderia: 50,
+        servicios: 100,
+        no_stock: 30,
+        referencia: 'REC-001',
+        event_id: 'evt-recepcion-mixta',
+      })).resolves.toEqual(asiento);
+
+      expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith(
+        'test-tenant-id',
+        ['4699', '20', '63'],
+      );
+      expect(generarSpy).toHaveBeenCalledWith(
+        'test-tenant-id',
+        new Date('2024-10-15'),
+        'Recepción pendiente de factura',
+        [
+          expect.objectContaining({ cuenta_id: 'cuenta-20', debe: 50, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-63', debe: 130, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-4699', debe: 0, haber: 180 }),
+        ],
+        'REC-001',
+        'evt-recepcion-mixta',
+      );
+    });
+
+    it('rechaza una clasificación cuyo total no coincide con el costo aceptado', async () => {
+      await expect(service.generarAsientoRecepcion({
+        tenant_id: 'test-tenant-id',
+        fecha: '2024-10-15',
+        costo: 100,
+        mercaderia: 40,
+        servicios: 30,
+        no_stock: 20,
+      })).rejects.toThrow('no coincide con el costo');
+      expect(planCuentasService.obtenerCuentasPorCodigos).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generarAsientoDevolucionProveedor', () => {
+    it('revierte CxP, mercadería, servicios e IGV con la clasificación durable', async () => {
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['42', createMockPlanCuenta('42', 'Proveedores', 'PASIVO')],
+        ['20', createMockPlanCuenta('20', 'Mercaderías', 'ACTIVO')],
+        ['63', createMockPlanCuenta('63', 'Servicios', 'GASTO')],
+        ['40', createMockPlanCuenta('40', 'IGV', 'ACTIVO')],
+      ]));
+      const asiento = { id: 'asiento-dev-450', total_debe: 271.4, total_haber: 271.4 } as any;
+      const generarSpy = jest.spyOn(service, 'generarAsiento').mockResolvedValue(asiento);
+
+      await service.generarAsientoDevolucionProveedor({
+        tenant_id: 'test-tenant-id', fecha: '2024-10-15', subtotal: 230,
+        igv: 41.4, total: 271.4, mercaderia: 100, servicios: 100,
+        no_stock: 30, cuenta_pasivo: '42', referencia: 'DEV-450', event_id: 'evt-dev-450',
+      });
+
+      expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith(
+        'test-tenant-id', ['42', '20', '63', '40'],
+      );
+      expect(generarSpy).toHaveBeenCalledWith(
+        'test-tenant-id', new Date('2024-10-15'), 'Devolución a proveedor',
+        [
+          expect.objectContaining({ cuenta_id: 'cuenta-42', debe: 271.4, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-20', debe: 0, haber: 100 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-63', debe: 0, haber: 130 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-40', debe: 0, haber: 41.4 }),
+        ],
+        'DEV-450', 'evt-dev-450',
+      );
+    });
+
+    it('sin factura revierte recibido por facturar y no inventa crédito fiscal', async () => {
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['4699', createMockPlanCuenta('4699', 'Recibido por facturar', 'PASIVO')],
+        ['20', createMockPlanCuenta('20', 'Mercaderías', 'ACTIVO')],
+      ]));
+      const asiento = { id: 'asiento-dev-sin-cxp', total_debe: 50, total_haber: 50 } as any;
+      const generarSpy = jest.spyOn(service, 'generarAsiento').mockResolvedValue(asiento);
+
+      await service.generarAsientoDevolucionProveedor({
+        tenant_id: 'test-tenant-id', fecha: '2024-10-15', subtotal: 50,
+        igv: 0, total: 50, mercaderia: 50, cuenta_pasivo: '4699',
+        referencia: 'DEV-SIN-CXP', event_id: 'evt-dev-sin-cxp',
+      });
+
+      expect(generarSpy).toHaveBeenCalledWith(
+        'test-tenant-id', new Date('2024-10-15'), 'Devolución a proveedor',
+        [
+          expect.objectContaining({ cuenta_id: 'cuenta-4699', debe: 50, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-20', debe: 0, haber: 50 }),
+        ],
+        'DEV-SIN-CXP', 'evt-dev-sin-cxp',
+      );
     });
   });
 
@@ -1654,6 +1854,240 @@ describe('AsientosGeneratorService', () => {
         expect(error).toBeInstanceOf(BadRequestException);
         expect(error.message).toContain('CERRADO');
       }
+    });
+  });
+
+  describe('movimientos laborales de liquidaciones y CTS', () => {
+    it.each([
+      ['generarAsientoDevengoLiquidacion', '621', '411'],
+      ['generarAsientoPagoLiquidacion', '411', '10'],
+      ['generarAsientoReversaPagoLiquidacion', '10', '411'],
+      ['generarAsientoDepositoCts', '621', '10'],
+    ])('%s genera un asiento cuadrado e idempotente', async (metodo, debeCodigo, haberCodigo) => {
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        [debeCodigo, createMockPlanCuenta(debeCodigo, `Cuenta ${debeCodigo}`)],
+        [haberCodigo, createMockPlanCuenta(haberCodigo, `Cuenta ${haberCodigo}`)],
+      ]));
+      const generarAsientoSpy = jest.spyOn(service, 'generarAsiento').mockResolvedValue({ id: 'asiento-laboral' } as any);
+
+      await (service as any)[metodo]({
+        tenant_id: 'tenant-rrhh',
+        fecha: '2026-08-09',
+        monto: 1250.45,
+        referencia: 'RRHH-1',
+        source_event_id: 'event-rrhh-1',
+      });
+
+      expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith(
+        'tenant-rrhh',
+        [debeCodigo, haberCodigo],
+      );
+      expect(generarAsientoSpy).toHaveBeenCalledWith(
+        'tenant-rrhh',
+        expect.any(Date),
+        expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({ cuenta_id: `cuenta-${debeCodigo}`, debe: 1250.45, haber: 0 }),
+          expect.objectContaining({ cuenta_id: `cuenta-${haberCodigo}`, debe: 0, haber: 1250.45 }),
+        ]),
+        'RRHH-1',
+        'event-rrhh-1',
+      );
+    });
+  });
+
+  describe('asientos bancarios 457', () => {
+    it('contabiliza ABONO y CARGO con las cuentas postables congeladas', async () => {
+      const cuentaBanco = createMockPlanCuenta('10411', 'Banco principal');
+      const cuentaContrapartida = createMockPlanCuenta('7599', 'Otros ingresos', 'INGRESO');
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['10411', cuentaBanco],
+        ['7599', cuentaContrapartida],
+      ]));
+      const generar = jest.spyOn(service, 'generarAsiento').mockResolvedValue({
+        id: 'asiento-banco-1',
+      } as AsientoContable);
+
+      await service.generarAsientoMovimientoBancario({
+        tenant_id: 'test-tenant-id',
+        event_id: 'evt-bank-abono',
+        accountingHandledByOutbox: true,
+        tipo: 'ABONO',
+        monto: 37.5,
+        montoOrigen: 37.5,
+        tipoCambio: 1,
+        cuentaBancoId: cuentaBanco.id,
+        cuentaBancoCodigo: '10411',
+        cuentaContrapartidaId: cuentaContrapartida.id,
+        cuentaContrapartidaCodigo: '7599',
+        fecha: '2026-08-09',
+        descripcion: 'Interés bancario',
+        referencia: 'BANCO-ABONO-1',
+      });
+
+      expect(generar).toHaveBeenCalledWith(
+        'test-tenant-id',
+        expect.any(Date),
+        'Interés bancario',
+        [
+          expect.objectContaining({ cuenta_id: cuentaBanco.id, debe: 37.5, haber: 0 }),
+          expect.objectContaining({ cuenta_id: cuentaContrapartida.id, debe: 0, haber: 37.5 }),
+        ],
+        'BANCO-ABONO-1',
+        'evt-bank-abono',
+      );
+
+      generar.mockClear();
+      await service.generarAsientoMovimientoBancario({
+        tenant_id: 'test-tenant-id',
+        event_id: 'evt-bank-cargo',
+        accountingHandledByOutbox: true,
+        tipo: 'CARGO',
+        monto: 12.5,
+        montoOrigen: 12.5,
+        tipoCambio: 1,
+        cuentaBancoId: cuentaBanco.id,
+        cuentaBancoCodigo: '10411',
+        cuentaContrapartidaId: cuentaContrapartida.id,
+        cuentaContrapartidaCodigo: '7599',
+        fecha: '2026-08-09',
+        descripcion: 'Comisión bancaria',
+        referencia: 'BANCO-CARGO-1',
+      });
+      expect(generar).toHaveBeenCalledWith(
+        'test-tenant-id',
+        expect.any(Date),
+        'Comisión bancaria',
+        [
+          expect.objectContaining({ cuenta_id: cuentaContrapartida.id, debe: 12.5, haber: 0 }),
+          expect.objectContaining({ cuenta_id: cuentaBanco.id, debe: 0, haber: 12.5 }),
+        ],
+        'BANCO-CARGO-1',
+        'evt-bank-cargo',
+      );
+    });
+
+    it('contabiliza transferencia Dr destino / Cr origen y rechaza payload alterado', async () => {
+      const cuentaOrigen = createMockPlanCuenta('10411', 'Banco origen');
+      const cuentaDestino = createMockPlanCuenta('10412', 'Banco destino');
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['10411', cuentaOrigen],
+        ['10412', cuentaDestino],
+      ]));
+      const generar = jest.spyOn(service, 'generarAsiento').mockResolvedValue({
+        id: 'asiento-transfer-1',
+      } as AsientoContable);
+      const payload = {
+        tenant_id: 'test-tenant-id',
+        event_id: 'evt-transfer-1',
+        accountingHandledByOutbox: true,
+        monto: 100,
+        montoOrigen: 25,
+        tipoCambio: 4,
+        cuentaOrigenContableId: cuentaOrigen.id,
+        cuentaOrigenCodigo: '10411',
+        cuentaDestinoContableId: cuentaDestino.id,
+        cuentaDestinoCodigo: '10412',
+        fecha: '2026-08-09',
+        referencia: 'TRANSFER-1',
+      };
+
+      await service.generarAsientoTransferenciaBancaria(payload);
+      expect(generar).toHaveBeenCalledWith(
+        'test-tenant-id',
+        expect.any(Date),
+        'Transferencia entre cuentas bancarias',
+        [
+          expect.objectContaining({ cuenta_id: cuentaDestino.id, debe: 100, haber: 0 }),
+          expect.objectContaining({ cuenta_id: cuentaOrigen.id, debe: 0, haber: 100 }),
+        ],
+        'TRANSFER-1',
+        'evt-transfer-1',
+      );
+
+      await expect(service.generarAsientoTransferenciaBancaria({
+        ...payload,
+        event_id: 'evt-transfer-corrupta',
+        monto: 99,
+      })).rejects.toThrow('valuación local');
+    });
+  });
+
+  describe('ajustes fiscales de proveedor 465', () => {
+    it('genera la factura compuesta y acredita sólo el saldo neto al proveedor', async () => {
+      const codigos = ['4699', '40', '42', '40113', '40114', '421', '422'];
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map(
+        codigos.map((codigo) => [codigo, createMockPlanCuenta(codigo, `Cuenta ${codigo}`)]),
+      ));
+      const generar = jest.spyOn(service, 'generarAsiento').mockResolvedValue({ id: 'asiento-fp-465' } as any);
+
+      await service.generarAsientoFacturaProveedor({
+        tenant_id: 'test-tenant-id',
+        fecha: '2026-08-10',
+        subtotal: 100,
+        igv: 18,
+        total: 118,
+        saldoProveedor: 87,
+        ajustes: { retencion: 3, percepcion: 2, detraccion: 10, anticipo: 20 },
+        recepcion_id: 'recepcion-1',
+        referencia: 'F001-20',
+        event_id: 'evt-fp-465',
+      });
+
+      expect(generar).toHaveBeenCalledWith(
+        'test-tenant-id',
+        expect.any(Date),
+        'Factura de proveedor',
+        expect.arrayContaining([
+          expect.objectContaining({ cuenta_id: 'cuenta-4699', debe: 100, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-40', debe: 18, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-40113', debe: 2, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-42', debe: 0, haber: 87 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-40114', debe: 0, haber: 3 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-421', debe: 0, haber: 10 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-422', debe: 0, haber: 20 }),
+        ]),
+        'F001-20',
+        'evt-fp-465',
+      );
+    });
+
+    it('rechaza una factura cuyo saldo no cuadra con sus ajustes', async () => {
+      await expect(service.generarAsientoFacturaProveedor({
+        tenant_id: 'test-tenant-id',
+        fecha: '2026-08-10', subtotal: 100, igv: 18, total: 118,
+        saldoProveedor: 100,
+        ajustes: { retencion: 3, percepcion: 2, detraccion: 10, anticipo: 20 },
+      })).rejects.toThrow('saldo');
+      expect(planCuentasService.obtenerCuentasPorCodigos).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['RETENCION', '42', '40114'],
+      ['PERCEPCION', '40113', '42'],
+      ['DETRACCION', '42', '421'],
+      ['ANTICIPO', '42', '422'],
+    ])('genera ajuste CxP %s sin usar banco', async (tipo, debe, haber) => {
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        [debe, createMockPlanCuenta(debe, `Cuenta ${debe}`)],
+        [haber, createMockPlanCuenta(haber, `Cuenta ${haber}`)],
+      ]));
+      const generar = jest.spyOn(service, 'generarAsiento').mockResolvedValue({ id: `asiento-${tipo}` } as any);
+
+      await service.generarAsientoAjusteCxp({
+        tenant_id: 'test-tenant-id', fecha: '2026-08-10',
+        tipoMovimiento: tipo, montoContabilizado: 25,
+        referencia: `AJ-${tipo}`, event_id: `evt-${tipo}`,
+      });
+
+      expect(generar).toHaveBeenCalledWith(
+        'test-tenant-id', expect.any(Date), expect.any(String),
+        [
+          expect.objectContaining({ cuenta_id: `cuenta-${debe}`, debe: 25, haber: 0 }),
+          expect.objectContaining({ cuenta_id: `cuenta-${haber}`, debe: 0, haber: 25 }),
+        ],
+        `AJ-${tipo}`, `evt-${tipo}`,
+      );
     });
   });
 

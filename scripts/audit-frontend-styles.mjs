@@ -12,7 +12,7 @@ function read(file) {
 
 function walk(dir, out = []) {
   for (const name of fs.readdirSync(dir)) {
-    if (skipDirs.has(name)) continue;
+    if (skipDirs.has(name) || name.startsWith('.next-')) continue;
     const fullPath = path.join(dir, name);
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {

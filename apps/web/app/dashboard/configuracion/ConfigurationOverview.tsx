@@ -39,6 +39,11 @@ interface ConfigurationStatus {
     isConfigured: boolean
     missingFields?: string[]
   }
+  fiscal?: {
+    isEnabled: boolean
+    isReady: boolean
+    missingItems?: string[]
+  }
 }
 
 interface EmpresaConfig {
@@ -273,11 +278,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
               !!empresa?.dianResolucionNumero &&
               !!empresa?.dianResolucionPrefijo)
           : ose?.verificacion?.valid === true && ose?.configuracion?.certificateExists === true,
-      fiscal: isArgentina
-        ? empresa?.monedaDefecto === 'ARS' && !!empresa?.arcaCondicionIva
-        : isColombia
-          ? empresa?.monedaDefecto === 'COP' && !!empresa?.dianRegimenFiscal
-          : !!empresa?.regimen && empresa?.emisionCpeModo !== '',
+      fiscal: status?.fiscal?.isReady === true,
       sales: isArgentina
         ? !!empresa?.arcaPuntoVenta && !!empresa?.arcaCondicionIva
         : isColombia
@@ -304,15 +305,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
           detalle: `Súbelo emitido a nombre del ${documentoFiscal} con el que vas a facturar.`,
         }
 
-  const operationalChecks = [
-    checks.ruc,
-    checks.certificate,
-    checks.ose,
-    checks.fiscal,
-    checks.sales,
-    checks.logistics,
-    checks.labor,
-  ]
+  const operationalChecks = [checks.ruc, checks.sales, checks.logistics, checks.labor]
   const operationalReadiness = Math.round(
     (operationalChecks.filter(Boolean).length / operationalChecks.length) * 100,
   )
@@ -368,7 +361,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         <div>
           <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Configuración operativa</h1>
           <p className="mt-2 text-base text-muted-foreground">
-            Estado real de empresa, certificado, emisión fiscal, ventas, logística y RRHH por país.
+            El ERP operativo se evalúa separado de la emisión fiscal, que usa exclusivamente los datos del cliente.
           </p>
         </div>
         <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50" onClick={() => loadConfiguration(true)} disabled={refreshing}>
@@ -411,7 +404,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
           </div>
           <div className="stat-content">
             <h3>{operationalReadiness}%</h3>
-            <p>Preparación operativa</p>
+            <p>Preparación del ERP</p>
           </div>
         </div>
         <div className="relative flex h-full min-h-36 flex-col overflow-hidden rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-ring/50 hover:shadow-lg">
@@ -433,7 +426,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             <Settings className="h-6 w-6" />
           </div>
           <div className="stat-content">
-            <h3>{checks.ose ? 'Operativo' : 'Revisar'}</h3>
+            <h3>{status?.fiscal?.isReady ? 'Listo' : status?.fiscal?.isEnabled ? 'Revisar' : 'Opcional'}</h3>
             <p>{autoridadFiscal}{isArgentina ? ' WSAA/WSFE' : isColombia ? ' UBL/CUFE' : '/OSE'}</p>
           </div>
         </div>
@@ -592,14 +585,25 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         )}
       </div>
 
-      {!status?.isDemo && !!status?.missingItems?.length && (
+        {!status?.isDemo && !!status?.missingItems?.length && (
         <div className="relative mt-4 rounded-2xl border border-primary/30 bg-primary/10 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           <h2 className="m-0 mb-2 text-base font-semibold text-primary">Pendientes detectados por backend</h2>
           <ul className="m-0 list-disc pl-5 text-foreground/85">
             {status.missingItems.map(item => <li key={item}>{item}</li>)}
           </ul>
         </div>
-      )}
+        )}
+        {!status?.isDemo && !!status?.fiscal?.missingItems?.length && (
+          <div className="relative mt-4 rounded-2xl border border-border bg-muted/40 p-4 text-card-foreground shadow-sm">
+            <h2 className="m-0 mb-2 text-base font-semibold text-foreground">Emisión fiscal (opcional)</h2>
+            <p className="mb-2 text-sm text-muted-foreground">
+              Estos datos no bloquean el ERP. Son necesarios únicamente cuando la empresa decida transmitir electrónicamente.
+            </p>
+            <ul className="m-0 list-disc pl-5 text-foreground/85">
+              {status.fiscal.missingItems.map(item => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+        )}
     </div>
   )
 }

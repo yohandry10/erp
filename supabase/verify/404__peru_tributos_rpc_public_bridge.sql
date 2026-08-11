@@ -20,5 +20,16 @@ BEGIN
       RAISE EXCEPTION 'service_role necesita ejecutar el puente RPC tributario %', v_function;
     END IF;
   END LOOP;
+
+  IF has_function_privilege('service_role',
+       'app.guardar_tributo_mensual_tx(uuid,uuid,jsonb)', 'EXECUTE')
+     OR has_function_privilege('service_role',
+       'app.guardar_tributo_anual_tx(uuid,uuid,jsonb)', 'EXECUTE')
+     OR has_table_privilege('service_role',
+       'public.tributos_declaraciones_mensuales', 'INSERT')
+     OR has_table_privilege('service_role',
+       'public.tributos_declaraciones_anuales', 'UPDATE') THEN
+    RAISE EXCEPTION 'Los writers tributarios internos no quedaron cerrados';
+  END IF;
 END
 $$;

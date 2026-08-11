@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
 import {
   CrearAjusteConsolidacionDto,
   CrearGrupoConsolidacionDto,
@@ -191,7 +192,15 @@ export class ConsolidacionReportesService {
     userId: string,
     grupoId: string,
     dto: RegistrarTasaConsolidacionDto,
+    idempotencyKey?: string,
   ) {
+    const key=idempotencyKey?.trim()||`consolidation-rate:${createHash('sha256').update(JSON.stringify({tenantId,userId,grupoId,dto})).digest('hex')}`;
+    const {data,error}=await this.client.rpc('gestionar_consolidacion_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_grupo_id:grupoId,p_accion:'RATE',p_payload:dto,p_idempotency_key:key,
+    });
+    if(error)this.dbError('Error registrando tasa de consolidación',error);
+    return data;
+    /* Writer legacy inalcanzable: la RPC 484 es la única frontera de mutación.
     const grupo = await this.exigirControladora(tenantId, grupoId);
     await this.exigirMiembroActivo(grupoId, dto.tenant_miembro_id);
 
@@ -228,6 +237,7 @@ export class ConsolidacionReportesService {
       .single();
     if (error) this.dbError('Error registrando tasa de consolidación', error);
     return data;
+    */
   }
 
   async registrarMapeoCuenta(
@@ -235,7 +245,30 @@ export class ConsolidacionReportesService {
     userId: string,
     grupoId: string,
     dto: RegistrarMapeoCuentaConsolidacionDto,
+    idempotencyKey?: string,
   ) {
+    await this.exigirControladora(tenantId, grupoId);
+    await this.exigirMiembroActivo(grupoId, dto.tenant_miembro_id);
+    if (dto.tenant_miembro_id === tenantId) {
+      throw new BadRequestException('La controladora ya usa el plan de cuentas de presentación.');
+    }
+    const [cuentaOrigen, cuentaDestino] = await Promise.all([
+      this.buscarCuenta(dto.tenant_miembro_id, dto.cuenta_codigo_origen.trim()),
+      this.buscarCuenta(tenantId, dto.cuenta_codigo_destino.trim()),
+    ]);
+    if (!cuentaOrigen) {
+      throw new NotFoundException(`La cuenta origen ${dto.cuenta_codigo_origen.trim()} no existe en la empresa miembro.`);
+    }
+    if (!cuentaDestino) {
+      throw new NotFoundException(`La cuenta destino ${dto.cuenta_codigo_destino.trim()} no existe en la controladora.`);
+    }
+    const key=idempotencyKey?.trim()||`consolidation-map:${createHash('sha256').update(JSON.stringify({tenantId,userId,grupoId,dto})).digest('hex')}`;
+    const {data,error}=await this.client.rpc('gestionar_consolidacion_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_grupo_id:grupoId,p_accion:'ACCOUNT_MAP',p_payload:dto,p_idempotency_key:key,
+    });
+    if(error)this.dbError('Error guardando mapeo de cuentas',error);
+    return data;
+    /* Writer legacy inalcanzable: la RPC 484 valida miembro y cuentas bajo lock.
     await this.exigirControladora(tenantId, grupoId);
     await this.exigirMiembroActivo(grupoId, dto.tenant_miembro_id);
     if (dto.tenant_miembro_id === tenantId) {
@@ -270,6 +303,7 @@ export class ConsolidacionReportesService {
       .single();
     if (error) this.dbError('Error guardando mapeo de cuentas', error);
     return data;
+    */
   }
 
   async crearAjuste(
@@ -277,7 +311,20 @@ export class ConsolidacionReportesService {
     userId: string,
     grupoId: string,
     dto: CrearAjusteConsolidacionDto,
+    idempotencyKey?: string,
   ) {
+    const debe = Number(dto.debe || 0);
+    const haber = Number(dto.haber || 0);
+    if ((debe > 0) === (haber > 0)) {
+      throw new BadRequestException('El ajuste debe tener importe en debe o en haber, pero no en ambos.');
+    }
+    const key=idempotencyKey?.trim()||`consolidation-adjustment:${createHash('sha256').update(JSON.stringify({tenantId,userId,grupoId,dto})).digest('hex')}`;
+    const {data,error}=await this.client.rpc('gestionar_consolidacion_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_grupo_id:grupoId,p_accion:'ADJUSTMENT',p_payload:dto,p_idempotency_key:key,
+    });
+    if(error)this.dbError('Error creando ajuste de consolidación',error);
+    return data;
+    /* Writer legacy inalcanzable: la RPC 484 valida importes y cuenta en la misma transacción.
     await this.exigirControladora(tenantId, grupoId);
     const debe = Number(dto.debe || 0);
     const haber = Number(dto.haber || 0);
@@ -302,6 +349,7 @@ export class ConsolidacionReportesService {
       .single();
     if (error) this.dbError('Error creando ajuste de consolidación', error);
     return data;
+    */
   }
 
   async listarReportes(tenantId: string) {

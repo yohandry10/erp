@@ -438,20 +438,13 @@ export class CashFraudDetectionService {
         anomalias: Anomalia[],
         tenantId: string,
     ): Promise<void> {
-        const registros = anomalias.map((anomalia) => ({
-            evento: 'ANOMALIA_DETECTADA',
-            sesion_caja_id: sesionId,
-            parametros: {
-                tipo: anomalia.tipo,
-                severidad: anomalia.severidad,
-                descripcion: anomalia.descripcion,
-                detalles: anomalia.detalles,
-            },
-            resultado: 'DETECTADO',
-            tenant_id: tenantId,
-        }));
-
-        await this.supabase.getClient().from('caja_audit_log').insert(registros);
+        // Este analizador no está registrado como provider y permanece
+        // read-only. Las alertas durables deben publicarse por una frontera de
+        // auditoría explícita con actor/idempotencia; no se inserta una bitácora
+        // huérfana desde un detector auxiliar.
+        this.logger.warn(
+            `Anomalías detectadas sin writer lateral: tenant=${tenantId}, sesión=${sesionId}, cantidad=${anomalias.length}`,
+        );
     }
 
     /**

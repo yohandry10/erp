@@ -1,263 +1,166 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { CxpService } from './cxp.service';
-import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 import { TesoreriaService } from '../tesoreria/tesoreria.service';
+import { CxpService } from './cxp.service';
 
-describe('CxpService - PagoProveedorRegistrado Event Emission', () => {
+describe('CxpService - delegación exclusiva al writer de tesorería', () => {
+  const tenantId = '11111111-1111-4111-8111-111111111111';
+  const cxpId = '22222222-2222-4222-8222-222222222222';
+  const userId = '33333333-3333-4333-8333-333333333333';
+  const cuentaBancariaId = '44444444-4444-4444-8444-444444444444';
+  const sesionCajaId = '55555555-5555-4555-8555-555555555555';
+
   let service: CxpService;
-  let eventBusService: EventBusService;
-  let supabaseService: SupabaseService;
-
-  const mockSupabaseClient = {
-    from: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    insert: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    single: jest.fn(),
-    maybeSingle: jest.fn(),
-  };
+  let tesoreria: { registrarPago: jest.Mock };
+  let eventBus: { emitPagoProveedorRegistrado: jest.Mock; emitFacturaProveedorRegistrada: jest.Mock };
+  let supabase: { getClient: jest.Mock };
 
   beforeEach(async () => {
+    tesoreria = { registrarPago: jest.fn() };
+    eventBus = {
+      emitPagoProveedorRegistrado: jest.fn(),
+      emitFacturaProveedorRegistrada: jest.fn(),
+    };
+    supabase = { getClient: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CxpService,
-        {
-          provide: SupabaseService,
-          useValue: {
-            getClient: jest.fn(() => mockSupabaseClient),
-          },
-        },
-        {
-          provide: EventBusService,
-          useValue: {
-            emitPagoProveedorRegistrado: jest.fn(),
-            emitFacturaProveedorRegistrada: jest.fn(),
-          },
-        },
+        { provide: SupabaseService, useValue: supabase },
+        { provide: EventBusService, useValue: eventBus },
         {
           provide: RetencionesValidationService,
           useValue: {
-            obtenerConfiguracionEmpresa: jest.fn().mockResolvedValue({}),
-            validarCalculoAjustes: jest.fn().mockResolvedValue({ valido: true, errores: [] }),
-            validarMontoPendiente: jest.fn().mockReturnValue({ valido: true, montoEsperado: 0 }),
+            obtenerConfiguracionEmpresa: jest.fn(),
+            validarCalculoAjustes: jest.fn(),
+            validarMontoPendiente: jest.fn(),
           },
         },
-        {
-          provide: TesoreriaService,
-          useValue: null,
-        },
+        { provide: TesoreriaService, useValue: tesoreria },
       ],
     }).compile();
 
-    service = module.get<CxpService>(CxpService);
-    eventBusService = module.get<EventBusService>(EventBusService);
-    supabaseService = module.get<SupabaseService>(SupabaseService);
+    service = module.get(CxpService);
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  it('delega una sola vez todos los datos del pago bancario y conserva la respuesta atómica', async () => {
+    const writerResult = {
+      success: true,
+      data: {
+        cxp: { id: cxpId, estado: 'PARCIAL', saldo: 500 },
+        pago: { pago_id: '66666666-6666-4666-8666-666666666666' },
+        movimiento_bancario: { id: '77777777-7777-4777-8777-777777777777' },
+        valuacion: { diferencia_cambio: 25 },
+      },
+    };
+    tesoreria.registrarPago.mockResolvedValue(writerResult);
 
-  describe('aplicarPago', () => {
-    it('should emit PagoProveedorRegistrado event when payment is applied successfully', async () => {
-      // Arrange
-      const tenantId = 'tenant-123';
-      const cxpId = 'cxp-456';
-      const userId = 'user-789';
-
-      const mockCxp = {
-        id: cxpId,
-        estado: 'PENDIENTE',
-        saldo: 1000,
-        total: 1000,
-        moneda: 'PEN',
-        proveedor_id: 'prov-001',
-        numero_documento: 'F001-00001',
-      };
-
-      const mockCuentaBancaria = {
-        id: 'cuenta-001',
-        nombre: 'Cuenta BCP',
-        saldo: 5000,
-        moneda: 'PEN',
-        permite_sobregiro: false,
-        activa: true,
-      };
-
-      const mockCxpActualizada = {
-        ...mockCxp,
-        saldo: 500,
-        estado: 'PARCIAL',
-        ultimo_pago: '2025-10-25',
-        updated_at: new Date().toISOString(),
-      };
-
-      const pagoDto = {
+    const result = await service.aplicarPago(
+      tenantId,
+      cxpId,
+      {
         monto: 500,
-        fecha_pago: '2025-10-25',
+        fecha_pago: '2026-08-09',
         metodo_pago: 'TRANSFERENCIA',
-        cuenta_bancaria_id: 'cuenta-001',
-        referencia: 'REF-001',
+        cuenta_bancaria_id: cuentaBancariaId,
+        referencia: 'OP-CXP-001',
         observaciones: 'Pago parcial',
-      };
+        idempotency_key: 'cxp-intento-001',
+      },
+      userId,
+    );
 
-      // Mock Supabase responses
-      mockSupabaseClient.maybeSingle
-        .mockResolvedValueOnce({ data: mockCxp, error: null }) // Get CxP
-        .mockResolvedValueOnce({ data: mockCuentaBancaria, error: null }); // Get cuenta bancaria
-
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({ data: mockCxpActualizada, error: null }); // Update CxP
-
-      // Act
-      await service.aplicarPago(tenantId, cxpId, pagoDto, userId);
-
-      // Assert
-      expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalledTimes(1);
-      expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantId,
-          eventId: expect.any(String),
-          idempotencyKey: expect.any(String),
-          cxpId,
-          pagoId: expect.any(String),
-          proveedorId: 'prov-001',
-          proveedorNombre: 'prov-001',
-          numeroDocumento: 'F001-00001',
-          monto: 500,
-          moneda: 'PEN',
-          fecha: '2025-10-25',
-          metodoPago: 'TRANSFERENCIA',
-          cuentaBancariaId: 'cuenta-001',
-          cuentaBancariaNombre: 'Cuenta BCP',
-          referencia: 'REF-001',
-          observaciones: 'Pago parcial',
-          saldoAnterior: 1000,
-          saldoNuevo: 500,
-          estadoAnterior: 'PENDIENTE',
-          estadoNuevo: 'PARCIAL',
-          createdBy: userId,
-          cuentaSaldoAnterior: 5000,
-          cuentaSaldoNuevo: 4500,
-          source: 'cxp.aplicarPago',
-        }),
-      );
-    });
-
-    it('should emit event with PAGADA status when payment completes the balance', async () => {
-      // Arrange
-      const tenantId = 'tenant-123';
-      const cxpId = 'cxp-456';
-
-      const mockCxp = {
-        id: cxpId,
-        estado: 'PARCIAL',
-        saldo: 500,
-        total: 1000,
-        moneda: 'PEN',
-        proveedor_id: 'prov-001',
-        numero_documento: 'F001-00001',
-      };
-
-      const mockCxpActualizada = {
-        ...mockCxp,
-        saldo: 0,
-        estado: 'PAGADA',
-        ultimo_pago: '2025-10-25',
-        updated_at: new Date().toISOString(),
-      };
-
-      const pagoDto = {
+    expect(tesoreria.registrarPago).toHaveBeenCalledTimes(1);
+    expect(tesoreria.registrarPago).toHaveBeenCalledWith(
+      tenantId,
+      {
+        cxp_id: cxpId,
         monto: 500,
-        fecha_pago: '2025-10-25',
-        metodo_pago: 'EFECTIVO',
-      };
-
-      // Mock Supabase responses
-      mockSupabaseClient.maybeSingle
-        .mockResolvedValueOnce({ data: mockCxp, error: null });
-
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({ data: mockCxpActualizada, error: null });
-
-      // Act
-      await service.aplicarPago(tenantId, cxpId, pagoDto);
-
-      // Assert
-      expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalledTimes(1);
-      expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantId,
-          eventId: expect.any(String),
-          idempotencyKey: expect.any(String),
-          cxpId,
-          pagoId: expect.any(String),
-          estadoAnterior: 'PARCIAL',
-          estadoNuevo: 'PAGADA',
-          saldoAnterior: 500,
-          saldoNuevo: 0,
-          proveedorNombre: 'prov-001',
-          cuentaBancariaId: null,
-          cuentaBancariaNombre: null,
-          cuentaSaldoAnterior: null,
-          cuentaSaldoNuevo: null,
-          source: 'cxp.aplicarPago',
-        })
-      );
-    });
-
-    it('should not fail the operation if event emission fails', async () => {
-      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
-      // Arrange
-      const tenantId = 'tenant-123';
-      const cxpId = 'cxp-456';
-
-      const mockCxp = {
-        id: cxpId,
-        estado: 'PENDIENTE',
-        saldo: 1000,
-        total: 1000,
-        moneda: 'PEN',
-        proveedor_id: 'prov-001',
-        numero_documento: 'F001-00001',
-      };
-
-      const mockCxpActualizada = {
-        ...mockCxp,
-        saldo: 500,
-        estado: 'PARCIAL',
-        ultimo_pago: '2025-10-25',
-        updated_at: new Date().toISOString(),
-      };
-
-      const pagoDto = {
-        monto: 500,
-        fecha_pago: '2025-10-25',
+        fecha_pago: '2026-08-09',
         metodo_pago: 'TRANSFERENCIA',
-      };
+        cuenta_bancaria_id: cuentaBancariaId,
+        sesion_caja_id: undefined,
+        referencia: 'OP-CXP-001',
+        observaciones: 'Pago parcial',
+        idempotency_key: 'cxp-intento-001',
+      },
+      userId,
+    );
+    expect(result).toBe(writerResult);
+    expect(supabase.getClient).not.toHaveBeenCalled();
+    expect(eventBus.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
+  });
 
-      // Mock Supabase responses
-      mockSupabaseClient.maybeSingle
-        .mockResolvedValueOnce({ data: mockCxp, error: null });
+  it('propaga sesión de caja e idempotencia para pagos en efectivo', async () => {
+    tesoreria.registrarPago.mockResolvedValue({ success: true, data: {} });
 
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({ data: mockCxpActualizada, error: null });
+    await service.aplicarPago(
+      tenantId,
+      cxpId,
+      {
+        monto: 100,
+        fecha_pago: '2026-08-09',
+        metodo_pago: 'EFECTIVO',
+        sesion_caja_id: sesionCajaId,
+        idempotency_key: 'cxp-efectivo-001',
+      },
+      userId,
+    );
 
-      // Mock event emission failure
-      (eventBusService.emitPagoProveedorRegistrado as jest.Mock).mockImplementation(() => {
-        throw new Error('Event bus error');
-      });
+    expect(tesoreria.registrarPago).toHaveBeenCalledWith(
+      tenantId,
+      expect.objectContaining({
+        sesion_caja_id: sesionCajaId,
+        idempotency_key: 'cxp-efectivo-001',
+      }),
+      userId,
+    );
+    expect(eventBus.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
+  });
 
-      // Act & Assert - should not throw
-      const result = await service.aplicarPago(tenantId, cxpId, pagoDto);
+  it('falla cerrado si el writer no está disponible', async () => {
+    (service as any).tesoreriaService = undefined;
 
-      // The operation should succeed despite event emission failure
-      expect(result.success).toBe(true);
-      expect(result.data.cxp).toEqual(mockCxpActualizada);
-      errorSpy.mockRestore();
-    });
+    await expect(
+      service.aplicarPago(
+        tenantId,
+        cxpId,
+        {
+          monto: 100,
+          fecha_pago: '2026-08-09',
+          metodo_pago: 'EFECTIVO',
+          idempotency_key: 'cxp-efectivo-002',
+        },
+        userId,
+      ),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(supabase.getClient).not.toHaveBeenCalled();
+    expect(eventBus.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
+  });
+
+  it('propaga el rechazo del writer sin ejecutar un fallback ni emitir eventos JS', async () => {
+    tesoreria.registrarPago.mockRejectedValue(new Error('outbox no disponible'));
+
+    await expect(
+      service.aplicarPago(
+        tenantId,
+        cxpId,
+        {
+          monto: 100,
+          fecha_pago: '2026-08-09',
+          metodo_pago: 'TRANSFERENCIA',
+          cuenta_bancaria_id: cuentaBancariaId,
+          referencia: 'OP-CXP-FAIL',
+          idempotency_key: 'cxp-intento-fallido',
+        },
+        userId,
+      ),
+    ).rejects.toThrow('outbox no disponible');
+    expect(tesoreria.registrarPago).toHaveBeenCalledTimes(1);
+    expect(supabase.getClient).not.toHaveBeenCalled();
+    expect(eventBus.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
   });
 });

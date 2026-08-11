@@ -7,8 +7,6 @@ import { calcularDesgloseIgv } from '../../../shared/utils/igv-afectacion.util';
 import { NotificationType, NotificationSeverity } from '../../notifications/notification.types';
 import { CreateCotizacionDto, UpdateCotizacionDto, ConvertirPedidoDto } from './dto';
 import { Cotizacion, EstadoCotizacion, CotizacionDetalle } from './entities';
-import { PedidosService } from '../pedidos/pedidos.service';
-import { CreatePedidoDto } from '../pedidos/dto';
 
 /**
  * CotizacionesService
@@ -22,7 +20,6 @@ export class CotizacionesService {
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
     private readonly taxCalculator: TaxCalculatorService,
-    private readonly pedidosService: PedidosService,
   ) {}
 
   /**
@@ -36,6 +33,10 @@ export class CotizacionesService {
   ): Promise<Cotizacion & { detalle: CotizacionDetalle[] }> {
     const client = this.supabase.getClient();
 
+    if (!userId) {
+      throw new BadRequestException('No se pudo identificar al creador de la cotización');
+    }
+
     // Validar que el cliente existe
     const { data: cliente, error: clienteError } = await client
       .from('clientes')
@@ -48,37 +49,8 @@ export class CotizacionesService {
       throw new NotFoundException('Cliente no encontrado');
     }
 
-    // Validar stock disponible antes de crear cotización (bloqueo hard)
-    for (const item of createCotizacionDto.detalle) {
-      const { data: prodStock } = await client
-        .from('productos')
-        .select('stock_actual, stock_reservado')
-        .eq('id', item.producto_id)
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-
-      const disponible =
-        Number((prodStock as any)?.stock_actual ?? 0) - Number(prodStock?.stock_reservado ?? 0);
-
-      if (Number(item.cantidad ?? 0) > disponible) {
-        throw new BadRequestException({
-          message: 'Stock insuficiente para uno o más productos',
-          warnings: [
-            {
-              producto_id: item.producto_id,
-              solicitado: Number(item.cantidad ?? 0),
-              disponible,
-            },
-          ],
-        });
-      }
-    }
-
     // Calcular totales
     const { subtotal, igv, total } = await this.calcularTotales(createCotizacionDto.detalle, tenantId);
-
-    // Generar número de cotización
-    const numero = await this.generarNumero(tenantId);
     const { data: empresaConfig } = await client
       .from('empresa_config')
       .select('moneda_defecto')
@@ -92,6 +64,7 @@ export class CotizacionesService {
         .from('usuarios')
         .select('nombre, apellido, email')
         .eq('id', userId)
+        .eq('tenant_id', tenantId)
         .single();
       
       if (usuario) {
@@ -101,100 +74,39 @@ export class CotizacionesService {
       }
     }
 
-    // Preparar items en formato JSON para la columna items
-    const items = createCotizacionDto.detalle.map((item) => ({
-      producto_id: item.producto_id,
-      descripcion: item.descripcion,
-      cantidad: item.cantidad,
-      precio_unitario: item.precio_unitario,
-      subtotal: item.cantidad * item.precio_unitario,
-    }));
-
-    // Crear cotización
-    const { data: cotizacion, error: cotizacionError } = await client
-      .from('cotizaciones')
-      .insert({
-        tenant_id: tenantId,
-        numero,
-        cliente_id: createCotizacionDto.cliente_id,
-        fecha_cotizacion: new Date().toISOString().split('T')[0],
-        fecha_vencimiento: createCotizacionDto.fecha_vencimiento || null,
-        estado: EstadoCotizacion.BORRADOR,
-        subtotal,
-        igv,
-        total,
-        observaciones: createCotizacionDto.notas || null,
-        vendedor: vendedorNombre, // Nombre del vendedor
-        moneda: empresaConfig?.moneda_defecto || 'PEN',
-        items: items, // Items en formato JSON
-        probabilidad: 50, // Probabilidad por defecto
-      })
-      .select()
-      .single();
-
-    if (cotizacionError) {
-      console.error('Error creating cotizacion:', cotizacionError);
-      throw new BadRequestException('Error al crear la cotización');
-    }
-
-    // Obtener información de productos para los detalles
-    const productosIds = createCotizacionDto.detalle.map(d => d.producto_id);
-    const { data: productos } = await client
-      .from('productos')
-      .select('id, codigo, nombre')
-      .in('id', productosIds)
-      .eq('tenant_id', tenantId);
-
-    const productosMap = new Map(productos?.map(p => [p.id, p]) || []);
-
-    // Crear detalles
+    // Una cotización ofrece precios; no inmoviliza inventario. La reserva se
+    // realiza al confirmar el pedido que nazca de ella.
     const detalleData = createCotizacionDto.detalle.map((item, index) => {
-      const producto = productosMap.get(item.producto_id);
       return {
-        tenant_id: tenantId,
-        cotizacion_id: cotizacion.id,
         producto_id: item.producto_id,
-        producto_nombre: producto?.nombre || item.descripcion,
         descripcion: item.descripcion,
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,
-        descuento_porcentaje: 0,
-        descuento_monto: 0,
-        subtotal: item.cantidad * item.precio_unitario,
         orden: index + 1,
       };
     });
 
-    const { data: detalle, error: detalleError } = await client
-      .from('cotizacion_detalles')
-      .insert(detalleData)
-      .select();
+    const { data: resultado, error: createError } = await client.rpc('crear_cotizacion_comercial_tx', {
+      p_tenant_id: tenantId,
+      p_created_by: userId,
+      p_cliente_id: createCotizacionDto.cliente_id,
+      p_fecha_vencimiento: createCotizacionDto.fecha_vencimiento || null,
+      p_observaciones: createCotizacionDto.notas || null,
+      p_vendedor: vendedorNombre,
+      p_moneda: empresaConfig?.moneda_defecto || 'PEN',
+      p_subtotal: subtotal,
+      p_igv: igv,
+      p_total: total,
+      p_detalle: detalleData,
+    });
 
-    if (detalleError) {
-      console.error('Error creating cotizacion detalle:', detalleError);
-      // Rollback: eliminar cotización
-      await client.from('cotizaciones').delete().eq('id', cotizacion.id).eq('tenant_id', tenantId);
-      throw new BadRequestException('Error al crear el detalle de la cotización');
+    if (createError || !(resultado as any)?.cotizacion) {
+      console.error('Error creating cotizacion atomically:', createError);
+      throw new BadRequestException(createError?.message || 'Error al crear la cotización');
     }
 
-    // ✅ CORRECCIÓN BRECHA 1: Reservar stock para la cotización
-    try {
-      const { data: reservaResult, error: reservaError } = await client
-        .rpc('reservar_stock_cotizacion', {
-          p_cotizacion_id: cotizacion.id,
-          p_tenant_id: tenantId,
-        });
-
-      if (reservaError) {
-        console.error('⚠️ [CotizacionesService] Error reservando stock:', reservaError);
-        // No fallar la creación, solo loguear (el stock ya fue validado arriba)
-      } else {
-        console.log('✅ [CotizacionesService] Stock reservado:', reservaResult);
-      }
-    } catch (reservaErr) {
-      console.error('⚠️ [CotizacionesService] Error en reserva de stock:', reservaErr);
-      // Continuar sin fallar - la validación de stock ya se hizo
-    }
+    const cotizacion = (resultado as any).cotizacion as Cotizacion;
+    const detalle = ((resultado as any).detalle || []) as CotizacionDetalle[];
 
     console.log('✅ [CotizacionesService] Cotización creada:', cotizacion.id);
 
@@ -351,9 +263,7 @@ export class CotizacionesService {
     }
 
     // Preparar datos de actualización
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    };
+    const updateData: any = {};
 
     if (updateCotizacionDto.cliente_id) {
       updateData.cliente_id = updateCotizacionDto.cliente_id;
@@ -361,10 +271,6 @@ export class CotizacionesService {
 
     if (updateCotizacionDto.fecha_vencimiento !== undefined) {
       updateData.fecha_vencimiento = updateCotizacionDto.fecha_vencimiento;
-    }
-
-    if (updateCotizacionDto.estado) {
-      updateData.estado = updateCotizacionDto.estado;
     }
 
     if (updateCotizacionDto.notas !== undefined) {
@@ -379,51 +285,30 @@ export class CotizacionesService {
       updateData.igv = igv;
       updateData.total = total;
 
-      // Eliminar detalle anterior
-      const { error: deleteDetalleError } = await client
-        .from('cotizacion_detalles')
-        .delete()
-        .eq('cotizacion_id', id)
-        .eq('tenant_id', tenantId);
+    }
 
-      if (deleteDetalleError) {
-        console.error('Error deleting cotizacion detalle:', deleteDetalleError);
-        throw new BadRequestException('Error al eliminar el detalle anterior de la cotización');
-      }
-
-      // Crear nuevo detalle
-      const detalleData = updateCotizacionDto.detalle.map((item) => ({
-        tenant_id: tenantId,
-        cotizacion_id: id,
+    const detalleData = updateCotizacionDto.detalle
+      ? updateCotizacionDto.detalle.map((item, index) => ({
         producto_id: item.producto_id,
         descripcion: item.descripcion,
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,
-        subtotal: item.cantidad * item.precio_unitario,
-      }));
+        orden: index + 1,
+      }))
+      : null;
 
-      const { error: detalleError } = await client
-        .from('cotizacion_detalles')
-        .insert(detalleData);
-
-      if (detalleError) {
-        console.error('Error updating cotizacion detalle:', detalleError);
-        throw new BadRequestException('Error al actualizar el detalle de la cotización');
-      }
-    }
-
-    // Actualizar cotización
-    const { data, error } = await client
-      .from('cotizaciones')
-      .update(updateData)
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
+    // Cabecera y detalle se reemplazan dentro de una única transacción. Si
+    // una línea falla, PostgreSQL conserva íntegra la cotización anterior.
+    const { error } = await client.rpc('actualizar_cotizacion_comercial_tx', {
+      p_cotizacion_id: id,
+      p_tenant_id: tenantId,
+      p_patch: updateData,
+      p_detalle: detalleData,
+    });
 
     if (error) {
-      console.error('Error updating cotizacion:', error);
-      throw new BadRequestException('Error al actualizar la cotización');
+      console.error('Error updating cotizacion atomically:', error);
+      throw new BadRequestException(error.message || 'Error al actualizar la cotización');
     }
 
     console.log('✅ [CotizacionesService] Cotización actualizada:', id);
@@ -432,39 +317,54 @@ export class CotizacionesService {
     return this.findOne(id, tenantId);
   }
 
+  async cambiarEstado(
+    id: string,
+    tenantId: string,
+    nuevoEstado: EstadoCotizacion.ENVIADA | EstadoCotizacion.APROBADA | EstadoCotizacion.RECHAZADA,
+    actorId?: string,
+    motivo?: string,
+  ): Promise<Cotizacion & { detalle: CotizacionDetalle[] }> {
+    if (!actorId) {
+      throw new BadRequestException('No se pudo identificar al actor de la transición');
+    }
+
+    const { data: resultado, error } = await this.supabase.getClient().rpc('cambiar_estado_cotizacion_tx', {
+      p_cotizacion_id: id,
+      p_tenant_id: tenantId,
+      p_nuevo_estado: nuevoEstado,
+      p_actor_id: actorId,
+      p_motivo: motivo ?? null,
+    });
+
+    if (error) {
+      throw new BadRequestException(error.message || 'No se pudo cambiar el estado de la cotización');
+    }
+
+    try {
+      return await this.findOne(id, tenantId);
+    } catch (hydrationError) {
+      // La transición ya quedó confirmada por PostgreSQL. Una lectura posterior
+      // puede fallar de forma transitoria, pero no debe convertir ese commit en
+      // un falso error ni provocar un retry de una transición ya consumida.
+      console.warn(
+        '⚠️ [CotizacionesService] Estado confirmado; no se pudo hidratar la cotización:',
+        hydrationError,
+      );
+      return {
+        id: resultado?.cotizacion_id ?? id,
+        tenant_id: tenantId,
+        estado: nuevoEstado,
+        detalle: [],
+      } as Cotizacion & { detalle: CotizacionDetalle[] };
+    }
+  }
+
   /**
    * Eliminar una cotización
    * Requirements: 3.1
    */
   async delete(id: string, tenantId: string): Promise<void> {
-    const client = this.supabase.getClient();
-
-    // Verificar que la cotización existe
-    const cotizacion = await this.findOne(id, tenantId);
-
-    // Validar que no esté convertida
-    if (cotizacion.estado === EstadoCotizacion.CONVERTIDA) {
-      throw new BadRequestException(
-        'No se puede eliminar una cotización que ya fue convertida a pedido',
-      );
-    }
-
-    // Eliminar detalle (por nombre de tabla real: cotizacion_detalles)
-    await client.from('cotizacion_detalles').delete().eq('cotizacion_id', id).eq('tenant_id', tenantId);
-
-    // Eliminar cotización
-    const { error } = await client
-      .from('cotizaciones')
-      .delete()
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
-
-    if (error) {
-      console.error('Error deleting cotizacion:', error);
-      throw new BadRequestException('Error al eliminar la cotización');
-    }
-
-    console.log('✅ [CotizacionesService] Cotización eliminada:', id);
+    return this.remove(id, tenantId);
   }
 
   /**
@@ -502,23 +402,13 @@ export class CotizacionesService {
       );
     }
 
-    if (cotizacion.fecha_vencimiento) {
-      const hoy = new Date().toISOString().split('T')[0];
-      const fechaVencimiento = String(cotizacion.fecha_vencimiento).split('T')[0];
-
-      if (fechaVencimiento < hoy) {
-        throw new BadRequestException('No se puede convertir una cotización vencida');
-      }
-    }
-
     if (!cotizacion.detalle || cotizacion.detalle.length === 0) {
       throw new BadRequestException('La cotización no tiene productos para convertir en pedido');
     }
 
     // ✅ CORRECCIÓN BRECHA 2: Usar función RPC transaccional
-    let resultado: any;
-    const { data: resultadoRpc, error: rpcError } = await client
-      .rpc('convertir_cotizacion_a_pedido', {
+    const { data: resultado, error: rpcError } = await client
+      .rpc('convertir_cotizacion_comercial_a_pedido_tx', {
         p_cotizacion_id: id,
         p_tenant_id: tenantId,
         p_user_id: userId || null,
@@ -527,25 +417,9 @@ export class CotizacionesService {
 
     if (rpcError) {
       console.error('❌ [CotizacionesService] Error en conversión transaccional:', rpcError);
-      const esDuplicado =
-        rpcError.code === '23505' ||
-        String(rpcError.message ?? '').toLowerCase().includes('duplicate key value') ||
-        String(rpcError.message ?? '').toLowerCase().includes('unique constraint');
-
-      if (!esDuplicado) {
-        throw new BadRequestException(
-          rpcError.message || 'Error al convertir cotización a pedido',
-        );
-      }
-
-      resultado = await this.convertirAPedidoConCorrelativoSeguro(
-        cotizacion,
-        convertirPedidoDto,
-        tenantId,
-        userId,
+      throw new BadRequestException(
+        rpcError.message || 'Error al convertir cotización a pedido',
       );
-    } else {
-      resultado = resultadoRpc;
     }
 
     if (!resultado?.success) {
@@ -555,7 +429,22 @@ export class CotizacionesService {
     console.log('✅ [CotizacionesService] Conversión transaccional exitosa:', resultado);
 
     // Obtener cotización actualizada
-    const updatedCotizacion = await this.findOne(id, tenantId);
+    let updatedCotizacion: Cotizacion & { detalle: CotizacionDetalle[] };
+    try {
+      updatedCotizacion = await this.findOne(id, tenantId);
+    } catch (hydrationError) {
+      // La conversión y el enlace al pedido ya hicieron commit dentro del RPC.
+      // Reutilizamos la instantánea validada para responder de forma idempotente.
+      console.warn(
+        '⚠️ [CotizacionesService] Conversión confirmada; no se pudo hidratar la cotización:',
+        hydrationError,
+      );
+      updatedCotizacion = {
+        ...cotizacion,
+        estado: EstadoCotizacion.CONVERTIDA,
+        pedido_id: resultado.pedido_id,
+      } as Cotizacion & { detalle: CotizacionDetalle[] };
+    }
 
     // Emitir notificación (no crítico, no falla si hay error)
     try {
@@ -583,132 +472,6 @@ export class CotizacionesService {
     };
   }
 
-  private async convertirAPedidoConCorrelativoSeguro(
-    cotizacion: any,
-    convertirPedidoDto: ConvertirPedidoDto,
-    tenantId: string,
-    userId?: string,
-  ): Promise<any> {
-    const client = this.supabase.getClient();
-    let pedidoCreado: any = null;
-    let ultimoError: any = null;
-
-    for (let intento = 1; intento <= 2; intento += 1) {
-      const numero = await this.generarNumeroPedidoSeguro(tenantId);
-
-      const { data: pedido, error: pedidoError } = await client
-        .from('pedidos_venta')
-        .insert({
-          tenant_id: tenantId,
-          numero,
-          cotizacion_id: cotizacion.id,
-          cliente_id: cotizacion.cliente_id,
-          fecha_pedido: new Date().toISOString().split('T')[0],
-          fecha: new Date().toISOString().split('T')[0],
-          estado: 'PENDIENTE',
-          subtotal: cotizacion.subtotal ?? 0,
-          igv: cotizacion.igv ?? 0,
-          total: cotizacion.total ?? 0,
-          moneda: cotizacion.moneda ?? 'PEN',
-          observaciones: convertirPedidoDto.notas ?? cotizacion.observaciones ?? null,
-          notas: convertirPedidoDto.notas ?? cotizacion.observaciones ?? null,
-          created_by: userId ?? null,
-        })
-        .select('id, numero')
-        .single();
-
-      if (!pedidoError) {
-        pedidoCreado = pedido;
-        break;
-      }
-
-      ultimoError = pedidoError;
-      const esDuplicado =
-        pedidoError.code === '23505' ||
-        String(pedidoError.message ?? '').toLowerCase().includes('duplicate key value') ||
-        String(pedidoError.message ?? '').toLowerCase().includes('unique constraint');
-
-      if (!esDuplicado || intento === 2) {
-        throw new BadRequestException(pedidoError.message || 'Error al crear pedido desde cotización');
-      }
-    }
-
-    if (!pedidoCreado) {
-      throw new BadRequestException(ultimoError?.message || 'Error al crear pedido desde cotización');
-    }
-
-    const detalles = (cotizacion.detalle ?? []).map((item: any) => ({
-      tenant_id: tenantId,
-      pedido_id: pedidoCreado.id,
-      producto_id: item.producto_id,
-      descripcion: item.descripcion ?? item.producto_nombre ?? 'Producto',
-      cantidad: item.cantidad ?? 0,
-      precio_unitario: item.precio_unitario ?? 0,
-      subtotal: item.subtotal ?? Number(item.cantidad ?? 0) * Number(item.precio_unitario ?? 0),
-      estado_item: 'PENDIENTE',
-    }));
-
-    const { error: detalleError } = await client
-      .from('pedidos_venta_detalle')
-      .insert(detalles);
-
-    if (detalleError) {
-      await client.from('pedidos_venta').delete().eq('id', pedidoCreado.id).eq('tenant_id', tenantId);
-      throw new BadRequestException(detalleError.message || 'Error al crear detalle del pedido');
-    }
-
-    const { error: cotizacionError } = await client
-      .from('cotizaciones')
-      .update({
-        estado: EstadoCotizacion.CONVERTIDA,
-        fecha_conversion: new Date().toISOString(),
-        convertido_por: userId ?? null,
-        pedido_id: pedidoCreado.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', cotizacion.id)
-      .eq('tenant_id', tenantId);
-
-    if (cotizacionError) {
-      await client.from('pedidos_venta_detalle').delete().eq('pedido_id', pedidoCreado.id);
-      await client.from('pedidos_venta').delete().eq('id', pedidoCreado.id).eq('tenant_id', tenantId);
-      throw new BadRequestException(cotizacionError.message || 'Error al actualizar cotización convertida');
-    }
-
-    return {
-      success: true,
-      pedido_id: pedidoCreado.id,
-      pedido_numero: pedidoCreado.numero,
-      cotizacion_id: cotizacion.id,
-    };
-  }
-
-  private async generarNumeroPedidoSeguro(tenantId: string): Promise<string> {
-    const client = this.supabase.getClient();
-    const year = new Date().getFullYear();
-    const prefix = `PED-${year}-`;
-
-    const { data, error } = await client
-      .from('pedidos_venta')
-      .select('numero')
-      .eq('tenant_id', tenantId)
-      .like('numero', `${prefix}%`)
-      .order('numero', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      throw new BadRequestException('Error al generar número de pedido');
-    }
-
-    const maxSuffix = (data ?? []).reduce((max: number, row: any) => {
-      const match = String(row.numero ?? '').match(/^PED-\d{4}-(\d+)$/);
-      const suffix = match ? Number.parseInt(match[1], 10) : 0;
-      return Number.isFinite(suffix) && suffix > max ? suffix : max;
-    }, 0);
-
-    return `${prefix}${String(maxSuffix + 1).padStart(4, '0')}`;
-  }
-
   /**
    * Marcar cotizaciones vencidas automáticamente
    * Requirements: 3.7
@@ -716,22 +479,18 @@ export class CotizacionesService {
   async marcarVencidas(tenantId: string): Promise<number> {
     const client = this.supabase.getClient();
 
-    const hoy = new Date().toISOString().split('T')[0];
-
-    const { data, error } = await client
-      .from('cotizaciones')
-      .update({ estado: EstadoCotizacion.VENCIDA })
-      .eq('tenant_id', tenantId)
-      .in('estado', [EstadoCotizacion.BORRADOR, EstadoCotizacion.ENVIADA])
-      .lt('fecha_vencimiento', hoy)
-      .select();
+    // La fecha comercial pertenece al tenant. Resolverla en PostgreSQL evita
+    // vencer documentos un día antes/después por la zona horaria del proceso.
+    const { data, error } = await client.rpc('marcar_cotizaciones_vencidas_tx', {
+      p_tenant_id: tenantId,
+    });
 
     if (error) {
       console.error('Error marking cotizaciones as vencidas:', error);
       throw new BadRequestException('Error al marcar cotizaciones vencidas');
     }
 
-    const count = data?.length || 0;
+    const count = Number(data ?? 0);
     if (count > 0) {
       console.log(`✅ [CotizacionesService] ${count} cotizaciones marcadas como vencidas`);
     }
@@ -747,10 +506,10 @@ export class CotizacionesService {
     detalle: Array<{ producto_id?: string; cantidad: number; precio_unitario: number }>,
     tenantId: string,
   ) {
-    const subtotal = detalle.reduce(
-      (sum, item) => sum + item.cantidad * item.precio_unitario,
-      0,
+    const bases = detalle.map(
+      (item) => Math.round(item.cantidad * item.precio_unitario * 100) / 100,
     );
+    const subtotal = bases.reduce((sum, base) => sum + base, 0);
     
     // La cotización debe ofrecer el mismo importe que después se facturará: si
     // grava bienes exonerados, el cliente ve un precio que no corresponde y el
@@ -759,8 +518,8 @@ export class CotizacionesService {
     const tasaIgv = await this.taxCalculator.getTasaIgv(tenantId);
 
     const desglose = calcularDesgloseIgv(
-      detalle.map((item) => ({
-        baseImponible: Math.round(item.cantidad * item.precio_unitario * 100) / 100,
+      detalle.map((item, index) => ({
+        baseImponible: bases[index],
         afectacionIgv: item.producto_id ? afectaciones.get(item.producto_id) : undefined,
       })),
       tasaIgv,
@@ -804,39 +563,6 @@ export class CotizacionesService {
     }
 
     return mapa;
-  }
-
-  /**
-   * Generar número de cotización
-   * Formato: COT-YYYY-NNNN
-   */
-  private async generarNumero(tenantId: string): Promise<string> {
-    const client = this.supabase.getClient();
-    const year = new Date().getFullYear();
-    const prefix = `COT-${year}-`;
-
-    // Obtener el último número del año
-    const { data, error } = await client
-      .from('cotizaciones')
-      .select('numero')
-      .eq('tenant_id', tenantId)
-      .like('numero', `${prefix}%`)
-      .order('numero', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('Error generating numero:', error);
-      throw new BadRequestException('Error al generar número de cotización');
-    }
-
-    let nextNumber = 1;
-    if (data && data.length > 0) {
-      const lastNumero = data[0].numero;
-      const lastNumber = parseInt(lastNumero.split('-')[2], 10);
-      nextNumber = lastNumber + 1;
-    }
-
-    return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
   }
 
   /**
@@ -909,46 +635,14 @@ export class CotizacionesService {
       );
     }
 
-    // ✅ CORRECCIÓN: Liberar stock reservado antes de eliminar
-    try {
-      const { error: liberarError } = await client
-        .rpc('liberar_stock_cotizacion', {
-          p_cotizacion_id: id,
-          p_tenant_id: tenantId,
-        });
+    const { error } = await client.rpc('eliminar_cotizacion_tx', {
+      p_cotizacion_id: id,
+      p_tenant_id: tenantId,
+    });
 
-      if (liberarError) {
-        console.error('⚠️ [CotizacionesService] Error liberando stock:', liberarError);
-        // Continuar con la eliminación aunque falle la liberación
-      } else {
-        console.log('✅ [CotizacionesService] Stock liberado para cotización:', id);
-      }
-    } catch (liberarErr) {
-      console.error('⚠️ [CotizacionesService] Error en liberación de stock:', liberarErr);
-    }
-
-    // Eliminar detalles primero
-    const { error: detalleError } = await client
-      .from('cotizacion_detalles')
-      .delete()
-      .eq('cotizacion_id', id)
-      .eq('tenant_id', tenantId);
-
-    if (detalleError) {
-      console.error('❌ [CotizacionesService] Error deleting cotizacion detalle:', detalleError);
-      throw new BadRequestException('Error al eliminar el detalle de la cotización');
-    }
-
-    // Eliminar cotización
-    const { error: cotizacionError } = await client
-      .from('cotizaciones')
-      .delete()
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
-
-    if (cotizacionError) {
-      console.error('❌ [CotizacionesService] Error deleting cotizacion:', cotizacionError);
-      throw new BadRequestException('Error al eliminar la cotización');
+    if (error) {
+      console.error('❌ [CotizacionesService] Error deleting cotizacion atomically:', error);
+      throw new BadRequestException(error.message || 'Error al eliminar la cotización');
     }
 
     console.log('✅ [CotizacionesService] Cotización eliminada:', id);

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { FiltrosContables } from './accounting.interfaces';
 import { TenantContextService } from '../tenant/tenant-context.service';
+import { createHash } from 'crypto';
 
 function normalizePC(pc: any) {
   return Array.isArray(pc) ? pc?.[0] : pc;
@@ -824,7 +825,7 @@ export class AccountingBooksService {
     }
   }
 
-  async createConsignacion(consignacionData: any) {
+  async createConsignacion(consignacionData:any,actorId:string,idempotencyKey?:string) {
     try {
       const tenantId = this.resolveTenantId();
       const cantidad = Number(consignacionData?.cantidad || 0);
@@ -835,7 +836,16 @@ export class AccountingBooksService {
       if (!Number.isFinite(valorUnitario) || valorUnitario < 0) {
         throw new BadRequestException('El valor unitario de la consignación no puede ser negativo');
       }
+      if(!actorId) throw new BadRequestException('Se requiere un usuario autenticado');
+      const key=idempotencyKey?.trim()||`consignment-create:${createHash('sha256').update(JSON.stringify({tenantId,actorId,consignacionData})).digest('hex')}`;
+      const {data:rpcData,error:rpcError}=await this.supabase.getClient().rpc('gestionar_consignacion_tx',{
+        p_tenant_id:tenantId,p_actor_id:actorId,p_action:'CREATE',p_id:null,p_payload:consignacionData,p_idempotency_key:key,
+      });
+      if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear la consignación');
+      const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
+      return result.record;
 
+      /* istanbul ignore next -- writer legacy inalcanzable */
       const payload = {
         numero: consignacionData?.numero,
         fecha_registro: consignacionData?.fecha_registro,
@@ -866,7 +876,7 @@ export class AccountingBooksService {
     }
   }
 
-  async updateEstadoConsignacion(id: string, nuevoEstado: string) {
+  async updateEstadoConsignacion(id:string,nuevoEstado:string,actorId:string,idempotencyKey?:string) {
     try {
       const tenantId = this.resolveTenantId();
       const estado = String(nuevoEstado || '').trim().toUpperCase();
@@ -874,6 +884,16 @@ export class AccountingBooksService {
       if (!permitidos.has(estado)) {
         throw new BadRequestException(`Estado de consignación no permitido: ${nuevoEstado}`);
       }
+      if(!actorId) throw new BadRequestException('Se requiere un usuario autenticado');
+      const key=idempotencyKey?.trim()||`consignment-transition:${createHash('sha256').update(JSON.stringify({tenantId,id,estado,actorId})).digest('hex')}`;
+      const {data:rpcData,error:rpcError}=await this.supabase.getClient().rpc('gestionar_consignacion_tx',{
+        p_tenant_id:tenantId,p_actor_id:actorId,p_action:'TRANSITION',p_id:id,p_payload:{estado},p_idempotency_key:key,
+      });
+      if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo actualizar la consignación');
+      const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
+      return result.record;
+
+      /* istanbul ignore next -- writer legacy inalcanzable */
       const { data, error } = await this.supabase
         .getClient()
         .from('registro_consignaciones')

@@ -8,6 +8,7 @@ export interface WizardStep {
 
 export interface CertificateValidationResult {
   isValid: boolean
+  isConfigured?: boolean
   expiresAt?: Date
   daysUntilExpiration?: number
   subject?: string

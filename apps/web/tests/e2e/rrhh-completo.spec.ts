@@ -1,6 +1,5 @@
 import { APIResponse, Page, expect, request as playwrightRequest, test } from '@playwright/test';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
@@ -302,42 +301,49 @@ test.describe('T15 RRHH completo', () => {
           total_aportes: 378,
           total_neto: 3680,
           estado_pago: 'PENDIENTE',
-          asientos_generados: false,
+          asientos_generados: 'false',
         },
       }),
       'crear planilla T15',
     );
     expect(planilla.id, 'planilla T15 debe persistir').toBeTruthy();
+    expect(String(planilla.estado).toLowerCase(), 'alta no debe aceptar salto de estado').toBe('borrador');
+    expect(Number(planilla.total_neto), 'alta no debe aceptar totales del cliente').toBe(0);
 
-    const empleadoPlanillaId = crypto.randomUUID();
-    const { error: empleadoPlanillaError } = await supabase.from('empleado_planilla').insert({
-      id: empleadoPlanillaId,
-      tenant_id: tenantId,
-      empleado_id: empleado.id,
-      id_empleado: empleado.id,
-      planilla_id: planilla.id,
-      id_planilla: planilla.id,
-      dias_trabajados: 30,
-      total_ingresos: 4200,
-      total_descuentos: 520,
-      total_aportes: 378,
-      neto_pagar: 3680,
-      estado: 'CALCULADA',
-    });
-    expect(empleadoPlanillaError?.message || '', 'crear detalle empleado_planilla T15').toBe('');
-
-    const pago = await parseOk<any>(
-      await apiContext.post(api(`/rrhh/planillas/${planilla.id}/pagar-empleados`), {
+    const calculo = await parseOk<any>(
+      await apiContext.post(api(`/rrhh/planillas/${planilla.id}/calcular-personalizada`), {
         data: {
-          empleados_ids: [empleadoPlanillaId],
-          metodo_pago: 'transferencia',
-          numero_operacion: `QA17-RRHH-${runId}`,
-          observaciones: `${qaPrefix} Pago auditado`,
+          empleados: [{
+            empleado_id: empleado.id,
+            dias_trabajados: 30,
+            horas_extras_25: 0,
+            horas_extras_35: 0,
+            tardanzas_minutos: 0,
+            faltas: 0,
+            bonos_adicionales: 0,
+          }],
         },
       }),
-      'pagar empleado de planilla T15',
+      'calcular planilla personalizada T15',
     );
-    expect(pago.empleados_pagados ?? pago.data?.empleados_pagados, 'pago debe procesar empleado').toBe(1);
+    expect(calculo.totalEmpleados, 'cálculo debe persistir un empleado').toBe(1);
+    expect(Number(calculo.totalNeto), 'cálculo debe producir neto positivo').toBeGreaterThan(0);
+
+    const aprobacion = await parseOk<any>(
+      await apiContext.post(api(`/rrhh/planillas/${planilla.id}/aprobar`), { data: {} }),
+      'aprobar planilla T15 y encolar devengo',
+    );
+    expect(aprobacion.eventId ?? aprobacion.data?.eventId, 'aprobación debe dejar eventId durable').toBeTruthy();
+
+    const pago = await parseOk<any>(
+      await apiContext.post(api(`/rrhh/planillas/${planilla.id}/pagar`), {
+        data: {
+          metodo_pago: 'transferencia',
+        },
+      }),
+      'pagar planilla completa T15',
+    );
+    expect(pago.empleadosPagados ?? pago.data?.empleadosPagados, 'pago debe procesar empleado').toBe(1);
 
     const { data: pagos, error: pagosError } = await supabase
       .from('rrhh_pagos')
@@ -347,7 +353,7 @@ test.describe('T15 RRHH completo', () => {
       .eq('empleado_id', empleado.id);
     expect(pagosError?.message || '', 'consultar obligacion de pago RRHH T15').toBe('');
     expect(pagos || [], 'pago RRHH debe persistir obligacion/pago').toHaveLength(1);
-    expect(Number(pagos![0].monto_neto), 'monto neto RRHH persistido').toBeCloseTo(3680, 2);
+    expect(Number(pagos![0].monto_neto), 'monto neto RRHH persistido').toBeCloseTo(Number(calculo.totalNeto), 2);
 
     const comprobantePdfResponse = await apiContext.get(api(`/rrhh/pagos/${pagos![0].id}/comprobante`));
     expect(
@@ -359,11 +365,6 @@ test.describe('T15 RRHH completo', () => {
     expect(comprobantePdf.subarray(0, 4).toString(), 'comprobante debe tener firma PDF').toBe('%PDF');
     expect(comprobantePdf.length, 'comprobante PDF debe tener contenido').toBeGreaterThan(500);
 
-    const asientoRespuesta = await parseOk<any>(
-      await apiContext.post(api(`/rrhh/planillas/${planilla.id}/generar-asientos`), { data: {} }),
-      'generar asiento planilla T15',
-    );
-    expect(asientoRespuesta.asiento_id ?? asientoRespuesta.data?.asiento_id, 'respuesta asiento RRHH debe tener id').toBeTruthy();
     const asiento = await waitForAsientoByReference(supabase, tenantId, `PLANILLA-${planilla.id}`);
     expectAsientoCuadrado(asiento);
 
@@ -374,7 +375,7 @@ test.describe('T15 RRHH completo', () => {
     await expect(empleadoRow).toBeVisible({ timeout: 30000 });
     await expect(empleadoRow).toContainText('Coordinador RRHH');
 
-    for (const route of ['/dashboard/rrhh/planillas/', '/dashboard/rrhh/pagos/', '/dashboard/rrhh/asistencia/']) {
+    for (const route of ['/dashboard/rrhh/planillas/', '/dashboard/rrhh/liquidaciones/', '/dashboard/rrhh/pagos/', '/dashboard/rrhh/asistencia/']) {
       await gotoAuthenticated(page, route);
       await expect(page.locator('body')).not.toContainText(/Cargando datos de RRHH\.\.\.|Loading/i, { timeout: 30000 });
       await expect(page.locator('body')).not.toContainText(/Application error|Unhandled Runtime Error|Error: Hydration/i);

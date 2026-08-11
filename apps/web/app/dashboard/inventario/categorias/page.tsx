@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { PageShell } from '@/components/erp/page-shell'
@@ -240,6 +240,7 @@ function CategoriaForm({
 
 function CategoriasContent() {
   const { get, post, put, del } = useApi()
+  const intentsRef = useRef(new Map<string, { fingerprint: string; key: string }>())
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -276,10 +277,34 @@ function CategoriasContent() {
     load()
   }, [load])
 
+  const payloadWithIntent = (intent: string, data: FormData) => {
+    const payload = {
+      nombre: data.nombre.trim(),
+      codigo: data.codigo.trim() || undefined,
+      descripcion: data.descripcion.trim() || undefined,
+      campos_extra: data.campos_extra,
+    }
+    const fingerprint = JSON.stringify(payload)
+    const previous = intentsRef.current.get(intent)
+    if (previous?.fingerprint !== fingerprint) {
+      intentsRef.current.set(intent, {
+        fingerprint,
+        key: `${intent}:${crypto.randomUUID()}`,
+      })
+    }
+    return {
+      ...payload,
+      idempotency_key: intentsRef.current.get(intent)!.key,
+    }
+  }
+
   const handleCreate = async (data: FormData) => {
     setSaving(true)
     try {
-      const resp = await post('/inventario/categorias', data)
+      const resp = await post(
+        '/inventario/categorias',
+        payloadWithIntent('inventory-category-create', data),
+      )
       if (resp?.success) {
         setCreating(false)
         await load()
@@ -297,7 +322,10 @@ function CategoriasContent() {
     if (!editingId) return
     setSaving(true)
     try {
-      const resp = await put(`/inventario/categorias/${editingId}`, data)
+      const resp = await put(
+        `/inventario/categorias/${editingId}`,
+        payloadWithIntent(`inventory-category-update:${editingId}`, data),
+      )
       if (resp?.success) {
         setEditingId(null)
         await load()
@@ -315,7 +343,11 @@ function CategoriasContent() {
     if (!confirm(`¿Eliminar la categoría "${nombre}"? Los productos con esta categoría no se verán afectados.`))
       return
     try {
-      const resp = await del(`/inventario/categorias/${id}`)
+      const resp = await del(`/inventario/categorias/${id}`, {
+        headers: {
+          'Idempotency-Key': `inventory-category-deactivate:${id}:${crypto.randomUUID()}`,
+        },
+      })
       if (resp?.success) {
         await load()
       } else {
@@ -359,9 +391,11 @@ function CategoriasContent() {
           saving={saving}
         />
       ) : (
-        <Button onClick={() => { setCreating(true); setEditingId(null) }} className="gap-2">
-          <Plus className="h-4 w-4" /> Nueva categoría
-        </Button>
+        <ProtectedComponent modulo="inventario" recurso="productos" accion="create">
+          <Button onClick={() => { setCreating(true); setEditingId(null) }} className="gap-2">
+            <Plus className="h-4 w-4" /> Nueva categoría
+          </Button>
+        </ProtectedComponent>
       )}
 
       {/* Editar existente */}
@@ -444,25 +478,29 @@ function CategoriasContent() {
                       )}
                     </div>
                     <div className="flex shrink-0 gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingId(cat.id)
-                          setCreating(false)
-                        }}
-                        className="gap-1.5"
-                      >
-                        <Pencil className="h-3.5 w-3.5" /> Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(cat.id, cat.nombre)}
-                        className="gap-1.5 text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                      </Button>
+                      <ProtectedComponent modulo="inventario" recurso="productos" accion="update">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingId(cat.id)
+                            setCreating(false)
+                          }}
+                          className="gap-1.5"
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Editar
+                        </Button>
+                      </ProtectedComponent>
+                      <ProtectedComponent modulo="inventario" recurso="productos" accion="delete">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(cat.id, cat.nombre)}
+                          className="gap-1.5 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                        </Button>
+                      </ProtectedComponent>
                     </div>
                   </div>
                 ))}

@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  Headers,
   ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -107,8 +108,16 @@ export class TenantManagementController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Acceso denegado - Se requieren privilegios de super-administrador' })
   @ApiResponse({ status: 409, description: 'El email del tenant ya existe' })
-  async createTenant(@Body() createTenantDto: CreateTenantDto) {
-    return this.tenantManagementService.createTenant(createTenantDto);
+  async createTenant(
+    @Body() createTenantDto: CreateTenantDto,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.tenantManagementService.createTenant(
+      createTenantDto,
+      req.user?.id || req.user?.sub,
+      idempotencyKey,
+    );
   }
 
   /**
@@ -127,8 +136,15 @@ export class TenantManagementController {
   async updateTenant(
     @Param('id') tenantId: string,
     @Body() updateTenantDto: UpdateTenantDto,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.tenantManagementService.updateTenant(tenantId, updateTenantDto);
+    return this.tenantManagementService.updateTenant(
+      tenantId,
+      updateTenantDto,
+      req.user?.id || req.user?.sub,
+      idempotencyKey,
+    );
   }
 
   /**
@@ -143,8 +159,16 @@ export class TenantManagementController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Acceso denegado - Se requieren privilegios de super-administrador' })
   @ApiResponse({ status: 404, description: 'Tenant no encontrado' })
-  async activateTenant(@Param('id') tenantId: string) {
-    return this.tenantManagementService.activateTenant(tenantId);
+  async activateTenant(
+    @Param('id') tenantId: string,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.tenantManagementService.activateTenant(
+      tenantId,
+      req.user?.id || req.user?.sub,
+      idempotencyKey,
+    );
   }
 
   /**
@@ -159,8 +183,16 @@ export class TenantManagementController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Acceso denegado - Se requieren privilegios de super-administrador' })
   @ApiResponse({ status: 404, description: 'Tenant no encontrado' })
-  async deactivateTenant(@Param('id') tenantId: string) {
-    return this.tenantManagementService.deactivateTenant(tenantId);
+  async deactivateTenant(
+    @Param('id') tenantId: string,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.tenantManagementService.deactivateTenant(
+      tenantId,
+      req.user?.id || req.user?.sub,
+      idempotencyKey,
+    );
   }
 
   /**
@@ -203,8 +235,18 @@ export class TenantManagementController {
   @RequirePermission('tenants.manage')
   @ApiOperation({ summary: 'Activar demo para tenant existente', description: 'Marca el tenant como demo por N días y crea/actualiza usuario demo' })
   @ApiResponse({ status: 200, description: 'Demo activada exitosamente' })
-  async activateDemoTenant(@Param('id') tenantId: string, @Body() dto: ActivateDemoTenantDto, @Req() req: any) {
-    return this.tenantManagementService.activateDemoTenant(tenantId, dto, req.user);
+  async activateDemoTenant(
+    @Param('id') tenantId: string,
+    @Body() dto: ActivateDemoTenantDto,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.tenantManagementService.activateDemoTenant(
+      tenantId,
+      dto,
+      req.user,
+      idempotencyKey,
+    );
   }
 
   /**
@@ -215,7 +257,15 @@ export class TenantManagementController {
   @RequirePermission('tenants.manage')
   @ApiOperation({ summary: 'Desactivar demo de tenant', description: 'Quita el modo demo del tenant y limpia flags de usuarios demo' })
   @ApiResponse({ status: 200, description: 'Demo desactivada exitosamente' })
-  async deactivateDemoTenant(@Param('id') tenantId: string, @Req() req: any) {
-    return this.tenantManagementService.deactivateDemoTenant(tenantId, req.user);
+  async deactivateDemoTenant(
+    @Param('id') tenantId: string,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.tenantManagementService.deactivateDemoTenant(
+      tenantId,
+      req.user,
+      idempotencyKey,
+    );
   }
 }

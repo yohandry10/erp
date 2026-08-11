@@ -7,12 +7,10 @@ import { CacheService } from '../../shared/cache/cache.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
-// TTL del cache de validación de sesión. Cada request autenticado pasa por
-// validateSession() y antes hacía 2 queries Supabase (~1.4s). Con cache, los
-// hits son <5ms. Tradeoff: una sesión revocada (logout, expulsión admin) puede
-// seguir aceptándose hasta SESSION_CACHE_TTL segundos. revokeSession() invalida
-// la entrada para mitigar el caso de logout explícito.
-const SESSION_CACHE_TTL = 60;
+// La revocación administrativa debe observarse en el request siguiente en
+// cualquier réplica. El cache positivo sólo puede reactivarse cuando exista
+// invalidación distribuida transaccional para todos los writers de sesiones.
+const SESSION_CACHE_TTL = 0;
 
 export interface LoginDto {
   email: string;
@@ -80,9 +78,6 @@ export class AuthService {
         return null;
       }
 
-      // Reset failed login attempts on successful login
-      await this.resetFailedLoginAttempts(user.id);
-
       // Verificar que el usuario esté activo
       if (user.estado !== 'ACTIVO') {
         // ✅ A5: Este caso se registrará en el método login cuando capture la excepción
@@ -110,20 +105,17 @@ export class AuthService {
     tenantId?: string | null;
   }): Promise<void> {
     try {
-      // Usar cliente público porque el login NO tiene tenant context
-      const client = this.supabaseService.getPublicClient();
-      const { error } = await client
-        .from('auth_login_attempts')
-        .insert({
-          user_email: data.email,
-          ip_address: data.ipAddress,
-          user_agent: data.userAgent,
-          success: data.success,
-          estado: data.success ? 'EXITOSO' : 'FALLIDO',
-          failed_reason: data.failedReason || null,
-          tenant_id: data.tenantId || null,
-          created_at: new Date().toISOString(),
-        });
+      // El login todavía no tiene contexto de tenant, pero la escritura queda
+      // encapsulada en una RPC service-role para no exponer DML sobre la tabla.
+      const client = this.supabaseService.getAdminClient();
+      const { error } = await client.rpc('registrar_intento_login_auth_tx', {
+        p_email: data.email.trim().toLowerCase(),
+        p_ip_address: data.ipAddress,
+        p_user_agent: data.userAgent,
+        p_success: data.success,
+        p_failed_reason: data.failedReason || null,
+        p_tenant_id: data.tenantId || null,
+      });
       if (error) {
         this.logger.error('Error registrando intento de login:', error);
       }
@@ -143,7 +135,7 @@ export class AuthService {
   ): Promise<boolean> {
     try {
       // Usar cliente público porque el login NO tiene tenant context
-      const client = this.supabaseService.getPublicClient();
+      const client = this.supabaseService.getAdminClient();
       const cutoffTime = new Date();
       cutoffTime.setMinutes(cutoffTime.getMinutes() - minutesWindow);
 
@@ -170,16 +162,17 @@ export class AuthService {
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
     const requestIpAddress = ipAddress || 'unknown';
     const requestUserAgent = userAgent || 'unknown';
+    const normalizedEmail = loginDto.email.trim().toLowerCase();
 
     // ✅ A5: Verificar límite de intentos fallidos antes de procesar
-    const hasTooManyAttempts = await this.checkFailedAttemptsLimit(loginDto.email, requestIpAddress, requestUserAgent);
+    const hasTooManyAttempts = await this.checkFailedAttemptsLimit(normalizedEmail, requestIpAddress, requestUserAgent);
 
     try {
-      const user = await this.validateUser(loginDto.email, loginDto.password);
+      const user = await this.validateUser(normalizedEmail, loginDto.password);
       if (!user) {
         if (hasTooManyAttempts) {
           await this.logLoginAttempt({
-            email: loginDto.email,
+            email: normalizedEmail,
             ipAddress: requestIpAddress,
             userAgent: requestUserAgent,
             success: false,
@@ -189,16 +182,7 @@ export class AuthService {
           throw new HttpException('Demasiados intentos fallidos. Intente más tarde.', HttpStatus.TOO_MANY_REQUESTS);
         }
 
-        // ✅ A5: Registrar intento fallido
-        await this.logLoginAttempt({
-          email: loginDto.email,
-          ipAddress: requestIpAddress,
-          userAgent: requestUserAgent,
-          success: false,
-          failedReason: 'Credenciales inválidas',
-          tenantId: null, // No sabemos el tenant si el usuario no existe
-        });
-        
+        // El catch registra exactamente un intento fallido.
         throw new UnauthorizedException('Credenciales inválidas');
       }
 
@@ -223,16 +207,13 @@ export class AuthService {
 
       console.log('🔐 [AUTH] Login exitoso - Tenant:', payload.tenant_id, 'Usuario:', user.email, 'Super-Admin:', payload.is_super_admin, 'Roles:', roleNames);
 
-      // Update last access timestamp
-      await this.updateLastAccess(user.id);
-
-      // Create session
-      const sessionToken = await this.createSession(user.id, user.tenant_id);
+      // La RPC vuelve inseparables validación de usuario/tenant, último acceso y sesión.
+      const sessionToken = await this.createSession(user.id);
       payload.session_token = sessionToken;
 
       // ✅ A5: Registrar intento exitoso
       await this.logLoginAttempt({
-        email: loginDto.email,
+        email: normalizedEmail,
         ipAddress: requestIpAddress,
         userAgent: requestUserAgent,
         success: true,
@@ -260,7 +241,7 @@ export class AuthService {
         let tenantIdForLogging: string | null = null;
         if (error.message.includes('bloqueada') || error.message.includes('inactivo')) {
           try {
-            const user = await this.findUserByEmail(loginDto.email);
+            const user = await this.findUserByEmail(normalizedEmail);
             if (user) {
               tenantIdForLogging = user.tenant_id || null;
             }
@@ -271,7 +252,7 @@ export class AuthService {
 
         const failedReason = error.message || 'Error de autenticación';
         await this.logLoginAttempt({
-        email: loginDto.email,
+          email: normalizedEmail,
         ipAddress: requestIpAddress,
         userAgent: requestUserAgent,
         success: false,
@@ -286,6 +267,9 @@ export class AuthService {
   async validateToken(token: string): Promise<any> {
     try {
       const payload = this.jwtService.verify(token);
+      if (!payload?.session_token || !(await this.validateSession(payload.session_token))) {
+        throw new UnauthorizedException('Sesión expirada o revocada');
+      }
       const user = await this.findUserById(payload.sub);
       if (!user || !user.activo) {
         throw new UnauthorizedException('Token inválido');
@@ -372,14 +356,15 @@ export class AuthService {
 
   private async findUserByEmail(email: string): Promise<any> {
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       // Usar cliente público porque el login NO tiene tenant context
-      const client = this.supabaseService.getPublicClient();
+      const client = this.supabaseService.getAdminClient();
       
       // Primero obtener el usuario
       const { data: user, error: userError } = await client
         .from('usuarios_sistema')
         .select('*')
-        .eq('email', email)
+        .eq('email', normalizedEmail)
         .single();
 
       if (this.isNoRowsError(userError)) {
@@ -395,7 +380,7 @@ export class AuthService {
       // Luego obtener sus roles por separado
       const { data: userRoles, error: rolesError } = await client
         .from('user_roles')
-        .select('role_id, roles(id, nombre, descripcion)')
+        .select('role_id, roles(id, nombre, descripcion, activo)')
         .eq('usuario_sistema_id', user.id);
 
       this.throwIfSupabaseUnavailable(rolesError, 'consulta de roles de usuario');
@@ -405,7 +390,10 @@ export class AuthService {
       }
 
       // Agregar roles al usuario
-      user.user_roles = userRoles || [];
+      user.user_roles = (userRoles || []).filter((link: any) => {
+        const role = Array.isArray(link.roles) ? link.roles[0] : link.roles;
+        return role?.activo !== false;
+      });
 
       return user;
     } catch (error) {
@@ -424,7 +412,7 @@ export class AuthService {
   async findUserById(id: string): Promise<any> {
     try {
       // Usar cliente público para validación de tokens
-      const client = this.supabaseService.getPublicClient();
+      const client = this.supabaseService.getAdminClient();
       const { data, error } = await client
         .from('usuarios_sistema')
         .select('*')
@@ -493,39 +481,6 @@ export class AuthService {
     }
   }
 
-  private async resetFailedLoginAttempts(userId: string): Promise<void> {
-    try {
-      // Usar cliente público porque el login NO tiene tenant context
-      const client = this.supabaseService.getPublicClient();
-      await client
-        .from('usuarios_sistema')
-        .update({
-          failed_login_attempts: 0,
-          locked_until: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-    } catch (error) {
-      console.error('Error resetting failed login attempts:', error);
-    }
-  }
-
-  private async updateLastAccess(userId: string): Promise<void> {
-    try {
-      // Usar cliente público porque el login NO tiene tenant context
-      const client = this.supabaseService.getPublicClient();
-      await client
-        .from('usuarios_sistema')
-        .update({
-          fecha_ultimo_acceso: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-    } catch (error) {
-      console.error('Error updating last access:', error);
-    }
-  }
-
   // Password reset functionality
   async generatePasswordResetToken(email: string, clientIp?: string): Promise<string> {
     try {
@@ -555,16 +510,12 @@ export class AuthService {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
 
-      // Usar cliente público porque password reset NO tiene tenant context
-      const client = this.supabaseService.getPublicClient();
-      const { error } = await client
-        .from('usuarios_sistema')
-        .update({
-          password_reset_token: hashedToken,
-          password_reset_expires: expiresAt.toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+      const { error } = await this.supabaseService.getAdminClient()
+        .rpc('registrar_solicitud_reset_auth_tx', {
+          p_usuario_id: user.id,
+          p_token_hash: hashedToken,
+          p_expires_at: expiresAt.toISOString(),
+        });
 
       if (error) {
         this.logger.error(`Failed to store reset token for user ${user.email}:`, error);
@@ -663,40 +614,25 @@ export class AuthService {
       // ✅ SEGURIDAD: Hash de contraseña nueva (ya validada por DTO)
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-      // Usar cliente público porque password reset NO tiene tenant context
-      const client = this.supabaseService.getPublicClient();
-      
-      // Update password and clear reset token only if the same reset token is
-      // still present. This makes token consumption atomic under concurrent
-      // reset attempts.
-      const { data: updatedUsers, error: updateError } = await client
-        .from('usuarios_sistema')
-        .update({
-          password_hash: hashedPassword,
-          password_reset_token: null,
-          password_reset_expires: null,
-          failed_login_attempts: 0, // Reset intentos fallidos
-          locked_until: null, // Desbloquear cuenta si estaba bloqueada
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id)
-        .eq('password_reset_token', user.password_reset_token)
-        .select('id');
-
+      const { data: resetResult, error: updateError } = await this.supabaseService.getAdminClient()
+        .rpc('consumir_reset_password_auth_tx', {
+          p_usuario_id: user.id,
+          p_expected_token_hash: user.password_reset_token,
+          p_new_password_hash: hashedPassword,
+        });
       if (updateError) {
         this.logger.error(`Failed to update password for user ${user.email}:`, updateError);
+        if (updateError.code === '42501') {
+          throw new UnauthorizedException('Token inválido o expirado');
+        }
         throw new Error('Failed to reset password');
       }
-
-      if (!updatedUsers || updatedUsers.length === 0) {
+      if (!resetResult) {
         this.logger.warn(
           `Password reset token already consumed for user: ${user.email} from IP: ${clientIp || 'unknown'}`
         );
         throw new UnauthorizedException('Token inválido o expirado');
       }
-
-      // ✅ CRÍTICO: Revocar todas las sesiones activas por seguridad
-      await this.revokeUserSessions(user.id);
 
       // ✅ SEGURIDAD: Log exitoso del reset
       this.logger.log(
@@ -729,7 +665,7 @@ export class AuthService {
       }
 
       // Validate target tenant exists - usar cliente público para validación
-      const client = this.supabaseService.getPublicClient();
+      const client = this.supabaseService.getAdminClient();
       const { data: tenant, error } = await client
         .from('tenants')
         .select('id, nombre, estado')
@@ -789,7 +725,7 @@ export class AuthService {
   }
 
   // Session management
-  private async createSession(userId: string, tenantId: string): Promise<string> {
+  private async createSession(userId: string): Promise<string> {
     try {
       const crypto = require('crypto');
       const sessionToken = crypto.randomBytes(32).toString('hex');
@@ -797,20 +733,16 @@ export class AuthService {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 8); // 8 hours session
 
-      const client = this.supabaseService.getAdminClient();
-      const { error } = await client
-        .from('user_sessions')
-        .insert({
-          usuario_sistema_id: userId,
-          tenant_id: tenantId,
-          session_token: sessionToken,
-          expires_at: expiresAt.toISOString(),
-          last_activity: new Date().toISOString(),
-          created_at: new Date().toISOString()
+      const { data, error } = await this.supabaseService.getAdminClient()
+        .rpc('crear_sesion_login_auth_tx', {
+          p_usuario_id: userId,
+          p_session_token: sessionToken,
+          p_expires_at: expiresAt.toISOString(),
         });
 
-      if (error) {
-        throw error;
+      if (error || !data) {
+        if (error?.code === '42501') throw new UnauthorizedException('Usuario o tenant inactivo');
+        throw error || new Error('No se pudo crear la sesión');
       }
 
       return sessionToken;
@@ -821,42 +753,24 @@ export class AuthService {
   }
 
   async validateSession(sessionToken: string): Promise<boolean> {
-    // Fast path: cache hit (positivo solo — los miss/false NUNCA se cachean
-    // para que un logout posterior no quede atrapado en cache).
-    const cached = await this.cacheService.get<boolean>(this.sessionCacheKey(sessionToken));
-    if (cached === true) {
-      return true;
+    if (SESSION_CACHE_TTL > 0) {
+      const cached = await this.cacheService.get<boolean>(this.sessionCacheKey(sessionToken));
+      if (cached === true) return true;
     }
 
     try {
       const client = this.supabaseService.getAdminClient();
-      const { data: session, error } = await client
-        .from('user_sessions')
-        .select('*')
-        .eq('session_token', sessionToken)
-        .single();
+      const { data: validation, error } = await client.rpc('validar_sesion_auth_tx', {
+        p_session_token: sessionToken,
+      });
 
-      if (error || !session) {
+      if (error || validation?.valid !== true) {
+        await this.cacheService.del(this.sessionCacheKey(sessionToken));
         return false;
       }
 
-      // Check if session is expired
-      if (new Date(session.expires_at) < new Date()) {
-        await this.revokeSession(sessionToken);
-        return false;
-      }
-
-      // Cache positivo por SESSION_CACHE_TTL segundos.
-      await this.cacheService.set(this.sessionCacheKey(sessionToken), true, SESSION_CACHE_TTL);
-
-      // Update last_activity en fire-and-forget para no bloquear el response.
-      // Si falla, no afecta la validez de la sesión que ya confirmamos arriba.
-      const updateBuilder: any = client
-        .from('user_sessions')
-        .update({ last_activity: new Date().toISOString() })
-        .eq('session_token', sessionToken);
-      if (updateBuilder && typeof updateBuilder.then === 'function') {
-        updateBuilder.then(() => undefined, () => undefined);
+      if (SESSION_CACHE_TTL > 0) {
+        await this.cacheService.set(this.sessionCacheKey(sessionToken), true, SESSION_CACHE_TTL);
       }
 
       return true;
@@ -866,17 +780,19 @@ export class AuthService {
     }
   }
 
-  async revokeSession(sessionToken: string): Promise<void> {
+  async revokeSession(sessionToken: string, userId: string): Promise<void> {
     try {
       // Invalidamos cache PRIMERO para que requests in-flight con cache
       // positivo no sigan pasando después del revoke.
       await this.cacheService.del(this.sessionCacheKey(sessionToken));
 
-      const client = this.supabaseService.getAdminClient();
-      await client
-        .from('user_sessions')
-        .delete()
-        .eq('session_token', sessionToken);
+      const { error } = await this.supabaseService.getAdminClient()
+        .rpc('revocar_sesion_auth_tx', {
+          p_session_token: sessionToken,
+          p_usuario_id: userId,
+          p_reason: 'LOGOUT',
+        });
+      if (error) throw error;
     } catch (error) {
       console.error('Error revoking session:', error);
     }
@@ -903,10 +819,11 @@ export class AuthService {
         sessionTokens.map((sessionToken) => this.cacheService.del(this.sessionCacheKey(sessionToken)))
       );
 
-      await client
-        .from('user_sessions')
-        .delete()
-        .eq('usuario_sistema_id', userId);
+      const { error } = await client.rpc('revocar_sesiones_usuario_auth_tx', {
+        p_usuario_id: userId,
+        p_reason: 'LOGOUT_ALL',
+      });
+      if (error) throw error;
 
       console.log('🔒 [AUTH] Sesiones revocadas - Usuario:', userId, 'Tokens:', sessionTokens.length);
     } catch (error) {
@@ -916,12 +833,8 @@ export class AuthService {
 
   async cleanupExpiredSessions(): Promise<void> {
     try {
-      // Usar cliente público para limpieza de sesiones
-      const client = this.supabaseService.getPublicClient();
-      const { data, error } = await client
-        .from('user_sessions')
-        .delete()
-        .lt('expires_at', new Date().toISOString());
+      const { data, error } = await this.supabaseService.getAdminClient()
+        .rpc('cleanup_expired_user_sessions', { p_limit: 5000 });
 
       if (!error) {
         console.log('🧹 [AUTH] Sesiones expiradas limpiadas');

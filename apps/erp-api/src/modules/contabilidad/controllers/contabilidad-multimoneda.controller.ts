@@ -6,6 +6,7 @@ import {
   Body,
   Query,
   Param,
+  Headers,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
@@ -104,8 +105,9 @@ export class ContabilidadMultimonedaController {
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId: string,
     @Body() dto: CreateTipoCambioDto,
+    @Headers('idempotency-key') idempotencyKey?:string,
   ) {
-    const tipoCambio = await this.tiposCambioService.registrar(tenantId, userId, dto);
+    const tipoCambio = await this.tiposCambioService.registrar(tenantId,userId,dto,idempotencyKey);
 
     return {
       success: true,
@@ -119,9 +121,11 @@ export class ContabilidadMultimonedaController {
   @ApiOperation({ summary: "Eliminar una cotización" })
   async eliminarTipoCambio(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId:string,
     @Param("id") id: string,
+    @Headers('idempotency-key') idempotencyKey?:string,
   ) {
-    await this.tiposCambioService.eliminar(tenantId, id);
+    await this.tiposCambioService.eliminar(tenantId,id,userId,idempotencyKey);
     return { success: true, message: "Tipo de cambio eliminado" };
   }
 

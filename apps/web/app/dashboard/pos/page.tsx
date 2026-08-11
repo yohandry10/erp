@@ -103,6 +103,8 @@ interface Cliente {
   nombres?: string
   apellidos?: string
   razon_social?: string
+  direccion?: string | null
+  direccion_fiscal?: string | null
 }
 
 interface EstadoCaja {
@@ -131,15 +133,35 @@ const posPrimaryButtonClass =
   'rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50'
 
 const getPosDocumentNumber = (sale: any) =>
-  String(sale?.numero_ticket || sale?.numero_venta || '').trim()
+  String(sale?.numero_fiscal || sale?.numero_ticket || sale?.numero_venta || '').trim()
 
 const getPosDocumentLabel = (sale: any) => {
   const number = getPosDocumentNumber(sale).toUpperCase()
-  const type = String(sale?.tipo_comprobante || sale?.tipo_documento || '').trim().toUpperCase()
+  const type = String(
+    sale?.canje?.tipo_documento || sale?.tipo_comprobante || sale?.tipo_documento || '',
+  ).trim().toUpperCase()
 
   if (type === '03' || type.includes('BOLETA') || number.startsWith('B')) return 'Boleta de venta'
   if (type === '01' || type.includes('FACTURA') || number.startsWith('F')) return 'Factura de venta'
   return 'Ticket de venta'
+}
+
+const inferirTipoDocumentoFiscal = (cliente?: Cliente | null, documentoFallback = '') => {
+  const tipo = String(cliente?.tipo_documento || '').trim().toUpperCase()
+  const documento = String(
+    cliente?.numero_documento ?? cliente?.documento_numero ?? cliente?.ruc ?? documentoFallback,
+  ).trim()
+  if (tipo === 'RUC' || tipo === '6' || /^\d{11}$/.test(documento)) return '6'
+  if (tipo === 'DNI' || tipo === '1' || /^\d{8}$/.test(documento)) return '1'
+  if (tipo.includes('EXTRANJ') || tipo === '4') return '4'
+  if (tipo.includes('PASAP') || tipo === '7') return '7'
+  return '0'
+}
+
+const crearClaveIdempotenciaPos = (prefijo: string) => {
+  const random = globalThis.crypto?.randomUUID?.()
+    || `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+  return `${prefijo}:${random}`
 }
 
 const posSecondaryButtonClass =
@@ -197,7 +219,9 @@ export default function POSPage() {
   const [montoRecibido, setMontoRecibido] = useState('')
   const [pagosMixtos, setPagosMixtos] = useState(false)
   const [pagos, setPagos] = useState<Array<{ metodo_pago_id: string; monto: string; referencia?: string }>>([])
-  const [tipoComprobante, setTipoComprobante] = useState<'03' | '01'>('03') // 03=Boleta, 01=Factura
+  const [tipoComprobante, setTipoComprobante] = useState<'TICKET' | '03' | '01'>(
+    paisCodigo === 'PE' ? 'TICKET' : '03',
+  )
 
   // Nuevos estados para funcionalidades avanzadas
 const [descuentoGlobal, setDescuentoGlobal] = useState<Descuento>({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
@@ -212,6 +236,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   const [mostrarCheckout, setMostrarCheckout] = useState(false)
   const [mostrarHistorial, setMostrarHistorial] = useState(false)
   const [mostrarVentaExitosa, setMostrarVentaExitosa] = useState(false)
+  const [ventaParaCanje, setVentaParaCanje] = useState<any | null>(null)
+  const [tipoCanje, setTipoCanje] = useState<'03' | '01'>('03')
+  const [clienteCanjeId, setClienteCanjeId] = useState('')
+  const [canjeIdempotencyKey, setCanjeIdempotencyKey] = useState<string | null>(null)
+  const [procesandoCanje, setProcesandoCanje] = useState(false)
   const [ventaExitosaData, setVentaExitosaData] = useState<any>(null)
   const [procesandoVenta, setProcesandoVenta] = useState(false)
   const [modoCajaEnfocado, setModoCajaEnfocado] = useState(false)
@@ -237,6 +266,12 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   const busquedaInputRef = useRef<HTMLInputElement>(null)
   const codigoBarrasInputRef = useRef<HTMLInputElement>(null)
   const documentoImprimibleRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isPeru && tipoComprobante === 'TICKET') {
+      setTipoComprobante('03')
+    }
+  }, [isPeru, tipoComprobante])
 
   const formatMoney = (value: any): string => {
     const num = Number(value);
@@ -553,6 +588,102 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     }
   }
 
+  const abrirCanjeTicket = (venta: any) => {
+    if (!isPeru) {
+      toast({
+        variant: 'destructive',
+        title: 'Canje no disponible',
+        description: 'El canje 01/03 está habilitado únicamente para operaciones de Perú.',
+      })
+      return
+    }
+    const clienteVenta = clientes.find((cliente) => cliente.id === venta?.cliente_id)
+    const puedeFacturar = inferirTipoDocumentoFiscal(
+      clienteVenta,
+      String(venta?.cliente_documento || ''),
+    ) === '6'
+    setVentaParaCanje(venta)
+    setClienteCanjeId(clienteVenta?.id || '')
+    setTipoCanje(puedeFacturar ? '01' : '03')
+    setCanjeIdempotencyKey(crearClaveIdempotenciaPos(`pos-canje-${venta?.id || 'ticket'}`))
+    setMostrarHistorial(false)
+  }
+
+  const confirmarCanjeTicket = async () => {
+    if (!ventaParaCanje || procesandoCanje) return
+    const clienteCanje = clientes.find((cliente) => cliente.id === clienteCanjeId)
+    const clienteDocumento = getClienteDocumento(clienteCanje)
+      || String(ventaParaCanje.cliente_documento || '').trim()
+    const clienteNombre = clienteCanje?.razon_social
+      || `${clienteCanje?.nombres || ''} ${clienteCanje?.apellidos || ''}`.trim()
+      || String(ventaParaCanje.cliente_nombre || '').trim()
+      || 'Consumidor final'
+    const clienteTipoDocumento = inferirTipoDocumentoFiscal(clienteCanje, clienteDocumento)
+
+    if (tipoCanje === '01' && (!clienteCanje || clienteTipoDocumento !== '6')) {
+      toast({
+        variant: 'destructive',
+        title: `Factura requiere ${documentoFiscal}`,
+        description: `Seleccione un cliente activo con ${documentoFiscal} antes de canjear.`,
+      })
+      return
+    }
+    if (tipoCanje === '03' && Number(ventaParaCanje.total || 0) > 700 && clienteTipoDocumento === '0') {
+      toast({
+        variant: 'destructive',
+        title: 'Receptor requerido',
+        description: 'Las boletas mayores a S/ 700 requieren identificar al adquirente.',
+      })
+      return
+    }
+    if (!clienteDocumento || !clienteNombre) {
+      toast({
+        variant: 'destructive',
+        title: 'Datos de receptor incompletos',
+        description: 'Seleccione un cliente o verifique los datos guardados en el ticket.',
+      })
+      return
+    }
+
+    setProcesandoCanje(true)
+    try {
+      const idempotencyKey = canjeIdempotencyKey
+        || crearClaveIdempotenciaPos(`pos-canje-${ventaParaCanje.id}`)
+      if (!canjeIdempotencyKey) setCanjeIdempotencyKey(idempotencyKey)
+      const resultado = await posSaleApi.post(
+        `/api/pos/ventas/${encodeURIComponent(String(ventaParaCanje.id))}/canjear-ticket`,
+        {
+          idempotency_key: idempotencyKey,
+          tipo_documento: tipoCanje,
+          ...(clienteCanje ? { cliente_id: clienteCanje.id } : {}),
+          cliente_tipo_documento: clienteTipoDocumento,
+          cliente_documento: clienteDocumento,
+          cliente_nombre: clienteNombre,
+          cliente_direccion: clienteCanje?.direccion_fiscal || clienteCanje?.direccion || undefined,
+        },
+      )
+      const canje = resultado?.data || resultado
+      if (!canje || resultado?.success === false || !canje.documento_id) {
+        throw new Error(resultado?.message || 'No se pudo reservar el comprobante fiscal del canje.')
+      }
+      toast({
+        title: 'Ticket canjeado',
+        description: `${tipoCanje === '01' ? 'Factura' : 'Boleta'} ${canje.numero_fiscal || ''} reservada sin repetir el cobro ni el stock.`,
+      })
+      setVentaParaCanje(null)
+      setCanjeIdempotencyKey(null)
+      await recargarHistorialVentas()
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'No se pudo canjear el ticket',
+        description: error instanceof Error ? error.message : 'Error inesperado durante el canje.',
+      })
+    } finally {
+      setProcesandoCanje(false)
+    }
+  }
+
   const recargarProductos = async () => {
     try {
       const productosResponse = await api.get('/api/pos/productos');
@@ -719,10 +850,8 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       return producto.precio_mayorista // Precio mayorista para empresas
     }
 
-    if (producto.precio_especial && Math.random() > 0.7) {
-      return producto.precio_especial // Precio especial aleatorio (simula promociones)
-    }
-
+    // El precio especial requiere una regla/promoción explícita. Aplicarlo de
+    // forma automática (antes incluso al azar) podía subfacturar al cliente.
     return producto.precio_venta
   }
 
@@ -988,7 +1117,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       return
     }
 
-    if (isPeru) {
+    if (isPeru && tipoComprobante === '03') {
       // Advertencia operativa: no convierte esta venta en una GRE automática.
       const esBoletaSinRuc = clienteActual?.tipo_documento !== 'RUC'
 
@@ -1001,7 +1130,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     }
 
     // Check configuration status before processing
-    if (configurationStatus && !configurationStatus.isComplete) {
+    if (tipoComprobante !== 'TICKET' && configurationStatus && !configurationStatus.isComplete) {
       toast({
         title: '⚠️ Configuración incompleta',
         description: 'La venta puede fallar. Revise la configuración.',
@@ -1031,9 +1160,14 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         cliente_id: clienteSeleccionado,
         cliente_nombre: clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Cliente General',
         cliente_documento: getClienteDocumento(clienteActual) || '00000000',
+        cliente_tipo_documento: inferirTipoDocumentoFiscal(
+          clienteActual,
+          getClienteDocumento(clienteActual),
+        ),
         metodo_pago_id: pagosMixtos ? null : metodoPagoSeleccionado,
         referencia_pago: pagosMixtos ? null : referenciaPago,
-        numero_comprobante: comprobante.numero,
+        numero_comprobante: tipoComprobante === 'TICKET' ? undefined : comprobante.numero,
+        emitir_cpe: tipoComprobante !== 'TICKET',
         items: carrito.map(item => ({
           producto_id: item.producto.id,
           cantidad: item.cantidad,
@@ -1140,10 +1274,14 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           subtotal: subtotalServidor ?? calcularSubtotal(),
           impuestos: impuestosServidor ?? calcularImpuestos(),
           tipo_comprobante: tipoComprobante,
+          tipo_emision: ventaInfo.tipo_emision || (tipoComprobante === 'TICKET' ? 'TICKET' : 'FISCAL_INMEDIATO'),
+          canjeable: Boolean(ventaInfo.canjeable ?? (tipoComprobante === 'TICKET')),
           estado: ventaInfo.estado || 'PAGADA',
           factura_electronica: ventaInfo.factura_electronica || false,
           facturacion_pendiente: ventaInfo.facturacion_pendiente || ventaInfo.cpe_pendiente || false,
           cpe_id: ventaInfo.cpe_id,
+          cliente_id: clienteSeleccionado,
+          cliente_documento: getClienteDocumento(clienteActual),
           cliente_nombre: clienteActual?.razon_social || clienteActual?.nombres || 'Cliente General',
           fecha: new Date().toISOString(),
         })
@@ -1307,14 +1445,17 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
   // Función para generar comprobante
   const generarComprobante = () => {
     const correlativo = String(Date.now()).slice(-8)
-    // Serie según tipo de comprobante: B=Boleta, F=Factura
-    const serie = tipoComprobante === '01' ? 'F001' : 'B001'
+    // T001 es una numeración interna. F/B sólo se reservan en la transacción
+    // fiscal inmediata o cuando el usuario canjea el ticket posteriormente.
+    const serie = tipoComprobante === 'TICKET'
+      ? 'T001'
+      : tipoComprobante === '01' ? 'F001' : 'B001'
 
     const comprobante = {
       serie,
       correlativo,
       numero: `${serie}-${correlativo}`,
-      tipo: tipoComprobante, // 01=Factura, 03=Boleta
+      tipo: tipoComprobante,
       fecha: new Date().toISOString(),
       cliente: clientes.find(c => c.id === clienteSeleccionado),
       items: carrito,
@@ -1510,6 +1651,19 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     (m) => m.id === metodoPagoSeleccionado
   );
   const clienteActual = clientes.find((c) => c.id === clienteSeleccionado);
+  const clienteCanjeActual = clientes.find((c) => c.id === clienteCanjeId)
+  const documentoCanjeActual = getClienteDocumento(clienteCanjeActual)
+    || String(ventaParaCanje?.cliente_documento || '').trim()
+  const tipoDocumentoCanjeActual = inferirTipoDocumentoFiscal(
+    clienteCanjeActual,
+    documentoCanjeActual,
+  )
+  const canjeFacturaHabilitado = Boolean(clienteCanjeActual && tipoDocumentoCanjeActual === '6')
+  const canjeBoletaAnonimaInvalida = Boolean(
+    tipoCanje === '03'
+      && Number(ventaParaCanje?.total || 0) > 700
+      && tipoDocumentoCanjeActual === '0',
+  )
   // El importe operativo debe coincidir exactamente con las dos cifras que ve y cobra el cajero.
   const totalVentaActual = Number(calcularTotal().toFixed(2))
   const esPagoEfectivo = Boolean(
@@ -2075,7 +2229,16 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     ))}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 rounded-lg bg-muted p-1">
+                <div className={`grid ${isPeru ? 'grid-cols-3' : 'grid-cols-2'} rounded-lg bg-muted p-1`}>
+                  {isPeru && (
+                    <button
+                      type="button"
+                      onClick={() => setTipoComprobante('TICKET')}
+                      className={`min-h-9 rounded-md px-3 text-sm font-medium transition ${tipoComprobante === 'TICKET' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Ticket
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setTipoComprobante('03')}
@@ -2093,6 +2256,11 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     {businessDocumentLabel}
                   </button>
                 </div>
+                {tipoComprobante === 'TICKET' && (
+                  <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
+                    Ticket interno canjeable: cobra y descuenta stock ahora, sin reservar todavía un correlativo fiscal.
+                  </p>
+                )}
               </div>
 
               {/* Lista de Items en Carrito */}
@@ -2245,7 +2413,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     onClick={abrirVistaPreviaBorrador}
                   >
                     <Eye className="h-4 w-4" />
-                    Vista previa del comprobante
+                    Vista previa del {tipoComprobante === 'TICKET' ? 'ticket' : 'comprobante'}
                   </Button>
                   <Button
                     type="button"
@@ -2282,7 +2450,9 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       {clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Cliente'}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {tipoComprobante === '01' ? businessDocumentLabel : consumerDocumentLabel} · {carrito.length} {carrito.length === 1 ? 'producto' : 'productos'}
+                      {tipoComprobante === 'TICKET'
+                        ? 'Ticket interno canjeable'
+                        : tipoComprobante === '01' ? businessDocumentLabel : consumerDocumentLabel} · {carrito.length} {carrito.length === 1 ? 'producto' : 'productos'}
                     </p>
                   </div>
                   <div className="text-right">
@@ -2423,7 +2593,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
             <DialogContent className="max-h-[88vh] overflow-hidden sm:max-w-[760px]">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Ventas del día</DialogTitle>
-                <DialogDescription>Consulte los comprobantes recientes sin abandonar la venta activa.</DialogDescription>
+                <DialogDescription>Consulte ventas recientes y canjee tickets internos sin repetir cobro, stock ni contabilidad.</DialogDescription>
               </DialogHeader>
               <div className="max-h-[60vh] overflow-y-auto rounded-xl border">
                 <table className="w-full border-collapse text-sm">
@@ -2433,28 +2603,184 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       <th className="p-3 text-left font-medium">Cliente</th>
                       <th className="p-3 text-right font-medium">Total</th>
                       <th className="p-3 text-center font-medium">Estado</th>
-                      <th className="w-16 p-3"><span className="sr-only">Acción</span></th>
+                      <th className="min-w-40 p-3 text-right"><span className="sr-only">Acciones</span></th>
                     </tr>
                   </thead>
                   <tbody>
                     {historialVentas.length === 0 ? (
                       <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Aún no hay ventas registradas hoy.</td></tr>
-                    ) : historialVentas.map((venta: any) => (
-                      <tr key={venta.id} className="border-t">
-                        <td className="p-3 font-medium">{venta.numero_venta || venta.numero_ticket || `#${venta.id}`}</td>
-                        <td className="p-3 text-muted-foreground">{venta.cliente_nombre || 'General'}</td>
-                        <td className="p-3 text-right font-semibold">{formatCurrency(venta.total)}</td>
-                        <td className="p-3 text-center"><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-400 dark:text-emerald-300">{venta.estado}</span></td>
-                        <td className="p-2 text-center">
-                          <Button type="button" variant="ghost" size="icon" onClick={() => { setMostrarHistorial(false); handleVerFactura(venta) }} aria-label={`Ver ticket ${venta.numero_venta || venta.numero_ticket || venta.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    ) : historialVentas.map((venta: any) => {
+                      const canjeable = Boolean(
+                        venta.canjeable ?? (venta.tipo_emision === 'TICKET' && !venta.canje),
+                      )
+                      const estadoFiscal = venta.cpe_id
+                        ? 'CPE emitido'
+                        : venta.tipo_emision === 'TICKET_CANJEADO'
+                          ? 'Canje reservado'
+                          : canjeable ? 'Ticket canjeable' : 'CPE pendiente'
+                      return (
+                        <tr key={venta.id} className="border-t">
+                          <td className="p-3 font-medium">
+                            <span className="block">{venta.numero_venta || venta.numero_ticket || `#${venta.id}`}</span>
+                            {venta.numero_fiscal && (
+                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{venta.numero_fiscal}</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-muted-foreground">{venta.cliente_nombre || 'General'}</td>
+                          <td className="p-3 text-right font-semibold">{formatCurrency(venta.total)}</td>
+                          <td className="p-3 text-center">
+                            <span className={`rounded-full px-2 py-1 text-xs font-medium ${canjeable
+                              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                              : venta.cpe_id
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                : 'bg-sky-500/10 text-sky-700 dark:text-sky-300'}`}>
+                              {estadoFiscal}
+                            </span>
+                          </td>
+                          <td className="p-2">
+                            <div className="flex justify-end gap-1">
+                              {isPeru && canjeable && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5"
+                                  onClick={() => abrirCanjeTicket(venta)}
+                                >
+                                  <FileText className="h-4 w-4" /> Canjear
+                                </Button>
+                              )}
+                              <Button type="button" variant="ghost" size="icon" onClick={() => { setMostrarHistorial(false); handleVerFactura(venta) }} aria-label={`Ver ticket ${venta.numero_venta || venta.numero_ticket || venta.id}`}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={Boolean(ventaParaCanje)}
+            onOpenChange={(open) => {
+              if (!open && !procesandoCanje) {
+                setVentaParaCanje(null)
+                setCanjeIdempotencyKey(null)
+              }
+            }}
+          >
+            <DialogContent className="sm:max-w-[560px]">
+              <DialogHeader>
+                <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <DialogTitle>Canjear ticket {ventaParaCanje?.numero_ticket}</DialogTitle>
+                <DialogDescription>
+                  Se reservará un único comprobante fiscal sobre la misma venta. El cobro, stock, CxC, ingreso, costo y comisión no se volverán a aplicar.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 rounded-xl border bg-muted/30 p-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Ticket original</span>
+                    <p className="mt-1 font-semibold">{ventaParaCanje?.numero_ticket || '—'}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-muted-foreground">Total congelado</span>
+                    <p className="mt-1 text-lg font-bold">{formatCurrency(ventaParaCanje?.total || 0)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Documento de destino</Label>
+                  <div className="grid grid-cols-2 rounded-lg bg-muted p-1">
+                    <button
+                      type="button"
+                      onClick={() => setTipoCanje('03')}
+                      className={`min-h-10 rounded-md px-3 text-sm font-medium transition ${tipoCanje === '03' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Boleta (03)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTipoCanje('01')}
+                      disabled={!canjeFacturaHabilitado}
+                      title={!canjeFacturaHabilitado ? `Seleccione un cliente con ${documentoFiscal}` : ''}
+                      className={`min-h-10 rounded-md px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${tipoCanje === '01' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Factura (01)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pos-cliente-canje">Receptor</Label>
+                  <select
+                    id="pos-cliente-canje"
+                    value={clienteCanjeId}
+                    onChange={(event) => {
+                      const nextId = event.target.value
+                      setClienteCanjeId(nextId)
+                      const nextCliente = clientes.find((cliente) => cliente.id === nextId)
+                      if (tipoCanje === '01' && inferirTipoDocumentoFiscal(nextCliente) !== '6') {
+                        setTipoCanje('03')
+                      }
+                    }}
+                    className={`${posInputClass} h-10 w-full px-3 text-sm`}
+                  >
+                    <option value="">Datos guardados en el ticket</option>
+                    {clientes
+                      .filter((cliente) => !ventaParaCanje?.cuenta_por_cobrar_id || cliente.id === ventaParaCanje?.cliente_id)
+                      .map((cliente) => (
+                        <option key={cliente.id} value={cliente.id}>
+                          {(cliente.razon_social || `${cliente.nombres || ''} ${cliente.apellidos || ''}`.trim() || 'Cliente')} · {getClienteDocumento(cliente)}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Documento: {documentoCanjeActual || 'sin identificar'}
+                    {ventaParaCanje?.cuenta_por_cobrar_id ? ' · La CxC conserva el mismo deudor.' : ''}
+                  </p>
+                </div>
+
+                {canjeBoletaAnonimaInvalida && (
+                  <div className="flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-200">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    Esta boleta supera S/ 700. Seleccione un receptor identificado antes de continuar.
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={procesandoCanje}
+                  onClick={() => {
+                    setVentaParaCanje(null)
+                    setCanjeIdempotencyKey(null)
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  className="gap-2"
+                  disabled={procesandoCanje
+                    || (tipoCanje === '01' && !canjeFacturaHabilitado)
+                    || canjeBoletaAnonimaInvalida
+                    || !documentoCanjeActual}
+                  onClick={confirmarCanjeTicket}
+                >
+                  {procesandoCanje ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  {procesandoCanje ? 'Reservando…' : `Canjear a ${tipoCanje === '01' ? 'factura' : 'boleta'}`}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
 
@@ -2607,6 +2933,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           <VentaExitosaModal
             isOpen={mostrarVentaExitosa}
             onClose={() => setMostrarVentaExitosa(false)}
+            onCanjearTicket={(venta) => {
+              setMostrarVentaExitosa(false)
+              abrirCanjeTicket({ ...venta, id: venta.venta_id })
+            }}
             ventaData={ventaExitosaData}
             empresaData={empresaInfo ? {
               nombre: empresaInfo.razon_social || empresaInfo.nombre_comercial || 'Mi Empresa',

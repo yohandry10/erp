@@ -1,14 +1,6 @@
-import { IsString, IsUUID, IsDate, IsOptional, IsNumber, IsEnum, IsArray, ValidateNested, Min, IsInt, ArrayMinSize } from 'class-validator';
+import { IsString, IsUUID, IsDate, IsOptional, IsNumber, IsArray, ValidateNested, Min, IsInt, ArrayMinSize, IsNotEmpty, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-
-export enum EstadoCotizacionCompra {
-  BORRADOR = 'BORRADOR',
-  ENVIADA = 'ENVIADA',
-  APROBADA = 'APROBADA',
-  RECHAZADA = 'RECHAZADA',
-  VENCIDA = 'VENCIDA'
-}
 
 export class CotizacionCompraDetalleDto {
   @ApiProperty({ description: 'ID del producto', example: '550e8400-e29b-41d4-a716-446655440001' })
@@ -31,6 +23,15 @@ export class CotizacionCompraDetalleDto {
 }
 
 export class CreateCotizacionCompraDto {
+  @ApiProperty({
+    description: 'Clave única del intento de creación para reintentos seguros',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  idempotency_key: string;
+
   @ApiProperty({ description: 'Número de cotización', example: 'COT-2024-001' })
   @IsString()
   numero: string;
@@ -50,15 +51,6 @@ export class CreateCotizacionCompraDto {
   @IsInt({ message: 'Los días de validez deben ser un número entero' })
   @Min(1, { message: 'Los días de validez deben ser al menos 1' })
   validez_dias?: number;
-
-  @ApiPropertyOptional({ 
-    description: 'Estado de la cotización', 
-    enum: EstadoCotizacionCompra,
-    default: EstadoCotizacionCompra.BORRADOR 
-  })
-  @IsOptional()
-  @IsEnum(EstadoCotizacionCompra, { message: 'Estado de cotización inválido' })
-  estado?: EstadoCotizacionCompra;
 
   @ApiPropertyOptional({ description: 'Observaciones adicionales', example: 'Incluye envío gratuito' })
   @IsOptional()

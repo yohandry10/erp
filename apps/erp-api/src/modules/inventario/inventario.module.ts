@@ -8,11 +8,12 @@ import { AlmacenesModule } from './almacenes/almacenes.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { ProductImagesService } from './product-images.service';
 
 @Module({
   imports: [IntegrationModule, SupabaseModule, LogisticaModule, AlmacenesModule, AuditModule, AuthModule, PermissionsModule],
   controllers: [InventarioController],
-  providers: [InventarioService],
+  providers: [InventarioService, ProductImagesService],
   exports: [InventarioService, LogisticaModule, AlmacenesModule]
 })
 export class InventarioModule {}

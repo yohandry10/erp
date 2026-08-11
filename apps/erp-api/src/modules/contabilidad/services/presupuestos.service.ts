@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreatePresupuestoDto, UpdatePresupuestoDto, EstadoPresupuesto } from '@erp-suite/dtos';
+import { createHash } from 'crypto';
 
 export interface Presupuesto {
   id: string;
@@ -39,8 +40,20 @@ export class PresupuestosService {
   async crearPresupuesto(
     tenantId: string,
     createPresupuestoDto: CreatePresupuestoDto,
-    userId?: string
+    userId?: string,
+    idempotencyKey?: string,
   ): Promise<Presupuesto> {
+    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    if(createPresupuestoDto.monto_presupuestado<=0) throw new BadRequestException('El monto presupuestado debe ser mayor a cero');
+    const key=idempotencyKey?.trim()||`budget-create:${createHash('sha256').update(JSON.stringify({tenantId,userId,createPresupuestoDto})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_presupuesto_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_action:'CREATE',p_presupuesto_id:null,p_payload:createPresupuestoDto,p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el presupuesto');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
+    return result.record as Presupuesto;
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     const { centro_costo_id, cuenta_id, periodo_contable_id, monto_presupuestado, notas, estado } = createPresupuestoDto;
 
     console.log(`💰 [Presupuestos] Creando presupuesto para tenant ${tenantId}`);
@@ -265,8 +278,19 @@ export class PresupuestosService {
     tenantId: string,
     presupuestoId: string,
     updatePresupuestoDto: UpdatePresupuestoDto,
-    userId?: string
+    userId?: string,
+    idempotencyKey?: string,
   ): Promise<Presupuesto> {
+    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    const key=idempotencyKey?.trim()||`budget-update:${createHash('sha256').update(JSON.stringify({tenantId,presupuestoId,userId,updatePresupuestoDto})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_presupuesto_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_action:'UPDATE',p_presupuesto_id:presupuestoId,p_payload:updatePresupuestoDto,p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo actualizar el presupuesto');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
+    return result.record as Presupuesto;
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     const { monto_presupuestado, notas, estado } = updatePresupuestoDto;
 
     console.log(`💰 [Presupuestos] Actualizando presupuesto ${presupuestoId} para tenant ${tenantId}`);
@@ -352,8 +376,20 @@ export class PresupuestosService {
    */
   async eliminarPresupuesto(
     tenantId: string,
-    presupuestoId: string
+    presupuestoId: string,
+    userId: string,
+    idempotencyKey?: string,
   ): Promise<Presupuesto> {
+    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    const key=idempotencyKey?.trim()||`budget-delete:${createHash('sha256').update(JSON.stringify({tenantId,presupuestoId,userId})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_presupuesto_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_action:'DELETE',p_presupuesto_id:presupuestoId,p_payload:{},p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo eliminar el presupuesto');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
+    return result.record as Presupuesto;
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     console.log(`💰 [Presupuestos] Eliminando presupuesto ${presupuestoId} para tenant ${tenantId}`);
 
     // Verificar que el presupuesto existe y pertenece al tenant

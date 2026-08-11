@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { CheckSquare, ChevronRight, FileText, Home, ShoppingCart, Users, type LucideIcon } from 'lucide-react'
+import { CheckSquare, ChevronRight, FileText, Home, RotateCcw, ShoppingCart, SlidersHorizontal, Users, type LucideIcon } from 'lucide-react'
 
 interface Breadcrumb {
   label: string
@@ -55,6 +55,14 @@ export default function VentasLayout({
       if (path === 'aprobaciones') {
         label = 'Aprobaciones'
         icon = CheckSquare
+      }
+      if (path === 'rma') {
+        label = 'RMA y devoluciones'
+        icon = RotateCcw
+      }
+      if (path === 'comercial') {
+        label = 'Gestión comercial'
+        icon = SlidersHorizontal
       }
       if (path === 'nuevo') label = 'Nuevo'
 

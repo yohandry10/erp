@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 
 const getCurrentPeriod = () => new Date().toISOString().slice(0, 7)
@@ -35,12 +35,21 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
   })
 
   const api = useApiCall()
+  const requestRef = useRef<{ fingerprint: string; key: string } | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    console.log('📊 Enviando datos para generar reporte SIRE:', formData)
-    const response = await api.post('/api/sire/generar-reporte', formData)
+    const fingerprint = JSON.stringify(formData)
+    if (!requestRef.current || requestRef.current.fingerprint !== fingerprint) {
+      requestRef.current = {
+        fingerprint,
+        key: `sire-generate:${crypto.randomUUID()}`,
+      }
+    }
+    const response = await api.post('/api/sire/generar-reporte', formData, {
+      headers: { 'Idempotency-Key': requestRef.current.key },
+    })
 
     if (response && response.success) {
       console.log('✅ Reporte SIRE generado exitosamente:', response.data)
@@ -50,6 +59,7 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
 
       onSuccess()
       onClose()
+      requestRef.current = null
       setFormData({
         tipoReporte: 'REGISTRO_VENTAS',
         periodo: getCurrentPeriod(),

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Download, FileCheck2, Loader2, RefreshCw, Save } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { fetchApi } from '@/lib/api-fetch'
@@ -28,6 +28,14 @@ export default function PlanillaElectronicaPeruPage() {
   const [procesando, setProcesando] = useState(false)
   const [mensaje, setMensaje] = useState('')
   const [evidencia, setEvidencia] = useState({ ticket_tregistro: '', cir_tregistro: '', constancia_plame: '', fecha_presentacion: '' })
+  const mutationIntents = useRef(new Map<string, string>())
+  const intentFor = (signature: string) => {
+    const existing = mutationIntents.current.get(signature)
+    if (existing) return existing
+    const key = `rrhh-plame:${crypto.randomUUID()}`
+    mutationIntents.current.set(signature, key)
+    return key
+  }
 
   const cargarBase = useCallback(async () => {
     setCargando(true)
@@ -36,7 +44,7 @@ export default function PlanillaElectronicaPeruPage() {
     ])
     const items = Array.isArray(planillasResponse) ? planillasResponse : planillasResponse?.data || []
     setPlanillas(items)
-    setHistorial(historialResponse?.data || [])
+    setHistorial(Array.isArray(historialResponse) ? historialResponse : historialResponse?.data || [])
     setPlanillaId((actual) => actual || items.find((item: any) => ['calculada', 'aprobada', 'pagada'].includes(String(item.estado).toLowerCase()))?.id || items[0]?.id || '')
     setCargando(false)
   }, [get])
@@ -45,9 +53,10 @@ export default function PlanillaElectronicaPeruPage() {
     if (!planillaId) return
     setCargando(true)
     const response = await get(`/api/rrhh/peru/planilla-electronica/${planillaId}/preview`)
-    if (response?.success) {
-      setPaquete(response.data)
-      setFichas(Object.fromEntries((response.data.trabajadores || []).map((item: any) => [item.empleado_id, { ...item.ficha, _horas_ordinarias: item.jornada?.horas_ordinarias ?? '', _dias_no_laborados: item.jornada?.dias_no_laborados ?? 0 }])))
+    const preview = response?.data ?? response
+    if (preview) {
+      setPaquete(preview)
+      setFichas(Object.fromEntries((preview.trabajadores || []).map((item: any) => [item.empleado_id, { ...item.ficha, _horas_ordinarias: item.jornada?.horas_ordinarias ?? '', _dias_no_laborados: item.jornada?.dias_no_laborados ?? 0 }])))
     }
     setCargando(false)
   }, [get, planillaId])
@@ -57,25 +66,34 @@ export default function PlanillaElectronicaPeruPage() {
 
   const guardarFicha = async (empleadoId: string) => {
     setProcesando(true)
-    const response = await put(`/api/rrhh/peru/planilla-electronica/empleados/${empleadoId}/ficha`, fichas[empleadoId])
-    if (response?.success) { setMensaje('Ficha SUNAT guardada. Se recalcularon los bloqueos.'); await previsualizar() }
+    const signature = `ficha:${empleadoId}:${JSON.stringify(fichas[empleadoId] || {})}`
+    const response = await put(`/api/rrhh/peru/planilla-electronica/empleados/${empleadoId}/ficha`, fichas[empleadoId], {
+      headers: { 'Idempotency-Key': intentFor(signature) },
+    })
+    if (response) { mutationIntents.current.delete(signature); setMensaje('Ficha SUNAT guardada. Se recalcularon los bloqueos.'); await previsualizar() }
     setProcesando(false)
   }
 
   const guardarJornada = async (trabajador: any) => {
     setProcesando(true)
     const valores = fichas[trabajador.empleado_id] || {}
+    const signature = `jornada:${trabajador.detalle_id}:${valores._horas_ordinarias}:${valores._dias_no_laborados}`
     const response = await put(`/api/rrhh/peru/planilla-electronica/detalles/${trabajador.detalle_id}/jornada`, {
       horas_ordinarias: Number(valores._horas_ordinarias), dias_no_laborados: Number(valores._dias_no_laborados),
+    }, {
+      headers: { 'Idempotency-Key': intentFor(signature) },
     })
-    if (response?.success) { setMensaje('Jornada PLAME guardada con fuente manual del contador.'); await previsualizar() }
+    if (response) { mutationIntents.current.delete(signature); setMensaje('Jornada PLAME guardada con fuente manual del contador.'); await previsualizar() }
     setProcesando(false)
   }
 
   const guardarPaquete = async () => {
     setProcesando(true)
-    const response = await post(`/api/rrhh/peru/planilla-electronica/${planillaId}/paquetes`, {})
-    if (response?.success) { setMensaje('Versión congelada con huellas SHA-256. Descárgala para revisión/PVS.'); await cargarBase() }
+    const signature = `paquete:${planillaId}`
+    const response = await post(`/api/rrhh/peru/planilla-electronica/${planillaId}/paquetes`, {}, {
+      headers: { 'Idempotency-Key': intentFor(signature) },
+    })
+    if (response) { mutationIntents.current.delete(signature); setMensaje('Versión congelada con huellas SHA-256. Descárgala para revisión/PVS.'); await cargarBase() }
     setProcesando(false)
   }
 
@@ -96,12 +114,15 @@ export default function PlanillaElectronicaPeruPage() {
     const requiereTregistro = Number(vigente?.resumen?.tregistro_novedades || 0) > 0
     if (!vigente || !evidencia.constancia_plame.trim() || (requiereTregistro && (!evidencia.ticket_tregistro.trim() || !evidencia.cir_tregistro.trim()))) return
     setProcesando(true)
+    const signature = `evidencia:${vigente.id}:${JSON.stringify(evidencia)}`
     const response = await post(`/api/rrhh/peru/planilla-electronica/paquetes/${vigente.id}/evidencia`, {
       ticket_tregistro: evidencia.ticket_tregistro.trim(), cir_tregistro: evidencia.cir_tregistro.trim(),
       constancia_plame: evidencia.constancia_plame.trim(),
       ...(evidencia.fecha_presentacion ? { fecha_presentacion: new Date(evidencia.fecha_presentacion).toISOString() } : {}),
+    }, {
+      headers: { 'Idempotency-Key': intentFor(signature) },
     })
-    if (response?.success) { setMensaje('Evidencia SUNAT registrada: constancia PLAME y, cuando corresponde, ticket/CIR T-Registro.'); await cargarBase() }
+    if (response) { mutationIntents.current.delete(signature); setMensaje('Evidencia SUNAT registrada: constancia PLAME y, cuando corresponde, ticket/CIR T-Registro.'); await cargarBase() }
     setProcesando(false)
   }
 

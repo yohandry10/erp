@@ -13,7 +13,6 @@ import { fetchApi } from '@/lib/api-fetch';
 import {
   BadgeCheck,
   Banknote,
-  BookOpenCheck,
   Calculator,
   BarChart3,
   CheckCircle,
@@ -41,7 +40,6 @@ const PlanillasPage = () => {
   // genera su integración contable. Crear, calcular, aprobar o pagar sigue
   // reservado al rol RRHH/ADMIN mediante el permiso global rrhh.access.
   const { hasPermission: canManagePayroll } = usePermission('rrhh', 'access', '__global__');
-  const { hasPermission: canGenerateAccounting } = usePermission('rrhh', 'accounting', 'planillas');
   const [planillas, setPlanillas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [detallePlanilla, setDetallePlanilla] = useState<any[]>([]);
@@ -121,35 +119,6 @@ const PlanillasPage = () => {
     setShowPagarModal(false);
     setPlanillaSeleccionada(null);
     loadPlanillas();
-  };
-
-  const generarAsientosContables = async (planillaId: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Generar Asientos Contables',
-      message: '¿Está seguro de generar los asientos contables para esta planilla?\n\nEsto creará registros en el módulo de contabilidad.',
-      variant: 'warning',
-      onConfirm: async () => {
-        try {
-          setLoading(true);
-          const response = await fetchApi(`/api/rrhh/planillas/${planillaId}/generar-asientos`, {
-            method: 'POST',
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            alert(`✅ Asientos contables generados correctamente\n\n• Total registros: ${data.registros || 'N/A'}\n• Monto total: ${currencySymbol} ${data.monto_total || '0.00'}`);
-          } else {
-            throw new Error('Error generando asientos contables');
-          }
-        } catch (error: any) {
-          console.error('Error generando asientos:', error);
-          alert('Error generando asientos contables: ' + error.message);
-        } finally {
-          setLoading(false);
-        }
-      }
-    });
   };
 
   const handlePlanillaSuccess = () => {
@@ -283,9 +252,8 @@ const PlanillasPage = () => {
       variant: 'warning',
       onConfirm: async () => {
         try {
-          const response = await fetchApi(`/api/rrhh/planillas/${planillaId}`, {
-            method: 'PUT',
-            body: JSON.stringify({ estado: 'aprobada' }),
+          const response = await fetchApi(`/api/rrhh/planillas/${planillaId}/aprobar`, {
+            method: 'POST',
           });
 
           if (response.ok) {
@@ -637,8 +605,8 @@ const PlanillasPage = () => {
                             </button>
                           )}
 
-                          {/* Botón Pagar - Para calculadas y aprobadas */}
-                          {canManagePayroll && (planilla?.estado === 'calculada' || planilla?.estado === 'aprobada') && (
+                          {/* El pago sólo existe después de aprobar y devengar. */}
+                          {canManagePayroll && planilla?.estado === 'aprobada' && (
                             <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-emerald-600 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-emerald-700"
                               onClick={() => abrirPagarPlanilla(planilla)}
                               title="Pagar planilla"
@@ -662,16 +630,6 @@ const PlanillasPage = () => {
                           >
                             <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" /> Reporte
                           </button>
-
-                          {/* La aprobación no debe ocultar la integración contable. */}
-                          {canGenerateAccounting && (planilla?.estado === 'calculada' || planilla?.estado === 'aprobada') && (
-                            <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-blue-700 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-blue-800"
-                              onClick={() => generarAsientosContables(planilla?.id)}
-                              title="Generar asientos contables"
-                            >
-                              <BookOpenCheck className="h-3.5 w-3.5" aria-hidden="true" /> Asientos
-                            </button>
-                          )}
 
                           {/* Botón Aprobar - Solo para calculadas */}
                           {canManagePayroll && planilla?.estado === 'calculada' && (

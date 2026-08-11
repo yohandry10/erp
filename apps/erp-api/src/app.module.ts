@@ -13,7 +13,6 @@ import { ValidationInterceptor } from './shared/security/interceptors/validation
 import { PermissionGuard } from './common/guards/permission.guard';
 import { IntegrationModule } from './shared/integration/integration.module'; // Importar el módulo de integración
 import { ComprasModule } from './modules/compras/compras.module';
-import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module';
 import { InventarioModule } from './modules/inventario/inventario.module';
 import { ContabilidadModule } from './modules/contabilidad/contabilidad.module';
 import { CxcModule } from './modules/finanzas/cxc/cxc.module';
@@ -44,6 +43,7 @@ import { CotizacionesModule as VentasCotizacionesModule } from './modules/ventas
 import { PedidosModule } from './modules/ventas/pedidos/pedidos.module';
 import { ReportesModule } from './modules/ventas/reportes/reportes.module';
 import { RmaModule } from './modules/ventas/rma/rma.module';
+import { ComercialVentasModule } from './modules/ventas/comercial/comercial-ventas.module';
 import { SecurityDashboardModule } from './modules/security/security.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { OutboxModule } from './shared/outbox/outbox.module';
@@ -91,7 +91,6 @@ import { apiEnvFilePath } from './config/env-files';
     UsuariosModule,
     TenantsModule,
     ComprasModule,
-    CotizacionesModule,
     InventarioModule,
     ContabilidadModule,
     CxcModule,
@@ -118,6 +117,7 @@ import { apiEnvFilePath } from './config/env-files';
     PedidosModule,
     ReportesModule,
     RmaModule,
+    ComercialVentasModule,
     OutboxModule, // 🔴 CRÍTICO: Módulo de outbox pattern para eventos persistentes
     SunatRetryModule, // 🔴 CRÍTICO: Módulo de reintentos automáticos para comunicación con SUNAT
     MetricsModule, // 📊 Módulo de métricas para Prometheus y Grafana

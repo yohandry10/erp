@@ -34,6 +34,9 @@ interface OrdenDetalle {
     nombre: string
     codigo: string
     unidad_medida?: string
+    tipo?: string | null
+    es_servicio?: boolean
+    controla_stock?: boolean
   }
 }
 
@@ -78,6 +81,8 @@ interface RecepcionItem {
   almacen_id?: string
   ubicacion_id?: string
   fecha_expiracion?: string
+  es_servicio: boolean
+  controla_stock: boolean
 }
 
 interface RecepcionWizardProps {
@@ -99,6 +104,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   const [scanBuffer, setScanBuffer] = useState('')
   const [flashItemIndex, setFlashItemIndex] = useState<number | null>(null)
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const createIdempotencyKeyRef = useRef<string | null>(null)
   const { get, post } = useApi()
 
   const loadOrden = useCallback(async () => {
@@ -114,17 +120,24 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
         if (ordenData.detalles && ordenData.detalles.length > 0) {
           const recepcionItems: RecepcionItem[] = ordenData.detalles
             .filter((d: OrdenDetalle) => (d.cantidad_recibida || 0) < d.cantidad)
-            .map((detalle: OrdenDetalle) => ({
-              detalle_id: detalle.id,
-              producto_id: detalle.producto_id,
-              producto_nombre: detalle.productos?.nombre || detalle.descripcion || 'Producto',
-              producto_codigo: detalle.productos?.codigo || detalle.codigo || '',
-              cantidad_pedida: detalle.cantidad,
-              cantidad_recibida_anterior: detalle.cantidad_recibida || 0,
-              cantidad_recibir: 0,
-              calidad: 'OK' as const,
-              observaciones: ''
-            }))
+            .map((detalle: OrdenDetalle) => {
+              const esServicio = Boolean(detalle.productos?.es_servicio)
+                || detalle.productos?.tipo?.toLowerCase() === 'servicio'
+
+              return {
+                detalle_id: detalle.id,
+                producto_id: detalle.producto_id,
+                producto_nombre: detalle.productos?.nombre || detalle.descripcion || 'Producto',
+                producto_codigo: detalle.productos?.codigo || detalle.codigo || '',
+                cantidad_pedida: detalle.cantidad,
+                cantidad_recibida_anterior: detalle.cantidad_recibida || 0,
+                cantidad_recibir: 0,
+                calidad: 'OK' as const,
+                observaciones: '',
+                es_servicio: esServicio,
+                controla_stock: !esServicio && detalle.productos?.controla_stock !== false,
+              }
+            })
           setItems(recepcionItems)
         }
       }
@@ -337,10 +350,12 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
     } else if (currentStep === 3) {
       // Validate all items with quantity have almacen selected
       const itemsToReceive = items.filter(item => item.cantidad_recibir > 0)
-      const itemsWithoutAlmacen = itemsToReceive.filter(item => !item.almacen_id)
+      const itemsWithoutAlmacen = itemsToReceive.filter(
+        item => item.controla_stock && item.calidad !== 'RECHAZADO' && !item.almacen_id,
+      )
 
       if (itemsWithoutAlmacen.length > 0) {
-        toast({ variant: 'destructive', title: 'Almacén requerido', description: 'Debe seleccionar un almacén para todos los productos a recepcionar' })
+        toast({ variant: 'destructive', title: 'Almacén requerido', description: 'Debe seleccionar un almacén para cada producto físico con control de stock' })
         return
       }
       setCurrentStep(4)
@@ -364,8 +379,12 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       }
 
       // Create reception
+      if (!createIdempotencyKeyRef.current) {
+        createIdempotencyKeyRef.current = crypto.randomUUID()
+      }
       const createDto = {
         orden_id: ordenId,
+        idempotency_key: createIdempotencyKeyRef.current,
         items: itemsToReceive.map(item => ({
           detalle_id: item.detalle_id,
           cantidad_recibida: item.cantidad_recibir,
@@ -373,35 +392,40 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
           observaciones: item.observaciones || undefined,
           lote: item.lote || undefined,
           serie: item.serie || undefined,
-          almacen_id: item.almacen_id,
-          ubicacion_id: item.ubicacion_id || undefined,
-          fecha_expiracion: item.fecha_expiracion || undefined
+          almacen_id: item.controla_stock && item.calidad !== 'RECHAZADO' ? item.almacen_id : undefined,
+          ubicacion_id: item.controla_stock && item.calidad !== 'RECHAZADO' ? item.ubicacion_id || undefined : undefined,
+          fecha_expiracion: item.controla_stock && item.calidad !== 'RECHAZADO' ? item.fecha_expiracion || undefined : undefined
         })),
         observaciones: 'Recepción creada desde wizard'
       }
 
       const createResponse = await post(`/api/compras/recepciones/ordenes/${ordenId}`, createDto)
 
-      const createSucceeded = createResponse?.success === true || Boolean(createResponse?.id)
+      const createdRecepcion = createResponse?.data ?? createResponse
+      const createSucceeded = createResponse?.success !== false && Boolean(createdRecepcion?.id)
 
       if (!createSucceeded) {
         throw new Error(createResponse?.message || 'Error al crear la recepción')
       }
 
-      const recepcionId = createResponse.data?.id || createResponse.id
+      const recepcionId = createdRecepcion.id
 
       // Close reception immediately
       const closeResponse = await post(`/api/compras/recepciones/${recepcionId}/cerrar`, {
         observaciones: 'Recepción cerrada automáticamente'
       })
 
-      const closeSucceeded = closeResponse?.success === true || Boolean(closeResponse?.id)
+      const closedRecepcion = closeResponse?.data ?? closeResponse
+      const closeSucceeded = closeResponse?.success !== false && Boolean(closedRecepcion?.id)
 
       if (!closeSucceeded) {
         throw new Error(closeResponse?.message || 'Error al cerrar la recepción')
       }
 
-      toast({ title: 'Recepción completada', description: 'Stock, cuentas por pagar y contabilidad actualizados.' })
+      toast({
+        title: 'Recepción completada',
+        description: 'Se actualizaron el cumplimiento y el stock físico aplicable. La cuenta por pagar se crea al registrar la factura del proveedor.',
+      })
       onComplete()
     } catch (error: any) {
       console.error('Error submitting recepcion:', error)
@@ -587,11 +611,12 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                             -
                           </button>
                           <input
-                            type="number"
-                            min="0"
-                            max={maxCantidad}
-                            value={item.cantidad_recibir}
-                            onChange={(e) => updateItemQuantity(index, parseInt(e.target.value) || 0)}
+                             type="number"
+                             min="0"
+                             step="0.01"
+                             max={maxCantidad}
+                             value={item.cantidad_recibir}
+                             onChange={(e) => updateItemQuantity(index, Number.parseFloat(e.target.value) || 0)}
                             className="w-20 rounded-md border-2 border-blue-600 px-2 py-2 text-center text-lg font-bold text-primary outline-none focus:ring-4 focus:ring-blue-100"
                           />
                           <button
@@ -739,12 +764,13 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
         {currentStep === 3 && (
           <div>
             <h3 className="mb-6 text-base font-semibold text-foreground">
-              Asignar Almacén, Ubicación, Lotes y Series
+              Asignar destino físico cuando corresponda
             </h3>
 
             <div className="flex flex-col gap-4">
               {items.filter(item => item.cantidad_recibir > 0).map((item, index) => {
                 const originalIndex = items.findIndex(i => i.detalle_id === item.detalle_id)
+                const requiereDestinoFisico = item.controla_stock && item.calidad !== 'RECHAZADO'
 
                 return (
                   <div
@@ -762,8 +788,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                       </div>
                     </div>
 
-                    {/* Almacen y Ubicacion */}
-                    <div className="mb-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+                    {requiereDestinoFisico ? (
+                      <>
+                        {/* Almacen y Ubicacion */}
+                        <div className="mb-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                       {/* Almacén */}
                       <div>
                         <label className="mb-2 block text-xs font-semibold text-foreground/85">
@@ -802,10 +830,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                           ))}
                         </select>
                       </div>
-                    </div>
+                        </div>
 
-                    {/* Lote/Serie/Expiracion Grid */}
-                    <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+                        {/* Lote/Serie/Expiracion Grid */}
+                        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                       {/* Lote */}
                       <div>
                         <label className="mb-2 block text-xs font-semibold text-foreground/85">
@@ -846,12 +874,26 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                           className={fieldClass}
                         />
                       </div>
-                    </div>
+                        </div>
 
-                    {/* Info Note */}
-                    <div className="mt-3 rounded-md border border-blue-300 bg-primary/10 p-3 text-xs text-primary">
-                      <strong>Nota:</strong> El almacén es obligatorio. Los campos de ubicación, lote y serie son opcionales. Complete solo si aplica para este producto.
-                    </div>
+                        <div className="mt-3 rounded-md border border-blue-300 bg-primary/10 p-3 text-xs text-primary">
+                          <strong>Nota:</strong> El almacén es obligatorio para este bien físico. Ubicación, lote y serie son opcionales.
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-md border border-cyan-300 bg-primary/10 p-3 text-sm text-primary">
+                        <strong>
+                          {item.calidad === 'RECHAZADO'
+                            ? 'Item rechazado'
+                            : item.es_servicio
+                              ? 'Servicio'
+                              : 'Producto sin control de stock'}:
+                        </strong>{' '}
+                        {item.calidad === 'RECHAZADO'
+                          ? 'queda registrado para inspección, pero no cumple la orden ni crea movimiento físico.'
+                          : 'cumple la orden y alimenta contabilidad, pero no requiere almacén ni crea un movimiento físico.'}
+                      </div>
+                    )}
                   </div>
                 )
               })}

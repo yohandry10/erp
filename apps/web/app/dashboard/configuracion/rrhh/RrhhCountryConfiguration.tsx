@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Loader2, Save, Users } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
@@ -75,6 +75,14 @@ export default function RrhhCountryConfiguration() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testingPila, setTestingPila] = useState(false)
+  const mutationIntents = useRef(new Map<string, string>())
+  const intentFor = (signature: string) => {
+    const existing = mutationIntents.current.get(signature)
+    if (existing) return existing
+    const key = `rrhh-country:${crypto.randomUUID()}`
+    mutationIntents.current.set(signature, key)
+    return key
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -127,15 +135,20 @@ export default function RrhhCountryConfiguration() {
 
   const save = async () => {
     setSaving(true)
+    const payload = {
+      ...form,
+      art_tasa: Number(form.art_tasa),
+      sindicato_aporte_default: Number(form.sindicato_aporte_default),
+      contribucion_patronal: Number(form.contribucion_patronal),
+      seguro_vida_monto: Number(form.seguro_vida_monto),
+      periodo_prueba_max_meses: Number(form.periodo_prueba_max_meses),
+    }
+    const signature = `ar:${JSON.stringify(payload)}`
     try {
-      await put('/rrhh/configuracion-laboral/argentina', {
-        ...form,
-        art_tasa: Number(form.art_tasa),
-        sindicato_aporte_default: Number(form.sindicato_aporte_default),
-        contribucion_patronal: Number(form.contribucion_patronal),
-        seguro_vida_monto: Number(form.seguro_vida_monto),
-        periodo_prueba_max_meses: Number(form.periodo_prueba_max_meses),
+      await put('/rrhh/configuracion-laboral/argentina', payload, {
+        headers: { 'Idempotency-Key': intentFor(signature) },
       })
+      mutationIntents.current.delete(signature)
       toast({
         title: 'RRHH Argentina actualizado',
         description: 'CCT, ART, registración y parámetros patronales quedaron guardados.',
@@ -154,14 +167,19 @@ export default function RrhhCountryConfiguration() {
 
   const saveColombia = async () => {
     setSaving(true)
+    const payload = {
+      ...coForm,
+      arl_clase_riesgo: Number(coForm.arl_clase_riesgo),
+      arl_tasa: Number(coForm.arl_tasa),
+      salario_minimo: Number(coForm.salario_minimo),
+      auxilio_transporte: Number(coForm.auxilio_transporte),
+    }
+    const signature = `co:${JSON.stringify(payload)}`
     try {
-      await put('/rrhh/configuracion-laboral/colombia', {
-        ...coForm,
-        arl_clase_riesgo: Number(coForm.arl_clase_riesgo),
-        arl_tasa: Number(coForm.arl_tasa),
-        salario_minimo: Number(coForm.salario_minimo),
-        auxilio_transporte: Number(coForm.auxilio_transporte),
+      await put('/rrhh/configuracion-laboral/colombia', payload, {
+        headers: { 'Idempotency-Key': intentFor(signature) },
       })
+      mutationIntents.current.delete(signature)
       toast({
         title: 'RRHH Colombia actualizado',
         description: 'PILA, seguridad social, parafiscales y nómina electrónica quedaron guardados.',
@@ -180,8 +198,12 @@ export default function RrhhCountryConfiguration() {
 
   const testPila = async () => {
     setTestingPila(true)
+    const signature = 'pila:test'
     try {
-      const result = await post('/rrhh/configuracion-laboral/colombia/pila/test', {})
+      const result = await post('/rrhh/configuracion-laboral/colombia/pila/test', {}, {
+        headers: { 'Idempotency-Key': intentFor(signature) },
+      })
+      mutationIntents.current.delete(signature)
       toast({
         title: result?.success ? 'Conexión PILA preparada' : 'PILA requiere atención',
         description: result?.message || (result?.missing?.length ? `Faltan: ${result.missing.join(', ')}` : 'Revise la configuración del operador.'),

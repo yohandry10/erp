@@ -40,6 +40,12 @@ $$;
 
 REVOKE ALL ON FUNCTION public.guardar_rrhh_peru_presentacion_tx(uuid, uuid, jsonb) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.registrar_rrhh_peru_evidencia_tx(uuid, uuid, uuid, text, text, text, timestamptz) FROM PUBLIC, anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE
+  ON TABLE public.rrhh_peru_presentaciones_planilla
+  FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION app.guardar_rrhh_peru_presentacion_tx(uuid, uuid, jsonb),
+  app.registrar_rrhh_peru_evidencia_tx(uuid, uuid, uuid, text, text, text, timestamptz)
+  FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.guardar_rrhh_peru_presentacion_tx(uuid, uuid, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.registrar_rrhh_peru_evidencia_tx(uuid, uuid, uuid, text, text, text, timestamptz) TO service_role;
 

@@ -71,6 +71,7 @@ export default function CashManagementPage() {
                     <CashSessionSelector
                         key={refreshKey}
                         onSelect={handleSessionSelect}
+                        onOpen={() => setShowOpenDialog(true)}
                     />
 
                     <CortesList id="cortes" />

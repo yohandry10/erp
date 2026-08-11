@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Query,
@@ -70,7 +71,7 @@ export class CxcController {
   }
 
   @Post(':id/pagos')
-  @RequirePermission('finanzas.cxc.cobros.write')
+  @RequirePermission('cpe.comprobantes.emitir')
   @ApiOperation({
     summary: 'Registrar pago/anticipo',
     description:
@@ -89,8 +90,8 @@ export class CxcController {
   @Post(':id/notas-credito')
   @RequirePermission('finanzas.cxc.cobros.write')
   @ApiOperation({
-    summary: 'Aplicar nota de crédito a una CxC',
-    description: 'Registra una nota de crédito asociada a la cuenta por cobrar reduciendo el saldo pendiente',
+    summary: 'Crear nota de crédito fiscal referenciada desde una CxC',
+    description: 'Delega al writer canónico 472: crea documento/CPE, reduce CxC, genera saldo a favor y outbox en un commit',
   })
   @ApiResponse({ status: 200, description: 'Nota de crédito aplicada correctamente' })
   async aplicarNotaCredito(
@@ -114,7 +115,8 @@ export class CxcController {
     @Body() reprogramarDto: ReprogramarCxcDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.cxcService.reprogramarCuentaPorCobrar(tenantId, id, reprogramarDto, user?.id);
+    return this.cxcService.reprogramarCuentaPorCobrar(tenantId, id, reprogramarDto, user?.id, idempotencyKey);
   }
 }

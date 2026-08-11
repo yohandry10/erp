@@ -119,7 +119,7 @@ async function createSaleWithCpe(apiContext: APIRequestContext) {
 
   await parseOk<any>(
     await apiContext.post(api(`/ventas/pedidos/${pedido.id}/confirmar`), {
-      data: { forzar_confirmacion: false },
+      data: {},
     }),
     'confirmar pedido SIRE',
   );
@@ -212,6 +212,7 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
       data: {
         orden_id: orden.id,
+        idempotency_key: `recepcion:${runId}:sire`,
         almacen_id: almacenes[0].id,
         observaciones: 'Recepción SIRE T12',
         items: [{

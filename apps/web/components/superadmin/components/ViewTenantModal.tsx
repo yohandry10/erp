@@ -72,12 +72,19 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
     setDemoError('')
     setDemoSuccess('')
     try {
+      const intentStorageKey = `tenant-demo-activate-intent:${tenant.id}`
+      let idempotencyKey = window.sessionStorage.getItem(intentStorageKey)
+      if (!idempotencyKey) {
+        idempotencyKey = `tenant-demo-activate-${window.crypto.randomUUID()}`
+        window.sessionStorage.setItem(intentStorageKey, idempotencyKey)
+      }
       const res = await api.post(`/tenants/${tenant.id}/demo/activate`, {
         email: demoEmail,
         password: demoPassword,
         dias_duracion: demoDays,
-      })
+      }, { headers: { 'Idempotency-Key': idempotencyKey } })
       if (res?.success) {
+        window.sessionStorage.removeItem(intentStorageKey)
         setTenantState((prev) => ({
           ...prev,
           is_demo: true,
@@ -101,8 +108,19 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
     setDemoError('')
     setDemoSuccess('')
     try {
-      const res = await api.post(`/tenants/${tenant.id}/demo/deactivate`)
+      const intentStorageKey = `tenant-demo-deactivate-intent:${tenant.id}`
+      let idempotencyKey = window.sessionStorage.getItem(intentStorageKey)
+      if (!idempotencyKey) {
+        idempotencyKey = `tenant-demo-deactivate-${window.crypto.randomUUID()}`
+        window.sessionStorage.setItem(intentStorageKey, idempotencyKey)
+      }
+      const res = await api.post(
+        `/tenants/${tenant.id}/demo/deactivate`,
+        undefined,
+        { headers: { 'Idempotency-Key': idempotencyKey } },
+      )
       if (res?.success) {
+        window.sessionStorage.removeItem(intentStorageKey)
         setTenantState((prev) => ({
           ...prev,
           is_demo: false,

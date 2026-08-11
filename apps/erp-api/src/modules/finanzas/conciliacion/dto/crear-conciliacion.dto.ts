@@ -2,10 +2,17 @@ import {
   IsDateString,
   IsString,
   IsUUID,
+  MaxLength,
+  MinLength,
   Matches,
 } from 'class-validator';
 
 export class CrearConciliacionDto {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(180)
+  idempotency_key!: string;
+
   @IsUUID('4', { message: 'El ID de la cuenta bancaria debe ser un UUID válido' })
   cuenta_bancaria_id!: string;
 

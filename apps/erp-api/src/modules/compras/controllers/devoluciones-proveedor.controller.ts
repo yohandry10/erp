@@ -16,7 +16,10 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { DevolucionesProveedorService } from '../services/devoluciones-proveedor.service';
-import { CreateDevolucionProveedorDto } from '../dto/create-devolucion-proveedor.dto';
+import {
+  AnularDevolucionProveedorDto,
+  CreateDevolucionProveedorDto,
+} from '../dto/create-devolucion-proveedor.dto';
 
 /**
  * DevolucionesProveedorController
@@ -115,5 +118,28 @@ export class DevolucionesProveedorController {
   ) {
     // HARDENING: tenant se obtiene del contexto autenticado.
     return this.devolucionesService.emitirDevolucion(devolucionId, tenantId, user?.id);
+  }
+
+  @Post(':id/anular')
+  @RequirePermission('compras.devoluciones.emitir')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Anular devolución pendiente',
+    description: 'Libera un borrador PENDIENTE. Una devolución EMITIDA requiere una reversa explícita.',
+  })
+  @ApiResponse({ status: 200, description: 'Devolución pendiente anulada' })
+  @ApiResponse({ status: 400, description: 'La devolución ya fue emitida o no es anulable' })
+  async anularDevolucion(
+    @Param('id') devolucionId: string,
+    @Body() dto: AnularDevolucionProveedorDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.devolucionesService.anularDevolucionPendiente(
+      devolucionId,
+      tenantId,
+      user?.id,
+      dto.motivo,
+    );
   }
 }

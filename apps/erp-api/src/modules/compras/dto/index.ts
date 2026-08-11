@@ -18,6 +18,7 @@ export * from './cancelar-orden-compra.dto';
 
 // Recepciones DTOs
 export * from './create-recepcion.dto';
+export * from './update-recepcion.dto';
 export * from './cerrar-recepcion.dto';
 
 // Devoluciones DTOs

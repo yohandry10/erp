@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
+import { usePermission } from '@/hooks/use-permission'
 import { parseDateLocal } from '@/lib/date-utils'
 import { Cotizacion, EstadoCotizacion } from '@/types/ventas'
 import CotizacionForm, { CotizacionFormData } from '@/components/ventas/CotizacionForm'
 import ConvertirPedidoButton from '@/components/ventas/ConvertirPedidoButton'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
-import { ArrowLeft, Edit, FileText, Eye } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Edit, FileText, Loader2, Send, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
@@ -34,11 +35,27 @@ export default function CotizacionDetailPage() {
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const router = useRouter()
   const params = useParams()
-  const { get, put } = useApi()
+  const { get, put, post } = useApi()
+  const { hasPermission: canEditCotizacion, loading: editPermissionLoading } = usePermission(
+    'ventas',
+    'editar',
+    'cotizaciones',
+  )
+  const { hasPermission: canApproveCotizacion, loading: approvePermissionLoading } = usePermission(
+    'ventas',
+    'approve',
+    'cotizaciones',
+  )
+  const { hasPermission: canConvertCotizacion, loading: convertPermissionLoading } = usePermission(
+    'ventas',
+    'convertir_pedido',
+    'cotizaciones',
+  )
 
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
+  const [transitioning, setTransitioning] = useState<'enviar' | 'aprobar' | 'rechazar' | null>(null)
 
   const cotizacionId = params.id as string
 
@@ -118,6 +135,56 @@ export default function CotizacionDetailPage() {
     return formatLocalizedCurrency(toNumber(amount))
   }
 
+  const handleEstadoTransition = async (accion: 'enviar' | 'aprobar' | 'rechazar') => {
+    let motivo: string | undefined
+
+    if (accion === 'enviar') {
+      if (!window.confirm(`¿Marcar la cotización ${cotizacion?.numero ?? ''} como enviada?`)) {
+        return
+      }
+    } else {
+      const decision = accion === 'aprobar' ? 'aprobar' : 'rechazar'
+      const motivoIngresado = window.prompt(
+        `Motivo u observación para ${decision} la cotización ${cotizacion?.numero ?? ''} (opcional):`,
+      )
+      if (motivoIngresado === null) {
+        return
+      }
+      motivo = motivoIngresado.trim() || undefined
+    }
+
+    try {
+      setTransitioning(accion)
+      const response = await post(
+        `/api/ventas/cotizaciones/${cotizacionId}/${accion}`,
+        motivo ? { motivo } : {},
+      )
+
+      if (!response?.success) {
+        throw new Error(response?.message || 'No se pudo actualizar el estado de la cotización')
+      }
+
+      const estadoFinal = accion === 'enviar'
+        ? 'enviada'
+        : accion === 'aprobar'
+          ? 'aprobada'
+          : 'rechazada'
+      toast({
+        title: 'Estado actualizado',
+        description: `La cotización quedó ${estadoFinal}.`,
+      })
+      await loadCotizacion()
+    } catch (error: any) {
+      toast({
+        title: 'No se pudo cambiar el estado',
+        description: error?.message || 'Intenta nuevamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setTransitioning(null)
+    }
+  }
+
   const formatDate = (dateString: string) => {
     try {
       return format(parseDateLocal(dateString), 'dd/MM/yyyy', { locale: es })
@@ -144,8 +211,12 @@ export default function CotizacionDetailPage() {
   }
 
   const canEdit = cotizacion.estado === EstadoCotizacion.BORRADOR
+  const canSend = cotizacion.estado === EstadoCotizacion.BORRADOR
+  const canDecide = cotizacion.estado === EstadoCotizacion.BORRADOR ||
+                    cotizacion.estado === EstadoCotizacion.ENVIADA
   const canConvert = cotizacion.estado === EstadoCotizacion.BORRADOR ||
-                     cotizacion.estado === EstadoCotizacion.ENVIADA
+                     cotizacion.estado === EstadoCotizacion.ENVIADA ||
+                     cotizacion.estado === EstadoCotizacion.APROBADA
   const isConverted = cotizacion.estado === EstadoCotizacion.CONVERTIDA
   const detalle = Array.isArray(cotizacion.detalle) ? cotizacion.detalle : []
 
@@ -183,7 +254,7 @@ export default function CotizacionDetailPage() {
         </div>
 
         <div className="flex gap-2">
-          {!isEditing && canEdit && (
+          {!isEditing && canEdit && canEditCotizacion && !editPermissionLoading && (
             <button
               onClick={() => setIsEditing(true)} className="inline-flex items-center gap-2 py-3 px-6 text-[0.875rem] font-semibold text-[var(--primary-700)] bg-card cursor-pointer transition"
               onMouseEnter={(e) => {
@@ -200,9 +271,45 @@ export default function CotizacionDetailPage() {
             </button>
           )}
 
+          {!isEditing && canSend && canEditCotizacion && !editPermissionLoading && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={transitioning !== null}
+              onClick={() => handleEstadoTransition('enviar')}
+            >
+              {transitioning === 'enviar' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Enviar
+            </Button>
+          )}
+
+          {!isEditing && canDecide && canApproveCotizacion && !approvePermissionLoading && (
+            <>
+              <Button
+                type="button"
+                variant="success"
+                disabled={transitioning !== null}
+                onClick={() => handleEstadoTransition('aprobar')}
+              >
+                {transitioning === 'aprobar' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                Aprobar
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={transitioning !== null}
+                onClick={() => handleEstadoTransition('rechazar')}
+              >
+                {transitioning === 'rechazar' ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                Rechazar
+              </Button>
+            </>
+          )}
+
           {!isEditing && canConvert && !isConverted && (
             <ConvertirPedidoButton
               cotizacionId={cotizacion.id}
+              disabled={transitioning !== null || convertPermissionLoading || !canConvertCotizacion}
               onSuccess={handleConversionSuccess}
             />
           )}

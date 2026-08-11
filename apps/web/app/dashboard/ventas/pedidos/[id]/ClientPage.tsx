@@ -7,6 +7,7 @@ import { useEmpresaConfig } from '@/hooks/use-empresa-config'
 import { PedidoVenta, EstadoPedido } from '@/types/ventas'
 import { toast } from '@/components/ui/use-toast'
 import GenerarFacturaButton from '@/components/ventas/GenerarFacturaButton'
+import CancelarPedidoButton from '@/components/ventas/CancelarPedidoButton'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -151,6 +152,19 @@ export default function PedidoDetailPage() {
     estadoPedido !== EstadoPedido.COMPLETADO &&
     estadoPedido !== EstadoPedido.COMPLETADO_CON_GRE
 
+  const tieneDespachoFisico = (pedido.detalle ?? []).some(
+    (item: any) => Number(item.cantidad_despachada ?? 0) > 0,
+  )
+  const puedeCancelarPedido = [
+    EstadoPedido.PENDIENTE,
+    EstadoPedido.PENDIENTE_APROBACION,
+    EstadoPedido.CONFIRMADO,
+    EstadoPedido.EN_PREPARACION,
+    EstadoPedido.LISTO_DESPACHO,
+    EstadoPedido.DESPACHO_PARCIAL,
+    EstadoPedido.LISTO_FACTURAR,
+  ].includes(estadoPedido)
+
   return (
     <div className="p-6 flex flex-col gap-6">
       {/* Header */}
@@ -191,7 +205,17 @@ export default function PedidoDetailPage() {
           <button
             onClick={async () => {
               try {
-                const response = await post(`/ventas/pedidos/${pedidoId}/confirmar`, { forzar_confirmacion: false })
+                const response = await post(`/ventas/pedidos/${pedidoId}/confirmar`, {})
+                if (response?.requiere_aprobacion) {
+                  toast({
+                    title: 'Pedido pendiente de aprobación',
+                    description: response.motivos?.length
+                      ? response.motivos.join(' • ')
+                      : 'El pedido requiere aprobación comercial antes de confirmarse.'
+                  })
+                  await loadPedido()
+                  return
+                }
                 if (!response?.success) {
                   const warningText = response?.warnings?.length
                     ? response.warnings.map((w: any) => `${w.descripcion || 'Producto'}: solicitado ${w.solicitado}, disponible ${w.disponible}`).join(' | ')
@@ -226,6 +250,16 @@ export default function PedidoDetailPage() {
           >
             Confirmar Pedido
           </button>
+        </div>
+      )}
+
+      {puedeCancelarPedido && (
+        <div className="flex flex-wrap gap-3">
+          <CancelarPedidoButton
+            pedidoId={pedidoId}
+            hasPhysicalDispatch={tieneDespachoFisico}
+            onSuccess={loadPedido}
+          />
         </div>
       )}
 

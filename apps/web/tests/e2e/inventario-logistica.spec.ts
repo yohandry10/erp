@@ -94,6 +94,7 @@ async function setLogisticaConfig(
   expect(error?.message || '', 'actualizar configuración logística').toBe('');
   await parseOk(
     await apiContext.put(api('/configuration/empresa'), {
+      headers: { 'Idempotency-Key': `configuration-logistics-${runId}` },
       data: { usar_flujo_logistica: values.usar_flujo_logistica },
     }),
     'invalidar configuración logística mediante API',
@@ -264,6 +265,7 @@ test.describe('T09 Inventario y logística', () => {
         await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
           data: {
             orden_id: orden.id,
+            idempotency_key: `recepcion:${runId}:inventario`,
             almacen_id: almacenId,
             observaciones: 'Recepción inventario T09',
             items: [{
@@ -381,7 +383,7 @@ test.describe('T09 Inventario y logística', () => {
 
       await parseOk<any>(
         await apiContext.post(api(`/ventas/pedidos/${pedido.id}/confirmar`), {
-          data: { forzar_confirmacion: false },
+          data: {},
         }),
         'confirmar pedido T09',
       );

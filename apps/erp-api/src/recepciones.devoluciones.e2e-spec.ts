@@ -1,18 +1,14 @@
 import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { EventEmitterService } from '../src/shared/events/event-emitter.service';
 import { RecepcionesService } from '../src/modules/compras/services/recepciones.service';
 import { DevolucionesProveedorService } from '../src/modules/compras/services/devoluciones-proveedor.service';
 import { SupabaseService } from '../src/shared/supabase/supabase.service';
-import { EventBusService } from '../src/shared/events/event-bus.service';
-import { InventarioService } from '../src/modules/inventario/inventario.service';
-import { TaxCalculatorService } from '../src/shared/utils/tax-calculator';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { DevolucionesProveedorRepository } from '../src/modules/compras/repositories/devoluciones-proveedor.repository';
 
 // Estos tests son de integración ligera (mock de supabase + servicios internos) para validar que
-// una recepción y una devolución emiten outbox/evento y disparan stock/CxP.
+// una recepción usa sus fronteras SQL y una devolución coordina sus efectos.
 
 describe('Compras E2E - recepciones y devoluciones (mock Supabase)', () => {
   let app: INestApplication;
@@ -29,8 +25,11 @@ describe('Compras E2E - recepciones y devoluciones (mock Supabase)', () => {
   const mockSingle = jest.fn();
   const mockOrder = jest.fn().mockReturnThis();
   const mockLimit = jest.fn().mockReturnThis();
+  const mockRpc = jest.fn();
+  const mockIn = jest.fn();
 
   const mockSupabaseClient = {
+    rpc: mockRpc,
     from: jest.fn(() => ({
       insert: mockInsert,
       update: mockUpdate,
@@ -40,6 +39,7 @@ describe('Compras E2E - recepciones y devoluciones (mock Supabase)', () => {
       single: mockSingle,
       order: mockOrder,
       limit: mockLimit,
+      in: mockIn,
     })),
   };
 
@@ -54,6 +54,8 @@ describe('Compras E2E - recepciones y devoluciones (mock Supabase)', () => {
       mockSingle,
       mockOrder,
       mockLimit,
+      mockRpc,
+      mockIn,
     ].forEach((mock) => mock.mockReset());
     const queryBuilder: any = {
       insert: mockInsert,
@@ -65,6 +67,7 @@ describe('Compras E2E - recepciones y devoluciones (mock Supabase)', () => {
       order: mockOrder,
       limit: mockLimit,
       like: jest.fn().mockReturnThis(),
+      in: mockIn,
     };
     mockSupabaseClient.from.mockReturnValue(queryBuilder);
     mockInsert.mockReturnValue(queryBuilder);
@@ -81,27 +84,19 @@ describe('Compras E2E - recepciones y devoluciones (mock Supabase)', () => {
         {
           provide: DevolucionesProveedorRepository,
           useValue: {
-            generarNumeroDevolucion: jest.fn().mockResolvedValue('DEV-001'),
-            crear: jest.fn().mockResolvedValue({ id: 'dev-1', numero: 'DEV-001' }),
-            crearItems: jest.fn().mockResolvedValue([{ id: 'dev-item-1' }]),
             obtenerPorId: jest.fn(),
-            actualizar: jest.fn(),
-            actualizarEstado: jest.fn().mockResolvedValue({ id: 'dev-1', estado: 'EMITIDA' }),
+            listar: jest.fn(),
           },
         },
         { provide: SupabaseService, useValue: { getClient: () => mockSupabaseClient } },
         {
-          provide: InventarioService,
+          provide: AuditService,
           useValue: {
-            registrarEntradaStockAtomico: jest.fn(),
-            crearMovimiento: jest.fn(),
-            descontarStock: jest.fn().mockResolvedValue({ success: true }),
+            registrarCambio: jest.fn(),
+            logAction: jest.fn(),
+            logBusinessEvent: jest.fn(),
           },
         },
-        { provide: EventBusService, useValue: { emitRecepcionRegistrada: jest.fn(), emitDevolucionProveedorEmitida: jest.fn() } },
-        { provide: EventEmitterService, useValue: { emit: jest.fn() } },
-        { provide: TaxCalculatorService, useValue: { calcularImpuestos: jest.fn().mockResolvedValue({ subtotal: 10, igv: 1.8, total: 11.8 }) } },
-        { provide: AuditService, useValue: { logAction: jest.fn(), logBusinessEvent: jest.fn() } },
       ],
     }).compile();
 
@@ -110,7 +105,6 @@ describe('Compras E2E - recepciones y devoluciones (mock Supabase)', () => {
 
     recepcionesService = moduleFixture.get(RecepcionesService);
     devolucionesService = moduleFixture.get(DevolucionesProveedorService);
-    jest.spyOn(recepcionesService as any, 'generarNumeroRecepcion').mockResolvedValue('REC-001');
     jest.spyOn(recepcionesService, 'obtenerRecepcionPorId').mockResolvedValue({
       id: 'rec-1',
       numero: 'REC-001',
@@ -123,85 +117,68 @@ describe('Compras E2E - recepciones y devoluciones (mock Supabase)', () => {
     if (app) await app.close();
   });
 
-  it('debería emitir outbox recepcion.registrada y registrar CxP/stock (mock)', async () => {
-    // Arrange: mock de orden/proveedor/recepción
-    mockSingle
-      // orden compra
-      .mockResolvedValueOnce({
-        data: {
-          id: 'ord-1',
-          numero: 'OC-001',
-          estado: 'APROBADA',
-          subtotal: 100,
-          igv: 18,
-          total: 118,
-          moneda: 'PEN',
-          detalles: [{ id: 'det-1', producto_id: 'prod-1', cantidad: 1, cantidad_recibida: 0 }],
-        },
-        error: null,
-      })
-      // recepcion insert result
-      .mockResolvedValueOnce({ data: { id: 'rec-1', numero: 'REC-001', fecha_recepcion: new Date().toISOString(), items: [] }, error: null });
+  it('debería delegar la creación completa a crear_recepcion_tx sin escrituras parciales', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: {
+        id: 'rec-1',
+        numero: 'REC-001',
+        estado: 'BORRADOR',
+        items: [],
+        idempotent: false,
+      },
+      error: null,
+    });
 
     const dto: any = {
       orden_id: 'ord-1',
-      proveedor_id: 'prov-1',
-      fecha_recepcion: new Date().toISOString(),
+      idempotency_key: 'recepcion:ord-1:intento-1',
       items: [
-        { detalle_id: 'det-1', producto_id: 'prod-1', cantidad_recibida: 1, precio_unitario: 10, calidad: 'ACEPTADO' },
+        { detalle_id: 'det-1', cantidad_recibida: 1, calidad: 'OK', almacen_id: 'alm-1' },
       ],
     };
 
     const result = await recepcionesService.crearRecepcion(tenantId, dto, 'user-1');
 
     expect(result).toBeDefined();
-    expect(mockInsert).toHaveBeenCalled(); // inserción recepciones
-    // El EventEmitterService.emit debería ser llamado con recepcion.registrada (mock ya cableado)
+    expect(mockRpc).toHaveBeenCalledWith('crear_recepcion_tx', expect.objectContaining({
+      p_tenant_id: tenantId,
+      p_orden_id: 'ord-1',
+      p_created_by: 'user-1',
+      p_idempotency_key: 'recepcion:ord-1:intento-1',
+    }));
+    expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('recepciones');
+    expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('recepcion_items');
+    // La atomicidad y el evento durable de cierre se validan en PostgreSQL (444).
   });
 
-  it('debería emitir outbox devolucion.proveedor.registrada y registrar stock (mock)', async () => {
-    // Arrange: orden/proveedor/recepcion
-    mockSingle
-      .mockResolvedValueOnce({ data: { id: 'ord-1', numero: 'OC-001', proveedor_id: 'prov-1', estado: 'APROBADA' }, error: null }) // orden
-      .mockResolvedValueOnce({ data: { id: 'rec-1', orden_id: 'ord-1' }, error: null }); // recepción
-
+  it('delega creación y emisión de devolución a las RPC atómicas 450', async () => {
     const repoMock = (devolucionesService as any).devolucionesRepository;
-    if (repoMock) {
-      repoMock.insertar = jest.fn().mockResolvedValue({ id: 'dev-1' });
-      repoMock.obtenerPorId = jest.fn().mockResolvedValue({
-        id: 'dev-1',
-        numero: 'DEV-001',
-        orden_id: 'ord-1',
-        proveedor_id: 'prov-1',
-        recepcion_id: null,
-        estado: 'PENDIENTE',
-        fecha_devolucion: new Date().toISOString(),
-        motivo: 'Producto defectuoso',
-        subtotal: 10,
-        igv: 1.8,
-        total: 11.8,
-        moneda: 'PEN',
-        items: [{ producto_id: 'prod-1', cantidad: 1, precio_unitario: 10, subtotal: 10 }],
+    repoMock.obtenerPorId = jest.fn().mockResolvedValue({
+      id: 'dev-1', numero: 'DEV-001', estado: 'EMITIDA', items: [],
+    });
+    mockRpc
+      .mockResolvedValueOnce({ data: { id: 'dev-1', estado: 'PENDIENTE', items: [] }, error: null })
+      .mockResolvedValueOnce({
+        data: { id: 'dev-1', estado: 'EMITIDA', movimientos: [{ movimiento_id: 'mov-1' }] },
+        error: null,
       });
-      repoMock.actualizar = jest.fn().mockResolvedValue({ id: 'dev-1', estado: 'EMITIDA' });
-      repoMock.listar = jest.fn();
-    }
 
     const dto: any = {
+      idempotency_key: 'return:rec-1:attempt-1',
       orden_id: 'ord-1',
       proveedor_id: 'prov-1',
-      items: [{ producto_id: 'prod-1', cantidad: 1, precio_unitario: 10 }],
+      recepcion_id: 'rec-1',
+      motivo: 'Producto defectuoso',
+      items: [{ recepcion_item_id: 'rec-item-1', producto_id: 'prod-1', cantidad: 1, precio_unitario: 10 }],
     };
 
     const creada = await devolucionesService.crearDevolucion(tenantId, dto, 'user-1');
     expect(creada).toBeDefined();
-
-    mockSingle
-      .mockResolvedValueOnce({ data: { razon_social: 'Proveedor Demo' }, error: null })
-      .mockResolvedValueOnce({ data: { numero: 'OC-001', moneda: 'PEN' }, error: null });
-
     const emitida = await devolucionesService.emitirDevolucion('dev-1', tenantId, 'user-1');
     expect(emitida.estado).toBe('EMITIDA');
-    // Se valida que el repo/inventario/eventEmitter mocks fueron llamados (propósito principal de E2E liviano)
+    expect(mockRpc).toHaveBeenNthCalledWith(1, 'crear_devolucion_proveedor_tx', expect.any(Object));
+    expect(mockRpc).toHaveBeenNthCalledWith(2, 'emitir_devolucion_proveedor_tx', expect.any(Object));
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

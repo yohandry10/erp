@@ -4,6 +4,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.pnpm-store/
 *.log
 
 # TypeScript
@@ -11,6 +12,7 @@ pnpm-debug.log*
 
 # Next.js
 apps/**/.next/
+apps/**/.next-*/
 apps/**/out/
 .next/
 out/
@@ -58,6 +60,10 @@ backups/*.dump
 coverage/
 apps/**/coverage/
 *.lnk
+
+# Bytecode generado por los harness QA de Python.
+__pycache__/
+*.pyc
 
 # Local validation databases and tool caches
 .codex_pg_rebuild/

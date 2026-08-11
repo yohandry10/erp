@@ -19,6 +19,7 @@ jest.mock('@erp-suite/crypto', () => {
             signXml: jest.fn().mockReturnValue('<xml>signed</xml>'),
             generateHash: jest.fn().mockReturnValue('mock-hash'),
             validateSignature: jest.fn().mockReturnValue(true),
+            validateSignatureStrict: jest.fn().mockReturnValue(true),
         })),
     };
 });
@@ -34,6 +35,7 @@ describe('CpeService', () => {
     let mockSupabaseClient: any;
 
     const mockTenantId = 'tenant-123';
+    const mockUserId = '11111111-1111-4111-8111-111111111111';
     const mockCreateFacturaDto: CreateFacturaDto = {
         tipo_documento: '01' as any,
         serie: 'F001',
@@ -166,6 +168,99 @@ describe('CpeService', () => {
     });
 
     describe('create', () => {
+        it.each(['07', '08'])('rechaza el writer genérico para la nota %s', async (tipo) => {
+            await expect(service.create({
+                ...mockCreateFacturaDto,
+                tipo_documento: tipo,
+            } as any, mockTenantId, mockUserId)).rejects.toThrow(
+                /notas 07\/08 deben crearse desde \/cpe\/notas-referenciadas/i,
+            );
+            expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+        });
+
+        it('finaliza un CPE POS sobre el documento reservado sin crear otra factura/CxC', async () => {
+            validationService.validateCertificate.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+            validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, missingFields: [], errors: [] });
+            validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+            mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+
+            jest.spyOn(service as any, 'validarDocumentoPosReservado').mockResolvedValue(undefined);
+            jest.spyOn(service as any, 'getXmlSigner').mockResolvedValue({
+                signXml: jest.fn().mockReturnValue('<xml>signed-pos</xml>'),
+                generateHash: jest.fn().mockReturnValue('pos-hash'),
+                validateSignature: jest.fn().mockReturnValue(true),
+                validateSignatureStrict: jest.fn().mockReturnValue(true),
+            });
+
+            const dto = {
+                ...mockCreateFacturaDto,
+                idempotency_key: 'pos.cpe:tenant-123:venta-1',
+                documento_id: 'doc-pos-1',
+                venta_pos_id: 'venta-pos-1',
+            } as any;
+            const cpeCreado = {
+                id: 'cpe-pos-1',
+                ...dto,
+                documento_id: 'doc-pos-1',
+                estado: 'FIRMADO',
+            };
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: {
+                    cpe: cpeCreado,
+                    documento_id: 'doc-pos-1',
+                    venta: { cpe_id: 'cpe-pos-1' },
+                },
+                error: null,
+            });
+
+            const result = await service.create(
+                dto,
+                mockTenantId,
+                mockUserId,
+                { finalizarDocumentoPosReservado: true },
+            );
+
+            expect(result.id).toBe('cpe-pos-1');
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith(
+                'emitir_factura_cliente_tx',
+                expect.anything(),
+            );
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'finalizar_cpe_pos_tx',
+                expect.objectContaining({ p_venta_id: 'venta-pos-1', p_actor_id: mockUserId }),
+            );
+            expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+            expect(eventBusService.emitComprobanteCreadoEvent).not.toHaveBeenCalled();
+        });
+
+        it('rechaza adoptar un documento POS que no coincide con la venta atómica', async () => {
+            mockSupabaseClient.single.mockResolvedValueOnce({
+                data: {
+                    id: 'venta-pos-1',
+                    documento_id: 'doc-distinto',
+                    cpe_data: {
+                        documento_id: 'doc-distinto',
+                        serie: 'F001',
+                        numero: 1,
+                    },
+                    total: 118,
+                    cliente_documento: '20600600600',
+                    accounting_event_id: 'event-pos-1',
+                    atomic_result: { venta_id: 'venta-pos-1' },
+                },
+                error: null,
+            });
+
+            await expect((service as any).validarDocumentoPosReservado({
+                ...mockCreateFacturaDto,
+                documento_id: 'doc-pos-1',
+                venta_pos_id: 'venta-pos-1',
+            }, mockTenantId)).rejects.toThrow(
+                'El CPE POS no coincide con la venta y el documento reservados atómicamente',
+            );
+        });
+
         it('debe crear un CPE exitosamente si pasa todas las validaciones', async () => {
             // 1. Validaciones
             validationService.validateCertificate.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
@@ -181,49 +276,112 @@ describe('CpeService', () => {
                 error: { message: 'Not found' }
             });
 
-            // 4. Insert CPE
             const mockCreatedCpe = {
                 id: 'cpe-123',
                 ...mockCreateFacturaDto,
+                estado: 'FIRMADO',
+                sunat_status: 'READY',
                 created_at: new Date().toISOString(),
             };
-            const mockDocumentoOperativo = { id: 'doc-123' };
-            mockSupabaseClient.single.mockResolvedValueOnce({ data: mockCreatedCpe, error: null });
-
-            // 5. Ensure Document: no existe documento previo, se crea documento operativo real
-            mockSupabaseClient.maybeSingle
-                .mockResolvedValueOnce({ data: null, error: null } as any)
-                .mockResolvedValueOnce({
-                    data: {
-                        ruc: '20100100100',
-                        razon_social: 'Empresa Demo',
-                        direccion_fiscal: 'Av. Demo 123',
-                    },
-                    error: null,
-                } as any);
-
-            mockSupabaseClient.single.mockResolvedValueOnce({ data: mockDocumentoOperativo, error: null });
-
-            // 6. Get certificate (2nd call in prepareXmlForSunat) -> Fallback to demo
-            mockSupabaseClient.single.mockResolvedValueOnce({
-                data: null, // No tenant cert -> fallback to demo
-                error: { message: 'Not found' }
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: {
+                    cpe: mockCreatedCpe,
+                    cpe_id: 'cpe-123',
+                    documento_id: 'doc-123',
+                    cxc_id: null,
+                    idempotent: false,
+                    repaired: false,
+                },
+                error: null,
             });
 
-            // 7. Update in prepareXmlForSunat
-            supabaseService.update.mockResolvedValue({ data: null, error: null } as any);
-
-            const result = await service.create(mockCreateFacturaDto, mockTenantId);
+            const result = await service.create(mockCreateFacturaDto, mockTenantId, mockUserId);
 
             expect(result).toBeDefined();
             expect(result.id).toBe('cpe-123');
-            expect(mockSupabaseClient.insert).toHaveBeenCalled();
-            expect(mockSupabaseClient.update).toHaveBeenCalledWith({ documento_id: 'doc-123' });
-            expect(eventBusService.emitFacturaEmitidaEvent).toHaveBeenCalled();
-            expect(eventBusService.emitFacturaEmitidaEvent).toHaveBeenCalledWith(
-                expect.objectContaining({ facturaId: 'doc-123', costoVentas: 60 }),
+            expect((result as any).documento_id).toBe('doc-123');
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'emitir_factura_cliente_tx',
+                expect.objectContaining({
+                    p_tenant_id: mockTenantId,
+                    p_event_id: expect.any(String),
+                    p_idempotency_key: expect.any(String),
+                    p_cxc: null,
+                    p_detalles: [
+                        expect.objectContaining({
+                            orden: 1,
+                            valor_venta: 100,
+                            impuesto_igv: 18,
+                            total_item: 118,
+                        }),
+                    ],
+                }),
             );
-            expect(supabaseService.update).toHaveBeenCalled();
+            expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+            expect(supabaseService.update).not.toHaveBeenCalled();
+            expect(eventBusService.emitComprobanteCreadoEvent).not.toHaveBeenCalled();
+            expect(eventBusService.emitFacturaEmitidaEvent).not.toHaveBeenCalled();
+        });
+
+        it('debe crear la CxC y sus ajustes dentro de la misma RPC para una venta a crédito', async () => {
+            validationService.validateCertificate.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+            validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, missingFields: [], errors: [] });
+            validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+
+            jest.spyOn(service as any, 'getXmlSigner').mockResolvedValue({
+                signXml: jest.fn().mockReturnValue('<xml>signed-credit</xml>'),
+                generateHash: jest.fn().mockReturnValue('credit-hash'),
+                validateSignature: jest.fn().mockReturnValue(true),
+                validateSignatureStrict: jest.fn().mockReturnValue(true),
+            });
+
+            mockSupabaseClient.maybeSingle
+                .mockResolvedValueOnce({
+                    data: {
+                        id: '22222222-2222-4222-8222-222222222222',
+                        sujeto_retencion: true,
+                        retencion_tasa: 3,
+                    },
+                    error: null,
+                })
+                .mockResolvedValueOnce({ data: {}, error: null });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: {
+                    cpe: {
+                        id: 'cpe-credit',
+                        ...mockCreateFacturaDto,
+                        estado: 'FIRMADO',
+                        sunat_status: 'READY',
+                    },
+                    documento_id: 'doc-credit',
+                    cxc_id: 'cxc-credit',
+                },
+                error: null,
+            });
+
+            const dto = {
+                ...mockCreateFacturaDto,
+                cliente_id: '22222222-2222-4222-8222-222222222222',
+                condicion_pago: 'CREDITO',
+            } as CreateFacturaDto;
+            const result = await service.create(dto, mockTenantId, mockUserId);
+
+            expect(result.id).toBe('cpe-credit');
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'emitir_factura_cliente_tx',
+                expect.objectContaining({
+                    p_cxc: expect.objectContaining({
+                        cliente_id: dto.cliente_id,
+                        monto_total: 118,
+                        monto_pendiente: 114.46,
+                        retencion_total: 3.54,
+                        percepcion_total: 0,
+                        detraccion_total: 0,
+                        anticipo_total: 0,
+                    }),
+                }),
+            );
+            expect(eventBusService.emitFacturaEmitidaEvent).not.toHaveBeenCalled();
         });
 
         it('debe lanzar BadRequestException si falla validación de certificado', async () => {
@@ -258,15 +416,34 @@ describe('CpeService', () => {
             errorSpy.mockRestore();
         });
 
-        it('debe retornar CPE existente si se detecta idempotencia', async () => {
-            // Mock existing CPE found
+        it('debe reconciliar un CPE existente mediante la RPC en vez de retornar temprano', async () => {
             const existingCpe = { id: 'existing-1', ...mockCreateFacturaDto };
             mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: existingCpe, error: null } as any);
 
-            const result = await service.create(mockCreateFacturaDto, mockTenantId);
+            validationService.validateCertificate.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+            validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, missingFields: [], errors: [] });
+            validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+            mockSupabaseClient.single.mockResolvedValueOnce({ data: null, error: { message: 'Not found' } });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: {
+                    cpe: { ...existingCpe, estado: 'FIRMADO', sunat_status: 'READY' },
+                    documento_id: 'doc-repaired',
+                    cxc_id: null,
+                    idempotent: true,
+                    repaired: true,
+                },
+                error: null,
+            });
+
+            const result = await service.create(mockCreateFacturaDto, mockTenantId, mockUserId);
 
             expect(result.id).toBe('existing-1');
-            expect(mockSupabaseClient.insert).not.toHaveBeenCalled(); // Should not try to insert again
+            expect((result as any).documento_id).toBe('doc-repaired');
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'emitir_factura_cliente_tx',
+                expect.any(Object),
+            );
+            expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
         });
     });
 
@@ -276,7 +453,7 @@ describe('CpeService', () => {
             const invalidDto = { ...mockCreateFacturaDto, items: [] };
             mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null } as any); // Idempotencia
 
-            await expect(service.create(invalidDto, mockTenantId)).rejects.toThrow(/El comprobante debe incluir al menos un ítem/);
+            await expect(service.create(invalidDto, mockTenantId, mockUserId)).rejects.toThrow(/El comprobante debe incluir al menos un ítem/);
             errorSpy.mockRestore();
         });
 
@@ -288,7 +465,7 @@ describe('CpeService', () => {
             };
             mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null } as any); // Idempotencia
 
-            await expect(service.create(invalidDto, mockTenantId)).rejects.toThrow(/Cada ítem debe tener cantidad > 0/);
+            await expect(service.create(invalidDto, mockTenantId, mockUserId)).rejects.toThrow(/Cada ítem debe tener cantidad > 0/);
             errorSpy.mockRestore();
         });
 
@@ -300,7 +477,7 @@ describe('CpeService', () => {
             };
             mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null } as any);
 
-            await expect(service.create(invalidDto, mockTenantId)).rejects.toThrow(/Totales inconsistentes/);
+            await expect(service.create(invalidDto, mockTenantId, mockUserId)).rejects.toThrow(/Totales inconsistentes/);
             errorSpy.mockRestore();
         });
 
@@ -314,20 +491,8 @@ describe('CpeService', () => {
             };
             mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null } as any);
 
-            await expect(service.create(invalidDto, mockTenantId)).rejects.toThrow(/factura requiere receptor con RUC/i);
+            await expect(service.create(invalidDto, mockTenantId, mockUserId)).rejects.toThrow(/factura requiere receptor con RUC/i);
             errorSpy.mockRestore();
-        });
-    });
-
-    describe('sincronización de estado con Documentos', () => {
-        it.each([
-            ['FIRMADO', 'EMITIDO'],
-            ['ENVIADO', 'ENVIADO_SUNAT'],
-            ['ACEPTADO', 'ACEPTADO'],
-            ['RECHAZADO', 'RECHAZADO'],
-            ['ANULADO', 'ANULADO'],
-        ])('mapea CPE %s a documento %s', (estadoCpe, estadoDocumento) => {
-            expect((service as any).mapCpeEstadoADocumento(estadoCpe)).toBe(estadoDocumento);
         });
     });
 
@@ -480,7 +645,7 @@ describe('CpeService', () => {
             ).rejects.toThrow(ConflictException);
 
             expect(auditService.registrarCambio).toHaveBeenCalledWith(
-                'comprobantes_electronicos',
+                'cpe',
                 'UPDATE',
                 'user-1',
                 expect.objectContaining({
@@ -611,37 +776,10 @@ describe('CpeService', () => {
             ).rejects.toThrow(/se encontraron 2/i);
         });
 
-        it('numera notas de crédito considerando el código SUNAT 07', async () => {
-            const numberingQuery = {
-                from: jest.fn().mockReturnThis(),
-                select: jest.fn().mockReturnThis(),
-                eq: jest.fn().mockReturnThis(),
-                in: jest.fn().mockReturnThis(),
-                order: jest.fn().mockReturnThis(),
-                limit: jest.fn().mockResolvedValue({
-                    data: [{ numero: 7 }],
-                    error: null,
-                }),
-            };
-            supabaseService.getClient.mockReturnValue(numberingQuery as any);
-
-            await expect(
-                (service as any).cancellationService.obtenerSiguienteNumeroNotaCredito(
-                    mockTenantId,
-                    'BC001',
-                ),
-            ).resolves.toBe(8);
-
-            expect(numberingQuery.in).toHaveBeenCalledWith(
-                'tipo_documento',
-                ['07', 'NOTA_CREDITO'],
-            );
-        });
     });
 
     describe('crearCPEDesdeDocumento', () => {
-        it('debe crear CPE desde documento fiscal', async () => {
-            const mockDocumento: any = {
+        const buildDocumento = (): any => ({
                 id: 'doc-1',
                 serie: 'F001',
                 numero: 100,
@@ -671,80 +809,84 @@ describe('CpeService', () => {
                     ruc: '20100000001',
                     razon_social: 'Emisor 1'
                 }
-            };
+            });
 
-            // 1. Check existing CPE for document (idempotency by doc id)
-            mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null } as any);
+        const prepararEmisionAtomica = (cpeId: string, idempotent = false) => {
+            validationService.validateCertificate.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+            validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, missingFields: [], errors: [] });
+            validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
+            jest.spyOn(service as any, 'getXmlSigner').mockResolvedValue({
+                signXml: jest.fn().mockReturnValue('<xml>signed-document</xml>'),
+                generateHash: jest.fn().mockReturnValue('document-hash'),
+                validateSignature: jest.fn().mockReturnValue(true),
+                validateSignatureStrict: jest.fn().mockReturnValue(true),
+            });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: {
+                    cpe: { id: cpeId, estado: 'FIRMADO', sunat_status: 'READY' },
+                    documento_id: 'doc-1',
+                    cxc_id: null,
+                    idempotent,
+                },
+                error: null,
+            });
+        };
 
-            // 2. Get Certificate
-            mockSupabaseClient.single.mockResolvedValueOnce({ data: null, error: { message: 'Not found' } }); // Demo cert
+        it('debe crear CPE desde documento fiscal mediante la RPC atómica', async () => {
+            const mockDocumento = buildDocumento();
+            prepararEmisionAtomica('cpe-doc-1');
 
-            // 3. Insert CPE
-            const mockInsertedCpe = { id: 'cpe-doc-1' };
-            mockSupabaseClient.single.mockResolvedValueOnce({ data: mockInsertedCpe, error: null });
+            const result = await service.crearCPEDesdeDocumento(mockDocumento, mockTenantId, 'actor-476');
 
-            const result = await service.crearCPEDesdeDocumento(mockDocumento, mockTenantId);
-
-            expect(result).toBe(mockInsertedCpe);
-            expect(mockSupabaseClient.insert).toHaveBeenCalledWith(expect.objectContaining({
-                documento_id: 'doc-1',
-                total_venta: 118
-            }));
-            expect(eventBusService.emitComprobanteCreadoEvent).toHaveBeenCalled();
-            expect(eventBusService.emitFacturaEmitidaEvent).toHaveBeenCalled();
+            expect(result.id).toBe('cpe-doc-1');
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'emitir_factura_cliente_tx',
+                expect.objectContaining({
+                    p_idempotency_key: 'doc.cpe:doc-1',
+                    p_tenant_id: mockTenantId,
+                }),
+            );
+            expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+            expect(eventBusService.emitComprobanteCreadoEvent).not.toHaveBeenCalled();
+            expect(eventBusService.emitFacturaEmitidaEvent).not.toHaveBeenCalled();
         });
 
-        it('debe retornar CPE existente si ya fue creado', async () => {
-            const mockDocumento: any = { id: 'doc-1' };
-            const existingCpe = { id: 'cpe-existing-1' };
+        it('debe reconciliar el retry mediante la misma RPC atómica', async () => {
+            const mockDocumento = buildDocumento();
+            prepararEmisionAtomica('cpe-existing-1', true);
 
-            mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: existingCpe, error: null });
+            const result = await service.crearCPEDesdeDocumento(mockDocumento, mockTenantId, 'actor-476');
 
-            const result = await service.crearCPEDesdeDocumento(mockDocumento, mockTenantId);
-
-            expect(result).toBe(existingCpe);
+            expect(result.id).toBe('cpe-existing-1');
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'emitir_factura_cliente_tx',
+                expect.objectContaining({ p_idempotency_key: 'doc.cpe:doc-1' }),
+            );
             expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
         });
     });
 
     describe('checkOseStatus', () => {
-        it('debe actualizar estado a ACEPETADO si SUNAT responde success', async () => {
-            const mockCpe = {
-                id: 'cpe-1',
-                tipo_documento: '01',
-                serie: 'F001',
-                numero: 1,
-                hash: 'hash-1',
-                estado: 'ENVIADO'
+        it('debe delegar la consulta durable y finalizar una posible anulación', async () => {
+            const deliveryResult = { estado: 'ACEPTADO', sunat_status: 'ACCEPTED' };
+            const deliverySpy = jest
+                .spyOn((service as any).deliveryService, 'checkOseStatus')
+                .mockResolvedValue(deliveryResult);
+            const cancellationSpy = jest
+                .spyOn((service as any).cancellationService, 'finalizarAnulacionAceptada')
+                .mockResolvedValue(null);
+            const options = {
+                idempotencyKey: 'query-476',
+                actorId: mockUserId,
+                origin: 'USER' as const,
             };
 
-            // 1. Find CPE
-            mockSupabaseClient.single.mockResolvedValueOnce({ data: mockCpe, error: null });
-
-            // 2. Mock Fiscal Adapter
-            const mockFiscalAdapter = (service as any).fiscalAdapter;
-            mockFiscalAdapter.obtenerNombreServicioFiscal = jest.fn().mockResolvedValue('SUNAT');
-            mockFiscalAdapter.consultarEstado = jest.fn().mockResolvedValue({
-                success: true,
-                cdr: 'CDR_XML_CONTENT',
-                codigoRespuesta: '0',
-                descripcionRespuesta: 'Aceptado'
-            });
-
-            // 3. Update CPE
-            supabaseService.update.mockResolvedValue({ data: null, error: null } as any);
-
-            const result = await service.checkOseStatus('cpe-1', mockTenantId);
+            const result = await service.checkOseStatus('cpe-1', mockTenantId, options);
 
             expect(result.estado).toBe('ACEPTADO');
-            expect(supabaseService.update).toHaveBeenCalledWith(
-                'cpe',
-                expect.objectContaining({
-                    estado: 'ACEPTADO',
-                    sunat_status: 'ACCEPTED'
-                }),
-                { id: 'cpe-1' }
-            );
+            expect(deliverySpy).toHaveBeenCalledWith('cpe-1', mockTenantId, options);
+            expect(cancellationSpy).toHaveBeenCalledWith('cpe-1', mockTenantId);
+            expect(supabaseService.update).not.toHaveBeenCalled();
         });
     });
 

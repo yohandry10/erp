@@ -167,75 +167,43 @@ export class StockInicialImporter implements Importer {
       }
 
       try {
-        // Idempotencia: si ya hay un movimiento de apertura para
-        // (tenant, producto, sucursal, almacen, fecha_corte), skip.
-        const { data: existingMov } = await client
-          .from('movimientos_inventario')
-          .select('id')
-          .eq('tenant_id', ctx.tenantId)
-          .eq('producto_id', productoId)
-          .eq('tipo', 'ENTRADA')
-          .eq('referencia_tipo', `MIGRACION_APERTURA_${ctx.fechaCorte}`)
-          .eq('almacen_id', almacenId)
-          .contains('metadata', {
-            fecha_corte: ctx.fechaCorte,
-            sucursal_id: sucursalId,
-            almacen_id: almacenId,
-          })
-          .maybeSingle();
-
-        if (existingMov?.id) {
-          result.skippedRows++;
-          if (ctx.runCtx) {
-            await this.runs.recordRow({
-              runId: ctx.runCtx.runId,
-              tenantId: ctx.tenantId,
-              rowIndex,
-              externalId: externalProd,
-              status: 'skipped',
-              targetTable: 'movimientos_inventario',
-              targetId: existingMov.id,
-              errorMessage: 'Apertura ya registrada para este producto/sucursal/fecha',
-            });
-          }
-          continue;
-        }
-
-        // Registrar el saldo físico, el agregado y el kardex en una sola RPC.
-        const { data: mov, error: movErr } = await client.rpc('aplicar_movimiento_inventario_tx', {
+        // La RPC 473 fija la huella antes de delegar el agregado fisico al
+        // writer canonico 347. Un replay con otra cantidad/costo ya no queda
+        // aceptado silenciosamente por la identidad fisica del movimiento.
+        const { data: mov, error: movErr } = await client.rpc('importar_stock_inicial_tx', {
           p_tenant_id: ctx.tenantId,
-          p_producto_id: productoId,
-          p_almacen_id: almacenId,
-          p_tipo: 'ENTRADA',
-          p_cantidad: cantidad,
-          p_referencia_tipo: `MIGRACION_APERTURA_${ctx.fechaCorte}`,
-          p_referencia_id: productoId,
-          p_notas: nonEmpty(row['descripcion']) ?? `Apertura migración al ${ctx.fechaCorte}`,
-          p_created_by: ctx.startedBy ?? null,
-          p_metadata: {
-            origen: 'migracion_apertura',
-            fecha_corte: ctx.fechaCorte,
-            costo_unitario: costo,
-            valor_total: cantidad * costo,
-            sucursal_id: sucursalId,
+          p_actor_id: ctx.startedBy,
+          p_run_id: ctx.runCtx?.runId ?? null,
+          p_external_id: `stock:${externalProd}:${almacenId}:${ctx.fechaCorte}`,
+          p_stock: {
+            producto_id: productoId,
             almacen_id: almacenId,
-            run_id: ctx.runCtx?.runId ?? null,
+            sucursal_id: sucursalId,
+            fecha_corte: ctx.fechaCorte,
+            cantidad,
+            costo_unitario: costo,
             external_id_producto: externalProd,
+            notas: nonEmpty(row['descripcion']) ?? `Apertura migración al ${ctx.fechaCorte}`,
           },
         });
         if (movErr) throw movErr;
 
-        result.created++;
-        result.okRows++;
+        const action = String(mov?.action ?? '');
+        const targetId = mov?.id ?? null;
+        if (action === 'CREATED') result.created++;
+        else if (action === 'IDEMPOTENT') result.skippedRows++;
+        else result.updated++;
+        if (action !== 'IDEMPOTENT') result.okRows++;
         if (ctx.runCtx) {
           await this.runs.recordRow({
             runId: ctx.runCtx.runId,
             tenantId: ctx.tenantId,
             rowIndex,
             externalId: externalProd,
-            status: 'ok',
+            status: action === 'IDEMPOTENT' ? 'skipped' : 'ok',
             targetTable: 'movimientos_inventario',
-            targetId: mov ?? null,
+            targetId,
+            errorMessage: action === 'IDEMPOTENT' ? 'Apertura ya aplicada con la misma huella' : null,
           });
         }
       } catch (err: any) {

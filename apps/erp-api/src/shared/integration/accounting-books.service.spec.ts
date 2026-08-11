@@ -17,11 +17,13 @@ describe('AccountingBooksService', () => {
 
     const from = jest.fn(() => chain);
 
+    const rpc=jest.fn().mockResolvedValue({data:{record:{id:'cons-1',tenant_id:'tenant-seguro',estado:'PENDIENTE',
+      cantidad:3,valor_unitario:10.125,valor_total:30.38,consignatario_nombre:'Cliente QA'}},error:null});
     const supabase = {
-      getClient: jest.fn(() => ({ from })),
+      getClient: jest.fn(() => ({ from,rpc })),
     };
 
-    return { supabase, from, chain };
+    return { supabase, from, chain,rpc };
   };
 
   it('lanza error si no hay tenant en contexto', async () => {
@@ -88,7 +90,7 @@ describe('AccountingBooksService', () => {
   });
 
   it('fuerza tenant, estado y total de la consignación desde el servidor', async () => {
-    const { supabase, chain } = buildSupabaseMock();
+    const { supabase, chain, rpc } = buildSupabaseMock();
     chain.single.mockReturnValue({ data: { id: 'cons-1' }, error: null });
     const service = new AccountingBooksService(
       supabase as any,
@@ -102,16 +104,12 @@ describe('AccountingBooksService', () => {
       valor_unitario: 10.125,
       valor_total: 1,
       consignatario_nombre: ' Cliente QA ',
-    });
+    },'11111111-1111-4111-8111-111111111111','consignment-test-create');
 
-    expect(chain.insert).toHaveBeenCalledWith(expect.objectContaining({
-      tenant_id: 'tenant-seguro',
-      estado: 'PENDIENTE',
-      cantidad: 3,
-      valor_unitario: 10.125,
-      valor_total: 30.38,
-      consignatario_nombre: 'Cliente QA',
+    expect(rpc).toHaveBeenCalledWith('gestionar_consignacion_tx',expect.objectContaining({
+      p_tenant_id:'tenant-seguro',p_action:'CREATE',p_idempotency_key:'consignment-test-create',
     }));
+    expect(chain.insert).not.toHaveBeenCalled();
   });
 
   it('rechaza estados de consignación fuera del flujo permitido', async () => {
@@ -122,7 +120,7 @@ describe('AccountingBooksService', () => {
       { getTenantId: jest.fn(() => 'tenant-1') } as any,
     );
 
-    await expect(service.updateEstadoConsignacion('cons-1', 'BORRADA')).rejects.toThrow(
+    await expect(service.updateEstadoConsignacion('cons-1','BORRADA','11111111-1111-4111-8111-111111111111')).rejects.toThrow(
       /Estado de consignación no permitido/,
     );
     errorSpy.mockRestore();

@@ -6,6 +6,7 @@ import { RoleService } from './role.service';
 import { PermissionService } from './permission.service';
 import { Role, Permission } from './types';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateRoleDto, UpdateRoleDto, AssignPermissionDto } from './dto';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
@@ -71,8 +72,9 @@ export class RoleController {
   async createRole(
     @CurrentTenant() tenantId: string,
     @Body() createRoleDto: CreateRoleDto,
+    @CurrentUser('id') actorId?: string,
   ): Promise<Role> {
-    return this.roleService.createRole(tenantId, createRoleDto);
+    return this.roleService.createRole(tenantId, createRoleDto, actorId);
   }
 
   /**
@@ -91,8 +93,9 @@ export class RoleController {
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
     @Body() updateRoleDto: UpdateRoleDto,
+    @CurrentUser('id') actorId?: string,
   ): Promise<Role> {
-    return this.roleService.updateRole(tenantId, roleId, updateRoleDto);
+    return this.roleService.updateRole(tenantId, roleId, updateRoleDto, actorId);
   }
 
   /**
@@ -111,8 +114,9 @@ export class RoleController {
   async deleteRole(
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
+    @CurrentUser('id') actorId?: string,
   ) {
-    await this.roleService.deleteRole(tenantId, roleId);
+    await this.roleService.deleteRole(tenantId, roleId, actorId);
     return { message: 'Rol eliminado exitosamente' };
   }
 
@@ -151,11 +155,13 @@ export class RoleController {
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
     @Body() assignPermissionDto: AssignPermissionDto,
+    @CurrentUser('id') actorId?: string,
   ) {
     await this.permissionService.assignPermissionToRole(
       tenantId,
       roleId,
       assignPermissionDto.permiso_id,
+      actorId,
     );
     return { message: 'Permiso asignado exitosamente' };
   }
@@ -176,8 +182,9 @@ export class RoleController {
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
     @Param('permissionId') permissionId: string,
+    @CurrentUser('id') actorId?: string,
   ) {
-    await this.permissionService.revokePermissionFromRole(tenantId, roleId, permissionId);
+    await this.permissionService.revokePermissionFromRole(tenantId, roleId, permissionId, actorId);
     return { message: 'Permiso revocado exitosamente' };
   }
 

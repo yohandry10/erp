@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { CheckSquare, FileText, ShoppingCart, Users, BarChart3 } from 'lucide-react'
+import { CheckSquare, FileText, ShoppingCart, Users, BarChart3, RotateCcw, SlidersHorizontal } from 'lucide-react'
 
 const sections = [
   {
@@ -29,6 +29,18 @@ const sections = [
     icon: CheckSquare,
   },
   {
+    href: '/dashboard/ventas/rma',
+    title: 'RMA y devoluciones',
+    description: 'Autoriza, recibe y acredita devoluciones sin anular la venta completa.',
+    icon: RotateCcw,
+  },
+  {
+    href: '/dashboard/ventas/comercial',
+    title: 'Gestión comercial',
+    description: 'Listas de precios, comisiones reversibles y bloques de ventas.',
+    icon: SlidersHorizontal,
+  },
+  {
     href: '/dashboard/ventas/reportes',
     title: 'Reportes',
     description: 'Indicadores comerciales, pipeline y análisis.',
@@ -43,7 +55,7 @@ export default function VentasPage() {
         <div>
           <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Ventas</h1>
           <p className="mt-2 text-base text-muted-foreground">
-            Acceso operativo a clientes, cotizaciones, pedidos, aprobaciones y reportes comerciales
+            Acceso operativo a clientes, cotizaciones, pedidos, devoluciones, aprobaciones y reportes comerciales
           </p>
         </div>
       </div>

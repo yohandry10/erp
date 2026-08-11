@@ -14,7 +14,7 @@ import { RequirePermission } from '../../../common/decorators/require-permission
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { ConciliacionService } from './conciliacion.service';
-import { CrearConciliacionDto, ListarConciliacionesDto, ImportarCsvDto, MatchAutomaticoDto, MarcarItemDto, RegistrarPlantillaCsvDto, CerrarConciliacionDto } from './dto';
+import { CrearConciliacionDto, ListarConciliacionesDto, ImportarCsvDto, MatchAutomaticoDto, MarcarItemDto, MatchLoteDto, RegistrarPlantillaCsvDto, CerrarConciliacionDto } from './dto';
 
 @ApiTags('Finanzas - Conciliación')
 @ApiBearerAuth()
@@ -104,7 +104,7 @@ export class ConciliacionController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
-    return this.conciliacionService.crearConciliacion(tenantId, crearConciliacionDto, user?.id);
+    return this.conciliacionService.crearConciliacionAtomica(tenantId, crearConciliacionDto, user?.id);
   }
 
   @Post(':id/importar-csv')
@@ -120,8 +120,9 @@ export class ConciliacionController {
     @Param('id') id: string,
     @Body() importarCsvDto: ImportarCsvDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
-    return this.conciliacionService.importarCsv(tenantId, id, importarCsvDto);
+    return this.conciliacionService.importarCsvAtomico(tenantId, id, importarCsvDto, user?.id);
   }
 
   @Post(':id/match-automatico')
@@ -137,8 +138,9 @@ export class ConciliacionController {
     @Param('id') id: string,
     @Body() matchAutomaticoDto: MatchAutomaticoDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
-    return this.conciliacionService.matchAutomatico(tenantId, id, matchAutomaticoDto);
+    return this.conciliacionService.matchAutomaticoAtomico(tenantId, id, matchAutomaticoDto, user?.id);
   }
 
   @Post(':id/marcar-item')
@@ -154,8 +156,21 @@ export class ConciliacionController {
     @Param('id') id: string,
     @Body() marcarItemDto: MarcarItemDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
-    return this.conciliacionService.marcarItem(tenantId, id, marcarItemDto);
+    return this.conciliacionService.marcarItemAtomico(tenantId, id, marcarItemDto, user?.id);
+  }
+
+  @Post(':id/match-lote')
+  @RequirePermission('finanzas.conciliacion.gestionar')
+  @ApiOperation({ summary: 'Conciliar un lote completo en una sola transacción' })
+  async marcarLote(
+    @Param('id') id: string,
+    @Body() dto: MatchLoteDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.conciliacionService.marcarLoteAtomico(tenantId, id, dto, user?.id);
   }
 
   @Get(':id/diferencias')
@@ -177,7 +192,7 @@ export class ConciliacionController {
   @RequirePermission('finanzas.conciliacion.gestionar')
   @ApiOperation({
     summary: 'Cerrar conciliación bancaria',
-    description: 'Cierra una conciliación bancaria después de validar que todos los ítems han sido procesados. Valida que: 1) Se haya importado un extracto bancario, 2) Todos los movimientos estén conciliados (o se fuerce el cierre). Marca todos los movimientos conciliados como definitivos, genera un reporte de diferencias y bloquea futuras modificaciones. Una vez cerrada, la conciliación no puede ser modificada.',
+    description: 'Cierra una conciliación sólo cuando existe extracto, todos los movimientos tienen match exacto y los saldos inicial/final de banco y libro coinciden. Las diferencias requieren un movimiento de ajuste contabilizado; no existe cierre forzado. El período y sus ítems quedan inmutables.',
   })
   @ApiResponse({ status: 200, description: 'Conciliación cerrada exitosamente' })
   @ApiResponse({ status: 400, description: 'Conciliación ya cerrada, tiene movimientos pendientes, o no se ha importado extracto' })
@@ -188,11 +203,8 @@ export class ConciliacionController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
-    return this.conciliacionService.cerrarConciliacion(
-      tenantId, 
-      id, 
-      user?.id,
-      cerrarConciliacionDto.forzar_cierre || false
+    return this.conciliacionService.cerrarConciliacionAtomica(
+      tenantId, id, cerrarConciliacionDto, user?.id,
     );
   }
 }

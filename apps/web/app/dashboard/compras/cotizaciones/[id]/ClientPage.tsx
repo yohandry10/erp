@@ -39,6 +39,12 @@ interface CotizacionDetalle {
   aprobado_at?: string
   rechazado_at?: string
   motivo_rechazo?: string
+  metadata?: {
+    last_action?: 'ENVIAR' | 'APROBAR' | 'RECHAZAR'
+    last_action_at?: string
+    motivo_rechazo?: string
+    converted_at?: string
+  }
   created_at: string
   proveedores?: {
     razon_social: string
@@ -211,9 +217,10 @@ export default function CotizacionDetallePage() {
       setActionLoading(true)
       const response = await post(`/api/compras/cotizaciones/${cotizacionId}/convertir-oc`, {})
 
-      if (response?.success && response.data?.orden_id) {
+      const ordenId = response?.data?.id || response?.data?.orden_id
+      if (response?.success && ordenId) {
         toast.success('✅ Orden de Compra creada exitosamente')
-        router.push(`/dashboard/compras/ordenes/${response.data.orden_id}`)
+        router.push(`/dashboard/compras/ordenes/${ordenId}`)
       } else {
         toast.error(`Error: ${response?.message || 'No se pudo convertir a OC'}`)
       }
@@ -256,6 +263,13 @@ export default function CotizacionDetallePage() {
   const puedeConvertir = estado === 'APROBADA' && !cotizacion.orden_compra_id && !isVencida
   const detalles = Array.isArray(cotizacion.detalles) ? cotizacion.detalles : []
   const moneda = cotizacion.moneda || currency
+  const enviadoAt = cotizacion.enviado_at
+    || (cotizacion.metadata?.last_action === 'ENVIAR' ? cotizacion.metadata.last_action_at : undefined)
+  const aprobadoAt = cotizacion.aprobado_at
+    || (cotizacion.metadata?.last_action === 'APROBAR' ? cotizacion.metadata.last_action_at : undefined)
+  const rechazadoAt = cotizacion.rechazado_at
+    || (cotizacion.metadata?.last_action === 'RECHAZAR' ? cotizacion.metadata.last_action_at : undefined)
+  const motivoRechazo = cotizacion.motivo_rechazo || cotizacion.metadata?.motivo_rechazo
 
   return (
     <div className={pageClass}>
@@ -417,35 +431,35 @@ export default function CotizacionDetallePage() {
         </div>
       )}
 
-      {(cotizacion.enviado_at || cotizacion.aprobado_at || cotizacion.rechazado_at || cotizacion.orden_compra_id) && (
+      {(enviadoAt || aprobadoAt || rechazadoAt || cotizacion.orden_compra_id) && (
         <div className={panelClass}>
           <h2 className="mb-4 text-lg font-bold text-foreground">Historial</h2>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {cotizacion.enviado_at && (
+            {enviadoAt && (
               <div className="flex items-center gap-3">
                 <div className={iconBoxClass}><Send size={16} /></div>
                 <div>
                   <div className={valueClass}>Enviada</div>
-                  <div className="text-xs text-muted-foreground">{formatDateTime(cotizacion.enviado_at)}</div>
+                  <div className="text-xs text-muted-foreground">{formatDateTime(enviadoAt)}</div>
                 </div>
               </div>
             )}
-            {cotizacion.aprobado_at && (
+            {aprobadoAt && (
               <div className="flex items-center gap-3">
                 <div className={iconBoxClass}><CheckCircle size={16} /></div>
                 <div>
                   <div className={valueClass}>Aprobada</div>
-                  <div className="text-xs text-muted-foreground">{formatDateTime(cotizacion.aprobado_at)}</div>
+                  <div className="text-xs text-muted-foreground">{formatDateTime(aprobadoAt)}</div>
                 </div>
               </div>
             )}
-            {cotizacion.rechazado_at && (
+            {rechazadoAt && (
               <div className="flex items-center gap-3">
                 <div className={iconBoxClass}><XCircle size={16} /></div>
                 <div>
                   <div className={valueClass}>Rechazada</div>
-                  <div className="text-xs text-muted-foreground">{formatDateTime(cotizacion.rechazado_at)}</div>
-                  {cotizacion.motivo_rechazo && <div className="mt-1 text-xs text-muted-foreground">Motivo: {cotizacion.motivo_rechazo}</div>}
+                  <div className="text-xs text-muted-foreground">{formatDateTime(rechazadoAt)}</div>
+                  {motivoRechazo && <div className="mt-1 text-xs text-muted-foreground">Motivo: {motivoRechazo}</div>}
                 </div>
               </div>
             )}

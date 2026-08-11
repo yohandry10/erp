@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import {
   AsignarDistribucionDto,
@@ -159,14 +160,31 @@ export class DistribucionAnaliticaService {
     return (data || []) as DistribucionAnaliticaResponseDto[];
   }
 
-  async eliminar(tenantId: string, detalleAsientoId: string, eje: string): Promise<void> {
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('distribucion_analitica')
-      .delete()
-      .eq('tenant_id', tenantId)
-      .eq('detalle_asiento_id', detalleAsientoId)
-      .eq('eje', eje.trim().toUpperCase());
+  async eliminar(
+    tenantId: string,
+    detalleAsientoId: string,
+    eje: string,
+    userId: string,
+    idempotencyKey?: string,
+  ): Promise<void> {
+    if (!userId) {
+      throw new BadRequestException('Se requiere un actor autenticado.');
+    }
+
+    const ejeNormalizado = (eje || 'CENTRO_COSTO').trim().toUpperCase();
+    const key = idempotencyKey?.trim() || createHash('sha256')
+      .update(`${tenantId}:${userId}:${detalleAsientoId}:${ejeNormalizado}`)
+      .digest('hex');
+    const { error } = await this.supabaseService.getClient().rpc(
+      'eliminar_distribucion_analitica_tx',
+      {
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+        p_detalle_id: detalleAsientoId,
+        p_eje: ejeNormalizado,
+        p_idempotency_key: key,
+      },
+    );
 
     if (error) {
       throw new Error(`Error eliminando la distribución analítica: ${error.message}`);

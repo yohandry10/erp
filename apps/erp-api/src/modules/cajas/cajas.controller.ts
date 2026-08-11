@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards, BadRequestException, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Put, Query, Req, UseGuards, BadRequestException, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { CajasService } from './cajas.service';
 import { CreateCajaDto } from './dto/create-caja.dto';
@@ -11,12 +11,30 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Denominaciones } from './services/cash-reconciliation.service';
+import {
+  CancelarCambioTurnoCajaDto,
+  CompletarCambioTurnoCajaDto,
+  ConciliarRetiroCajaDto,
+  IniciarCambioTurnoCajaDto,
+  MovimientoManualCajaDto,
+  SolicitarRetiroCajaDto,
+} from './dto/cash-operations.dto';
 
 
 @Controller('cajas')
 @UseGuards(JwtAuthGuard, PermissionGuard) // Asegura req.user y tenant_id para @CurrentTenant()
 export class CajasController {
   constructor(private readonly service: CajasService) { }
+
+  private requireIdempotencyKey(value: string | undefined, operation: string): string {
+    const key = String(value || '').trim();
+    if (key.length < 8 || key.length > 180) {
+      throw new BadRequestException(
+        `Idempotency-Key obligatorio (8-180 caracteres) para ${operation}`,
+      );
+    }
+    return key;
+  }
 
   @Get()
   @RequirePermission('cajas.ver')
@@ -30,9 +48,15 @@ export class CajasController {
   async crear(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
-    @Body() dto: CreateCajaDto
+    @Body() dto: CreateCajaDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.service.crearCaja(tenantId, dto, user?.id);
+    const data = await this.service.crearCaja(
+      tenantId,
+      dto,
+      user?.id,
+      this.requireIdempotencyKey(idempotencyKey, 'crear caja'),
+    );
     return { success: true, data };
   }
 
@@ -40,10 +64,28 @@ export class CajasController {
   @RequirePermission('cajas.editar')
   async actualizar(
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() dto: UpdateCajaDto
+    @Body() dto: UpdateCajaDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.service.actualizarCaja(tenantId, id, dto);
+    const data = await this.service.actualizarCaja(
+      tenantId,
+      id,
+      dto,
+      user?.id,
+      this.requireIdempotencyKey(idempotencyKey, 'actualizar caja'),
+    );
+    return { success: true, data };
+  }
+
+  @Get('opciones-contables')
+  @RequirePermission('cajas.ver')
+  async obtenerOpcionesContables(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.service.obtenerOpcionesContables(tenantId, user?.id);
     return { success: true, data };
   }
 
@@ -194,31 +236,15 @@ export class CajasController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('sesionId') sesionId: string,
-    @Body() dto: {
-      monto: number;
-      motivo: string;
-      motivo_detalle?: string;
-      banco_destino?: string;
-      numero_operacion?: string;
-      foto_comprobante?: string;
-      supervisor_id?: string;
-      codigo_autorizacion?: string;
-    },
+    @Body() dto: SolicitarRetiroCajaDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     const data = await this.service.solicitarRetiro(
       tenantId,
       sesionId,
-      dto.monto,
-      dto.motivo as any,
+      dto,
       user?.id,
-      {
-        motivo_detalle: dto.motivo_detalle,
-        banco_destino: dto.banco_destino,
-        numero_operacion: dto.numero_operacion,
-        foto_comprobante: dto.foto_comprobante,
-      },
-      dto.supervisor_id,
-      dto.codigo_autorizacion,
+      this.requireIdempotencyKey(idempotencyKey, 'registrar retiro'),
     );
     return { success: true, data };
   }
@@ -229,14 +255,16 @@ export class CajasController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('retiroId') retiroId: string,
-    @Body() dto: {
-      banco_destino: string;
-      numero_operacion: string;
-      fecha_conciliacion: string;
-      comprobante_url?: string;
-    },
+    @Body() dto: ConciliarRetiroCajaDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const data = await this.service.conciliarRetiro(tenantId, retiroId, dto, user?.id);
+    const data = await this.service.conciliarRetiro(
+      tenantId,
+      retiroId,
+      dto,
+      user?.id,
+      this.requireIdempotencyKey(idempotencyKey, 'conciliar retiro'),
+    );
     return { success: true, data };
   }
 
@@ -246,13 +274,15 @@ export class CajasController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('sesionId') sesionId: string,
-    @Body() dto: { usuario_entrante_id: string },
+    @Body() dto: IniciarCambioTurnoCajaDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     const data = await this.service.iniciarCambioTurno(
       tenantId,
       sesionId,
       user?.id,
       dto.usuario_entrante_id,
+      this.requireIdempotencyKey(idempotencyKey, 'iniciar cambio de turno'),
     );
     return { success: true, data };
   }
@@ -263,24 +293,15 @@ export class CajasController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('cambioId') cambioId: string,
-    @Body() dto: {
-      monto_contado: number;
-      denominaciones: Record<string, any>;
-      foto_arqueo?: string;
-      firma_saliente: string;
-      firma_entrante: string;
-    },
+    @Body() dto: CompletarCambioTurnoCajaDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     const data = await this.service.completarCambioTurno(
       tenantId,
       cambioId,
-      dto.monto_contado,
-      dto.denominaciones,
-      dto.foto_arqueo || '',
-      {
-        saliente: dto.firma_saliente,
-        entrante: dto.firma_entrante,
-      },
+      dto,
+      user?.id,
+      this.requireIdempotencyKey(idempotencyKey, 'completar cambio de turno'),
     );
     return { success: true, data };
   }
@@ -291,13 +312,15 @@ export class CajasController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('cambioId') cambioId: string,
-    @Body() dto: { razon: string },
+    @Body() dto: CancelarCambioTurnoCajaDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     const data = await this.service.cancelarCambioTurno(
       tenantId,
       cambioId,
       dto.razon,
       user?.id,
+      this.requireIdempotencyKey(idempotencyKey, 'cancelar cambio de turno'),
     );
     return { success: true, data };
   }
@@ -318,22 +341,15 @@ export class CajasController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('sesionId') sesionId: string,
-    @Body() dto: {
-      tipo: 'INGRESO' | 'GASTO';
-      monto: number;
-      motivo: string;
-      idempotency_key?: string;
-      referencia_documento?: string;
-    },
+    @Body() dto: MovimientoManualCajaDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     const data = await this.service.registrarMovimientoManual(
       tenantId,
       sesionId,
-      dto.tipo,
-      dto.monto,
-      dto.motivo,
+      dto,
       user?.id,
-      dto.idempotency_key || dto.referencia_documento,
+      this.requireIdempotencyKey(idempotencyKey, 'registrar movimiento manual'),
     );
     return { success: true, data };
   }

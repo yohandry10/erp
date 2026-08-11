@@ -254,23 +254,9 @@ export class PlanillasService {
       ...(planillaData?.observaciones ? { observaciones: String(planillaData.observaciones).trim() } : {}),
     };
 
-    const camposPermitidos = [
-      'id',
-      'periodo',
-      'estado',
-      'estado_pago',
-      'total_ingresos',
-      'total_descuentos',
-      'total_aportes',
-      'total_neto',
-      'total_pagado',
-      'fecha_pago',
-      'metodo_pago',
-      'asientos_generados',
-      'fecha_asientos',
-      'centro_costo_id',
-      'metadata',
-    ];
+    // Una planilla siempre nace vacía. Cálculo, aprobación, devengo y pago
+    // pertenecen a sus operaciones dedicadas y no se aceptan en el alta.
+    const camposPermitidos = ['periodo', 'metadata'];
     const datosLimpios = Object.fromEntries(
       Object.entries({ ...planillaData, periodo })
         .filter(([key]) => camposPermitidos.includes(key))
@@ -287,8 +273,26 @@ export class PlanillasService {
           tenant_id: tenantId,
           pais_codigo: paisLaboral,
           moneda: this.monedaPais(paisLaboral),
+          estado: 'borrador',
+          estado_pago: 'pendiente',
+          total_ingresos: 0,
+          total_descuentos: 0,
+          total_aportes: 0,
+          total_neto: 0,
+          total_pagado: 0,
+          asientos_generados: 'false',
         }
-      : datosLimpios;
+      : {
+          ...datosLimpios,
+          estado: 'borrador',
+          estado_pago: 'pendiente',
+          total_ingresos: 0,
+          total_descuentos: 0,
+          total_aportes: 0,
+          total_neto: 0,
+          total_pagado: 0,
+          asientos_generados: 'false',
+        };
       
     const { data, error } = await this.supabaseService.getClient()
       .from('planillas')
@@ -1162,8 +1166,76 @@ export class PlanillasService {
     };
   }
 
-  // Actualizar planilla (para cambiar estado, por ejemplo)
-  async updatePlanilla(planillaId: string, updateData: any, tenantId?: string) {
+  async aprobarPlanilla(planillaId: string, tenantId?: string, usuarioId = 'sistema') {
+    if (!tenantId) {
+      throw new BadRequestException('El tenant es obligatorio para aprobar una planilla');
+    }
+
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'aprobar_planilla_tx',
+      {
+        p_tenant_id: tenantId,
+        p_planilla_id: planillaId,
+        p_usuario_id: usuarioId || 'sistema',
+      },
+    );
+
+    if (error) {
+      if (error.code === 'P0002') throw new NotFoundException(error.message);
+      if (error.code === '23514' || error.code === '23505') {
+        throw new ConflictException(error.message);
+      }
+      if (error.code === '22023') throw new BadRequestException(error.message);
+      throw error;
+    }
+    if (!data?.success || !data?.eventId) {
+      throw new Error('La aprobación no confirmó su evento contable durable');
+    }
+
+    return {
+      success: true,
+      message: data.idempotent
+        ? 'La planilla ya estaba aprobada'
+        : 'Planilla aprobada y devengo contable encolado',
+      data,
+    };
+  }
+
+  // Los cambios de ciclo de vida no se aceptan como updates genéricos. Se
+  // conserva la aprobación por PUT como alias compatible, pero delega a la RPC.
+  async updatePlanilla(
+    planillaId: string,
+    updateData: any,
+    tenantId?: string,
+    usuarioId = 'sistema',
+  ) {
+    const estadoSolicitado = String(updateData?.estado || '').trim().toLowerCase();
+    if (estadoSolicitado === 'aprobada') {
+      const keys = Object.keys(updateData || {});
+      if (keys.some((key) => key !== 'estado')) {
+        throw new BadRequestException(
+          'La aprobación no puede mezclarse con otras modificaciones de planilla',
+        );
+      }
+      return this.aprobarPlanilla(planillaId, tenantId, usuarioId);
+    }
+    if (estadoSolicitado) {
+      throw new ConflictException(
+        'El estado de planilla sólo cambia mediante calcular, aprobar o pagar',
+      );
+    }
+
+    const camposProtegidos = [
+      'tenant_id', 'estado_pago', 'fecha_pago', 'metodo_pago', 'total_pagado',
+      'total_ingresos', 'total_descuentos', 'total_aportes', 'total_neto',
+      'asientos_generados', 'fecha_asientos',
+    ];
+    if (camposProtegidos.some((campo) => campo in (updateData || {}))) {
+      throw new BadRequestException(
+        'Los importes, el pago y la integración contable de planilla no se editan directamente',
+      );
+    }
+
     const query = this.supabaseService.getClient()
       .from('planillas')
       .update(updateData)
@@ -1179,18 +1251,6 @@ export class PlanillasService {
     const planillaActualizada = data?.[0];
     if (!planillaActualizada) {
       throw new NotFoundException('Planilla no encontrada para el tenant actual');
-    }
-
-    // El trigger de estados es la última autoridad. Si una base desactualizada
-    // vuelve a degradar APROBADA a CALCULADA, no debemos responder 200 ni dejar
-    // que la interfaz anuncie una aprobación que nunca quedó persistida.
-    if (
-      String(updateData?.estado || '').toLowerCase() === 'aprobada'
-      && String(planillaActualizada.estado || '').toLowerCase() !== 'aprobada'
-    ) {
-      throw new ConflictException(
-        'La aprobación de la planilla no quedó persistida; revise el contrato de estados de la base de datos',
-      );
     }
 
     return planillaActualizada;
@@ -1223,6 +1283,9 @@ export class PlanillasService {
 
       if (error) {
         console.error('❌ Error eliminando planilla:', error);
+        if (error.code === '23514') {
+          throw new ConflictException(error.message);
+        }
         throw error;
       }
 
@@ -1870,7 +1933,12 @@ export class PlanillasService {
   /**
    * Pagar planilla completa - Genera pagos individuales y emite evento contable
    */
-  async pagarPlanillaCompleta(planillaId: string, metodoPago: 'efectivo' | 'transferencia', tenantId?: string) {
+  async pagarPlanillaCompleta(
+    planillaId: string,
+    metodoPago: 'efectivo' | 'transferencia',
+    tenantId?: string,
+    usuarioId = 'sistema',
+  ) {
     if (!tenantId) {
       throw new BadRequestException('El tenant es obligatorio para pagar una planilla');
     }
@@ -1882,13 +1950,13 @@ export class PlanillasService {
         p_tenant_id: tenantId,
         p_planilla_id: planillaId,
         p_metodo_pago: metodoPago,
-        p_usuario_id: 'sistema',
+        p_usuario_id: usuarioId || 'sistema',
       },
     );
 
     if (error) {
       if (error.code === 'P0002') throw new NotFoundException(error.message);
-      if (error.code === '23514' || error.code === '40001') {
+      if (error.code === '23514' || error.code === '23505' || error.code === '40001') {
         throw new ConflictException(error.message);
       }
       if (error.code === '22023') throw new BadRequestException(error.message);
@@ -1909,171 +1977,130 @@ export class PlanillasService {
   }
 
   /**
-   * Pagar empleados seleccionados de una planilla
+   * Alias compatible de la antigua ruta parcial. Sólo acepta el conjunto
+   * completo de detalles y termina delegando en la misma RPC atómica.
    */
-  async pagarEmpleadosSeleccionados(planillaId: string, pagoData: any, tenantId?: string) {
-    try {
-      this.logger.debug(`💰 [RRHH] Pagando empleados seleccionados de planilla ${planillaId}`);
-
-      const { empleados_ids, metodo_pago, numero_operacion, observaciones } = pagoData;
-
-      if (!empleados_ids || empleados_ids.length === 0) {
-        throw new BadRequestException('Debe seleccionar al menos un empleado');
-      }
-
-      let planillaInfoQuery = this.supabaseService.getClient()
-        .from('planillas')
-        .select('periodo, tenant_id')
-        .eq('id', planillaId);
-
-      if (tenantId) {
-        planillaInfoQuery = planillaInfoQuery.eq('tenant_id', tenantId);
-      }
-
-      const { data: planillaInfo, error: planillaInfoError } = await planillaInfoQuery.single();
-      if (planillaInfoError || !planillaInfo) {
-        throw new NotFoundException('Planilla no encontrada para el tenant');
-      }
-
-      const tenantIdPlanilla = tenantId || planillaInfo.tenant_id;
-
-      let empleadosPlanillaQuery = this.supabaseService.getClient()
-        .from('empleado_planilla')
-        .select('*')
-        .in('id', empleados_ids)
-        .eq('id_planilla', planillaId);
-
-      if (tenantIdPlanilla) {
-        empleadosPlanillaQuery = empleadosPlanillaQuery.eq('tenant_id', tenantIdPlanilla);
-      }
-
-      const { data: empleadosPlanilla, error } = await empleadosPlanillaQuery;
-
-      if (error) throw error;
-      if (!empleadosPlanilla || empleadosPlanilla.length === 0) {
-        throw new BadRequestException('No se encontraron empleados de planilla para pagar');
-      }
-
-      let totalPagado = 0;
-      const empleadosPagados = [];
-      const numeroOperacionNormalizado =
-        numero_operacion && /^\d+$/.test(String(numero_operacion))
-          ? Number(numero_operacion)
-          : null;
-      const observacionesPago = [
-        observaciones || null,
-        numero_operacion && !numeroOperacionNormalizado ? `Operacion: ${numero_operacion}` : null,
-      ].filter(Boolean).join(' | ') || null;
-
-      // Procesar cada empleado
-      for (const empleadoPlanilla of empleadosPlanilla) {
-        const { error: updateError } = await this.supabaseService.getClient()
-          .from('empleado_planilla')
-          .update({
-            estado_pago: 'pagado',
-            fecha_pago: new Date().toISOString(),
-            metodo_pago: metodo_pago,
-            numero_operacion: numeroOperacionNormalizado,
-            observaciones_pago: observacionesPago
-          })
-          .eq('id', empleadoPlanilla.id)
-          .eq('id_planilla', planillaId);
-
-        if (updateError) {
-          console.error('Error actualizando empleado planilla:', updateError);
-          continue;
-        }
-
-        totalPagado += parseFloat(empleadoPlanilla.neto_pagar) || 0;
-        empleadosPagados.push(empleadoPlanilla);
-      }
-
-      // Crear registro en historial de pagos
-      const { error: historialError } = await this.supabaseService.getClient()
-        .from('historial_pagos_planilla')
-        .insert({
-          planilla_id: planillaId,
-          fecha: new Date().toISOString(),
-          metodo: metodo_pago,
-          monto: totalPagado,
-          empleados_count: empleadosPagados.length,
-          numero_operacion: numero_operacion || null,
-          observaciones: observaciones || null
-        });
-
-      if (historialError) {
-        console.warn('Error creando historial de pago:', historialError);
-      }
-
-      // 🎯 SINCRONIZAR CON TABLA RRHH_PAGOS para que aparezca en "Pagos & Comprobantes"
-      const fechaPago = new Date().toISOString();
-
-      const periodoDisplay = planillaInfo?.periodo || new Date().toISOString().substring(0, 7);
-
-      this.logger.debug(`🔄 [RRHH] Sincronizando ${empleadosPagados.length} pagos con tabla rrhh_pagos...`);
-
-      for (const empleadoPlanilla of empleadosPagados) {
-        const empleadoId = empleadoPlanilla.id_empleado || empleadoPlanilla.empleado_id;
-        this.logger.debug(`📝 [RRHH] Insertando pago para empleado ${empleadoId}:`, {
-          empleado_id: empleadoId,
-          planilla_id: planillaId,
-          periodo: periodoDisplay,
-          monto_bruto: parseFloat(empleadoPlanilla.total_ingresos) || 0,
-          descuentos: parseFloat(empleadoPlanilla.total_descuentos) || 0,
-          monto_neto: parseFloat(empleadoPlanilla.neto_pagar) || 0,
-          metodo_pago: metodo_pago
-        });
-
-        const { error: rrhhPagoError } = await this.supabaseService.getClient()
-          .from('rrhh_pagos')
-          .insert({
-            tenant_id: tenantIdPlanilla,
-            empleado_id: empleadoId,
-            planilla_id: planillaId,
-            periodo: periodoDisplay, // Usar el período real de la planilla
-            monto_bruto: parseFloat(empleadoPlanilla.total_ingresos) || 0,
-            descuentos: parseFloat(empleadoPlanilla.total_descuentos) || 0,
-            monto_neto: parseFloat(empleadoPlanilla.neto_pagar) || 0,
-          metodo_pago: metodo_pago,
-          estado: 'PROCESADO',
-          fecha_pago: fechaPago,
-          usuario_id: 'sistema'
-        });
-
-        if (rrhhPagoError) {
-          console.error('❌ Error sincronizando con rrhh_pagos:', rrhhPagoError);
-          throw new Error(`No se pudo registrar pago RRHH: ${rrhhPagoError.message}`);
-        } else {
-          this.logger.debug(`✅ Pago sincronizado para empleado ${empleadoId}`);
-        }
-      }
-
-      this.logger.debug(`✅ [RRHH] Sincronización completada - ${empleadosPagados.length} registros en rrhh_pagos`)
-
-      // 🎯 GENERAR ASIENTOS CONTABLES AUTOMÁTICAMENTE
-      try {
-        this.logger.debug('📊 [RRHH] Generando asientos contables automáticamente...');
-        await this.generarAsientosContables(planillaId, planillaInfo?.tenant_id);
-        this.logger.debug('✅ [RRHH] Asientos contables generados automáticamente');
-      } catch (asientosError) {
-        console.warn('⚠️ [RRHH] Error generando asientos automáticos (no crítico):', asientosError);
-      }
-
-      return {
-        success: true,
-        message: `Pago procesado para ${empleadosPagados.length} empleados`,
-        data: {
-          empleados_pagados: empleadosPagados.length,
-          total_pagado: totalPagado,
-          metodo_pago,
-          asientos_generados: true
-        }
-      };
-
-    } catch (error) {
-      console.error('❌ Error pagando empleados seleccionados:', error);
-      throw error;
+  async pagarEmpleadosSeleccionados(
+    planillaId: string,
+    pagoData: any,
+    tenantId?: string,
+    usuarioId = 'sistema',
+  ) {
+    if (!tenantId) {
+      throw new BadRequestException('El tenant es obligatorio para pagar una planilla');
     }
+    const metodoPago = String(pagoData?.metodo_pago || '').trim().toLowerCase();
+    if (metodoPago !== 'efectivo' && metodoPago !== 'transferencia') {
+      throw new BadRequestException('Método de pago no permitido');
+    }
+
+    const { data: detalles, error } = await this.supabaseService.getClient()
+      .from('empleado_planilla')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('planilla_id', planillaId);
+    if (error) throw error;
+    if (!detalles?.length) {
+      throw new BadRequestException('La planilla no contiene empleados calculados');
+    }
+
+    const seleccionados: string[] = Array.isArray(pagoData?.empleados_ids)
+      ? [...new Set<string>(pagoData.empleados_ids.map((id: unknown) => String(id)))]
+      : [];
+    const idsEsperados = new Set(detalles.map((detalle: any) => String(detalle.id)));
+    if (
+      Array.isArray(pagoData?.empleados_ids)
+      && (seleccionados.length !== idsEsperados.size
+        || seleccionados.some((id) => !idsEsperados.has(id)))
+    ) {
+      throw new ConflictException(
+        'Los pagos parciales por empleado fueron retirados; debe pagar la planilla completa',
+      );
+    }
+
+    return this.pagarPlanillaCompleta(
+      planillaId,
+      metodoPago as 'efectivo' | 'transferencia',
+      tenantId,
+      usuarioId,
+    );
+  }
+
+  /**
+   * Alias de /rrhh/pagos/:id/procesar. El registro es sólo una proyección: la
+   * autoridad sigue siendo la cabecera de planilla y su RPC de pago completo.
+   */
+  async procesarPagoLegado(pagoId: string, tenantId: string, usuarioId = 'sistema') {
+    const { data: pago, error } = await this.supabaseService.getClient()
+      .from('rrhh_pagos')
+      .select('id, planilla_id, metodo_pago')
+      .eq('id', pagoId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!pago) throw new NotFoundException('Pago RRHH no encontrado para el tenant');
+    if (!pago.planilla_id) {
+      throw new ConflictException(
+        'El pago legado no está vinculado a una planilla y no puede procesarse aisladamente',
+      );
+    }
+
+    const metodoPago = String(pago.metodo_pago || '').trim().toLowerCase();
+    if (metodoPago !== 'efectivo' && metodoPago !== 'transferencia') {
+      throw new BadRequestException(
+        'El pago legado no tiene un método válido; pague desde la planilla aprobada',
+      );
+    }
+    return this.pagarPlanillaCompleta(
+      pago.planilla_id,
+      metodoPago as 'efectivo' | 'transferencia',
+      tenantId,
+      usuarioId,
+    );
+  }
+
+  async getEstadoDevengoContable(planillaId: string, tenantId: string) {
+    const { data: planilla, error: planillaError } = await this.supabaseService.getClient()
+      .from('planillas')
+      .select('id, estado, asientos_generados, fecha_asientos, metadata')
+      .eq('id', planillaId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (planillaError) throw planillaError;
+    if (!planilla) throw new NotFoundException('Planilla no encontrada para el tenant');
+
+    const { data: evento, error: eventoError } = await this.supabaseService.getClient()
+      .from('outbox_events')
+      .select('event_id, status, processed_at, error_message')
+      .eq('tenant_id', tenantId)
+      .eq('event_type', 'planilla.liquidada')
+      .eq('aggregate_id', planillaId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (eventoError) throw eventoError;
+    if (!evento) {
+      throw new ConflictException(
+        'El devengo se crea al aprobar la planilla; primero complete esa transición',
+      );
+    }
+
+    return {
+      success: true,
+      message: evento.status === 'processed'
+        ? 'El devengo contable ya fue procesado'
+        : 'El devengo contable está encolado de forma durable',
+      data: {
+        planilla_id: planillaId,
+        estado_planilla: planilla.estado,
+        asientos_generados: String(planilla.asientos_generados || '').toLowerCase() === 'true',
+        fecha_asientos: planilla.fecha_asientos,
+        event_id: evento.event_id,
+        estado_evento: evento.status,
+        procesado_en: evento.processed_at,
+        error: evento.error_message,
+      },
+    };
   }
 
   /**
@@ -2148,9 +2175,11 @@ export class PlanillasService {
   }
 
   /**
-   * Generar asientos contables para planilla
+   * Implementación histórica sin llamadores runtime. Se conserva temporalmente
+   * para no mezclar este cierre con la extracción del generador contable; el
+   * endpoint público consulta getEstadoDevengoContable y nunca entra aquí.
    */
-  async generarAsientosContables(planillaId: string, tenantId?: string) {
+  private async generarAsientosContablesLegacyDeshabilitado(planillaId: string, tenantId?: string) {
     try {
       this.logger.debug(`📊 [RRHH] Generando asientos contables para planilla ${planillaId}`);
 

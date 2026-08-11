@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Req, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, Req, Headers, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { DemoService } from './demo.service';
@@ -31,9 +31,12 @@ export class DemoController {
   @ApiOperation({ summary: 'Crear tenant demo con datos seed (14 días)' })
   @ApiResponse({ status: 201, description: 'Tenant demo creado exitosamente' })
   @ApiResponse({ status: 429, description: 'Límite de demos alcanzado (5/hora)' })
-  async createDemo(@Body() dto: CreateDemoTenantDto) {
+  async createDemo(
+    @Body() dto: CreateDemoTenantDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
     this.ensureDemoApiEnabled();
-    return this.demoService.createDemoTenant(dto);
+    return this.demoService.createDemoTenant(dto, idempotencyKey);
   }
 
   @Get('status')

@@ -5,15 +5,17 @@
 
 BEGIN;
 
--- 1) Privilegios por schema (USAGE/CREATE), útil para entender qué esquemas puede consultar PostgREST
+-- 1) Privilegios efectivos por schema (USAGE/CREATE). PostgreSQL 16 no
+-- expone information_schema.schema_privileges.
 SELECT
-  schema_name,
-  grantee,
-  privilege_type,
-  is_grantable
-FROM information_schema.schema_privileges
-WHERE grantee IN ('anon', 'authenticated', 'service_role')
-ORDER BY schema_name, grantee, privilege_type;
+  n.nspname AS schema_name,
+  r.rolname AS grantee,
+  has_schema_privilege(r.rolname, n.oid, 'USAGE') AS has_usage,
+  has_schema_privilege(r.rolname, n.oid, 'CREATE') AS has_create
+FROM pg_namespace n
+CROSS JOIN pg_roles r
+WHERE r.rolname IN ('anon', 'authenticated', 'service_role')
+ORDER BY n.nspname, r.rolname;
 
 -- 2) Privilegios sobre tablas y vistas (SELECT/INSERT/UPDATE/DELETE/REFERENCES/TRIGGER)
 SELECT
@@ -57,4 +59,3 @@ WHERE rtg.grantee IN ('anon', 'authenticated')
 ORDER BY rtg.table_schema, rtg.table_name, rtg.grantee, rtg.privilege_type;
 
 ROLLBACK;
-

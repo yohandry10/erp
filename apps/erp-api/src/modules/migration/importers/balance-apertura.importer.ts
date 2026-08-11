@@ -102,6 +102,8 @@ export class BalanceAperturaImporter implements Importer {
       .from('plan_cuentas')
       .select('id, codigo')
       .eq('tenant_id', ctx.tenantId)
+      .eq('activo', true)
+      .eq('acepta_movimiento', true)
       .in('codigo', codigos);
     if (ctaErr) {
       result.errors.push({ rowIndex: 1, message: `Error cargando plan_cuentas: ${ctaErr.message}` });
@@ -124,11 +126,17 @@ export class BalanceAperturaImporter implements Importer {
     const ccCodigos = Array.from(new Set(parsed.rows.map((r) => nonEmpty(r['centro_costo_codigo'])).filter((v): v is string => !!v)));
     const ccMap = new Map<string, string>();
     if (ccCodigos.length > 0) {
-      const { data: ccs } = await client
+      const { data: ccs, error: ccErr } = await client
         .from('centros_costo')
         .select('id, codigo')
         .eq('tenant_id', ctx.tenantId)
+        .eq('activo', true)
         .in('codigo', ccCodigos);
+      if (ccErr) {
+        result.errors.push({ rowIndex: 1, message: `Error cargando centros_costo: ${ccErr.message}` });
+        result.errorRows = parsed.rows.length;
+        return result;
+      }
       (ccs ?? []).forEach((c) => ccMap.set(c.codigo, c.id));
       const missingCc = ccCodigos.filter((c) => !ccMap.has(c));
       if (missingCc.length > 0) {
@@ -146,89 +154,34 @@ export class BalanceAperturaImporter implements Importer {
       return result;
     }
 
-    const externalIdAsiento = `APERTURA-${ctx.fechaCorte}`;
-    let totalDebe = 0;
-    let totalHaber = 0;
-    parsed.rows.forEach((r) => {
-      totalDebe += toNumber(r['debe']);
-      totalHaber += toNumber(r['haber']);
-    });
-
-    // Idempotencia: si ya existe un asiento APERTURA con este external_id, borrar su detalle y re-crear
     try {
-      const { data: existing } = await client
-        .from('asientos_contables')
-        .select('id')
-        .eq('tenant_id', ctx.tenantId)
-        .eq('external_id', externalIdAsiento)
-        .maybeSingle();
-
-      if (existing?.id) {
-        await client
-          .from('detalle_asientos')
-          .delete()
-          .eq('tenant_id', ctx.tenantId)
-          .eq('asiento_id', existing.id);
-        await client
-          .from('asientos_contables')
-          .delete()
-          .eq('tenant_id', ctx.tenantId)
-          .eq('id', existing.id);
-      }
-
-      const { data: asiento, error: asErr } = await client
-        .from('asientos_contables')
-        .insert({
-          tenant_id: ctx.tenantId,
-          external_id: externalIdAsiento,
-          source_event_id: externalIdAsiento,
-          tipo_asiento: 'APERTURA',
-          fecha: `${ctx.fechaCorte}T00:00:00Z`,
-          referencia: externalIdAsiento,
-          origen: 'MIGRACION',
-          concepto: `Asiento de apertura por migración (${ctx.fechaCorte})`,
-          descripcion: `Saldos iniciales migrados desde ERP externo al ${ctx.fechaCorte}`,
-          total_debe: totalDebe,
-          total_haber: totalHaber,
-          estado: 'confirmado',
-          created_by: ctx.startedBy ?? null,
-          usuario_id: ctx.startedBy ?? null,
-          metadata: {
-            origen: 'migracion_apertura',
-            run_id: ctx.runCtx?.runId ?? null,
-            fecha_corte: ctx.fechaCorte,
-          },
-        })
-        .select('id, numero_asiento, codigo')
-        .single();
-      if (asErr || !asiento) throw asErr ?? new Error('No se pudo crear asiento de apertura');
-
-      const detalleRows = parsed.rows.map((row, idx) => {
+      const detalleRows = parsed.rows.map((row) => {
         const cuentaId = cuentaMap.get(row['cuenta_contable_codigo'])!;
         const ccCod = nonEmpty(row['centro_costo_codigo']);
         return {
-          tenant_id: ctx.tenantId,
-          asiento_id: asiento.id,
           cuenta_id: cuentaId,
           centro_costo_id: ccCod ? ccMap.get(ccCod) : null,
           debe: toNumber(row['debe']),
           haber: toNumber(row['haber']),
-          fecha: `${ctx.fechaCorte}T00:00:00Z`,
-          descripcion: nonEmpty(row['descripcion']),
-          estado: 'ACTIVO',
-          metadata: { row_index: idx + 2 },
+          concepto: nonEmpty(row['descripcion']) ?? '',
         };
       });
+      const { data: asiento, error } = await client.rpc('importar_balance_apertura_tx', {
+        p_tenant_id: ctx.tenantId,
+        p_actor_id: ctx.startedBy,
+        p_run_id: ctx.runCtx?.runId ?? null,
+        p_fecha_corte: ctx.fechaCorte,
+        p_detalles: detalleRows,
+      });
+      if (error || !asiento?.id) throw error ?? new Error('La RPC no devolvió el asiento de apertura');
 
-      const { error: detErr } = await client.from('detalle_asientos').insert(detalleRows);
-      if (detErr) {
-        // Rollback manual del asiento si falla el detalle
-        await client.from('asientos_contables').delete().eq('id', asiento.id);
-        throw detErr;
+      const action = String(asiento.action ?? '');
+      if (action === 'CREATED') {
+        result.created = 1;
+        result.okRows = parsed.rows.length;
+      } else {
+        result.skippedRows = parsed.rows.length;
       }
-
-      result.created = 1;
-      result.okRows = parsed.rows.length;
       // Registrar cada fila como OK
       if (ctx.runCtx) {
         for (let i = 0; i < parsed.rows.length; i++) {
@@ -236,9 +189,10 @@ export class BalanceAperturaImporter implements Importer {
             runId: ctx.runCtx.runId,
             tenantId: ctx.tenantId,
             rowIndex: i + 2,
-            status: 'ok',
+            status: action === 'IDEMPOTENT' ? 'skipped' : 'ok',
             targetTable: 'detalle_asientos',
             targetId: asiento.id,
+            errorMessage: action === 'IDEMPOTENT' ? 'Balance ya aplicado con la misma huella' : null,
           });
         }
       }

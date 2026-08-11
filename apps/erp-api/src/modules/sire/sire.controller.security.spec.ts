@@ -10,9 +10,6 @@ describe('SireController security metadata', () => {
     enviarSunat: 'sire.emitir',
     consultarTicket: 'sire.emitir',
     getOperaciones: 'sire.read',
-    testEvento: 'system.debug',
-    testIntegracionPOS: 'system.debug',
-    findAll: 'sire.read',
   };
 
   it('declara permisos en todos los handlers', () => {
@@ -25,5 +22,11 @@ describe('SireController security metadata', () => {
       expect(metadata).toBeDefined();
       expect(metadata.raw).toBe(permission);
     });
+  });
+
+  it('no expone endpoints de prueba ni un estado mock del módulo', () => {
+    expect((SireController.prototype as any).testEvento).toBeUndefined();
+    expect((SireController.prototype as any).testIntegracionPOS).toBeUndefined();
+    expect((SireController.prototype as any).findAll).toBeUndefined();
   });
 });

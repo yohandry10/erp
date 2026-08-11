@@ -1,102 +1,110 @@
+import { BadRequestException } from '@nestjs/common';
 import { SireService } from './sire.service';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
-const reportId = '22222222-2222-4222-8222-222222222222';
+const actorId = '22222222-2222-4222-8222-222222222222';
+const reportId = '33333333-3333-4333-8333-333333333333';
+const operationId = '44444444-4444-4444-8444-444444444444';
+const claimToken = '55555555-5555-4555-8555-555555555555';
 
-class FlowQuery {
-  private action: 'select' | 'insert' | 'update' = 'select';
-  private payload: any;
-  private filters: Array<[string, any]> = [];
-
-  constructor(
-    private readonly table: string,
-    private readonly state: { report: any; operations: any[] },
-  ) {}
-
-  select() { return this; }
-  eq(column: string, value: any) { this.filters.push([column, value]); return this; }
-  in() { return this; }
-  order() { return this; }
-  limit() { return this; }
-  insert(payload: any) { this.action = 'insert'; this.payload = payload; return this; }
-  update(payload: any) { this.action = 'update'; this.payload = payload; return this; }
-
-  async single() {
-    if (this.action === 'insert') {
-      const row = { ...this.payload };
-      this.state.operations.push(row);
-      return { data: row, error: null };
-    }
-    if (this.table === 'sire_files') return { data: { ...this.state.report }, error: null };
-    return { data: this.state.operations.at(-1) || null, error: null };
-  }
-
-  async maybeSingle() { return this.single(); }
-
-  then(resolve: (value: any) => unknown, reject?: (reason: unknown) => unknown) {
-    const execute = async () => {
-      if (this.action === 'insert') {
-        this.state.operations.push({ ...this.payload });
-      } else if (this.action === 'update') {
-        if (this.table === 'sire_files') {
-          Object.assign(this.state.report, this.payload);
-        } else {
-          const id = this.filters.find(([column]) => column === 'id')?.[1];
-          const operation = this.state.operations.find((row) => row.id === id);
-          if (operation) Object.assign(operation, this.payload);
-        }
-      }
-      return { data: null, error: null };
-    };
-    return execute().then(resolve, reject);
-  }
-}
-
-function createFlowService() {
-  const state = {
-    report: {
-      id: reportId,
-      tenant_id: tenantId,
-      tipo: 'REG_VEN',
-      periodo: '2026-08',
-      estado: 'GENERADO',
-      sunat_ticket: null,
-    } as any,
-    operations: [] as any[],
-  };
-  const client = { from: jest.fn((table: string) => new FlowQuery(table, state)) };
-  const api = {
-    aceptarPropuesta: jest.fn(async () => ({
-      ticket: '20260100000001',
-      httpStatus: 200,
-      responseSummary: { numTicket: '20260100000001' },
-    })),
-    consultarTicket: jest.fn(),
-  };
+function createFlowService(rpc: jest.Mock) {
+  const client = { rpc, from: jest.fn() };
+  const api = { aceptarPropuesta: jest.fn(), consultarTicket: jest.fn() };
   const service = new SireService(
     { getClient: jest.fn(() => client) } as any,
     { onComprobanteCreadoEvent: jest.fn() } as any,
     { getTenantId: jest.fn(() => tenantId) } as any,
     api as any,
   );
-  return { service, api, state };
+  return { service, client, api };
 }
 
-describe('SireService flujo SUNAT', () => {
-  it('un ticket recién recibido queda PENDIENTE y nunca se presenta como ENVIADO', async () => {
-    const { service, state } = createFlowService();
+const claimedReservation = {
+  claimed: true,
+  idempotent: false,
+  operation: { id: operationId, claim_token: claimToken },
+  report: { id: reportId, tipo: 'REG_VEN', periodo: '2026-08', estado: 'GENERADO' },
+};
 
-    const result = await service.enviarSunat(reportId, tenantId, 'user-1');
+describe('SireService flujo SUNAT durable', () => {
+  it('acepta la propuesta una vez y persiste el ticket por finalizador 463', async () => {
+    const rpc = jest.fn()
+      .mockResolvedValueOnce({ data: claimedReservation, error: null })
+      .mockResolvedValueOnce({
+        data: {
+          operation: { id: operationId, ticket: '20260100000001' },
+          report: { id: reportId, estado: 'PENDIENTE', sunat_ticket: '20260100000001' },
+        },
+        error: null,
+      });
+    const { service, client, api } = createFlowService(rpc);
+    api.aceptarPropuesta.mockResolvedValue({
+      ticket: '20260100000001',
+      httpStatus: 200,
+      responseSummary: { numTicket: '20260100000001' },
+    });
+
+    const result = await service.enviarSunat(
+      reportId,
+      tenantId,
+      actorId,
+      'sire-accept-2026-08-rvie',
+    );
 
     expect(result.data.estado).toBe('PENDIENTE');
-    expect(state.report.estado).toBe('PENDIENTE');
-    expect(state.report.sunat_ticket).toBe('20260100000001');
-    expect(state.operations[0].estado).toBe('PROCESANDO');
+    expect(api.aceptarPropuesta).toHaveBeenCalledWith(tenantId, 'REG_VEN', '202608');
+    expect(rpc).toHaveBeenNthCalledWith(2, 'finalizar_aceptacion_sire_tx', {
+      p_tenant_id: tenantId,
+      p_operation_id: operationId,
+      p_claim_token: claimToken,
+      p_ticket: '20260100000001',
+      p_http_status: 200,
+      p_response_summary: { numTicket: '20260100000001' },
+    });
+    expect(client.from).not.toHaveBeenCalled();
   });
 
-  it('sólo cambia a ENVIADO cuando SUNAT confirma estado 06 Terminado', async () => {
-    const { service, api, state } = createFlowService();
-    await service.enviarSunat(reportId, tenantId, 'user-1');
+  it('un replay ya reservado no vuelve a llamar a SUNAT', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: {
+        claimed: false,
+        idempotent: true,
+        reason: 'TICKET_PENDING',
+        report: { id: reportId, estado: 'PENDIENTE', sunat_ticket: '20260100000001' },
+      },
+      error: null,
+    });
+    const { service, api } = createFlowService(rpc);
+
+    const result = await service.enviarSunat(reportId, tenantId, actorId, 'same-accept-key');
+
+    expect(result.data.idempotent).toBe(true);
+    expect(api.aceptarPropuesta).not.toHaveBeenCalled();
+  });
+
+  it('sólo marca ENVIADO cuando el finalizador recibe código SUNAT 06', async () => {
+    const queryReservation = {
+      ...claimedReservation,
+      report: {
+        id: reportId,
+        tipo: 'REG_VEN',
+        periodo: '2026-08',
+        estado: 'PENDIENTE',
+        sunat_ticket: '20260100000001',
+      },
+    };
+    const rpc = jest.fn()
+      .mockResolvedValueOnce({ data: queryReservation, error: null })
+      .mockResolvedValueOnce({
+        data: {
+          terminado: true,
+          con_errores: false,
+          operation: { id: operationId, codigo_estado_sunat: '06' },
+          report: { id: reportId, estado: 'ENVIADO', sunat_codigo_estado: '06' },
+        },
+        error: null,
+      });
+    const { service, api } = createFlowService(rpc);
     api.consultarTicket.mockResolvedValue({
       ticket: '20260100000001',
       codigoEstado: '06',
@@ -107,10 +115,77 @@ describe('SireService flujo SUNAT', () => {
       responseSummary: { registros: [] },
     });
 
-    const result = await service.consultarTicket(reportId, tenantId, 'user-1');
+    const result = await service.consultarTicket(
+      reportId,
+      tenantId,
+      actorId,
+      'sire-query-ticket-attempt-1',
+    );
 
     expect(result.data.estado).toBe('ENVIADO');
-    expect(state.report.estado).toBe('ENVIADO');
-    expect(state.report.sunat_aceptado_at).toBeTruthy();
+    expect(rpc).toHaveBeenNthCalledWith(2, 'finalizar_consulta_sire_tx', expect.objectContaining({
+      p_codigo_estado: '06',
+      p_descripcion: 'Terminado',
+    }));
+  });
+
+  it('un estado SUNAT desconocido falla cerrado y deja evidencia de error durable', async () => {
+    const rpc = jest.fn()
+      .mockResolvedValueOnce({ data: {
+        ...claimedReservation,
+        report: {
+          id: reportId,
+          tipo: 'REG_COM',
+          periodo: '2026-08',
+          estado: 'PENDIENTE',
+          sunat_ticket: '20260100000001',
+        },
+      }, error: null })
+      .mockResolvedValueOnce({ data: { operation: { id: operationId, estado: 'ERROR' } }, error: null });
+    const { service, api } = createFlowService(rpc);
+    api.consultarTicket.mockResolvedValue({
+      ticket: '20260100000001',
+      codigoEstado: null,
+      descripcionEstado: 'Sin código',
+      terminado: false,
+      conErrores: false,
+      httpStatus: 200,
+      responseSummary: {},
+    });
+
+    await expect(service.consultarTicket(
+      reportId,
+      tenantId,
+      actorId,
+      'sire-query-invalid-status',
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(rpc).toHaveBeenNthCalledWith(2, 'fallar_operacion_sire_tx', expect.objectContaining({
+      p_operation_id: operationId,
+      p_claim_token: claimToken,
+      p_error_code: 'SIRE_TICKET_STATUS_INVALID',
+    }));
+  });
+
+  it('no cierra como ERROR una aceptación si SUNAT ya entregó ticket pero falló su persistencia', async () => {
+    const rpc = jest.fn()
+      .mockResolvedValueOnce({ data: claimedReservation, error: null })
+      .mockResolvedValueOnce({ data: null, error: { code: '08006', message: 'connection lost' } });
+    const { service, api } = createFlowService(rpc);
+    api.aceptarPropuesta.mockResolvedValue({
+      ticket: '20260100000001',
+      httpStatus: 200,
+      responseSummary: {},
+    });
+
+    await expect(service.enviarSunat(
+      reportId,
+      tenantId,
+      actorId,
+      'sire-accept-persist-failure',
+    )).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'SIRE_TICKET_PERSISTENCE_PENDING' }),
+    });
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).not.toHaveBeenCalledWith('fallar_operacion_sire_tx', expect.anything());
   });
 });

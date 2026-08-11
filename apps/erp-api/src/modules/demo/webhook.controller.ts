@@ -44,8 +44,9 @@ export class WebhookController {
         }
 
         case 'customer.subscription.created': {
-          // Suscripción creada - ya procesado en checkout.session.completed
-          console.log('📝 Suscripción creada:', event.data.object);
+          // Compatibilidad de sólo lectura con checkouts anteriores. Los planes
+          // 488 son prepagos y llegan como checkout.session.completed.
+          console.log('📝 Suscripción Stripe legacy recibida');
           break;
         }
 
@@ -56,9 +57,11 @@ export class WebhookController {
         }
 
         case 'customer.subscription.deleted': {
-          // Suscripción cancelada
-          console.log('❌ Suscripción cancelada:', event.data.object);
-          // TODO: Marcar tenant como inactivo
+          // No se suspende una empresa adivinando el tenant desde una
+          // suscripción legacy que no llevaba un vínculo durable. Los contratos
+          // nuevos vencen por empresa_config.plan_vence_at y no generan este
+          // evento porque se cobran como paquetes prepagados.
+          console.log('ℹ️ Cancelación de suscripción Stripe legacy recibida; sin mutación automática');
           break;
         }
 

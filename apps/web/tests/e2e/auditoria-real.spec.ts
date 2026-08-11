@@ -363,6 +363,7 @@ test.describe('CASE-19 Auditoria real', () => {
       await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
         data: {
           orden_id: orden.id,
+          idempotency_key: `recepcion:${prefix}:auditoria`,
           almacen_id: almacenId,
           observaciones: `${prefix} recepcion`,
           items: [{ detalle_id: detalleId, cantidad_recibida: 3, calidad: 'OK', almacen_id: almacenId }],

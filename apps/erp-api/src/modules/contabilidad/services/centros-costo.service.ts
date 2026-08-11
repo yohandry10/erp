@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { createHash } from 'crypto';
 
 export interface CentroCosto {
   id: string;
@@ -73,8 +74,19 @@ export class CentrosCostoService {
     tenantId: string,
     codigo: string,
     nombre: string,
-    descripcion?: string
+    descripcion?: string,
+    userId?:string,
+    idempotencyKey?:string,
   ): Promise<CentroCosto> {
+    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    const payload={codigo,nombre,descripcion}; const key=idempotencyKey?.trim()||`cost-center-create:${createHash('sha256').update(JSON.stringify({tenantId,userId,payload})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_maestro_contable_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_entity:'COST_CENTER',p_action:'CREATE',p_record_id:null,p_payload:payload,p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el centro de costo');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData; return result.record as CentroCosto;
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     try {
       console.log(`📊 [CentrosCosto] Creando centro de costo ${codigo} para tenant ${tenantId}`);
 
@@ -125,8 +137,19 @@ export class CentrosCostoService {
       nombre?: string;
       descripcion?: string;
       activo?: boolean;
-    }
+    },
+    userId?:string,
+    idempotencyKey?:string,
   ): Promise<CentroCosto> {
+    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    const key=idempotencyKey?.trim()||`cost-center-update:${createHash('sha256').update(JSON.stringify({tenantId,id,userId,updates})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_maestro_contable_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_entity:'COST_CENTER',p_action:'UPDATE',p_record_id:id,p_payload:updates,p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo actualizar el centro de costo');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData; return result.record as CentroCosto;
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     try {
       console.log(`📊 [CentrosCosto] Actualizando centro de costo ${id} para tenant ${tenantId}`);
 

@@ -5,6 +5,7 @@ import {
   CreateCotizacionCompraDto,
   CreateOrdenCompraDto,
   CreateRecepcionDto,
+  UpdateRecepcionDto,
   CreateDevolucionProveedorDto,
   AprobarOrdenCompraDto,
   RechazarOrdenCompraDto,
@@ -65,6 +66,7 @@ describe('Compras DTOs Validation', () => {
   describe('CreateCotizacionCompraDto', () => {
     it('should validate a valid cotizacion', async () => {
       const dto = plainToClass(CreateCotizacionCompraDto, {
+        idempotency_key: 'quote-attempt-1',
         numero: 'COT-2024-001',
         proveedor_id: '550e8400-e29b-41d4-a716-446655440001',
         detalles: [
@@ -83,6 +85,7 @@ describe('Compras DTOs Validation', () => {
 
     it('should fail without detalles', async () => {
       const dto = plainToClass(CreateCotizacionCompraDto, {
+        idempotency_key: 'quote-attempt-2',
         numero: 'COT-2024-001',
         proveedor_id: '550e8400-e29b-41d4-a716-446655440001',
         detalles: [],
@@ -91,11 +94,28 @@ describe('Compras DTOs Validation', () => {
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
     });
+
+    it('should require an idempotency key', async () => {
+      const dto = plainToClass(CreateCotizacionCompraDto, {
+        numero: 'COT-2024-001',
+        proveedor_id: '550e8400-e29b-41d4-a716-446655440001',
+        detalles: [{
+          producto_id: '550e8400-e29b-41d4-a716-446655440002',
+          descripcion: 'Laptop HP',
+          cantidad: 1,
+          precio_unitario: 2500,
+        }],
+      });
+
+      const errors = await validate(dto);
+      expect(errors.some((error) => error.property === 'idempotency_key')).toBe(true);
+    });
   });
 
   describe('CreateOrdenCompraDto', () => {
     it('should validate a valid orden', async () => {
       const dto = plainToClass(CreateOrdenCompraDto, {
+        idempotency_key: 'order-attempt-1',
         numero: 'OC-2024-001',
         proveedor_id: '550e8400-e29b-41d4-a716-446655440001',
         detalles: [
@@ -111,12 +131,29 @@ describe('Compras DTOs Validation', () => {
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
     });
+
+    it('should require an idempotency key', async () => {
+      const dto = plainToClass(CreateOrdenCompraDto, {
+        numero: 'OC-2024-001',
+        proveedor_id: '550e8400-e29b-41d4-a716-446655440001',
+        detalles: [{
+          producto_id: '550e8400-e29b-41d4-a716-446655440002',
+          descripcion: 'Laptop HP',
+          cantidad: 1,
+          precio_unitario: 2500,
+        }],
+      });
+
+      const errors = await validate(dto);
+      expect(errors.some((error) => error.property === 'idempotency_key')).toBe(true);
+    });
   });
 
   describe('CreateRecepcionDto', () => {
     it('should validate a valid recepcion', async () => {
       const dto = plainToClass(CreateRecepcionDto, {
         orden_id: '550e8400-e29b-41d4-a716-446655440001',
+        idempotency_key: 'recepcion:550e8400-e29b-41d4-a716-446655440001',
         items: [
           {
             detalle_id: '550e8400-e29b-41d4-a716-446655440002',
@@ -129,11 +166,46 @@ describe('Compras DTOs Validation', () => {
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
     });
+
+    it('should reject an empty reception', async () => {
+      const dto = plainToClass(CreateRecepcionDto, {
+        orden_id: '550e8400-e29b-41d4-a716-446655440001',
+        idempotency_key: 'recepcion:550e8400-e29b-41d4-a716-446655440001',
+        items: [],
+      });
+
+      const errors = await validate(dto);
+      expect(errors.some((error) => error.property === 'items')).toBe(true);
+    });
+
+    it('should require an idempotency key', async () => {
+      const dto = plainToClass(CreateRecepcionDto, {
+        orden_id: '550e8400-e29b-41d4-a716-446655440001',
+        items: [
+          {
+            detalle_id: '550e8400-e29b-41d4-a716-446655440002',
+            cantidad_recibida: 1,
+            calidad: 'OK',
+          },
+        ],
+      });
+
+      const errors = await validate(dto);
+      expect(errors.some((error) => error.property === 'idempotency_key')).toBe(true);
+    });
+
+    it('should expose only the mutable reception observations contract', async () => {
+      const dto = plainToClass(UpdateRecepcionDto, { observaciones: 'Bultos sin daños' });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+      expect(dto).toEqual(expect.objectContaining({ observaciones: 'Bultos sin daños' }));
+    });
   });
 
   describe('CreateDevolucionProveedorDto', () => {
     it('should validate a valid devolucion', async () => {
       const dto = plainToClass(CreateDevolucionProveedorDto, {
+        idempotency_key: 'supplier-return-attempt-1',
         recepcion_id: '550e8400-e29b-41d4-a716-446655440004',
         orden_id: '550e8400-e29b-41d4-a716-446655440001',
         proveedor_id: '550e8400-e29b-41d4-a716-446655440002',

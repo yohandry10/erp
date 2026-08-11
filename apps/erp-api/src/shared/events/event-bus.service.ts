@@ -147,6 +147,9 @@ export interface RecepcionRegistradaEvent {
   subtotalParcial?: number;
   igvParcial?: number;
   totalParcial?: number;
+  mercaderiaParcial?: number;
+  serviciosParcial?: number;
+  noStockParcial?: number;
   moneda: string;
   diasCredito?: number;
   condicionesPago?: string;
@@ -158,6 +161,10 @@ export interface RecepcionRegistradaEvent {
     precioUnitario: number;
     total: number;
     calidad: string;
+    esServicio?: boolean;
+    controlaStock?: boolean;
+    clasificacionContable?: 'MERCADERIA' | 'SERVICIO' | 'GASTO_NO_STOCK';
+    almacenId?: string | null;
     lote?: string;
     serie?: string;
     ubicacionId?: string;
@@ -291,6 +298,12 @@ export interface DevolucionProveedorEmitidaEvent {
   emitidoPor?: string;
   emitidoEn: string;
   tenantId: string;
+  cxpAjustadaAtomicamente?: boolean;
+  cuentaPorPagarId?: string;
+  cuentaPasivo?: '42' | '4699';
+  mercaderia?: number;
+  servicios?: number;
+  noStock?: number;
 }
 
 // EVENTOS PARA INTEGRACIONES CRÍTICAS
@@ -460,6 +473,12 @@ export interface CobroRegistradoEvent {
   moneda: string;
   fecha: string;
   medio: string;
+  tipoMovimiento?: 'PAGO' | 'ANTICIPO' | 'DETRACCION' | 'PERCEPCION' | 'RETENCION' | 'NOTA_CREDITO';
+  tipoCambioOrigen?: number;
+  tipoCambioLiquidacion?: number;
+  montoContabilizado?: number;
+  montoLiquidacion?: number;
+  diferenciaCambio?: number;
   cuentaBancariaId?: string | null;
   referencia?: string | null;
   notas?: string | null;

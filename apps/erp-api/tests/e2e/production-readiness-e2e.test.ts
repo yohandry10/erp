@@ -261,6 +261,7 @@ async function main() {
     method: 'POST',
     body: JSON.stringify({
       orden_id: ocId,
+      idempotency_key: `recepcion:${ocId}:production-readiness`,
       almacen_id: data.almacen.id,
       observaciones: 'Recepcion E2E',
       items: [{ detalle_id: ocDetalleId, cantidad_recibida: 5, calidad: 'OK', almacen_id: data.almacen.id }],
@@ -288,7 +289,7 @@ async function main() {
 
   await api(`/ventas/pedidos/${pedidoId}/confirmar`, token, {
     method: 'POST',
-    body: JSON.stringify({ forzar_confirmacion: true }),
+    body: JSON.stringify({}),
   });
   const pendientes = await api('/inventario/logistica/ordenes-pendientes', token);
   assert.ok(JSON.stringify(pendientes).includes(pedidoId), 'El pedido confirmado debe aparecer en ordenes pendientes');

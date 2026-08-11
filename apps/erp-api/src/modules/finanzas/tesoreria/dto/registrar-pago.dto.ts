@@ -49,6 +49,13 @@ export class RegistrarPagoDto {
   cuenta_bancaria_id?: string;
 
   @ApiPropertyOptional({
+    description: 'Sesion de caja abierta para pagos en efectivo; si se omite se usa la unica sesion abierta del actor',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'El ID de la sesion de caja debe ser un UUID valido' })
+  sesion_caja_id?: string;
+
+  @ApiPropertyOptional({
     description: 'Número de referencia del pago (número de operación, cheque, etc.)',
     example: 'OP-2025-001234',
   })
@@ -66,12 +73,12 @@ export class RegistrarPagoDto {
   @MaxLength(1000, { message: 'Las observaciones no pueden exceder 1000 caracteres' })
   observaciones?: string;
 
-  @ApiPropertyOptional({
-    description: 'Llave de idempotencia para asegurar que el pago no se procese dos veces',
+  @ApiProperty({
+    description: 'Llave de idempotencia estable del intento de pago',
     example: 'tesoreria:pago:tenant-uuid:cxp-uuid:ref-001',
   })
-  @IsOptional()
+  @IsNotEmpty({ message: 'La llave de idempotencia es requerida' })
   @IsString({ message: 'La llave de idempotencia debe ser un texto' })
   @MaxLength(200, { message: 'La llave de idempotencia no puede exceder 200 caracteres' })
-  idempotency_key?: string;
+  idempotency_key: string;
 }

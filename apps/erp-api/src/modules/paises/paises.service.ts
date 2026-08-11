@@ -225,8 +225,10 @@ export class PaisesService {
   }
 
   async actualizarConfiguracionUsuario(
-    usuarioId: string, 
-    configuracion: UpdateUsuarioConfiguracionDto
+    usuarioId: string,
+    configuracion: UpdateUsuarioConfiguracionDto,
+    actorId?: string,
+    idempotencyKey?: string,
   ): Promise<UsuarioConfiguracionDto> {
     try {
       this.logger.log(`👤 Actualizando configuración de usuario: ${usuarioId}`);
@@ -237,69 +239,27 @@ export class PaisesService {
         throw new BadRequestException(INITIAL_ACTIVE_COUNTRY_MESSAGE);
       }
       
-      // Verificar si ya existe configuración
-      const existeConfiguracion = await this.obtenerConfiguracionUsuario(usuarioId);
-      
-      let data, error;
-      
-      if (existeConfiguracion) {
-        // Actualizar configuración existente
-        const resultado = await this.supabaseService
-          .getClient()
-          .from('usuario_configuracion')
-          .update({
-            ...configuracion,
-            updated_at: new Date().toISOString()
-          })
-          .eq('usuario_id', usuarioId)
-          .select(`
-            *,
-            paises (
-              id,
-              codigo_iso,
-              nombre,
-              nombre_fiscal,
-              moneda_codigo,
-              moneda_simbolo
-            )
-          `)
-          .single();
-          
-        data = resultado.data;
-        error = resultado.error;
-      } else {
-        // Crear nueva configuración
-        const resultado = await this.supabaseService
-          .getClient()
-          .from('usuario_configuracion')
-          .insert({
-            usuario_id: usuarioId,
-            ...configuracion,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .select(`
-            *,
-            paises (
-              id,
-              codigo_iso,
-              nombre,
-              nombre_fiscal,
-              moneda_codigo,
-              moneda_simbolo
-            )
-          `)
-          .single();
-          
-        data = resultado.data;
-        error = resultado.error;
+      const key = String(idempotencyKey || '').trim();
+      if (!actorId || key.length < 8 || key.length > 255) {
+        throw new BadRequestException(
+          'Idempotency-Key es obligatorio y el actor debe estar autenticado',
+        );
       }
-
+      const { error } = await this.supabaseService.getClient().rpc(
+        'actualizar_preferencia_pais_tx',
+        {
+          p_usuario_id: usuarioId,
+          p_actor_id: actorId,
+          p_idempotency_key: key,
+          p_preferencia: configuracion,
+        },
+      );
       if (error) {
         this.logger.error('❌ Error actualizando configuración de usuario:', error);
         throw error;
       }
-
+      const data = await this.obtenerConfiguracionUsuario(usuarioId);
+      if (!data) throw new Error('La preferencia se guardó pero no pudo releerse');
       this.logger.log(`✅ Configuración de usuario actualizada exitosamente`);
       return data;
     } catch (error) {

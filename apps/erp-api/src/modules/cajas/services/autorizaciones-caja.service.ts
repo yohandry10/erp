@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -68,85 +68,12 @@ export class AutorizacionesCajaService {
      * Registra una autorización de supervisor
      */
     async registrarAutorizacion(
-        tenantId: string,
-        dto: RegistrarAutorizacionDto,
+        _tenantId: string,
+        _dto: RegistrarAutorizacionDto,
     ): Promise<AutorizacionCaja> {
-        // Validar que el supervisor existe
-        const { data: supervisor, error: supError } = await this.supabase
-            .getClient()
-            .from('usuarios')
-            .select('id, nombre, email')
-            .eq('id', dto.supervisor_id)
-            .eq('tenant_id', tenantId)
-            .single();
-
-        if (supError || !supervisor) {
-            throw new NotFoundException(
-                `Supervisor con ID ${dto.supervisor_id} no encontrado`,
-            );
-        }
-
-        // Validar que el solicitante existe
-        const { data: solicitante, error: solError } = await this.supabase
-            .getClient()
-            .from('usuarios')
-            .select('id, nombre')
-            .eq('id', dto.solicitante_id)
-            .eq('tenant_id', tenantId)
-            .single();
-
-        if (solError || !solicitante) {
-            throw new NotFoundException(
-                `Solicitante con ID ${dto.solicitante_id} no encontrado`,
-            );
-        }
-
-        // Generar firma digital
-        const firma = this.generarFirmaDigital({
-            tipo: dto.tipo_autorizacion,
-            monto: dto.monto_solicitado,
-            supervisor_id: dto.supervisor_id,
-            timestamp: new Date(),
-        });
-
-        const autorizacionData = {
-            tenant_id: tenantId,
-            sesion_caja_id: dto.sesion_caja_id,
-            tipo_autorizacion: dto.tipo_autorizacion,
-            monto_solicitado: dto.monto_solicitado,
-            monto_min_configurado: dto.monto_min_configurado || null,
-            monto_max_configurado: dto.monto_max_configurado || null,
-            supervisor_id: dto.supervisor_id,
-            solicitante_id: dto.solicitante_id,
-            razon_autorizacion: dto.razon_autorizacion,
-            estado: 'APROBADO' as const,
-            firma_digital: firma,
-            ip_address: dto.ip_address || null,
-            dispositivo: dto.dispositivo || null,
-        };
-
-        const { data, error } = await this.supabase
-            .getClient()
-            .from('autorizaciones_caja')
-            .insert([autorizacionData])
-            .select()
-            .single();
-
-        if (error) {
-            this.logger.error(
-                `Error al registrar autorización: ${error.message}`,
-                error,
-            );
-            throw new Error(`Error al registrar autorización: ${error.message}`);
-        }
-
-        this.logger.log(
-            `Autorización registrada: Tipo=${dto.tipo_autorizacion}, ` +
-            `Monto=$${dto.monto_solicitado}, Supervisor=${supervisor.nombre}, ` +
-            `Solicitante=${solicitante.nombre}`,
+        throw new BadRequestException(
+            'La autorización aislada fue retirada: debe formar parte de la RPC atómica de la operación de caja',
         );
-
-        return data;
     }
 
     /**

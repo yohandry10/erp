@@ -1,12 +1,12 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import {
   formatBalanceComprobacionItem,
-  formatEstadoResultados,
   formatBalanceGeneral,
+  formatEstadoResultados,
   FormattedBalanceComprobacionItem,
-  FormattedEstadoResultados,
   FormattedBalanceGeneral,
+  FormattedEstadoResultados,
 } from '../utils/accounting-formatter.util';
 
 export interface BalanceComprobacionItem {
@@ -78,737 +78,217 @@ export interface BalanceGeneral {
   };
 }
 
-interface CacheEntry<T> {
-  data: T;
-  expiresAt: number;
-}
-
+/**
+ * Estados financieros operativos.
+ *
+ * Las materialized views históricas se conservan sólo para diagnósticos y
+ * exportaciones explícitas. Las consultas de UI leen el libro confirmado en
+ * cada request mediante las RPC live de 458, por lo que un asiento recién
+ * confirmado nunca queda oculto por un refresh o un caché de proceso.
+ */
 @Injectable()
 export class EstadosFinancierosService {
-  private readonly logger = new Logger(EstadosFinancierosService.name);
-  private cache: Map<string, CacheEntry<any>> = new Map();
-  private readonly CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
-  private cacheCleanupInterval?: NodeJS.Timeout;
+  constructor(private readonly supabase: SupabaseService) {}
 
-  constructor(private readonly supabase: SupabaseService) {
-    console.log('📊 [EstadosFinancierosService] Servicio de estados financieros inicializado');
-    // Limpiar cache expirado cada 10 minutos
-    this.cacheCleanupInterval = setInterval(() => this.cleanExpiredCache(), 10 * 60 * 1000);
-    this.cacheCleanupInterval.unref?.();
-  }
-
-  onModuleDestroy() {
-    if (this.cacheCleanupInterval) {
-      clearInterval(this.cacheCleanupInterval);
-      this.cacheCleanupInterval = undefined;
-    }
-  }
-
-  /**
-   * Genera una clave de cache única basada en los parámetros
-   */
-  private getCacheKey(method: string, tenantId: string, anio: number, mes: number): string {
-    return `${method}:${tenantId}:${anio}:${mes}`;
-  }
-
-  /**
-   * Obtiene datos del cache si están disponibles y no han expirado
-   */
-  private getFromCache<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) {
-      return null;
-    }
-
-    if (Date.now() > entry.expiresAt) {
-      this.cache.delete(key);
-      console.log(`🗑️ [Cache] Entrada expirada eliminada: ${key}`);
-      return null;
-    }
-
-    console.log(`✅ [Cache] Hit: ${key}`);
-    return entry.data as T;
-  }
-
-  /**
-   * Guarda datos en el cache con TTL de 1 hora
-   */
-  private setCache<T>(key: string, data: T, ttlMs?: number): void {
-    const ttl = ttlMs ?? this.CACHE_TTL;
-    const entry: CacheEntry<T> = {
-      data,
-      expiresAt: Date.now() + ttl,
-    };
-    this.cache.set(key, entry);
-  }
-
-  /**
-   * Invalida el cache para un tenant y período específico
-   */
-  private invalidateCache(tenantId: string, anio: number, mes: number): void {
-    const patterns = [
-      this.getCacheKey('balance-comprobacion', tenantId, anio, mes),
-      this.getCacheKey('estado-resultados', tenantId, anio, mes),
-      this.getCacheKey('balance-general', tenantId, anio, mes),
-    ];
-
-    patterns.forEach(key => {
-      if (this.cache.delete(key)) {
-        console.log(`🗑️ [Cache] Invalidado: ${key}`);
-      }
+  async refrescarEstadosFinancieros(
+    tenantId: string,
+    anio: number,
+    mes: number,
+  ): Promise<void> {
+    const { error } = await this.supabase.getClient().rpc('refrescar_estados_financieros', {
+      p_tenant_id: tenantId,
+      p_anio: anio,
+      p_mes: mes,
     });
+    if (error) throw error;
   }
 
-  private isMaterializedViewUnavailable(error: any): boolean {
-    // PGRST116: PostgREST "no rows found" — view empty or not populated
-    if (error?.code === 'PGRST116') return true;
-    // 55000: PostgreSQL "object not in prerequisite state" — view may not exist
-    if (error?.code === '55000') {
-      this.logger.warn(`Vista materializada no disponible (55000): ${error.message}`);
-      return true;
-    }
-    return false;
-  }
-
-  private getPeriodoRange(anio: number, mes: number): { inicio: string; fin: string } {
-    const inicio = new Date(Date.UTC(anio, mes - 1, 1)).toISOString();
-    const fin = new Date(Date.UTC(anio, mes, 1)).toISOString();
-
-    return { inicio, fin };
-  }
-
-  private async calcularBalanceComprobacionDesdeAsientos(
+  async getBalanceComprobacion(
     tenantId: string,
     anio: number,
     mes: number,
   ): Promise<BalanceComprobacionItem[]> {
-    const { inicio, fin } = this.getPeriodoRange(anio, mes);
+    const { data, error } = await this.supabase.getClient().rpc(
+      'balance_comprobacion_live',
+      { p_tenant_id: tenantId, p_anio: anio, p_mes: mes },
+    );
+    if (error) throw error;
 
-    const detalles: any[] = [];
-    const pageSize = 1000;
-
-    for (let offset = 0; ; offset += pageSize) {
-      const { data, error } = await this.supabase
-        .getClient()
-        .from('detalle_asientos')
-        .select(`
-          debe,
-          haber,
-          plan_cuentas!fk_detalle_asientos_cuenta_id (
-            codigo,
-            nombre
-          ),
-          asientos_contables!fk_detalle_asientos_asiento_id_v2 (
-            tenant_id,
-            fecha,
-            estado
-          )
-        `)
-        .eq('asientos_contables.tenant_id', tenantId)
-        .gte('asientos_contables.fecha', inicio)
-        .lt('asientos_contables.fecha', fin)
-        .neq('asientos_contables.estado', 'ANULADO')
-        .range(offset, offset + pageSize - 1);
-
-      if (error) {
-        console.error('❌ Error calculando balance desde asientos:', error);
-        throw error;
-      }
-
-      detalles.push(...(data || []));
-
-      if (!data || data.length < pageSize) {
-        break;
-      }
-    }
-
-    const porCuenta = new Map<string, BalanceComprobacionItem>();
-
-    for (const detalle of detalles || []) {
-      // Skip rows where the asientos_contables JOIN didn't match (cross-tenant safety)
-      const asiento = Array.isArray((detalle as any).asientos_contables)
-        ? (detalle as any).asientos_contables[0]
-        : (detalle as any).asientos_contables;
-      if (!asiento?.tenant_id) continue;
-
-      const cuenta = Array.isArray((detalle as any).plan_cuentas)
-        ? (detalle as any).plan_cuentas[0]
-        : (detalle as any).plan_cuentas;
-      const codigo = cuenta?.codigo || 'SIN_CUENTA';
-      const nombre = cuenta?.nombre || 'Cuenta sin nombre';
-      const debe = Number((detalle as any).debe || 0);
-      const haber = Number((detalle as any).haber || 0);
-
-      const actual = porCuenta.get(codigo) || {
-        cuenta: codigo,
-        nombre,
-        saldo_inicial: 0,
-        debe: 0,
-        haber: 0,
-        saldo_final: 0,
-      };
-
-      actual.debe += debe;
-      actual.haber += haber;
-      actual.saldo_final = actual.debe - actual.haber;
-      porCuenta.set(codigo, actual);
-    }
-
-    return [...porCuenta.values()]
-      .map(item => ({
-        ...item,
-        debe: Number(item.debe.toFixed(2)),
-        haber: Number(item.haber.toFixed(2)),
-        saldo_final: Number(item.saldo_final.toFixed(2)),
-      }))
-      .filter(item => Math.abs(item.debe) > 0.01 || Math.abs(item.haber) > 0.01 || Math.abs(item.saldo_final) > 0.01)
-      .sort((a, b) => a.cuenta.localeCompare(b.cuenta, 'es'));
+    return (data || []).map((item: any) => ({
+      cuenta: String(item.cuenta || ''),
+      nombre: String(item.nombre || 'Cuenta sin nombre'),
+      saldo_inicial: Number(item.saldo_inicial || 0),
+      debe: Number(item.debe || 0),
+      haber: Number(item.haber || 0),
+      saldo_final: Number(item.saldo_final || 0),
+    }));
   }
 
-  private getEmptyEstadoResultados(): EstadoResultados {
-    return {
-      ingresos: {
-        ventas: 0,
-        otros_ingresos: 0,
-        total_ingresos: 0,
-      },
-      costos: {
-        costo_ventas: 0,
-        utilidad_bruta: 0,
-      },
-      gastos: {
-        gastos_administrativos: 0,
-        gastos_ventas: 0,
-        gastos_financieros: 0,
-        total_gastos: 0,
-      },
-      utilidad_neta: 0,
-    };
-  }
-
-  private getEmptyBalanceGeneral(resultadoEjercicio = 0): BalanceGeneral {
-    return {
-      activos: {
-        corrientes: {
-          efectivo: 0,
-          cuentas_por_cobrar: 0,
-          inventarios: 0,
-          otros_activos: 0,
-          total_corrientes: 0,
-        },
-        no_corrientes: {
-          activos_fijos: 0,
-          depreciacion_acumulada: 0,
-          activos_fijos_neto: 0,
-          otros_activos: 0,
-          total_no_corrientes: 0,
-        },
-        total_activos: 0,
-      },
-      pasivos: {
-        corrientes: {
-          cuentas_por_pagar: 0,
-          tributos_por_pagar: 0,
-          remuneraciones_por_pagar: 0,
-          otros_pasivos: 0,
-          total_corrientes: 0,
-        },
-        no_corrientes: {
-          deudas_largo_plazo: 0,
-          otros_pasivos: 0,
-          total_no_corrientes: 0,
-        },
-        total_pasivos: 0,
-      },
-      patrimonio: {
-        capital: 0,
-        resultados_acumulados: 0,
-        resultado_ejercicio: resultadoEjercicio,
-        total_patrimonio: resultadoEjercicio,
-      },
-    };
-  }
-
-  /**
-   * Limpia entradas de cache expiradas
-   */
-  private cleanExpiredCache(): void {
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const [key, entry] of this.cache.entries()) {
-      if (now > entry.expiresAt) {
-        this.cache.delete(key);
-        cleaned++;
-      }
-    }
-
-    if (cleaned > 0) {
-      console.log(`🧹 [Cache] Limpieza automática: ${cleaned} entradas eliminadas`);
-    }
-  }
-
-  /**
-   * Refresca las vistas materializadas de estados financieros
-   * @param tenantId ID del tenant
-   * @param anio Año del período
-   * @param mes Mes del período (1-12)
-   */
-  async refrescarEstadosFinancieros(
-    tenantId: string,
-    anio: number,
-    mes: number
-  ): Promise<void> {
-    try {
-      console.log(`🔄 [EstadosFinancieros] Refrescando vistas materializadas para ${anio}-${mes}, tenant: ${tenantId}`);
-
-      // Llamar a la función de PostgreSQL que refresca las vistas materializadas
-      const { error } = await this.supabase
-        .getClient()
-        .rpc('refrescar_estados_financieros', {
-          p_tenant_id: tenantId,
-          p_anio: anio,
-          p_mes: mes,
-        });
-
-      if (error) {
-        console.error('❌ Error refrescando vistas materializadas:', error);
-        throw error;
-      }
-
-      // Invalidar cache después de refrescar las vistas
-      this.invalidateCache(tenantId, anio, mes);
-
-      console.log('✅ Vistas materializadas refrescadas exitosamente y cache invalidado');
-    } catch (error) {
-      console.error('❌ Error en refrescarEstadosFinancieros:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obtiene el Balance de Comprobación para un período específico
-   * @param tenantId ID del tenant
-   * @param anio Año del período
-   * @param mes Mes del período (1-12)
-   * @returns Balance de comprobación con saldos por cuenta
-   */
-  async getBalanceComprobacion(
-    tenantId: string,
-    anio: number,
-    mes: number
-  ): Promise<BalanceComprobacionItem[]> {
-    try {
-      // Intentar obtener del cache
-      const cacheKey = this.getCacheKey('balance-comprobacion', tenantId, anio, mes);
-      const cached = this.getFromCache<BalanceComprobacionItem[]>(cacheKey);
-      if (cached) {
-        return cached;
-      }
-
-      console.log(`⚖️ [EstadosFinancieros] Consultando Balance de Comprobación desde vista materializada para ${anio}-${mes}, tenant: ${tenantId}`);
-
-      // La MV tiene una fila por cuenta únicamente en meses con movimiento. Un
-      // filtro exacto por mes omite saldos arrastrados de cuentas inactivas y
-      // produce balances incompletos. Tomamos la última fila de cada cuenta al
-      // cierre solicitado; cuando no hubo movimiento en el mes, el último saldo
-      // pasa a ser saldo inicial/final y debe/haber quedan en cero.
-      const rows: any[] = [];
-      const pageSize = 1000;
-      let viewError: any = null;
-
-      for (let offset = 0; ; offset += pageSize) {
-        const { data, error } = await this.supabase
-          .getClient()
-          .from('mv_balance_comprobacion')
-          .select('*')
-          .eq('tenant_id', tenantId)
-          .lte('anio', anio)
-          .order('cuenta', { ascending: true })
-          .order('anio', { ascending: true })
-          .order('mes', { ascending: true })
-          .range(offset, offset + pageSize - 1);
-
-        if (error) {
-          viewError = error;
-          break;
-        }
-
-        rows.push(...(data || []));
-        if (!data || data.length < pageSize) break;
-      }
-
-      if (viewError) {
-        if (this.isMaterializedViewUnavailable(viewError)) {
-          console.warn('⚠️ Balance de comprobación sin MV disponible; calculando desde asientos');
-          const fallbackBalance = await this.calcularBalanceComprobacionDesdeAsientos(tenantId, anio, mes);
-          this.setCache(cacheKey, fallbackBalance);
-          return fallbackBalance;
-        }
-        console.error('❌ Error consultando vista materializada:', viewError);
-        throw viewError;
-      }
-
-      const latestByAccount = new Map<string, any>();
-      for (const item of rows) {
-        const itemAnio = Number(item.anio);
-        const itemMes = Number(item.mes);
-        if (itemAnio < anio || (itemAnio === anio && itemMes <= mes)) {
-          latestByAccount.set(item.cuenta, item);
-        }
-      }
-
-      console.log(`✅ Balance obtenido con ${latestByAccount.size} cuentas acumuladas desde vista materializada`);
-
-      const balanceItems: BalanceComprobacionItem[] = [...latestByAccount.values()]
-        .map((item: any) => {
-          const tuvoMovimientoEnPeriodo = Number(item.anio) === anio && Number(item.mes) === mes;
-          const saldoFinal = parseFloat(item.saldo_final || 0);
-          return {
-            cuenta: item.cuenta,
-            nombre: item.nombre_cuenta,
-            saldo_inicial: tuvoMovimientoEnPeriodo ? parseFloat(item.saldo_inicial || 0) : saldoFinal,
-            debe: tuvoMovimientoEnPeriodo ? parseFloat(item.debe || 0) : 0,
-            haber: tuvoMovimientoEnPeriodo ? parseFloat(item.haber || 0) : 0,
-            saldo_final: saldoFinal,
-          };
-        })
-        .filter(item => Math.abs(item.saldo_inicial) > 0.01 || Math.abs(item.debe) > 0.01 || Math.abs(item.haber) > 0.01 || Math.abs(item.saldo_final) > 0.01)
-        .sort((a, b) => a.cuenta.localeCompare(b.cuenta, 'es'));
-
-      if (balanceItems.length === 0) {
-        console.warn('⚠️ Balance de comprobación con MV vacía; calculando desde asientos');
-        const fallbackBalance = await this.calcularBalanceComprobacionDesdeAsientos(tenantId, anio, mes);
-        this.setCache(cacheKey, fallbackBalance);
-        return fallbackBalance;
-      }
-
-      // Guardar en cache
-      this.setCache(cacheKey, balanceItems);
-
-      return balanceItems;
-    } catch (error) {
-      console.error('❌ Error generando balance de comprobación:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Obtiene el Balance de Comprobación formateado según estándares contables
-   * @param tenantId ID del tenant
-   * @param anio Año del período
-   * @param mes Mes del período (1-12)
-   * @param showCurrency Si se debe mostrar el símbolo de moneda
-   * @returns Balance de comprobación con valores formateados
-   */
   async getBalanceComprobacionFormatted(
     tenantId: string,
     anio: number,
     mes: number,
-    showCurrency: boolean = false
+    showCurrency = false,
   ): Promise<FormattedBalanceComprobacionItem[]> {
     const balance = await this.getBalanceComprobacion(tenantId, anio, mes);
-    return balance.map(item => formatBalanceComprobacionItem(item, showCurrency));
+    return balance.map((item) => formatBalanceComprobacionItem(item, showCurrency));
   }
 
-  /**
-   * Obtiene el Estado de Resultados (P&L) para un período específico
-   * @param tenantId ID del tenant
-   * @param anio Año del período
-   * @param mes Mes del período (1-12)
-   * @returns Estado de Resultados con ingresos, costos, gastos y utilidad neta
-   */
   async getEstadoResultados(
     tenantId: string,
     anio: number,
-    mes: number
+    mes: number,
   ): Promise<EstadoResultados> {
-    try {
-      // Intentar obtener del cache
-      const cacheKey = this.getCacheKey('estado-resultados', tenantId, anio, mes);
-      const cached = this.getFromCache<EstadoResultados>(cacheKey);
-      if (cached) {
-        return cached;
-      }
+    const { data: resultado, error } = await this.supabase.getClient().rpc(
+      'estado_resultados_live',
+      { p_tenant_id: tenantId, p_anio: anio, p_mes: mes },
+    );
+    if (error) throw error;
 
-      console.log(`📊 [EstadosFinancieros] Consultando Estado de Resultados desde vista materializada para ${anio}-${mes}, tenant: ${tenantId}`);
+    const raw = resultado || {};
+    const ventas = Number(raw.ventas || 0);
+    const otrosIngresos = Number(raw.otros_ingresos || 0);
+    const costoVentas = Number(raw.costo_ventas || 0);
+    const gastosAdministrativos = Number(raw.gastos_administrativos || 0);
+    const gastosVentas = Number(raw.gastos_ventas || 0);
+    const gastosFinancieros = Number(raw.gastos_financieros || 0);
 
-      // Consultar vista materializada en lugar de calcular en tiempo real
-      const { data: resultado, error } = await this.supabase
-        .getClient()
-        .from('mv_estado_resultados')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('anio', anio)
-        .eq('mes', mes)
-        .single();
-
-      if (error) {
-        if (this.isMaterializedViewUnavailable(error)) {
-          console.warn('⚠️ Estado de resultados sin MV poblada o sin filas, retornando valores en cero');
-          const emptyResult = this.getEmptyEstadoResultados();
-          this.setCache(cacheKey, emptyResult, 5 * 60 * 1000); // 5 min para vacíos
-          return emptyResult;
-        }
-        console.error('❌ Error consultando vista materializada:', error);
-        throw error;
-      }
-
-      if (!resultado) {
-        console.log('⚠️ No se encontraron datos para el período especificado, retornando valores en cero');
-        const emptyResult = this.getEmptyEstadoResultados();
-        this.setCache(cacheKey, emptyResult, 5 * 60 * 1000); // 5 min para vacíos
-        return emptyResult;
-      }
-
-      // Mapear los datos de la vista materializada al formato esperado
-      const ventas = parseFloat(resultado.ventas || 0);
-      const otrosIngresos = parseFloat(resultado.otros_ingresos || 0);
-      const costoVentas = parseFloat(resultado.costo_ventas || 0);
-      const gastosAdministrativos = parseFloat(resultado.gastos_administrativos || 0);
-      const gastosVentas = parseFloat(resultado.gastos_ventas || 0);
-      const gastosFinancieros = parseFloat(resultado.gastos_financieros || 0);
-
-      // Calcular totales y subtotales
-      const totalIngresos = ventas + otrosIngresos;
-      const utilidadBruta = totalIngresos - costoVentas;
-      const totalGastos = gastosAdministrativos + gastosVentas + gastosFinancieros;
-      const utilidadNeta = utilidadBruta - totalGastos;
-
-      const estadoResultados: EstadoResultados = {
-        ingresos: {
-          ventas,
-          otros_ingresos: otrosIngresos,
-          total_ingresos: totalIngresos,
-        },
-        costos: {
-          costo_ventas: costoVentas,
-          utilidad_bruta: utilidadBruta,
-        },
-        gastos: {
-          gastos_administrativos: gastosAdministrativos,
-          gastos_ventas: gastosVentas,
-          gastos_financieros: gastosFinancieros,
-          total_gastos: totalGastos,
-        },
-        utilidad_neta: utilidadNeta,
-      };
-
-      console.log(`✅ Estado de Resultados calculado - Total Ingresos: ${totalIngresos.toFixed(2)}, Total Gastos: ${totalGastos.toFixed(2)}, Utilidad Neta: ${utilidadNeta.toFixed(2)}`);
-
-      // Guardar en cache
-      this.setCache(cacheKey, estadoResultados);
-
-      return estadoResultados;
-    } catch (error) {
-      console.error('❌ Error generando estado de resultados:', error);
-      throw error;
-    }
+    return {
+      ingresos: {
+        ventas,
+        otros_ingresos: otrosIngresos,
+        total_ingresos: Number(raw.total_ingresos ?? ventas + otrosIngresos),
+      },
+      costos: {
+        costo_ventas: costoVentas,
+        utilidad_bruta: Number(raw.utilidad_bruta ?? ventas + otrosIngresos - costoVentas),
+      },
+      gastos: {
+        gastos_administrativos: gastosAdministrativos,
+        gastos_ventas: gastosVentas,
+        gastos_financieros: gastosFinancieros,
+        total_gastos: Number(
+          raw.total_gastos ?? gastosAdministrativos + gastosVentas + gastosFinancieros,
+        ),
+      },
+      utilidad_neta: Number(raw.utilidad_neta ?? 0),
+    };
   }
 
-  /**
-   * Obtiene el Estado de Resultados formateado según estándares contables
-   * @param tenantId ID del tenant
-   * @param anio Año del período
-   * @param mes Mes del período (1-12)
-   * @param showCurrency Si se debe mostrar el símbolo de moneda
-   * @returns Estado de Resultados con valores formateados
-   */
   async getEstadoResultadosFormatted(
     tenantId: string,
     anio: number,
     mes: number,
-    showCurrency: boolean = false
+    showCurrency = false,
   ): Promise<FormattedEstadoResultados> {
-    const estado = await this.getEstadoResultados(tenantId, anio, mes);
-    return formatEstadoResultados(estado, showCurrency);
+    return formatEstadoResultados(
+      await this.getEstadoResultados(tenantId, anio, mes),
+      showCurrency,
+    );
   }
 
-  /**
-   * Obtiene el Balance General para un período específico
-   * @param tenantId ID del tenant
-   * @param anio Año del período
-   * @param mes Mes del período (1-12)
-   * @returns Balance General con activos, pasivos y patrimonio
-   */
   async getBalanceGeneral(
     tenantId: string,
     anio: number,
-    mes: number
+    mes: number,
   ): Promise<BalanceGeneral> {
-    try {
-      // Intentar obtener del cache
-      const cacheKey = this.getCacheKey('balance-general', tenantId, anio, mes);
-      const cached = this.getFromCache<BalanceGeneral>(cacheKey);
-      if (cached) {
-        return cached;
-      }
+    const { data: raw, error } = await this.supabase.getClient().rpc(
+      'balance_general_live',
+      { p_tenant_id: tenantId, p_anio: anio, p_mes: mes },
+    );
+    if (error) throw error;
 
-      console.log(`🏦 [EstadosFinancieros] Consultando Balance General desde vista materializada para ${anio}-${mes}, tenant: ${tenantId}`);
+    const balance = raw || {};
+    const efectivo = Number(balance.efectivo || 0);
+    const cuentasPorCobrar = Number(balance.cuentas_por_cobrar || 0);
+    const inventarios = Number(balance.inventarios || 0);
+    const otrosActivosCorrientes = Number(balance.otros_activos_corrientes || 0);
+    const activosFijos = Number(balance.activos_fijos || 0);
+    const depreciacionAcumulada = Number(balance.depreciacion_acumulada || 0);
+    const otrosActivosNoCorrientes = Number(balance.otros_activos_no_corrientes || 0);
+    const cuentasPorPagar = Number(balance.cuentas_por_pagar || 0);
+    const tributosPorPagar = Number(balance.tributos_por_pagar || 0);
+    const remuneracionesPorPagar = Number(balance.remuneraciones_por_pagar || 0);
+    const otrosPasivosCorrientes = Number(balance.otros_pasivos_corrientes || 0);
+    const deudasLargoPlazo = Number(balance.deudas_largo_plazo || 0);
+    const otrosPasivosNoCorrientes = Number(balance.otros_pasivos_no_corrientes || 0);
+    const capital = Number(balance.capital || 0);
+    const resultadosAcumulados = Number(balance.resultados_acumulados || 0);
+    const resultadoEjercicio = Number(balance.resultado_ejercicio || 0);
 
-      // El Balance General es un estado a fecha de cierre, no sólo de cuentas
-      // con movimiento en ese mes. Se deriva del snapshot acumulado que ya
-      // arrastra el último saldo de cada cuenta; la MV agregada mensual omitía
-      // cuentas inactivas y podía romper la ecuación contable.
-      const balanceComprobacion = await this.getBalanceComprobacion(tenantId, anio, mes);
-      const sum = (pattern: RegExp, creditNature = false, positiveOnly = false) => {
-        const raw = balanceComprobacion
-          .filter((item) => pattern.test(item.cuenta))
-          .reduce((total, item) => {
-            const value = Number(item.saldo_final || 0);
-            // Para activos se conserva el contrato de la vista: una cuenta con
-            // saldo acreedor anómalo no compensa silenciosamente otra cuenta
-            // deudora del mismo rubro.
-            return total + (positiveOnly ? Math.max(value, 0) : value);
-          }, 0);
-        if (creditNature) return Math.abs(raw);
-        return raw;
-      };
+    const totalActivosCorrientes =
+      efectivo + cuentasPorCobrar + inventarios + otrosActivosCorrientes;
+    const activosFijosNeto = activosFijos - depreciacionAcumulada;
+    const totalActivosNoCorrientes = activosFijosNeto + otrosActivosNoCorrientes;
+    const totalActivos = totalActivosCorrientes + totalActivosNoCorrientes;
+    const totalPasivosCorrientes =
+      cuentasPorPagar + tributosPorPagar + remuneracionesPorPagar + otrosPasivosCorrientes;
+    const totalPasivosNoCorrientes = deudasLargoPlazo + otrosPasivosNoCorrientes;
+    const totalPasivos = totalPasivosCorrientes + totalPasivosNoCorrientes;
+    const totalPatrimonio = capital + resultadosAcumulados + resultadoEjercicio;
 
-      const balance = {
-        efectivo: sum(/^10/, false, true),
-        cuentas_por_cobrar: sum(/^12/, false, true),
-        inventarios: sum(/^20/, false, true),
-        otros_activos_corrientes: sum(/^(11|13|14|16|18)/, false, true),
-        activos_fijos: sum(/^33/, false, true),
-        depreciacion_acumulada: sum(/^39/, true),
-        otros_activos_no_corrientes: sum(/^(34|35|36|37|38)/, false, true),
-        cuentas_por_pagar: sum(/^42/, true),
-        tributos_por_pagar: sum(/^40/, true),
-        remuneraciones_por_pagar: sum(/^41/, true),
-        otros_pasivos_corrientes: sum(/^(43|44)/, true),
-        deudas_largo_plazo: sum(/^(45|46|47|48)/, true),
-        otros_pasivos_no_corrientes: sum(/^49/, true),
-        capital: sum(/^50/, true),
-        resultados_acumulados: sum(/^(56|57|58|59)/, true),
-      };
-
-      // Obtener el resultado del ejercicio desde el Estado de Resultados (usa cache si está disponible)
-      const estadoResultados = await this.getEstadoResultados(tenantId, anio, mes);
-      const resultadoEjercicio = estadoResultados.utilidad_neta;
-
-      if (balanceComprobacion.length === 0) {
-        console.log('⚠️ No se encontraron datos para el período especificado, retornando valores en cero');
-        const emptyBalance = this.getEmptyBalanceGeneral(resultadoEjercicio);
-        this.setCache(cacheKey, emptyBalance, 5 * 60 * 1000); // 5 min para vacíos
-        return emptyBalance;
-      }
-
-      // Mapear los datos de la vista materializada al formato esperado
-      const efectivo = Number(balance.efectivo || 0);
-      const cuentasPorCobrar = Number(balance.cuentas_por_cobrar || 0);
-      const inventarios = Number(balance.inventarios || 0);
-      const otrosActivosCorrientes = Number(balance.otros_activos_corrientes || 0);
-
-      const activosFijos = Number(balance.activos_fijos || 0);
-      const depreciacionAcumulada = Number(balance.depreciacion_acumulada || 0);
-      const otrosActivosNoCorrientes = Number(balance.otros_activos_no_corrientes || 0);
-
-      const cuentasPorPagar = Number(balance.cuentas_por_pagar || 0);
-      const tributosPorPagar = Number(balance.tributos_por_pagar || 0);
-      const remuneracionesPorPagar = Number(balance.remuneraciones_por_pagar || 0);
-      const otrosPasivosCorrientes = Number(balance.otros_pasivos_corrientes || 0);
-
-      const deudasLargoPlazo = Number(balance.deudas_largo_plazo || 0);
-      const otrosPasivosNoCorrientes = Number(balance.otros_pasivos_no_corrientes || 0);
-
-      const capital = Number(balance.capital || 0);
-      const resultadosAcumulados = Number(balance.resultados_acumulados || 0);
-
-      // Calcular totales y subtotales
-      const totalActivosCorrientes = efectivo + cuentasPorCobrar + inventarios + otrosActivosCorrientes;
-      const activosFijosNeto = activosFijos - depreciacionAcumulada;
-      const totalActivosNoCorrientes = activosFijosNeto + otrosActivosNoCorrientes;
-      const totalActivos = totalActivosCorrientes + totalActivosNoCorrientes;
-
-      const totalPasivosCorrientes = cuentasPorPagar + tributosPorPagar + remuneracionesPorPagar + otrosPasivosCorrientes;
-      const totalPasivosNoCorrientes = deudasLargoPlazo + otrosPasivosNoCorrientes;
-      const totalPasivos = totalPasivosCorrientes + totalPasivosNoCorrientes;
-
-      const totalPatrimonio = capital + resultadosAcumulados + resultadoEjercicio;
-
-      const balanceGeneral: BalanceGeneral = {
-        activos: {
-          corrientes: {
-            efectivo,
-            cuentas_por_cobrar: cuentasPorCobrar,
-            inventarios,
-            otros_activos: otrosActivosCorrientes,
-            total_corrientes: totalActivosCorrientes,
-          },
-          no_corrientes: {
-            activos_fijos: activosFijos,
-            depreciacion_acumulada: depreciacionAcumulada,
-            activos_fijos_neto: activosFijosNeto,
-            otros_activos: otrosActivosNoCorrientes,
-            total_no_corrientes: totalActivosNoCorrientes,
-          },
-          total_activos: totalActivos,
+    const result: BalanceGeneral = {
+      activos: {
+        corrientes: {
+          efectivo,
+          cuentas_por_cobrar: cuentasPorCobrar,
+          inventarios,
+          otros_activos: otrosActivosCorrientes,
+          total_corrientes: totalActivosCorrientes,
         },
-        pasivos: {
-          corrientes: {
-            cuentas_por_pagar: cuentasPorPagar,
-            tributos_por_pagar: tributosPorPagar,
-            remuneraciones_por_pagar: remuneracionesPorPagar,
-            otros_pasivos: otrosPasivosCorrientes,
-            total_corrientes: totalPasivosCorrientes,
-          },
-          no_corrientes: {
-            deudas_largo_plazo: deudasLargoPlazo,
-            otros_pasivos: otrosPasivosNoCorrientes,
-            total_no_corrientes: totalPasivosNoCorrientes,
-          },
-          total_pasivos: totalPasivos,
+        no_corrientes: {
+          activos_fijos: activosFijos,
+          depreciacion_acumulada: depreciacionAcumulada,
+          activos_fijos_neto: activosFijosNeto,
+          otros_activos: otrosActivosNoCorrientes,
+          total_no_corrientes: totalActivosNoCorrientes,
         },
-        patrimonio: {
-          capital,
-          resultados_acumulados: resultadosAcumulados,
-          resultado_ejercicio: resultadoEjercicio,
-          total_patrimonio: totalPatrimonio,
+        total_activos: totalActivos,
+      },
+      pasivos: {
+        corrientes: {
+          cuentas_por_pagar: cuentasPorPagar,
+          tributos_por_pagar: tributosPorPagar,
+          remuneraciones_por_pagar: remuneracionesPorPagar,
+          otros_pasivos: otrosPasivosCorrientes,
+          total_corrientes: totalPasivosCorrientes,
         },
+        no_corrientes: {
+          deudas_largo_plazo: deudasLargoPlazo,
+          otros_pasivos: otrosPasivosNoCorrientes,
+          total_no_corrientes: totalPasivosNoCorrientes,
+        },
+        total_pasivos: totalPasivos,
+      },
+      patrimonio: {
+        capital,
+        resultados_acumulados: resultadosAcumulados,
+        resultado_ejercicio: resultadoEjercicio,
+        total_patrimonio: totalPatrimonio,
+      },
+    };
+
+    const diferencia = Number((totalActivos - totalPasivos - totalPatrimonio).toFixed(2));
+    if (Math.abs(diferencia) >= 0.01) {
+      (result as any).advertencia_balance = {
+        desbalanceado: true,
+        diferencia,
+        mensaje: `La ecuación contable no está balanceada. Diferencia: ${diferencia.toFixed(2)}`,
       };
-
-      // Validar ecuación contable: Activos = Pasivos + Patrimonio
-      const diferencia = totalActivos - (totalPasivos + totalPatrimonio);
-      const ecuacionBalanceada = Math.abs(diferencia) < 0.01; // Tolerancia de 1 centavo
-      
-      console.log(`✅ Balance General calculado - Total Activos: ${totalActivos.toFixed(2)}, Total Pasivos: ${totalPasivos.toFixed(2)}, Total Patrimonio: ${totalPatrimonio.toFixed(2)}, Diferencia: ${diferencia.toFixed(2)}, Balanceado: ${ecuacionBalanceada ? 'Sí' : 'No'}`);
-
-      if (!ecuacionBalanceada) {
-        console.warn(`⚠️ ADVERTENCIA: La ecuación contable no está balanceada. Diferencia: ${diferencia.toFixed(2)}`);
-        // Incluir advertencia en el resultado para que el UI pueda alertar al usuario
-        (balanceGeneral as any).advertencia_balance = {
-          desbalanceado: true,
-          diferencia: Number(diferencia.toFixed(2)),
-          mensaje: `La ecuación contable no está balanceada. Diferencia: ${diferencia.toFixed(2)}`,
-        };
-      }
-
-      // Guardar en cache
-      this.setCache(cacheKey, balanceGeneral);
-
-      return balanceGeneral;
-    } catch (error) {
-      console.error('❌ Error generando balance general:', error);
-      throw error;
     }
+
+    return result;
   }
 
-  /**
-   * Obtiene el Balance General formateado según estándares contables
-   * @param tenantId ID del tenant
-   * @param anio Año del período
-   * @param mes Mes del período (1-12)
-   * @param showCurrency Si se debe mostrar el símbolo de moneda
-   * @returns Balance General con valores formateados
-   */
   async getBalanceGeneralFormatted(
     tenantId: string,
     anio: number,
     mes: number,
-    showCurrency: boolean = false
+    showCurrency = false,
   ): Promise<FormattedBalanceGeneral> {
-    const balance = await this.getBalanceGeneral(tenantId, anio, mes);
-    return formatBalanceGeneral(balance, showCurrency);
+    return formatBalanceGeneral(
+      await this.getBalanceGeneral(tenantId, anio, mes),
+      showCurrency,
+    );
   }
 }

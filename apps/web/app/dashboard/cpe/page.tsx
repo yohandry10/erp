@@ -7,6 +7,8 @@ import CpeViewModal from '@/components/modals/CpeViewModal'
 import GreModal from '@/components/modals/GreModal'
 import { ComprobantesFilters } from '@/components/cpe/ComprobantesFilters'
 import { ComprobantesTable } from '@/components/cpe/ComprobantesTable'
+import { AnulacionFinancieraModal } from '@/components/cpe/AnulacionFinancieraModal'
+import { ReferencedNoteModal } from '@/components/cpe/ReferencedNoteModal'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
 import { fetchApi } from '@/lib/api-fetch'
@@ -25,7 +27,7 @@ interface CpeDocument {
   clienteRuc: string
   total: number
   moneda: string
-  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO'
+  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'ERROR' | 'RECHAZADO' | 'ANULADO'
   estadoSunat?: string
   observaciones?: string
   fechaCreacion: string
@@ -58,11 +60,13 @@ export default function CPEPage() {
   const [documents, setDocuments] = useState<CpeDocument[]>([])
   const [stats, setStats] = useState<CpeStats | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [isGreModalOpen, setIsGreModalOpen] = useState(false)
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>('')
   const [selectedDocumentType, setSelectedDocumentType] = useState<string>('')
   const [selectedCpeForGre, setSelectedCpeForGre] = useState<CpeDocument | null>(null)
+  const [selectedCpeForCancellation, setSelectedCpeForCancellation] = useState<CpeDocument | null>(null)
 
   const [filters, setFilters] = useState({
     tipoComprobante: '',
@@ -154,6 +158,25 @@ export default function CPEPage() {
     }
   }
 
+  const signReferencedNote = async (documentId: string) => {
+    const storageKey = `cpe-note-sign:${documentId}`
+    let idempotencyKey = window.sessionStorage.getItem(storageKey)
+    if (!idempotencyKey) {
+      idempotencyKey = `note-sign-ui:${crypto.randomUUID()}`
+      window.sessionStorage.setItem(storageKey, idempotencyKey)
+    }
+    const response = await post(
+      `/api/cpe/notas-referenciadas/${encodeURIComponent(documentId)}/firmar`,
+      {},
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    )
+    if (apiSucceeded(response)) {
+      window.sessionStorage.removeItem(storageKey)
+      await loadDocuments()
+      alert('✅ Nota firmada. Ya puede enviarse cuando corresponda.')
+    }
+  }
+
   const openDownloadedBlob = async (endpoint: string, fallbackName: string) => {
     const response = await fetchApi(endpoint, { method: 'GET' })
     if (!response.ok) {
@@ -198,6 +221,8 @@ export default function CPEPage() {
         return 'Firmado'
       case 'ENVIADO':
         return 'Pendiente'
+      case 'ERROR':
+        return 'Error técnico reintentable'
       case 'RECHAZADO':
         return 'Rechazado'
       case 'ANULADO':
@@ -244,10 +269,18 @@ export default function CPEPage() {
                 {isArgentina ? 'Facturas A/B/C' : isColombia ? 'Facturas de venta' : 'Facturas, boletas'} y notas conectadas a {fiscalLabel}.
               </p>
             </div>
-            <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
-              <Plus className="h-4 w-4" />
-              {isArgentina ? 'Nuevo comprobante' : isColombia ? 'Nueva factura DIAN' : 'Nuevo CPE'}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {paisCodigo === 'PE' && (
+                <Button type="button" variant="outline" onClick={() => setIsNoteModalOpen(true)} className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Nueva NC / ND
+                </Button>
+              )}
+              <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Plus className="h-4 w-4" />
+                {isArgentina ? 'Nuevo comprobante' : isColombia ? 'Nueva factura DIAN' : 'Nuevo CPE'}
+              </Button>
+            </div>
           </div>
         </section>
 
@@ -300,6 +333,8 @@ export default function CPEPage() {
               onView={viewDocument}
               onPdf={downloadPdf}
               onSend={sendToFiscal}
+              onSign={signReferencedNote}
+              onCancel={setSelectedCpeForCancellation}
               onGre={paisCodigo === 'PE' ? openGreModal : undefined}
               fiscalLabel={fiscalLabel}
               canSend={canSendToFiscal}
@@ -312,6 +347,12 @@ export default function CPEPage() {
       <CpeModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={handleCpeCreated}
+      />
+
+      <ReferencedNoteModal
+        isOpen={isNoteModalOpen}
+        onClose={() => setIsNoteModalOpen(false)}
         onSuccess={handleCpeCreated}
       />
 
@@ -330,6 +371,15 @@ export default function CPEPage() {
           onClose={() => setIsGreModalOpen(false)}
           onSuccess={handleGreCreated}
           cpeData={selectedCpeForGre}
+        />
+      )}
+
+      {selectedCpeForCancellation && (
+        <AnulacionFinancieraModal
+          cpeId={selectedCpeForCancellation.id}
+          label={`${selectedCpeForCancellation.serie}-${selectedCpeForCancellation.numero}`}
+          onClose={() => setSelectedCpeForCancellation(null)}
+          onCompleted={loadData}
         />
       )}
 

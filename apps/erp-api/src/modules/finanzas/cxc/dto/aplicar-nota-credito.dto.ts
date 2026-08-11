@@ -1,4 +1,4 @@
-import { IsDateString, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsDateString, IsIn, IsNumber, IsOptional, IsString, IsUUID, Length, Min } from 'class-validator';
 
 export class AplicarNotaCreditoDto {
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El monto debe ser numérico' })
@@ -32,4 +32,12 @@ export class AplicarNotaCreditoDto {
   @IsString()
   // HARDENING: permitir anotaciones internas para auditoría del ajuste.
   notas?: string;
+
+  @IsOptional()
+  @IsIn(['04', '05', '08', '09', '10', '11', '12', '13'])
+  codigo_motivo?: string;
+
+  @IsString()
+  @Length(8, 200)
+  idempotency_key!: string;
 }

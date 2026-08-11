@@ -1,7 +1,13 @@
-import { IsInt, IsOptional, Min, Max } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min, Max, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class MatchAutomaticoDto {
+  @ApiProperty({ description: 'Clave estable de intención' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(180)
+  idempotency_key!: string;
+
   @ApiProperty({
     description: 'Tolerancia en días para el match por fecha (±N días)',
     example: 2,

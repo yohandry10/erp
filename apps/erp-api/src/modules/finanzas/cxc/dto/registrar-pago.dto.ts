@@ -3,6 +3,7 @@ import {
   IsDateString,
   IsEnum,
   IsIn,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -64,6 +65,10 @@ export class RegistrarPagoCxcDto {
   cuenta_bancaria_id?: string;
 
   @IsOptional()
+  @IsUUID()
+  sesion_caja_id?: string;
+
+  @IsOptional()
   @IsEnum(TipoMovimientoCxc, { message: 'Tipo de movimiento inválido' })
   tipo?: TipoMovimientoCxc;
 
@@ -79,9 +84,8 @@ export class RegistrarPagoCxcDto {
   @IsUUID()
   documento_pago_id?: string;
 
-  @IsOptional()
+  @IsNotEmpty({ message: 'La llave de idempotencia es requerida' })
   @IsString()
   @MaxLength(200)
-  // HARDENING: permitir idempotencia en solicitudes de cobro al aceptar un identificador del cliente.
-  idempotency_key?: string;
+  idempotency_key!: string;
 }

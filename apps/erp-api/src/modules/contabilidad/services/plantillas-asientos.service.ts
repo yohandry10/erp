@@ -126,10 +126,10 @@ export class PlantillasAsientosService {
     const periodicidad = dto.periodicidad ?? PeriodicidadPlantilla.NINGUNA;
 
     const { data: plantilla, error } = await this.supabaseService.getClient().rpc(
-      'guardar_plantilla_con_detalles_tx',
+      'guardar_plantilla_contable_tx_473',
       {
         p_tenant_id: tenantId,
-        p_user_id: userId,
+        p_actor_id: userId,
         p_plantilla_id: null,
         p_plantilla: this.construirCabeceraRpc(dto, periodicidad),
         p_detalles: dto.detalles
@@ -146,6 +146,7 @@ export class PlantillasAsientosService {
 
   async actualizar(
     tenantId: string,
+    userId: string,
     plantillaId: string,
     dto: UpdatePlantillaAsientoDto
   ): Promise<PlantillaAsientoResponseDto> {
@@ -155,10 +156,10 @@ export class PlantillasAsientosService {
     const periodicidad = dto.periodicidad ?? PeriodicidadPlantilla.NINGUNA;
 
     const { error } = await this.supabaseService.getClient().rpc(
-      'guardar_plantilla_con_detalles_tx',
+      'guardar_plantilla_contable_tx_473',
       {
         p_tenant_id: tenantId,
-        p_user_id: null,
+        p_actor_id: userId,
         p_plantilla_id: plantillaId,
         p_plantilla: this.construirCabeceraRpc(dto, periodicidad),
         p_detalles: dto.detalles
@@ -172,24 +173,17 @@ export class PlantillasAsientosService {
     return this.obtener(tenantId, plantillaId);
   }
 
-  async eliminar(tenantId: string, plantillaId: string): Promise<void> {
-    await this.obtener(tenantId, plantillaId);
-
-    // El historial se conserva: los asientos ya generados deben seguir siendo
-    // rastreables aunque la plantilla que los originó desaparezca.
-    await this.supabaseService
-      .getClient()
-      .from('plantillas_asientos_detalle')
-      .delete()
-      .eq('tenant_id', tenantId)
-      .eq('plantilla_id', plantillaId);
-
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('plantillas_asientos')
-      .delete()
-      .eq('id', plantillaId)
-      .eq('tenant_id', tenantId);
+  async eliminar(tenantId: string, userId: string, plantillaId: string): Promise<void> {
+    // El historial se conserva por ON DELETE SET NULL. Cabecera y lineas se
+    // eliminan en una sola transaccion para no dejar plantillas vacias.
+    const { error } = await this.supabaseService.getClient().rpc(
+      'eliminar_plantilla_contable_tx_473',
+      {
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+        p_plantilla_id: plantillaId
+      }
+    );
 
     if (error) {
       throw new Error(`Error eliminando plantilla: ${error.message}`);

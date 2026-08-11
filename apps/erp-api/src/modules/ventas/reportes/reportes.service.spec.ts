@@ -1,16 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { ReportesService } from './reportes.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 describe('ReportesService', () => {
   let service: ReportesService;
   let respuestas: Record<string, { data: any[]; count: number }>;
+  let rpc: jest.Mock;
 
   /**
    * El builder de PostgREST encadena filtros y se resuelve al await. Se imita
    * devolviendo un thenable que entrega la respuesta fijada para cada tabla.
    */
   const crearClienteMock = () => ({
+    rpc,
     from: (tabla: string) => {
       const builder: any = {
         select: () => builder,
@@ -28,6 +31,7 @@ describe('ReportesService', () => {
   });
 
   beforeEach(async () => {
+    rpc = jest.fn();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ReportesService,
@@ -106,6 +110,72 @@ describe('ReportesService', () => {
         pedidos_a_facturas: 0,
         total: 0,
       });
+    });
+  });
+
+  describe('getAgingCxc', () => {
+    it('delega el snapshot completo al reporte canónico sin excluir saldos antiguos', async () => {
+      const payload = {
+        fechaCorte: '2026-08-10',
+        monedaBase: 'PEN',
+        resumen: {
+          cuentasAnalizadas: 2,
+          totalPendienteBase: 275,
+          totalPendientePorMoneda: { PEN: 100, USD: 50 },
+          cuentasSinValuacion: 0,
+        },
+        buckets: [],
+        saldoPorCliente: [],
+        cuentasCriticas: [],
+        detalle: [
+          { id: 'cxc-antigua', moneda: 'PEN', montoOrigen: 100, montoBase: 100 },
+          { id: 'cxc-usd', moneda: 'USD', montoOrigen: 50, montoBase: 175 },
+        ],
+      };
+      rpc.mockResolvedValue({ data: payload, error: null });
+
+      const resultado = await service.getAgingCxc(
+        'tenant-a',
+        '2026-08-10',
+        'Cliente histórico',
+      );
+
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(rpc).toHaveBeenCalledWith('reporte_cxc_aging_470', {
+        p_tenant_id: 'tenant-a',
+        p_fecha_corte: '2026-08-10',
+        p_cliente_filtro: 'Cliente histórico',
+        p_limit: 1000,
+      });
+      expect(resultado).toBe(payload);
+      expect(payload.resumen.totalPendientePorMoneda).toEqual({ PEN: 100, USD: 50 });
+    });
+
+    it('usa el corte local del tenant cuando el consumidor no envía fecha', async () => {
+      const payload = {
+        fechaCorte: '2026-08-10',
+        resumen: {},
+        buckets: [],
+        saldoPorCliente: [],
+        cuentasCriticas: [],
+        detalle: [],
+      };
+      rpc.mockResolvedValue({ data: payload, error: null });
+
+      await service.getAgingCxc('tenant-a');
+
+      expect(rpc).toHaveBeenCalledWith(
+        'reporte_cxc_aging_470',
+        expect.objectContaining({ p_fecha_corte: null, p_cliente_filtro: null }),
+      );
+    });
+
+    it('rechaza un corte inexistente sin convertirlo en un reporte sin filtro', async () => {
+      await expect(
+        service.getAgingCxc('tenant-a', '2026-02-30'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(rpc).not.toHaveBeenCalled();
     });
   });
 });

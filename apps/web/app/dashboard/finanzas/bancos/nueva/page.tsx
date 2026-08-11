@@ -8,7 +8,7 @@ import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 export default function NuevaCuentaBancariaPage() {
   const router = useRouter()
-  const { post } = useApi()
+  const { get, post } = useApi()
   const { country, currency } = useLocalizedMoney()
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
@@ -45,10 +45,30 @@ export default function NuevaCuentaBancariaPage() {
   const [saldo, setSaldo] = useState('0.00')
   const [permiteSobregiro, setPermiteSobregiro] = useState(false)
   const [activa, setActiva] = useState(true)
+  const [cuentasContables, setCuentasContables] = useState<any[]>([])
+  const [cuentaContableId, setCuentaContableId] = useState('')
 
   useEffect(() => {
     if (!country.loading && currency) setMoneda(currency)
   }, [country.loading, currency])
+
+  useEffect(() => {
+    let active = true
+    get('/api/contabilidad/plan-cuentas')
+      .then((response) => {
+        if (!active) return
+        const rows = Array.isArray(response?.data) ? response.data : []
+        const bancarias = rows.filter((cuenta: any) =>
+          String(cuenta.codigo || '').startsWith('10') &&
+          Boolean(cuenta.acepta_movimiento) &&
+          String(cuenta.estado || 'ACTIVO').toUpperCase() === 'ACTIVO',
+        )
+        setCuentasContables(bancarias)
+        setCuentaContableId((current) => current || bancarias[0]?.id || '')
+      })
+      .catch(() => setCuentasContables([]))
+    return () => { active = false }
+  }, [get])
 
   const bankExamples = isColombia
     ? { account: 'Ej: Cuenta Operaciones Bancolombia', bank: 'Ej: Bancolombia', number: 'Ej: 12345678901' }
@@ -71,6 +91,7 @@ export default function NuevaCuentaBancariaPage() {
     if (!nombre.trim()) nextErrors.nombre = 'El nombre de la cuenta es requerido'
     if (!banco.trim()) nextErrors.banco = 'El nombre del banco es requerido'
     if (!numeroCuenta.trim()) nextErrors.numeroCuenta = 'El número de cuenta es requerido'
+    if (!cuentaContableId) nextErrors.cuentaContableId = 'Seleccione la cuenta contable del banco'
 
     const saldoNum = parseFloat(saldo)
     if (isNaN(saldoNum) || saldoNum < 0) {
@@ -103,6 +124,7 @@ export default function NuevaCuentaBancariaPage() {
         saldo: saldoNum,
         permite_sobregiro: permiteSobregiro,
         activa,
+        cuenta_contable_id: cuentaContableId,
       }
 
       const response = await post('/api/finanzas/bancos/cuentas', payload)
@@ -272,6 +294,30 @@ export default function NuevaCuentaBancariaPage() {
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                    Cuenta contable bancaria *
+                  </label>
+                  <select
+                    value={cuentaContableId}
+                    onChange={(event) => {
+                      setCuentaContableId(event.target.value)
+                      clearFieldError('cuentaContableId')
+                    }}
+                    className="w-full px-4 py-2 border border-border rounded-lg"
+                    aria-invalid={Boolean(fieldErrors.cuentaContableId)}
+                  >
+                    <option value="">Seleccione una cuenta de Caja y Bancos</option>
+                    {cuentasContables.map((cuenta) => (
+                      <option key={cuenta.id} value={cuenta.id}>
+                        {cuenta.codigo} - {cuenta.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.cuentaContableId && (
+                    <p className="text-xs text-destructive mt-1">{fieldErrors.cuentaContableId}</p>
+                  )}
+                </div>
                 {/* Moneda */}
                 <div>
                   <label className="block text-sm font-medium text-foreground/85 mb-2">

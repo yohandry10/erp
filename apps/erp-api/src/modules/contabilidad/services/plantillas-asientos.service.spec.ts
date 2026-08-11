@@ -206,7 +206,7 @@ describe('PlantillasAsientosService', () => {
         detalles: detallesValidos
       });
 
-      const cabecera = rpcs.find(i => i.funcion === 'guardar_plantilla_con_detalles_tx')!.parametros.p_plantilla;
+      const cabecera = rpcs.find(i => i.funcion === 'guardar_plantilla_contable_tx_473')!.parametros.p_plantilla;
       expect(cabecera.fecha_inicio).toBe('2026-09-01');
       expect(cabecera.periodicidad).toBe('MENSUAL');
     });
@@ -218,7 +218,7 @@ describe('PlantillasAsientosService', () => {
         detalles: detallesValidos
       });
 
-      const llamada = rpcs.find(i => i.funcion === 'guardar_plantilla_con_detalles_tx')!;
+      const llamada = rpcs.find(i => i.funcion === 'guardar_plantilla_contable_tx_473')!;
       const cabecera = llamada.parametros.p_plantilla;
       expect(llamada.parametros.p_plantilla_id).toBeNull();
       expect(cabecera.periodicidad).toBe('NINGUNA');
@@ -231,7 +231,7 @@ describe('PlantillasAsientosService', () => {
         detalles: detallesValidos
       });
 
-      const cabecera = rpcs.find(i => i.funcion === 'guardar_plantilla_con_detalles_tx')!.parametros.p_plantilla;
+      const cabecera = rpcs.find(i => i.funcion === 'guardar_plantilla_contable_tx_473')!.parametros.p_plantilla;
       expect(cabecera.crear_en_estado).toBe('BORRADOR');
     });
 
@@ -242,7 +242,7 @@ describe('PlantillasAsientosService', () => {
         detalles: detallesValidos
       });
 
-      const lineas = rpcs.find(i => i.funcion === 'guardar_plantilla_con_detalles_tx')!.parametros.p_detalles;
+      const lineas = rpcs.find(i => i.funcion === 'guardar_plantilla_contable_tx_473')!.parametros.p_detalles;
       expect(lineas).toEqual(detallesValidos);
     });
 
@@ -254,13 +254,28 @@ describe('PlantillasAsientosService', () => {
       });
 
       expect(rpcs).toContainEqual({
-        funcion: 'guardar_plantilla_con_detalles_tx',
+        funcion: 'guardar_plantilla_contable_tx_473',
         parametros: expect.objectContaining({
           p_tenant_id: TENANT,
-          p_user_id: USER,
+          p_actor_id: USER,
           p_plantilla_id: null,
           p_detalles: detallesValidos
         })
+      });
+    });
+  });
+
+  describe('eliminación', () => {
+    it('delega cabecera y líneas a una única RPC con actor explícito', async () => {
+      await service.eliminar(TENANT, USER, 'plantilla-1');
+
+      expect(rpcs).toContainEqual({
+        funcion: 'eliminar_plantilla_contable_tx_473',
+        parametros: {
+          p_tenant_id: TENANT,
+          p_actor_id: USER,
+          p_plantilla_id: 'plantilla-1'
+        }
       });
     });
   });

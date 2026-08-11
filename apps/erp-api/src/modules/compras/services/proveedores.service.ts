@@ -1,8 +1,7 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ProveedoresRepository } from '../repositories/proveedores.repository';
 import { CreateProveedorDto } from '../dto/create-proveedor.dto';
 import { UpdateProveedorDto } from '../dto/update-proveedor.dto';
-import { AuditService } from '../../audit/audit.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { validarCuilArgentina } from '../../rrhh/planillas-argentina.util';
 import { validateColombiaNit } from '../../paises/initial-country';
@@ -11,8 +10,7 @@ import { validateColombiaNit } from '../../paises/initial-country';
 export class ProveedoresService {
   constructor(
     private readonly proveedoresRepository: ProveedoresRepository,
-    private readonly auditService: AuditService,
-    @Optional() private readonly supabaseService?: SupabaseService,
+    private readonly supabaseService: SupabaseService,
   ) {}
 
   async findAll(tenantId: string, filters?: { 
@@ -40,14 +38,10 @@ export class ProveedoresService {
   }
 
   async create(createDto: CreateProveedorDto, tenantId: string, userId?: string) {
-    createDto.ruc = await this.validateTaxId(createDto.ruc, tenantId);
-    const taxIdLabel = await this.getTaxIdLabel(tenantId);
-
-    // Verificar si ya existe un proveedor con el mismo RUC
-    const existingProveedor = await this.proveedoresRepository.findByRuc(createDto.ruc, tenantId);
-    if (existingProveedor) {
-      throw new ConflictException(`Ya existe un proveedor con ${taxIdLabel} ${createDto.ruc}`);
+    if (!userId) {
+      throw new BadRequestException('Se requiere un usuario autenticado para crear el proveedor');
     }
+    const identidad = await this.validateTaxIdentity(createDto.ruc, tenantId);
 
     // Validar email
     if (!this.isValidEmail(createDto.email)) {
@@ -59,39 +53,40 @@ export class ProveedoresService {
       throw new BadRequestException('El límite de crédito no puede ser negativo');
     }
 
-    const proveedor = await this.proveedoresRepository.create(createDto, tenantId, userId);
-    if (userId) {
-      await this.auditService.registrarCambio(
-        'proveedores',
-        'INSERT',
-        userId,
-        { new: proveedor },
-        tenantId,
-        proveedor.id,
-        { accion: 'CREAR_PROVEEDOR' },
-      ).catch((error) => console.warn('⚠️ No se pudo registrar auditoría de creación de proveedor:', error));
+    const payload = {
+      ...createDto,
+      ruc: identidad.ruc,
+      documento_tipo: identidad.documentoTipo,
+    };
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'crear_proveedor_maestro_tx',
+      {
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+        p_proveedor: payload,
+      },
+    );
+    if (error) {
+      this.throwMasterError(error);
     }
-    return proveedor;
+    return data;
   }
 
   async update(id: string, updateDto: UpdateProveedorDto, tenantId: string, userId?: string) {
-    // Verificar que el proveedor existe
-    const previousProveedor = await this.findById(id, tenantId);
+    if (!userId) {
+      throw new BadRequestException('Se requiere un usuario autenticado para editar el proveedor');
+    }
 
     // Si se está actualizando el RUC, validarlo
+    const cambios: Record<string, any> = { ...updateDto };
     if (updateDto.ruc) {
-      updateDto.ruc = await this.validateTaxId(updateDto.ruc, tenantId);
-      const taxIdLabel = await this.getTaxIdLabel(tenantId);
-
-      // Verificar que no exista otro proveedor con el mismo RUC
-      const existingProveedor = await this.proveedoresRepository.findByRuc(updateDto.ruc, tenantId);
-      if (existingProveedor && existingProveedor.id !== id) {
-        throw new ConflictException(`Ya existe otro proveedor con ${taxIdLabel} ${updateDto.ruc}`);
-      }
+      const identidad = await this.validateTaxIdentity(updateDto.ruc, tenantId);
+      cambios.ruc = identidad.ruc;
+      cambios.documento_tipo = identidad.documentoTipo;
     }
 
     // Validar email si se proporciona
-    if (updateDto.email && !this.isValidEmail(updateDto.email)) {
+    if (updateDto.email !== undefined && !this.isValidEmail(updateDto.email)) {
       throw new BadRequestException('El email proporcionado no es válido');
     }
 
@@ -100,49 +95,56 @@ export class ProveedoresService {
       throw new BadRequestException('El límite de crédito no puede ser negativo');
     }
 
-    const proveedor = await this.proveedoresRepository.update(id, updateDto, tenantId);
-    if (userId) {
-      await this.auditService.registrarCambio(
-        'proveedores',
-        'UPDATE',
-        userId,
-        { old: previousProveedor, new: proveedor },
-        tenantId,
-        id,
-        { accion: 'EDITAR_PROVEEDOR' },
-      ).catch((error) => console.warn('⚠️ No se pudo registrar auditoría de edición de proveedor:', error));
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'actualizar_proveedor_maestro_tx',
+      {
+        p_proveedor_id: id,
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+        p_cambios: cambios,
+      },
+    );
+    if (error) {
+      this.throwMasterError(error);
     }
-    return proveedor;
+    return data;
   }
 
-  async softDelete(id: string, tenantId: string) {
-    // Verificar que el proveedor existe
-    await this.findById(id, tenantId);
-
-    return await this.proveedoresRepository.softDelete(id, tenantId);
+  async softDelete(id: string, tenantId: string, userId?: string) {
+    if (!userId) {
+      throw new BadRequestException('Se requiere un usuario autenticado para desactivar el proveedor');
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'desactivar_proveedor_maestro_tx',
+      {
+        p_proveedor_id: id,
+        p_tenant_id: tenantId,
+        p_actor_id: userId,
+      },
+    );
+    if (error) {
+      this.throwMasterError(error);
+    }
+    return data;
   }
 
   // Métodos de validación privados
   private async getCountryCode(tenantId: string): Promise<'PE' | 'AR' | 'CO'> {
     let pais = 'PE';
-    if (this.supabaseService) {
-      const { data } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .select('pais')
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-      pais = String(data?.pais || 'PE').toUpperCase();
-    }
+    const { data } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select('pais')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    pais = String(data?.pais || 'PE').toUpperCase();
     return pais === 'AR' || pais === 'CO' ? pais : 'PE';
   }
 
-  private async getTaxIdLabel(tenantId: string): Promise<'RUC' | 'CUIT' | 'NIT'> {
-    const pais = await this.getCountryCode(tenantId);
-    return pais === 'AR' ? 'CUIT' : pais === 'CO' ? 'NIT' : 'RUC';
-  }
-
-  private async validateTaxId(ruc: string, tenantId: string): Promise<string> {
+  private async validateTaxIdentity(
+    ruc: string,
+    tenantId: string,
+  ): Promise<{ ruc: string; documentoTipo: 'RUC' | 'CUIT' | 'NIT' }> {
     const pais = await this.getCountryCode(tenantId);
     const rawTaxId = String(ruc || '').trim().replace(/\s+/g, '');
 
@@ -153,7 +155,7 @@ export class ProveedoresService {
       if (!validateColombiaNit(normalizedNit) || !/^\d{9,10}-\d$/.test(normalizedNit)) {
         throw new BadRequestException('NIT inválido: incluya la base y un dígito de verificación válido');
       }
-      return normalizedNit;
+      return { ruc: normalizedNit, documentoTipo: 'NIT' };
     }
 
     if (!/^\d{11}$/.test(rawTaxId)) {
@@ -164,7 +166,7 @@ export class ProveedoresService {
       if (!validarCuilArgentina(rawTaxId)) {
         throw new BadRequestException('CUIT inválido: el dígito verificador no coincide');
       }
-      return rawTaxId;
+      return { ruc: rawTaxId, documentoTipo: 'CUIT' };
     }
 
     // Validar dígito verificador para RUC peruano (módulo 11 SUNAT)
@@ -180,11 +182,22 @@ export class ProveedoresService {
     if (digitoVerificador !== digitos[10]) {
       throw new BadRequestException('RUC inválido: dígito verificador no coincide');
     }
-    return rawTaxId;
+    return { ruc: rawTaxId, documentoTipo: 'RUC' };
   }
 
   private isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  }
+
+  private throwMasterError(error: any): never {
+    const message = String(error?.message || '');
+    if (error?.code === '23505' || message.includes('IDENTITY_CONFLICT')) {
+      throw new ConflictException('Ya existe otro proveedor con esa identidad fiscal');
+    }
+    if (error?.code === 'P0002' || message.includes('NOT_FOUND')) {
+      throw new NotFoundException('Proveedor no encontrado');
+    }
+    throw new BadRequestException('No se pudo guardar el proveedor');
   }
 }

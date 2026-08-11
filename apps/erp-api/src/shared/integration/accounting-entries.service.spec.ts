@@ -14,6 +14,7 @@ describe('AccountingEntriesService - Period Validation', () => {
 
   const mockSupabaseService = {
     getClient: jest.fn(() => ({
+      rpc: jest.fn().mockResolvedValue({ data: { id: 'asiento-123' }, error: null }),
       auth: {
         getUser: jest.fn().mockResolvedValue({
           data: {
@@ -188,6 +189,7 @@ describe('AccountingEntriesService - Period Validation', () => {
       });
 
       mockSupabaseService.getClient = jest.fn(() => ({
+        rpc: jest.fn().mockResolvedValue({ data: { id: mockAsientoId }, error: null }),
         auth: {
           getUser: jest.fn().mockResolvedValue({
             data: {
@@ -289,21 +291,21 @@ describe('AccountingEntriesService - Period Validation', () => {
 
       const selectMock = jest.fn().mockReturnThis();
       const eqMock = jest.fn().mockReturnThis();
-      const orderMock = jest.fn().mockReturnThis();
-      const limitMock = jest.fn().mockResolvedValue({
-        data: [{ id: existingAsientoId }],
-        error: null,
-      });
+      const maybeSingleMock = jest.fn().mockResolvedValue({ data: { id: existingAsientoId }, error: null });
 
-      const mockFrom = jest.fn().mockReturnValueOnce({
+      const mockFrom = jest.fn().mockReturnValue({
         select: selectMock,
         eq: eqMock,
-        order: orderMock,
-        limit: limitMock,
+        maybeSingle: maybeSingleMock,
+      });
+      const rpcMock = jest.fn().mockResolvedValue({
+        data: null,
+        error: { code: '23505', message: 'duplicate source event' },
       });
 
       mockSupabaseService.getClient = jest.fn(() => ({
         from: mockFrom,
+        rpc: rpcMock,
         auth: { getUser: jest.fn() } as any
       }));
 
@@ -336,8 +338,8 @@ describe('AccountingEntriesService - Period Validation', () => {
 
       expect(result).toBe(existingAsientoId);
       expect(mockFrom).toHaveBeenCalledTimes(1);
-      expect(orderMock).toHaveBeenCalledWith('created_at', { ascending: true });
-      expect(limitMock).toHaveBeenCalledWith(1);
+      expect(rpcMock).toHaveBeenCalledWith('crear_asiento_con_detalles_tx', expect.any(Object));
+      expect(maybeSingleMock).toHaveBeenCalled();
     });
   });
 });

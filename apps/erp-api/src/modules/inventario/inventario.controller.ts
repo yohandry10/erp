@@ -1,8 +1,8 @@
-import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, Headers, InternalServerErrorException, Logger, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentTenant } from '../../common';
-import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
+import { CurrentTenant, CurrentUser } from '../../common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AlmacenesService } from './almacenes/almacenes.service';
 import { PermissionGuard } from '../../common/guards/permission.guard';
@@ -11,8 +11,20 @@ import { InventarioService } from './inventario.service';
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
 import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
-import { randomUUID } from 'node:crypto';
 import { CreateCategoriaProductoDto, UpdateCategoriaProductoDto } from './dto/categoria-producto.dto';
+import {
+  RegistrarAjusteInventarioDto,
+  TransferirInventarioDto,
+} from './dto/operacion-inventario.dto';
+import {
+  CreateAlmacenDto,
+  CreateProductoMaestroDto,
+  CreateUbicacionDto,
+  UpdateAlmacenDto,
+  UpdateProductoMaestroDto,
+  UpdateUbicacionDto,
+} from './dto/maestro-inventario.dto';
+import { MAX_PRODUCT_IMAGE_BYTES, ProductImagesService, ProductImageUpload } from './product-images.service';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -27,12 +39,27 @@ import { CreateCategoriaProductoDto, UpdateCategoriaProductoDto } from './dto/ca
 export class InventarioController {
   private readonly logger = new Logger(InventarioController.name); // HARDENING: centraliza trazabilidad por módulo.
   constructor(
-    private readonly inventoryService: InventoryIntegrationService,
     private readonly supabase: SupabaseService,
     private readonly almacenesService: AlmacenesService,
     private readonly inventarioService: InventarioService,
     private readonly taxCalculator: TaxCalculatorService,
+    private readonly productImagesService: ProductImagesService,
   ) {}
+
+  private requireActor(actorId: string): string {
+    if (!actorId) {
+      throw new BadRequestException('Se requiere un usuario autenticado para modificar inventario');
+    }
+    return actorId;
+  }
+
+  private requireIdempotencyKey(key?: string): string {
+    const value = key?.trim() ?? '';
+    if (value.length < 8 || value.length > 180) {
+      throw new BadRequestException('Idempotency-Key debe tener entre 8 y 180 caracteres');
+    }
+    return value;
+  }
 
   /**
    * Obtener almacenes activos del tenant
@@ -41,10 +68,16 @@ export class InventarioController {
   @RequirePermission('inventario.almacenes.read') // HARDENING: listado de almacenes requiere permiso.
   @ApiOperation({ summary: 'Listar almacenes activos' })
   @ApiResponse({ status: 200, description: 'Almacenes listados exitosamente' })
-  async getAlmacenes(@CurrentTenant() tenantId: string) {
+  async getAlmacenes(
+    @CurrentTenant() tenantId: string,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
     try {
       this.logger.log(`🏢 [Tenant: ${tenantId}] Obteniendo almacenes...`); // HARDENING: reemplaza console.log para auditoría multitenant.
-      const almacenes = await this.almacenesService.listar(tenantId);
+      const almacenes = await this.almacenesService.listar(
+        tenantId,
+        `${includeInactive ?? 'false'}`.toLowerCase() === 'true',
+      );
       
       return {
         success: true,
@@ -60,11 +93,63 @@ export class InventarioController {
     }
   }
 
+  @Post('almacenes')
+  @RequirePermission('inventario.almacenes.create')
+  @ApiOperation({ summary: 'Crear almacén de inventario' })
+  async createAlmacen(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() body: CreateAlmacenDto,
+  ) {
+    const data = await this.inventarioService.crearAlmacenMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      body,
+    );
+    return { success: true, data, message: 'Almacén creado exitosamente' };
+  }
+
+  @Put('almacenes/:almacenId')
+  @RequirePermission('inventario.almacenes.update')
+  @ApiOperation({ summary: 'Actualizar almacén de inventario' })
+  async updateAlmacen(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('almacenId') almacenId: string,
+    @Body() body: UpdateAlmacenDto,
+  ) {
+    const data = await this.inventarioService.actualizarAlmacenMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      almacenId,
+      body,
+    );
+    return { success: true, data, message: 'Almacén actualizado exitosamente' };
+  }
+
+  @Delete('almacenes/:almacenId')
+  @RequirePermission('inventario.almacenes.delete')
+  @ApiOperation({ summary: 'Desactivar almacén sin stock ni reservas' })
+  async deleteAlmacen(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('almacenId') almacenId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    const data = await this.inventarioService.desactivarAlmacenMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      almacenId,
+      this.requireIdempotencyKey(key),
+    );
+    return { success: true, data, message: 'Almacén desactivado exitosamente' };
+  }
+
   /**
    * Obtener ubicaciones de un almacén
    */
   @Get('almacenes/:almacenId/ubicaciones')
-  @RequirePermission('inventario.almacenes.read') // HARDENING: ubicaciones protegidas.
+  @RequirePermission('inventario.ubicaciones.read')
   @ApiOperation({ summary: 'Listar ubicaciones de un almacén' })
   @ApiResponse({ status: 200, description: 'Ubicaciones listadas exitosamente' })
   async getUbicaciones(
@@ -74,16 +159,7 @@ export class InventarioController {
     try {
       this.logger.log(`📍 [Tenant: ${tenantId}] Obteniendo ubicaciones del almacén ${almacenId}...`); // HARDENING: traza accesos a estructuras de inventario.
       
-      const { data, error } = await this.supabase.getClient()
-        .from('almacen_ubicaciones')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('almacen_id', almacenId)
-        .order('codigo', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
+      const data = await this.almacenesService.listarUbicaciones(tenantId, almacenId, true);
 
       this.logger.log(`✅ ${data?.length || 0} ubicaciones obtenidas`); // HARDENING: confirma operación exitosa para auditoría.
       
@@ -99,6 +175,64 @@ export class InventarioController {
         data: []
       };
     }
+  }
+
+  @Post('almacenes/:almacenId/ubicaciones')
+  @RequirePermission('inventario.ubicaciones.create')
+  @ApiOperation({ summary: 'Crear ubicación dentro de un almacén' })
+  async createUbicacion(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('almacenId') almacenId: string,
+    @Body() body: CreateUbicacionDto,
+  ) {
+    const data = await this.inventarioService.crearUbicacionMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      almacenId,
+      body,
+    );
+    return { success: true, data, message: 'Ubicación creada exitosamente' };
+  }
+
+  @Put('almacenes/:almacenId/ubicaciones/:ubicacionId')
+  @RequirePermission('inventario.ubicaciones.update')
+  @ApiOperation({ summary: 'Actualizar ubicación de almacén' })
+  async updateUbicacion(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('almacenId') almacenId: string,
+    @Param('ubicacionId') ubicacionId: string,
+    @Body() body: UpdateUbicacionDto,
+  ) {
+    const data = await this.inventarioService.actualizarUbicacionMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      almacenId,
+      ubicacionId,
+      body,
+    );
+    return { success: true, data, message: 'Ubicación actualizada exitosamente' };
+  }
+
+  @Delete('almacenes/:almacenId/ubicaciones/:ubicacionId')
+  @RequirePermission('inventario.ubicaciones.delete')
+  @ApiOperation({ summary: 'Desactivar ubicación sin stock ni reservas' })
+  async deleteUbicacion(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('almacenId') almacenId: string,
+    @Param('ubicacionId') ubicacionId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    const data = await this.inventarioService.desactivarUbicacionMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      almacenId,
+      ubicacionId,
+      this.requireIdempotencyKey(key),
+    );
+    return { success: true, data, message: 'Ubicación desactivada exitosamente' };
   }
 
   /**
@@ -147,7 +281,7 @@ export class InventarioController {
   }
 
   /**
-   * Obtener kardex valorizado (entradas) del inventario
+   * Obtener kardex valorizado de todos los movimientos físicos del inventario
    */
   @Get('kardex')
   @RequirePermission('inventario.kardex.read')
@@ -304,124 +438,19 @@ export class InventarioController {
   @RequirePermission('inventario.productos.create') // HARDENING: creación de productos restringida.
   @ApiOperation({ summary: 'Crear nuevo producto' })
   @ApiResponse({ status: 201, description: 'Producto creado exitosamente' })
-  async createProducto(@CurrentTenant() tenantId: string, @Body() productData: any) {
-    try {
-      this.logger.log(`🆕 [Tenant: ${tenantId}] Creando nuevo producto: ${productData?.codigo ?? 'sin-codigo'}`); // HARDENING: evita volsado de objetos completos y mantiene rastro.
-
-      if (!productData.codigo || !productData.nombre || !productData.categoria) {
-        return {
-          success: false,
-          message: 'Código, nombre y categoría son requeridos'
-        };
-      }
-
-      // ✅ FIX H09: Obtener tasa de impuesto desde configuración fiscal
-      const tasaIgv = await this.taxCalculator.getTasaIgv(tenantId);
-      const impuestoPorcentaje = tasaIgv * 100; // Convertir 0.18 a 18.0
-
-      const parseNonNegative = (value: unknown, field: string): number => {
-        const parsed = Number(value ?? 0);
-        if (!Number.isFinite(parsed) || parsed < 0) {
-          throw new BadRequestException(`${field} debe ser un número mayor o igual a cero`);
-        }
-        return parsed;
-      };
-
-      const esServicio = productData.es_servicio === true || `${productData.es_servicio}`.toLowerCase() === 'true';
-      const controlaStock = esServicio ? false : !(productData.controla_stock === false || `${productData.controla_stock}`.toLowerCase() === 'false');
-      const precioVenta = parseNonNegative(productData.precioVenta ?? productData.precio_venta, 'precioVenta');
-      const precioCompra = parseNonNegative(productData.precioCompra ?? productData.precio_compra, 'precioCompra');
-      const stockMinimo = parseNonNegative(productData.stockMinimo ?? productData.stock_minimo, 'stockMinimo');
-      const stockReservado = parseNonNegative(productData.stockReservado ?? productData.stock_reservado, 'stockReservado');
-      const sucursalId = productData.sucursal_id || null;
-      const almacenId = productData.almacen_id || null;
-      const stockInicial = controlaStock ? parseNonNegative(productData.stock, 'stock') : 0;
-      if (controlaStock && (stockInicial > 0 || stockReservado > 0) && !almacenId) {
-        throw new BadRequestException('almacen_id es obligatorio para inicializar stock físico');
-      }
-
-      const nuevoProducto = {
-        tenant_id: tenantId,
-        codigo: productData.codigo,
-        nombre: productData.nombre,
-        descripcion: productData.descripcion || null,
-        precio_venta: precioVenta,
-        precio_compra: precioCompra,
-        stock_actual: 0,
-        stock: 0,
-        categoria: productData.categoria,
-        activo: true,
-        codigo_barras: productData.codigoBarras || productData.codigo,
-        stock_minimo: stockMinimo,
-        stock_reservado: 0,
-        impuesto: impuestoPorcentaje,
-        es_servicio: esServicio,
-        controla_stock: controlaStock,
-        afectacion_igv: productData.afectacion_igv || productData.afectacionIgv || '10',
-        tipo_operacion: productData.tipo_operacion || productData.tipoOperacion || null,
-        clasificador_sunat: productData.clasificador_sunat || productData.clasificadorSunat || null,
-        favorito: productData.favorito === true || `${productData.favorito}`.toLowerCase() === 'true',
-        imagen_url: productData.imagen_url || productData.imagenUrl || '',
-        atributos_extra: productData.atributos_extra || {},
-      };
-
-      // El RPC inserta producto, stock/reserva y precios en una sola transacción.
-      const preciosSucursal = Array.isArray(productData.precios_sucursal)
-        ? [...productData.precios_sucursal]
-        : [];
-      if (sucursalId) {
-        preciosSucursal.push({
-          sucursal_id: sucursalId,
-          moneda: productData.moneda || 'PEN',
-          precio: precioVenta,
-          activo: productData.activo ?? true,
-        });
-      }
-      const preciosPayload = preciosSucursal.map((precio: any, index: number) => {
-        if (!precio?.sucursal_id) {
-          throw new BadRequestException(`precios_sucursal[${index}].sucursal_id es obligatorio`);
-        }
-        return {
-          sucursal_id: precio.sucursal_id,
-          moneda: precio.moneda || 'PEN',
-          precio: parseNonNegative(precio.precio ?? precioVenta, `precios_sucursal[${index}].precio`),
-          activo: precio.activo ?? true,
-        };
-      });
-
-      const { data: productoCreado, error } = await this.supabase.getClient().rpc(
-        'crear_producto_inventario_tx',
-        {
-          p_tenant_id: tenantId,
-          p_producto: nuevoProducto,
-          p_almacen_id: almacenId,
-          p_stock_inicial: stockInicial,
-          p_stock_reservado: stockReservado,
-          p_precios_sucursal: preciosPayload,
-        },
-      );
-      if (error) {
-        if (error.code === '23505' || error.message?.includes('ux_productos_tenant_codigo_ci')) {
-          throw new BadRequestException('Ya existe un producto con ese código');
-        }
-        throw error;
-      }
-
-      this.logger.log(`✅ Producto creado exitosamente: ${productoCreado?.id}`); // HARDENING: confirma alta.
-
-      return {
-        success: true,
-        data: productoCreado,
-        message: 'Producto creado exitosamente'
-      };
-    } catch (error) {
-      this.logger.error('❌ Error creando producto', error as Error);
-      if (error instanceof BadRequestException) throw error;
-      return {
-        success: false,
-        message: 'Error al crear el producto: ' + (error as Error).message
-      };
-    }
+  async createProducto(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() productData: CreateProductoMaestroDto,
+  ) {
+    const impuesto = productData.impuesto
+      ?? (await this.taxCalculator.getTasaIgv(tenantId)) * 100;
+    const data = await this.inventarioService.crearProductoMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      { ...productData, impuesto },
+    );
+    return { success: true, data, message: 'Producto creado exitosamente' };
   }
 
   /**
@@ -512,17 +541,45 @@ export class InventarioController {
     }
   }
 
-  /**
-   * Realizar un movimiento de stock
-   */
+  /** Ajuste manual: ledger, saldo y outbox contable en una sola RPC. */
   @Post('movimientos')
   @RequirePermission('inventario.movimientos.create') // HARDENING: creación de movimientos limitada.
+  @ApiOperation({ summary: 'Registrar ajuste manual de inventario' })
   async realizarMovimiento(
     @CurrentTenant() tenantId: string,
-    @Body() movimiento: any
+    @CurrentUser('id') actorId: string,
+    @Body() movimiento: RegistrarAjusteInventarioDto,
   ) {
-    this.logger.log(`📦 [Inventario] Realizando movimiento para tenant: ${tenantId}`); // HARDENING: monitorea movimientos críticos.
-    return this.inventoryService.realizarMovimientoStock(movimiento, tenantId);
+    if (!actorId) {
+      throw new BadRequestException('Se requiere un usuario autenticado para ajustar inventario');
+    }
+    this.logger.log(`📦 [Inventario] Registrando ajuste atómico para tenant: ${tenantId}`);
+    const data = await this.inventarioService.registrarAjusteAtomico(
+      tenantId,
+      actorId,
+      movimiento,
+    );
+    return { success: true, data };
+  }
+
+  /** Traslado físico entre almacenes; no crea ingreso ni gasto contable. */
+  @Post('transferencias')
+  @RequirePermission('inventario.movimientos.create')
+  @ApiOperation({ summary: 'Transferir existencias entre almacenes' })
+  async transferirInventario(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() transferencia: TransferirInventarioDto,
+  ) {
+    if (!actorId) {
+      throw new BadRequestException('Se requiere un usuario autenticado para transferir inventario');
+    }
+    const data = await this.inventarioService.transferirStockAtomico(
+      tenantId,
+      actorId,
+      transferencia,
+    );
+    return { success: true, data };
   }
 
   /**
@@ -594,49 +651,19 @@ export class InventarioController {
   @RequirePermission('inventario.productos.delete') // HARDENING: eliminación controlada por permiso.
   @ApiOperation({ summary: 'Eliminar producto por ID' })
   @ApiResponse({ status: 200, description: 'Producto eliminado exitosamente' })
-  async deleteProducto(@CurrentTenant() tenantId: string, @Param('id') id: string) {
-    try {
-      this.logger.log(`🗑️ [Tenant: ${tenantId}] Eliminando producto por ID: ${id}`); // HARDENING: registra operaciones destructivas.
-      
-      const { data: producto, error: findError } = await this.supabase.getClient()
-        .from('productos')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('id', id)
-        .single();
-
-      if (findError || !producto) {
-        return {
-          success: false,
-          message: 'Producto no encontrado'
-        };
-      }
-
-      // Un producto es parte del historial fiscal y del ledger canónico. Nunca
-      // se borra físicamente: incluso sin movimientos actuales puede ser
-      // referenciado después por documentos, precios o sincronizaciones.
-      const { data: updatedProduct, error: updateError } = await this.supabase.getClient()
-        .from('productos')
-        .update({ activo: false, updated_at: new Date().toISOString() })
-        .eq('tenant_id', tenantId)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
-
-      return {
-        success: true,
-        data: updatedProduct,
-        message: 'Producto desactivado exitosamente'
-      };
-    } catch (error) {
-      this.logger.error('❌ Error eliminando producto', error as Error);
-      return {
-        success: false,
-        message: 'Error al eliminar el producto: ' + (error as Error).message
-      };
-    }
+  async deleteProducto(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    const data = await this.inventarioService.desactivarProductoMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      id,
+      this.requireIdempotencyKey(key),
+    );
+    return { success: true, data, message: 'Producto desactivado exitosamente' };
   }
 
   /**
@@ -648,189 +675,72 @@ export class InventarioController {
   @ApiResponse({ status: 200, description: 'Producto actualizado exitosamente' })
   async updateProducto(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
     @Param('id') id: string,
-    @Body() productData: any
+    @Body() productData: UpdateProductoMaestroDto,
   ) {
-    try {
-      this.logger.log(`✏️ [Tenant: ${tenantId}] Actualizando producto por ID: ${id}`);
+    const data = await this.inventarioService.actualizarProductoMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      id,
+      productData,
+    );
+    return { success: true, data, message: 'Producto actualizado exitosamente' };
+  }
 
-      // Verificar que el producto existe
-      const { data: existingProduct, error: findError } = await this.supabase.getClient()
-        .from('productos')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('id', id)
-        .single();
+  @Post('productos/:id/imagen')
+  @RequirePermission('inventario.productos.update')
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { files: 1, fileSize: MAX_PRODUCT_IMAGE_BYTES },
+  }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOperation({ summary: 'Subir o reemplazar la imagen de un producto' })
+  async uploadProductImage(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('id') productId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @UploadedFile() file?: ProductImageUpload,
+  ) {
+    const data = await this.productImagesService.upload(
+      tenantId,
+      this.requireActor(actorId),
+      productId,
+      this.requireIdempotencyKey(key),
+      file,
+    );
+    return {
+      success: true,
+      data,
+      message: data.cleanup_pending
+        ? 'Imagen actualizada; la limpieza del objeto anterior quedó pendiente de reintento'
+        : 'Imagen del producto actualizada exitosamente',
+    };
+  }
 
-      if (findError || !existingProduct) {
-        return {
-          success: false,
-          message: 'Producto no encontrado'
-        };
-      }
-
-      // Verificar si el código ya existe en otro producto
-      if (productData.codigo && productData.codigo !== existingProduct.codigo) {
-        const { data: duplicateProduct } = await this.supabase.getClient()
-          .from('productos')
-          .select('id')
-          .eq('tenant_id', tenantId)
-          .eq('codigo', productData.codigo)
-          .neq('id', id)
-          .single();
-
-        if (duplicateProduct) {
-          return {
-            success: false,
-            message: 'Ya existe otro producto con ese código'
-          };
-        }
-      }
-
-      // Preparar datos de actualización
-      const updateData: any = {
-        updated_at: new Date().toISOString()
-      };
-
-      if (productData.codigo) updateData.codigo = productData.codigo;
-      if (productData.nombre) updateData.nombre = productData.nombre;
-      if (productData.descripcion !== undefined) updateData.descripcion = productData.descripcion;
-      if (productData.categoria) updateData.categoria = productData.categoria;
-      if (productData.precioVenta !== undefined || productData.precio_venta !== undefined) {
-        updateData.precio_venta = parseFloat(productData.precioVenta ?? productData.precio_venta);
-      }
-      if (productData.precioCompra !== undefined || productData.precio_compra !== undefined) {
-        updateData.precio_compra = parseFloat(productData.precioCompra ?? productData.precio_compra);
-      }
-      if (productData.stockMinimo !== undefined || productData.stock_minimo !== undefined) {
-        updateData.stock_minimo = parseFloat(productData.stockMinimo ?? productData.stock_minimo);
-      }
-      if (productData.codigoBarras !== undefined) updateData.codigo_barras = productData.codigoBarras;
-      if (productData.impuesto !== undefined) updateData.impuesto = parseFloat(productData.impuesto);
-      if (productData.activo !== undefined) updateData.activo = productData.activo;
-      if (productData.es_servicio !== undefined) {
-        const esServicio = productData.es_servicio === true || `${productData.es_servicio}`.toLowerCase() === 'true';
-        updateData.es_servicio = esServicio;
-        if (esServicio) {
-          updateData.controla_stock = false;
-        }
-      }
-      if (productData.controla_stock !== undefined) {
-        const controlaStock = productData.controla_stock === true || `${productData.controla_stock}`.toLowerCase() === 'true';
-        updateData.controla_stock = controlaStock;
-      }
-      if (productData.afectacion_igv !== undefined || productData.afectacionIgv !== undefined) {
-        updateData.afectacion_igv = productData.afectacion_igv ?? productData.afectacionIgv;
-      }
-      if (productData.tipo_operacion !== undefined || productData.tipoOperacion !== undefined) {
-        updateData.tipo_operacion = productData.tipo_operacion ?? productData.tipoOperacion;
-      }
-      if (productData.clasificador_sunat !== undefined || productData.clasificadorSunat !== undefined) {
-        updateData.clasificador_sunat = productData.clasificador_sunat ?? productData.clasificadorSunat;
-      }
-      if (productData.favorito !== undefined) {
-        updateData.favorito = productData.favorito === true || `${productData.favorito}`.toLowerCase() === 'true';
-      }
-      if (productData.imagen_url !== undefined || productData.imagenUrl !== undefined) {
-        updateData.imagen_url = productData.imagen_url ?? productData.imagenUrl;
-      }
-      if (productData.atributos_extra !== undefined) {
-        updateData.atributos_extra = productData.atributos_extra;
-      }
-
-      const solicitaStock = productData.stock !== undefined
-        || productData.stockActual !== undefined
-        || productData.stock_actual !== undefined
-        || productData.stockReservado !== undefined
-        || productData.stock_reservado !== undefined;
-      const almacenId = productData.almacen_id || null;
-      if (solicitaStock && !almacenId) {
-        throw new BadRequestException('almacen_id es obligatorio para ajustar stock físico');
-      }
-
-      if (solicitaStock) {
-        const stockObjetivo = parseFloat(
-          productData.stock ?? productData.stockActual ?? productData.stock_actual ?? existingProduct.stock_actual ?? 0,
-        );
-        const reservadoObjetivo = parseFloat(
-          productData.stockReservado ?? productData.stock_reservado ?? existingProduct.stock_reservado ?? 0,
-        );
-        if (!Number.isFinite(stockObjetivo) || !Number.isFinite(reservadoObjetivo)) {
-          throw new BadRequestException('stock y stock_reservado deben ser números válidos');
-        }
-        const { error: stockError } = await this.supabase.getClient().rpc(
-          'establecer_stock_en_almacen_tx',
-          {
-            p_tenant_id: tenantId,
-            p_producto_id: id,
-            p_almacen_id: almacenId,
-            p_stock_objetivo: stockObjetivo,
-            p_reservado_objetivo: reservadoObjetivo,
-            p_referencia_tipo: 'PRODUCTO_AJUSTE_MANUAL',
-            p_referencia_id: randomUUID(),
-            p_notas: 'Ajuste desde edición de producto',
-            p_metadata: { source: 'inventario_producto_update' },
-          },
-        );
-        if (stockError) throw stockError;
-      }
-
-      // Actualizar producto
-      const { data: updatedProduct, error: updateError } = await this.supabase.getClient()
-        .from('productos')
-        .update(updateData)
-        .eq('tenant_id', tenantId)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
-
-      // Manejo de precio/stock por sucursal en update
-      const sucursalId = productData.sucursal_id || null;
-      const precioVenta = parseFloat(productData.precioVenta ?? productData.precio_venta ?? updatedProduct.precio_venta ?? 0);
-
-      // Upsert precios por sucursal (acepta arreglo o sucursal_id individual)
-      const preciosSucursal = Array.isArray(productData.precios_sucursal) ? productData.precios_sucursal : [];
-      if (sucursalId) {
-        preciosSucursal.push({
-          sucursal_id: sucursalId,
-          moneda: productData.moneda || 'PEN',
-          precio: precioVenta,
-          activo: productData.activo ?? true,
-        });
-      }
-      if (preciosSucursal.length > 0) {
-        const preciosPayload = preciosSucursal
-          .filter((p: any) => p?.sucursal_id)
-          .map((p: any) => ({
-            producto_id: id,
-            sucursal_id: p.sucursal_id,
-            moneda: p.moneda || 'PEN',
-            precio: parseFloat(p.precio ?? precioVenta ?? 0),
-            activo: p.activo ?? true,
-          }));
-        if (preciosPayload.length > 0) {
-          await this.supabase.getClient()
-            .from('producto_precios_sucursal')
-            .upsert(preciosPayload, { onConflict: 'producto_id,sucursal_id,moneda' });
-        }
-      }
-
-      this.logger.log(`✅ Producto actualizado exitosamente: ${id}`);
-
-      return {
-        success: true,
-        data: updatedProduct,
-        message: 'Producto actualizado exitosamente'
-      };
-    } catch (error) {
-      this.logger.error('❌ Error actualizando producto', error as Error);
-      return {
-        success: false,
-        message: 'Error al actualizar el producto: ' + (error as Error).message
-      };
-    }
+  @Delete('productos/:id/imagen')
+  @RequirePermission('inventario.productos.update')
+  @ApiOperation({ summary: 'Quitar de forma segura la imagen de un producto' })
+  async deleteProductImage(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('id') productId: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    const data = await this.productImagesService.remove(
+      tenantId,
+      this.requireActor(actorId),
+      productId,
+      this.requireIdempotencyKey(key),
+    );
+    return { success: true, data, message: 'Imagen del producto eliminada exitosamente' };
   }
 
   // ============================================================
@@ -870,33 +780,17 @@ export class InventarioController {
   @RequirePermission('inventario.productos.create')
   @ApiOperation({ summary: 'Crear categoría de producto' })
   @ApiResponse({ status: 201, description: 'Categoría creada exitosamente' })
-  async createCategoria(@CurrentTenant() tenantId: string, @Body() body: CreateCategoriaProductoDto) {
-    try {
-      const { data, error } = await this.supabase.getClient()
-        .from('categorias_producto')
-        .insert([{
-          tenant_id: tenantId,
-          nombre: body.nombre.trim(),
-          codigo: body.codigo?.trim() || null,
-          descripcion: body.descripcion?.trim() || null,
-          campos_extra: Array.isArray(body.campos_extra) ? body.campos_extra : [],
-          activo: true,
-          orden: body.orden ?? 0,
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      this.logger.log(`✅ Categoría creada: ${data.id}`);
-      return { success: true, data, message: 'Categoría creada exitosamente' };
-    } catch (error) {
-      this.logger.error('❌ Error creando categoría', error as Error);
-      if ((error as any)?.code === '23505') {
-        throw new BadRequestException('Ya existe una categoría con ese nombre');
-      }
-      return { success: false, message: 'Error al crear la categoría: ' + (error as Error).message };
-    }
+  async createCategoria(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() body: CreateCategoriaProductoDto,
+  ) {
+    const data = await this.inventarioService.crearCategoriaMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      body,
+    );
+    return { success: true, data, message: 'Categoría creada exitosamente' };
   }
 
   /**
@@ -908,34 +802,17 @@ export class InventarioController {
   @ApiResponse({ status: 200, description: 'Categoría actualizada exitosamente' })
   async updateCategoria(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
     @Param('id') id: string,
     @Body() body: UpdateCategoriaProductoDto,
   ) {
-    try {
-      const updateData: any = { updated_at: new Date().toISOString() };
-      if (body.nombre !== undefined) updateData.nombre = body.nombre.trim();
-      if (body.codigo !== undefined) updateData.codigo = body.codigo?.trim() || null;
-      if (body.descripcion !== undefined) updateData.descripcion = body.descripcion?.trim() || null;
-      if (body.campos_extra !== undefined) updateData.campos_extra = body.campos_extra;
-      if (body.activo !== undefined) updateData.activo = body.activo;
-      if (body.orden !== undefined) updateData.orden = body.orden;
-
-      const { data, error } = await this.supabase.getClient()
-        .from('categorias_producto')
-        .update(updateData)
-        .eq('tenant_id', tenantId)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      this.logger.log(`✅ Categoría actualizada: ${id}`);
-      return { success: true, data, message: 'Categoría actualizada exitosamente' };
-    } catch (error) {
-      this.logger.error('❌ Error actualizando categoría', error as Error);
-      return { success: false, message: 'Error al actualizar la categoría: ' + (error as Error).message };
-    }
+    const data = await this.inventarioService.actualizarCategoriaMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      id,
+      body,
+    );
+    return { success: true, data, message: 'Categoría actualizada exitosamente' };
   }
 
   /**
@@ -945,25 +822,18 @@ export class InventarioController {
   @RequirePermission('inventario.productos.delete')
   @ApiOperation({ summary: 'Eliminar categoría de producto' })
   @ApiResponse({ status: 200, description: 'Categoría eliminada exitosamente' })
-  async deleteCategoria(@CurrentTenant() tenantId: string, @Param('id') id: string) {
-    try {
-      const { data, error } = await this.supabase.getClient()
-        .from('categorias_producto')
-        .update({ activo: false, updated_at: new Date().toISOString() })
-        .eq('tenant_id', tenantId)
-        .eq('id', id)
-        .select('id')
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) throw new NotFoundException('Categoría no encontrada');
-
-      this.logger.log(`✅ Categoría eliminada: ${id}`);
-      return { success: true, message: 'Categoría eliminada exitosamente' };
-    } catch (error) {
-      this.logger.error('❌ Error eliminando categoría', error as Error);
-      if (error instanceof NotFoundException) throw error;
-      return { success: false, message: 'Error al eliminar la categoría: ' + (error as Error).message };
-    }
+  async deleteCategoria(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    const data = await this.inventarioService.desactivarCategoriaMaestro(
+      tenantId,
+      this.requireActor(actorId),
+      id,
+      this.requireIdempotencyKey(key),
+    );
+    return { success: true, data, message: 'Categoría desactivada exitosamente' };
   }
 }

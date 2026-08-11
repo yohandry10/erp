@@ -1,9 +1,25 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditService } from '../audit/audit.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  RegistrarAjusteInventarioDto,
+  TransferirInventarioDto,
+} from './dto/operacion-inventario.dto';
+import {
+  CreateAlmacenDto,
+  CreateProductoMaestroDto,
+  CreateUbicacionDto,
+  UpdateAlmacenDto,
+  UpdateProductoMaestroDto,
+  UpdateUbicacionDto,
+} from './dto/maestro-inventario.dto';
+import {
+  CreateCategoriaProductoDto,
+  UpdateCategoriaProductoDto,
+} from './dto/categoria-producto.dto';
 
 export enum TipoMovimiento {
   ENTRADA = 'ENTRADA',
@@ -79,6 +95,240 @@ export class InventarioService {
     private readonly eventBus: EventBusService,
   ) {
     console.log('✅ [InventarioService] Servicio inicializado con soporte de reservas y eventos');
+  }
+
+  private async ejecutarRpcMaestro(
+    rpc: string,
+    args: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const { data, error } = await this.supabase.getClient().rpc(rpc, args);
+    if (!error) return (data ?? {}) as Record<string, unknown>;
+
+    const message = String(error.message || 'Error en maestro de inventario');
+    if (error.code === '42501' || message.includes('ACTOR_INVALID')) {
+      throw new ForbiddenException('El actor no pertenece al tenant o está inactivo');
+    }
+    if (error.code === '23503' || message.includes('NOT_FOUND')) {
+      throw new NotFoundException(message);
+    }
+    throw new BadRequestException(message);
+  }
+
+  crearProductoMaestro(
+    tenantId: string,
+    actorId: string,
+    dto: CreateProductoMaestroDto,
+  ) {
+    const { idempotency_key, ...payload } = dto;
+    return this.ejecutarRpcMaestro('crear_producto_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_idempotency_key: idempotency_key,
+      p_payload: payload,
+    });
+  }
+
+  actualizarProductoMaestro(
+    tenantId: string,
+    actorId: string,
+    productoId: string,
+    dto: UpdateProductoMaestroDto,
+  ) {
+    const { idempotency_key, ...payload } = dto;
+    return this.ejecutarRpcMaestro('actualizar_producto_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_producto_id: productoId,
+      p_idempotency_key: idempotency_key,
+      p_cambios: payload,
+    });
+  }
+
+  desactivarProductoMaestro(tenantId: string, actorId: string, productoId: string, key: string) {
+    return this.ejecutarRpcMaestro('desactivar_producto_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_producto_id: productoId,
+      p_idempotency_key: key,
+    });
+  }
+
+  crearCategoriaMaestro(tenantId: string, actorId: string, dto: CreateCategoriaProductoDto) {
+    const { idempotency_key, ...payload } = dto;
+    return this.ejecutarRpcMaestro('crear_categoria_producto_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_idempotency_key: idempotency_key,
+      p_payload: payload,
+    });
+  }
+
+  actualizarCategoriaMaestro(
+    tenantId: string,
+    actorId: string,
+    categoriaId: string,
+    dto: UpdateCategoriaProductoDto,
+  ) {
+    const { idempotency_key, ...payload } = dto;
+    return this.ejecutarRpcMaestro('actualizar_categoria_producto_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_categoria_id: categoriaId,
+      p_idempotency_key: idempotency_key,
+      p_cambios: payload,
+    });
+  }
+
+  desactivarCategoriaMaestro(tenantId: string, actorId: string, categoriaId: string, key: string) {
+    return this.ejecutarRpcMaestro('desactivar_categoria_producto_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_categoria_id: categoriaId,
+      p_idempotency_key: key,
+    });
+  }
+
+  crearAlmacenMaestro(tenantId: string, actorId: string, dto: CreateAlmacenDto) {
+    const { idempotency_key, ...payload } = dto;
+    return this.ejecutarRpcMaestro('crear_almacen_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_idempotency_key: idempotency_key,
+      p_payload: payload,
+    });
+  }
+
+  actualizarAlmacenMaestro(
+    tenantId: string,
+    actorId: string,
+    almacenId: string,
+    dto: UpdateAlmacenDto,
+  ) {
+    const { idempotency_key, ...payload } = dto;
+    return this.ejecutarRpcMaestro('actualizar_almacen_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_almacen_id: almacenId,
+      p_idempotency_key: idempotency_key,
+      p_cambios: payload,
+    });
+  }
+
+  desactivarAlmacenMaestro(tenantId: string, actorId: string, almacenId: string, key: string) {
+    return this.ejecutarRpcMaestro('desactivar_almacen_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_almacen_id: almacenId,
+      p_idempotency_key: key,
+    });
+  }
+
+  crearUbicacionMaestro(
+    tenantId: string,
+    actorId: string,
+    almacenId: string,
+    dto: CreateUbicacionDto,
+  ) {
+    const { idempotency_key, ...payload } = dto;
+    return this.ejecutarRpcMaestro('crear_ubicacion_almacen_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_almacen_id: almacenId,
+      p_idempotency_key: idempotency_key,
+      p_payload: payload,
+    });
+  }
+
+  actualizarUbicacionMaestro(
+    tenantId: string,
+    actorId: string,
+    almacenId: string,
+    ubicacionId: string,
+    dto: UpdateUbicacionDto,
+  ) {
+    const { idempotency_key, ...payload } = dto;
+    return this.ejecutarRpcMaestro('actualizar_ubicacion_almacen_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_almacen_id: almacenId,
+      p_ubicacion_id: ubicacionId,
+      p_idempotency_key: idempotency_key,
+      p_cambios: payload,
+    });
+  }
+
+  desactivarUbicacionMaestro(
+    tenantId: string,
+    actorId: string,
+    almacenId: string,
+    ubicacionId: string,
+    key: string,
+  ) {
+    return this.ejecutarRpcMaestro('desactivar_ubicacion_almacen_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_almacen_id: almacenId,
+      p_ubicacion_id: ubicacionId,
+      p_idempotency_key: key,
+    });
+  }
+
+  /**
+   * Ajuste manual canónico. La RPC conserva decimales y confirma en el mismo
+   * commit el ledger, la existencia por almacén y el evento contable.
+   */
+  async registrarAjusteAtomico(
+    tenantId: string,
+    actorId: string,
+    dto: RegistrarAjusteInventarioDto,
+  ): Promise<any> {
+    const { idempotency_key, ...payload } = dto;
+    const { data, error } = await this.supabase.getClient().rpc(
+      'registrar_ajuste_inventario_tx',
+      {
+        p_tenant_id: tenantId,
+        p_payload: payload,
+        p_actor_id: actorId,
+        p_idempotency_key: idempotency_key,
+      },
+    );
+
+    if (error) {
+      throw new BadRequestException(
+        `No se pudo registrar el ajuste de inventario: ${error.message}`,
+      );
+    }
+
+    return data;
+  }
+
+  /**
+   * Transferencia física sin impacto contable neto. SALIDA y ENTRADA se
+   * escriben juntas y el mismo idempotency key representa todo el traslado.
+   */
+  async transferirStockAtomico(
+    tenantId: string,
+    actorId: string,
+    dto: TransferirInventarioDto,
+  ): Promise<any> {
+    const { idempotency_key, ...payload } = dto;
+    const { data, error } = await this.supabase.getClient().rpc(
+      'transferir_inventario_tx',
+      {
+        p_tenant_id: tenantId,
+        p_payload: payload,
+        p_actor_id: actorId,
+        p_idempotency_key: idempotency_key,
+      },
+    );
+
+    if (error) {
+      throw new BadRequestException(
+        `No se pudo transferir el inventario: ${error.message}`,
+      );
+    }
+
+    return data;
   }
 
   /**
@@ -844,253 +1094,33 @@ export class InventarioService {
     try {
       const client = this.supabase.getClient();
       const limit = filtros.limit && filtros.limit > 0 ? Math.min(filtros.limit, 500) : 200;
-
-      let itemsQuery = client
-        .from('vw_kardex_valorizado')
-        .select(
-          `
-            recepcion_item_id,
-            recepcion_id,
-            tenant_id,
-            recepcion_numero,
-            fecha_recepcion,
-            recepcion_estado,
-            producto_id,
-            producto_codigo,
-            producto_nombre,
-            producto_sku,
-            cantidad_recibida,
-            costo_unitario,
-            valor_total,
-            almacen_id,
-            almacen_nombre,
-            ubicacion_id,
-            ubicacion_codigo,
-            lote,
-            serie,
-            fecha_expiracion,
-            moneda_detalle
-          `,
-        )
-        .eq('tenant_id', tenantId);
-
-      if (filtros.productoId) {
-        itemsQuery = itemsQuery.eq('producto_id', filtros.productoId);
-      }
-
-      if (filtros.almacenId) {
-        itemsQuery = itemsQuery.eq('almacen_id', filtros.almacenId);
-      }
-
-      const fechaDesde = this.normalizeDateFilter(filtros.desde, 'start');
-      if (fechaDesde) {
-        itemsQuery = itemsQuery.gte('fecha_recepcion', fechaDesde);
-      }
-
-      const fechaHasta = this.normalizeDateFilter(filtros.hasta, 'end');
-      if (fechaHasta) {
-        itemsQuery = itemsQuery.lte('fecha_recepcion', fechaHasta);
-      }
-
-      itemsQuery = itemsQuery.order('fecha_recepcion', { ascending: false }).limit(limit);
-
-      const { data: itemsData, error } = await itemsQuery;
-      if (error) {
-        throw error;
-      }
-
-      const { data: empresaConfig } = await client
-        .from('empresa_config')
-        .select('moneda_defecto')
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-      const tenantCurrency = String(
-        empresaConfig?.moneda_defecto ||
-        (itemsData ?? []).find((item: any) => item.moneda_detalle)?.moneda_detalle ||
-        'PEN',
-      ).toUpperCase();
-
-      const movimientos = (itemsData ?? []).map((item: any) => {
-        const cantidad = Number(item.cantidad_recibida ?? 0);
-        const costoUnitario = this.round2(Number(item.costo_unitario ?? 0));
-        const valorTotal = this.round2(Number(item.valor_total ?? 0));
-
-        return {
-          id: item.recepcion_item_id,
-          tipo: 'ENTRADA',
-          fecha: this.sanitizeDateOutput(item.fecha_recepcion) ?? null,
-          documento: item.recepcion_numero ?? null,
-          estado: item.recepcion_estado ?? null,
-          cantidad,
-          costoUnitario,
-          valorTotal,
-          moneda: item.moneda_detalle ?? tenantCurrency,
-          producto: {
-            id: item.producto_id,
-            nombre: item.producto_nombre ?? 'Producto',
-            codigo: item.producto_codigo ?? null,
-            sku: item.producto_sku ?? null,
-          },
-          almacen: item.almacen_id
-            ? {
-                id: item.almacen_id,
-                nombre: item.almacen_nombre ?? 'Almacén',
-                codigo: null,
-              }
-            : null,
-          ubicacion: item.ubicacion_id
-            ? {
-                id: item.ubicacion_id,
-                codigo: item.ubicacion_codigo ?? null,
-              }
-            : null,
-          lote: item.lote ?? null,
-          serie: item.serie ?? null,
-          fechaExpiracion: this.sanitizeDateOutput(item.fecha_expiracion, true),
-          recepcionId: item.recepcion_id,
-        };
-      });
-
-      let salidasQuery = client
-        .from('movimientos_inventario')
-        .select('id, tenant_id, producto_id, tipo, cantidad, created_at, referencia_tipo, referencia_id, notas, metadata, almacen_id')
-        .eq('tenant_id', tenantId)
-        .in('tipo', ['SALIDA', 'AJUSTE', 'DEVOLUCION']);
-
-      if (filtros.productoId) {
-        salidasQuery = salidasQuery.eq('producto_id', filtros.productoId);
-      }
-
-      if (fechaDesde) {
-        salidasQuery = salidasQuery.gte('created_at', fechaDesde);
-      }
-
-      if (fechaHasta) {
-        salidasQuery = salidasQuery.lte('created_at', fechaHasta);
-      }
-
-      const { data: salidasData, error: salidasError } = await salidasQuery
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (salidasError) {
-        throw salidasError;
-      }
-
-      // Resolver nombres de producto para las salidas (movimientos_inventario no trae el join)
-      const salidaProductoIds = Array.from(
-        new Set((salidasData ?? []).map((m: any) => m.producto_id).filter(Boolean)),
+      const fechaDesde = this.normalizeDateOnlyFilter(filtros.desde);
+      const fechaHasta = this.normalizeDateOnlyFilter(filtros.hasta);
+      const { data: resultado, error } = await client.rpc(
+        'reporte_kardex_valorizado_470',
+        {
+          p_tenant_id: tenantId,
+          p_producto_id: filtros.productoId || null,
+          p_almacen_id: filtros.almacenId || null,
+          p_desde: fechaDesde,
+          p_hasta: fechaHasta,
+          p_limit: limit,
+        },
       );
-      const productosSalidaMap = new Map<string, any>();
-      if (salidaProductoIds.length > 0) {
-        const { data: productosSalida } = await client
-          .from('productos')
-          .select('id, nombre, codigo, sku')
-          .eq('tenant_id', tenantId)
-          .in('id', salidaProductoIds);
-        for (const p of productosSalida ?? []) {
-          productosSalidaMap.set(p.id, p);
-        }
+
+      if (error) throw error;
+      if (
+        !resultado ||
+        typeof resultado !== 'object' ||
+        (resultado as any).success !== true ||
+        !Array.isArray((resultado as any).data) ||
+        !(resultado as any).resumen
+      ) {
+        throw new Error('El reporte canónico de kardex devolvió una respuesta inválida');
       }
 
-      // Resolver nombres de almacén para las salidas
-      const salidaAlmacenIds = Array.from(
-        new Set((salidasData ?? []).map((m: any) => m.almacen_id).filter(Boolean)),
-      );
-      const almacenesSalidaMap = new Map<string, any>();
-      if (salidaAlmacenIds.length > 0) {
-        const { data: almacenesSalida } = await client
-          .from('almacenes')
-          .select('id, nombre, codigo')
-          .eq('tenant_id', tenantId)
-          .in('id', salidaAlmacenIds);
-        for (const a of almacenesSalida ?? []) {
-          almacenesSalidaMap.set(a.id, a);
-        }
-      }
-
-      const movimientosSalida = (salidasData ?? []).map((movimiento: any) => {
-        const cantidad = Number(movimiento.cantidad ?? 0);
-        const costoUnitario = this.round2(Number(movimiento.metadata?.costo_unitario ?? 0));
-        const valorTotal = this.round2(Number(movimiento.metadata?.valor_total ?? costoUnitario * cantidad));
-        const productoInfo = productosSalidaMap.get(movimiento.producto_id);
-        const almacenInfo = movimiento.almacen_id
-          ? almacenesSalidaMap.get(movimiento.almacen_id)
-          : null;
-        return {
-          id: movimiento.id,
-          tipo: movimiento.tipo ?? 'SALIDA',
-          fecha: this.sanitizeDateOutput(movimiento.created_at) ?? null,
-          documento: movimiento.referencia_tipo ?? null,
-          estado: null,
-          cantidad,
-          costoUnitario,
-          valorTotal,
-          moneda: tenantCurrency,
-          producto: {
-            id: movimiento.producto_id,
-            nombre: productoInfo?.nombre ?? 'Producto',
-            codigo: productoInfo?.codigo ?? null,
-            sku: productoInfo?.sku ?? null,
-          },
-          almacen: almacenInfo
-            ? {
-                id: almacenInfo.id,
-                nombre: almacenInfo.nombre ?? 'Almacén',
-                codigo: almacenInfo.codigo ?? null,
-              }
-            : null,
-          ubicacion: null,
-          lote: null,
-          serie: null,
-          fechaExpiracion: null,
-          recepcionId: null,
-          referenciaTipo: movimiento.referencia_tipo ?? null,
-          referenciaId: movimiento.referencia_id ?? null,
-          motivo: movimiento.notas ?? movimiento.referencia_tipo ?? null,
-        };
-      });
-
-      movimientos.push(...movimientosSalida);
-
-      movimientos.sort((a, b) => {
-        const fechaA = a.fecha ? new Date(a.fecha).getTime() : 0;
-        const fechaB = b.fecha ? new Date(b.fecha).getTime() : 0;
-        return fechaB - fechaA;
-      });
-
-      const totalEntradas = movimientos
-        .filter((mov) => String(mov.tipo ?? '').toUpperCase() === 'ENTRADA')
-        .reduce((sum, mov) => sum + Number(mov.cantidad ?? 0), 0);
-      const totalSalidas = movimientos
-        .filter((mov) => String(mov.tipo ?? '').toUpperCase() === 'SALIDA')
-        .reduce((sum, mov) => sum + Number(mov.cantidad ?? 0), 0);
-      const valorEntradas = movimientos
-        .filter((mov) => String(mov.tipo ?? '').toUpperCase() === 'ENTRADA')
-        .reduce((sum, mov) => sum + Number(mov.valorTotal ?? 0), 0);
-      const valorSalidas = movimientos
-        .filter((mov) => String(mov.tipo ?? '').toUpperCase() === 'SALIDA')
-        .reduce((sum, mov) => sum + Number(mov.valorTotal ?? 0), 0);
-      const valorPorMoneda = movimientos.reduce<Record<string, number>>((acc, mov) => {
-        const moneda = mov.moneda ?? 'PEN';
-        const signo = String(mov.tipo ?? '').toUpperCase() === 'SALIDA' ? -1 : 1;
-        acc[moneda] = (acc[moneda] ?? 0) + signo * Number(mov.valorTotal ?? 0);
-        return acc;
-      }, {});
-
-      const resumen = {
-        totalMovimientos: movimientos.length,
-        totalEntradas: this.round2(totalEntradas),
-        totalSalidas: this.round2(totalSalidas),
-        valorEntradas: this.round2(valorEntradas),
-        valorSalidas: this.round2(valorSalidas),
-        saldoCantidad: this.round2(totalEntradas - totalSalidas),
-        saldoValorizado: this.round2(valorEntradas - valorSalidas),
-        valorPorMoneda: Object.entries(valorPorMoneda).reduce<Record<string, number>>((acc, [moneda, valor]) => {
-          acc[moneda] = this.round2(valor);
-          return acc;
-        }, {}),
-      };
+      const movimientos = (resultado as any).data;
+      const resumen = (resultado as any).resumen;
 
       await this.registrarIntegrationLog({
         tenantId,
@@ -1118,6 +1148,9 @@ export class InventarioService {
         durationMs: Date.now() - startedAt,
       });
       this.logger.error('❌ [Inventario] Error obteniendo kardex valorizado:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new BadRequestException('No se pudo obtener el kardex valorizado');
     }
   }
@@ -1796,6 +1829,26 @@ export class InventarioService {
     }
 
     return parsed.toISOString();
+  }
+
+  private normalizeDateOnlyFilter(value?: string): string | null {
+    if (!value?.trim()) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      this.logger.warn(`⚠️ [Inventario] Fecha inválida recibida en kardex: "${value}"`);
+      throw new BadRequestException('La fecha del kardex debe usar el formato YYYY-MM-DD');
+    }
+
+    const parsed = new Date(`${trimmed}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== trimmed) {
+      this.logger.warn(`⚠️ [Inventario] Fecha inexistente recibida en kardex: "${value}"`);
+      throw new BadRequestException('La fecha del kardex no existe en el calendario');
+    }
+
+    return trimmed;
   }
 
   private sanitizeDateOutput(value?: string | null, dateOnly = false): string | null {

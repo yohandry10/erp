@@ -19,6 +19,9 @@ interface Producto {
   precio_venta: number
   stock_actual: number
   stock_reservado?: number
+  es_servicio?: boolean
+  controla_stock?: boolean
+  afectacion_igv?: string
 }
 
 interface CotizacionFormProps {
@@ -71,7 +74,10 @@ export default function CotizacionForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const stockAlerts = detalle
-    .filter((item) => !!item.producto_id)
+    .filter((item) => {
+      const producto = productos.find((p) => p.id === item.producto_id)
+      return !!item.producto_id && !producto?.es_servicio && producto?.controla_stock !== false
+    })
     .map((item) => {
       const producto = productos.find((p) => p.id === item.producto_id)
       const disponible = (producto?.stock_actual ?? 0) - (producto?.stock_reservado ?? 0)
@@ -111,6 +117,9 @@ export default function CotizacionForm({
           precio_venta: Number(p.precio_venta ?? p.precio ?? 0),
           stock_actual: Number(p.stock_actual ?? p.stock ?? 0),
           stock_reservado: Number(p.stock_reservado ?? 0),
+          es_servicio: Boolean(p.es_servicio),
+          controla_stock: p.controla_stock !== false,
+          afectacion_igv: String(p.afectacion_igv ?? '10'),
         }))
         setProductos(productosApi)
       }
@@ -186,7 +195,13 @@ export default function CotizacionForm({
 
   const calculateTotals = () => {
     const subtotal = detalle.reduce((sum, item) => sum + item.subtotal, 0)
-    const igv = subtotal * tasaIgv
+    const baseGravada = detalle.reduce((sum, item) => {
+      const producto = productos.find((p) => p.id === item.producto_id)
+      return String(producto?.afectacion_igv ?? '10').startsWith('1')
+        ? sum + item.subtotal
+        : sum
+    }, 0)
+    const igv = baseGravada * tasaIgv
     const total = subtotal + igv
     return { subtotal, igv, total }
   }
@@ -208,11 +223,6 @@ export default function CotizacionForm({
       }
       if (item.cantidad <= 0) {
         newErrors[`cantidad_${index}`] = 'La cantidad debe ser mayor a 0'
-      }
-      const producto = productos.find((p) => p.id === item.producto_id)
-      const disponible = (producto?.stock_actual ?? 0) - (producto?.stock_reservado ?? 0)
-      if (producto && item.cantidad > disponible) {
-        newErrors[`cantidad_${index}`] = `Solo hay ${disponible} disponibles (reservado: ${producto.stock_reservado ?? 0})`
       }
       if (item.precio_unitario <= 0) {
         newErrors[`precio_${index}`] = 'El precio debe ser mayor a 0'
@@ -269,8 +279,9 @@ export default function CotizacionForm({
       {/* Cliente Section */}
       <div className="p-6 shadow border">
         {stockAlerts.length > 0 && (
-          <div className="bg-destructive/10 border text-[var(--red-700)] py-3 px-4 mb-3">
-            <strong className="block mb-1">⚠️ Stock insuficiente</strong>
+          <div className="border border-amber-300 bg-amber-50 text-amber-900 py-3 px-4 mb-3">
+            <strong className="block mb-1">Disponibilidad a revisar al confirmar</strong>
+            <p className="mb-1 text-sm">La cotización puede guardarse; todavía no reserva inventario.</p>
             <ul className="m-0 pl-4 text-sm">
               {stockAlerts.map((s, i) => (
                 <li key={i}>
@@ -529,7 +540,7 @@ export default function CotizacionForm({
         </button>
         <button
           type="submit"
-          disabled={disabled || submitting || stockAlerts.length > 0} className="inline-flex items-center gap-2 py-3 px-8 text-base font-semibold text-white bg-[var(--gradient-primary)] border-0 transition shadow relative overflow-hidden"
+          disabled={disabled || submitting} className="inline-flex items-center gap-2 py-3 px-8 text-base font-semibold text-white bg-[var(--gradient-primary)] border-0 transition shadow relative overflow-hidden"
           onMouseEnter={(e) => {
             if (!disabled && !submitting) {
               e.currentTarget.style.transform = 'translateY(-2px)'

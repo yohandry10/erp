@@ -257,6 +257,45 @@ export const VENTAS_RMA_PERMISSIONS: PermissionDefinition[] = [
   },
 ];
 
+export const VENTAS_COMERCIAL_PERMISSIONS: PermissionDefinition[] = [
+  {
+    modulo: 'ventas',
+    recurso: 'precios',
+    accion: 'ver',
+    descripcion: 'Consultar listas y precios comerciales vigentes',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'precios',
+    accion: 'gestionar',
+    descripcion: 'Registrar y activar o desactivar listas de precios',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'comisiones',
+    accion: 'ver',
+    descripcion: 'Consultar reglas, devengos, reversas y reintegros de comisión',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'comisiones',
+    accion: 'gestionar',
+    descripcion: 'Registrar y activar o desactivar reglas de comisión',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'consolidados',
+    accion: 'ver',
+    descripcion: 'Consultar bloques inmutables de ventas',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'consolidados',
+    accion: 'crear',
+    descripcion: 'Crear bloques inmutables de ventas válidas',
+  },
+];
+
 /**
  * Todos los permisos del módulo de Ventas
  */
@@ -268,6 +307,7 @@ export const ALL_VENTAS_PERMISSIONS: PermissionDefinition[] = [
   ...INVENTARIO_CORE_PERMISSIONS,
   ...INVENTARIO_LOGISTICA_PERMISSIONS,
   ...VENTAS_RMA_PERMISSIONS,
+  ...VENTAS_COMERCIAL_PERMISSIONS,
 ];
 
 /**

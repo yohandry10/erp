@@ -9,6 +9,15 @@ import { isOfflineQueuedResponse } from '@/lib/offline-store'
 import { INITIAL_ACTIVE_COUNTRY_CODE, INITIAL_ACTIVE_COUNTRY_ID } from '@/lib/initial-country'
 import { validateCountryTaxId } from '@/lib/country-tax-id'
 
+function getOrCreateWizardIntent(storageKey: string, prefix: string) {
+  let key = window.sessionStorage.getItem(storageKey)
+  if (!key) {
+    key = `${prefix}-${window.crypto.randomUUID()}`
+    window.sessionStorage.setItem(storageKey, key)
+  }
+  return key
+}
+
 export function useWizard() {
   const country = useCountryContext()
   const {
@@ -29,9 +38,7 @@ export function useWizard() {
     try {
       setLoading(true)
 
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-      }
+      const headers: HeadersInit = { 'Content-Type': 'application/json' }
 
       // PRIMERO: Verificar si la configuración ya está completa
       const statusResponse = await fetchApi('/api/configuration/status', {
@@ -42,14 +49,10 @@ export function useWizard() {
       if (statusResponse.ok) {
         const statusData = await statusResponse.json()
 
-        // VALIDACIÓN ESTRICTA: Solo marcar como completo si TODOS los campos críticos existen
+        // isComplete representa preparación del ERP, no habilitación fiscal.
+        // El certificado propio del cliente se muestra por separado y no reabre onboarding.
         const isReallyComplete = statusData.success &&
           statusData.data?.isComplete === true &&
-          (
-            statusData.data?.isDemo === true ||
-            statusData.data?.certificate?.exists === true
-          ) &&
-          statusData.data?.certificate?.isValid === true &&
           statusData.data?.ruc?.isConfigured === true &&
           (!statusData.data?.ruc?.missingFields || statusData.data.ruc.missingFields.length === 0)
 
@@ -70,9 +73,6 @@ export function useWizard() {
 
           setLoading(false)
           return
-        } else if (statusData.success && statusData.data?.isComplete === true) {
-          // Si dice que está completo pero faltan validaciones, resetear
-          console.warn('⚠️ Configuration marked as complete but validations failed, resetting wizard')
         }
       }
 
@@ -139,7 +139,11 @@ export function useWizard() {
       }
 
       const headers: HeadersInit = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Idempotency-Key': getOrCreateWizardIntent(
+          `configuration-wizard-step-intent:${stepId}`,
+          'wizard-step',
+        ),
       }
 
       // Backend expects pasoActual to be 1-indexed (1, 2, 3...), not 0-indexed
@@ -169,6 +173,7 @@ export function useWizard() {
       const data = await response.json()
 
       if (data.success) {
+        window.sessionStorage.removeItem(`configuration-wizard-step-intent:${stepId}`)
         markStepComplete(state.currentStep)
       }
 
@@ -193,7 +198,22 @@ export function useWizard() {
       const warnings: string[] = []
 
       if (!certificateBase64) {
-        errors.push('No se ha cargado un certificado digital')
+        if (certificatePassword) {
+          errors.push('No se puede validar una contraseña sin certificado digital')
+        } else {
+          updateValidationResults({
+            certificate: {
+              isValid: true,
+              isConfigured: false,
+              errors: [],
+              warnings: ['Puedes cargar el certificado propio de tu empresa cuando habilites emisión electrónica.'],
+            },
+          })
+          return {
+            success: true,
+            data: { isValid: true, isConfigured: false, skipped: true },
+          }
+        }
       }
 
       if (certificatePassword === undefined || certificatePassword === null || certificatePassword === '') {
@@ -256,6 +276,7 @@ export function useWizard() {
       updateValidationResults({
         certificate: {
           isValid: true,
+          isConfigured: true,
           errors: [],
           warnings: serverWarnings,
           expiresAt: validTo,
@@ -270,7 +291,8 @@ export function useWizard() {
       return {
         success: true,
         data: {
-          isValid: true,
+            isValid: true,
+            isConfigured: true,
           certificate: {
             subject: certificateData.subject,
             issuer: certificateData.issuer,
@@ -374,6 +396,10 @@ export function useWizard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Idempotency-Key': getOrCreateWizardIntent(
+            'configuration-wizard-complete-intent',
+            'wizard-complete',
+          ),
         },
         credentials: 'include',
         body: JSON.stringify({
@@ -387,6 +413,7 @@ export function useWizard() {
       }
 
       const data = await response.json()
+      window.sessionStorage.removeItem('configuration-wizard-complete-intent')
       setPersistedConfiguration(true)
       return data
     } catch (error) {
@@ -417,6 +444,10 @@ export function useWizard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Idempotency-Key': getOrCreateWizardIntent(
+            'configuration-wizard-reset-intent',
+            'wizard-reset',
+          ),
         },
         credentials: 'include',
       })
@@ -428,6 +459,7 @@ export function useWizard() {
       }
 
       resetWizardState()
+      window.sessionStorage.removeItem('configuration-wizard-reset-intent')
       goToStep(0)
 
       return data
@@ -459,16 +491,22 @@ export function useWizard() {
         state.configuration.ruc &&
         state.configuration.razonSocial &&
         state.configuration.direccion &&
-        (country.paisCodigo !== 'PE' || /^\d{6}$/.test(state.configuration.ubigeo || ''))
+        (
+          country.paisCodigo !== 'PE' ||
+          (!state.configuration.ubigeo &&
+            state.configuration.gre_obligatorio !== true &&
+            state.configuration.gre_automatico_habilitado !== true) ||
+          /^\d{6}$/.test(state.configuration.ubigeo || '')
+        )
       )
     }
 
-    // Certificate step requires file and password
+    // El certificado es opcional para operar el ERP. Si se aporta, el par
+    // archivo/contraseña debe quedar completo para poder validarlo.
     if (currentStepData.id === 'certificate') {
-      return !!(
-        state.configuration.certificateBase64 &&
-        state.configuration.certificatePassword
-      )
+      const hasCertificate = !!state.configuration.certificateBase64
+      const hasPassword = !!state.configuration.certificatePassword
+      return hasCertificate === hasPassword
     }
 
     // Fiscal step requires regimen_tributario and series
@@ -480,10 +518,7 @@ export function useWizard() {
         return false
       }
       if (country.paisCodigo === 'CO') {
-        return !!(
-          state.configuration.dian_tipo_contribuyente &&
-          state.configuration.dian_regimen_fiscal
-        )
+        return true
       }
       if (!state.configuration.regimen_tributario) {
         return false
@@ -497,6 +532,7 @@ export function useWizard() {
     // SUNAT/OSE step
     if (currentStepData.id === 'sunat') {
       if (country.paisCodigo === 'AR') {
+        if (state.configuration.arca_activo !== true) return true
         return !!(
           state.configuration.arca_punto_venta &&
           state.configuration.arca_condicion_iva &&
@@ -506,6 +542,7 @@ export function useWizard() {
         )
       }
       if (country.paisCodigo === 'CO') {
+        if (state.configuration.dian_activo !== true) return true
         const homologacion = (state.configuration.dian_environment || 'HOMOLOGACION') === 'HOMOLOGACION'
         return !!(
           state.configuration.dian_activo &&
@@ -525,20 +562,7 @@ export function useWizard() {
       }
       const modo = state.configuration.emision_cpe_modo || 'SUNAT_DIRECTO'
 
-      if (modo === 'SUNAT_DIRECTO') {
-        if (!state.configuration.sunat_username || !state.configuration.sunat_password) {
-          return false
-        }
-
-        if (state.configuration.sunat_gre_transport === 'rest') {
-          return !!(
-            state.configuration.sunat_gre_client_id &&
-            state.configuration.sunat_gre_client_secret
-          )
-        }
-      }
-
-      if (state.configuration.sire_activo !== false) {
+      if (state.configuration.sire_activo === true) {
         if (!state.configuration.sunat_username || !state.configuration.sunat_password) {
           return false
         }
@@ -547,10 +571,8 @@ export function useWizard() {
         }
       }
 
-      if (modo === 'OSE_API') {
-        if (!state.configuration.ose_activo) {
-          return false
-        }
+      if (state.configuration.ose_activo === true) {
+        if (modo !== 'OSE_API') return false
 
         if (!state.configuration.ose_url) {
           return false
@@ -574,7 +596,8 @@ export function useWizard() {
       return true
     }
 
-    // Validation step requires successful validations
+    // Sólo la identidad de empresa es obligatoria; el certificado puede haber
+    // sido omitido explícitamente y en ese caso validateCertificate devuelve ok.
     if (currentStepData.id === 'validation') {
       return !!(
         state.validationResults.certificate?.isValid &&

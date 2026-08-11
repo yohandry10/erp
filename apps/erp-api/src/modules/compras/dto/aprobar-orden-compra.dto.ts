@@ -7,19 +7,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 // si un cliente envia aprobador_id la API responde 400.
 export class AprobarOrdenCompraDto {
   @ApiPropertyOptional({
-    description: 'Nombre opcional para overridear el nombre derivado del aprobador (uso administrativo).',
-    example: 'Juan Pérez'
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  aprobador_nombre?: string;
-
-  @ApiPropertyOptional({
     description: 'Comentarios del aprobador',
     example: 'Aprobado según presupuesto del trimestre'
   })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   comentarios?: string;
 }

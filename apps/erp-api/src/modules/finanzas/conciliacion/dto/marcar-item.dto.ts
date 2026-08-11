@@ -1,19 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import { IsUUID, IsOptional, IsNumber, IsBoolean, Min } from 'class-validator';
-
-const toOptionalBoolean = ({ value }: { value: unknown }) => {
-  if (value === undefined || value === null || value === '') return undefined;
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (['true', '1', 'yes', 'si', 'sí'].includes(normalized)) return true;
-    if (['false', '0', 'no'].includes(normalized)) return false;
-  }
-  return value;
-};
+import { IsEmpty, IsUUID, IsString, MinLength, MaxLength } from 'class-validator';
 
 export class MarcarItemDto {
+  @ApiProperty({ description: 'Clave estable de intención' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(180)
+  idempotency_key!: string;
+
   @ApiProperty({
     description: 'ID del movimiento del sistema a conciliar',
     example: '123e4567-e89b-12d3-a456-426614174000',
@@ -28,23 +22,10 @@ export class MarcarItemDto {
   @IsUUID()
   movimiento_extracto_id: string;
 
-  @ApiProperty({
-    description: 'Diferencia entre los montos (opcional, para registro)',
-    example: 0.50,
-    required: false,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(0, { message: 'La diferencia no puede ser negativa' })
+  @IsEmpty({ message: 'Las diferencias requieren un ajuste bancario explícito y contabilizado' })
   diferencia?: number;
 
-  @ApiProperty({
-    description: 'Autoriza explícitamente conciliar movimientos con diferencia de monto',
-    example: false,
-    required: false,
-  })
-  @IsOptional()
-  @Transform(toOptionalBoolean)
-  @IsBoolean()
+  @IsEmpty({ message: 'No se permite aceptar diferencias sin ajuste explícito' })
   aceptar_diferencia?: boolean;
+
 }

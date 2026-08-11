@@ -8,6 +8,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../common';
 import { Throttle } from '@nestjs/throttler';
 
 /**
@@ -70,9 +71,10 @@ export class ImportExportController {
   async importCatalogo(
     @Body() body: ImportCatalogoDto,
     @CurrentTenant() tenantId: string,  // ✅ Del token, no del body
+    @CurrentUser('id') actorId: string,
   ) {
     const csv = Buffer.from(body.fileBase64, 'base64').toString('utf8');
     // Ignoramos body.tenantId y usamos el del token
-    return this.service.importCatalogo(csv, tenantId);
+    return this.service.importCatalogo(csv, tenantId, actorId, body.idempotency_key);
   }
 }

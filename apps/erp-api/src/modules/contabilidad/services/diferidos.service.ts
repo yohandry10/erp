@@ -11,6 +11,7 @@ import {
   EstadoAsiento
 } from '@erp-suite/dtos';
 import { buildDeterministicUuid } from '../../../common/util/deterministic-uuid.util';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class DiferidosService {
@@ -149,8 +150,21 @@ export class DiferidosService {
   async crear(
     tenantId: string,
     userId: string,
-    dto: CreateDiferidoDto
+    dto: CreateDiferidoDto,
+    idempotencyKey?: string,
   ): Promise<DiferidoResponseDto> {
+    if (dto.cuenta_diferido_id === dto.cuenta_resultado_id) {
+      throw new BadRequestException('La cuenta de balance y la de resultados no pueden ser la misma: el devengo no movería nada.');
+    }
+    const key=idempotencyKey?.trim()||`deferred-create:${createHash('sha256').update(JSON.stringify({tenantId,userId,dto})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_activo_diferido_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_entity:'DEFERRED',p_action:'CREATE',p_record_id:null,p_payload:dto,p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el diferido');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
+    return this.aRespuesta(result.record);
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     if (dto.cuenta_diferido_id === dto.cuenta_resultado_id) {
       throw new BadRequestException(
         'La cuenta de balance y la de resultados no pueden ser la misma: el devengo no movería nada.'
@@ -187,7 +201,17 @@ export class DiferidosService {
     return this.aRespuesta(data);
   }
 
-  async cancelar(tenantId: string, diferidoId: string): Promise<DiferidoResponseDto> {
+  async cancelar(tenantId: string,diferidoId: string,userId: string,idempotencyKey?: string): Promise<DiferidoResponseDto> {
+    if(!userId) throw new BadRequestException('Se requiere un usuario autenticado');
+    const key=idempotencyKey?.trim()||`deferred-cancel:${createHash('sha256').update(JSON.stringify({tenantId,diferidoId,userId})).digest('hex')}`;
+    const {data:rpcData,error:rpcError}=await this.supabaseService.getClient().rpc('gestionar_activo_diferido_tx',{
+      p_tenant_id:tenantId,p_actor_id:userId,p_entity:'DEFERRED',p_action:'CANCEL',p_record_id:diferidoId,p_payload:{},p_idempotency_key:key,
+    });
+    if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo cancelar el diferido');
+    const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
+    return this.aRespuesta(result.record);
+
+    /* istanbul ignore next -- writer legacy inalcanzable */
     const diferido = await this.obtener(tenantId, diferidoId);
 
     if (diferido.estado !== EstadoDiferido.VIGENTE) {

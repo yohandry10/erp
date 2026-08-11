@@ -19,6 +19,11 @@ export interface ConfigurationStatus {
     isConfigured: boolean
     missingFields: string[]
   }
+  fiscal: {
+    isEnabled: boolean
+    isReady: boolean
+    missingItems: string[]
+  }
 }
 
 const SUPER_ADMIN_STATUS: ConfigurationStatus = {
@@ -28,15 +33,17 @@ const SUPER_ADMIN_STATUS: ConfigurationStatus = {
   missingItems: [],
   certificate: { exists: true, isValid: true },
   ruc: { isConfigured: true, missingFields: [] },
+  fiscal: { isEnabled: false, isReady: false, missingItems: [] },
 }
 
 const EMPTY_STATUS: ConfigurationStatus = {
   isComplete: false,
   isDemo: false,
   completionPercentage: 0,
-  missingItems: ['Certificado digital', 'RUC', 'Razón Social', 'Dirección'],
+  missingItems: ['RUC', 'Razón Social', 'Dirección'],
   certificate: { exists: false, isValid: false },
   ruc: { isConfigured: false, missingFields: ['RUC', 'Razón Social'] },
+  fiscal: { isEnabled: false, isReady: false, missingItems: ['Certificado digital del cliente'] },
 }
 
 async function fetchConfigurationStatus(): Promise<ConfigurationStatus> {

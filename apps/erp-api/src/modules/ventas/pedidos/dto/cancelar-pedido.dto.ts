@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
 
 /**
  * CancelarPedidoDto
@@ -6,7 +6,12 @@ import { IsString, IsOptional } from 'class-validator';
  * Requirements: 12.1, 12.2
  */
 export class CancelarPedidoDto {
-  @IsOptional()
   @IsString({ message: 'El motivo debe ser texto' })
-  motivo?: string;
+  @MinLength(3, { message: 'El motivo debe tener al menos 3 caracteres' })
+  @MaxLength(1000, { message: 'El motivo no puede exceder 1000 caracteres' })
+  motivo!: string;
+
+  @IsOptional()
+  @IsBoolean({ message: 'La confirmación de retorno físico debe ser booleana' })
+  confirmar_retorno_fisico?: boolean;
 }

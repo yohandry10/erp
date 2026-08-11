@@ -12,6 +12,7 @@ describe('TiposCambioService', () => {
   let tablas: Record<string, any>;
   let inserciones: Array<{ tabla: string; payload: any }>;
   let actualizaciones: Array<{ tabla: string; payload: any }>;
+  let rpc:jest.Mock;
 
   const construirQuery = (tabla: string) => {
     const filtros: string[] = [];
@@ -50,6 +51,10 @@ describe('TiposCambioService', () => {
     tablas = {};
     inserciones = [];
     actualizaciones = [];
+    rpc=jest.fn(async (_name:string,args:any)=>({data:{record:{id:'tc-1',tenant_id:TENANT,
+      moneda_origen:String(args.p_payload.moneda_origen).toUpperCase(),moneda_destino:String(args.p_payload.moneda_destino).toUpperCase(),
+      fecha:args.p_payload.fecha,compra:args.p_payload.compra??args.p_payload.venta,venta:args.p_payload.venta??args.p_payload.compra,
+      fuente:String(args.p_payload.fuente??'MANUAL').toUpperCase()}},error:null}));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -57,7 +62,7 @@ describe('TiposCambioService', () => {
         {
           provide: SupabaseService,
           useValue: {
-            getClient: jest.fn(() => ({ from: jest.fn((tabla: string) => construirQuery(tabla)) }))
+            getClient: jest.fn(() => ({from:jest.fn((tabla:string)=>construirQuery(tabla)),rpc}))
           }
         }
       ]
@@ -135,7 +140,8 @@ describe('TiposCambioService', () => {
         venta: 3.75
       });
 
-      expect(inserciones[0].payload).toMatchObject({
+      expect(rpc).toHaveBeenCalledWith('gestionar_maestro_contable_tx',expect.objectContaining({p_entity:'FX',p_action:'CREATE'}));
+      expect((await rpc.mock.results[0].value).data.record).toMatchObject({
         moneda_origen: 'USD',
         moneda_destino: 'PEN',
         compra: 3.75,
@@ -159,7 +165,7 @@ describe('TiposCambioService', () => {
       });
 
       expect(inserciones).toHaveLength(0);
-      expect(actualizaciones[0].payload).toMatchObject({ compra: 3.7, venta: 3.75 });
+      expect(rpc).toHaveBeenCalledWith('gestionar_maestro_contable_tx',expect.objectContaining({p_payload:expect.objectContaining({compra:3.7,venta:3.75})}));
     });
 
     it('rechaza un par con la misma moneda de origen y destino', async () => {

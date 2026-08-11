@@ -1,13 +1,10 @@
 import { BadRequestException, Logger } from '@nestjs/common';
-import { randomUUID } from 'crypto';
 import * as crypto from 'crypto';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
-import { EventBusService } from '../../shared/events/event-bus.service';
-import { AuditService } from '../audit/audit.service';
 import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
-import { CpeOperationalDocumentService } from './cpe-operational-document.service';
-import { CpeXmlBuilder } from './cpe-xml.builder';
-import { fechaHoyEnPeru } from '../../shared/utils/fecha-peru.util';
+import { CpeCertificateService } from './cpe-certificate.service';
+import { DesktopSignedCpeDto } from './dto/desktop-signed-cpe.dto';
 import {
   validateArgentinaCuit,
   validateColombiaNit,
@@ -17,27 +14,12 @@ import {
 /** Registra XML firmado por el escritorio y normaliza su payload de entrada. */
 export class CpeRegistrationService {
   private readonly logger = new Logger(CpeRegistrationService.name);
-  private readonly sunatStatuses = {
-    NOT_SENT: 'NOT_SENT', READY: 'READY', SENDING: 'SENDING', ACCEPTED: 'ACCEPTED',
-    REJECTED: 'REJECTED', ERROR: 'ERROR',
-  } as const;
 
   constructor(
     private readonly supabaseService: SupabaseService,
-    private readonly eventBus: EventBusService,
-    private readonly auditService: AuditService,
     private readonly cacheInvalidation: CacheInvalidationService,
-    private readonly operationalDocumentService: CpeOperationalDocumentService,
-    private readonly xmlBuilder: CpeXmlBuilder,
+    private readonly certificateService: CpeCertificateService,
   ) {}
-
-  private ensureDocumentoParaCpe(cpe: any, tenantId: string) {
-    return this.operationalDocumentService.ensureDocumentoParaCpe(cpe, tenantId);
-  }
-
-  private normalizeTipoDocumentoSunat(tipo: string | null | undefined, throwOnUnknown = true) {
-    return this.xmlBuilder.normalizeTipoDocumentoSunat(tipo, throwOnUnknown);
-  }
 
 async getEmpresaEmisorInfoStrict(tenantId: string) {
     const { data, error } = await this.supabaseService
@@ -82,175 +64,224 @@ async getEmpresaEmisorInfoStrict(tenantId: string) {
     };
   }
 
-async registerDesktopSignedXml(payload: any, tenantId: string, userId?: string) {
-    const signedXml = String(payload?.signed_xml ?? payload?.signedXml ?? '').trim();
-    if (!signedXml) {
-      throw new BadRequestException('El XML firmado desktop es requerido');
+async registerDesktopSignedXml(payload: DesktopSignedCpeDto, tenantId: string, userId: string) {
+    if (!userId) {
+      throw new BadRequestException('El registro desktop exige un actor autenticado');
     }
-
-    const client = this.supabaseService.getClient();
-    const hash = crypto.createHash('sha256').update(signedXml).digest('base64');
-    const providedHash = String(payload?.hash ?? '').trim();
-    if (providedHash && providedHash !== hash) {
-      throw new BadRequestException('El hash del XML firmado no coincide con el contenido recibido');
-    }
-
-    const idempotencyKey = String(payload?.idempotency_key ?? payload?.idempotencyKey ?? `desktop.signed:${tenantId}:${hash}`).trim();
-    const { data: existing, error: existingError } = await client
-      .from('cpe')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
-
-    if (existingError && existingError.code && existingError.code !== 'PGRST116') {
-      throw new BadRequestException('No se pudo validar idempotencia del XML desktop');
-    }
-    if (existing) {
-      return { success: true, data: existing, message: 'XML firmado desktop ya registrado' };
-    }
-
-    const emisor = await this.getEmpresaEmisorInfoStrict(tenantId);
-    const xmlId = this.extractXmlTag(signedXml, 'ID');
-    const [serieFromXml, numeroFromXml] = xmlId.includes('-') ? xmlId.split('-', 2) : ['', ''];
-    const tipoDocumento = this.normalizeTipoDocumentoSunat(
-      payload?.tipo_documento ?? payload?.document_type ?? this.extractXmlTag(signedXml, 'InvoiceTypeCode') ?? '01',
-    );
-    const serie = String(payload?.serie ?? serieFromXml ?? this.defaultSerieForTipo(tipoDocumento)).trim().toUpperCase();
-    const numero = Number(payload?.numero ?? numeroFromXml ?? 1);
-    const totalVenta = this.roundMoney(
-      payload?.total_venta ?? payload?.total ?? this.extractXmlNumber(signedXml, 'PayableAmount') ?? 0,
-    );
-    const totalIgv = this.roundMoney(payload?.total_igv ?? payload?.igv ?? 0);
-    const totalGravadas = this.roundMoney(payload?.total_gravadas ?? payload?.subtotal ?? Math.max(totalVenta - totalIgv, 0));
-    const documentoReceptor = String(payload?.documento_receptor ?? payload?.cliente_ruc ?? '00000000').replace(/\D/g, '');
-    const tipoDocumentoReceptor = this.resolveTipoDocumentoReceptor(
-      tipoDocumento,
-      payload?.tipo_documento_receptor ?? payload?.clienteTipoDocumento,
-      documentoReceptor,
-    );
-    const eventId = randomUUID();
-
-    const cpePayload = {
-      tenant_id: tenantId,
-      tipo_documento: tipoDocumento,
-      serie,
-      numero: Number.isFinite(numero) && numero > 0 ? numero : 1,
-      // En horario de Peru, no en el del servidor: con el proceso en UTC, entre
-      // las 19:00 y las 24:00 de Lima esto fechaba el comprobante al dia
-      // siguiente y el validador de emision lo rechazaba por futuro.
-      fecha_emision: fechaHoyEnPeru(),
-      fecha_vencimiento: fechaHoyEnPeru(),
-      ruc_emisor: emisor.ruc,
-      razon_social_emisor: emisor.razonSocial,
-      tipo_documento_receptor: tipoDocumentoReceptor,
-      documento_receptor: documentoReceptor,
-      razon_social_receptor: String(payload?.razon_social_receptor ?? payload?.cliente_nombre ?? 'Cliente desktop offline'),
-      direccion_receptor: String(payload?.direccion_receptor ?? ''),
-      moneda: String(payload?.moneda ?? 'PEN'),
-      total_gravadas: totalGravadas,
-      total_igv: totalIgv,
-      total_venta: totalVenta,
-      items: Array.isArray(payload?.items) ? payload.items : [],
-      idempotency_key: idempotencyKey,
-      event_id: eventId,
-      estado: 'FIRMADO',
-      hash,
-      hash_firma: hash,
-      sunat_status: this.sunatStatuses.NOT_SENT,
-      xml_firmado: signedXml,
-    };
-
-    const { data, error } = await client
-      .from('cpe')
-      .insert(cpePayload)
-      .select()
-      .single();
-
-    if (error) {
-      this.logger.error(`❌ [CPE] Error registrando XML firmado desktop: ${error.message}`, error);
-      throw new BadRequestException('No se pudo registrar el XML firmado desktop');
-    }
-
-    const createdCpe = Array.isArray(data) ? data[0] : data;
-    const documentoId = await this.ensureDocumentoParaCpe(createdCpe, tenantId);
-    if (documentoId) {
-      (createdCpe as any).documento_id = documentoId;
-    } else {
-      throw new BadRequestException(`CPE desktop ${createdCpe.id} no tiene documento operativo asociado`);
-    }
-
-    await this.eventBus.emitComprobanteCreadoEvent({
-      eventId: randomUUID(),
-      tenantId,
-      idempotencyKey: `desktop.cpe.creado:${tenantId}:${createdCpe.id}`,
-      cpeId: createdCpe.id,
-      tipoDocumento,
-      serie,
-      numero: createdCpe.numero,
-      clienteId: createdCpe.documento_receptor,
-      total: createdCpe.total_venta,
-      esCredito: false,
-      ventaId: undefined,
-      requiereTransporte: false,
-      moneda: createdCpe.moneda,
-    });
-
-    await this.eventBus.emitFacturaEmitidaEvent({
-      eventId,
-      tenantId,
-      idempotencyKey,
-      cpeId: createdCpe.id,
-      facturaId: documentoId,
-      serie,
-      numero: String(createdCpe.numero),
-      clienteId: createdCpe.documento_receptor,
-      subtotal: createdCpe.total_gravadas,
-      impuestos: createdCpe.total_igv,
-      total: createdCpe.total_venta,
-      moneda: createdCpe.moneda,
-      fechaEmision: createdCpe.fecha_emision,
-      fechaVencimiento: createdCpe.fecha_vencimiento,
-      source: 'cpe.desktop',
-      sunatStatus: this.sunatStatuses.NOT_SENT,
-      hashFirma: hash,
-      hash,
-    });
-
-    try {
-      await this.auditService.registrarCambio(
-        'cpe',
-        'INSERT',
-        userId ?? null,
-        {
-          new: {
-            tipo_documento: tipoDocumento,
-            serie,
-            numero: createdCpe.numero,
-            total_venta: createdCpe.total_venta,
-            estado: 'FIRMADO',
-            source: 'desktop_offline',
-          },
-        },
-        tenantId,
-        createdCpe.id,
-        { accion: 'REGISTRAR_CPE_DESKTOP', tipo_documento: tipoDocumento },
+    if (['07', '08'].includes(payload.tipo_documento)) {
+      throw new BadRequestException(
+        'Las notas 07/08 deben usar /cpe/notas-referenciadas (contrato atómico 472)',
       );
-    } catch (auditError) {
-      this.logger.warn('⚠️ No se pudo registrar auditoria de CPE desktop:', auditError);
+    }
+
+    const signedXml = payload.signed_xml.trim();
+    const hash = crypto.createHash('sha256').update(signedXml, 'utf8').digest('base64');
+    if (payload.hash !== hash) {
+      throw new BadRequestException('El hash SHA-256 del XML firmado no coincide con el contenido recibido');
+    }
+
+    const signer = await this.certificateService.getXmlSigner(tenantId);
+    if (!signer.validateSignatureStrict(signedXml)) {
+      throw new BadRequestException(
+        'La firma XMLDSig no es válida para el certificado configurado del tenant',
+      );
+    }
+
+    const parsed = this.parseInvoiceXml(signedXml);
+    const emisor = await this.getEmpresaEmisorInfoStrict(tenantId);
+    const invoiceId = this.xmlText(parsed.ID);
+    const [xmlSerie, xmlNumero] = invoiceId.split('-', 2);
+    const xmlTipo = this.xmlText(parsed.InvoiceTypeCode);
+    const xmlMoneda = this.xmlText(parsed.DocumentCurrencyCode);
+    const xmlFecha = this.xmlText(parsed.IssueDate);
+    const supplierParty = parsed.AccountingSupplierParty?.Party;
+    const customerParty = parsed.AccountingCustomerParty?.Party;
+    const xmlEmisor = this.xmlText(supplierParty?.PartyIdentification?.ID);
+    const xmlEmisorNombre = this.xmlText(supplierParty?.PartyLegalEntity?.RegistrationName);
+    const xmlReceptor = this.xmlText(customerParty?.PartyIdentification?.ID);
+    const xmlTipoReceptor = String(customerParty?.PartyIdentification?.ID?.['@_schemeID'] ?? '').trim();
+    const xmlReceptorNombre = this.xmlText(customerParty?.PartyLegalEntity?.RegistrationName);
+    const legalTotals = parsed.LegalMonetaryTotal ?? {};
+    const xmlGravadas = this.money(this.xmlText(legalTotals.LineExtensionAmount));
+    const xmlTotal = this.money(this.xmlText(legalTotals.PayableAmount));
+    const xmlIgv = this.money(this.xmlText(parsed.TaxTotal?.TaxAmount));
+    const xmlItems = this.parseInvoiceItems(parsed.InvoiceLine);
+
+    if (
+      xmlTipo !== payload.tipo_documento
+      || xmlSerie !== payload.serie
+      || Number(xmlNumero) !== payload.numero
+      || invoiceId !== `${payload.serie}-${String(payload.numero).padStart(8, '0')}`
+      || (payload.tipo_documento === '01' && !payload.serie.startsWith('F'))
+      || (payload.tipo_documento === '03' && !payload.serie.startsWith('B'))
+      || xmlFecha !== payload.fecha_emision.slice(0, 10)
+      || xmlMoneda !== payload.moneda
+      || xmlEmisor !== emisor.ruc
+      || this.normalizedText(xmlEmisorNombre) !== this.normalizedText(emisor.razonSocial)
+      || xmlReceptor !== payload.documento_receptor
+      || xmlTipoReceptor !== payload.tipo_documento_receptor
+      || this.normalizedText(xmlReceptorNombre) !== this.normalizedText(payload.razon_social_receptor)
+      || !this.sameMoney(xmlGravadas, payload.total_gravadas)
+      || !this.sameMoney(xmlIgv, payload.total_igv)
+      || !this.sameMoney(xmlTotal, payload.total_venta)
+      || JSON.stringify(xmlItems) !== JSON.stringify(this.canonicalDtoItems(payload.items))
+    ) {
+      throw new BadRequestException(
+        'Los campos fiscales del XML no coinciden con serie, receptor, moneda, totales o ítems del snapshot desktop',
+      );
+    }
+
+    const detalles = payload.items.map((item, index) => ({
+      orden: index + 1,
+      producto_id: item.producto_id ?? null,
+      codigo_producto: item.codigo,
+      descripcion: item.descripcion.trim(),
+      unidad_medida: item.unidad,
+      cantidad: item.cantidad,
+      precio_unitario: item.precio_unitario,
+      descuento_unitario: 0,
+      valor_venta: item.valor_venta,
+      impuesto_igv: item.igv,
+      impuesto_isc: 0,
+      total_item: item.precio_venta,
+      afectacion_igv: item.igv > 0 ? '10' : '20',
+    }));
+    const rpcPayload = {
+      cpe: {
+        tipo_documento: payload.tipo_documento,
+        serie: payload.serie,
+        numero: String(payload.numero).padStart(8, '0'),
+        fecha_emision: xmlFecha,
+        fecha_vencimiento: xmlFecha,
+        ruc_emisor: emisor.ruc,
+        razon_social_emisor: emisor.razonSocial,
+        direccion_emisor: emisor.direccion,
+        tipo_documento_receptor: payload.tipo_documento_receptor,
+        documento_receptor: payload.documento_receptor,
+        razon_social_receptor: payload.razon_social_receptor,
+        direccion_receptor: payload.direccion_receptor ?? '',
+        cliente_id: payload.cliente_id ?? null,
+        moneda: payload.moneda,
+        total_gravadas: payload.total_gravadas,
+        total_exoneradas: 0,
+        total_inafectas: 0,
+        total_exportacion: 0,
+        total_igv: payload.total_igv,
+        total_venta: payload.total_venta,
+        items: payload.items,
+        idempotency_key: payload.idempotency_key,
+        estado: 'FIRMADO',
+        estado_sunat: 'PENDIENTE',
+        sunat_status: 'READY',
+        hash,
+        hash_firma: hash,
+        xml_firmado: signedXml,
+        metadata: {
+          source: 'desktop_offline',
+          local_fiscal_id: payload.local_fiscal_id,
+          source_type: payload.source_type,
+          source_id: payload.source_id ?? null,
+        },
+      },
+      documento: {
+        subtotal: payload.total_gravadas,
+        impuesto_igv: payload.total_igv,
+        impuesto_isc: 0,
+        total: payload.total_venta,
+        tipo_cambio: 1,
+      },
+      detalles,
+    };
+    const { data, error } = await this.supabaseService.getClient().rpc('registrar_cpe_desktop_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: userId,
+      p_payload: rpcPayload,
+      p_idempotency_key: payload.idempotency_key,
+    });
+    if (error) {
+      throw new BadRequestException(`No se pudo registrar/reparar el CPE desktop: ${error.message}`);
+    }
+    const result = Array.isArray(data) ? data[0] : data;
+    if (!result?.cpe?.id || !result?.documento_id) {
+      throw new BadRequestException('El registro desktop no devolvió CPE, documento y detalles completos');
     }
 
     try {
       await this.cacheInvalidation.onCpeCreated(tenantId);
     } catch (cacheError) {
-      this.logger.warn('⚠️ No se pudo invalidar cache despues de CPE desktop:', cacheError);
+      this.logger.warn('No se pudo invalidar cache después del commit desktop', cacheError);
     }
-
     return {
       success: true,
-      data: createdCpe,
-      message: 'XML firmado desktop registrado; envio SUNAT/OSE pendiente de confirmacion externa',
+      data: { ...result.cpe, documento_id: result.documento_id },
+      repaired: Boolean(result.repaired),
+      message: 'XML desktop validado y registrado; el envío SUNAT/OSE continúa pendiente',
     };
+  }
+
+  private parseInvoiceXml(xml: string): any {
+    const validation = XMLValidator.validate(xml);
+    if (validation !== true) {
+      throw new BadRequestException('El XML firmado desktop no es XML bien formado');
+    }
+    const parsed = new XMLParser({
+      ignoreAttributes: false,
+      removeNSPrefix: true,
+      trimValues: true,
+      parseTagValue: false,
+      allowBooleanAttributes: false,
+    }).parse(xml);
+    if (!parsed?.Invoice || Object.keys(parsed).filter((key) => key !== '?xml').length !== 1) {
+      throw new BadRequestException('El XML desktop debe contener exactamente una raíz UBL Invoice');
+    }
+    return parsed.Invoice;
+  }
+
+  private parseInvoiceItems(lines: any): any[] {
+    const values = Array.isArray(lines) ? lines : lines ? [lines] : [];
+    return values.map((line, index) => ({
+      codigo: this.xmlText(line.Item?.SellersItemIdentification?.ID) || `ITEM-${index + 1}`,
+      descripcion: this.xmlText(line.Item?.Description),
+      unidad: String(line.InvoicedQuantity?.['@_unitCode'] ?? '').trim(),
+      cantidad: this.money(this.xmlText(line.InvoicedQuantity), 6),
+      precio_unitario: this.money(this.xmlText(line.Price?.PriceAmount), 6),
+      valor_venta: this.money(this.xmlText(line.LineExtensionAmount)),
+      igv: this.money(this.xmlText(line.TaxTotal?.TaxAmount)),
+      precio_venta: this.money(this.xmlText(line.LineExtensionAmount))
+        + this.money(this.xmlText(line.TaxTotal?.TaxAmount)),
+    }));
+  }
+
+  private canonicalDtoItems(items: DesktopSignedCpeDto['items']): any[] {
+    return items.map((item) => ({
+      codigo: item.codigo,
+      descripcion: item.descripcion.trim(),
+      unidad: item.unidad,
+      cantidad: this.money(item.cantidad, 6),
+      precio_unitario: this.money(item.precio_unitario, 6),
+      valor_venta: this.money(item.valor_venta),
+      igv: this.money(item.igv),
+      precio_venta: this.money(item.precio_venta),
+    }));
+  }
+
+  private xmlText(value: any): string {
+    if (value == null) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
+    return String(value['#text'] ?? '').trim();
+  }
+
+  private normalizedText(value: string): string {
+    return value.normalize('NFKC').replace(/\s+/g, ' ').trim().toUpperCase();
+  }
+
+  private money(value: unknown, decimals = 2): number {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Number(numeric.toFixed(decimals)) : Number.NaN;
+  }
+
+  private sameMoney(left: number, right: number): boolean {
+    return Number.isFinite(left) && Math.abs(left - Number(right)) <= 0.01;
   }
 
 private extractXmlTag(xml: string, tag: string): string {

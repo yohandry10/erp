@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "screenshots": [
+    "C:\\Users\\PC\\Desktop\\erp\\artifacts\\qa-rrhh-475\\01-rrhh-maestro.png",
+    "C:\\Users\\PC\\Desktop\\erp\\artifacts\\qa-rrhh-475\\02-asistencia.png",
+    "C:\\Users\\PC\\Desktop\\erp\\artifacts\\qa-rrhh-475\\03-contratos.png",
+    "C:\\Users\\PC\\Desktop\\erp\\artifacts\\qa-rrhh-475\\04-candidatos.png",
+    "C:\\Users\\PC\\Desktop\\erp\\artifacts\\qa-rrhh-475\\04a-vacante-creada.png",
+    "C:\\Users\\PC\\Desktop\\erp\\artifacts\\qa-rrhh-475\\04b-candidato-actualizado.png",
+    "C:\\Users\\PC\\Desktop\\erp\\artifacts\\qa-rrhh-475\\05-planilla-electronica.png",
+    "C:\\Users\\PC\\Desktop\\erp\\artifacts\\qa-rrhh-475\\06-planilla-electronica-ficha-guardada.png",
+    "C:\\Users\\PC\\Desktop\\erp\\artifacts\\qa-rrhh-475\\07-configuracion-rrhh-pe.png"
+  ],
+  "mutations": {
+    "employee_create": 1,
+    "attendance_exit": 1,
+    "vacancy_create": 1,
+    "contract_create": 1,
+    "candidate_update": 1,
+    "plame_ficha_update": 1
+  },
+  "browser_failures": []
+}

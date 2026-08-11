@@ -239,30 +239,6 @@ export default function PlanillaCalcularModal({
     }
   };
 
-  const generarAsientosContables = async () => {
-    try {
-      setLoading(true);
-
-      const response = await post(
-        `/api/rrhh/planillas/${planilla.id}/generar-asientos`,
-      );
-
-      if (response?.success) {
-        alert("✅ Asientos contables generados correctamente");
-      } else {
-        throw new Error("Error generando asientos contables");
-      }
-    } catch (error: any) {
-      console.error("Error generando asientos:", error);
-      alert(
-        "Error generando asientos contables: " +
-          (error?.message || String(error)),
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Cálculos totales
   const totalIngresos = empleados.reduce(
     (sum, emp) => sum + emp.total_ingresos,
@@ -542,13 +518,6 @@ export default function PlanillaCalcularModal({
         </div>
 
         <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-border p-6">
-          <Button
-            variant="warning"
-            onClick={generarAsientosContables}
-            disabled={loading || calculando}
-          >
-            📊 Generar Asientos Contables
-          </Button>
           <Button
             onClick={calcularPlanillaCompleta}
             disabled={loading || calculando}

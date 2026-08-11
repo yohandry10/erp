@@ -21,6 +21,7 @@ describe('PresupuestosService', () => {
     lte: jest.fn().mockReturnThis(),
     maybeSingle: jest.fn(),
     single: jest.fn(),
+    rpc: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -68,22 +69,18 @@ describe('PresupuestosService', () => {
     });
 
     it('debe rechazar presupuesto duplicado (mismo centro + cuenta + período)', async () => {
-      // Mock: verificar duplicado - encontrar presupuesto existente
-      mockSupabaseClient.maybeSingle.mockResolvedValue({
-        data: { id: 'presupuesto-existente-123' },
-        error: null,
-      });
+      mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: { message: 'duplicate key value violates unique constraint' } });
 
       await expect(service.crearPresupuesto(tenantId, createDto, userId)).rejects.toThrow(
         BadRequestException
       );
       await expect(service.crearPresupuesto(tenantId, createDto, userId)).rejects.toThrow(
-        'Ya existe un presupuesto para este centro de costo, cuenta y período'
+        'duplicate key value'
       );
-
-      // Verificar que se llamó la consulta de duplicados
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('presupuestos');
-      expect(mockSupabaseClient.select).toHaveBeenCalledWith('id');
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('gestionar_presupuesto_tx', expect.objectContaining({
+        p_action: 'CREATE', p_actor_id: userId,
+      }));
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
     });
 
   });

@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-07.
+Actualizado: 2026-08-08.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
@@ -119,6 +119,20 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   confirmados descuadrados, cero roles `ADMIN_DEMO` en cuentas reales, cero
   teléfonos inválidos y cero tenants sin 4699. Los RPC `SECURITY DEFINER` que
   aceptan `tenant_id` quedaron limitados a `service_role`.
+- `434..487`: creadas y verificadas únicamente en PostgreSQL 16 local efímero;
+  no están aplicadas en PROD. El rango fuerza RLS/ACL y `SECURITY DEFINER`
+  service-only, normaliza `pgcrypto`, locks y validadores runtime, y mueve los
+  writers de ventas, compras, recepción, inventario, POS/caja, facturación,
+  bancos, tesorería, RRHH, administración, configuración, importaciones y
+  contabilidad a fronteras SQL atómicas con actor, huella e idempotencia.
+  También incorpora CPE/GRE/SIRE durables, RMA y reembolsos/reversas, imágenes
+  de producto, listas de precios/comisiones/consolidados, ticket POS canjeable,
+  aging CxC y kardex multimoneda, así como cierres contables residuales.
+- La cadena completa `434..487` suma 54 verificadores transaccionales verdes.
+  Una reconstrucción limpia desde cero aplicó 481 migraciones hasta `487`; la
+  API pasó 191 suites/1.659 pruebas y los typechecks API/Web. Las carreras reales
+  de recepción, RMA, caja, RRHH, CPE y canje POS confirmaron un solo efecto por
+  intención. Esta evidencia local no autoriza ni sustituye la promoción PROD.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -172,11 +186,12 @@ Cambios recientes principales:
   PCGE para diferidos y recurrencia contable reprogramable.
 - `412..424`: demos empresariales coherentes y conversión a cuenta real sin
   estado parcial; backfills limitados a tenants aún marcados como demo.
-- `425..433`: escrituras críticas de planilla, liquidación, asientos, factura
+- `425..487`: escrituras críticas de planilla, liquidación, asientos, factura
   proveedor y pago bancario en una sola transacción, con outbox e idempotencia;
-  reconciliación de costo de ventas y contrato RPC demo no ambiguo. La prueba
-  productiva posterior creó una demo Perú, emitió sesión y segundo aprobador,
-  y entró visualmente al dashboard sin errores de consola.
+  además de los cierres comerciales, fiscales, logísticos, financieros,
+  administrativos y contables descritos arriba. Sólo `425..433` están
+  promovidas; `434..487` conservan evidencia local y requieren despliegue
+  coordinado.
 
 ## Flujos cerrados técnicamente
 
@@ -246,6 +261,10 @@ productivo autorizado.
 
 ### Antes de PROD
 
+- Promover y verificar las migraciones `434..487` como una cadena coordinada con
+  el procedimiento PROD-only, respaldo y postchecks sólo lectura. No aplicar
+  fragmentos aislados: el rango cambia firmas RPC, ACL, writers, outbox y UI en
+  conjunto. Hasta entonces PROD continúa en `433` y no dispone de estos cierres.
 - Reconciliar el historial consolidado de `003..382` y la deriva previa de 13
   funciones y dos políticas antes de usar un `db push --include-all` sobre todo
   el directorio. La contabilidad `383..394` ya está promovida.
@@ -293,7 +312,8 @@ productivo autorizado.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `432` en PROD.
+1. Código y migraciones actuales; estado remoto verificado hasta `433` en PROD
+   y `434..487` verificadas sólo en infraestructura local efímera.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.

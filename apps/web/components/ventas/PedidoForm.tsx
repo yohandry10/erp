@@ -19,6 +19,9 @@ interface Producto {
   precio: number
   stock: number
   stock_reservado?: number
+  es_servicio?: boolean
+  controla_stock?: boolean
+  afectacion_igv?: string
 }
 
 interface PedidoFormProps {
@@ -30,7 +33,7 @@ interface PedidoFormProps {
 
 export interface PedidoFormData {
   cliente_id: string
-  observaciones?: string
+  notas?: string
   detalle: {
     producto_id: string
     descripcion: string
@@ -70,7 +73,10 @@ export default function PedidoForm({
 
   // Derivar advertencias de stock para mostrar alerta en la UI antes de enviar
  const stockAlerts = detalle
-   .filter((item) => !!item.producto_id)
+   .filter((item) => {
+     const producto = productos.find((p) => p.id === item.producto_id)
+     return !!item.producto_id && !producto?.es_servicio && producto?.controla_stock !== false
+   })
    .map((item) => {
      const producto = productos.find((p) => p.id === item.producto_id)
      const disponible = (producto?.stock ?? 0) - (producto?.stock_reservado ?? 0)
@@ -110,7 +116,10 @@ const hasStockShortage = stockAlerts.length > 0
           nombre: p.nombre,
           precio: Number(p.precio ?? p.precio_venta ?? 0),
           stock: Number(p.stock ?? p.stock_actual ?? 0),
-          stock_reservado: Number(p.stock_reservado ?? 0)
+          stock_reservado: Number(p.stock_reservado ?? 0),
+          es_servicio: Boolean(p.es_servicio),
+          controla_stock: p.controla_stock !== false,
+          afectacion_igv: String(p.afectacion_igv ?? '10'),
         }))
         setProductos(productosApi)
       }
@@ -186,7 +195,13 @@ const hasStockShortage = stockAlerts.length > 0
 
   const calculateTotals = () => {
     const subtotal = detalle.reduce((sum, item) => sum + item.subtotal, 0)
-    const igv = subtotal * tasaIgv
+    const baseGravada = detalle.reduce((sum, item) => {
+      const producto = productos.find((p) => p.id === item.producto_id)
+      return String(producto?.afectacion_igv ?? '10').startsWith('1')
+        ? sum + item.subtotal
+        : sum
+    }, 0)
+    const igv = baseGravada * tasaIgv
     const total = subtotal + igv
     return { subtotal, igv, total }
   }
@@ -209,11 +224,6 @@ const hasStockShortage = stockAlerts.length > 0
       if (item.cantidad <= 0) {
         newErrors[`cantidad_${index}`] = 'La cantidad debe ser mayor a 0'
       }
-      const producto = productos.find(p => p.id === item.producto_id)
-      const disponible = (producto?.stock ?? 0) - (producto?.stock_reservado ?? 0)
-      if (producto && item.cantidad > disponible) {
-        newErrors[`cantidad_${index}`] = `Solo hay ${disponible} disponibles (reservado: ${producto.stock_reservado ?? 0})`
-      }
       if (item.precio_unitario <= 0) {
         newErrors[`precio_${index}`] = 'El precio debe ser mayor a 0'
       }
@@ -225,16 +235,6 @@ const hasStockShortage = stockAlerts.length > 0
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (hasStockShortage) {
-      const first = stockAlerts[0]
-      toast({
-        title: 'Stock insuficiente',
-        description: `${first.descripcion}: solicitado ${first.solicitado}, disponible ${first.disponible} (reservado ${first.reservado}). Ajusta las cantidades o repon stock para continuar.`,
-        variant: 'destructive'
-      })
-      return
-    }
 
     if (!validate()) {
       toast({
@@ -250,7 +250,7 @@ const hasStockShortage = stockAlerts.length > 0
 
       const formData: PedidoFormData = {
         cliente_id: clienteId,
-        observaciones: observaciones || undefined,
+        notas: observaciones || undefined,
         detalle: detalle.map(item => ({
           producto_id: item.producto_id,
           descripcion: item.descripcion,
@@ -525,7 +525,7 @@ const hasStockShortage = stockAlerts.length > 0
       </button>
       <button
         type="submit"
-        disabled={disabled || submitting || stockAlerts.length > 0}
+        disabled={disabled || submitting}
         className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold leading-5 text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
       >
         {submitting ? 'Guardando...' : pedido ? 'Actualizar Pedido' : 'Crear Pedido'}

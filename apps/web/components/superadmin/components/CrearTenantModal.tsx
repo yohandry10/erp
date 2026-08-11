@@ -204,11 +204,22 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
         pais_id: formData.pais_id,
       }
 
+      const intentStorageKey = isEditing
+        ? `tenant-update-intent:${tenant.id}`
+        : 'tenant-create-intent'
+      let idempotencyKey = window.sessionStorage.getItem(intentStorageKey)
+      if (!idempotencyKey) {
+        idempotencyKey = `tenant-${isEditing ? 'update' : 'create'}-${window.crypto.randomUUID()}`
+        window.sessionStorage.setItem(intentStorageKey, idempotencyKey)
+      }
+      const requestOptions = { headers: { 'Idempotency-Key': idempotencyKey } }
+
       const result = isEditing
-        ? await api.put(`/tenants/${tenant.id}`, payload)
-        : await api.post('/tenants', payload)
+        ? await api.put(`/tenants/${tenant.id}`, payload, requestOptions)
+        : await api.post('/tenants', payload, requestOptions)
 
       if (result && result.success) {
+        window.sessionStorage.removeItem(intentStorageKey)
         // Mostrar credenciales del usuario administrador
         const adminUser = result.data?.adminUser
         if (adminUser?.email && adminUser?.temporaryPassword) {

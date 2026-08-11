@@ -19,6 +19,7 @@ describe('PedidosService', () => {
     let mockSupabaseClient: any;
     let mockTaxCalculator: any;
     let mockTenantContext: any;
+    let mockEventBus: any;
 
     beforeEach(async () => {
         mockSupabaseClient = {
@@ -42,6 +43,9 @@ describe('PedidosService', () => {
         mockTenantContext = {
             getTenantId: jest.fn().mockReturnValue('tenant-123'),
         };
+        mockEventBus = {
+            emitVentaProcessed: jest.fn(),
+        };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -56,7 +60,7 @@ describe('PedidosService', () => {
                 { provide: AuditService, useValue: {} },
                 { provide: CPEIntegrationService, useValue: {} },
                 { provide: GREIntegrationService, useValue: {} },
-                { provide: EventBusService, useValue: {} },
+                { provide: EventBusService, useValue: mockEventBus },
                 { provide: DocumentosService, useValue: {} },
                 {
                     provide: TaxCalculatorService,
@@ -80,6 +84,7 @@ describe('PedidosService', () => {
 
     describe('create', () => {
         const tenantId = 'tenant-123';
+        const userId = 'user-123';
         const createDto = {
             cliente_id: 'client-1',
             detalle: [
@@ -87,70 +92,53 @@ describe('PedidosService', () => {
             ],
         };
 
-        it('should create a pedido successfully using atomic RPC', async () => {
-            // 1. Mock Cliente exists
+        it('crea el pedido pendiente por RPC con tenant y actor explícitos, sin reservar stock', async () => {
             mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'client-1' }, error: null });
-
-            // 2. Mock Stock Check
-            mockSupabaseClient.single.mockResolvedValueOnce({
-                data: { stock_actual: 20, stock_reservado: 10 },
-                error: null
-            });
-
-            // 3. Mock Tax Calc
             mockTaxCalculator.calcularImpuestos.mockResolvedValue({
                 subtotal: 100,
                 igv: 18,
                 total: 118,
             });
-
-            // 4. Mock generarNumero (limit returns { data, error })
-            mockSupabaseClient.limit.mockResolvedValueOnce({ data: [], error: null }); // No previous orders
-
-            // 5. Mock RPC creation
             mockSupabaseClient.rpc.mockResolvedValueOnce({ data: { pedido_id: 'new-pedido-id' }, error: null });
-
-            // 6. Mock findOne for return (Header)
             mockSupabaseClient.single.mockResolvedValueOnce({
                 data: { id: 'new-pedido-id', estado: 'PENDIENTE' },
                 error: null
             });
+            mockSupabaseClient.order.mockResolvedValueOnce({ data: [], error: null });
 
-            // 7. Mock findOne details (order returns { data, error })
-            mockSupabaseClient.order
-                .mockReturnValueOnce(mockSupabaseClient) // Call #1 (generarNumero)
-                .mockResolvedValueOnce({ data: [], error: null }); // Call #2 (findOne details)
-
-            const result = await service.create(createDto as any, tenantId);
+            const result = await service.create(createDto as any, tenantId, userId);
 
             expect(result).toBeDefined();
-            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('crear_pedido_completo', expect.any(Object));
-
-            // El subtotal calculado con Decimal viaja al RPC de creación
             expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-                'crear_pedido_completo',
+                'crear_pedido_comercial_tx',
                 expect.objectContaining({
-                    p_pedido: expect.objectContaining({ subtotal: 100 }),
+                    p_pedido: expect.objectContaining({
+                        tenant_id: tenantId,
+                        cliente_id: 'client-1',
+                        created_by: userId,
+                        subtotal: 100,
+                    }),
+                    p_detalle: [expect.objectContaining({
+                        producto_id: 'prod-1',
+                        cantidad: 1,
+                        subtotal: 100,
+                    })],
                 }),
             );
+            expect(mockSupabaseClient.select).toHaveBeenCalledWith('id, afectacion_igv');
+            expect(mockSupabaseClient.select).not.toHaveBeenCalledWith(expect.stringContaining('stock_actual'));
+            expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('movimientos_almacen');
         });
 
-        it('should throw BadRequestException if stock is insufficient', async () => {
-            // Mock Cliente exists
-            mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'client-1' }, error: null });
-
-            // Mock Stock Check -> 0 available (stock 10, reserved 10)
-            mockSupabaseClient.single.mockResolvedValueOnce({
-                data: { stock_actual: 10, stock_reservado: 10 },
-                error: null
-            });
-
+        it('rechaza crear un pedido sin actor antes de consultar datos', async () => {
             await expect(service.create(createDto as any, tenantId))
-                .rejects.toThrow(BadRequestException);
+                .rejects.toThrow('No se pudo identificar al creador del pedido');
+
+            expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
         });
 
-        it('should handle floating point precision correctly', async () => {
-            // 0.1 + 0.2 case
+        it('mantiene precisión decimal en el payload transaccional', async () => {
             const dto = {
                 cliente_id: 'client-1',
                 detalle: [
@@ -159,79 +147,301 @@ describe('PedidosService', () => {
                 ],
             };
 
-            // 1. Mock Cliente
             mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'client-1' }, error: null });
-
-            // 2. Mock Stock (plenty) for 2 items
-            mockSupabaseClient.single
-                .mockResolvedValueOnce({ data: { stock_actual: 100, stock_reservado: 0 }, error: null })
-                .mockResolvedValueOnce({ data: { stock_actual: 100, stock_reservado: 0 }, error: null });
-
-            // 3. Mock Tax Calc
             mockTaxCalculator.calcularImpuestos.mockImplementation(async ({ subtotal }) => {
                 return { subtotal, igv: subtotal * 0.18, total: subtotal * 1.18 };
             });
-
-            // 4. Mock generarNumero
-            mockSupabaseClient.limit.mockResolvedValueOnce({ data: [], error: null });
-
-            // 5. Mock RPC creation
             mockSupabaseClient.rpc.mockResolvedValueOnce({ data: { pedido_id: 'pid' }, error: null });
-
-            // 6. Mock findOne
             mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'pid' }, error: null });
+            mockSupabaseClient.order.mockResolvedValueOnce({ data: [], error: null });
 
-            // 7. Mock findOne details
-            mockSupabaseClient.order
-                .mockReturnValueOnce(mockSupabaseClient)
-                .mockResolvedValueOnce({ data: [], error: null });
+            await service.create(dto as any, tenantId, userId);
 
-            await service.create(dto as any, tenantId);
-
-            // El subtotal debe ser exactamente 0.3, no 0.30000000000000004
             expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-                'crear_pedido_completo',
+                'crear_pedido_comercial_tx',
                 expect.objectContaining({
                     p_pedido: expect.objectContaining({ subtotal: 0.3 }),
                 }),
             );
         });
-    });
 
-    describe('numeración de documentos de venta', () => {
-        it('no reutiliza correlativos si el RPC quedó por detrás de documentos ya emitidos', async () => {
-            const query = {
-                select: jest.fn().mockReturnThis(),
-                eq: jest.fn().mockReturnThis(),
-                order: jest.fn().mockReturnThis(),
-                limit: jest.fn().mockResolvedValue({
-                    data: [{ tipo_documento: '03', numero: '00000004' }],
-                    error: null,
-                }),
-            };
-            const client = {
-                rpc: jest.fn().mockResolvedValue({ data: '00000001', error: null }),
-                from: jest.fn().mockReturnValue(query),
-            };
-
-            const result = await (service as any).obtenerSiguienteNumeroDocumentoSeguro(
-                client,
-                'tenant-123',
-                'BOLETA',
-                'B001',
+        it('no reporta fallo si el alta hizo commit y sólo falla la hidratación', async () => {
+            mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'client-1' }, error: null });
+            mockTaxCalculator.calcularImpuestos.mockResolvedValue({
+                subtotal: 100,
+                igv: 18,
+                total: 118,
+            });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: { pedido_id: 'pedido-commit' },
+                error: null,
+            });
+            jest.spyOn(service, 'findOne').mockRejectedValueOnce(
+                new Error('timeout de lectura post-commit'),
             );
 
-            expect(result).toBe('00000005');
-            expect(client.rpc).toHaveBeenCalledWith('obtener_siguiente_numero_documento', {
-                p_tenant_id: 'tenant-123',
-                p_tipo_documento: 'BOLETA',
-                p_serie: 'B001',
-            });
-            expect(query.eq).toHaveBeenCalledWith('serie', 'B001');
+            await expect(service.create(createDto as any, tenantId, userId)).resolves.toEqual(
+                expect.objectContaining({
+                    id: 'pedido-commit',
+                    tenant_id: tenantId,
+                    estado: 'PENDIENTE',
+                    detalle: [expect.objectContaining({ producto_id: 'prod-1' })],
+                }),
+            );
         });
     });
 
-    describe('Aislamiento multi-tenant (P2.2)', () => {
+    describe('confirmarPedido', () => {
+        const pedidoPendiente = {
+            id: 'pedido-1',
+            tenant_id: 'tenant-123',
+            cliente_id: 'cliente-1',
+            numero: 'PV-0001',
+            estado: 'PENDIENTE',
+            estado_credito: 'PENDIENTE',
+            detalle: [
+                { producto_id: 'prod-1', descripcion: 'Producto', cantidad: 2, precio_unitario: 10, subtotal: 20 },
+            ],
+        };
+
+        it('confirma con la política vigente y la reserva atómica sin reconocer ingreso', async () => {
+            jest.spyOn(service, 'findOne').mockResolvedValue(pedidoPendiente as any);
+            jest.spyOn(service as any, 'registrarAuditoriaAccion').mockResolvedValue(undefined);
+            jest.spyOn(service as any, 'enviarNotificacion').mockResolvedValue(undefined);
+            mockSupabaseClient.rpc
+                .mockResolvedValueOnce({
+                    data: {
+                        requiere_aprobacion: true,
+                        estado_credito: 'OBSERVADO',
+                        motivos: ['Excede límite'],
+                        usar_flujo_logistica: false,
+                        pedido_fingerprint: 'fp-pedido-1',
+                    },
+                    error: null,
+                })
+                .mockResolvedValueOnce({ data: true, error: null })
+                .mockResolvedValueOnce({
+                    data: {
+                        estado: 'LISTO_FACTURAR',
+                        reserva: { skipped: false, movimientos: [{ movimiento_id: 'mov-1' }] },
+                    },
+                    error: null,
+                });
+
+            const result = await service.confirmarPedido('pedido-1', 'tenant-123', 'user-1');
+
+            expect(result).toEqual(expect.objectContaining({
+                success: true,
+                confirmado: true,
+                estado_credito: 'APROBADO',
+            }));
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(3);
+            expect(mockSupabaseClient.rpc).toHaveBeenNthCalledWith(1, 'evaluar_politica_pedido_441', {
+                p_pedido_id: 'pedido-1',
+                p_tenant_id: 'tenant-123',
+            });
+            expect(mockSupabaseClient.rpc).toHaveBeenNthCalledWith(2, 'pedido_tiene_aprobacion_vigente', {
+                p_pedido_id: 'pedido-1',
+                p_tenant_id: 'tenant-123',
+            });
+            expect(mockSupabaseClient.rpc).toHaveBeenNthCalledWith(3, 'confirmar_pedido_tx', {
+                p_pedido_id: 'pedido-1',
+                p_tenant_id: 'tenant-123',
+                p_estado_credito: 'APROBADO',
+                p_estado_destino: 'LISTO_FACTURAR',
+                p_forzado: false,
+                p_requiere_aprobacion: true,
+                p_aprobado_por: null,
+                p_motivos: 'Excede límite',
+                p_expected_fingerprint: 'fp-pedido-1',
+                p_actor_id: 'user-1',
+            });
+            expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('productos');
+            expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('movimientos_almacen');
+            expect(mockEventBus.emitVentaProcessed).not.toHaveBeenCalled();
+        });
+
+        it('propaga el fallo de reserva transaccional sin intentar cambios parciales en JavaScript', async () => {
+            jest.spyOn(service, 'findOne').mockResolvedValue(pedidoPendiente as any);
+            mockSupabaseClient.rpc
+                .mockResolvedValueOnce({
+                    data: {
+                        requiere_aprobacion: false,
+                        estado_credito: 'OK',
+                        motivos: [],
+                        usar_flujo_logistica: true,
+                        pedido_fingerprint: 'fp-pedido-1',
+                    },
+                    error: null,
+                })
+                .mockResolvedValueOnce({
+                    data: null,
+                    error: { message: 'Stock insuficiente para completar reserva' },
+                });
+
+            await expect(
+                service.confirmarPedido('pedido-1', 'tenant-123', 'user-1'),
+            ).rejects.toThrow(BadRequestException);
+
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(2);
+            expect(mockSupabaseClient.rpc).toHaveBeenLastCalledWith(
+                'confirmar_pedido_tx',
+                expect.objectContaining({
+                    p_pedido_id: 'pedido-1',
+                    p_tenant_id: 'tenant-123',
+                    p_expected_fingerprint: 'fp-pedido-1',
+                }),
+            );
+            expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('productos');
+            expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('movimientos_almacen');
+            expect(mockEventBus.emitVentaProcessed).not.toHaveBeenCalled();
+        });
+
+        it('devuelve un outcome 2xx consumible si el pedido ya está pendiente de aprobación', async () => {
+            jest.spyOn(service, 'findOne').mockResolvedValue({
+                ...pedidoPendiente,
+                estado: 'PENDIENTE_APROBACION',
+                estado_credito: 'REVISION',
+                motivo_requiere_aprobacion: 'Excede el monto autorizado',
+            } as any);
+
+            await expect(
+                service.confirmarPedido('pedido-1', 'tenant-123', 'user-1'),
+            ).resolves.toEqual({
+                success: true,
+                confirmado: false,
+                requiere_aprobacion: true,
+                motivos: ['Excede el monto autorizado'],
+                estado_credito: 'REVISION',
+            });
+
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+        });
+
+        it('exige un actor trazable antes de consultar o confirmar', async () => {
+            await expect(
+                service.confirmarPedido('pedido-1', 'tenant-123'),
+            ).rejects.toThrow('confirmador');
+
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+        });
+
+        it('responde idempotentemente si el commit se perdió después de confirmar', async () => {
+            jest.spyOn(service, 'findOne').mockResolvedValue({
+                ...pedidoPendiente,
+                estado: 'LISTO_FACTURAR',
+                estado_credito: 'OK',
+                metadata: {
+                    confirmation_fingerprint: 'sha256-confirmado',
+                    confirmation_fingerprint_version: 2,
+                },
+            } as any);
+
+            await expect(
+                service.confirmarPedido('pedido-1', 'tenant-123', 'user-1'),
+            ).resolves.toEqual({ success: true, confirmado: true, estado_credito: 'OK' });
+
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+        });
+
+        it('deriva una excepción comercial a aprobación como outcome exitoso sin confirmar', async () => {
+            jest.spyOn(service, 'findOne').mockResolvedValue(pedidoPendiente as any);
+            const solicitarAprobacion = jest
+                .spyOn(service as any, 'registrarSolicitudAprobacion')
+                .mockResolvedValue(undefined);
+            jest.spyOn(service as any, 'enviarNotificacion').mockResolvedValue(undefined);
+            mockSupabaseClient.rpc
+                .mockResolvedValueOnce({
+                    data: {
+                        requiere_aprobacion: true,
+                        estado_credito: 'REVISION',
+                        motivos: ['Excede el monto autorizado'],
+                        usar_flujo_logistica: true,
+                        pedido_fingerprint: 'fp-aprobacion',
+                    },
+                    error: null,
+                })
+                .mockResolvedValueOnce({ data: false, error: null });
+
+            await expect(
+                service.confirmarPedido('pedido-1', 'tenant-123', 'user-1'),
+            ).resolves.toEqual({
+                success: true,
+                confirmado: false,
+                requiere_aprobacion: true,
+                motivos: ['Excede el monto autorizado'],
+                estado_credito: 'REVISION',
+            });
+
+            expect(solicitarAprobacion).toHaveBeenCalledWith(
+                pedidoPendiente,
+                'tenant-123',
+                ['Excede el monto autorizado'],
+                'REVISION',
+            );
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith(
+                'confirmar_pedido_tx',
+                expect.anything(),
+            );
+        });
+
+        it('bloquea por crédito sin crear una solicitud de aprobación comercial', async () => {
+            jest.spyOn(service, 'findOne').mockResolvedValue(pedidoPendiente as any);
+            const solicitarAprobacion = jest
+                .spyOn(service as any, 'registrarSolicitudAprobacion')
+                .mockResolvedValue(undefined);
+            jest.spyOn(service as any, 'enviarNotificacion').mockResolvedValue(undefined);
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: {
+                    requiere_aprobacion: true,
+                    estado_credito: 'BLOQUEADO',
+                    motivos: ['Cliente con documentos vencidos'],
+                    usar_flujo_logistica: true,
+                    pedido_fingerprint: 'fp-bloqueado',
+                },
+                error: null,
+            });
+
+            await expect(
+                service.confirmarPedido('pedido-1', 'tenant-123', 'user-1'),
+            ).rejects.toThrow('Crédito bloqueado');
+
+            expect(solicitarAprobacion).not.toHaveBeenCalled();
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith(
+                'solicitar_aprobacion_pedido_tx',
+                expect.anything(),
+            );
+        });
+
+    });
+
+    describe('update', () => {
+        it('no reporta fallo si el update hizo commit y sólo falla la hidratación', async () => {
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: {
+                    id: 'pedido-1',
+                    tenant_id: 'tenant-123',
+                    estado: 'PENDIENTE',
+                    observaciones: 'Nota confirmada',
+                },
+                error: null,
+            });
+            jest.spyOn(service, 'findOne').mockRejectedValueOnce(
+                new Error('timeout de lectura post-commit'),
+            );
+
+            await expect(
+                service.update('pedido-1', { notas: 'Nota confirmada' }, 'tenant-123'),
+            ).resolves.toEqual(expect.objectContaining({
+                id: 'pedido-1',
+                tenant_id: 'tenant-123',
+                observaciones: 'Nota confirmada',
+                detalle: [],
+            }));
+        });
+    });
+
+    describe('Aislamiento multi-tenant y límite de inventario', () => {
         it('debe validar cliente solo dentro del tenant del contexto', async () => {
             const tenantA = 'tenant-a';
             const createDto = {
@@ -251,7 +461,7 @@ describe('PedidosService', () => {
                 error: { message: 'No encontrado' },
             });
 
-            await expect(service.create(createDto as any, tenantA)).rejects.toThrow(NotFoundException);
+            await expect(service.create(createDto as any, tenantA, 'actor-a')).rejects.toThrow(NotFoundException);
 
             expect(mockSupabaseClient.from).toHaveBeenCalledWith('clientes');
             expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', tenantA);
@@ -270,7 +480,6 @@ describe('PedidosService', () => {
 
             mockSupabaseClient.single
                 .mockResolvedValueOnce({ data: { id: 'client-1' }, error: null })
-                .mockResolvedValueOnce({ data: { stock_actual: 20, stock_reservado: 10 }, error: null })
                 .mockResolvedValueOnce({ data: { id: 'new-pedido-id', estado: 'PENDIENTE' }, error: null });
 
             mockTaxCalculator.calcularImpuestos.mockResolvedValue({
@@ -279,40 +488,70 @@ describe('PedidosService', () => {
                 total: 118,
             });
 
-            mockSupabaseClient.limit.mockResolvedValueOnce({ data: [], error: null });
             mockSupabaseClient.rpc.mockResolvedValueOnce({ data: { pedido_id: 'new-pedido-id' }, error: null });
 
-            mockSupabaseClient.order
-                .mockReturnValueOnce(mockSupabaseClient)
-                .mockResolvedValueOnce({ data: [], error: null });
+            mockSupabaseClient.order.mockResolvedValueOnce({ data: [], error: null });
 
-            await service.create(createDto as any, tenantA);
+            await service.create(createDto as any, tenantA, 'actor-a');
 
             const [functionName, rpcPayload] = mockSupabaseClient.rpc.mock.calls[0];
-            expect(functionName).toBe('crear_pedido_completo');
+            expect(functionName).toBe('crear_pedido_comercial_tx');
             expect(rpcPayload).toEqual(
                 expect.objectContaining({
                     p_pedido: expect.objectContaining({
                         tenant_id: tenantA,
                         cliente_id: 'client-1',
+                        created_by: 'actor-a',
                     }),
                 }),
             );
             expect(rpcPayload.p_pedido.tenant_id).not.toBe('tenant-b');
         });
 
-        it('getStockDisponible debe filtrar stock por tenant', async () => {
-            mockSupabaseClient.single.mockResolvedValueOnce({
-                data: { stock_actual: 10, stock_reservado: 3 },
-                error: null,
-            });
+        it('delega a confirmar_pedido_tx la clasificación de servicios y productos sin stock', async () => {
+            jest.spyOn(service, 'findOne').mockResolvedValue({
+                id: 'pedido-servicios',
+                tenant_id: 'tenant-a',
+                numero: 'PV-0002',
+                estado: 'PENDIENTE',
+                detalle: [
+                    { producto_id: 'servicio-1', cantidad: 1, es_servicio: true },
+                    { producto_id: 'no-stock-1', cantidad: 1, controla_stock: false },
+                ],
+            } as any);
+            jest.spyOn(service as any, 'registrarAuditoriaAccion').mockResolvedValue(undefined);
+            jest.spyOn(service as any, 'enviarNotificacion').mockResolvedValue(undefined);
+            mockSupabaseClient.rpc
+                .mockResolvedValueOnce({
+                    data: {
+                        requiere_aprobacion: false,
+                        estado_credito: 'OK',
+                        motivos: [],
+                        usar_flujo_logistica: false,
+                        pedido_fingerprint: 'fp-servicios',
+                    },
+                    error: null,
+                })
+                .mockResolvedValueOnce({
+                    data: { estado: 'LISTO_FACTURAR', reserva: { skipped: true, movimientos: [] } },
+                    error: null,
+                });
 
-            const disponible = await (service as any).getStockDisponible('prod-1', 'tenant-a');
+            await expect(
+                service.confirmarPedido('pedido-servicios', 'tenant-a', 'actor-a'),
+            ).resolves.toEqual({ success: true, confirmado: true, estado_credito: 'OK' });
 
-            expect(disponible).toBe(7);
-            expect(mockSupabaseClient.from).toHaveBeenCalledWith('productos');
-            expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', 'tenant-a');
-            expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', 'prod-1');
+            expect(mockSupabaseClient.rpc).toHaveBeenLastCalledWith(
+                'confirmar_pedido_tx',
+                expect.objectContaining({
+                    p_pedido_id: 'pedido-servicios',
+                    p_tenant_id: 'tenant-a',
+                    p_expected_fingerprint: 'fp-servicios',
+                }),
+            );
+            expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('productos');
+            expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('movimientos_almacen');
+            expect(mockEventBus.emitVentaProcessed).not.toHaveBeenCalled();
         });
     });
 });

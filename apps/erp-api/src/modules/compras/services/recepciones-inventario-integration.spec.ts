@@ -1,26 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
 import { RecepcionesService } from './recepciones.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
-import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 
 /**
  * Integración Recepciones <-> Inventario.
  *
  * NOTA (refactor C-004, 2026-05-27): el cierre de recepción dejó de orquestar
  * el inventario con N escrituras secuenciales en JS y ahora delega TODO a la
- * RPC transaccional `cerrar_recepcion_tx` (migración 338), que en una sola
+ * RPC transaccional `cerrar_recepcion_tx` (migración 440), que en una sola
  * transacción: ingresa stock por item (reusando `registrar_movimiento_almacen`),
  * actualiza cantidad_recibida en los detalles, recalcula el estado de la OC y
- * cierra la recepción — con rollback total si algo falla.
+ * cierra la recepción, además de insertar el outbox `recepcion.registrada` — con
+ * rollback total si algo falla.
  *
  * Por eso la verificación de stock/existencias real ya NO se hace con mocks
  * aquí (sería un mock probando un mock): se valida con smoke SQL contra una BD
  * real (ver `docs/CURRENT_STATE.md`). Estos tests
  * cubren el CONTRATO de integración del lado del backend: que la RPC se invoque
- * correctamente y que sus movimientos se propaguen a los eventos contables.
+ * correctamente y que el servicio no duplique en caliente los efectos ya
+ * persistidos dentro del commit.
  */
 describe('RecepcionesService - Inventario Integration (RPC cerrar_recepcion_tx)', () => {
   let recepcionesService: RecepcionesService;
@@ -77,7 +77,6 @@ describe('RecepcionesService - Inventario Integration (RPC cerrar_recepcion_tx)'
           },
         },
         { provide: AuditService, useValue: { registrarCambio: jest.fn() } },
-        { provide: EventEmitterService, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
@@ -91,8 +90,6 @@ describe('RecepcionesService - Inventario Integration (RPC cerrar_recepcion_tx)'
     jest.clearAllMocks();
     mockClient.single.mockResolvedValue({ data: { id: mockOrdenId, proveedor: {} }, error: null });
     mockClient.rpc.mockResolvedValue({ data: { movimientos: [] }, error: null });
-    // Aislar la emisión del evento canónico de recepción (se prueba en el unit spec).
-    jest.spyOn(recepcionesService as any, 'emitirEventoRecepcionRegistrada').mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -117,7 +114,7 @@ describe('RecepcionesService - Inventario Integration (RPC cerrar_recepcion_tx)'
     );
   });
 
-  it('propaga los movimientos creados por la RPC a MovimientoStockEvent (asiento de entrada)', async () => {
+  it('no duplica en EventBus los movimientos ni el evento durable creados dentro de la RPC', async () => {
     jest.spyOn(recepcionesService, 'obtenerRecepcionPorId').mockResolvedValue(baseRecepcion as any);
     mockClient.rpc.mockResolvedValueOnce({
       data: {
@@ -130,34 +127,42 @@ describe('RecepcionesService - Inventario Integration (RPC cerrar_recepcion_tx)'
       },
       error: null,
     });
-    // orden (evento) + producto (cálculo del valor del movimiento)
-    mockClient.single
-      .mockResolvedValueOnce({ data: { id: mockOrdenId, numero: 'OC-2025-0001', proveedor: {} }, error: null })
-      .mockResolvedValueOnce({ data: { stock_actual: 10, precio_compra: 8.5 }, error: null });
 
     await recepcionesService.cerrarRecepcion(mockRecepcionId, mockTenantId, {}, mockUserId);
 
-    expect(eventBusService.emitMovimientoStock).toHaveBeenCalledTimes(1);
-    expect(eventBusService.emitMovimientoStock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        movimientoId: 'mov-1',
-        productoId: mockProductoId,
-        tipoMovimiento: 'ENTRADA',
-        cantidad: 10,
-        valor: 85,
-      }),
-      mockTenantId,
-    );
+    expect(eventBusService.emitMovimientoStock).not.toHaveBeenCalled();
+    expect(eventBusService.emitRecepcionRegistrada).not.toHaveBeenCalled();
+    expect(eventBusService.emitCompraEntregada).not.toHaveBeenCalled();
+    expect(mockClient.from).not.toHaveBeenCalledWith('productos');
+    expect(mockClient.from).not.toHaveBeenCalledWith('movimientos_almacen');
   });
 
-  it('no invoca la RPC si la recepción no está en BORRADOR', async () => {
-    jest
-      .spyOn(recepcionesService, 'obtenerRecepcionPorId')
-      .mockResolvedValue({ ...baseRecepcion, estado: 'CERRADA' } as any);
+  it('delega a la RPC el reintento idempotente de una recepción ya CERRADA', async () => {
+    const recepcionCerrada = { ...baseRecepcion, estado: 'CERRADA' };
+    jest.spyOn(recepcionesService, 'obtenerRecepcionPorId').mockResolvedValue(recepcionCerrada as any);
+    mockClient.rpc.mockResolvedValueOnce({
+      data: {
+        id: mockRecepcionId,
+        recepcion_id: mockRecepcionId,
+        numero: 'REC-2025-0001',
+        orden_id: mockOrdenId,
+        estado: 'CERRADA',
+        idempotent: true,
+        movimientos: [],
+      },
+      error: null,
+    });
 
     await expect(
       recepcionesService.cerrarRecepcion(mockRecepcionId, mockTenantId, {}, mockUserId),
-    ).rejects.toThrow(BadRequestException);
-    expect(mockClient.rpc).not.toHaveBeenCalled();
+    ).resolves.toEqual(recepcionCerrada);
+    expect(mockClient.rpc).toHaveBeenCalledWith('cerrar_recepcion_tx', {
+      p_recepcion_id: mockRecepcionId,
+      p_tenant_id: mockTenantId,
+      p_user_id: mockUserId,
+      p_observaciones: null,
+    });
+    expect(eventBusService.emitMovimientoStock).not.toHaveBeenCalled();
+    expect(eventBusService.emitRecepcionRegistrada).not.toHaveBeenCalled();
   });
 });

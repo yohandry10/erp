@@ -23,7 +23,8 @@ interface CuentaBancaria {
   moneda: string;
   saldo?: number;
   saldo_actual?: number;
-  activo: boolean;
+  activa?: boolean;
+  activo?: boolean;
 }
 
 interface PagoProveedorModalProps {
@@ -35,6 +36,13 @@ interface PagoProveedorModalProps {
   moneda: string;
   onPagoSuccess: () => void;
 }
+
+const createPaymentIntentKey = (prefix: string) => {
+  const randomPart = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}:${randomPart}`;
+};
 
 export default function PagoProveedorModal({
   isOpen,
@@ -61,6 +69,7 @@ export default function PagoProveedorModal({
   const [cuentaBancariaId, setCuentaBancariaId] = useState<string>('');
   const [referencia, setReferencia] = useState<string>('');
   const [observaciones, setObservaciones] = useState<string>('');
+  const [idempotencyKey, setIdempotencyKey] = useState(() => createPaymentIntentKey(`cxp-pago:${cxpId}`));
 
   const getSaldoCuenta = (cuenta: CuentaBancaria) => Number(cuenta.saldo ?? cuenta.saldo_actual ?? 0);
 
@@ -70,7 +79,8 @@ export default function PagoProveedorModal({
     try {
       const data = await get('/api/finanzas/bancos/cuentas');
       const cuentas = (data.data || []).filter(
-        (cuenta: CuentaBancaria) => cuenta.activo && cuenta.moneda === moneda
+        (cuenta: CuentaBancaria) =>
+          (cuenta.activa === true || cuenta.activo === true) && cuenta.moneda === moneda
       );
       setCuentasBancarias(cuentas);
 
@@ -90,6 +100,12 @@ export default function PagoProveedorModal({
       setMonto(saldoPendiente.toString());
     }
   }, [isOpen, loadCuentasBancarias, saldoPendiente]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIdempotencyKey(createPaymentIntentKey(`cxp-pago:${cxpId}`));
+    }
+  }, [isOpen, cxpId, monto, fechaPago, metodoPago, cuentaBancariaId, referencia, observaciones]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,8 +133,18 @@ export default function PagoProveedorModal({
       return;
     }
 
-    // Check if selected account has sufficient balance for TRANSFERENCIA or CHEQUE
-    if ((metodoPago === 'TRANSFERENCIA' || metodoPago === 'CHEQUE') && cuentaBancariaId) {
+    const requiereBanco = metodoPago !== 'EFECTIVO';
+    if (requiereBanco && !cuentaBancariaId) {
+      setError('Seleccione una cuenta bancaria para el medio de pago elegido');
+      return;
+    }
+    if (requiereBanco && !referencia.trim()) {
+      setError('Ingrese la referencia de la operacion bancaria');
+      return;
+    }
+
+    // Check if selected account has sufficient balance for a bank-backed payment.
+    if (requiereBanco && cuentaBancariaId) {
       const cuentaSeleccionada = cuentasBancarias.find((cuenta) => cuenta.id === cuentaBancariaId);
       const saldoCuenta = cuentaSeleccionada ? getSaldoCuenta(cuentaSeleccionada) : 0;
       if (cuentaSeleccionada && saldoCuenta < montoNum) {
@@ -134,10 +160,10 @@ export default function PagoProveedorModal({
         monto: montoNum,
         fecha_pago: fechaPago,
         metodo_pago: metodoPago,
-        idempotency_key: `cxp-pago:${cxpId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
+        idempotency_key: idempotencyKey,
       };
 
-      if (cuentaBancariaId) {
+      if (requiereBanco && cuentaBancariaId) {
         payload.cuenta_bancaria_id = cuentaBancariaId;
       }
 
@@ -189,7 +215,7 @@ export default function PagoProveedorModal({
     setMonto(saldoPendiente.toString());
   };
 
-  const requiresCuentaBancaria = metodoPago === 'TRANSFERENCIA' || metodoPago === 'CHEQUE';
+  const requiresCuentaBancaria = metodoPago !== 'EFECTIVO';
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -304,7 +330,7 @@ export default function PagoProveedorModal({
                 </div>
               ) : cuentasBancarias.length === 0 ? (
                 <div className="text-sm text-amber-400 bg-amber-500/10 border border-amber-200 rounded-lg p-3">
-                  No hay cuentas bancarias activas en {moneda}. Puede continuar sin seleccionar una cuenta.
+                  No hay cuentas bancarias activas en {moneda}. Registre o active una cuenta para usar este medio.
                 </div>
               ) : (
                 <select
@@ -329,7 +355,7 @@ export default function PagoProveedorModal({
           <div>
             <label htmlFor="cxp-pago-referencia" className="block text-sm font-medium text-foreground/85 mb-2">
               <FileText className="inline h-4 w-4 mr-1" />
-              Número de Referencia
+              Número de Referencia {requiresCuentaBancaria && '*'}
             </label>
             <input
               id="cxp-pago-referencia"
@@ -338,6 +364,7 @@ export default function PagoProveedorModal({
               onChange={(e) => setReferencia(e.target.value)}
               placeholder="Ej: OP-2025-001234, Cheque #12345"
               className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required={requiresCuentaBancaria}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Número de operación, cheque, etc.

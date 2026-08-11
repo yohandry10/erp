@@ -6,10 +6,9 @@ import { CacheModule } from '../../shared/cache/cache.module';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { CpeModule } from '../cpe/cpe.module';
-import { CxcModule } from '../finanzas/cxc/cxc.module';
 
 @Module({
-  imports: [SupabaseModule, CacheModule, AuthModule, PermissionsModule, CpeModule, CxcModule],
+  imports: [SupabaseModule, CacheModule, AuthModule, PermissionsModule, CpeModule],
   controllers: [DocumentosController],
   providers: [DocumentosService],
   exports: [DocumentosService]

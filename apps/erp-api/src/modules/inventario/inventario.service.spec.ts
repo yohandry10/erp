@@ -338,4 +338,80 @@ describe('InventarioService', () => {
         });
     });
 
+
+    describe('obtenerKardexValorizado canónico', () => {
+        it('aplica producto, almacén y fechas una sola vez en la RPC canónica', async () => {
+            const payload = {
+                success: true,
+                data: [
+                    {
+                        id: 'mov-1',
+                        tipo: 'DEVOLUCION',
+                        sentido: 'SALIDA',
+                        cantidad: 1,
+                        cantidadFirmada: -1,
+                        costoUnitario: 20,
+                        valorTotal: 20,
+                        moneda: 'PEN',
+                        valuacionEstado: 'CONFIRMADA',
+                    },
+                ],
+                resumen: {
+                    totalMovimientos: 7,
+                    totalEntradas: 13,
+                    totalSalidas: 2,
+                    saldoCantidad: 11,
+                    valorPorMoneda: { PEN: 200, USD: 5 },
+                    pendientesValorizacion: 1,
+                    saldoValorizadoBase: null,
+                },
+            };
+            mockSupabaseClient.rpc.mockResolvedValueOnce({ data: payload, error: null });
+            jest.spyOn(service as any, 'registrarIntegrationLog').mockResolvedValue(undefined);
+
+            const resultado = await service.obtenerKardexValorizado('tenant-a', {
+                productoId: 'producto-a',
+                almacenId: 'almacen-a',
+                desde: '2026-08-01',
+                hasta: '2026-08-10',
+                limit: 2,
+            });
+
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('reporte_kardex_valorizado_470', {
+                p_tenant_id: 'tenant-a',
+                p_producto_id: 'producto-a',
+                p_almacen_id: 'almacen-a',
+                p_desde: '2026-08-01',
+                p_hasta: '2026-08-10',
+                p_limit: 2,
+            });
+            expect(resultado).toEqual(payload);
+            expect(resultado.resumen.totalMovimientos).toBe(7);
+            expect(resultado.data).toHaveLength(1);
+            expect(resultado.resumen.saldoValorizadoBase).toBeNull();
+        });
+
+        it('falla cerrado si SQL no entrega detalle y resumen', async () => {
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: { success: true },
+                error: null,
+            });
+
+            await expect(
+                service.obtenerKardexValorizado('tenant-a'),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('rechaza una fecha inválida sin ejecutar el reporte sin filtro', async () => {
+            jest.spyOn(service as any, 'registrarIntegrationLog').mockResolvedValue(undefined);
+
+            await expect(
+                service.obtenerKardexValorizado('tenant-a', { desde: '2026-02-30' }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+        });
+    });
+
 });

@@ -1,12 +1,10 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { AuditService } from '../../audit/audit.service';
 import { CreateClienteDto, UpdateClienteDto, ValidarRucDto } from './dto';
 import { Cliente } from './entities/cliente.entity';
 import { validarDocumentoIdentidad, validarRucPeru } from '../../../shared/utils/documento-identidad-peru.util';
 import { validateArgentinaTaxId } from '../../fiscal/arca-fiscal.service';
 import { validateColombiaNit } from '../../paises/initial-country';
-import axios from 'axios';
 
 function validarDocumentoCliente(tipo: string, numero: string) {
   if (tipo === 'CUIT') {
@@ -42,7 +40,6 @@ function validarDocumentoCliente(tipo: string, numero: string) {
 export class ClientesService {
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -53,10 +50,9 @@ export class ClientesService {
   async create(createClienteDto: CreateClienteDto, tenantId: string, userId?: string): Promise<Cliente> {
     const client = this.supabase.getClient();
     const documentoTexto = String(createClienteDto.documento_numero || '').trim();
-    const documentoNumero = this.toSafeIntegerDocument(documentoTexto);
 
-    if (!/^\d+$/.test(documentoTexto)) {
-      throw new BadRequestException('El número de documento debe ser numérico');
+    if (!userId) {
+      throw new BadRequestException('Se requiere un usuario autenticado para crear el cliente');
     }
 
     // El documento del cliente termina en el comprobante: un RUC con dígito
@@ -70,63 +66,15 @@ export class ClientesService {
       throw new BadRequestException(validacionDocumento.error);
     }
 
-    // Validar duplicados por documento textual. RUC de 11 dígitos excede integer, por eso no se filtra solo por numero_documento.
-    const { data: existingCliente } = await client
-      .from('clientes')
-      .select('id, numero_documento, codigo, ruc')
-      .eq('tenant_id', tenantId)
-      .or(`codigo.eq.${documentoTexto},ruc.eq.${documentoTexto}`)
-      .maybeSingle();
-
-    if (existingCliente) {
-      throw new ConflictException(
-        `Ya existe un cliente con el ${createClienteDto.documento_tipo} ${createClienteDto.documento_numero}`
-      );
-    }
-
-    // Crear cliente usando solo columnas reales del esquema runtime.
-    const insertData = {
-      tenant_id: tenantId,
-      tipo: createClienteDto.tipo, // PERSONA o EMPRESA
-      tipo_documento: createClienteDto.documento_tipo,
-      documento_tipo: createClienteDto.documento_tipo,
-      documento_numero: documentoNumero,
-      numero_documento: documentoNumero,
-      razon_social: createClienteDto.razon_social,
-      nombre: createClienteDto.razon_social,
-      nombre_comercial: createClienteDto.nombre_comercial?.trim() || null,
-      codigo: documentoTexto,
-      direccion: createClienteDto.direccion || null,
-      email: createClienteDto.email || null,
-      telefono: createClienteDto.telefono?.trim() || null,
-      ruc: ['RUC', 'CUIT', 'NIT'].includes(createClienteDto.documento_tipo) ? documentoTexto : null,
-      activo: true,
-    };
-
-    const { data, error} = await client
-      .from('clientes')
-      .insert(insertData)
-      .select()
-      .single();
-
+    const { data, error } = await client.rpc('crear_cliente_maestro_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: userId,
+      p_cliente: createClienteDto,
+    });
     if (error) {
-      console.error('Error creating cliente:', error);
-      throw new BadRequestException('Error al crear el cliente');
+      this.throwMasterError(error, 'cliente');
     }
-
-    console.log('✅ [ClientesService] Cliente creado:', data.id);
-    if (userId) {
-      await this.auditService.registrarCambio(
-        'clientes',
-        'INSERT',
-        userId,
-        { new: data },
-        tenantId,
-        data.id,
-        { accion: 'CREAR_CLIENTE' },
-      ).catch((error) => console.warn('⚠️ No se pudo registrar auditoría de creación de cliente:', error));
-    }
-    return data;
+    return this.conDocumentoTextual(data as Record<string, any>) as Cliente;
   }
 
   /**
@@ -262,96 +210,30 @@ export class ClientesService {
    */
   async update(id: string, updateClienteDto: UpdateClienteDto, tenantId: string, userId?: string): Promise<Cliente> {
     const client = this.supabase.getClient();
-
-    // Verificar que el cliente existe
     const previousCliente = await this.findOne(id, tenantId);
-
-    const updateData: Record<string, any> = {};
-
-    if (updateClienteDto.tipo !== undefined) updateData.tipo = updateClienteDto.tipo;
-    if (updateClienteDto.documento_tipo !== undefined) {
-      updateData.tipo_documento = updateClienteDto.documento_tipo;
-      updateData.documento_tipo = updateClienteDto.documento_tipo;
+    if (!userId) {
+      throw new BadRequestException('Se requiere un usuario autenticado para editar el cliente');
     }
-    if (updateClienteDto.documento_numero !== undefined) {
-      const documentoTexto = String(updateClienteDto.documento_numero || '').trim();
-      if (!/^\d+$/.test(documentoTexto)) {
-        throw new BadRequestException('El número de documento debe ser numérico');
-      }
-      const documentoNumero = this.toSafeIntegerDocument(documentoTexto);
-      const tipoDocumento = updateClienteDto.documento_tipo || previousCliente.documento_tipo || (previousCliente as any).tipo_documento;
-
-      // Misma validación que en el alta: editar el documento no puede saltarse
-      // las reglas del Catálogo 06.
-      const validacionDocumento = validarDocumentoCliente(tipoDocumento, documentoTexto);
-      if (!validacionDocumento.valido) {
-        throw new BadRequestException(validacionDocumento.error);
-      }
-
-      updateData.documento_numero = documentoNumero;
-      updateData.numero_documento = documentoNumero;
-      updateData.codigo = documentoTexto;
-      updateData.ruc = ['RUC', 'CUIT', 'NIT'].includes(tipoDocumento) ? documentoTexto : null;
+    const documentoTexto = String(
+      updateClienteDto.documento_numero ?? previousCliente.documento_numero ?? '',
+    ).trim();
+    const tipoDocumento = updateClienteDto.documento_tipo
+      ?? previousCliente.documento_tipo
+      ?? (previousCliente as any).tipo_documento;
+    const validacionDocumento = validarDocumentoCliente(tipoDocumento, documentoTexto);
+    if (!validacionDocumento.valido) {
+      throw new BadRequestException(validacionDocumento.error);
     }
-    if (updateClienteDto.razon_social !== undefined) {
-      updateData.razon_social = updateClienteDto.razon_social;
-      updateData.nombre = updateClienteDto.razon_social;
-    }
-    if (updateClienteDto.nombre_comercial !== undefined) {
-      updateData.nombre_comercial = updateClienteDto.nombre_comercial?.trim() || null;
-    }
-    if (updateClienteDto.direccion !== undefined) updateData.direccion = updateClienteDto.direccion || null;
-    if (updateClienteDto.email !== undefined) updateData.email = updateClienteDto.email || null;
-    if (updateClienteDto.telefono !== undefined) updateData.telefono = updateClienteDto.telefono?.trim() || null;
-
-    // Si se está actualizando el documento, validar duplicados usando el documento textual canónico.
-    if (updateClienteDto.documento_numero) {
-      const documentoTexto = String(updateClienteDto.documento_numero).trim();
-      const { data: existingCliente } = await client
-        .from('clientes')
-        .select('id, numero_documento, codigo, ruc')
-        .eq('tenant_id', tenantId)
-        .or(`codigo.eq.${documentoTexto},ruc.eq.${documentoTexto}`)
-        .neq('id', id)
-        .maybeSingle();
-
-      if (existingCliente) {
-        throw new ConflictException(
-          `Ya existe otro cliente con el documento ${updateClienteDto.documento_numero}`
-        );
-      }
-    }
-
-    // Actualizar cliente
-    const { data, error } = await client
-      .from('clientes')
-      .update({
-        ...updateData,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-
+    const { data, error } = await client.rpc('actualizar_cliente_maestro_tx', {
+      p_cliente_id: id,
+      p_tenant_id: tenantId,
+      p_actor_id: userId,
+      p_cambios: updateClienteDto,
+    });
     if (error) {
-      console.error('Error updating cliente:', error);
-      throw new BadRequestException('Error al actualizar el cliente');
+      this.throwMasterError(error, 'cliente');
     }
-
-    console.log('✅ [ClientesService] Cliente actualizado:', id);
-    if (userId) {
-      await this.auditService.registrarCambio(
-        'clientes',
-        'UPDATE',
-        userId,
-        { old: previousCliente as any, new: data },
-        tenantId,
-        id,
-        { accion: 'EDITAR_CLIENTE' },
-      ).catch((error) => console.warn('⚠️ No se pudo registrar auditoría de edición de cliente:', error));
-    }
-    return data;
+    return this.conDocumentoTextual(data as Record<string, any>) as Cliente;
   }
 
   /**
@@ -359,55 +241,30 @@ export class ClientesService {
    * Verifica dependencias antes de eliminar
    * Requirements: 1.8
    */
-  async delete(id: string, tenantId: string): Promise<void> {
+  async delete(id: string, tenantId: string, userId?: string): Promise<void> {
     const client = this.supabase.getClient();
-
-    // Verificar que el cliente existe
-    await this.findOne(id, tenantId);
-
-    // HARDENING multi-tenant: dependencias deben filtrarse por tenant_id
-    // para no revelar existencia de cotizaciones/pedidos de otros tenants
-    // que casualmente referencien el mismo cliente_id (vía service_role).
-    const { data: cotizaciones } = await client
-      .from('cotizaciones')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('cliente_id', id)
-      .limit(1);
-
-    if (cotizaciones && cotizaciones.length > 0) {
-      throw new BadRequestException(
-        'No se puede eliminar el cliente porque tiene cotizaciones asociadas'
-      );
+    if (!userId) {
+      throw new BadRequestException('Se requiere un usuario autenticado para desactivar el cliente');
     }
-
-    // Verificar dependencias en pedidos
-    const { data: pedidos } = await client
-      .from('pedidos_venta')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('cliente_id', id)
-      .limit(1);
-
-    if (pedidos && pedidos.length > 0) {
-      throw new BadRequestException(
-        'No se puede eliminar el cliente porque tiene pedidos asociados'
-      );
-    }
-
-    // Eliminar cliente
-    const { error } = await client
-      .from('clientes')
-      .delete()
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
-
+    const { error } = await client.rpc('desactivar_cliente_maestro_tx', {
+      p_cliente_id: id,
+      p_tenant_id: tenantId,
+      p_actor_id: userId,
+    });
     if (error) {
-      console.error('Error deleting cliente:', error);
-      throw new BadRequestException('Error al eliminar el cliente');
+      this.throwMasterError(error, 'cliente');
     }
+  }
 
-    console.log('✅ [ClientesService] Cliente eliminado:', id);
+  private throwMasterError(error: any, entity: 'cliente'): never {
+    const message = String(error?.message || '');
+    if (error?.code === '23505' || message.includes('IDENTITY_CONFLICT')) {
+      throw new ConflictException('Ya existe otro cliente con esa identidad');
+    }
+    if (error?.code === 'P0002' || message.includes('NOT_FOUND')) {
+      throw new NotFoundException('Cliente no encontrado');
+    }
+    throw new BadRequestException(`No se pudo guardar el ${entity}`);
   }
 
   /**
