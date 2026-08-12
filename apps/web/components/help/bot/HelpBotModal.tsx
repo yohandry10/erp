@@ -4,6 +4,7 @@ import { X, Send, Loader2 } from 'lucide-react'
 import { HelpBotMessage as MessageType, HelpSuggestion } from './types'
 import { HelpBotMessage } from './HelpBotMessage'
 import { HelpBotSuggestions } from './HelpBotSuggestions'
+import { GuiaDeModulo, GuiaModulo } from '../module-guide'
 import { useRef, useEffect } from 'react'
 
 interface HelpBotModalProps {
@@ -17,6 +18,7 @@ interface HelpBotModalProps {
   onSuggestionSelect: (pregunta: string) => void
   isLoading: boolean
   isSuggestionsLoading: boolean
+  guiaModulo?: GuiaModulo | null
 }
 
 export function HelpBotModal({
@@ -30,6 +32,7 @@ export function HelpBotModal({
   onSuggestionSelect,
   isLoading,
   isSuggestionsLoading,
+  guiaModulo = null,
 }: HelpBotModalProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -83,6 +86,7 @@ export function HelpBotModal({
             <p className="m-0 text-sm text-foreground/80">
               ¡Hola! Soy tu asistente. ¿En qué puedo ayudarte?
             </p>
+            <GuiaDeModulo guia={guiaModulo} />
             <HelpBotSuggestions
               suggestions={suggestions}
               onSelect={onSuggestionSelect}

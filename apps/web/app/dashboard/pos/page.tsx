@@ -1797,7 +1797,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                 </p>
                 {hayCajasDisponibles ? (
                   <button
-                    onClick={abrirCaja}
+                    onClick={abrirCaja} data-tour="btn-abrir-caja"
                     className="flex w-full items-center justify-center gap-3 rounded-xl border border-cyan-300/30 bg-blue-700 bg-gradient-to-br from-blue-700 to-cyan-700 px-8 py-6 text-lg font-bold text-white shadow-[0_20px_45px_rgba(37,99,235,0.26)] transition hover:brightness-110"
                   >
                     <CircleDollarSign className="h-5 w-5" />
@@ -1904,7 +1904,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button type="button" variant="outline" size="sm" className="gap-2" aria-label="Operación de caja">
+                    <Button type="button" variant="outline" size="sm" className="gap-2" aria-label="Operación de caja" data-tour="btn-cerrar-caja">
                       <WalletCards className="h-4 w-4" />
                       <span className="hidden sm:inline">Caja</span>
                       <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1984,7 +1984,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                     <input
                       ref={busquedaInputRef}
                       id="pos-busqueda"
-                      name="pos-busqueda"
+                      name="pos-busqueda" data-tour="input-buscar-producto"
                       type="text"
                       placeholder="Buscar por nombre, código o código de barras"
                       value={busqueda}
@@ -2159,7 +2159,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
             </div>
 
             {/* Venta activa: único panel persistente a la derecha. */}
-            <div
+            <div data-tour="carrito"
               className={`${posPanelClass} flex min-w-0 flex-col overflow-hidden xl:sticky ${modoCajaEnfocado ? 'xl:top-3' : 'xl:top-4'}`}
             >
               {/* Header del Carrito */}
@@ -2389,7 +2389,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                     type="button"
                     size="lg"
                     className="mt-2 min-h-12 w-full justify-between text-base"
-                    onClick={() => setMostrarCheckout(true)}
+                    onClick={() => setMostrarCheckout(true)} data-tour="btn-procesar-venta"
                     disabled={!clienteSeleccionado}
                   >
                     <span className="flex items-center gap-2"><WalletCards className="h-5 w-5" /> Cobrar</span>

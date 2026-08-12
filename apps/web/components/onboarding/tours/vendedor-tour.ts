@@ -46,7 +46,8 @@ export const vendedorTour: OnboardingTour = {
     {
       id: 'facturas',
       tipo: 'spotlight',
-      selector: '[data-tour="menu-facturas"]',
+      // No existe un menu "Facturas": los comprobantes viven en Documentos.
+      selector: '[data-tour="menu-documentos"]',
       titulo: 'Facturación',
       descripcion: 'Genera los comprobantes electrónicos habilitados y procésalos con la autoridad fiscal del tenant.',
       posicion: 'right',
