@@ -20,5 +20,6 @@ export type {
 export { getHelpItem, getHelpByModule } from './help-data'
 
 // Ficha por pantalla ("¿Qué hace esta pantalla?")
-export { getGuiaPorRuta, guias } from './module-guide'
-export type { GuiaModulo } from './module-guide'
+export { getGuiaPorRuta, guias, agruparGuias } from './module-guide'
+export { CatalogoModulos } from './module-guide/CatalogoModulos'
+export type { GuiaModulo, GrupoGuias } from './module-guide'
