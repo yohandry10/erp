@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { EmpresaConfigProvider } from "@/hooks/use-empresa-config";
 import { useAuth } from "@/contexts/AuthContext";
 import { DemoBanner } from "@/components/demo/DemoBanner";
-import { HelpBot } from "@/components/help";
+import { CentroAyuda } from "@/components/help";
 import { OnboardingProvider } from "@/components/onboarding";
 import { DashboardThemeToggle } from "@/components/ui/dashboard-theme-toggle";
 import { useCountryContext } from "@/hooks/use-country-context";
@@ -161,8 +161,8 @@ export default function DashboardLayout({
             </main>
           </div>
 
-          {/* 🤖 Bot de Ayuda - Disponible en todo el dashboard */}
-          <HelpBot />
+          {/* Centro de ayuda contextual: botón flotante, se abre solo si se pide */}
+          <CentroAyuda />
         </div>
       </OnboardingProvider>
     </EmpresaConfigProvider>

@@ -5,7 +5,6 @@ import { GuiaModulo } from './types'
 
 export type { GuiaModulo }
 export { guias }
-export { GuiaDeModulo } from './GuiaDeModulo'
 
 /**
  * Devuelve la ficha de la ruta actual buscando el prefijo más largo que
