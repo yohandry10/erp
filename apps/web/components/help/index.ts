@@ -3,21 +3,22 @@ export { HelpIcon } from './HelpIcon'
 export { FieldHelp } from './FieldHelp'
 export { HelpTooltipContent } from './HelpTooltip'
 
-// Componentes Bot
-export { HelpBot } from './bot'
+// Centro de ayuda contextual (botón flotante + panel navegable, sin chat)
+export { CentroAyuda } from './panel'
+export type { TemaAyuda } from './panel'
 
 // Tipos
-export type { 
-  HelpItem, 
-  HelpModule, 
+export type {
+  HelpItem,
+  HelpModule,
   TooltipPosition,
   HelpIconProps,
-  FieldHelpProps 
+  FieldHelpProps
 } from './types'
 
 // Datos
 export { getHelpItem, getHelpByModule } from './help-data'
 
 // Ficha por pantalla ("¿Qué hace esta pantalla?")
-export { GuiaDeModulo, getGuiaPorRuta, guias } from './module-guide'
+export { getGuiaPorRuta, guias } from './module-guide'
 export type { GuiaModulo } from './module-guide'
