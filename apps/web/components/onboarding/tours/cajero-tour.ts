@@ -36,12 +36,13 @@ export const cajeroTour: OnboardingTour = {
       posicion: 'left',
     },
     {
+      // Sin spotlight a proposito: los medios de pago viven dentro del dialogo
+      // de cobro, que no esta en pantalla mientras corre el tour. Un selector
+      // aqui no iluminaria nada.
       id: 'metodo-pago',
-      tipo: 'spotlight',
-      selector: '[data-tour="metodo-pago"]',
+      tipo: 'modal',
       titulo: 'Método de Pago',
-      descripcion: 'Selecciona cómo pagará el cliente: efectivo, tarjeta, transferencia, etc.',
-      posicion: 'top',
+      descripcion: 'Al presionar Cobrar se abre el diálogo de pago, donde eliges cómo paga el cliente: efectivo, tarjeta, transferencia o Yape/Plin. Puedes combinar varios medios en una misma venta, y si cobras en efectivo el sistema calcula el vuelto.',
     },
     {
       id: 'procesar-venta',
@@ -56,7 +57,7 @@ export const cajeroTour: OnboardingTour = {
       tipo: 'spotlight',
       selector: '[data-tour="btn-cerrar-caja"]',
       titulo: 'Cerrar Caja',
-      descripcion: 'Al final de tu turno, cierra la caja declarando el efectivo final para cuadrar.',
+      descripcion: 'Al final de tu turno, abre este menú de Caja y elige cerrar. Declaras el efectivo final y el sistema te dice si hay sobrante o faltante.',
       posicion: 'bottom',
     },
     {

@@ -6,6 +6,8 @@ import { HelpBotModal } from './HelpBotModal'
 import { HelpBotMessage, HelpSearchResult, HelpSuggestion } from './types'
 import { useTenant } from '@/contexts/TenantContext'
 import { fetchApi } from '@/lib/api-fetch'
+import { usePathname } from 'next/navigation'
+import { getGuiaPorRuta } from '../module-guide'
 
 export function HelpBot() {
   const [isOpen, setIsOpen] = useState(false)
@@ -17,6 +19,11 @@ export function HelpBot() {
 
   const { user } = useTenant()
   const userRole = (user?.roles?.[0] || (user?.is_super_admin ? 'superadmin' : null)) as string | null
+
+  // Ficha de la pantalla en la que esta parado el usuario. Se calcula siempre,
+  // pero solo se renderiza dentro del modal, que abre bajo demanda.
+  const pathname = usePathname()
+  const guiaModulo = getGuiaPorRuta(pathname)
 
   const loadSuggestions = useCallback(async () => {
     setIsSuggestionsLoading(true)
@@ -147,6 +154,7 @@ export function HelpBot() {
         onSuggestionSelect={handleSuggestionSelect}
         isLoading={isLoading}
         isSuggestionsLoading={isSuggestionsLoading}
+        guiaModulo={guiaModulo}
       />
     </>
   )
