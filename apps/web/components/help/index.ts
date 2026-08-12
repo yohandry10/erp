@@ -17,3 +17,7 @@ export type {
 
 // Datos
 export { getHelpItem, getHelpByModule } from './help-data'
+
+// Ficha por pantalla ("¿Qué hace esta pantalla?")
+export { GuiaDeModulo, getGuiaPorRuta, guias } from './module-guide'
+export type { GuiaModulo } from './module-guide'
