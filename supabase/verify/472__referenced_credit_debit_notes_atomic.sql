@@ -168,6 +168,14 @@ BEGIN
      now(), current_date + 30, 'ACEPTADO', 'ACEPTADO', 'ACCEPTED',
      v_actor, v_event_debit, true);
 
+  -- Desde 494 sólo un origen fiscal terminal con CDR puede recibir 07/08.
+  UPDATE public.cpe
+  SET cdr_sunat = '<cdr>source-472</cdr>'
+  WHERE id IN (v_cpe_credit, v_cpe_debit);
+  UPDATE public.documentos
+  SET estado_sunat = 'ACEPTADO', cdr_content = '<cdr>source-472</cdr>'
+  WHERE id IN (v_document_credit, v_document_debit);
+
   INSERT INTO public.cuentas_por_cobrar (
     tenant_id, cliente_id, documento_id, estado,
     monto_total, monto_original, monto_pendiente, saldo, saldo_pendiente,
@@ -228,24 +236,21 @@ BEGIN
   v_note_document := (v_note_credit->>'documento_id')::uuid;
   v_note_cpe := (v_note_credit->>'cpe_id')::uuid;
 
-  IF (v_note_credit->>'cxc_reduction')::numeric <> 40
-     OR (v_note_credit->>'saldo_favor')::numeric <> 20
-     OR (SELECT monto_pendiente FROM public.cuentas_por_cobrar WHERE id = v_cxc) <> 0
-     OR lower((SELECT estado::text FROM public.cuentas_por_cobrar WHERE id = v_cxc)) <> 'cancelado'
-     OR (SELECT count(*) FROM public.cxc_pagos
-         WHERE tenant_id = v_tenant AND documento_id = v_note_document
-           AND tipo = 'NOTA_CREDITO' AND monto = 40) <> 1
-     OR (SELECT count(*) FROM public.saldos_favor_clientes
-         WHERE tenant_id = v_tenant AND nota_credito_documento_id = v_note_document
-           AND rma_id IS NULL AND monto_disponible = 20) <> 1
+  IF v_note_credit->>'financial_effect_status' <> 'PENDING_FISCAL_ACCEPTANCE'
+     OR (v_note_credit->>'cxc_reduction')::numeric <> 0
+     OR (v_note_credit->>'saldo_favor')::numeric <> 0
+     OR (SELECT monto_pendiente FROM public.cuentas_por_cobrar WHERE id = v_cxc) <> 40
+     OR lower((SELECT estado::text FROM public.cuentas_por_cobrar WHERE id = v_cxc)) <> 'parcial'
+     OR EXISTS (SELECT 1 FROM public.cxc_pagos
+         WHERE tenant_id = v_tenant AND documento_id = v_note_document)
+     OR EXISTS (SELECT 1 FROM public.saldos_favor_clientes
+         WHERE tenant_id = v_tenant AND nota_credito_documento_id = v_note_document)
      OR (SELECT count(*) FROM public.documento_detalles
          WHERE tenant_id = v_tenant AND documento_id = v_note_document) <> 1
-     OR (SELECT count(*) FROM public.outbox_events
+     OR EXISTS (SELECT 1 FROM public.outbox_events
          WHERE tenant_id = v_tenant AND event_type = 'nota_credito.emitida'
-           AND aggregate_id = v_note_document::text
-           AND (payload->>'cxcReduction')::numeric = 40
-           AND (payload->>'customerCreditBalance')::numeric = 20) <> 1 THEN
-    RAISE EXCEPTION 'VERIFY_472_CREDIT_NOTE_PROJECTIONS_INVALID:%', v_note_credit;
+           AND aggregate_id = v_note_document::text) THEN
+    RAISE EXCEPTION 'VERIFY_472_CREDIT_DRAFT_NOT_NEUTRAL:%', v_note_credit;
   END IF;
 
   SELECT public.crear_nota_referenciada_tx(
@@ -280,7 +285,8 @@ BEGIN
   END;
   IF NOT v_failed THEN RAISE EXCEPTION 'VERIFY_472_CUMULATIVE_CREDIT_EXCESS_ACCEPTED'; END IF;
 
-  -- Falla inducida en la última frontera: documento/CPE/CxC deben revertirse.
+  -- Incluso una falla interna tardía de la implementación heredada revierte el
+  -- borrador completo; nunca queda una neutralización parcial.
   SELECT count(*) INTO v_before_docs FROM public.documentos WHERE tenant_id = v_tenant;
   SELECT count(*) INTO v_before_cxc FROM public.cuentas_por_cobrar WHERE tenant_id = v_tenant;
   PERFORM set_config('app.verify_472_fail_outbox', 'on', true);
@@ -304,14 +310,13 @@ BEGIN
     'Aumento contractual verify 472', 59, 'verify:472:debit:main'
   ) INTO v_note_debit;
   v_note_debit_document := (v_note_debit->>'documento_id')::uuid;
-  IF (SELECT count(*) FROM public.cuentas_por_cobrar
-      WHERE tenant_id = v_tenant AND documento_id = v_note_debit_document
-        AND tipo_documento = 'NOTA_DEBITO' AND monto_pendiente = 59) <> 1
-     OR (SELECT count(*) FROM public.outbox_events
-         WHERE tenant_id = v_tenant AND event_type = 'nota_debito.emitida'
-           AND aggregate_id = v_note_debit_document::text
-           AND (payload->>'total')::numeric = 59) <> 1 THEN
-    RAISE EXCEPTION 'VERIFY_472_DEBIT_NOTE_PROJECTIONS_INVALID:%', v_note_debit;
+  IF v_note_debit->>'financial_effect_status' <> 'PENDING_FISCAL_ACCEPTANCE'
+     OR EXISTS (SELECT 1 FROM public.cuentas_por_cobrar
+        WHERE tenant_id = v_tenant AND documento_id = v_note_debit_document)
+     OR EXISTS (SELECT 1 FROM public.outbox_events
+        WHERE tenant_id = v_tenant AND event_type = 'nota_debito.emitida'
+          AND aggregate_id = v_note_debit_document::text) THEN
+    RAISE EXCEPTION 'VERIFY_472_DEBIT_DRAFT_NOT_NEUTRAL:%', v_note_debit;
   END IF;
 
   IF (SELECT count(*) FROM public.movimientos_inventario WHERE tenant_id = v_tenant)
@@ -326,7 +331,9 @@ BEGIN
   ) INTO v_sign;
   IF v_sign->>'estado' <> 'FIRMADO'
      OR (SELECT estado FROM public.cpe WHERE id = v_note_cpe) <> 'FIRMADO'
-     OR (SELECT metadata->>'signed_xml_sha256' FROM public.cpe WHERE id = v_note_cpe) <> v_sha THEN
+     OR (SELECT metadata->>'signed_xml_sha256' FROM public.cpe WHERE id = v_note_cpe) <> v_sha
+     OR (SELECT monto_pendiente FROM public.cuentas_por_cobrar WHERE id = v_cxc) <> 40
+     OR EXISTS (SELECT 1 FROM public.outbox_events WHERE aggregate_id = v_note_document::text) THEN
     RAISE EXCEPTION 'VERIFY_472_SIGNATURE_NOT_PERSISTED:%', v_sign;
   END IF;
 
@@ -364,7 +371,10 @@ BEGIN
      OR has_table_privilege('service_role', 'public.notas_referenciadas_operaciones', 'DELETE')
      OR NOT has_table_privilege('service_role', 'public.notas_referenciadas_operaciones', 'SELECT')
      OR has_function_privilege('service_role',
-       'app.insert_nota_outbox_472(uuid,uuid,text,uuid,text,text,jsonb)', 'EXECUTE') THEN
+       'app.insert_nota_outbox_472(uuid,uuid,text,uuid,text,text,jsonb)', 'EXECUTE')
+     OR has_function_privilege('service_role',
+       'public.crear_nota_referenciada_legacy_494(uuid,uuid,uuid,text,text,text,numeric,text)',
+       'EXECUTE') THEN
     RAISE EXCEPTION 'VERIFY_472_ACL_OR_ACCOUNTING_OWNERSHIP_INVALID';
   END IF;
 END;

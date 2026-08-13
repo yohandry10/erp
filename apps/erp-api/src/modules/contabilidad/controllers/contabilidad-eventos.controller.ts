@@ -1,7 +1,15 @@
-import { Controller, Get, Post, Query, Param, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Param,
+  UseGuards,
+  NotFoundException,
+} from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
-import { CurrentTenant } from "../../../common";
+import { CurrentTenant, CurrentUser } from "../../../common";
 import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import { OutboxEventsService } from "../services/outbox-events.service";
@@ -60,37 +68,20 @@ export class ContabilidadEventosController {
       },
     },
   })
-  async getEstadisticasEventos(@CurrentTenant() _tenantId: string) {
-    try {
-      console.log(
-        "📊 [ContabilidadController] Obteniendo estadísticas de eventos...",
-      );
+  async getEstadisticasEventos(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser("id") actorId: string,
+  ) {
+    const stats = await this.outboxEventsService.obtenerEstadisticasEventos(
+      tenantId,
+      actorId,
+    );
 
-      const stats = await this.outboxEventsService.obtenerEstadisticasEventos();
-
-      return {
-        success: true,
-        data: stats,
-        message: `Estadísticas: ${stats.pending} pendientes, ${stats.processed_today} procesados hoy, ${stats.failed} fallidos`,
-      };
-    } catch (error) {
-      console.error(
-        "❌ [ContabilidadController] Error obteniendo estadísticas:",
-        error,
-      );
-      return {
-        success: false,
-        message: "Error obteniendo estadísticas de eventos",
-        data: {
-          pending: 0,
-          processed: 0,
-          processed_today: 0,
-          failed: 0,
-          dead_letter: 0,
-          avg_processing_time_ms: null,
-        },
-      };
-    }
+    return {
+      success: true,
+      data: stats,
+      message: `Estadísticas: ${stats.pending} pendientes, ${stats.processed_today} procesados hoy, ${stats.failed} fallidos`,
+    };
   }
 
   @Get("eventos/fallidos")
@@ -102,31 +93,20 @@ export class ContabilidadEventosController {
   })
   async getEventosFallidos(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") actorId: string,
     @Query("limit") limit?: number,
   ) {
-    try {
-      console.log("🔴 [ContabilidadController] Obteniendo eventos fallidos...");
+    const eventos = await this.outboxEventsService.leerEventosFallidos(
+      tenantId,
+      actorId,
+      limit || 100,
+    );
 
-      const eventos = await this.outboxEventsService.leerEventosFallidos(
-        limit || 100,
-      );
-
-      return {
-        success: true,
-        data: eventos,
-        message: `${eventos.length} evento(s) fallido(s) encontrado(s)`,
-      };
-    } catch (error) {
-      console.error(
-        "❌ [ContabilidadController] Error obteniendo eventos fallidos:",
-        error,
-      );
-      return {
-        success: false,
-        message: "Error obteniendo eventos fallidos",
-        data: [],
-      };
-    }
+    return {
+      success: true,
+      data: eventos,
+      message: `${eventos.length} evento(s) fallido(s) encontrado(s)`,
+    };
   }
 
   @Get("eventos/dead-letter")
@@ -141,33 +121,20 @@ export class ContabilidadEventosController {
   })
   async getEventosDeadLetter(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") actorId: string,
     @Query("limit") limit?: number,
   ) {
-    try {
-      console.log(
-        "💀 [ContabilidadController] Obteniendo eventos dead letter...",
-      );
+    const eventos = await this.outboxEventsService.leerEventosDeadLetter(
+      tenantId,
+      actorId,
+      limit || 100,
+    );
 
-      const eventos = await this.outboxEventsService.leerEventosDeadLetter(
-        limit || 100,
-      );
-
-      return {
-        success: true,
-        data: eventos,
-        message: `${eventos.length} evento(s) dead letter encontrado(s)`,
-      };
-    } catch (error) {
-      console.error(
-        "❌ [ContabilidadController] Error obteniendo eventos dead letter:",
-        error,
-      );
-      return {
-        success: false,
-        message: "Error obteniendo eventos dead letter",
-        data: [],
-      };
-    }
+    return {
+      success: true,
+      data: eventos,
+      message: `${eventos.length} evento(s) dead letter encontrado(s)`,
+    };
   }
 
   @Post("eventos/:eventId/reintentar")
@@ -176,31 +143,26 @@ export class ContabilidadEventosController {
   @ApiResponse({ status: 200, description: "Evento reiniciado exitosamente" })
   async reintentarEvento(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") actorId: string,
     @Param("eventId") eventId: string,
   ) {
-    try {
-      console.log(
-        `🔄 [ContabilidadController] Reintentando evento ${eventId}...`,
+    const reiniciado =
+      await this.asientosGeneratorService.reiniciarEventoFallido(
+        tenantId,
+        actorId,
+        eventId,
       );
-
-      await this.asientosGeneratorService.reiniciarEventoFallido(eventId);
-
-      return {
-        success: true,
-        data: { eventId, reiniciado: true },
-        message: "Evento reiniciado para reprocesamiento",
-      };
-    } catch (error) {
-      console.error(
-        "❌ [ContabilidadController] Error reintentando evento:",
-        error,
+    if (!reiniciado) {
+      throw new NotFoundException(
+        "El evento no existe en este tenant o ya no es reintentable",
       );
-      return {
-        success: false,
-        message: "Error reintentando evento",
-        data: null,
-      };
     }
+
+    return {
+      success: true,
+      data: { eventId, reiniciado: true },
+      message: "Evento reiniciado para reprocesamiento",
+    };
   }
 
   @Get("eventos/estadisticas-fallidos")
@@ -212,34 +174,20 @@ export class ContabilidadEventosController {
     status: 200,
     description: "Estadísticas de eventos fallidos obtenidas exitosamente",
   })
-  async getEstadisticasEventosFallidos(@CurrentTenant() _tenantId: string) {
-    try {
-      console.log(
-        "📊 [ContabilidadController] Obteniendo estadísticas de eventos fallidos...",
+  async getEstadisticasEventosFallidos(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser("id") actorId: string,
+  ) {
+    const stats =
+      await this.asientosGeneratorService.obtenerEstadisticasEventosFallidos(
+        tenantId,
+        actorId,
       );
 
-      const stats =
-        await this.asientosGeneratorService.obtenerEstadisticasEventosFallidos();
-
-      return {
-        success: true,
-        data: stats,
-        message: "Estadísticas de eventos fallidos obtenidas exitosamente",
-      };
-    } catch (error) {
-      console.error(
-        "❌ [ContabilidadController] Error obteniendo estadísticas de fallidos:",
-        error,
-      );
-      return {
-        success: false,
-        message: "Error obteniendo estadísticas de eventos fallidos",
-        data: {
-          total_fallidos: 0,
-          total_dead_letter: 0,
-          por_tipo: {},
-        },
-      };
-    }
+    return {
+      success: true,
+      data: stats,
+      message: "Estadísticas de eventos fallidos obtenidas exitosamente",
+    };
   }
 }

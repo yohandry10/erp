@@ -50,7 +50,8 @@ describe("ContabilidadEventsListener", () => {
     };
 
     const mockOutboxEventsService = {
-      leerEventosPendientesConReintentos: jest.fn(),
+      reclamarEventosContables: jest.fn(),
+      renovarClaimContable: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -86,6 +87,16 @@ describe("ContabilidadEventsListener", () => {
               eq: jest.fn().mockReturnThis(),
               in: jest.fn().mockReturnThis(),
               order: jest.fn().mockReturnThis(),
+              rpc: jest.fn().mockImplementation((fn: string) => Promise.resolve({
+                data: fn === 'resolver_cuenta_tesoreria_laboral_492'
+                  ? {
+                    metodo_pago: 'transferencia',
+                    cuenta_tesoreria_id: 'cuenta-banco-default',
+                    cuenta_tesoreria_codigo: '10411',
+                  }
+                  : { updated: true },
+                error: null,
+              })),
               // `limit` se usa de dos formas: awaited directo (detalles) y encadenado
               // con .maybeSingle() por el dedupe de referencia, que debe resolver vacío
               // (sin asiento previo) para que el handler genere el asiento.
@@ -358,7 +369,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoVenta.mockResolvedValue({
@@ -376,8 +387,8 @@ describe("ContabilidadEventsListener", () => {
       await listener.procesarEventosPendientes();
 
       expect(
-        outboxEventsService.leerEventosPendientesConReintentos,
-      ).toHaveBeenCalledWith(3, 50);
+        outboxEventsService.reclamarEventosContables,
+      ).toHaveBeenCalledWith(expect.stringMatching(/^outbox-accounting:/), 3, 50);
       expect(asientosGenerator.generarAsientoVenta).toHaveBeenCalledWith(
         expect.objectContaining({
           tenant_id: "tenant-001",
@@ -388,14 +399,14 @@ describe("ContabilidadEventsListener", () => {
     });
 
     it("should handle no pending events", async () => {
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         [],
       );
 
       await listener.procesarEventosPendientes();
 
       expect(
-        outboxEventsService.leerEventosPendientesConReintentos,
+        outboxEventsService.reclamarEventosContables,
       ).toHaveBeenCalled();
       expect(asientosGenerator.generarAsientoVenta).not.toHaveBeenCalled();
     });
@@ -423,7 +434,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoVenta.mockRejectedValue(
@@ -480,7 +491,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoVenta
@@ -532,7 +543,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoVenta.mockRejectedValue(
@@ -570,7 +581,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoVenta.mockRejectedValue(
@@ -607,7 +618,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
 
@@ -701,7 +712,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoCobro.mockResolvedValue({
@@ -757,7 +768,7 @@ describe("ContabilidadEventsListener", () => {
           error_message: null,
         },
       ];
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(mockEventos);
       asientosGenerator.generarAsientoAjusteCxc.mockResolvedValue({ id: "asiento-adj-1" } as any);
 
       await listener.procesarEventosPendientes();
@@ -796,7 +807,7 @@ describe("ContabilidadEventsListener", () => {
         status: "PENDING",
         error_message: null,
       };
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue([event]);
+      outboxEventsService.reclamarEventosContables.mockResolvedValue([event]);
       asientosGenerator.generarAsientoAjusteCxp.mockResolvedValue({ id: "asiento-cxp-adj" } as any);
 
       await listener.procesarEventosPendientes();
@@ -838,7 +849,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoRecepcion.mockResolvedValue({
@@ -896,7 +907,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoRecepcion.mockResolvedValue({
@@ -951,7 +962,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoRecepcion.mockResolvedValue({
@@ -970,10 +981,6 @@ describe("ContabilidadEventsListener", () => {
         testingModule.get(SupabaseService).getClient as jest.Mock
       )();
       supabaseClient.maybeSingle
-        .mockResolvedValueOnce({
-          data: { event_id: "evt-004-duplicado" },
-          error: null,
-        })
         .mockResolvedValueOnce({
           data: null,
           error: {
@@ -1016,7 +1023,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoPago.mockResolvedValue({
@@ -1075,7 +1082,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoDevolucionProveedor.mockResolvedValue({
@@ -1127,7 +1134,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoAjusteInventario.mockResolvedValue({
@@ -1173,12 +1180,14 @@ describe("ContabilidadEventsListener", () => {
           created_at: "2025-01-31T10:00:00Z",
           processed_at: null,
           retry_count: 0,
-          status: "PENDING",
+          status: "processing",
           error_message: null,
+          claim_token: "claim-token-008",
+          claimed_by: "outbox-accounting:test",
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoPlanilla.mockResolvedValue({
@@ -1201,16 +1210,75 @@ describe("ContabilidadEventsListener", () => {
         }),
       );
       const client = testingModule.get(SupabaseService).getClient() as any;
-      expect(client.update).toHaveBeenCalledWith(expect.objectContaining({
-        asientos_generados: 'true',
-        fecha_asientos: expect.any(String),
+      expect(client.rpc).toHaveBeenCalledWith(
+        'marcar_planilla_contabilizada_tx_492',
+        {
+          p_tenant_id: 'tenant-001',
+          p_planilla_id: 'plan-001',
+          p_event_id: 'evt-008',
+          p_claim_token: 'claim-token-008',
+        },
+      );
+    });
+
+    it.each([
+      ['banco A', 'transferencia', 'cuenta-banco-a', '104101'],
+      ['banco B', 'transferencia', 'cuenta-banco-b', '104102'],
+      ['caja', 'efectivo', 'cuenta-caja', '10111'],
+    ])('pago de planilla conserva la cuenta exacta de %s', async (_caso, metodoPago, cuentaId, cuentaCodigo) => {
+      const client = testingModule.get(SupabaseService).getClient() as any;
+      client.rpc.mockImplementation((fn: string) => Promise.resolve({
+        data: fn === 'resolver_cuenta_tesoreria_laboral_492'
+          ? {
+            metodo_pago: metodoPago,
+            cuenta_tesoreria_id: cuentaId,
+            cuenta_tesoreria_codigo: cuentaCodigo,
+          }
+          : { updated: true },
+        error: null,
       }));
+      outboxEventsService.reclamarEventosContables.mockResolvedValue([{
+        id: `row-planilla-${cuentaId}`,
+        event_id: `evt-planilla-${cuentaId}`,
+        aggregate_type: 'planilla',
+        aggregate_id: 'plan-001',
+        event_type: 'planilla.pagada',
+        event_data: {
+          tenantId: 'tenant-001', planillaId: 'plan-001', totalPagado: 850,
+          fechaPago: '2026-08-10', metodoPago,
+        },
+        created_at: '2026-08-10T10:00:00Z', processed_at: null,
+        retry_count: 0, status: 'processing', error_message: null,
+        claim_token: `claim-${cuentaId}`, claimed_by: 'outbox-accounting:test',
+      } as OutboxEvent]);
+      asientosGenerator.generarAsientoPagoPlanilla.mockResolvedValue({ id: `asiento-${cuentaId}` } as any);
+
+      await listener.procesarEventosPendientes();
+
+      expect(client.rpc).toHaveBeenCalledWith('resolver_cuenta_tesoreria_laboral_492', {
+        p_tenant_id: 'tenant-001',
+        p_outbox_id: `row-planilla-${cuentaId}`,
+        p_claim_token: `claim-${cuentaId}`,
+      });
+      expect(asientosGenerator.generarAsientoPagoPlanilla).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metodo_pago: metodoPago,
+          cuenta_tesoreria_id: cuentaId,
+          cuenta_tesoreria_codigo: cuentaCodigo,
+        }),
+      );
     });
 
     it.each([
       {
         tipo: 'liquidacion.aprobada',
-        payload: { liquidacionId: 'liq-1', totalLiquidacion: 1200, fechaTerminacion: '2026-08-09' },
+        payload: {
+          liquidacionId: 'liq-1', totalLiquidacion: 1200, fechaTerminacion: '2026-08-09',
+          componentesLiquidacion: {
+            version: 492, montoCts: 300, indemnizacion: 100,
+            beneficiosSociales: 400, remuneracionesYOtros: 800, total: 1200,
+          },
+        },
         metodo: 'generarAsientoDevengoLiquidacion',
         monto: 1200,
         referencia: 'LIQUIDACION-liq-1',
@@ -1242,7 +1310,7 @@ describe("ContabilidadEventsListener", () => {
       },
     ])('procesa $tipo con el asiento laboral canónico', async ({ tipo, payload, metodo, monto, referencia, fecha }) => {
       const eventId = `evt-${tipo}`;
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue([{
+      outboxEventsService.reclamarEventosContables.mockResolvedValue([{
         id: eventId,
         event_id: eventId,
         correlation_id: eventId,
@@ -1256,6 +1324,8 @@ describe("ContabilidadEventsListener", () => {
         retry_count: 0,
         status: 'PENDING',
         error_message: null,
+        claim_token: `claim-${tipo}`,
+        claimed_by: 'outbox-accounting:test',
       } as OutboxEvent]);
       (asientosGenerator as any)[metodo].mockResolvedValue({ id: `asiento-${tipo}` });
 
@@ -1268,7 +1338,22 @@ describe("ContabilidadEventsListener", () => {
         referencia,
         source_event_id: eventId,
         event_id: eventId,
+        ...(tipo === 'liquidacion.aprobada' ? {
+          componentes_liquidacion: (payload as any).componentesLiquidacion,
+        } : {
+          metodo_pago: 'transferencia',
+          cuenta_tesoreria_id: 'cuenta-banco-default',
+          cuenta_tesoreria_codigo: '10411',
+        }),
       }));
+      if (tipo !== 'liquidacion.aprobada') {
+        const client = testingModule.get(SupabaseService).getClient() as any;
+        expect(client.rpc).toHaveBeenCalledWith('resolver_cuenta_tesoreria_laboral_492', {
+          p_tenant_id: 'tenant-001',
+          p_outbox_id: eventId,
+          p_claim_token: `claim-${tipo}`,
+        });
+      }
     });
 
     it("should handle depreciacion generada event", async () => {
@@ -1295,7 +1380,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoDepreciacion.mockResolvedValue({
@@ -1345,7 +1430,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
       asientosGenerator.generarAsientoNotaCredito.mockResolvedValue({
@@ -1388,7 +1473,7 @@ describe("ContabilidadEventsListener", () => {
         },
       ];
 
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
         mockEventos,
       );
 
@@ -1399,42 +1484,12 @@ describe("ContabilidadEventsListener", () => {
       expect(asientosGenerator.marcarEventoComoFallido).not.toHaveBeenCalled();
     });
 
-    it("should not process an accounting event when another worker already claimed it", async () => {
-      const mockEventos: OutboxEvent[] = [
-        {
-          id: "1",
-          event_id: "evt-claimed-by-other",
-          correlation_id: "corr-claimed-by-other",
-          aggregate_type: "cxc",
-          aggregate_id: "cxc-001",
-          event_type: "cxc.creada",
-          event_data: {
-            tenantId: "tenant-001",
-            fechaEmision: "2025-01-15",
-            montoTotal: 118,
-            subtotal: 100,
-            impuestos: 18,
-            serie: "F001",
-            numero: "000001",
-          },
-          event_version: 1,
-          created_at: "2025-01-15T10:00:00Z",
-          processed_at: null,
-          retry_count: 0,
-          status: "PENDING",
-          error_message: null,
-        },
-      ];
-
-      const supabaseClient = (
-        testingModule.get(SupabaseService).getClient as jest.Mock
-      )();
-      supabaseClient.maybeSingle.mockResolvedValueOnce({
-        data: null,
-        error: null,
-      });
-      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(
-        mockEventos,
+    it("should not process an accounting event claimed by another worker", async () => {
+      // El RPC de claim usa SKIP LOCKED: un evento reclamado por otro worker no
+      // puede aparecer en este lote. Un resultado vacío es la evidencia del
+      // contrato, sin una segunda lectura susceptible a TOCTOU.
+      outboxEventsService.reclamarEventosContables.mockResolvedValue(
+        [],
       );
 
       await listener.procesarEventosPendientes();

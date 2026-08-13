@@ -310,22 +310,6 @@ export class PosService {
     return numero;
   }
 
-  private async resolveCajaIdForSesion(tenantId: string, sesionCajaId: string | null): Promise<string | null> {
-    if (!sesionCajaId) return null;
-    const { data, error } = await this.supabase.getClient()
-      .from('sesiones_caja')
-      .select('caja_id')
-      .eq('tenant_id', tenantId)
-      .eq('id', sesionCajaId)
-      .maybeSingle();
-
-    if (error) {
-      throw error;
-    }
-
-    return data?.caja_id ?? null;
-  }
-
   private async getMaxCorrelativoFiscalOcupado(tenantId: string, serie: string): Promise<number> {
     const client = this.supabase.getClient();
     const normalizedSerie = String(serie || '').trim().toUpperCase();
@@ -570,31 +554,12 @@ export class PosService {
   async getSesionCajaActual(user: any) {
     return this.runWithTenantContext(user, async () => {
       try {
-        const client = this.supabase.getClient();
-
-        // Traer todas las sesiones ABIERTAS de este usuario (por rol/campos) ordenadas por apertura desc
-        const { data: sesiones, error } = await client
-          .from('sesiones_caja')
-          .select('*')
-          .eq('tenant_id', user.tenant_id)
-          .or(`usuario_id.eq.${user.id},usuario_apertura.eq.${user.id},cajero_id.eq.${user.id},abierto_por.eq.${user.id}`)
-          .eq('estado', 'ABIERTA')
-          .is('hora_cierre', null)
-          .is('fecha_cierre', null)
-          .order('hora_apertura', { ascending: false })
-          .limit(10);
-
-        if (error && error.code !== 'PGRST116') throw error;
-
-        const listaSesiones = Array.isArray(sesiones)
-          ? sesiones
-          : sesiones
-            ? [sesiones as any]
-            : [];
-
-        if (listaSesiones.length === 0) {
-          return { success: true, data: null };
-        }
+        const { data, error } = await this.supabase.getClient()
+          .rpc('obtener_sesion_caja_actual_tx', {
+            p_tenant_id: user.tenant_id,
+            p_actor_id: user.id,
+          });
+        if (error) throw error;
 
         // Consultar el estado de caja no puede cerrarla. Este GET cerraba toda
         // sesión cuya apertura no cayera en el día UTC actual, sin saldo teórico,
@@ -602,7 +567,7 @@ export class PosService {
         // hecho de abrir el POS. Además, comparar en UTC parte la jornada peruana
         // a las 19:00 locales. La sesión abierta se devuelve tal cual y sólo se
         // cierra desde el flujo de cierre, con su arqueo.
-        return { success: true, data: listaSesiones[0] || null };
+        return { success: true, data: data ?? null };
       } catch (error) {
         this.logger.error('Error obteniendo sesión de caja POS:', error);
         return {
@@ -1099,23 +1064,6 @@ export class PosService {
       if (!sesionCajaId) {
         const sesionActual = await this.getSesionCajaActual(user);
         sesionCajaId = sesionActual?.success ? sesionActual.data?.id ?? null : null;
-      }
-
-      // Permitir que el frontend envíe la sesión explícita (por ejemplo, recién abierta) y validarla
-      if (!sesionCajaId && ventaData.sesion_caja_id) {
-        const { data: sesionPayload } = await this.supabase.getClient()
-          .from('sesiones_caja')
-          .select('id, tenant_id, estado, hora_cierre, fecha_cierre')
-          .eq('id', ventaData.sesion_caja_id)
-          .eq('tenant_id', user.tenant_id)
-          .eq('estado', 'ABIERTA')
-          .is('hora_cierre', null)
-          .is('fecha_cierre', null)
-          .maybeSingle();
-
-        if (sesionPayload) {
-          sesionCajaId = sesionPayload.id;
-        }
       }
 
       if (!sesionCajaId) {
@@ -1748,13 +1696,13 @@ export class PosService {
 
       if (error) {
         this.logger.error('Error obteniendo ventas pendientes:', error);
-        return [];
+        throw new Error(`No se pudieron leer ventas POS pendientes: ${error.message}`);
       }
 
       return data || [];
     } catch (error) {
       this.logger.error('Excepción obteniendo ventas pendientes:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -1800,7 +1748,7 @@ export class PosService {
 
       if (error) {
         this.logger.error('Error obteniendo ventas pendientes para procesar:', error);
-        return { procesadas: 0, errores: 0 };
+        throw new Error(`No se pudieron reclamar ventas POS pendientes: ${error.message}`);
       }
 
       if (!ventasPendientes || ventasPendientes.length === 0) {
@@ -1859,7 +1807,7 @@ export class PosService {
       return { procesadas, errores };
     } catch (error) {
       this.logger.error('Excepción procesando ventas pendientes:', error);
-      return { procesadas: 0, errores: 0 };
+      throw error;
     }
   }
 

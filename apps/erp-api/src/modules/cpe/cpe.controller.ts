@@ -156,7 +156,7 @@ export class CpeController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.emitir')
   @ApiOperation({
-    summary: 'Crear NC/ND referenciada con efecto financiero atómico, sin exigir certificado',
+    summary: 'Crear borrador NC/ND fiscalmente neutro; el efecto nace al aceptar el CDR',
   })
   async crearNotaReferenciada(
     @Body() dto: CrearNotaReferenciadaDto,
@@ -171,7 +171,7 @@ export class CpeController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.emitir')
   @ApiOperation({
-    summary: 'Firmar una NC/ND ya creada cuando el cliente configure su certificado',
+    summary: 'Firmar una NC/ND pendiente; todavía no modifica CxC ni contabilidad',
   })
   async firmarNotaReferenciada(
     @Param('id') id: string,

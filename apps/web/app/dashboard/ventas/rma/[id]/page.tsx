@@ -116,15 +116,17 @@ export default function RmaDetailPage() {
   }, [get, id])
 
   useEffect(() => { void load() }, [load])
+  const rmaEstado = rma?.estado
+
   useEffect(() => {
-    if (!rma || !['APROBADA', 'PARCIAL', 'RECIBIDA'].includes(rma.estado)) return
+    if (!rmaEstado || !['APROBADA', 'PARCIAL', 'RECIBIDA'].includes(rmaEstado)) return
     void (async () => {
       const response = await get('/api/ventas/rma/recursos-recepcion')
       const value = unwrap<Recursos>(response, { control_calidad_requerido: false, almacenes: [], ubicaciones: [] })
       setRecursos(value)
       setWarehouse((current) => current || value.almacenes.find((item) => item.es_principal)?.id || '')
     })()
-  }, [get, rma?.estado])
+  }, [get, rmaEstado])
 
   const currentActor = session?.user?.id
   const isCreator = Boolean(currentActor && rma?.created_by === currentActor)

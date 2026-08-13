@@ -336,6 +336,7 @@ describe('persistencia atomica de planilla', () => {
       '22222222-2222-4222-8222-222222222222',
       '33333333-3333-4333-8333-333333333333',
       empleados,
+      '55555555-5555-4555-8555-555555555555',
     )).resolves.toMatchObject({ success: true, totalEmpleados: 1 });
 
     expect(rpc).toHaveBeenCalledTimes(1);
@@ -343,6 +344,7 @@ describe('persistencia atomica de planilla', () => {
       p_tenant_id: '33333333-3333-4333-8333-333333333333',
       p_planilla_id: '22222222-2222-4222-8222-222222222222',
       p_empleados: empleados,
+      p_actor_id: '55555555-5555-4555-8555-555555555555',
     });
   });
 
@@ -364,18 +366,29 @@ describe('persistencia atomica de planilla', () => {
 
     await expect(servicio.pagarPlanillaCompleta(
       '22222222-2222-4222-8222-222222222222',
-      'transferencia',
+      {
+        metodo_pago: 'transferencia',
+        idempotency_key: '66666666-6666-4666-8666-666666666666',
+        cuenta_bancaria_id: '77777777-7777-4777-8777-777777777777',
+        referencia: 'OP-PLANILLA-1',
+      },
       '33333333-3333-4333-8333-333333333333',
+      '55555555-5555-4555-8555-555555555555',
     )).resolves.toMatchObject({
       success: true,
       data: { totalPagado: 1740, empleadosPagados: 1 },
     });
 
-    expect(rpc).toHaveBeenCalledWith('pagar_planilla_completa_tx', {
+    expect(rpc).toHaveBeenCalledWith('pagar_planilla_con_tesoreria_tx_495', {
       p_tenant_id: '33333333-3333-4333-8333-333333333333',
       p_planilla_id: '22222222-2222-4222-8222-222222222222',
-      p_metodo_pago: 'transferencia',
-      p_usuario_id: 'sistema',
+      p_pago: {
+        metodo_pago: 'transferencia',
+        idempotency_key: '66666666-6666-4666-8666-666666666666',
+        cuenta_bancaria_id: '77777777-7777-4777-8777-777777777777',
+        referencia: 'OP-PLANILLA-1',
+      },
+      p_actor_id: '55555555-5555-4555-8555-555555555555',
     });
   });
 });

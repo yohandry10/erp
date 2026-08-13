@@ -55,4 +55,24 @@ describe('RrhhController RBAC contable', () => {
       });
     }
   });
+
+  it('separa cálculo, aprobación, pago, liquidaciones y CTS por acción', () => {
+    const cases: Array<[keyof RrhhController, string, string]> = [
+      ['crearPlanilla', 'planillas', 'create'],
+      ['calcularPlanilla', 'planillas', 'calculate'],
+      ['calcularPlanillaPersonalizada', 'planillas', 'calculate'],
+      ['aprobarPlanilla', 'planillas', 'approve'],
+      ['pagarPlanillaCompleta', 'planillas', 'pay'],
+      ['calcularLiquidacion', 'liquidaciones', 'calculate'],
+      ['confirmarLiquidacion', 'liquidaciones', 'approve'],
+      ['pagarLiquidacion', 'liquidaciones', 'pay'],
+      ['revertirPagoLiquidacion', 'liquidaciones', 'reverse'],
+      ['calcularDepositosCts', 'cts', 'calculate'],
+      ['depositarCts', 'cts', 'deposit'],
+    ];
+
+    for (const [method, resource, action] of cases) {
+      expect(permissionFor(method)).toMatchObject({ module: 'rrhh', resource, action });
+    }
+  });
 });

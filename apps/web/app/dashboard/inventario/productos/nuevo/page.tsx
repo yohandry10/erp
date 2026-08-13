@@ -54,6 +54,7 @@ export default function NuevoProductoPage() {
     codigo: "",
     nombre: "",
     marca: "",
+    unidadMedida: "NIU",
     descripcion: "",
     categoria: "",
     precioVenta: "",
@@ -173,6 +174,7 @@ export default function NuevoProductoPage() {
         codigo: formData.codigo.trim(),
         nombre: formData.nombre.trim(),
         marca: formData.marca.trim() || undefined,
+        unidad_medida: formData.unidadMedida,
         descripcion: formData.descripcion.trim() || undefined,
         categoria: formData.categoria,
         precio_venta: Number(formData.precioVenta),
@@ -375,6 +377,25 @@ export default function NuevoProductoPage() {
             />
             <p className="mt-1 text-xs text-muted-foreground">
               Se usa en listas de precios y comisiones comerciales por marca.
+            </p>
+          </div>
+
+          <div className="mt-4">
+            <label htmlFor="nuevo-unidad-medida">Unidad de medida</label>
+            <select
+              id="nuevo-unidad-medida"
+              name="unidadMedida"
+              value={formData.unidadMedida}
+              onChange={handleChange}
+            >
+              <option value="NIU">Unidad (NIU)</option>
+              <option value="KGM">Kilogramo (KGM)</option>
+              <option value="LTR">Litro (LTR)</option>
+              <option value="MTR">Metro (MTR)</option>
+              <option value="ZZ">Servicio (ZZ)</option>
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              No podrá cambiarse después de registrar movimientos de kardex.
             </p>
           </div>
 

@@ -66,6 +66,7 @@ __pycache__/
 *.pyc
 
 # Local validation databases and tool caches
+/tmp/
 .codex_pg_rebuild/
 .codex-local-logs/
 .codex_run_logs/

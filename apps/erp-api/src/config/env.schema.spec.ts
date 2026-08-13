@@ -20,6 +20,7 @@ describe('env.schema', () => {
     SESSION_SECRET: 'e'.repeat(40),
     CSRF_SECRET: 'f'.repeat(40),
     AUTH_SIGNATURE_SECRET: strongSecret,
+    REQUIRED_DATABASE_SCHEMA_VERSION: 496,
     PFX_PATH: '/secure/certs/fiscal.pfx',
     PFX_PASS: 'securepass',
   };
@@ -41,6 +42,26 @@ describe('env.schema', () => {
     });
 
     expect(result.error).toBeDefined();
+  });
+
+  it('exige la versión mínima de esquema en production', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      REQUIRED_DATABASE_SCHEMA_VERSION: undefined,
+    });
+
+    expect(result.error?.message).toContain('REQUIRED_DATABASE_SCHEMA_VERSION');
+  });
+
+  it('usa la última migración contractual como default fuera de production', () => {
+    const result = envSchema.validate({
+      ...baseConfig,
+      NODE_ENV: 'test',
+      REQUIRED_DATABASE_SCHEMA_VERSION: undefined,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.value.REQUIRED_DATABASE_SCHEMA_VERSION).toBe(496);
   });
 
   it('falla con secreto JWT demasiado débil', () => {

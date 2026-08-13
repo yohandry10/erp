@@ -36,6 +36,7 @@ describe('NotificationsService', () => {
             insert: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
+            rpc: jest.fn(),
             single: jest.fn(),
             // The then method makes this object 'awaitable'
             then: jest.fn().mockImplementation((resolve, reject) => {
@@ -53,6 +54,18 @@ describe('NotificationsService', () => {
         mockClient.insert.mockReturnValue(mockClient);
         mockClient.update.mockReturnValue(mockClient);
         mockClient.delete.mockReturnValue(mockClient);
+        mockClient.rpc.mockImplementation((_name: string, params: any) => {
+            if (params?.p_operacion === 'CREATE' || params?.p_operacion === 'MARK_READ') {
+                return mockClient.single();
+            }
+            if (params?.p_operacion === 'MARK_ALL_READ') {
+                return Promise.resolve({
+                    data: { updated_count: Array.isArray(mockDbResponse.data) ? mockDbResponse.data.length : 0 },
+                    error: mockDbResponse.error,
+                });
+            }
+            return Promise.resolve(mockDbResponse);
+        });
 
         // single() usually ends the chain and returns a Promise, NOT the builder
         mockClient.single.mockImplementation(() => {
@@ -142,7 +155,10 @@ describe('NotificationsService', () => {
             expect(result).toBeDefined();
             expect(result.id).toBe('notif-123');
             expect(result.type).toBe(NotificationType.STOCK_BAJO);
-            expect(mockClient.insert).toHaveBeenCalled();
+            expect(mockClient.rpc).toHaveBeenCalledWith(
+                'gestionar_notificacion_tx',
+                expect.objectContaining({ p_operacion: 'CREATE' }),
+            );
         });
 
         it('should create a notification with roles_destinatarios', async () => {
@@ -160,7 +176,13 @@ describe('NotificationsService', () => {
             const result = await service.createNotification('tenant-123', dtoWithRoles);
 
             expect(result).toBeDefined();
-            expect(mockClient.insert).toHaveBeenCalled();
+            expect(mockClient.rpc).toHaveBeenCalledWith(
+                'gestionar_notificacion_tx',
+                expect.objectContaining({
+                    p_operacion: 'CREATE',
+                    p_payload: expect.objectContaining({ roles_destinatarios: ['role-admin', 'role-manager'] }),
+                }),
+            );
         });
 
         it('should throw error when insert fails', async () => {
@@ -365,7 +387,10 @@ describe('NotificationsService', () => {
             const result = await service.markAllAsRead('tenant-123', 'user-123');
 
             expect(result).toBe(2);
-            expect(mockClient.update).toHaveBeenCalled();
+            expect(mockClient.rpc).toHaveBeenCalledWith(
+                'gestionar_notificacion_tx',
+                expect.objectContaining({ p_operacion: 'MARK_ALL_READ' }),
+            );
         });
 
         it('should return 0 when no notifications to mark', async () => {

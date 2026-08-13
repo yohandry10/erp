@@ -119,7 +119,7 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess }: Props) {
       retryIntent.current = null
       alert(
         `${type === '07' ? 'Nota de crédito' : 'Nota de débito'} ${result.serie ?? ''}-${result.numero ?? ''} creada. ` +
-        'El efecto financiero ya quedó registrado; firme y envíe cuando el cliente configure su certificado.',
+        'Quedó fiscalmente pendiente y sin afectar CxC, saldo a favor ni contabilidad. El efecto se aplicará sólo si la autoridad fiscal la acepta con CDR.',
       )
       onSuccess()
       onClose()
@@ -216,7 +216,9 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess }: Props) {
           </label>
 
           <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-foreground/80">
-            La creación confirma documento, CxC o saldo a favor y asiento por outbox. No exige certificado. La firma y transmisión fiscal son pasos posteriores.
+            Crear reserva el correlativo y congela el documento, pero no modifica CxC,
+            saldo a favor ni contabilidad. Esos efectos se aplican una sola vez cuando
+            SUNAT/OSE acepte la nota y entregue el CDR; un rechazo queda sin efecto financiero.
           </div>
 
           <div className="flex justify-end gap-3">
