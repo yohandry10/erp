@@ -63,13 +63,14 @@ DECLARE
   v_planilla_id uuid := gen_random_uuid();
   v_planilla_event_id uuid := gen_random_uuid();
   v_recent_event_id uuid;
+  v_run_key text := 'verify-492-' || txid_current()::text;
 BEGIN
   v_demo := public.create_demo_tenant_ready_tx(
-    'Verify Runtime 492', 14, 'PE', 'verify-492-runtime', NULL, NULL, NULL, 'COMERCIO'
+    'Verify Runtime 492', 14, 'PE', v_run_key || '-runtime', NULL, NULL, NULL, 'COMERCIO'
   );
   v_tenant := (v_demo->>'tenant_id')::uuid;
   v_other_demo := public.create_demo_tenant_ready_tx(
-    'Verify Runtime 492 Other', 14, 'PE', 'verify-492-runtime-other',
+    'Verify Runtime 492 Other', 14, 'PE', v_run_key || '-runtime-other',
     NULL, NULL, NULL, 'COMERCIO'
   );
   v_other_tenant := (v_other_demo->>'tenant_id')::uuid;
@@ -661,9 +662,14 @@ BEGIN
       'attachments', jsonb_build_array(jsonb_build_object('content', 'BASE64-SENSITIVE'))
     )
   ));
-  SELECT * INTO v_claim FROM public.claim_outbox_events_tx(
-    'verify-worker-email', 1, ARRAY['email.send'], NULL, v_tenant, 1
-  );
+  SELECT * INTO v_claim
+  FROM public.claim_outbox_events_tx(
+    'verify-worker-email', 100, ARRAY['email.send'], NULL, v_tenant, 1
+  ) AS claimed
+  WHERE claimed.id = (v_non_accounting_enqueued->>'id')::uuid;
+  IF v_claim.id IS NULL THEN
+    RAISE EXCEPTION 'VERIFY_492_EMAIL_FIXTURE_NOT_CLAIMED';
+  END IF;
   v_result := public.fail_outbox_event_tx(
     v_claim.id, v_claim.claim_token, 'email terminal', NULL, 1
   );
@@ -681,11 +687,23 @@ BEGIN
   );
   IF coalesce((v_result->>'updated')::boolean, true)
      OR NOT EXISTS (
-       SELECT 1 FROM public.outbox_events
-       WHERE event_id = (v_non_accounting_enqueued->>'event_id')::uuid
-         AND status = 'dead_letter'
+       SELECT 1 FROM public.list_outbox_events_492(
+         v_tenant, ARRAY['dead_letter'], NULL,
+         (v_non_accounting_enqueued->>'event_id')::uuid, 1, NULL
+       ) e
+       WHERE e.id = (v_non_accounting_enqueued->>'id')::uuid
      ) THEN
-    RAISE EXCEPTION 'VERIFY_492_NON_ACCOUNTING_RESET_MUTATED_EVENT:%', v_result;
+    RAISE EXCEPTION 'VERIFY_492_NON_ACCOUNTING_RESET_MUTATED_EVENT:%',
+      v_result || jsonb_build_object(
+        'enqueued', v_non_accounting_enqueued,
+        'stored_status', (
+          SELECT e.status FROM public.list_outbox_events_492(
+            v_tenant, ARRAY['pending','failed','dead_letter','completed'], NULL,
+            (v_non_accounting_enqueued->>'event_id')::uuid, 1, NULL
+          ) e
+          WHERE e.id = (v_non_accounting_enqueued->>'id')::uuid
+        )
+      );
   END IF;
 
   -- Repetir la misma intención no duplica; cambiar identidad con la misma key sí falla.
@@ -722,9 +740,11 @@ BEGIN
     RAISE EXCEPTION 'VERIFY_492_FAIL_TRANSITION_INVALID:%', v_result;
   END IF;
   IF NOT EXISTS (
-    SELECT 1 FROM public.outbox_events
-    WHERE id = v_claim.id AND status = 'failed'
-      AND error_message = 'verify p_error 492' AND retry_count = 1
+    SELECT 1 FROM public.list_outbox_events_492(
+      v_tenant, ARRAY['failed'], NULL, v_claim.event_id, 1, NULL
+    ) e
+    WHERE e.id = v_claim.id
+      AND e.error_message = 'verify p_error 492' AND e.retry_count = 1
   ) THEN
     RAISE EXCEPTION 'VERIFY_492_P_ERROR_NOT_PERSISTED';
   END IF;
@@ -754,7 +774,11 @@ BEGIN
   IF public.reset_stuck_outbox_events_tx(clock_timestamp() + interval '1 minute', 10) < 1 THEN
     RAISE EXCEPTION 'VERIFY_492_STUCK_RESET_FAILED';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.outbox_events WHERE id = v_claim.id AND status = 'pending') THEN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.list_outbox_events_492(
+      v_tenant, ARRAY['pending'], NULL, v_claim.event_id, 1, NULL
+    ) e WHERE e.id = v_claim.id
+  ) THEN
     RAISE EXCEPTION 'VERIFY_492_STUCK_NOT_PENDING';
   END IF;
 
@@ -786,9 +810,10 @@ BEGIN
   );
   IF coalesce((v_result->>'updated')::boolean, true)
      OR NOT EXISTS (
-       SELECT 1 FROM public.outbox_events
-       WHERE event_id = (v_enqueued->>'event_id')::uuid
-         AND tenant_id = v_tenant AND status = 'dead_letter'
+       SELECT 1 FROM public.list_outbox_events_492(
+         v_tenant, ARRAY['dead_letter'], NULL,
+         (v_enqueued->>'event_id')::uuid, 1, NULL
+       ) e WHERE e.id = (v_enqueued->>'id')::uuid
      ) THEN
     RAISE EXCEPTION 'VERIFY_492_CROSS_TENANT_RESET_MUTATED_EVENT:%', v_result;
   END IF;
@@ -890,7 +915,7 @@ BEGIN
     v_treasury_result := public.resolver_cuenta_tesoreria_laboral_492(
       v_tenant, v_treasury_claim.id, v_treasury_claim.claim_token
     );
-    IF app.to_uuid_or_null(v_treasury_result->>'cuenta_tesoreria_id')
+    IF nullif(v_treasury_result->>'cuenta_tesoreria_id', '')::uuid
          IS DISTINCT FROM v_treasury_expected.expected_account_id
        OR v_treasury_result->>'cuenta_tesoreria_codigo'
           IS DISTINCT FROM v_treasury_expected.expected_account_code
@@ -916,15 +941,23 @@ BEGIN
     RAISE EXCEPTION 'VERIFY_492_TREASURY_MATRIX_INCOMPLETE';
   END IF;
 
-  -- Readiness es pasivo: mismo conjunto y mismos xmin/updated_at antes/después.
+  -- Readiness es pasivo: mismo conjunto, estado y updated_at antes/después.
   SELECT md5(coalesce(string_agg(
-    id::text || ':' || xmin::text || ':' || updated_at::text, ',' ORDER BY id
-  ), '')) INTO v_before FROM public.outbox_events;
+    id::text || ':' || status::text || ':' || updated_at::text, ',' ORDER BY id
+  ), '')) INTO v_before
+  FROM public.list_outbox_events_492(
+    v_tenant, ARRAY['pending','processing','completed','failed','dead_letter'],
+    NULL, NULL, 500, NULL
+  );
   v_health := public.outbox_runtime_health_492(5000, 900, 100, 900, 492);
   v_unready_health := public.outbox_runtime_health_492(5000, 900, 100, 900, 999999);
   SELECT md5(coalesce(string_agg(
-    id::text || ':' || xmin::text || ':' || updated_at::text, ',' ORDER BY id
-  ), '')) INTO v_after FROM public.outbox_events;
+    id::text || ':' || status::text || ':' || updated_at::text, ',' ORDER BY id
+  ), '')) INTO v_after
+  FROM public.list_outbox_events_492(
+    v_tenant, ARRAY['pending','processing','completed','failed','dead_letter'],
+    NULL, NULL, 500, NULL
+  );
   IF v_before IS DISTINCT FROM v_after THEN
     RAISE EXCEPTION 'VERIFY_492_READINESS_MUTATED_OUTBOX';
   END IF;

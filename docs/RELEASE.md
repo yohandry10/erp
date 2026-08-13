@@ -47,6 +47,15 @@ outbox y flujos. El backfill `490→492` debe abortar si no puede congelar evide
 contable histórica de forma inequívoca; nunca se completa usando el mapping
 bancario mutable actual. No desplegar el runtime nuevo sobre esquema `490`.
 
+El 2026-08-13 el preflight PROD pasó y se creó un respaldo PostgreSQL 17 nuevo,
+validado por listado y SHA-256. La restauración local preservó el estado `490`
+(55 tenants), aplicó `491..496`, registró `496`, pasó `verify491..496` con
+rollback y terminó con readiness `ready=true` para esquema requerido `496`.
+La evidencia sin datos de negocio está en
+`artifacts/qa-10-questions/prod-490-to-496-rehearsal-20260813.json`. Este ensayo
+reduce el riesgo técnico, pero no autoriza la escritura PROD ni el cambio de
+plan de Render.
+
 ## Go-live
 
 Orden recomendado:

@@ -22,7 +22,10 @@ migraciones verificados, prevalece la implementación actual.
 - El cierre local más reciente del backend reporta 199/199 suites y 1711/1711
   pruebas, type-check API/Web y lint sin errores. Una reconstrucción limpia en
   PostgreSQL 16 aplicó 493 migraciones `000..496`, ejecutó `verify491..496` y
-  confirmó el readiness pasivo con esquema requerido `496`.
+  confirmó el readiness pasivo con esquema requerido `496`. El 2026-08-13 se
+  generó además un respaldo nuevo de PROD `490`, se restauró en PostgreSQL 17
+  local y el upgrade realista `490→496`, sus seis verificadores y readiness
+  `496` pasaron sin escribir en PROD.
 - El cierre Web del 2026-08-13 reporta type-check limpio, build Next 131/131 y
   un perfil Playwright aislado de 16/16 pruebas: autenticación, maestro de
   inventario, gate fiscal de NC/ND, monitor outbox contable con `failed` y
@@ -57,10 +60,10 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Entornos
 
-| Entorno | Proyecto Supabase      | Estado                                      |
-| ------- | ---------------------- | ------------------------------------------- |
-| PROD    | `wypnbcptofqdmoynlonq` | Único destino remoto; datos reales          |
-| DEV     | retirado               | Bloqueado; no se usa para desarrollo ni QA  |
+| Entorno | Proyecto Supabase      | Estado                                     |
+| ------- | ---------------------- | ------------------------------------------ |
+| PROD    | `wypnbcptofqdmoynlonq` | Único destino remoto; datos reales         |
+| DEV     | retirado               | Bloqueado; no se usa para desarrollo ni QA |
 
 Reglas vigentes:
 
@@ -168,7 +171,11 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   límite de diez fuentes comerciales y Kardex con apertura, saldo corrido,
   fecha local y unidades no mezclables. La reconstrucción limpia `000..496`,
   sus seis verificadores y el gate de esquema `496` pasaron en PostgreSQL 16.
-  Ninguna de estas migraciones se ha aplicado a PROD.
+  También pasó el ensayo `490→496` sobre un respaldo restaurado de PROD en
+  PostgreSQL 17: conservó 55 tenants, el backfill laboral procesó cero filas
+  ambiguas y readiness terminó listo en esquema `496`. La evidencia está en
+  `artifacts/qa-10-questions/prod-490-to-496-rehearsal-20260813.json`. Ninguna
+  de estas migraciones se ha aplicado a PROD.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -309,8 +316,9 @@ productivo autorizado.
 - Confirmar que no existan colisiones históricas fiscales antes de resincronizar
   series.
 - Completar secretos productivos y ejecutar smoke controlado.
-- Promover de forma coordinada `491..496`: preflight y respaldo, inspección del
-  backfill 490→492, migraciones, API/worker con
+- Promover de forma coordinada `491..496`: el preflight, respaldo verificable y
+  ensayo local sobre la copia de PROD pasaron el 2026-08-13; repetir el
+  preflight justo antes de la ventana autorizada, aplicar migraciones, API/worker con
   `REQUIRED_DATABASE_SCHEMA_VERSION=496`, Web y postchecks. Render debe exponer
   el SHA/fecha reales y su readiness debe comprobar DB, Redis y outbox; el plan
   `starter` propuesto implica costo y requiere aprobación antes de aplicar el
