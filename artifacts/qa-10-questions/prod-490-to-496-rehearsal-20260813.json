@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-08-13T08:35:10-05:00",
+  "source": {
+    "environment": "PROD",
+    "projectRef": "wypnbcptofqdmoynlonq",
+    "databaseServerVersion": "17.6",
+    "latestMigrationBefore": 490,
+    "migrationRowsBefore": 111,
+    "tenantCount": 55,
+    "publicTableCountBefore": 242
+  },
+  "backup": {
+    "format": "pg_dump custom",
+    "sizeBytes": 11874362,
+    "sha256": "6920AE92791894EB42E635DA2D99F37ECAA0EA21DD4684F8C3985FF4F698FF8D",
+    "validatedWithPgRestoreList": true,
+    "committedToGit": false
+  },
+  "rehearsal": {
+    "remoteWrites": false,
+    "localPostgreSQLVersion": "17.5",
+    "restoredSchemas": [
+      "public",
+      "app",
+      "supabase_migrations",
+      "auth",
+      "storage"
+    ],
+    "migrationsApplied": [491, 492, 493, 494, 495, 496],
+    "latestMigrationAfter": 496,
+    "migrationRowsAfter": 117,
+    "tenantCountAfter": 55,
+    "publicTableCountAfter": 243,
+    "laborOutboxBackfillRows": 0,
+    "referencedNoteLegacyRepairs": 0,
+    "verifiersPassed": [491, 492, 493, 494, 495, 496],
+    "verifiersRolledBackFixtures": true,
+    "readiness": {
+      "ready": true,
+      "database": "ok",
+      "schemaVersion": 496,
+      "requiredSchemaVersion": 496,
+      "requiredSchemaApplied": true,
+      "claimable": 0,
+      "processing": 0,
+      "failed": 0,
+      "deadLetter": 0,
+      "missingServiceRoleReads": []
+    }
+  },
+  "result": "PASS",
+  "authorization": "No se aplicaron migraciones ni despliegues en PROD."
+}
