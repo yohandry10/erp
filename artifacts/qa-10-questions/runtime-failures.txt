@@ -1,0 +1,19 @@
+Entorno local efímero, cadena limpia hasta migración 491 — 2026-08-13
+
+Readiness HTTP:
+  200 { "status": "ready", "checks": { "database": "ok" } }
+
+Errores simultáneos del runtime:
+  OutboxEventsService: permission denied for table outbox_events
+  OutboxWorker: No se pudo marcar evento como procesando: permission denied for table outbox_events
+  OutboxService.markEventFailed: RPC invocada con p_error_message; SQL expone p_error
+  POS worker: permission denied for table ventas_pos; resultado informado como procesadas=0, errores=0
+  POS UI/session: permission denied for table sesiones_caja
+  CPE UI/API: permission denied for table cpe
+  RRHH UI/API: permission denied for table planillas
+  RRHH liquidaciones: permission denied for table empleados
+  Tesorería/RRHH: permission denied for table cuentas_bancarias
+  Layout/notificaciones: permission denied for table notificaciones
+
+Conclusión reproducida: un HTTP 200 de /api/health/ready no demuestra que los
+workers durables ni las superficies funcionales puedan operar.

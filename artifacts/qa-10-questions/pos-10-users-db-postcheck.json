@@ -1,0 +1,20 @@
+{
+  "environment": "local_ephemeral",
+  "run": "qa-pos-10-1786606539634",
+  "attempted_sales": 10,
+  "http_created": 1,
+  "http_conflict_closed_cashbox": 1,
+  "http_unique_document_failures": 8,
+  "persisted_sales": 1,
+  "persisted_unique_idempotency_keys": 1,
+  "persisted_details": 1,
+  "persisted_payments": 1,
+  "persisted_inventory_movements": 1,
+  "persisted_cash_movements": 1,
+  "persisted_ticket_documents": 1,
+  "stock_before": 200,
+  "stock_after": 199,
+  "winning_ticket": "T001-00000001",
+  "losing_error": "23505 ux_documentos_tenant_tipo_serie_numero_runtime",
+  "rollback_of_failed_sales": "verified_no_partial_rows"
+}

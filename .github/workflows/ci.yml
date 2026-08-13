@@ -7,10 +7,10 @@ on:
     branches:
       - main
       - develop
-      - 'codex/**'
-      - 'feat/**'
-      - 'fix/**'
-      - 'chore/**'
+      - "codex/**"
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
   pull_request:
     branches: [main, develop]
 
@@ -35,8 +35,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: "20"
+          cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
@@ -64,8 +64,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: "20"
+          cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
@@ -96,8 +96,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: "20"
+          cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
@@ -128,8 +128,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: "20"
+          cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
@@ -159,11 +159,65 @@ jobs:
             node -e "const t=require('./apps/erp-api/coverage/coverage-summary.json').total; for (const k of ['statements','branches','functions','lines']) console.log('- '+k+': '+t[k].pct+'%');" >> $GITHUB_STEP_SUMMARY
           fi
 
+  database-contracts:
+    name: PostgreSQL 16 fresh schema + SQL contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: [install]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: erp_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d erp_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      E2E_EPHEMERAL_LOCAL_DB: "1"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "496"
+      PGPASSWORD: postgres
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGDATABASE: erp_e2e
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Ensure PostgreSQL 16 client
+        run: |
+          if ! command -v psql >/dev/null || ! psql --version | grep -q ' 16\.'; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client-16
+          fi
+          psql --version
+
+      - name: Rebuild and verify the required database contract
+        run: node scripts/ci/verify-database-contracts.mjs
+
+      - name: Database contract summary
+        if: always()
+        run: |
+          echo "## PostgreSQL 16 schema gate" >> "$GITHUB_STEP_SUMMARY"
+          echo '- Reconstrucción limpia de todas las migraciones.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Todos los verificadores SQL desde 491 hasta el esquema requerido 496.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Una migración nueva sin verificador del mismo prefijo falla el job.' >> "$GITHUB_STEP_SUMMARY"
+
   build:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [test]
+    needs: [test, database-contracts]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -176,8 +230,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: "20"
+          cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
@@ -208,8 +262,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: "20"
+          cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies

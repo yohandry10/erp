@@ -38,6 +38,16 @@ export interface AppEnvironment {
   REDIS_PORT?: number;
   REDIS_PASSWORD?: string;
   REDIS_REQUIRED?: boolean;
+  OUTBOX_WORKER_CRON_ENABLED?: boolean;
+  ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED?: boolean;
+  OUTBOX_READY_MAX_CLAIMABLE?: number;
+  OUTBOX_READY_MAX_OLDEST_SECONDS?: number;
+  OUTBOX_READY_MAX_DEAD_LETTER?: number;
+  OUTBOX_READY_STALE_SECONDS?: number;
+  REQUIRED_DATABASE_SCHEMA_VERSION?: number;
+  APP_VERSION?: string;
+  APP_COMMIT_SHA?: string;
+  APP_BUILD_DATE?: string;
   PFX_PATH?: string;
   PFX_PASS?: string;
   REQUIRE_REAL_FISCAL_CERTIFICATE?: boolean;
@@ -144,6 +154,20 @@ export const envSchema = Joi.object({
   REDIS_PORT: Joi.number().port().default(6379),
   REDIS_PASSWORD: Joi.string().allow('').optional(),
   REDIS_REQUIRED: Joi.boolean().truthy('true').falsy('false').default(false),
+  OUTBOX_WORKER_CRON_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
+  ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
+  OUTBOX_READY_MAX_CLAIMABLE: Joi.number().integer().min(0).default(5000),
+  OUTBOX_READY_MAX_OLDEST_SECONDS: Joi.number().integer().min(0).default(900),
+  OUTBOX_READY_MAX_DEAD_LETTER: Joi.number().integer().min(0).default(100),
+  OUTBOX_READY_STALE_SECONDS: Joi.number().integer().min(1).default(900),
+  REQUIRED_DATABASE_SCHEMA_VERSION: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.number().integer().min(1).required(),
+    otherwise: Joi.number().integer().min(1).default(496),
+  }),
+  APP_VERSION: Joi.string().max(100).optional(),
+  APP_COMMIT_SHA: Joi.string().max(100).optional(),
+  APP_BUILD_DATE: Joi.string().isoDate().optional(),
   PFX_PATH: Joi.string().allow('').optional(),
   PFX_PASS: Joi.string().allow('').min(8).optional(),
   REQUIRE_REAL_FISCAL_CERTIFICATE: Joi.boolean().truthy('true').falsy('false').default(false),

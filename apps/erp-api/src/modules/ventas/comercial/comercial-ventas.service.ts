@@ -229,6 +229,9 @@ export class ComercialVentasService {
     dto: CrearConsolidadoVentasDto,
     idempotencyKey?: string,
   ) {
+    if (dto.fuentes.length < 1 || dto.fuentes.length > 10) {
+      throw new BadRequestException('Un consolidado debe reunir entre 1 y 10 ventas');
+    }
     const unique = new Set(dto.fuentes.map((fuente) => `${fuente.tipo}:${fuente.id}`));
     if (unique.size !== dto.fuentes.length) {
       throw new BadRequestException('Una venta no puede repetirse dentro del mismo bloque');

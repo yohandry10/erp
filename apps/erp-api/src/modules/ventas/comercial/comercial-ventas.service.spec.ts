@@ -94,6 +94,19 @@ describe('ComercialVentasService 469', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it('rechaza más de diez ventas aunque el servicio se invoque sin ValidationPipe', async () => {
+    const { service, rpc } = build();
+    const fuentes = Array.from({ length: 11 }, (_, index) => ({
+      tipo: 'POS' as const,
+      id: `4e9b26b1-1607-4f8a-9d28-${String(index).padStart(12, '0')}`,
+    }));
+
+    await expect(service.crearConsolidado(
+      'tenant-1', 'actor-1', { fuentes }, 'batch-key-max-ten',
+    )).rejects.toThrow('entre 1 y 10 ventas');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['23505', ConflictException],
     ['42501', ForbiddenException],

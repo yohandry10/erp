@@ -4,7 +4,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { SupabaseService } from './shared/supabase/supabase.service';
 import { ValidationPipe } from '@nestjs/common';
 import { SecurityService } from './shared/security/security.service';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -14,24 +13,6 @@ import { StructuredLogger } from './shared/logging/structured-logger.service';
 import helmet from 'helmet';
 import compression from 'compression';
 import { ConfigService } from '@nestjs/config';
-
-/**
- * Notifica a PostgREST para que recargue el esquema de la base de datos.
- * Esto es útil después de realizar migraciones o cambios en la DB.
- */
-async function notifySchemaReload(supabase: SupabaseService) {
-  try {
-    // Usar cliente público porque no hay tenant context en el arranque
-    const client = supabase.getPublicClient();
-    if (client) {
-      console.log('📢 Notificando a PostgREST para recargar el esquema...');
-      await client.rpc('pgrst_reload_schema');
-      console.log('✅ Esquema notificado para recarga.');
-    }
-  } catch (error) {
-    console.warn('⚠️ No se pudo notificar la recarga del esquema a PostgREST. Esto es seguro de ignorar si el rol no tiene permisos.', error.message);
-  }
-}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -287,10 +268,6 @@ Para más información, consulte la documentación técnica en el repositorio.
   const logger = await app.resolve(StructuredLogger);
   logger.setService('Bootstrap');
   app.useGlobalInterceptors(new LoggingInterceptor(logger));
-
-  // Forzar recarga de esquema de Supabase al iniciar
-  const supabaseService = app.get(SupabaseService);
-  await notifySchemaReload(supabaseService);
 
   await app.listen(port);
 

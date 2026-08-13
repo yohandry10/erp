@@ -10,6 +10,7 @@ type KardexMovimiento = {
   tipo: 'ENTRADA' | 'SALIDA' | 'AJUSTE' | 'DEVOLUCION'
   sentido: 'ENTRADA' | 'SALIDA' | 'PENDIENTE'
   fecha: string | null
+  fechaLocal: string | null
   documento?: string | null
   estado?: string | null
   cantidad: number
@@ -22,12 +23,16 @@ type KardexMovimiento = {
   tipoCambio: number | null
   valorTotalBase: number | null
   valorFirmadoBase: number | null
+  saldoCantidadPosterior: number | null
+  saldoValorizadoBasePosterior: number | null
+  saldoMonedaBase: string | null
   valuacionEstado: string
   producto: {
     id: string
     nombre: string
     codigo?: string | null
     sku?: string | null
+    unidadMedida?: string | null
   }
   almacen?: {
     id: string
@@ -47,21 +52,31 @@ type KardexMovimiento = {
 
 type KardexResumen = {
   totalMovimientos: number
-  totalEntradas: number
-  totalSalidas: number
-  totalAjustes: number
-  totalDevoluciones: number
+  totalEntradas: number | null
+  totalSalidas: number | null
+  totalAjustes: number | null
+  totalDevoluciones: number | null
   valorEntradasBase: number | null
   valorSalidasBase: number | null
   saldoCantidad: number | null
   saldoValorizadoBase: number | null
+  saldoInicialCantidad: number | null
+  movimientoNetoCantidad: number | null
+  saldoInicialValorizadoBase: number | null
+  movimientoNetoValorizadoBase: number | null
   monedaBase: string | null
   pendientesValorizacion: number
   pendientesSentido: number
+  pendientesSaldoValorizacion: number
+  pendientesSaldoSentido: number
   multiplesMonedasBase: boolean
+  cantidadAgregable: boolean
+  productosEnSaldo: number
+  unidadesEnSaldo: number
+  movimientosSinUnidad: number
   resumenConfiable: boolean
-  valorPorMoneda: Record<string, number>
-  valorBasePorMoneda: Record<string, number>
+  valorPorMoneda: Record<string, number> | null
+  valorBasePorMoneda: Record<string, number> | null
 }
 
 type FilterState = {
@@ -81,10 +96,20 @@ const DEFAULT_RESUMEN: KardexResumen = {
   valorSalidasBase: 0,
   saldoCantidad: 0,
   saldoValorizadoBase: 0,
+  saldoInicialCantidad: 0,
+  movimientoNetoCantidad: 0,
+  saldoInicialValorizadoBase: 0,
+  movimientoNetoValorizadoBase: 0,
   monedaBase: 'PEN',
   pendientesValorizacion: 0,
   pendientesSentido: 0,
+  pendientesSaldoValorizacion: 0,
+  pendientesSaldoSentido: 0,
   multiplesMonedasBase: false,
+  cantidadAgregable: true,
+  productosEnSaldo: 0,
+  unidadesEnSaldo: 0,
+  movimientosSinUnidad: 0,
   resumenConfiable: true,
   valorPorMoneda: {},
   valorBasePorMoneda: {},
@@ -123,6 +148,13 @@ const formatDateTime = (value?: string | null) => {
   const candidate = value.includes('T') ? value : `${value}T00:00:00Z`
   const parsed = new Date(candidate)
   return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleString('es-PE', DATE_OPTIONS)
+}
+
+const formatTenantDate = (value?: string | null) => {
+  if (!value) return '—'
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`
+  return formatDateTime(value)
 }
 
 function NoPermissionBanner() {
@@ -193,6 +225,7 @@ export default function KardexPage() {
             tipo: String(item.tipo ?? 'ENTRADA').toUpperCase() as KardexMovimiento['tipo'],
             sentido: String(item.sentido ?? (item.tipo === 'SALIDA' ? 'SALIDA' : 'ENTRADA')).toUpperCase() as KardexMovimiento['sentido'],
             fecha: item.fecha ?? item.fechaRecepcion ?? null,
+            fechaLocal: item.fechaLocal ?? null,
             documento: item.documento ?? item.recepcionNumero ?? null,
             estado: item.estado ?? item.recepcionEstado ?? null,
             cantidad: Number(item.cantidad ?? item.cantidadRecibida ?? 0),
@@ -205,12 +238,16 @@ export default function KardexPage() {
             tipoCambio: nullableNumber(item.tipoCambio),
             valorTotalBase: nullableNumber(item.valorTotalBase),
             valorFirmadoBase: nullableNumber(item.valorFirmadoBase),
+            saldoCantidadPosterior: nullableNumber(item.saldoCantidadPosterior),
+            saldoValorizadoBasePosterior: nullableNumber(item.saldoValorizadoBasePosterior),
+            saldoMonedaBase: item.saldoMonedaBase ?? null,
             valuacionEstado: item.valuacionEstado ?? 'PENDIENTE_COSTO',
             producto: {
               id: item.producto?.id ?? item.productoId,
               nombre: item.producto?.nombre ?? item.productoNombre ?? 'Producto',
               codigo: item.producto?.codigo ?? item.productoCodigo ?? null,
               sku: item.producto?.sku ?? item.productoSku ?? null,
+              unidadMedida: item.producto?.unidadMedida ?? item.productoUnidadMedida ?? null,
             },
             almacen: item.almacen
               ? item.almacen
@@ -283,20 +320,28 @@ export default function KardexPage() {
         note: 'Entradas, salidas, ajustes y devoluciones',
       },
       {
-        label: 'Saldo unidades',
+        label: resumen.cantidadAgregable ? 'Saldo final unidades' : 'Saldo físico por producto',
         value: resumen.saldoCantidad,
-        note: `${formatNumber(resumen.totalEntradas)} entradas · ${formatNumber(resumen.totalSalidas)} salidas`,
+        note: resumen.cantidadAgregable
+          ? `${formatNumber(resumen.saldoInicialCantidad)} inicial · ${formatNumber(resumen.movimientoNetoCantidad)} movimiento neto`
+          : resumen.movimientosSinUnidad > 0
+            ? `${resumen.movimientosSinUnidad} movimiento(s) pertenecen a productos legacy sin unidad regularizada; no se presume NIU.`
+            : `${resumen.productosEnSaldo} productos / ${resumen.unidadesEnSaldo} unidad(es): no se suman cantidades heterogéneas; use el detalle o filtre un producto`,
       },
       {
-        label: `Flujo valorizado (${resumen.monedaBase ?? 'bases múltiples'})`,
+        label: `Saldo final valorizado (${resumen.monedaBase ?? 'bases múltiples'})`,
         value: resumen.saldoValorizadoBase,
-        note: `${formatCurrency(resumen.valorEntradasBase, resumen.monedaBase)} entradas · ${formatCurrency(resumen.valorSalidasBase, resumen.monedaBase)} salidas`,
+        note: `${formatCurrency(resumen.saldoInicialValorizadoBase, resumen.monedaBase)} inicial · ${formatCurrency(resumen.movimientoNetoValorizadoBase, resumen.monedaBase)} movimiento neto`,
         formatted: formatCurrency(resumen.saldoValorizadoBase, resumen.monedaBase),
       },
       {
         label: 'Ajustes y devoluciones',
-        value: resumen.totalAjustes + resumen.totalDevoluciones,
-        note: `${formatNumber(resumen.totalAjustes)} ajustes netos · ${formatNumber(resumen.totalDevoluciones)} devoluciones netas`,
+        value: resumen.cantidadAgregable
+          ? (resumen.totalAjustes ?? 0) + (resumen.totalDevoluciones ?? 0)
+          : null,
+        note: resumen.cantidadAgregable
+          ? `${formatNumber(resumen.totalAjustes)} ajustes netos · ${formatNumber(resumen.totalDevoluciones)} devoluciones netas`
+          : 'Cantidades disponibles por producto en el detalle; no se mezclan SKU ni unidades',
       },
     ],
     [resumen],
@@ -429,9 +474,9 @@ export default function KardexPage() {
 
               {!error && !resumen.resumenConfiable && (
                 <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4 text-sm text-amber-950 dark:text-amber-100">
-                  <strong>Valoración incompleta.</strong> Hay {resumen.pendientesValorizacion} movimiento(s) sin costo o
-                  tipo de cambio durable y {resumen.pendientesSentido} sin sentido físico determinable.
-                  {resumen.multiplesMonedasBase ? ' El rango contiene snapshots de más de una moneda base.' : ''} El saldo base
+                  <strong>Valoración incompleta.</strong> Hay {resumen.pendientesSaldoValorizacion} movimiento(s) históricos
+                  hasta el corte sin costo o tipo de cambio durable y {resumen.pendientesSaldoSentido} sin sentido físico determinable.
+                  {resumen.multiplesMonedasBase ? ' El historial hasta el corte contiene snapshots de más de una moneda base.' : ''} El saldo base
                   permanece “Por valorizar” para evitar inventar importes.
                 </div>
               )}
@@ -453,11 +498,11 @@ export default function KardexPage() {
                 ))}
               </section>
 
-              {Object.keys(resumen.valorPorMoneda ?? {}).length > 0 && (
+              {resumen.resumenConfiable && Object.keys(resumen.valorPorMoneda ?? {}).length > 0 && (
                 <section className="rounded-[0.875rem] border bg-blue-500/10 p-4 text-foreground text-sm flex flex-wrap gap-4"
                 >
                   <strong>Saldo valorizado por moneda origen:</strong>
-                  {Object.entries(resumen.valorPorMoneda).map(([moneda, valor]) => (
+                  {Object.entries(resumen.valorPorMoneda ?? {}).map(([moneda, valor]) => (
                     <span key={moneda}>
                       {moneda}: {formatCurrency(valor, moneda)}
                     </span>
@@ -465,10 +510,10 @@ export default function KardexPage() {
                 </section>
               )}
 
-              {Object.keys(resumen.valorBasePorMoneda ?? {}).length > 1 && (
+              {resumen.resumenConfiable && Object.keys(resumen.valorBasePorMoneda ?? {}).length > 1 && (
                 <section className="rounded-[0.875rem] border border-amber-500/40 bg-amber-500/10 p-4 text-sm flex flex-wrap gap-4">
                   <strong>Snapshots por moneda base:</strong>
-                  {Object.entries(resumen.valorBasePorMoneda).map(([moneda, valor]) => (
+                  {Object.entries(resumen.valorBasePorMoneda ?? {}).map(([moneda, valor]) => (
                     <span key={moneda}>{moneda}: {formatCurrency(valor, moneda)}</span>
                   ))}
                 </section>
@@ -481,7 +526,7 @@ export default function KardexPage() {
                   <div className="text-muted-foreground text-sm">No se encontraron movimientos para los filtros seleccionados.</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-[100%] min-w-[880px]">
+                    <table className="w-[100%] min-w-[1040px]">
                       <thead>
                         <tr className="border-b text-left text-foreground/80 text-xs">
                           <th className="py-[0.65rem] px-2">Fecha</th>
@@ -490,6 +535,7 @@ export default function KardexPage() {
                           <th className="py-[0.65rem] px-2">Producto</th>
                           <th className="py-[0.65rem] px-2">Almacén</th>
                           <th className="py-[0.65rem] px-2 text-right">Cantidad</th>
+                          <th className="py-[0.65rem] px-2 text-right">Saldo posterior</th>
                           <th className="py-[0.65rem] px-2 text-right">Costo Unit.</th>
                           <th className="py-[0.65rem] px-2 text-right">Valor total</th>
                           <th className="py-[0.65rem] px-2">Lote / Serie</th>
@@ -498,7 +544,9 @@ export default function KardexPage() {
                       <tbody>
                         {movimientos.map((mov) => (
                           <tr key={mov.id} className="border-b">
-                            <td className="py-3 px-2 text-foreground font-semibold">{formatDateTime(mov.fecha)}</td>
+                            <td className="py-3 px-2 text-foreground font-semibold" title={formatDateTime(mov.fecha)}>
+                              {formatTenantDate(mov.fechaLocal ?? mov.fecha)}
+                            </td>
                             <td className="py-3 px-2 text-foreground/80">{mov.documento ?? '—'}</td>
                             <td className="py-3 px-2">
                               <span className={mov.sentido === 'SALIDA' ? 'font-semibold text-rose-500' : mov.sentido === 'ENTRADA' ? 'font-semibold text-emerald-500' : 'font-semibold text-amber-500'}>
@@ -522,7 +570,15 @@ export default function KardexPage() {
                               ) : null}
                             </td>
                             <td className="py-3 px-2 text-right text-foreground font-semibold">
-                              {mov.sentido === 'SALIDA' ? '-' : mov.sentido === 'ENTRADA' ? '+' : ''}{formatNumber(mov.cantidad)}
+                              {mov.sentido === 'SALIDA' ? '-' : mov.sentido === 'ENTRADA' ? '+' : ''}{formatNumber(mov.cantidad)} {mov.producto.unidadMedida ?? ''}
+                            </td>
+                            <td className="py-3 px-2 text-right text-foreground font-semibold">
+                              {formatNumber(mov.saldoCantidadPosterior)} {mov.producto.unidadMedida ?? ''}
+                              {mov.saldoValorizadoBasePosterior !== null && (
+                                <span className="block text-xs font-normal text-muted-foreground">
+                                  {formatCurrency(mov.saldoValorizadoBasePosterior, mov.saldoMonedaBase)}
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 px-2 text-right text-foreground/80">
                               {formatCurrency(mov.costoUnitario, mov.moneda)}

@@ -5,12 +5,14 @@ import { PeriodosService, EstadoPeriodo } from './periodos.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { PlanCuentasService, PlanCuenta } from './plan-cuentas.service';
 import { DocumentoFiscalGeneradoEvent } from '../../../shared/events/event-bus.service';
+import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 
 describe('AsientosGeneratorService', () => {
   let service: AsientosGeneratorService;
   let periodosService: jest.Mocked<PeriodosService>;
   let supabaseService: jest.Mocked<SupabaseService>;
   let planCuentasService: jest.Mocked<PlanCuentasService>;
+  let tenantContext: { getOutboxClaim: jest.Mock };
 
   let mockSupabaseClient: any;
 
@@ -64,6 +66,9 @@ describe('AsientosGeneratorService', () => {
 
   beforeEach(async () => {
     mockSupabaseClient = createMockSupabaseClient();
+    tenantContext = {
+      getOutboxClaim: jest.fn().mockReturnValue(null),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -86,6 +91,10 @@ describe('AsientosGeneratorService', () => {
             obtenerCuentasPorCodigos: jest.fn(),
             buscarCuentaPorCodigoONombre: jest.fn().mockResolvedValue(null)
           }
+        },
+        {
+          provide: TenantContextService,
+          useValue: tenantContext,
         }
       ]
     }).compile();
@@ -422,8 +431,9 @@ describe('AsientosGeneratorService', () => {
         'crear_asiento_con_detalles_tx',
         expect.any(Object)
       );
-      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'completed' })
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith(
+        'complete_outbox_event_tx',
+        expect.any(Object),
       );
     });
 
@@ -438,7 +448,10 @@ describe('AsientosGeneratorService', () => {
 
       await service.marcarEventoComoFallido('event-completed', 'Tipo de evento no manejado');
 
-      expect(mockSupabaseClient.update).not.toHaveBeenCalled();
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith(
+        'fail_outbox_event_tx',
+        expect.any(Object),
+      );
     });
 
     it('debe procesar múltiples intentos del mismo evento retornando el mismo asiento', async () => {
@@ -1858,41 +1871,151 @@ describe('AsientosGeneratorService', () => {
   });
 
   describe('movimientos laborales de liquidaciones y CTS', () => {
-    it.each([
-      ['generarAsientoDevengoLiquidacion', '621', '411'],
-      ['generarAsientoPagoLiquidacion', '411', '10'],
-      ['generarAsientoReversaPagoLiquidacion', '10', '411'],
-      ['generarAsientoDepositoCts', '621', '10'],
-    ])('%s genera un asiento cuadrado e idempotente', async (metodo, debeCodigo, haberCodigo) => {
+    it('genera el devengo desde el snapshot y separa beneficios de remuneraciones/otros', async () => {
       planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
-        [debeCodigo, createMockPlanCuenta(debeCodigo, `Cuenta ${debeCodigo}`)],
-        [haberCodigo, createMockPlanCuenta(haberCodigo, `Cuenta ${haberCodigo}`)],
+        ['629', createMockPlanCuenta('629', 'Beneficios sociales')],
+        ['621', createMockPlanCuenta('621', 'Remuneraciones y otros')],
+        ['411', createMockPlanCuenta('411', 'Liquidaciones por pagar')],
       ]));
       const generarAsientoSpy = jest.spyOn(service, 'generarAsiento').mockResolvedValue({ id: 'asiento-laboral' } as any);
 
-      await (service as any)[metodo]({
+      await service.generarAsientoDevengoLiquidacion({
         tenant_id: 'tenant-rrhh',
         fecha: '2026-08-09',
         monto: 1250.45,
+        componentes_liquidacion: {
+          version: 492,
+          montoCts: 300,
+          indemnizacion: 200,
+          beneficiosSociales: 500,
+          remuneracionesYOtros: 750.45,
+          total: 1250.45,
+        },
         referencia: 'RRHH-1',
         source_event_id: 'event-rrhh-1',
       });
 
       expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith(
         'tenant-rrhh',
-        [debeCodigo, haberCodigo],
+        ['411', '629', '621'],
       );
       expect(generarAsientoSpy).toHaveBeenCalledWith(
         'tenant-rrhh',
         expect.any(Date),
         expect.any(String),
         expect.arrayContaining([
-          expect.objectContaining({ cuenta_id: `cuenta-${debeCodigo}`, debe: 1250.45, haber: 0 }),
-          expect.objectContaining({ cuenta_id: `cuenta-${haberCodigo}`, debe: 0, haber: 1250.45 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-629', debe: 500, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-621', debe: 750.45, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-411', debe: 0, haber: 1250.45 }),
         ]),
         'RRHH-1',
         'event-rrhh-1',
       );
+    });
+
+    it('omite componentes en cero pero conserva el total exacto', async () => {
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['621', createMockPlanCuenta('621', 'Remuneraciones y otros')],
+        ['411', createMockPlanCuenta('411', 'Liquidaciones por pagar')],
+      ]));
+      const generarAsientoSpy = jest.spyOn(service, 'generarAsiento').mockResolvedValue({ id: 'asiento-sin-beneficios' } as any);
+
+      await service.generarAsientoDevengoLiquidacion({
+        tenant_id: 'tenant-rrhh', fecha: '2026-08-09', monto: 900,
+        componentes_liquidacion: {
+          version: 492, montoCts: 0, indemnizacion: 0,
+          beneficiosSociales: 0, remuneracionesYOtros: 900, total: 900,
+        },
+      });
+
+      const detalles = generarAsientoSpy.mock.calls[0][3];
+      expect(detalles).toHaveLength(2);
+      expect(detalles).toEqual(expect.arrayContaining([
+        expect.objectContaining({ cuenta_id: 'cuenta-621', debe: 900, haber: 0 }),
+        expect.objectContaining({ cuenta_id: 'cuenta-411', debe: 0, haber: 900 }),
+      ]));
+    });
+
+    it('falla cerrado ante un snapshot de liquidación ausente o desbalanceado', async () => {
+      await expect(service.generarAsientoDevengoLiquidacion({
+        tenant_id: 'tenant-rrhh', fecha: '2026-08-09', monto: 900,
+      })).rejects.toThrow('snapshot de componentes');
+      await expect(service.generarAsientoDevengoLiquidacion({
+        tenant_id: 'tenant-rrhh', fecha: '2026-08-09', monto: 900,
+        componentes_liquidacion: {
+          version: 492, montoCts: 100, indemnizacion: 100,
+          beneficiosSociales: 200, remuneracionesYOtros: 699, total: 900,
+        },
+      })).rejects.toThrow('snapshot de componentes');
+      expect(planCuentasService.obtenerCuentasPorCodigos).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['generarAsientoPagoLiquidacion', '411', 'haber'],
+      ['generarAsientoReversaPagoLiquidacion', '411', 'debe'],
+      ['generarAsientoDepositoCts', '629', 'haber'],
+    ])('%s usa la cuenta bancaria exacta y nunca el código genérico 10', async (metodo, contraparte, ladoTesoreria) => {
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        [contraparte, createMockPlanCuenta(contraparte, `Cuenta ${contraparte}`)],
+      ]));
+      const generarAsientoSpy = jest.spyOn(service, 'generarAsiento').mockResolvedValue({ id: 'asiento-tesoreria-laboral' } as any);
+
+      await (service as any)[metodo]({
+        tenant_id: 'tenant-rrhh', fecha: '2026-08-09', monto: 1250.45,
+        referencia: 'RRHH-TES-1', source_event_id: 'event-rrhh-tes-1',
+        metodo_pago: 'transferencia', cuenta_tesoreria_id: 'ledger-bank-exact',
+        cuenta_tesoreria_codigo: '104199',
+      });
+
+      expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith(
+        'tenant-rrhh', [contraparte],
+      );
+      expect(planCuentasService.obtenerCuentasPorCodigos).not.toHaveBeenCalledWith(
+        'tenant-rrhh', expect.arrayContaining(['10']),
+      );
+      const detalles = generarAsientoSpy.mock.calls[0][3];
+      expect(detalles).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          cuenta_id: 'ledger-bank-exact',
+          debe: ladoTesoreria === 'debe' ? 1250.45 : 0,
+          haber: ladoTesoreria === 'haber' ? 1250.45 : 0,
+        }),
+      ]));
+    });
+
+    it.each([
+      ['banco A', 'transferencia', 'ledger-bank-a', '104101'],
+      ['banco B', 'transferencia', 'ledger-bank-b', '104102'],
+      ['efectivo', 'efectivo', 'ledger-cash', '10111'],
+    ])('pago de planilla acredita exactamente %s', async (_caso, metodoPago, cuentaId, cuentaCodigo) => {
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['411', createMockPlanCuenta('411', 'Remuneraciones por pagar', 'PASIVO')],
+      ]));
+      const generarAsientoSpy = jest.spyOn(service, 'generarAsiento').mockResolvedValue({ id: `asiento-${cuentaId}` } as any);
+
+      await service.generarAsientoPagoPlanilla({
+        tenant_id: 'tenant-rrhh', fecha: '2026-08-09', monto: 900,
+        referencia: `PLAN-${cuentaId}`, source_event_id: `event-${cuentaId}`,
+        metodo_pago: metodoPago, cuenta_tesoreria_id: cuentaId,
+        cuenta_tesoreria_codigo: cuentaCodigo,
+      });
+
+      expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith('tenant-rrhh', ['411']);
+      expect(generarAsientoSpy).toHaveBeenCalledWith(
+        'tenant-rrhh', expect.any(Date), expect.any(String),
+        expect.arrayContaining([
+          expect.objectContaining({ cuenta_id: 'cuenta-411', debe: 900, haber: 0 }),
+          expect.objectContaining({ cuenta_id: cuentaId, debe: 0, haber: 900 }),
+        ]),
+        `PLAN-${cuentaId}`, `event-${cuentaId}`,
+      );
+    });
+
+    it('falla cerrado si un pago laboral llega sin cuenta tesorera resuelta', async () => {
+      await expect(service.generarAsientoPagoLiquidacion({
+        tenant_id: 'tenant-rrhh', fecha: '2026-08-09', monto: 10,
+      })).rejects.toThrow('cuenta tesorera exacta requerida');
+      expect(planCuentasService.obtenerCuentasPorCodigos).not.toHaveBeenCalled();
     });
   });
 

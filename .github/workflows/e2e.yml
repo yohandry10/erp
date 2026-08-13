@@ -1,16 +1,79 @@
-name: E2E remoto deshabilitado
+name: E2E web aislado
 
-# Las specs existentes aprovisionan y modifican datos. DEV fue retirado y no se
-# redirigen a PROD porque eso mezclaría QA sintético con clientes reales.
+# Estas pruebas levantan únicamente Next.js y enrutan las APIs dentro de
+# Playwright. El preflight rechaza cualquier URL que no sea localhost, por lo
+# que este workflow nunca usa PROD ni el proyecto DEV retirado.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+      - "codex/**"
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: e2e-web-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  blocked:
-    name: Bloqueado por contrato PROD-only
+  isolated-browser-contracts:
+    name: Playwright isolated browser contracts
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      E2E_ISOLATED_BROWSER: "1"
+      PLAYWRIGHT_SKIP_GLOBAL_AUTH: "1"
+      BASE_URL: http://127.0.0.1:3001
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3002
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      SUPABASE_URL: http://127.0.0.1:54321
+      JWT_SECRET: ci-isolated-browser-contract-only-32-bytes-minimum
     steps:
-      - name: Explicar bloqueo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
+
+      - name: Run isolated browser contracts
+        run: pnpm --filter @erp-suite/web test:e2e:isolated
+
+      - name: Upload Playwright failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-isolated-failures
+          path: apps/web/test-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: E2E summary
+        if: always()
         run: |
-          echo "## E2E remoto bloqueado" >> "$GITHUB_STEP_SUMMARY"
-          echo "DEV está deshabilitado y las pruebas con escritura están prohibidas en PROD." >> "$GITHUB_STEP_SUMMARY"
+          echo '## E2E web aislado' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Navegación pública y formulario de login.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Contrato de sesión/middleware.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- CRUD visual de almacén/ubicación con APIs interceptadas.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Gate visual NC/ND: borrador neutro y efecto sólo con CDR aceptado.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Monitor outbox: failed/dead-letter, retry real y snapshot degradado.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Kardex/unidades y pagos RRHH con contratos financieros 495/496.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Login responsive y guard de orígenes exclusivamente locales.' >> "$GITHUB_STEP_SUMMARY"

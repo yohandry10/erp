@@ -14,7 +14,6 @@ export class SupabaseService {
     'user_roles',
     'usuarios_sistema',
     'user_sessions',
-    'outbox_events',
     'empresa_config',
     'paises',
     'configuracion_fiscal',
@@ -27,10 +26,12 @@ export class SupabaseService {
   ]);
 
   private readonly publicRpcAllowlist = new Set([
-    'pgrst_reload_schema',
     'create_demo_tenant_ready_tx',
     'acquire_job_lock',
     'release_job_lock',
+    'claim_outbox_events_tx',
+    'heartbeat_outbox_event_tx',
+    'outbox_runtime_health_492',
   ]);
   private readonly logger = new Logger(SupabaseService.name);
   private readonly serviceRoleKey: string;

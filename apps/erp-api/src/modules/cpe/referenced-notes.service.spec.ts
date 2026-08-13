@@ -18,7 +18,10 @@ describe('ReferencedNotesService 472', () => {
 
   it('envía actor, llave e intención exacta a la RPC de creación', async () => {
     client.rpc.mockResolvedValue({
-      data: { documento_id: 'doc-note', cpe_id: 'cpe-note', idempotent: false },
+      data: {
+        documento_id: 'doc-note', cpe_id: 'cpe-note', idempotent: false,
+        financial_effect_status: 'PENDING_FISCAL_ACCEPTANCE',
+      },
       error: null,
     });
 
@@ -41,6 +44,22 @@ describe('ReferencedNotesService 472', () => {
       p_idempotency_key: 'note-472-create-1',
     });
     expect(result).toEqual(expect.objectContaining({ cpe_id: 'cpe-note' }));
+  });
+
+  it('rechaza una respuesta que no pruebe neutralidad financiera del borrador', async () => {
+    client.rpc.mockResolvedValue({
+      data: { documento_id: 'doc-note', cpe_id: 'cpe-note', idempotent: false },
+      error: null,
+    });
+
+    await expect(service.crear({
+      documento_origen_id: '33333333-3333-4333-8333-333333333333',
+      tipo_documento: '07',
+      codigo_motivo: '10',
+      motivo: 'Ajuste comercial',
+      monto_total: 10,
+    }, tenantId, actorId, 'NOTE-494-CREATE-NEUTRAL'))
+      .rejects.toThrow(/neutralidad financiera/i);
   });
 
   it('rechaza antes de SQL si falta actor o llave idempotente', async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
@@ -52,14 +52,15 @@ export default function LiquidacionesPage() {
   const [terminationDate, setTerminationDate] = useState(localCalendarDate);
   const [terminationReason, setTerminationReason] = useState("renuncia");
   const [selectedLiquidationId, setSelectedLiquidationId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<
-    "efectivo" | "transferencia"
-  >("transferencia");
   const [bankAccountId, setBankAccountId] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
   const [reversalReason, setReversalReason] = useState("");
   const [ctsPeriod, setCtsPeriod] = useState(`${new Date().getFullYear()}-11`);
   const [ctsReference, setCtsReference] = useState("");
+  const liquidationPaymentIntentRef = useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["rrhh-liquidaciones-operativas", country.paisCodigo],
@@ -148,20 +149,30 @@ export default function LiquidacionesPage() {
       "Liquidación confirmada, cese aplicado y devengo contable encolado.",
     );
 
-  const payLiquidation = () =>
-    run(
-      () =>
-        post(`/rrhh/liquidaciones/${selectedLiquidationId}/pagar`, {
-          metodo_pago: paymentMethod,
-          cuenta_bancaria_id:
-            paymentMethod === "transferencia" ? bankAccountId : undefined,
-          referencia:
-            paymentMethod === "transferencia" ? paymentReference : undefined,
-          fecha_pago: new Date().toISOString(),
-          idempotency_key: crypto.randomUUID(),
-        }),
+  const payLiquidation = () => {
+    const payload = {
+      metodo_pago: "transferencia" as const,
+      cuenta_bancaria_id: bankAccountId,
+      referencia: paymentReference,
+    };
+    const fingerprint = JSON.stringify([selectedLiquidationId, payload]);
+    if (liquidationPaymentIntentRef.current?.fingerprint !== fingerprint) {
+      liquidationPaymentIntentRef.current = {
+        fingerprint,
+        key: `rrhh-liquidation-pay:${crypto.randomUUID()}`,
+      };
+    }
+    return run(
+      async () => {
+        await post(`/rrhh/liquidaciones/${selectedLiquidationId}/pagar`, {
+          ...payload,
+          idempotency_key: liquidationPaymentIntentRef.current!.key,
+        });
+        liquidationPaymentIntentRef.current = null;
+      },
       "Pago registrado con evidencia, tesorería y asiento contable durable.",
     );
+  };
 
   const reverseLiquidationPayment = () =>
     run(
@@ -184,7 +195,6 @@ export default function LiquidacionesPage() {
         post(`/rrhh/cts/depositos/${id}/depositar`, {
           cuenta_bancaria_id: bankAccountId,
           referencia: ctsReference,
-          fecha_deposito: localCalendarDate(),
         }),
       "CTS depositada con movimiento de tesorería y asiento contable.",
     );
@@ -392,61 +402,43 @@ export default function LiquidacionesPage() {
               <>
                 <div>
                   <Label>Medio</Label>
+                  <Input value="Transferencia bancaria" disabled />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    El pago en efectivo permanece deshabilitado hasta contar con una sesión de caja y egreso tesorero explícitos.
+                  </p>
+                </div>
+                <div>
+                  <Label>Cuenta bancaria</Label>
                   <Select
-                    value={paymentMethod}
-                    onValueChange={(value) => setPaymentMethod(value as any)}
+                    value={bankAccountId}
+                    onValueChange={setBankAccountId}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecciona cuenta" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="transferencia">
-                        Transferencia
-                      </SelectItem>
-                      <SelectItem value="efectivo">Efectivo</SelectItem>
+                      {banks.map((bank: any) => (
+                        <SelectItem key={bank.id} value={bank.id}>
+                          {bank.banco || bank.nombre} · {bank.moneda}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                {paymentMethod === "transferencia" && (
-                  <>
-                    <div>
-                      <Label>Cuenta bancaria</Label>
-                      <Select
-                        value={bankAccountId}
-                        onValueChange={setBankAccountId}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona cuenta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {banks.map((bank: any) => (
-                            <SelectItem key={bank.id} value={bank.id}>
-                              {bank.banco || bank.nombre} · {bank.moneda}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="payment-reference">Referencia</Label>
-                      <Input
-                        id="payment-reference"
-                        value={paymentReference}
-                        onChange={(event) =>
-                          setPaymentReference(event.target.value)
-                        }
-                        placeholder="Operación bancaria"
-                      />
-                    </div>
-                  </>
-                )}
+                <div>
+                  <Label htmlFor="payment-reference">Referencia</Label>
+                  <Input
+                    id="payment-reference"
+                    value={paymentReference}
+                    onChange={(event) =>
+                      setPaymentReference(event.target.value)
+                    }
+                    placeholder="Operación bancaria"
+                  />
+                </div>
                 <Button
                   className="self-end"
-                  disabled={
-                    busy ||
-                    (paymentMethod === "transferencia" &&
-                      (!bankAccountId || !paymentReference.trim()))
-                  }
+                  disabled={busy || !bankAccountId || !paymentReference.trim()}
                   onClick={payLiquidation}
                 >
                   Registrar pago

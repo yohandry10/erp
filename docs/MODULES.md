@@ -28,10 +28,14 @@ Cotización -> Pedido -> Reserva -> Despacho -> Documento/CPE -> Cobro -> Asient
   La marca proviene del snapshot de venta cuando existe, de modo que editar el
   producto después no altera la regla histórica. NC y anulaciones agregan
   reversas o reintegros serializados; nunca reescriben el devengo.
-- El consolidado comercial agrupa ventas POS y documentos válidos de una sola
-  moneda (la UI opera bloques de hasta diez). Congela cabecera y líneas, impide
+- El consolidado comercial agrupa entre una y diez ventas POS/documentos
+  válidos de una sola moneda; UI, DTO y PostgreSQL aplican el mismo máximo.
+  Congela cabecera y líneas, impide
   reutilizar una fuente, es idempotente e inmutable y no publica outbox ni crea
   otro asiento: los efectos contables siguen perteneciendo a cada venta origen.
+  Un consolidado histórico anterior de 11..100 fuentes sólo admite replay
+  exacto por el mismo actor; no se puede crear ni modificar con el contrato
+  vigente.
 - La cotización puede enviarse y ser aprobada o rechazada por un actor distinto
   de su creador; `BORRADOR`, `ENVIADA` y `APROBADA` son elegibles para convertir
   a pedido, según permisos.
@@ -102,6 +106,10 @@ Apertura -> Venta -> Pago -> Ticket/CPE -> Movimiento de caja -> Cierre
   durables; un sobrante o faltante emite `caja.cerrada` y genera su asiento.
 - Consultar una sesión nunca debe cerrarla como efecto lateral.
 - Reintentar una venta reutiliza identidad y correlativo reservados.
+- La numeración POS se serializa por tenant/caja/serie. La prueba de concurrencia
+  local usa diez usuarios distintos del mismo tenant y diez cajas: produce diez
+  tickets/documentos/pagos/detalles únicos, descuenta stock exactamente diez
+  veces y sus diez retries recuperan los mismos identificadores.
 - Ingresos y gastos manuales exigen cuenta de contrapartida; un retiro a banco
   exige una cuenta bancaria real y un retiro a bóveda o gasto conserva su
   destino contable. Caja, saldo, evidencia y outbox se confirman juntos.
@@ -129,7 +137,11 @@ Código principal: `apps/erp-api/src/modules/pos`,
 - Factura y boleta manual delegan su emisión al writer CPE canónico: documento,
   CPE, CxC cuando corresponde y outbox se confirman en una frontera única. Un
   contrato permanece no fiscal. Las NC/ND sólo nacen desde el comprobante
-  original y no anulan un pedido ni duplican stock, CxC o asientos.
+  original y no anulan un pedido ni duplican stock, CxC o asientos. Crear una
+  nota `07/08` deja su efecto financiero en `PENDING_FISCAL_ACCEPTANCE`: no
+  modifica CxC, saldo a favor ni contabilidad. El efecto se aplica una sola vez
+  después de que nota y documento origen estén aceptados y exista CDR; rechazo
+  o retry técnico quedan sin efecto financiero.
 - El XML canónico siempre es UBL firmado con el certificado configurado por el
   tenant. La demo y QA usan transporte local simulado, sin habilitación legal
   ni transmisión real; al aportar sus credenciales, el cliente reutiliza el
@@ -191,10 +203,18 @@ Código principal: `apps/erp-api/src/modules/compras`.
 - El kardex valorizado proyecta todos los movimientos físicos (`ENTRADA`,
   `SALIDA`, `AJUSTE` y `DEVOLUCION`) desde ese ledger único. Producto, almacén
   y fechas se filtran dentro del mismo RPC; el detalle puede limitarse, pero el
-  resumen siempre agrega el conjunto completo. Cantidad, costo, moneda origen,
+  resumen siempre agrega el conjunto completo. Con filtro `desde` separa saldo
+  inicial, movimiento neto y saldo final, y cada fila expone saldo corrido. La
+  fecha se calcula en la zona del tenant y no en la del navegador. Cantidad,
+  costo, moneda origen,
   moneda base y tipo de cambio quedan congelados en el movimiento. Si falta
   costo, dirección o TC, el saldo afectado queda pendiente: no se sustituye por
-  cero ni se suman monedas/base distintas. El backfill histórico sólo usa
+  cero ni se publican subtotales incompletos como saldos finales. Las cantidades
+  de productos/unidades diferentes no se suman: el detalle conserva NIU, KGM,
+  LTR, MTR o ZZ y el resumen físico exige filtrar un producto cuando no es
+  agregable. Un producto legacy con unidad nula permanece “Sin regularizar”; una
+  edición de precio/nombre no presume NIU y asignar unidad requiere confirmación
+  explícita. El backfill histórico sólo usa
   evidencia persistida y un snapshot confirmado no admite cambiar almacén,
   referencia, semántica de signo ni columnas de valorización.
 - Picking, packing, despacho, backorders y GRE mantienen referencia al pedido.
@@ -379,15 +399,22 @@ Código principal: `apps/erp-api/src/modules/contabilidad`.
   Perú, Argentina y Colombia.
 - Calcular una liquidación PE/AR/CO sólo congela el cálculo: no inactiva al
   empleado ni termina su contrato. La confirmación explícita exige actor y
-  aplica cese, devengo `Dr 621 / Cr 411` y outbox en una frontera transaccional
-  e idempotente.
+  aplica cese, devengo y outbox en una frontera transaccional e idempotente. El
+  asiento separa beneficios sociales en `Dr 629` y el resto remunerativo en
+  `Dr 621`, contra `Cr 411`, usando componentes congelados del cálculo.
 - Una liquidación aprobada se paga completa. La transferencia registra la
   evidencia laboral, el cargo bancario y el evento de pago en el mismo commit;
-  su asiento es `Dr 411 / Cr 10`. La reversa restaura banco y obligación, crea
-  el contra-asiento y conserva el pago original como evidencia `REVERTIDO`.
+  su asiento es `Dr 411` contra la cuenta bancaria exacta congelada, no contra
+  una cuenta genérica. La reversa restaura el mismo banco y obligación aunque
+  el banco o la cuenta contable se desactiven después, crea el contra-asiento y
+  conserva el pago original como evidencia `REVERTIDO`. Nuevos pagos de
+  liquidación son sólo por transferencia; efectivo legacy sin sesión/movimiento
+  inequívocos falla cerrado y exige regularización.
 - CTS usa un libro independiente: recalcular sólo modifica filas `CALCULADO`,
   nunca reabre un depósito realizado. Depositar exige cuenta bancaria, actor y
-  referencia, y genera tesorería/outbox/asiento atómicos. Una CTS pendiente que
+  referencia, y genera tesorería/outbox/asiento atómicos (`Dr 629` contra la
+  cuenta tesorera exacta, mientras no exista un evento separado de provisión).
+  Una CTS pendiente que
   ya se incorpora a la liquidación final queda consumida para impedir doble
   pago.
 - Perú calcula AFP/ONP, EsSalud, quinta categoría, gratificaciones, CTS,
@@ -442,6 +469,10 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
 ## Administración, auth y configuración
 
 - Tenants, usuarios, roles y permisos determinan acceso.
+- En demo, `ADMIN_DEMO` puede crear usuarios y roles operativos del propio
+  tenant para probar segregación y permisos. No puede delegar `users.manage`,
+  conceder permisos globales ni crear otro `ADMIN_DEMO` mediante un writer
+  alterno; el actor debe poseer autorización administrativa real.
 - El alta administrativa usa la identidad local canónica del ERP: contraseña
   cifrada en `usuarios_sistema`, roles y auditoría se confirman en una sola
   transacción. No se crea una segunda cuenta en el proveedor de autenticación.

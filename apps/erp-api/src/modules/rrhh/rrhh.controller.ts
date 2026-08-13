@@ -11,6 +11,11 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PlanillaElectronicaPeruService } from './planilla-electronica-peru.service';
 import { CalcularPlanillaPersonalizadaDto } from './dto/calcular-planilla-personalizada.dto';
+import {
+  ActualizarPlanillaBorradorDto,
+  CrearPlanillaFinancieraDto,
+  PagarPlanillaTesoreriaDto,
+} from './dto/planilla-financiera.dto';
 
 /**
  * ✅ MULTI-TENANT: Controlador de RRHH con soporte multi-tenant
@@ -133,19 +138,35 @@ export class RrhhController {
     return this.planillasService.getPlanillas(tenantId);
   }
 
+  @Get('planillas/tesoreria/destinos')
+  @RequirePermission('rrhh.planillas.pay')
+  async getDestinosTesoreriaPlanilla(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.planillasService.getDestinosTesoreriaPlanilla(tenantId, userId);
+  }
+
   @Post('planillas')
-  async crearPlanilla(@CurrentTenant() tenantId: string, @Body() planillaData: any) {
+  @RequirePermission('rrhh.planillas.create')
+  async crearPlanilla(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Body() planillaData: CrearPlanillaFinancieraDto,
+  ) {
     this.logger.debug(`📋 [RRHH] Creando planilla para tenant: ${tenantId}`, planillaData);
-    return this.planillasService.crearPlanilla(planillaData, tenantId);
+    return this.planillasService.crearPlanilla(planillaData, tenantId, userId);
   }
 
   @Post('planillas/:id/calcular')
+  @RequirePermission('rrhh.planillas.calculate')
   async calcularPlanilla(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
     @Param('id') planillaId: string
   ) {
     this.logger.debug(`🧮 [RRHH] Calculando planilla ${planillaId} para tenant: ${tenantId}`);
-    return this.planillasService.calcularPlanillaMensual(planillaId, tenantId);
+    return this.planillasService.calcularPlanillaMensual(planillaId, tenantId, userId);
   }
 
   @Get('planillas/:id/detalle')
@@ -169,17 +190,19 @@ export class RrhhController {
   }
 
   @Put('planillas/:id')
+  @RequirePermission('rrhh.planillas.create')
   async updatePlanilla(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Param('id') planillaId: string,
-    @Body() updateData: any
+    @Body() updateData: ActualizarPlanillaBorradorDto
   ) {
     this.logger.debug(`✏️ [RRHH] Actualizando planilla ${planillaId} para tenant: ${tenantId}`);
     return this.planillasService.updatePlanilla(planillaId, updateData, tenantId, userId);
   }
 
   @Post('planillas/:id/aprobar')
+  @RequirePermission('rrhh.planillas.approve')
   async aprobarPlanilla(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
@@ -190,12 +213,15 @@ export class RrhhController {
   }
 
   @Delete('planillas/:id')
+  @RequirePermission('rrhh.planillas.create')
   async deletePlanilla(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') planillaId: string
   ) {
     this.logger.debug(`🗑️ [RRHH] Eliminando planilla ${planillaId} para tenant: ${tenantId}`);
-    return this.planillasService.deletePlanilla(planillaId, tenantId);
+    return this.planillasService.deletePlanilla(planillaId, tenantId, userId, idempotencyKey);
   }
 
   @Get('conceptos')
@@ -205,17 +231,25 @@ export class RrhhController {
   }
 
   @Post('planillas/:id/calcular-personalizada')
+  @RequirePermission('rrhh.planillas.calculate')
   async calcularPlanillaPersonalizada(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId: string,
     @Param('id') planillaId: string,
     @Body() empleadosData: CalcularPlanillaPersonalizadaDto
   ) {
     this.logger.debug('🧮 Calculando planilla personalizada:', planillaId);
-    return this.planillasService.calcularPlanillaPersonalizada(planillaId, empleadosData.empleados, tenantId);
+    return this.planillasService.calcularPlanillaPersonalizada(
+      planillaId,
+      empleadosData.empleados,
+      tenantId,
+      userId,
+    );
   }
 
   // ===== PAGOS Y COMPROBANTES =====
   @Get('pagos')
+  @RequirePermission('rrhh.planillas.read')
   async getPagos(
     @CurrentTenant() tenantId: string,
     @Query('periodo') periodo?: string,
@@ -226,6 +260,7 @@ export class RrhhController {
   }
 
   @Put('pagos/:id/procesar')
+  @RequirePermission('rrhh.planillas.pay')
   async procesarPago(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
@@ -236,17 +271,19 @@ export class RrhhController {
   }
 
   @Post('planillas/:id/pagar')
+  @RequirePermission('rrhh.planillas.pay')
   async pagarPlanillaCompleta(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Param('id') planillaId: string,
-    @Body() pagoData: { metodo_pago: 'efectivo' | 'transferencia' }
+    @Body() pagoData: PagarPlanillaTesoreriaDto
   ) {
     this.logger.debug(`💰 [RRHH] Pagando planilla ${planillaId} para tenant: ${tenantId}`);
-    return this.planillasService.pagarPlanillaCompleta(planillaId, pagoData.metodo_pago, tenantId, userId);
+    return this.planillasService.pagarPlanillaCompleta(planillaId, pagoData, tenantId, userId);
   }
 
   @Post('planillas/:id/pagar-empleados')
+  @RequirePermission('rrhh.planillas.pay')
   async pagarEmpleadosSeleccionados(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
@@ -719,11 +756,13 @@ export class RrhhController {
 
   // ===== LIQUIDACIONES =====
   @Get('liquidaciones')
+  @RequirePermission('rrhh.planillas.read')
   async getLiquidaciones(@CurrentTenant() tenantId: string) {
     return this.rrhhService.getLiquidaciones(tenantId);
   }
 
   @Post('empleados/:id/liquidacion')
+  @RequirePermission('rrhh.liquidaciones.calculate')
   async calcularLiquidacion(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
@@ -741,6 +780,7 @@ export class RrhhController {
   }
 
   @Post('liquidaciones/:id/confirmar')
+  @RequirePermission('rrhh.liquidaciones.approve')
   async confirmarLiquidacion(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
@@ -751,6 +791,7 @@ export class RrhhController {
   }
 
   @Post('liquidaciones/:id/pagar')
+  @RequirePermission('rrhh.liquidaciones.pay')
   async pagarLiquidacion(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
@@ -767,6 +808,7 @@ export class RrhhController {
   }
 
   @Post('liquidaciones/:id/pago/revertir')
+  @RequirePermission('rrhh.liquidaciones.reverse')
   async revertirPagoLiquidacion(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
@@ -784,6 +826,7 @@ export class RrhhController {
   // ===== CTS =====
   // La CTS se deposita en mayo y noviembre; no es un concepto de planilla.
   @Get('cts/depositos')
+  @RequirePermission('rrhh.planillas.read')
   async getDepositosCts(
     @CurrentTenant() tenantId: string,
     @Query('periodo') periodo?: string,
@@ -792,6 +835,7 @@ export class RrhhController {
   }
 
   @Post('cts/depositos')
+  @RequirePermission('rrhh.cts.calculate')
   async calcularDepositosCts(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
@@ -802,6 +846,7 @@ export class RrhhController {
   }
 
   @Post('cts/depositos/:id/depositar')
+  @RequirePermission('rrhh.cts.deposit')
   async depositarCts(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,

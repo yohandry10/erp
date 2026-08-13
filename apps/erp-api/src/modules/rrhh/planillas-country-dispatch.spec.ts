@@ -1,5 +1,5 @@
 import { PlanillasService } from './planillas.service';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 
 type Country = 'PE' | 'AR' | 'CO';
 
@@ -21,14 +21,14 @@ const thenableQuery = (result: any) => {
 
 describe('PlanillasService approval persistence', () => {
   it('crea siempre en borrador y descarta campos de ciclo/totales enviados por el cliente', async () => {
-    const select = jest.fn().mockResolvedValue({
-      data: [{ id: 'plan-1', estado: 'borrador' }],
+    const rpc = jest.fn().mockResolvedValue({
+      data: { id: 'plan-1', estado: 'borrador', success: true },
       error: null,
     });
-    const insert = jest.fn().mockReturnValue({ select });
     const service = new PlanillasService(
-      { getClient: () => ({ from: () => ({ insert }) }) } as any,
+      { getClient: () => ({ rpc }) } as any,
       {} as any,
+      { obtenerContexto: jest.fn().mockResolvedValue({ codigo: 'PE' }) } as any,
     );
 
     await expect(service.crearPlanilla({
@@ -40,20 +40,18 @@ describe('PlanillasService approval persistence', () => {
       asientos_generados: 'true',
       metodo_pago: 'efectivo',
       observaciones: 'Alta segura',
-    }, 'tenant-1')).resolves.toMatchObject({ id: 'plan-1' });
+      idempotency_key: '11111111-1111-4111-8111-111111111111',
+    }, 'tenant-1', 'user-1')).resolves.toMatchObject({ id: 'plan-1' });
 
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      tenant_id: 'tenant-1',
-      periodo: '2026-08',
-      estado: 'borrador',
-      estado_pago: 'pendiente',
-      total_neto: 0,
-      total_pagado: 0,
-      asientos_generados: 'false',
-      metadata: { observaciones: 'Alta segura' },
-    }));
-    const payload = insert.mock.calls[0][0];
-    expect(payload.metodo_pago).toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith('crear_planilla_tx_495', {
+      p_tenant_id: 'tenant-1',
+      p_planilla: {
+        periodo: '2026-08', pais_codigo: 'PE', moneda: 'PEN',
+        metadata: { observaciones: 'Alta segura' },
+      },
+      p_actor_id: 'user-1',
+      p_idempotency_key: '11111111-1111-4111-8111-111111111111',
+    });
   });
 
   it('delega el alias PUT a la RPC que aprueba y deja el devengo durable', async () => {
@@ -83,6 +81,38 @@ describe('PlanillasService approval persistence', () => {
     });
   });
 
+  it('expone maker-checker de aprobación como HTTP 403 y no como error 500', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'La persona que calculó no puede aprobar' },
+    });
+    const service = new PlanillasService(
+      { getClient: () => ({ rpc }) } as any,
+      {} as any,
+    );
+
+    await expect(service.aprobarPlanilla('plan-1', 'tenant-1', 'user-1'))
+      .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('expone maker-checker de pago como HTTP 403 y no como error 500', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'La persona que aprobó no puede pagar' },
+    });
+    const service = new PlanillasService(
+      { getClient: () => ({ rpc }) } as any,
+      {} as any,
+    );
+
+    await expect(service.pagarPlanillaCompleta(
+      'plan-1',
+      { metodo_pago: 'efectivo', sesion_caja_id: 'cash-1', idempotency_key: 'pay-planilla-1' },
+      'tenant-1',
+      'user-1',
+    )).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('rechaza saltos de estado distintos del alias de aprobación', async () => {
     const service = new PlanillasService({} as any, {} as any);
     await expect(service.updatePlanilla('plan-1', { estado: 'pagada' }, 'tenant-1'))
@@ -110,7 +140,11 @@ describe('PlanillasService approval persistence', () => {
 
     await expect(service.pagarEmpleadosSeleccionados(
       'plan-1',
-      { empleados_ids: ['detalle-1'], metodo_pago: 'transferencia' },
+      {
+        empleados_ids: ['detalle-1'], metodo_pago: 'transferencia',
+        idempotency_key: '22222222-2222-4222-8222-222222222222',
+        cuenta_bancaria_id: '33333333-3333-4333-8333-333333333333', referencia: 'OP-1',
+      },
       'tenant-1',
       'user-1',
     )).rejects.toBeInstanceOf(ConflictException);
@@ -118,7 +152,11 @@ describe('PlanillasService approval persistence', () => {
 
     await expect(service.pagarEmpleadosSeleccionados(
       'plan-1',
-      { empleados_ids: [], metodo_pago: 'transferencia' },
+      {
+        empleados_ids: [], metodo_pago: 'transferencia',
+        idempotency_key: '22222222-2222-4222-8222-222222222222',
+        cuenta_bancaria_id: '33333333-3333-4333-8333-333333333333', referencia: 'OP-1',
+      },
       'tenant-1',
       'user-1',
     )).rejects.toBeInstanceOf(ConflictException);
@@ -126,15 +164,22 @@ describe('PlanillasService approval persistence', () => {
 
     await expect(service.pagarEmpleadosSeleccionados(
       'plan-1',
-      { empleados_ids: ['detalle-1', 'detalle-2'], metodo_pago: 'transferencia' },
+      {
+        empleados_ids: ['detalle-1', 'detalle-2'], metodo_pago: 'transferencia',
+        idempotency_key: '22222222-2222-4222-8222-222222222222',
+        cuenta_bancaria_id: '33333333-3333-4333-8333-333333333333', referencia: 'OP-1',
+      },
       'tenant-1',
       'user-1',
     )).resolves.toMatchObject({ success: true, data: { empleadosPagados: 2 } });
-    expect(rpc).toHaveBeenCalledWith('pagar_planilla_completa_tx', {
+    expect(rpc).toHaveBeenCalledWith('pagar_planilla_con_tesoreria_tx_495', {
       p_tenant_id: 'tenant-1',
       p_planilla_id: 'plan-1',
-      p_metodo_pago: 'transferencia',
-      p_usuario_id: 'user-1',
+      p_pago: expect.objectContaining({
+        metodo_pago: 'transferencia',
+        cuenta_bancaria_id: '33333333-3333-4333-8333-333333333333',
+      }),
+      p_actor_id: 'user-1',
     });
   });
 
@@ -161,12 +206,8 @@ describe('PlanillasService approval persistence', () => {
     );
 
     await expect(service.procesarPagoLegado('pago-1', 'tenant-1', 'user-1'))
-      .resolves.toMatchObject({ success: true });
-    expect(rpc).toHaveBeenCalledWith('pagar_planilla_completa_tx', expect.objectContaining({
-      p_planilla_id: 'plan-1',
-      p_metodo_pago: 'transferencia',
-      p_usuario_id: 'user-1',
-    }));
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
 
@@ -260,7 +301,11 @@ describe('PlanillasService — despacho normativo por país', () => {
     async (country, expectedIncome, expectedDiscount, expectedNet) => {
       const harness = buildHarness(country);
 
-      const result = await harness.service.calcularPlanillaMensual('payroll-1', `tenant-${country}`);
+      const result = await harness.service.calcularPlanillaMensual(
+        'payroll-1',
+        `tenant-${country}`,
+        `actor-${country}`,
+      );
 
       expect(harness.countryService.obtenerContexto).toHaveBeenCalledWith(`tenant-${country}`);
       expect(result).toEqual(expect.objectContaining({
@@ -279,6 +324,7 @@ describe('PlanillasService — despacho normativo por país', () => {
         p_tenant_id: `tenant-${country}`,
         p_planilla_id: 'payroll-1',
         p_empleados: expect.any(Array),
+        p_actor_id: `actor-${country}`,
       }));
       expect(harness.eventBus.emitPlanillaCalculada).toHaveBeenCalledWith(
         expect.objectContaining({ totalIngresos: expectedIncome, totalNeto: expectedNet }),

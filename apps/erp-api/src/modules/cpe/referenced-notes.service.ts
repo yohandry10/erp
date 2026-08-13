@@ -56,7 +56,11 @@ export class ReferencedNotesService {
       .select('id,documento_id,tipo_documento,serie,numero,fecha_emision,cliente_id,documento_receptor,razon_social_receptor,moneda,total_venta,total,estado,sunat_status')
       .eq('tenant_id', tenantId)
       .in('tipo_documento', ['01', '03'])
-      .in('estado', ['FIRMADO', 'ENVIADO', 'ACEPTADO'])
+      .eq('estado', 'ACEPTADO')
+      .eq('estado_sunat', 'ACEPTADO')
+      .eq('sunat_status', 'ACCEPTED')
+      .not('cdr_sunat', 'is', null)
+      .neq('cdr_sunat', '')
       .is('nota_credito_id', null)
       .order('fecha_emision', { ascending: false })
       .limit(100);
@@ -107,7 +111,13 @@ export class ReferencedNotesService {
       },
     );
     if (error) this.throwRpc(error, 'crear la nota referenciada');
-    return Array.isArray(data) ? data[0] : data;
+    const result = Array.isArray(data) ? data[0] : data;
+    if (result?.financial_effect_status !== 'PENDING_FISCAL_ACCEPTANCE') {
+      throw new BadRequestException(
+        'La creación de la nota no confirmó su neutralidad financiera',
+      );
+    }
+    return result;
   }
 
   async firmar(

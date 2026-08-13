@@ -68,7 +68,7 @@ BEGIN
     'borrador', 'pendiente', '2026-08', 0, 0, 0, 0, 0, 'PE', 'PEN'
   );
 
-  SELECT public.guardar_calculo_planilla_tx(
+  SELECT app.guardar_calculo_planilla_tx(
     v_tenant_id,
     v_planilla_id,
     jsonb_build_array(
@@ -114,7 +114,7 @@ BEGIN
   END IF;
 
   BEGIN
-    PERFORM public.pagar_planilla_completa_tx(
+    PERFORM app.pagar_planilla_completa_tx(
       v_tenant_id, v_planilla_id, 'transferencia', v_user_id::text
     );
     RAISE EXCEPTION 'El pago desde CALCULADA debio fallar';
@@ -150,7 +150,7 @@ BEGIN
     v_legacy_approval_event_id, now()
   );
 
-  SELECT public.aprobar_planilla_tx(
+  SELECT app.aprobar_planilla_tx(
     v_tenant_id, v_planilla_id, v_user_id::text
   ) INTO v_result;
   v_approval_event_id := (v_result->>'eventId')::uuid;
@@ -184,7 +184,7 @@ BEGIN
     RAISE EXCEPTION 'La aprobacion no dejo un unico devengo durable sin asiento sincrono: %', v_result;
   END IF;
 
-  SELECT public.aprobar_planilla_tx(
+  SELECT app.aprobar_planilla_tx(
     v_tenant_id, v_planilla_id, v_user_id::text
   ) INTO v_result;
   IF NOT (v_result->>'idempotent')::boolean
@@ -195,7 +195,7 @@ BEGIN
     RAISE EXCEPTION 'El retry de aprobacion no fue idempotente: %', v_result;
   END IF;
 
-  SELECT public.pagar_planilla_completa_tx(
+  SELECT app.pagar_planilla_completa_tx(
     v_tenant_id, v_planilla_id, 'transferencia', v_user_id::text
   ) INTO v_result;
   v_payment_event_id := (v_result->>'eventId')::uuid;
@@ -226,7 +226,7 @@ BEGIN
     RAISE EXCEPTION 'El pago no sincronizo cabecera/detalle/proyecciones/outbox: %', v_result;
   END IF;
 
-  SELECT public.pagar_planilla_completa_tx(
+  SELECT app.pagar_planilla_completa_tx(
     v_tenant_id, v_planilla_id, 'transferencia', v_user_id::text
   ) INTO v_result;
   IF NOT (v_result->>'idempotent')::boolean
@@ -242,7 +242,7 @@ BEGIN
   END IF;
 
   BEGIN
-    PERFORM public.pagar_planilla_completa_tx(
+    PERFORM app.pagar_planilla_completa_tx(
       v_tenant_id, v_planilla_id, 'efectivo', v_user_id::text
     );
     RAISE EXCEPTION 'El retry con metodo distinto debio fallar por fingerprint';
@@ -267,7 +267,7 @@ BEGIN
     v_rollback_planilla_id, v_tenant_id, 'Planilla Rollback 445', 'PL-RB-445',
     'borrador', 'pendiente', '2026-09', 0, 0, 0, 0, 0, 'PE', 'PEN'
   );
-  PERFORM public.guardar_calculo_planilla_tx(
+  PERFORM app.guardar_calculo_planilla_tx(
     v_tenant_id,
     v_rollback_planilla_id,
     jsonb_build_array(jsonb_build_object(
@@ -278,7 +278,7 @@ BEGIN
       'total_aportes', 90, 'neto_pagar', 900, 'conceptos', '[]'::jsonb
     ))
   );
-  PERFORM public.aprobar_planilla_tx(
+  PERFORM app.aprobar_planilla_tx(
     v_tenant_id, v_rollback_planilla_id, v_user_id::text
   );
   INSERT INTO public.outbox_events (
@@ -295,7 +295,7 @@ BEGIN
     gen_random_uuid(), now()
   );
   BEGIN
-    PERFORM public.pagar_planilla_completa_tx(
+    PERFORM app.pagar_planilla_completa_tx(
       v_tenant_id, v_rollback_planilla_id, 'transferencia', v_user_id::text
     );
     RAISE EXCEPTION 'La colision tardia del outbox debio abortar el pago';
@@ -351,8 +351,10 @@ BEGIN
      OR has_function_privilege('anon', 'public.pagar_planilla_completa_tx(uuid,uuid,text,text)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.pagar_planilla_completa_tx(uuid,uuid,text,text)', 'EXECUTE')
      OR NOT has_function_privilege('service_role', 'public.aprobar_planilla_tx(uuid,uuid,text)', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'public.pagar_planilla_completa_tx(uuid,uuid,text,text)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'ACL incorrecta: aprobar/pagar deben ser exclusivamente service_role';
+     OR has_function_privilege('service_role', 'public.pagar_planilla_completa_tx(uuid,uuid,text,text)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role',
+       'public.pagar_planilla_con_tesoreria_tx_495(uuid,uuid,jsonb,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'ACL incorrecta: aprobación segregada y pago tesorero 495 deben ser service-role-only; pago legacy debe quedar interno';
   END IF;
 END;
 $$;

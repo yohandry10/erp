@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-11.
+Actualizado: 2026-08-13.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
@@ -8,17 +8,27 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- El código core está en estado **release candidate promovido**. La API está
-  desplegada en Render sobre `a650700`, Web está activa en Vercel y ambos
-  healthchecks productivos responden `ready`.
+- El código core está en estado **release candidate local hasta `496`**. PROD
+  continúa verificado hasta `490`; `491..496` no se han promovido. La API
+  pública responde, pero el despliegue vigente aún no acredita commit ni fecha
+  de build porque `/api/health/version` devuelve esos campos como `unknown`.
+  No se atribuye a Render ningún SHA hasta desplegar el contrato de versión y
+  comprobarlo después de la promoción coordinada.
 - El alcance operativo activo es Perú (`PE`, `pais_id=1`, `PEN`, SUNAT),
   Argentina (`AR`, `pais_id=5`, `ARS`, ARCA) y Colombia (`CO`, `pais_id=2`,
   `COP`, DIAN).
 - PROD `wypnbcptofqdmoynlonq` es el único proyecto remoto operativo. El antiguo
   DEV está retirado y bloqueado por runtime, scripts y CI.
-- El cierre más reciente del backend reporta 193/193 suites y 1673/1673 pruebas
-  con cobertura; build y type-check del monorepo están verdes.
-- El cierre Web del 2026-08-07 reporta type-check limpio y build Next 124/124
+- El cierre local más reciente del backend reporta 199/199 suites y 1711/1711
+  pruebas, type-check API/Web y lint sin errores. Una reconstrucción limpia en
+  PostgreSQL 16 aplicó 493 migraciones `000..496`, ejecutó `verify491..496` y
+  confirmó el readiness pasivo con esquema requerido `496`.
+- El cierre Web del 2026-08-13 reporta type-check limpio, build Next 131/131 y
+  un perfil Playwright aislado de 16/16 pruebas: autenticación, maestro de
+  inventario, gate fiscal de NC/ND, monitor outbox contable con `failed` y
+  `dead_letter`, Kardex con unidades mixtas/fecha del tenant, liquidación sólo
+  por transferencia y edición de productos legacy sin asumir NIU. El cierre
+  previo del 2026-08-07 reportó build Next 124/124
   rutas; 73 rutas se verificaron en escritorio y móvil (146 casos) y el
   recorrido visible de demos nuevas PE/AR/CO no presentó errores de consola.
   La inspección autenticada posterior en PROD confirmó los flujos Perú de
@@ -37,8 +47,10 @@ migraciones verificados, prevalece la implementación actual.
   ficticio ni habilitar fiscalmente al demo.
 - Los cálculos de nómina PE/AR/CO conservan cobertura automatizada sin depender
   de una base remota. Las pruebas con escritura no se ejecutan en PROD.
-- Factura `01`, boleta `03`, nota de crédito `07`, nota de débito `08`, RA y RC
-  cuentan con evidencia aceptada en SUNAT beta.
+- Factura `01` y boleta `03` cuentan con evidencia aceptada en SUNAT beta; RA y
+  RC conservan evidencia de ticket/consulta. El soporte `07/08` existe y está
+  probado localmente, pero no se encontró un artefacto crudo versionado que
+  demuestre una aceptación beta de ambas notas; no se afirma esa homologación.
 - Inventario usa un único ledger físico por almacén.
 - Desktop/Tauri está implementado como cliente offline-first con SQLite y outbox
   por tenant.
@@ -149,6 +161,14 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   193 suites/1.673 pruebas con cobertura y los typechecks API/Web. Las carreras reales
   de recepción, RMA, caja, RRHH, CPE y canje POS confirmaron un solo efecto por
   intención. Esta evidencia local no autoriza ni sustituye la promoción PROD.
+- `491..496` forman el candidato local pendiente de promoción: tolerancia POS a
+  `pagos=null`; outbox single-writer, claims y readiness pasivo; concurrencia de
+  diez usuarios/cajas y techo RBAC del demo; efecto financiero de NC/ND sólo
+  después de aceptación+CDR; permisos/maker-checker y tesorería real de RR. HH.;
+  límite de diez fuentes comerciales y Kardex con apertura, saldo corrido,
+  fecha local y unidades no mezclables. La reconstrucción limpia `000..496`,
+  sus seis verificadores y el gate de esquema `496` pasaron en PostgreSQL 16.
+  Ninguna de estas migraciones se ha aplicado a PROD.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -208,6 +228,10 @@ Cambios recientes principales:
   administrativos y contables descritos arriba. El rango completo está
   promovido en PROD; la evidencia local y el respaldo restaurable conservan el
   ensayo coordinado previo.
+- `491..496`: hardening posterior validado sólo localmente. La promoción debe
+  detenerse si el preflight del backfill `490→492` encuentra un evento laboral
+  sin snapshot contable inequívoco; el runtime nuevo exige esquema `496` y no
+  debe desplegarse antes que la base.
 
 ## Flujos cerrados técnicamente
 
@@ -270,8 +294,10 @@ productivo autorizado.
 - Tauri protege secretos locales con DPAPI y la outbox no guarda headers
   sensibles.
 - El frontend usa Tailwind 3.4, shadcn/Radix y tokens semánticos.
-- ADMIN de un tenant normal recibe permisos activos completos; un demo conserva
-  restricciones sensibles.
+- `ADMIN_DEMO` puede crear usuarios y roles operativos dentro de su propio
+  tenant para probar el sistema. `users.manage` no es delegable a roles custom,
+  los permisos globales permanecen prohibidos y ningún writer alterno puede
+  asignar `ADMIN_DEMO` sin la autorización administrativa real del actor.
 
 ## Pendientes reales
 
@@ -283,6 +309,12 @@ productivo autorizado.
 - Confirmar que no existan colisiones históricas fiscales antes de resincronizar
   series.
 - Completar secretos productivos y ejecutar smoke controlado.
+- Promover de forma coordinada `491..496`: preflight y respaldo, inspección del
+  backfill 490→492, migraciones, API/worker con
+  `REQUIRED_DATABASE_SCHEMA_VERSION=496`, Web y postchecks. Render debe exponer
+  el SHA/fecha reales y su readiness debe comprobar DB, Redis y outbox; el plan
+  `starter` propuesto implica costo y requiere aprobación antes de aplicar el
+  Blueprint.
 - La migración `395` ya está aplicada. Falta que cada contribuyente cargue sus
   credenciales API SUNAT y active SIRE explícitamente antes de una aceptación
   controlada RVIE/RCE; no hay smoke real posible sin consentimiento y datos de
