@@ -8,13 +8,12 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- El código core está en estado **release candidate local hasta `496`**. PROD
-  continúa verificado hasta `490`; la consulta read-only del 2026-08-17 confirmó
-  que `491..496` no se han promovido. La API pública responde y su readiness
-  vigente sólo informa `database=ok`, pero el despliegue aún no acredita commit
-  ni fecha de build porque `/api/health/version` devuelve esos campos como
-  `unknown`. No se atribuye a Render ningún SHA hasta desplegar el contrato de
-  versión y comprobarlo después de la promoción coordinada.
+- El código core y PROD están verificados hasta `496`. El 2026-08-17 se creó un
+  respaldo nuevo de PROD `490`, se aplicaron y registraron `491..496` en orden y
+  el postcheck remoto confirmó esquema requerido `496`, Redis listo y outbox sin
+  filas claimable, processing, failed ni dead-letter. Render sirve el commit
+  `85f35175eaa6d51d4a0d19afe65930481a9c29c4`; `/api/health/version` ya acredita
+  ese SHA, aunque `buildDate` continúa `unknown`.
 - El alcance operativo activo es Perú (`PE`, `pais_id=1`, `PEN`, SUNAT),
   Argentina (`AR`, `pais_id=5`, `ARS`, ARCA) y Colombia (`CO`, `pais_id=2`,
   `COP`, DIAN).
@@ -27,13 +26,13 @@ migraciones verificados, prevalece la implementación actual.
   generó además un respaldo nuevo de PROD `490`, se restauró en PostgreSQL 17
   local y el upgrade realista `490→496`, sus seis verificadores y readiness
   `496` pasaron sin escribir en PROD.
-- El candidato está versionado en el commit `03370c6` de la rama
-  `codex/peru-prod-only-closure` y publicado en el PR draft
-  [#79](https://github.com/yohandry10/erp/pull/79). Al 2026-08-17 el PR está
-  `MERGEABLE` y todos sus gates concluyeron correctamente: PostgreSQL 16 y
-  contratos SQL, lint, type-check, tests, build, Playwright aislado, auditoría
-  de seguridad, CodeQL, NPM Audit y preview de Vercel. El PR no está fusionado
-  y esos checks no equivalen a promoción PROD.
+- El PR [#79](https://github.com/yohandry10/erp/pull/79) fue fusionado a `main`
+  el 2026-08-17 en `85f3517`. Sobre ese SHA pasaron PostgreSQL 16 y contratos
+  SQL, lint, type-check, tests, build, Playwright aislado, auditoría de
+  seguridad, CodeQL y NPM Audit. Render desplegó
+  `dep-da1i4su417fc73ai2rlg` y Vercel dejó `READY` el deployment productivo
+  `dpl_GDNtR83fFAQhoqNwnyxK5Aqgmv9W`; `/`, `/login` y `/demo` responden 200 en
+  `https://erp-web-zeta-neon.vercel.app`.
 - El cierre Web del 2026-08-13 reporta type-check limpio, build Next 131/131 y
   un perfil Playwright aislado de 16/16 pruebas: autenticación, maestro de
   inventario, gate fiscal de NC/ND, monitor outbox contable con `failed` y
@@ -172,7 +171,8 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   193 suites/1.673 pruebas con cobertura y los typechecks API/Web. Las carreras reales
   de recepción, RMA, caja, RRHH, CPE y canje POS confirmaron un solo efecto por
   intención. Esta evidencia local no autoriza ni sustituye la promoción PROD.
-- `491..496` forman el candidato local pendiente de promoción: tolerancia POS a
+- `491..496` están aplicadas y registradas en PROD desde el 2026-08-17:
+  tolerancia POS a
   `pagos=null`; outbox single-writer, claims y readiness pasivo; concurrencia de
   diez usuarios/cajas y techo RBAC del demo; efecto financiero de NC/ND sólo
   después de aceptación+CDR; permisos/maker-checker y tesorería real de RR. HH.;
@@ -182,8 +182,11 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   También pasó el ensayo `490→496` sobre un respaldo restaurado de PROD en
   PostgreSQL 17: conservó 55 tenants, el backfill laboral procesó cero filas
   ambiguas y readiness terminó listo en esquema `496`. La evidencia está en
-  `artifacts/qa-10-questions/prod-490-to-496-rehearsal-20260813.json`. Ninguna
-  de estas migraciones se ha aplicado a PROD.
+  `artifacts/qa-10-questions/prod-490-to-496-rehearsal-20260813.json`. La
+  promoción real conservó 55 tenants, procesó cero filas ambiguas del backfill
+  laboral y terminó con readiness remoto listo en esquema `496`; su evidencia
+  operativa está en
+  `artifacts/qa-10-questions/prod-491-496-promotion-20260817.json`.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -324,13 +327,11 @@ productivo autorizado.
 - Confirmar que no existan colisiones históricas fiscales antes de resincronizar
   series.
 - Completar secretos productivos y ejecutar smoke controlado.
-- Promover de forma coordinada `491..496`: el preflight, respaldo verificable y
-  ensayo local sobre la copia de PROD pasaron el 2026-08-13; repetir el
-  preflight justo antes de la ventana autorizada, aprobar/fusionar el PR #79 y
-  aplicar migraciones, API/worker con `REQUIRED_DATABASE_SCHEMA_VERSION=496`,
-  Web y postchecks. Render debe exponer el SHA/fecha reales y su readiness debe
-  comprobar DB, Redis y outbox; el plan `starter` propuesto implica costo y
-  requiere aprobación antes de aplicar el Blueprint.
+- La promoción coordinada `491..496`, API/worker y Web ya terminó. Queda añadir
+  un medio de pago y aprobar el cambio de la instancia Render `free→starter`
+  (USD 7/mes) para evitar que los workers internos se duerman; Render no permite
+  aplicarlo sin tarjeta. El Blueprint ya apunta a `main`, pero no debe
+  sincronizarse con el plan pagado sin esa aprobación financiera.
 - La migración `395` ya está aplicada. Falta que cada contribuyente cargue sus
   credenciales API SUNAT y active SIRE explícitamente antes de una aceptación
   controlada RVIE/RCE; no hay smoke real posible sin consentimiento y datos de

@@ -1,0 +1,66 @@
+{
+  "executedAt": "2026-08-17T15:15:00Z",
+  "environment": "PROD",
+  "supabaseProjectRef": "wypnbcptofqdmoynlonq",
+  "source": {
+    "pullRequest": 79,
+    "mergeCommit": "85f35175eaa6d51d4a0d19afe65930481a9c29c4",
+    "mainChecks": {
+      "ci": "success",
+      "e2eIsolated": "success",
+      "codeql": "success",
+      "npmAudit": "success"
+    }
+  },
+  "backup": {
+    "localFile": "tmp/prod-pre-491-496-20260817T094504.dump",
+    "bytes": 12559394,
+    "sha256": "357DFBDBFD390F63B26C1469EBCE4B1D1C6BB8B2793AAF3DCABCC0810764192C",
+    "pgRestoreListEntries": 7507,
+    "committed": false
+  },
+  "database": {
+    "previousSchemaVersion": 490,
+    "appliedVersions": [491, 492, 493, 494, 495, 496],
+    "finalSchemaVersion": 496,
+    "tenantCountBefore": 55,
+    "tenantCountAfter": 55,
+    "laborOutboxBackfillRows": 0
+  },
+  "render": {
+    "serviceId": "srv-d9plnou417fc73e6qbfg",
+    "blueprintId": "exs-d9plitlbedkc73ccgd80",
+    "blueprintBranch": "main",
+    "deployId": "dep-da1i4su417fc73ai2rlg",
+    "commit": "85f35175eaa6d51d4a0d19afe65930481a9c29c4",
+    "status": "live",
+    "instancePlan": "free",
+    "starterPendingReason": "payment_method_required",
+    "starterMonthlyUsd": 7
+  },
+  "readiness": {
+    "status": "ready",
+    "schemaVersion": 496,
+    "requiredSchemaVersion": 496,
+    "requiredSchemaApplied": true,
+    "serviceRoleReads": true,
+    "redisReady": true,
+    "redisRequired": true,
+    "claimable": 0,
+    "processing": 0,
+    "failed": 0,
+    "deadLetter": 0
+  },
+  "vercel": {
+    "project": "trivia1/erp-web",
+    "deploymentId": "dpl_GDNtR83fFAQhoqNwnyxK5Aqgmv9W",
+    "status": "READY",
+    "productionUrl": "https://erp-nyemreae6-trivia1.vercel.app",
+    "alias": "https://erp-web-zeta-neon.vercel.app",
+    "httpChecks": {
+      "/": 200,
+      "/login": 200,
+      "/demo": 200
+    }
+  }
+}
