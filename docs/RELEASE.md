@@ -37,15 +37,16 @@ Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 8. Comparar conteos y revisar logs.
 9. Detener y revertir ante cualquier diferencia no explicada.
 
-El estado remoto vigente está verificado hasta `490`; cualquier rango posterior
+El estado remoto vigente está verificado hasta `496`; cualquier rango posterior
 vuelve a comenzar por preflight, respaldo y ensayo transaccional.
 
-El candidato local actual es `491..496`. Su promoción es coordinada y en este
-orden: respaldo/preflight; inspección y aplicación DB; API/worker con
-`REQUIRED_DATABASE_SCHEMA_VERSION=496`; Web; postchecks de versión, readiness,
-outbox y flujos. El backfill `490→492` debe abortar si no puede congelar evidencia
-contable histórica de forma inequívoca; nunca se completa usando el mapping
-bancario mutable actual. No desplegar el runtime nuevo sobre esquema `490`.
+El rango `491..496` se promovió el 2026-08-17 en este orden:
+respaldo/preflight; inspección y aplicación DB; API/worker con
+`REQUIRED_DATABASE_SCHEMA_VERSION=496`; Web; postchecks de versión, readiness y
+outbox. El backfill `490→492` procesó cero filas ambiguas. La regla estable se
+mantiene: cualquier backfill futuro debe abortar si no puede congelar evidencia
+contable histórica de forma inequívoca y nunca debe inferirla de un mapping
+bancario mutable.
 
 El 2026-08-13 el preflight PROD pasó y se creó un respaldo PostgreSQL 17 nuevo,
 validado por listado y SHA-256. La restauración local preservó el estado `490`
@@ -56,14 +57,14 @@ La evidencia sin datos de negocio está en
 reduce el riesgo técnico, pero no autoriza la escritura PROD ni el cambio de
 plan de Render.
 
-El candidato reproducible está en el commit `03370c6` y en el PR draft
-[#79](https://github.com/yohandry10/erp/pull/79). Al 2026-08-17 el PR permanece
-abierto y mergeable; PostgreSQL/contratos SQL, lint, type-check, tests, build,
-Playwright, seguridad, CodeQL, NPM Audit y preview Vercel están verdes. La
-consulta read-only de PROD del mismo día confirmó que la última migración sigue
-siendo `490`; Render continúa respondiendo con `commit=unknown` y
-`buildDate=unknown`. No fusionar ni desplegar el runtime antes de promover la DB
-y configurar el gate de esquema en la misma ventana coordinada.
+El PR [#79](https://github.com/yohandry10/erp/pull/79) fue fusionado a `main` en
+el commit `85f35175eaa6d51d4a0d19afe65930481a9c29c4`. Los gates de `main` quedaron
+verdes, incluyendo PostgreSQL/contratos SQL, lint, type-check, tests, build,
+Playwright, seguridad, CodeQL y NPM Audit. Render desplegó ese SHA con el gate
+de esquema `496`; readiness remoto confirma DB, Redis y outbox listos. Vercel
+publicó el Web productivo como `dpl_GDNtR83fFAQhoqNwnyxK5Aqgmv9W`. La evidencia
+sin datos de negocio está en
+`artifacts/qa-10-questions/prod-491-496-promotion-20260817.json`.
 
 ## Go-live
 
@@ -157,9 +158,10 @@ correctivo probado. Nunca improvisarlo sobre PROD.
 - Prueba física de impresión y cliente desktop.
 - Validación legal externa de PLAME/T-Registro.
 - Decisión de producto sobre venta rápida.
-- Promoción autorizada de `491..496`, identificación verificable del SHA de
-  Render y aprobación del cambio de plan `free→starter` antes de aplicar el
-  Blueprint que evita que los workers internos se duerman.
+- Añadir un medio de pago en Render y aprobar el cambio de la instancia
+  `free→starter` (USD 7/mes). La promoción `491..496`, el SHA de Render y los
+  despliegues API/Web ya están verificados; el plan pagado es el único pendiente
+  de infraestructura de esta ventana.
 
 ## Evidencia y cierre
 
