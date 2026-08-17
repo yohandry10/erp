@@ -114,4 +114,28 @@ describe('EventBusService', () => {
 
     expect(finalizado).toBe(true);
   });
+
+  it('falla cerrado si un evento canónico no puede persistirse', async () => {
+    const outboxService = {
+      persistEventStandard: jest.fn().mockRejectedValue(new Error('outbox no disponible')),
+    };
+    const service = new EventBusService(outboxService as any);
+
+    await expect(service.emit(
+      'cobro.registrado',
+      { eventId: 'cobro-1', idempotencyKey: 'cobro-1' },
+      'finanzas',
+      'tenant-1',
+    )).rejects.toThrow('outbox no disponible');
+  });
+
+  it('no permite completar silenciosamente un evento outbox sin handler', async () => {
+    const service = new EventBusService(undefined);
+
+    await expect(service.emitAndAwait(
+      'email.send',
+      { outboxRowId: 'row-without-handler' },
+      'outbox-worker',
+    )).rejects.toThrow('OUTBOX_HANDLER_NOT_REGISTERED:email.send');
+  });
 });

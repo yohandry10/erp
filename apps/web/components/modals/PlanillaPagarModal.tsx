@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApi } from "@/hooks/use-api";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,22 @@ interface EmpleadoPago {
   estado_pago: string;
 }
 
+interface CuentaBancariaPago {
+  id: string;
+  nombre?: string;
+  banco?: string;
+  numero_cuenta?: string;
+  moneda?: string;
+  saldo?: number;
+  saldo_actual?: number;
+}
+
+interface SesionCajaPago {
+  id: string;
+  nombre?: string;
+  moneda?: string;
+}
+
 const toAmount = (value: unknown) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -48,6 +64,12 @@ export default function PlanillaPagarModal({
   const [pagando, setPagando] = useState(false);
   const [empleados, setEmpleados] = useState<EmpleadoPago[]>([]);
   const [error, setError] = useState("");
+  const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancariaPago[]>([]);
+  const [sesionesCaja, setSesionesCaja] = useState<SesionCajaPago[]>([]);
+  const [cuentaBancariaId, setCuentaBancariaId] = useState("");
+  const [sesionCajaId, setSesionCajaId] = useState("");
+  const [referencia, setReferencia] = useState("");
+  const paymentKeyRef = useRef("");
   const [metodoPago, setMetodoPago] = useState<"efectivo" | "transferencia">(
     "transferencia",
   );
@@ -90,11 +112,44 @@ export default function PlanillaPagarModal({
     void loadDetallePlanilla();
   }, [loadDetallePlanilla]);
 
+  const loadDestinosTesoreria = useCallback(async () => {
+    if (!isOpen) return;
+    try {
+      const response = await get("/api/rrhh/planillas/tesoreria/destinos");
+      const payload = response?.data ?? response ?? {};
+      const cuentas = Array.isArray(payload?.cuentas_bancarias)
+        ? payload.cuentas_bancarias
+        : [];
+      const sesiones = Array.isArray(payload?.sesiones_caja)
+        ? payload.sesiones_caja
+        : [];
+      setCuentasBancarias(cuentas);
+      setSesionesCaja(sesiones);
+      setCuentaBancariaId((current) => current || String(cuentas[0]?.id || ""));
+      setSesionCajaId((current) => current || String(sesiones[0]?.id || ""));
+    } catch (loadError: any) {
+      setCuentasBancarias([]);
+      setSesionesCaja([]);
+      setError(loadError?.message || "No se pudieron cargar los destinos de tesorería");
+    }
+  }, [get, isOpen]);
+
+  useEffect(() => {
+    if (isOpen && !paymentKeyRef.current) paymentKeyRef.current = crypto.randomUUID();
+    void loadDestinosTesoreria();
+  }, [isOpen, loadDestinosTesoreria]);
+
   const totalNeto = useMemo(
     () => empleados.reduce((sum, empleado) => sum + empleado.neto_pagar, 0),
     [empleados],
   );
   const planillaAprobada = String(planilla?.estado || "").toLowerCase() === "aprobada";
+  const cerrarModal = () => {
+    paymentKeyRef.current = "";
+    setReferencia("");
+    setError("");
+    onClose();
+  };
 
   const procesarPago = async () => {
     if (!planillaAprobada) {
@@ -105,12 +160,24 @@ export default function PlanillaPagarModal({
       setError("La planilla no contiene empleados calculados.");
       return;
     }
+    if (metodoPago === "transferencia" && (!cuentaBancariaId || !referencia.trim())) {
+      setError("Seleccione una cuenta bancaria e ingrese la referencia de la transferencia.");
+      return;
+    }
+    if (metodoPago === "efectivo" && !sesionCajaId) {
+      setError("El pago en efectivo requiere una sesión de caja abierta a nombre del pagador.");
+      return;
+    }
 
     try {
       setPagando(true);
       setError("");
       const response = await post(`/api/rrhh/planillas/${planilla.id}/pagar`, {
         metodo_pago: metodoPago,
+        idempotency_key: paymentKeyRef.current,
+        cuenta_bancaria_id: metodoPago === "transferencia" ? cuentaBancariaId : undefined,
+        sesion_caja_id: metodoPago === "efectivo" ? sesionCajaId : undefined,
+        referencia: metodoPago === "transferencia" ? referencia.trim() : undefined,
       });
       if (!response?.success) {
         throw new Error(response?.message || "La transacción de pago no fue confirmada");
@@ -122,6 +189,7 @@ export default function PlanillaPagarModal({
         `✅ Planilla pagada en una sola operación\n\n${empleadosPagados} empleados · ${currencySymbol} ${totalPagado.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       );
       onSuccess();
+      paymentKeyRef.current = "";
       onClose();
     } catch (paymentError: any) {
       console.error("Error pagando la planilla:", paymentError);
@@ -134,7 +202,7 @@ export default function PlanillaPagarModal({
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && !pagando && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !pagando && cerrarModal()}>
       <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden border-border bg-card p-0 text-card-foreground xl:max-w-5xl">
         <DialogHeader className="shrink-0 border-b border-border px-6 py-5">
           <DialogTitle>💰 Pagar planilla {planilla?.periodo}</DialogTitle>
@@ -187,6 +255,55 @@ export default function PlanillaPagarModal({
             </select>
           </label>
 
+          {metodoPago === "transferencia" ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-2 text-sm font-semibold">
+                Cuenta bancaria
+                <select
+                  value={cuentaBancariaId}
+                  onChange={(event) => setCuentaBancariaId(event.target.value)}
+                  disabled={pagando}
+                  className="rounded-md border border-input bg-background px-3 py-2 font-normal"
+                >
+                  <option value="">Seleccione una cuenta</option>
+                  {cuentasBancarias.map((cuenta) => (
+                    <option key={cuenta.id} value={cuenta.id}>
+                      {cuenta.banco || cuenta.nombre || "Banco"} · {cuenta.numero_cuenta || cuenta.id.slice(0, 8)} · {cuenta.moneda || "PEN"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-semibold">
+                Referencia / operación
+                <input
+                  value={referencia}
+                  onChange={(event) => setReferencia(event.target.value)}
+                  disabled={pagando}
+                  maxLength={180}
+                  placeholder="Ej. OP-2026-000123"
+                  className="rounded-md border border-input bg-background px-3 py-2 font-normal"
+                />
+              </label>
+            </div>
+          ) : (
+            <label className="flex flex-col gap-2 text-sm font-semibold sm:max-w-md">
+              Sesión de caja del pagador
+              <select
+                value={sesionCajaId}
+                onChange={(event) => setSesionCajaId(event.target.value)}
+                disabled={pagando}
+                className="rounded-md border border-input bg-background px-3 py-2 font-normal"
+              >
+                <option value="">Seleccione una sesión abierta</option>
+                {sesionesCaja.map((sesion) => (
+                  <option key={sesion.id} value={sesion.id}>
+                    {sesion.nombre || `Sesión ${sesion.id.slice(0, 8)}`} · {sesion.moneda || "PEN"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-muted">
@@ -220,7 +337,7 @@ export default function PlanillaPagarModal({
         </div>
 
         <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-border p-6">
-          <Button variant="outline" onClick={onClose} disabled={pagando}>Cancelar</Button>
+          <Button variant="outline" onClick={cerrarModal} disabled={pagando}>Cancelar</Button>
           <Button
             variant="success"
             onClick={procesarPago}

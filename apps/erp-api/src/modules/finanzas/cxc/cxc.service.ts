@@ -554,7 +554,7 @@ export class CxcService {
 
       const cxcEventId = sourceEventId;
 
-      this.eventBus.emitCuentaPorCobrarCreadaEvent({
+      await this.eventBus.emitCuentaPorCobrarCreadaEvent({
         eventId: cxcEventId,
         tenantId,
         idempotencyKey,
@@ -983,7 +983,7 @@ export class CxcService {
     const eventId = uuidv4();
     const idempotencyKey = `cxc.doc:${documento.id}`;
 
-    this.eventBus.emitCuentaPorCobrarCreadaEvent({
+    await this.eventBus.emitCuentaPorCobrarCreadaEvent({
       eventId,
       tenantId,
       idempotencyKey,

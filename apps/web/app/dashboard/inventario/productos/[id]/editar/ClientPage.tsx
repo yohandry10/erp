@@ -32,10 +32,12 @@ export default function EditarProductoPage() {
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [productImage, setProductImage] = useState<File | null>(null);
   const [removeCurrentImage, setRemoveCurrentImage] = useState(false);
+  const [originalUnit, setOriginalUnit] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     codigo: "",
     nombre: "",
     marca: "",
+    unidadMedida: "",
     descripcion: "",
     categoria: "",
     precioVenta: "",
@@ -67,11 +69,16 @@ export default function EditarProductoPage() {
       }
       if (response?.success && response.data) {
         const p = response.data;
+        const loadedUnit = typeof p.unidad_medida === "string" && p.unidad_medida.trim()
+          ? p.unidad_medida.trim().toUpperCase()
+          : "";
         setCurrentImageUrl(p.imagen_url || null);
+        setOriginalUnit(loadedUnit || null);
         setFormData({
           codigo: p.codigo || "",
           nombre: p.nombre || "",
           marca: p.marca || "",
+          unidadMedida: loadedUnit,
           descripcion: p.descripcion || "",
           categoria: p.categoria || "",
           precioVenta: p.precio_venta?.toString() || "",
@@ -102,6 +109,13 @@ export default function EditarProductoPage() {
       return;
     }
 
+    if (!originalUnit && formData.unidadMedida) {
+      const confirmed = window.confirm(
+        `Este producto histórico no tiene unidad registrada. Asignar ${formData.unidadMedida} regularizará su Kardex de forma auditable y la unidad ya no podrá cambiar cuando existan movimientos. ¿Desea continuar?`,
+      );
+      if (!confirmed) return;
+    }
+
     setIsLoading(true);
     try {
       const payload = {
@@ -110,6 +124,9 @@ export default function EditarProductoPage() {
         // En edición, la cadena vacía es intencional: el writer la convierte
         // en NULL y permite quitar una marca anterior.
         marca: formData.marca.trim(),
+        ...(formData.unidadMedida
+          ? { unidad_medida: formData.unidadMedida }
+          : {}),
         descripcion: formData.descripcion.trim() || undefined,
         categoria: formData.categoria,
         precio_venta: Number(formData.precioVenta),
@@ -272,6 +289,30 @@ export default function EditarProductoPage() {
             />
             <p className="mt-1 text-xs text-muted-foreground">
               Las ventas futuras congelan esta marca al calcular la comisión.
+            </p>
+          </div>
+
+          <div className="mt-4">
+            <label htmlFor="editar-unidad-medida">Unidad de medida</label>
+            <select
+              id="editar-unidad-medida"
+              name="unidadMedida"
+              value={formData.unidadMedida}
+              onChange={handleChange}
+            >
+              {!originalUnit && (
+                <option value="">Sin regularizar (producto histórico)</option>
+              )}
+              <option value="NIU">Unidad (NIU)</option>
+              <option value="KGM">Kilogramo (KGM)</option>
+              <option value="LTR">Litro (LTR)</option>
+              <option value="MTR">Metro (MTR)</option>
+              <option value="ZZ">Servicio (ZZ)</option>
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {originalUnit
+                ? "Si el producto ya tiene Kardex, el sistema preservará su unidad histórica."
+                : "Sin regularizar no se presume NIU. Elegir una unidad requiere confirmación y reclasifica explícitamente su Kardex histórico."}
             </p>
           </div>
 

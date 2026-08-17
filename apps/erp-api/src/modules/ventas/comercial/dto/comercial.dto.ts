@@ -176,7 +176,7 @@ export class FuenteConsolidadoDto {
 export class CrearConsolidadoVentasDto {
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(100)
+  @ArrayMaxSize(10)
   @ValidateNested({ each: true })
   @Type(() => FuenteConsolidadoDto)
   fuentes: FuenteConsolidadoDto[];

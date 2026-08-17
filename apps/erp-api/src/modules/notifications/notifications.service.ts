@@ -56,7 +56,6 @@ export class NotificationsService {
   ): Promise<Notification> {
     return this.withTenantContext(tenantId, user, async () => {
       const insertData: any = {
-        tenant_id: tenantId,
         usuario_id: notificationData.usuario_id,
         tipo: notificationData.type,
         severidad: notificationData.severity,
@@ -64,8 +63,6 @@ export class NotificationsService {
         mensaje: notificationData.message,
         action_url: notificationData.action_url,
         action_label: notificationData.action_label,
-        leida: false,
-        created_at: new Date().toISOString(),
       };
 
       // Agregar roles_destinatarios si se especificaron
@@ -75,10 +72,12 @@ export class NotificationsService {
 
       const { data, error } = await this.supabaseService
         .getClient()
-        .from('notificaciones')
-        .insert(insertData)
-        .select()
-        .single();
+        .rpc('gestionar_notificacion_tx', {
+          p_tenant_id: tenantId,
+          p_actor_id: user?.id ?? null,
+          p_operacion: 'CREATE',
+          p_payload: insertData,
+        });
 
       if (error) {
         this.logger.error(`Error creating notification: ${error.message}`, error);
@@ -319,15 +318,12 @@ export class NotificationsService {
 
       const { data, error } = await this.supabaseService
         .getClient()
-        .from('notificaciones')
-        .update({
-          leida: true,
-          leida_at: new Date().toISOString(),
-        })
-        .eq('id', notificationId)
-        .eq('tenant_id', tenantId)
-        .select()
-        .single();
+        .rpc('gestionar_notificacion_tx', {
+          p_tenant_id: tenantId,
+          p_actor_id: user?.id ?? null,
+          p_operacion: 'MARK_READ',
+          p_payload: { notification_id: notificationId },
+        });
 
       if (error) {
         this.logger.error(`Error marking notification as read: ${error.message}`, error);
@@ -346,27 +342,20 @@ export class NotificationsService {
   ): Promise<number> {
     const effectiveUser = user ?? { id: usuarioId };
     return this.withTenantContext(tenantId, effectiveUser, async () => {
-      let query = this.supabaseService
+      const { data, error } = await this.supabaseService
         .getClient()
-        .from('notificaciones')
-        .update({
-          leida: true,
-          leida_at: new Date().toISOString(),
-        })
-        .eq('tenant_id', tenantId)
-        .eq('leida', false);
-
-      if (usuarioId) {
-        query = query.eq('usuario_id', usuarioId);
-      }
-
-      const { data, error } = await query.select();
+        .rpc('gestionar_notificacion_tx', {
+          p_tenant_id: tenantId,
+          p_actor_id: effectiveUser?.id ?? null,
+          p_operacion: 'MARK_ALL_READ',
+          p_payload: { usuario_id: usuarioId ?? null },
+        });
       if (error) {
         this.logger.error(`Error marking all notifications as read: ${error.message}`, error);
         throw new Error(error.message);
       }
 
-      const count = data?.length || 0;
+      const count = Number((data as { updated_count?: number } | null)?.updated_count ?? 0);
       this.logger.log(`${count} notifications marked as read for tenant ${tenantId}`);
       return count;
     });
@@ -409,10 +398,12 @@ export class NotificationsService {
 
       const { error } = await this.supabaseService
         .getClient()
-        .from('notificaciones')
-        .delete()
-        .eq('id', notificationId)
-        .eq('tenant_id', tenantId);
+        .rpc('gestionar_notificacion_tx', {
+          p_tenant_id: tenantId,
+          p_actor_id: user?.id ?? null,
+          p_operacion: 'DELETE',
+          p_payload: { notification_id: notificationId },
+        });
 
       if (error) {
         this.logger.error(`Error deleting notification: ${error.message}`, error);

@@ -40,6 +40,31 @@ Estado actual y pendientes: `docs/CURRENT_STATE.md`.
 El estado remoto vigente está verificado hasta `490`; cualquier rango posterior
 vuelve a comenzar por preflight, respaldo y ensayo transaccional.
 
+El candidato local actual es `491..496`. Su promoción es coordinada y en este
+orden: respaldo/preflight; inspección y aplicación DB; API/worker con
+`REQUIRED_DATABASE_SCHEMA_VERSION=496`; Web; postchecks de versión, readiness,
+outbox y flujos. El backfill `490→492` debe abortar si no puede congelar evidencia
+contable histórica de forma inequívoca; nunca se completa usando el mapping
+bancario mutable actual. No desplegar el runtime nuevo sobre esquema `490`.
+
+El 2026-08-13 el preflight PROD pasó y se creó un respaldo PostgreSQL 17 nuevo,
+validado por listado y SHA-256. La restauración local preservó el estado `490`
+(55 tenants), aplicó `491..496`, registró `496`, pasó `verify491..496` con
+rollback y terminó con readiness `ready=true` para esquema requerido `496`.
+La evidencia sin datos de negocio está en
+`artifacts/qa-10-questions/prod-490-to-496-rehearsal-20260813.json`. Este ensayo
+reduce el riesgo técnico, pero no autoriza la escritura PROD ni el cambio de
+plan de Render.
+
+El candidato reproducible está en el commit `03370c6` y en el PR draft
+[#79](https://github.com/yohandry10/erp/pull/79). Al 2026-08-17 el PR permanece
+abierto y mergeable; PostgreSQL/contratos SQL, lint, type-check, tests, build,
+Playwright, seguridad, CodeQL, NPM Audit y preview Vercel están verdes. La
+consulta read-only de PROD del mismo día confirmó que la última migración sigue
+siendo `490`; Render continúa respondiendo con `commit=unknown` y
+`buildDate=unknown`. No fusionar ni desplegar el runtime antes de promover la DB
+y configurar el gate de esquema en la misma ventana coordinada.
+
 ## Go-live
 
 Orden recomendado:
@@ -51,7 +76,8 @@ Orden recomendado:
 5. Configurar SOL y GRE REST si corresponde.
 6. Promover DB mediante el procedimiento anterior.
 7. Desplegar API, worker y Web/Tauri.
-8. Verificar health, logs, colas y observabilidad.
+8. Verificar `/health/version` contra el commit esperado y readiness pasivo de
+   esquema, Redis y outbox; después revisar logs, colas y observabilidad.
 9. Crear o migrar el tenant real.
 10. Ejecutar smoke mínimo autorizado:
     - login y RBAC;
@@ -81,8 +107,11 @@ Antes de un envío productivo:
 - Clock, correlativos, series y numeración están verificados.
 - El preflight confirma que no se usó producción durante simulaciones.
 
-Factura, boleta, notas, RA y RC cuentan con prueba beta. GRE SOAP beta no es un
-gate satisfactorio mientras continúe el rechazo `2112`.
+Factura y boleta cuentan con evidencia aceptada en beta; RA/RC tienen evidencia
+de ticket/consulta. El soporte de notas `07/08` está probado localmente, pero la
+release no debe afirmar aceptación beta hasta guardar un CDR aceptado de cada
+tipo como evidencia cruda. GRE SOAP beta no es un gate satisfactorio mientras
+continúe el rechazo `2112`.
 
 ## Migración de clientes
 
@@ -128,6 +157,9 @@ correctivo probado. Nunca improvisarlo sobre PROD.
 - Prueba física de impresión y cliente desktop.
 - Validación legal externa de PLAME/T-Registro.
 - Decisión de producto sobre venta rápida.
+- Promoción autorizada de `491..496`, identificación verificable del SHA de
+  Render y aprobación del cambio de plan `free→starter` antes de aplicar el
+  Blueprint que evita que los workers internos se duerman.
 
 ## Evidencia y cierre
 

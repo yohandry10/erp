@@ -1,0 +1,31 @@
+{
+  "environment": "local_ephemeral",
+  "database": "erp_qa10",
+  "migration": 493,
+  "run": "verify493-1786615124850",
+  "distinct_actors": 10,
+  "distinct_cash_registers": 10,
+  "created_sales": 10,
+  "idempotent_retries": 10,
+  "unique_sale_ids": 10,
+  "unique_tickets": 10,
+  "tickets": [
+    "T001-00000032",
+    "T001-00000033",
+    "T001-00000034",
+    "T001-00000035",
+    "T001-00000036",
+    "T001-00000037",
+    "T001-00000038",
+    "T001-00000039",
+    "T001-00000040",
+    "T001-00000041"
+  ],
+  "ticket_documents": 10,
+  "sale_details": 10,
+  "payments": 10,
+  "stock_before": 88,
+  "stock_after": 78,
+  "rows_marked_ticket_sequence_version_493": 10,
+  "result": "passed"
+}

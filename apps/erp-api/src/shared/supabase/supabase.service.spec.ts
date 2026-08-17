@@ -78,7 +78,11 @@ describe('SupabaseService', () => {
     const { service } = buildService();
     const publicClient = service.getPublicClient();
 
-    expect(() => publicClient.rpc('pgrst_reload_schema')).not.toThrow();
+    expect(() => publicClient.rpc('outbox_runtime_health_492')).not.toThrow();
+    expect(() => publicClient.rpc('heartbeat_outbox_event_tx')).not.toThrow();
+    expect(() => publicClient.rpc('pgrst_reload_schema')).toThrow(
+      /Public Supabase client blocked for RPC "pgrst_reload_schema"/,
+    );
     expect(service).toBeDefined();
   });
 

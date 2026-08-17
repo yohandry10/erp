@@ -56,6 +56,9 @@ Reglas:
 - `.env.local`, `.env` y el antiguo proyecto DEV no son fuentes operativas.
 - El frontend sólo recibe variables `NEXT_PUBLIC_*` expresamente públicas.
 - Logs y evidencia deben redactar tokens, passwords y claves.
+- En producción `REQUIRED_DATABASE_SCHEMA_VERSION` es obligatorio. Debe igualar
+  la última migración requerida por el release; omitirlo es error de arranque,
+  no un fallback a una versión antigua.
 
 ## Contrato PROD-only
 
@@ -131,7 +134,11 @@ Nunca realizar borrados amplios con rutas, tenants o filtros no resueltos.
 
 ## Health y observabilidad
 
-La API expone health checks de proceso y dependencias según su configuración.
+La API expone checks separados: `live` sólo acredita proceso; `ready` es pasivo
+y no recarga el esquema ni muta PostgreSQL. Readiness exige la versión mínima
+de DB configurada, Redis cuando es obligatorio y capacidad real del outbox; el
+endpoint de versión debe publicar commit y fecha de build inyectados por el
+despliegue.
 Validar al menos:
 
 - proceso API;
@@ -143,6 +150,17 @@ Validar al menos:
 
 Los dashboards y alertas deben usar métricas estructuradas. Un health “OK” no
 demuestra que los flujos funcionales estén listos.
+
+El worker de outbox sólo escribe mediante RPCs de enqueue/claim/heartbeat/
+complete/fail/reset con token de claim; `service_role` no recibe DML directo en
+la tabla. Las listas, métricas y reintentos expuestos a usuarios revalidan
+`tenant_id`, actor activo y permiso dentro de PostgreSQL; sólo incluyen tipos
+propiedad del worker contable, proyectan metadatos operativos mínimos y nunca
+usan una lectura global de `service_role`. Al iniciar ejecuta catch-up, además
+del cron. Antes de promover `492`,
+el backfill revisa eventos laborales `pending`, `failed` y `processing`; si un
+movimiento histórico no contiene un snapshot contable 1:1, la migración aborta
+con `REGULARIZATION_REQUIRED` en vez de inferir el mapping bancario actual.
 
 ## Pruebas operativas
 
@@ -191,9 +209,11 @@ afectación de IGV), `ple-export.service.ts` (libros electrónicos),
   pruebas fijan el número de campos, pero quien certifica que un archivo es
   válido es el validador PVS, que no se puede ejecutar en CI.
 
-El workflow remoto `e2e.yml` está bloqueado porque las specs actuales escriben y
-aprovisionan datos. No se reactivará hasta disponer de infraestructura local o
-efímera aislada; queda expresamente prohibido conectarlo a PROD.
+CI ejecuta dos fronteras aisladas: PostgreSQL 16 efímero reconstruye la cadena,
+corre los verificadores requeridos y prueba el readiness contra la versión
+final; Playwright usa sólo localhost y mocks controlados para los recorridos sin
+base. Las specs que necesiten datos reales continúan bloqueadas salvo que reciban
+una base efímera explícita. Ningún E2E puede apuntar a PROD ni al DEV retirado.
 
 Conviene recordar qué **no** cazan las pruebas. La suite estaba verde mientras el
 sistema adelantaba las fechas un día pasadas las 19:00, perdía las bases

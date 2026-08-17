@@ -167,7 +167,7 @@ export class UsuariosController {
   }
 
   @Post('/crear')
-  @RequirePermission('configuracion', 'crear', 'usuarios')
+  @RequirePermission('users.manage')
   @ApiOperation({ summary: 'Crear usuario mediante el writer RBAC canónico' })
   @ApiResponse({ status: 201, description: 'Usuario y rol creados atómicamente' })
   async crearUsuario(@Body() body: any, @Req() req: any) {
@@ -192,7 +192,7 @@ export class UsuariosController {
   }
 
   @Put('/:id')
-  @RequirePermission('configuracion', 'editar', 'usuarios')
+  @RequirePermission('users.manage')
   @ApiOperation({ summary: 'Actualizar usuario y rol en una transacción' })
   async actualizarUsuario(@Param('id') id: string, @Body() body: any, @Req() req: any) {
     const tenantId = this.resolveTenantOrThrow(req);
@@ -210,7 +210,7 @@ export class UsuariosController {
   }
 
   @Put('/:id/estado')
-  @RequirePermission('configuracion', 'editar', 'usuarios')
+  @RequirePermission('users.manage')
   @ApiOperation({ summary: 'Cambiar estado y revocar sesiones cuando corresponda' })
   async cambiarEstado(@Param('id') id: string, @Body() body: { estado: string }, @Req() req: any) {
     const estado = this.normalizeEstado(body.estado);
@@ -221,7 +221,7 @@ export class UsuariosController {
   }
 
   @Delete('/:id')
-  @RequirePermission('configuracion', 'eliminar', 'usuarios')
+  @RequirePermission('users.manage')
   @ApiOperation({ summary: 'Inactivar usuario de forma trazable' })
   async eliminarUsuario(@Param('id') id: string, @Req() req: any) {
     await this.userManagementService.deleteUser(this.resolveTenantOrThrow(req), id, this.requireActor(req));

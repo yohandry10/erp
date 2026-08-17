@@ -6,6 +6,11 @@ export interface TenantContextSnapshot {
   userId?: string | null;
   supabaseAccessToken?: string | null;
   isSuperAdmin?: boolean | null;
+  /** Propiedad efímera del claim outbox; nunca se acepta desde HTTP. */
+  outboxEventRowId?: string | null;
+  outboxEventId?: string | null;
+  outboxClaimToken?: string | null;
+  outboxWorker?: string | null;
 }
 
 @Injectable()
@@ -34,6 +39,24 @@ export class TenantContextService {
 
   getIsSuperAdmin(): boolean {
     return this.storage.getStore()?.isSuperAdmin ?? false;
+  }
+
+  getOutboxClaim(): {
+    eventRowId: string;
+    eventId: string | null;
+    claimToken: string;
+    worker: string | null;
+  } | null {
+    const context = this.storage.getStore();
+    if (!context?.outboxEventRowId || !context?.outboxClaimToken) {
+      return null;
+    }
+    return {
+      eventRowId: context.outboxEventRowId,
+      eventId: context.outboxEventId ?? null,
+      claimToken: context.outboxClaimToken,
+      worker: context.outboxWorker ?? null,
+    };
   }
 
   setContext(partial: TenantContextSnapshot): void {

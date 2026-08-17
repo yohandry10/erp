@@ -53,6 +53,11 @@ class ProductoMaestroBaseDto {
   @MaxLength(120)
   marca?: string;
 
+  @IsOptional()
+  @IsString()
+  @IsIn(['NIU', 'KGM', 'LTR', 'MTR', 'ZZ'])
+  unidad_medida?: string;
+
   @IsString()
   @MinLength(1)
   @MaxLength(120)
