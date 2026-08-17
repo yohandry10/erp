@@ -83,6 +83,9 @@ const createSupabaseMock = (fixtures: {
   };
 
   const rpcMock = jest.fn(async (fn: string, args?: any) => {
+    if (fn === 'obtener_sesion_caja_actual_tx') {
+      return { data: responseFor('sesiones_caja').data, error: null };
+    }
     if (fn === 'reintentar_venta_pos_comercial_tx') return { data: null, error: null };
     if (fn === 'resolver_precios_venta_tx') return resolvedCommercialPrices(args);
     if (fn === 'pos_registrar_venta_comercial_tx') {
@@ -212,6 +215,7 @@ const createService = (fixtures: {
 const user = { id: 'user-1', tenant_id: 'tenant-1', email: 'user@example.com' };
 const ventaBase = {
   idempotency_key: 'lock-123',
+  sesion_caja_id: 'sesion-1',
   cliente_documento: '12345678',
   cliente_nombre: 'Cliente Demo',
   items: [
@@ -259,6 +263,29 @@ describe('PosService atomic transaction contract', () => {
     expect(ctx.inserts.find((entry) => entry.table === 'ventas_pos_pagos')).toBeUndefined();
     expect(ctx.inserts.find((entry) => entry.table === 'movimientos_inventario')).toBeUndefined();
     expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_tx', expect.any(Object));
+  });
+
+  it('consulta la sesión propia por la proyección RPC sin leer sesiones_caja directamente', async () => {
+    const ctx = createService();
+    ctx.rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === 'obtener_sesion_caja_actual_tx') {
+        return {
+          data: { id: 'sesion-1', caja_id: 'caja-1', estado: 'ABIERTA' },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    await expect(ctx.service.getSesionCajaActual(user)).resolves.toEqual({
+      success: true,
+      data: { id: 'sesion-1', caja_id: 'caja-1', estado: 'ABIERTA' },
+    });
+    expect(ctx.rpcMock).toHaveBeenCalledWith('obtener_sesion_caja_actual_tx', {
+      p_tenant_id: 'tenant-1',
+      p_actor_id: 'user-1',
+    });
+    expect(ctx.supabaseClient.from).not.toHaveBeenCalledWith('sesiones_caja');
   });
 
   it('devuelve el retry confirmado antes de recalcular una lista que pudo cambiar', async () => {

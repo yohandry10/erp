@@ -498,7 +498,13 @@ export class InventarioService {
               });
 
               try {
-                await this.supabase.getClient().from('outbox_events').insert(ajusteEvent);
+                const { error: outboxError } = await this.supabase.getClient().rpc(
+                  'enqueue_outbox_event_tx',
+                  { p_event: ajusteEvent },
+                );
+                if (outboxError) {
+                  throw new Error(outboxError.message);
+                }
                 console.log(`✅ Evento ajuste.inventario.aplicado encolado (${ajusteEvent.event_id})`);
               } catch (err) {
                 console.error('❌ Error encolando ajuste.inventario.aplicado:', err);

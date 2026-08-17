@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PosService } from './pos.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 
 @Injectable()
-export class PosWorkerScheduler {
+export class PosWorkerScheduler implements OnApplicationBootstrap {
   private readonly logger = new Logger(PosWorkerScheduler.name);
   private readonly cronLockKey = 'worker:pos:pendientes';
   private readonly cronLockTtlSeconds = 600;
@@ -13,6 +13,14 @@ export class PosWorkerScheduler {
     private readonly posService: PosService,
     private readonly supabase: SupabaseService,
   ) {}
+
+  onApplicationBootstrap(): void {
+    setImmediate(() => {
+      void this.handleCron().catch((error) => {
+        this.logger.error('[POS Worker] Catch-up inicial falló', error);
+      });
+    });
+  }
 
   private async fetchTenants(): Promise<string[]> {
     try {
@@ -25,13 +33,13 @@ export class PosWorkerScheduler {
 
       if (error) {
         this.logger.error(`❌ [POS Worker] Error obteniendo tenants: ${error.message}`);
-        return [];
+        throw new Error(`No se pudieron leer tenants POS: ${error.message}`);
       }
 
       return (data || []).map((t: any) => t.id).filter(Boolean);
     } catch (err: any) {
       this.logger.error(`❌ [POS Worker] Excepción obteniendo tenants: ${err?.message || err}`);
-      return [];
+      throw err;
     }
   }
 
@@ -50,8 +58,8 @@ export class PosWorkerScheduler {
       return;
     }
 
-    const tenants = await this.fetchTenants();
     try {
+      const tenants = await this.fetchTenants();
       if (!tenants.length) {
         this.logger.warn('⚠️ [POS Worker] No se encontraron tenants para procesar');
         return;
@@ -93,33 +101,14 @@ export class PosWorkerScheduler {
 
       if (error) {
         this.logger.warn(`⚠️ [POS Worker] No se pudo adquirir lock distribuido: ${error.message}`);
-        return this.shouldContinueWithoutDistributedLock(error);
+        return false;
       }
 
       return data === true || data === 'true';
     } catch (err: any) {
       this.logger.warn(`⚠️ [POS Worker] Error adquiriendo lock distribuido: ${err?.message || err}`);
-      return this.shouldContinueWithoutDistributedLock(err);
+      return false;
     }
-  }
-
-  private shouldContinueWithoutDistributedLock(error: any): boolean {
-    const message = String(error?.message || error || '').toLowerCase();
-    const lockUnavailable =
-      message.includes('permission denied') ||
-      message.includes('does not exist') ||
-      message.includes('could not find') ||
-      message.includes('schema cache') ||
-      message.includes('blocked for rpc');
-
-    if (lockUnavailable) {
-      this.logger.warn(
-        '⚠️ [POS Worker] Lock distribuido no disponible; se continua con procesamiento idempotente.',
-      );
-      return true;
-    }
-
-    return false;
   }
 
   private async releaseJobLock(): Promise<void> {

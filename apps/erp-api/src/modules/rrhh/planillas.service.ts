@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService, PlanillaCalculadaEvent } from '../../shared/events/event-bus.service';
 import Decimal from 'decimal.js';
@@ -178,10 +178,24 @@ export class PlanillasService {
     return pais === 'AR' ? 'ARS' : pais === 'CO' ? 'COP' : 'PEN';
   }
 
+  private throwPlanillaRpcError(error: any): never {
+    const message = String(error?.message || 'No se pudo completar la operación de planilla');
+    if (error?.code === '42501') throw new ForbiddenException(message);
+    if (error?.code === 'P0002') throw new NotFoundException(message);
+    if (['22003', '22007', '22008', '22023', '22P02'].includes(error?.code)) {
+      throw new BadRequestException(message);
+    }
+    if (['23503', '23505', '23514', '40001'].includes(error?.code)) {
+      throw new ConflictException(message);
+    }
+    throw error;
+  }
+
   private async guardarCalculoPlanillaAtomico(
     planillaId: string,
     tenantId: string | undefined,
     empleados: CalculoEmpleadoPersistencia[],
+    actorId: string,
   ) {
     if (!tenantId) {
       throw new BadRequestException('El tenant es obligatorio para calcular una planilla');
@@ -193,21 +207,11 @@ export class PlanillasService {
         p_tenant_id: tenantId,
         p_planilla_id: planillaId,
         p_empleados: empleados,
+        p_actor_id: actorId,
       },
     );
 
-    if (error) {
-      if (error.code === '23514' || error.code === '23505') {
-        throw new ConflictException(error.message);
-      }
-      if (error.code === 'P0002') {
-        throw new NotFoundException(error.message);
-      }
-      if (error.code === '22023' || error.code === '23503') {
-        throw new BadRequestException(error.message);
-      }
-      throw error;
-    }
+    if (error) this.throwPlanillaRpcError(error);
 
     if (!data?.success) {
       throw new Error('La transaccion de calculo de planilla no confirmo su finalizacion');
@@ -237,9 +241,43 @@ export class PlanillasService {
     };
   }
 
+  async getDestinosTesoreriaPlanilla(tenantId: string, actorId: string) {
+    const client = this.supabaseService.getClient();
+    const [cuentasResult, sesionesResult] = await Promise.all([
+      client
+        .from('cuentas_bancarias')
+        .select('id, nombre, banco, numero_cuenta, moneda, saldo, saldo_actual, activa, activo, estado')
+        .eq('tenant_id', tenantId)
+        .eq('activa', true)
+        .eq('activo', true)
+        .order('nombre', { ascending: true }),
+      client
+        .from('sesiones_caja')
+        .select('id, caja_id, nombre, moneda, estado, congelada, monto_inicial, monto_inicio')
+        .eq('tenant_id', tenantId)
+        .ilike('estado', 'abierta')
+        .eq('congelada', false)
+        .or(
+          `cajero_id.eq.${actorId},usuario_id.eq.${actorId},abierto_por.eq.${actorId},usuario_apertura.eq.${actorId}`,
+        ),
+    ]);
+    if (cuentasResult.error) throw cuentasResult.error;
+    if (sesionesResult.error) throw sesionesResult.error;
+    return {
+      success: true,
+      data: {
+        cuentas_bancarias: cuentasResult.data || [],
+        sesiones_caja: sesionesResult.data || [],
+      },
+    };
+  }
+
   // Crear nueva planilla
   // ✅ FIX: Agregar soporte multi-tenant
-  async crearPlanilla(planillaData: any, tenantId?: string) {
+  async crearPlanilla(planillaData: any, tenantId?: string, actorId?: string) {
+    if (!tenantId || !actorId) {
+      throw new BadRequestException('Tenant y actor son obligatorios para crear una planilla');
+    }
     const periodo = String(planillaData?.periodo || '').trim();
     if (!/^\d{4}-\d{2}$/.test(periodo)) {
       throw new BadRequestException('Debe enviar periodo de planilla en formato YYYY-MM');
@@ -254,57 +292,30 @@ export class PlanillasService {
       ...(planillaData?.observaciones ? { observaciones: String(planillaData.observaciones).trim() } : {}),
     };
 
-    // Una planilla siempre nace vacía. Cálculo, aprobación, devengo y pago
-    // pertenecen a sus operaciones dedicadas y no se aceptan en el alta.
-    const camposPermitidos = ['periodo', 'metadata'];
-    const datosLimpios = Object.fromEntries(
-      Object.entries({ ...planillaData, periodo })
-        .filter(([key]) => camposPermitidos.includes(key))
-        .filter(([, value]) => value !== '' && value !== undefined && value !== null)
-    );
-    if (Object.keys(metadata).length > 0) {
-      datosLimpios.metadata = metadata;
-    }
-
     const paisLaboral = await this.obtenerPaisLaboral(tenantId);
-    const dataToInsert = tenantId 
-      ? {
-          ...datosLimpios,
-          tenant_id: tenantId,
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'crear_planilla_tx_495',
+      {
+        p_tenant_id: tenantId,
+        p_planilla: {
+          periodo,
           pais_codigo: paisLaboral,
           moneda: this.monedaPais(paisLaboral),
-          estado: 'borrador',
-          estado_pago: 'pendiente',
-          total_ingresos: 0,
-          total_descuentos: 0,
-          total_aportes: 0,
-          total_neto: 0,
-          total_pagado: 0,
-          asientos_generados: 'false',
-        }
-      : {
-          ...datosLimpios,
-          estado: 'borrador',
-          estado_pago: 'pendiente',
-          total_ingresos: 0,
-          total_descuentos: 0,
-          total_aportes: 0,
-          total_neto: 0,
-          total_pagado: 0,
-          asientos_generados: 'false',
-        };
-      
-    const { data, error } = await this.supabaseService.getClient()
-      .from('planillas')
-      .insert(dataToInsert)
-      .select();
-    if (error) throw error;
-    return data[0];
+          metadata,
+        },
+        p_actor_id: actorId,
+        p_idempotency_key: String(planillaData?.idempotency_key || ''),
+      },
+    );
+    if (error) this.throwPlanillaRpcError(error);
+    if (!data?.success) throw new Error('La creación atómica de planilla no confirmó su resultado');
+    return data;
   }
 
   // Calcular planilla mensual para todos los empleados activos
   // ✅ FIX: Agregar soporte multi-tenant
-  async calcularPlanillaMensual(planillaId: string, tenantId?: string) {
+  async calcularPlanillaMensual(planillaId: string, tenantId?: string, actorId?: string) {
+    if (!actorId) throw new BadRequestException('El actor es obligatorio para calcular planilla');
     this.logger.debug(`🧮 Iniciando cálculo de planilla: ${planillaId}`);
     const client = this.supabaseService.getClient();
 
@@ -318,7 +329,7 @@ export class PlanillasService {
     }
     const { data: planillaEstado } = await planillaEstadoQuery.single();
 
-    if (planillaEstado?.estado === 'calculada' || planillaEstado?.estado === 'pagada') {
+    if (planillaEstado?.estado === 'aprobada' || planillaEstado?.estado === 'pagada') {
       // El estado de la planilla choca con la operación pedida: es un conflicto
       // del cliente, no un fallo del servidor.
       throw new ConflictException(
@@ -466,7 +477,12 @@ export class PlanillasService {
       });
     }
 
-    await this.guardarCalculoPlanillaAtomico(planillaId, tenantId, calculosPersistencia);
+    await this.guardarCalculoPlanillaAtomico(
+      planillaId,
+      tenantId,
+      calculosPersistencia,
+      actorId,
+    );
 
     this.logger.debug(`✅ Planilla calculada exitosamente:`);
     this.logger.debug(`   - Empleados procesados: ${empleados.length}`);
@@ -1180,14 +1196,7 @@ export class PlanillasService {
       },
     );
 
-    if (error) {
-      if (error.code === 'P0002') throw new NotFoundException(error.message);
-      if (error.code === '23514' || error.code === '23505') {
-        throw new ConflictException(error.message);
-      }
-      if (error.code === '22023') throw new BadRequestException(error.message);
-      throw error;
-    }
+    if (error) this.throwPlanillaRpcError(error);
     if (!data?.success || !data?.eventId) {
       throw new Error('La aprobación no confirmó su evento contable durable');
     }
@@ -1235,71 +1244,46 @@ export class PlanillasService {
         'Los importes, el pago y la integración contable de planilla no se editan directamente',
       );
     }
-
-    const query = this.supabaseService.getClient()
-      .from('planillas')
-      .update(updateData)
-      .eq('id', planillaId);
-
-    if (tenantId) {
-      query.eq('tenant_id', tenantId);
+    if (!tenantId || !usuarioId || usuarioId === 'sistema') {
+      throw new BadRequestException('Tenant y actor son obligatorios para editar una planilla');
     }
-
-    const { data, error } = await query.select();
-
-    if (error) throw error;
-    const planillaActualizada = data?.[0];
-    if (!planillaActualizada) {
-      throw new NotFoundException('Planilla no encontrada para el tenant actual');
-    }
-
-    return planillaActualizada;
+    const { idempotency_key: idempotencyKey, ...cambios } = updateData || {};
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'actualizar_planilla_borrador_tx_495',
+      {
+        p_tenant_id: tenantId,
+        p_planilla_id: planillaId,
+        p_cambios: cambios,
+        p_actor_id: usuarioId,
+        p_idempotency_key: String(idempotencyKey || ''),
+      },
+    );
+    if (error) this.throwPlanillaRpcError(error);
+    return data;
   }
 
   // Eliminar planilla y todos sus datos asociados
-  async deletePlanilla(planillaId: string, tenantId?: string) {
+  async deletePlanilla(
+    planillaId: string,
+    tenantId?: string,
+    actorId?: string,
+    idempotencyKey?: string,
+  ) {
     this.logger.debug(`🗑️ Iniciando eliminación de planilla: ${planillaId}`);
-    const client = this.supabaseService.getClient();
-
-    try {
-      // 1. Eliminar conceptos de empleados en planilla (cascada automática por FK)
-      this.logger.debug('🧹 Eliminando conceptos de empleados...');
-
-      // 2. Eliminar empleados de planilla (cascada automática por FK)
-      this.logger.debug('🧹 Eliminando empleados de planilla...');
-
-      // 3. Eliminar la planilla principal
-      this.logger.debug('🧹 Eliminando planilla principal...');
-      const query = client
-        .from('planillas')
-        .delete()
-        .eq('id', planillaId);
-
-      if (tenantId) {
-        query.eq('tenant_id', tenantId);
-      }
-
-      const { data, error } = await query.select();
-
-      if (error) {
-        console.error('❌ Error eliminando planilla:', error);
-        if (error.code === '23514') {
-          throw new ConflictException(error.message);
-        }
-        throw error;
-      }
-
-      this.logger.debug('✅ Planilla eliminada exitosamente');
-      return {
-        success: true,
-        message: 'Planilla eliminada exitosamente',
-        deletedPlanilla: data[0]
-      };
-
-    } catch (error) {
-      console.error('❌ Error en proceso de eliminación:', error);
-      throw error;
+    if (!tenantId || !actorId || !idempotencyKey) {
+      throw new BadRequestException('Tenant, actor y clave idempotente son obligatorios para eliminar');
     }
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'eliminar_planilla_borrador_tx_495',
+      {
+        p_tenant_id: tenantId,
+        p_planilla_id: planillaId,
+        p_actor_id: actorId,
+        p_idempotency_key: idempotencyKey,
+      },
+    );
+    if (error) this.throwPlanillaRpcError(error);
+    return { success: true, message: 'Planilla eliminada exitosamente', data };
   }
 
   // ✅ FIX: Agregar soporte multi-tenant
@@ -1414,13 +1398,21 @@ export class PlanillasService {
     };
   }
 
-  async calcularPlanillaPersonalizada(planillaId: string, empleadosPersonalizados: any[], tenantId?: string) {
+  async calcularPlanillaPersonalizada(
+    planillaId: string,
+    empleadosPersonalizados: any[],
+    tenantId?: string,
+    actorId?: string,
+  ) {
     this.logger.debug(`🧮 Iniciando cálculo personalizado de planilla: ${planillaId}`);
     if (!Array.isArray(empleadosPersonalizados) || empleadosPersonalizados.length === 0) {
       throw new BadRequestException('Debe seleccionar al menos un empleado');
     }
     if (!tenantId) {
       throw new BadRequestException('El tenant es obligatorio para calcular una planilla');
+    }
+    if (!actorId) {
+      throw new BadRequestException('El actor es obligatorio para calcular una planilla');
     }
 
     this.logger.debug(`👥 Empleados personalizados: ${empleadosPersonalizados.length}`);
@@ -1439,7 +1431,7 @@ export class PlanillasService {
     if (!planillaInfo) {
       throw new NotFoundException('Planilla no encontrada');
     }
-    if (String(planillaInfo.estado).toLowerCase() !== 'borrador') {
+    if (!['borrador', 'calculada'].includes(String(planillaInfo.estado).toLowerCase())) {
       throw new ConflictException(
         `La planilla ya fue ${planillaInfo.estado}. No se puede recalcular sin anular primero.`,
       );
@@ -1558,6 +1550,7 @@ export class PlanillasService {
       planillaId,
       tenantId,
       calculosPersistencia,
+      actorId,
     );
 
     this.logger.debug(`✅ Planilla personalizada calculada exitosamente:`);
@@ -1935,7 +1928,14 @@ export class PlanillasService {
    */
   async pagarPlanillaCompleta(
     planillaId: string,
-    metodoPago: 'efectivo' | 'transferencia',
+    pagoData: {
+      metodo_pago: 'efectivo' | 'transferencia';
+      idempotency_key: string;
+      cuenta_bancaria_id?: string;
+      sesion_caja_id?: string;
+      referencia?: string;
+      fecha_pago?: string;
+    },
     tenantId?: string,
     usuarioId = 'sistema',
   ) {
@@ -1943,25 +1943,18 @@ export class PlanillasService {
       throw new BadRequestException('El tenant es obligatorio para pagar una planilla');
     }
 
-    this.logger.debug(`💰 [RRHH] Pago atómico de planilla ${planillaId} por ${metodoPago}`);
+    this.logger.debug(`💰 [RRHH] Pago atómico de planilla ${planillaId} por ${pagoData?.metodo_pago}`);
     const { data, error } = await this.supabaseService.getClient().rpc(
-      'pagar_planilla_completa_tx',
+      'pagar_planilla_con_tesoreria_tx_495',
       {
         p_tenant_id: tenantId,
         p_planilla_id: planillaId,
-        p_metodo_pago: metodoPago,
-        p_usuario_id: usuarioId || 'sistema',
+        p_pago: pagoData,
+        p_actor_id: usuarioId,
       },
     );
 
-    if (error) {
-      if (error.code === 'P0002') throw new NotFoundException(error.message);
-      if (error.code === '23514' || error.code === '23505' || error.code === '40001') {
-        throw new ConflictException(error.message);
-      }
-      if (error.code === '22023') throw new BadRequestException(error.message);
-      throw error;
-    }
+    if (error) this.throwPlanillaRpcError(error);
     if (!data?.success) {
       throw new Error('La transacción de pago de planilla no confirmó su finalización');
     }
@@ -2020,7 +2013,10 @@ export class PlanillasService {
 
     return this.pagarPlanillaCompleta(
       planillaId,
-      metodoPago as 'efectivo' | 'transferencia',
+      {
+        ...pagoData,
+        metodo_pago: metodoPago as 'efectivo' | 'transferencia',
+      },
       tenantId,
       usuarioId,
     );
@@ -2051,11 +2047,8 @@ export class PlanillasService {
         'El pago legado no tiene un método válido; pague desde la planilla aprobada',
       );
     }
-    return this.pagarPlanillaCompleta(
-      pago.planilla_id,
-      metodoPago as 'efectivo' | 'transferencia',
-      tenantId,
-      usuarioId,
+    throw new ConflictException(
+      'El pago legado no contiene destino de tesorería ni clave idempotente; pague desde la planilla aprobada',
     );
   }
 
@@ -2327,24 +2320,10 @@ export class PlanillasService {
           });
 
           const { error: outboxError } = await this.supabaseService.getClient()
-            .from('outbox_events')
-            .insert(outboxEvent);
+            .rpc('enqueue_outbox_event_tx', { p_event: outboxEvent });
 
           if (outboxError) {
-            const isDuplicateOutbox = outboxError.code === '23505' ||
-              String(outboxError.message || '').toLowerCase().includes('duplicate key');
-            if (isDuplicateOutbox) {
-              const eventoDuplicado = await buscarEventoExistente();
-              if (eventoDuplicado?.event_id) {
-                this.logger.debug(
-                  `♻️ [RRHH] Insercion idempotente detecto evento planilla.liquidada existente (${eventoDuplicado.event_id}); se garantiza asiento sincronico`
-                );
-              } else {
-                throw new Error(`No se pudo resolver evento contable duplicado de planilla: ${outboxError.message}`);
-              }
-            } else {
-              throw new Error(`No se pudo encolar evento contable de planilla: ${outboxError.message}`);
-            }
+            throw new Error(`No se pudo encolar evento contable de planilla: ${outboxError.message}`);
           } else {
             this.logger.debug(
               `✅ [RRHH] Evento planilla.liquidada encolado; se crea asiento sincronico para cumplir contrato del endpoint`

@@ -1,4 +1,5 @@
 import { UsuariosController } from './usuarios.controller';
+import { PERMISSION_KEY } from '../common/decorators/require-permission.decorator';
 
 const createController = (client: any, userManagement: any = {}) =>
   new UsuariosController(
@@ -58,5 +59,16 @@ describe('UsuariosController security', () => {
     expect(changes).not.toHaveProperty('password_hash');
     expect(changes).not.toHaveProperty('password_reset_token');
     expect(changes).not.toHaveProperty('is_super_admin');
+  });
+
+  it('protege todos los writers legacy con users.manage', () => {
+    const methods = ['crearUsuario', 'actualizarUsuario', 'cambiarEstado', 'eliminarUsuario'];
+    for (const method of methods) {
+      const metadata = Reflect.getMetadata(
+        PERMISSION_KEY,
+        (UsuariosController.prototype as any)[method],
+      );
+      expect(metadata?.raw).toBe('users.manage');
+    }
   });
 });

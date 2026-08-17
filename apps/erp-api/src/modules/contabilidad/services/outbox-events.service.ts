@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { SupabaseService } from "../../../shared/supabase/supabase.service";
+import { ACCOUNTING_EVENT_TYPES } from "../../../shared/outbox/accounting-event-types";
 
 export interface OutboxEvent {
   id: string;
@@ -16,6 +17,9 @@ export interface OutboxEvent {
   retry_count: number;
   status: string;
   error_message: string | null;
+  tenant_id?: string;
+  claim_token?: string;
+  claimed_by?: string;
 }
 
 @Injectable()
@@ -35,243 +39,68 @@ export class OutboxEventsService {
     return row as OutboxEvent;
   }
 
-  /**
-   * Lee eventos pendientes de la tabla outbox_events
-   * @param tenantId - ID del tenant (opcional, para filtrar por tenant si aplica)
-   * @param limit - Límite de eventos a leer (default: 100)
-   * @returns Lista de eventos pendientes ordenados por fecha de creación (created_at ASC)
-   */
-  async leerEventosPendientes(
-    tenantId?: string,
-    limit: number = 100
+  private async leerEventosTenant(
+    tenantId: string,
+    actorId: string,
+    statuses: string[] | null,
+    limit: number,
   ): Promise<OutboxEvent[]> {
-    try {
-      let query = this.supabaseService
-        .getPublicClient()
-        .from('outbox_events')
-        .select('*')
-        .is('processed_at', null)
-        .order('created_at', { ascending: true })
-        .limit(limit);
-
-      // Si el tenant_id está en event_data, necesitamos filtrar después
-      // Por ahora, leemos todos los eventos pendientes
-      const { data, error } = await query;
-
-      if (error) {
-        this.logger.error(
-          '❌ [OutboxEvents] Error leyendo eventos pendientes:',
-          error
-        );
-        throw new Error(`Error leyendo eventos pendientes: ${error.message}`);
-      }
-
-      if (!data || data.length === 0) {
-        this.logger.debug('ℹ️ [OutboxEvents] No hay eventos pendientes');
-        return [];
-      }
-
-      this.logger.log(
-        `✅ [OutboxEvents] ${data.length} eventos pendientes encontrados`
-      );
-
-      // Filtrar por tenant si se proporciona
-      let eventos = data.map((row: any) => this.normalizeEvent(row));
-      if (tenantId) {
-        eventos = eventos.filter(evento => {
-          const eventData = evento.event_data;
-          return eventData && eventData.tenant_id === tenantId;
-        });
-        this.logger.log(
-          `✅ [OutboxEvents] ${eventos.length} eventos para tenant ${tenantId}`
-        );
-      }
-
-      return eventos;
-    } catch (error) {
-      this.logger.error(
-        '❌ [OutboxEvents] Excepción leyendo eventos pendientes:',
-        error
-      );
-      throw error;
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .rpc("list_tenant_outbox_events_492", {
+        p_tenant_id: tenantId,
+        p_actor_id: actorId,
+        p_statuses: statuses,
+        p_limit: limit,
+      });
+    if (error) {
+      throw new Error(`Error leyendo eventos del tenant: ${error.message}`);
     }
+    return ((data ?? []) as any[]).map((row) => this.normalizeEvent(row));
   }
 
-  /**
-   * Lee eventos pendientes con reintentos limitados
-   * @param maxRetries - Número máximo de reintentos permitidos (default: 3)
-   * @param limit - Límite de eventos a leer (default: 100)
-   * @returns Lista de eventos pendientes que no han excedido el límite de reintentos
-   */
-  async leerEventosPendientesConReintentos(
+  /** Reclama atómicamente sólo los tipos cuyo propietario es contabilidad. */
+  async reclamarEventosContables(
+    worker: string,
     maxRetries: number = 3,
-    limit: number = 100
+    limit: number = 50,
   ): Promise<OutboxEvent[]> {
-    try {
-      const { data, error } = await this.supabaseService
-        .getPublicClient()
-        .from('outbox_events')
-        .select('*')
-        .is('processed_at', null)
-        .or(`status.eq.pending,status.eq.failed,status.eq.PENDING,status.eq.FAILED`)
-        .lt('retry_count', maxRetries)
-        .order('created_at', { ascending: true })
-        .limit(limit);
-
-      if (error) {
-        this.logger.error(
-          '❌ [OutboxEvents] Error leyendo eventos con reintentos:',
-          error
-        );
-        throw new Error(
-          `Error leyendo eventos con reintentos: ${error.message}`
-        );
-      }
-
-      if (!data || data.length === 0) {
-        this.logger.debug(
-          'ℹ️ [OutboxEvents] No hay eventos pendientes con reintentos disponibles'
-        );
-        return [];
-      }
-
-      this.logger.log(
-        `✅ [OutboxEvents] ${data.length} eventos pendientes con reintentos encontrados`
+    const { data, error } = await this.supabaseService
+      .getPublicClient()
+      .rpc("claim_outbox_events_tx", {
+        p_worker: worker,
+        p_limit: limit,
+        p_event_types: [...ACCOUNTING_EVENT_TYPES],
+        p_excluded_event_types: null,
+        p_tenant_id: null,
+        p_max_retries: maxRetries,
+      });
+    if (error) {
+      throw new Error(
+        `No se pudieron reclamar eventos contables: ${error.message}`,
       );
-
-      return data.map((row: any) => this.normalizeEvent(row));
-    } catch (error) {
-      // Silenciar errores de tenant context - es normal cuando no hay eventos con tenant
-      if (error.message === 'Tenant context required') {
-        return [];
-      }
-      if (error.message !== 'Tenant context required') {
-        this.logger.error(
-          '❌ [OutboxEvents] Excepción leyendo eventos con reintentos:',
-          error
-        );
-      }
-      throw error;
     }
+    return ((data ?? []) as any[]).map((row) => this.normalizeEvent(row));
   }
 
-  /**
-   * Lee eventos pendientes por tipo de evento
-   * @param eventType - Tipo de evento a filtrar
-   * @param limit - Límite de eventos a leer (default: 100)
-   * @returns Lista de eventos pendientes del tipo especificado
-   */
-  async leerEventosPendientesPorTipo(
-    eventType: string,
-    limit: number = 100
-  ): Promise<OutboxEvent[]> {
-    try {
-      const { data, error } = await this.supabaseService
-        .getPublicClient()
-        .from('outbox_events')
-        .select('*')
-        .is('processed_at', null)
-        .eq('event_type', eventType)
-        .order('created_at', { ascending: true })
-        .limit(limit);
-
-      if (error) {
-        this.logger.error(
-          `❌ [OutboxEvents] Error leyendo eventos tipo ${eventType}:`,
-          error
-        );
-        throw new Error(
-          `Error leyendo eventos tipo ${eventType}: ${error.message}`
-        );
-      }
-
-      if (!data || data.length === 0) {
-        this.logger.debug(
-          `ℹ️ [OutboxEvents] No hay eventos pendientes tipo ${eventType}`
-        );
-        return [];
-      }
-
-      this.logger.log(
-        `✅ [OutboxEvents] ${data.length} eventos tipo ${eventType} encontrados`
-      );
-
-      return data.map((row: any) => this.normalizeEvent(row));
-    } catch (error) {
-      this.logger.error(
-        `❌ [OutboxEvents] Excepción leyendo eventos tipo ${eventType}:`,
-        error
-      );
-      throw error;
+  async renovarClaimContable(
+    eventId: string,
+    claimToken: string,
+  ): Promise<void> {
+    if (!eventId || !claimToken) {
+      throw new Error("El heartbeat contable requiere fila y claim token");
     }
-  }
-
-  /**
-   * Obtiene un evento específico por su event_id
-   * @param eventId - ID del evento
-   * @returns Evento encontrado o null
-   */
-  async obtenerEventoPorId(eventId: string): Promise<OutboxEvent | null> {
-    try {
-      const { data, error } = await this.supabaseService
-        .getPublicClient()
-        .from('outbox_events')
-        .select('*')
-        .eq('event_id', eventId)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          this.logger.debug(
-            `ℹ️ [OutboxEvents] Evento ${eventId} no encontrado`
-          );
-          return null;
-        }
-        this.logger.error(
-          `❌ [OutboxEvents] Error obteniendo evento ${eventId}:`,
-          error
-        );
-        throw new Error(`Error obteniendo evento ${eventId}: ${error.message}`);
-      }
-
-      return this.normalizeEvent(data);
-    } catch (error) {
-      this.logger.error(
-        `❌ [OutboxEvents] Excepción obteniendo evento ${eventId}:`,
-        error
-      );
-      throw error;
+    const { data, error } = await this.supabaseService
+      .getPublicClient()
+      .rpc("heartbeat_outbox_event_tx", {
+        p_id: eventId,
+        p_claim_token: claimToken,
+      });
+    if (error) {
+      throw new Error(`No se pudo renovar claim contable: ${error.message}`);
     }
-  }
-
-  /**
-   * Cuenta el número de eventos pendientes
-   * @param tenantId - ID del tenant (opcional)
-   * @returns Número de eventos pendientes
-   */
-  async contarEventosPendientes(tenantId?: string): Promise<number> {
-    try {
-      const { count, error } = await this.supabaseService
-        .getPublicClient()
-        .from('outbox_events')
-        .select('*', { count: 'exact', head: true })
-        .is('processed_at', null);
-
-      if (error) {
-        this.logger.error(
-          '❌ [OutboxEvents] Error contando eventos pendientes:',
-          error
-        );
-        throw new Error(`Error contando eventos pendientes: ${error.message}`);
-      }
-
-      return count || 0;
-    } catch (error) {
-      this.logger.error(
-        '❌ [OutboxEvents] Excepción contando eventos pendientes:',
-        error
-      );
-      throw error;
+    if (data !== true) {
+      throw new Error(`OUTBOX_CLAIM_LOST:${eventId}`);
     }
   }
 
@@ -280,38 +109,32 @@ export class OutboxEventsService {
    * @param limit - Límite de eventos a leer (default: 100)
    * @returns Lista de eventos fallidos
    */
-  async leerEventosFallidos(limit: number = 100): Promise<OutboxEvent[]> {
+  async leerEventosFallidos(
+    tenantId: string,
+    actorId: string,
+    limit: number = 100,
+  ): Promise<OutboxEvent[]> {
     try {
-      const { data, error } = await this.supabaseService
-        .getPublicClient()
-        .from('outbox_events')
-        .select('*')
-        .in('status', ['FAILED', 'failed'])
-        .order('created_at', { ascending: true })
-        .limit(limit);
-
-      if (error) {
-        this.logger.error(
-          '❌ [OutboxEvents] Error leyendo eventos fallidos:',
-          error
-        );
-        throw new Error(`Error leyendo eventos fallidos: ${error.message}`);
-      }
-
-      if (!data || data.length === 0) {
-        this.logger.debug('ℹ️ [OutboxEvents] No hay eventos fallidos');
+      const data = await this.leerEventosTenant(
+        tenantId,
+        actorId,
+        ["failed"],
+        limit,
+      );
+      if (data.length === 0) {
+        this.logger.debug("ℹ️ [OutboxEvents] No hay eventos fallidos");
         return [];
       }
 
       this.logger.log(
-        `✅ [OutboxEvents] ${data.length} eventos fallidos encontrados`
+        `✅ [OutboxEvents] ${data.length} eventos fallidos encontrados`,
       );
 
-      return data.map((row: any) => this.normalizeEvent(row));
+      return data;
     } catch (error) {
       this.logger.error(
-        '❌ [OutboxEvents] Excepción leyendo eventos fallidos:',
-        error
+        "❌ [OutboxEvents] Excepción leyendo eventos fallidos:",
+        error,
       );
       throw error;
     }
@@ -322,40 +145,32 @@ export class OutboxEventsService {
    * @param limit - Límite de eventos a leer (default: 100)
    * @returns Lista de eventos en dead letter
    */
-  async leerEventosDeadLetter(limit: number = 100): Promise<OutboxEvent[]> {
+  async leerEventosDeadLetter(
+    tenantId: string,
+    actorId: string,
+    limit: number = 100,
+  ): Promise<OutboxEvent[]> {
     try {
-      const { data, error } = await this.supabaseService
-        .getPublicClient()
-        .from('outbox_events')
-        .select('*')
-        .in('status', ['DEAD_LETTER', 'dead_letter'])
-        .order('created_at', { ascending: true })
-        .limit(limit);
-
-      if (error) {
-        this.logger.error(
-          '❌ [OutboxEvents] Error leyendo eventos dead letter:',
-          error
-        );
-        throw new Error(
-          `Error leyendo eventos dead letter: ${error.message}`
-        );
-      }
-
-      if (!data || data.length === 0) {
-        this.logger.debug('ℹ️ [OutboxEvents] No hay eventos dead letter');
+      const data = await this.leerEventosTenant(
+        tenantId,
+        actorId,
+        ["dead_letter"],
+        limit,
+      );
+      if (data.length === 0) {
+        this.logger.debug("ℹ️ [OutboxEvents] No hay eventos dead letter");
         return [];
       }
 
       this.logger.log(
-        `✅ [OutboxEvents] ${data.length} eventos dead letter encontrados`
+        `✅ [OutboxEvents] ${data.length} eventos dead letter encontrados`,
       );
 
-      return data.map((row: any) => this.normalizeEvent(row));
+      return data;
     } catch (error) {
       this.logger.error(
-        '❌ [OutboxEvents] Excepción leyendo eventos dead letter:',
-        error
+        "❌ [OutboxEvents] Excepción leyendo eventos dead letter:",
+        error,
       );
       throw error;
     }
@@ -365,7 +180,10 @@ export class OutboxEventsService {
    * Obtiene estadísticas de eventos por estado
    * @returns Estadísticas de eventos
    */
-  async obtenerEstadisticasEventos(): Promise<{
+  async obtenerEstadisticasEventos(
+    tenantId: string,
+    actorId: string,
+  ): Promise<{
     pending: number;
     processed: number;
     failed: number;
@@ -375,83 +193,42 @@ export class OutboxEventsService {
   }> {
     try {
       const { data, error } = await this.supabaseService
-        .getPublicClient()
-        .from('outbox_events')
-        .select('status, processed_at, created_at');
+        .getClient()
+        .rpc("outbox_tenant_stats_492", {
+          p_tenant_id: tenantId,
+          p_actor_id: actorId,
+        });
 
       if (error) {
         this.logger.error(
-          '❌ [OutboxEvents] Error obteniendo estadísticas:',
-          error
+          "❌ [OutboxEvents] Error obteniendo estadísticas:",
+          error,
         );
         throw new Error(`Error obteniendo estadísticas: ${error.message}`);
       }
 
+      const raw = (data ?? {}) as Record<string, unknown>;
       const stats = {
-        pending: 0,
-        processed: 0,
-        failed: 0,
-        dead_letter: 0,
-        processed_today: 0,
-        avg_processing_time_ms: null as number | null
+        pending: Number(raw.pending ?? 0),
+        processed: Number(raw.processed ?? 0),
+        failed: Number(raw.failed ?? 0),
+        dead_letter: Number(raw.dead_letter ?? 0),
+        processed_today: Number(raw.processed_today ?? 0),
+        avg_processing_time_ms:
+          raw.avg_processing_time_ms == null
+            ? null
+            : Number(raw.avg_processing_time_ms),
       };
 
-      // Get today's date at midnight (start of day)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayISO = today.toISOString();
-
-      // Variables for calculating average processing time
-      let totalProcessingTimeMs = 0;
-      let processedCount = 0;
-
-      if (data) {
-        for (const evento of data) {
-          const status = String((evento as any).status ?? '').toUpperCase();
-
-          if (status === 'PENDING') {
-            stats.pending++;
-          } else if (status === 'PROCESSED' || status === 'COMPLETED') {
-            stats.processed++;
-            
-            // Check if processed today
-            if (evento.processed_at && evento.processed_at >= todayISO) {
-              stats.processed_today++;
-            }
-
-            // Calculate processing time
-            if (evento.processed_at && evento.created_at) {
-              const createdAt = new Date(evento.created_at).getTime();
-              const processedAt = new Date(evento.processed_at).getTime();
-              const processingTime = processedAt - createdAt;
-              
-              if (processingTime >= 0) {
-                totalProcessingTimeMs += processingTime;
-                processedCount++;
-              }
-            }
-          } else if (status === 'FAILED') {
-            stats.failed++;
-          } else if (status === 'DEAD_LETTER') {
-            stats.dead_letter++;
-          }
-        }
-      }
-
-      // Calculate average processing time
-      if (processedCount > 0) {
-        stats.avg_processing_time_ms = Math.round(totalProcessingTimeMs / processedCount);
-      }
-
       this.logger.log(
-        `📊 [OutboxEvents] Estadísticas: ${stats.pending} pendientes, ${stats.processed} procesados (${stats.processed_today} hoy), ${stats.failed} fallidos, ${stats.dead_letter} dead letter, tiempo promedio: ${stats.avg_processing_time_ms ? `${stats.avg_processing_time_ms}ms` : 'N/A'}`
+        `📊 [OutboxEvents] Estadísticas: ${stats.pending} pendientes, ${stats.processed} procesados (${stats.processed_today} hoy), ${stats.failed} fallidos, ${stats.dead_letter} dead letter, tiempo promedio: ${stats.avg_processing_time_ms ? `${stats.avg_processing_time_ms}ms` : "N/A"}`,
       );
 
       return stats;
     } catch (error) {
       this.logger.error(
-        '❌ [OutboxEvents] Excepción obteniendo estadísticas:',
-        error
+        "❌ [OutboxEvents] Excepción obteniendo estadísticas:",
+        error,
       );
       throw error;
     }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { OutboxService } from '../outbox/outbox.service';
+import { ACCOUNTING_EVENT_TYPES } from '../outbox/accounting-event-types';
 
 export interface ERPEvent {
   type: string;
@@ -686,17 +687,7 @@ export interface DashboardMetricsUpdatedEvent {
 @Injectable()
 export class EventBusService {
   private eventEmitter = new EventEmitter();
-  private readonly canonicalOutboxEventTypes = new Set([
-    'factura.emitida',
-    'cxc.creada',
-    'cobro.registrado',
-    'recepcion.registrada',
-    'pago.proveedor.registrado',
-    'planilla.liquidada',
-    'planilla.pagada',
-    'cpe.anulado',
-    'stock.movimiento',
-  ]);
+  private readonly canonicalOutboxEventTypes = new Set<string>(ACCOUNTING_EVENT_TYPES);
 
   constructor(private readonly outboxService?: OutboxService) {
     this.eventEmitter.setMaxListeners(200); // Aumentamos el límite para más listeners
@@ -755,8 +746,12 @@ export class EventBusService {
         console.log(`✅ [EventBus] Evento ${eventType} persistido en outbox`);
       } catch (error) {
         console.error(`❌ [EventBus] Error persistiendo evento en outbox:`, error);
-        // Continuar con emisión aunque falle persistencia (degradación controlada)
-        // El worker procesará eventos pendientes luego
+        if (this.canonicalOutboxEventTypes.has(eventType)) {
+          throw error;
+        }
+        // Los eventos auxiliares conservan compatibilidad con el bus en
+        // memoria; los eventos canónicos, en cambio, nunca pueden aparentar
+        // éxito si no quedó evidencia durable para el worker.
       }
     }
     
@@ -779,6 +774,9 @@ export class EventBusService {
     };
 
     const listeners = this.eventEmitter.rawListeners(eventType);
+    if (listeners.length === 0) {
+      throw new Error(`OUTBOX_HANDLER_NOT_REGISTERED:${eventType}`);
+    }
     const promises = listeners.map((listener) => {
       try {
         const result = (listener as any)(event);
@@ -840,7 +838,7 @@ export class EventBusService {
   }
 
   // HARDENING: notifica creación automática de CxC.
-  emitCuentaPorCobrarCreadaEvent(data: CuentaPorCobrarCreadaEvent) {
+  async emitCuentaPorCobrarCreadaEvent(data: CuentaPorCobrarCreadaEvent): Promise<void> {
     const resolvedCxcId = data?.cxcId ?? data?.cuentaId;
     if (!data?.eventId || !data?.tenantId || !data?.idempotencyKey || !resolvedCxcId) {
       throw new Error('CuentaPorCobrarCreadaEvent requiere eventId, tenantId, idempotencyKey y cxcId');
@@ -858,7 +856,7 @@ export class EventBusService {
       montoPendiente: data.montoPendiente ?? data.saldoPendiente ?? data.montoTotal,
     };
 
-    this.emit('cxc.creada', payload, 'finanzas', data.tenantId);
+    await this.emit('cxc.creada', payload, 'finanzas', data.tenantId);
   }
 
   async emitDocumentoGenerado(data: DocumentoGeneradoEvent) {
@@ -934,7 +932,7 @@ export class EventBusService {
     this.emit('orden.compra.aprobada', payload, 'compras', data.tenantId);
   }
 
-  emitRecepcionRegistrada(data: RecepcionRegistradaEvent) {
+  async emitRecepcionRegistrada(data: RecepcionRegistradaEvent): Promise<void> {
     if (!data?.tenantId || !data?.eventId || !data?.idempotencyKey || !data?.recepcionId) {
       throw new Error('RecepcionRegistradaEvent requiere tenantId, eventId, idempotencyKey y recepcionId');
     }
@@ -942,7 +940,7 @@ export class EventBusService {
       ...data,
       emittedAt: data.emittedAt ?? new Date().toISOString(),
     };
-    this.emit('recepcion.registrada', payload, 'compras', data.tenantId);
+    await this.emit('recepcion.registrada', payload, 'compras', data.tenantId);
   }
 
   emitDevolucionProveedorEmitida(data: DevolucionProveedorEmitidaEvent) {
@@ -996,8 +994,8 @@ export class EventBusService {
     this.emit('planilla.calculada', data, 'rrhh');
   }
 
-  emitPlanillaPagada(data: PlanillaPagadaEvent) {
-    this.emit('planilla.pagada', data, 'rrhh', data.tenantId);
+  async emitPlanillaPagada(data: PlanillaPagadaEvent): Promise<void> {
+    await this.emit('planilla.pagada', data, 'rrhh', data.tenantId);
   }
 
   emitEmpleadoAsistencia(data: EmpleadoAsistenciaEvent) {
@@ -1026,20 +1024,20 @@ export class EventBusService {
   }
 
   // Eventos de pagos a proveedores
-  emitPagoProveedorRegistrado(data: PagoProveedorRegistradoEvent) {
+  async emitPagoProveedorRegistrado(data: PagoProveedorRegistradoEvent): Promise<void> {
     if (!data?.tenantId || !data?.eventId || !data?.idempotencyKey || !data?.pagoId) {
       throw new Error('PagoProveedorRegistradoEvent requiere tenantId, eventId, idempotencyKey y pagoId');
     }
-    this.emit('pago.proveedor.registrado', data, 'finanzas', data.tenantId);
+    await this.emit('pago.proveedor.registrado', data, 'finanzas', data.tenantId);
   }
 
   // Eventos de cobros a clientes
-  emitCobroRegistrado(data: CobroRegistradoEvent) {
+  async emitCobroRegistrado(data: CobroRegistradoEvent): Promise<void> {
     // HARDENING: validar metadatos críticos antes de emitir el evento de cobro.
     if (!data?.eventId || !data?.tenantId || !data?.idempotencyKey || !data?.cobroId) {
       throw new Error('CobroRegistradoEvent requiere tenantId, eventId, idempotencyKey y cobroId');
     }
-    this.emit('cobro.registrado', data, 'finanzas', data.tenantId);
+    await this.emit('cobro.registrado', data, 'finanzas', data.tenantId);
   }
 
   // Eventos de movimientos bancarios

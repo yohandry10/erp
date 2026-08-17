@@ -1,0 +1,12 @@
+{
+  "environment": "local_ephemeral",
+  "tenant_id": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+  "custom_role_id": "17f3819f-95ba-4e98-99ea-778fd8c86dfa",
+  "custom_role_permissions": [
+    "configuracion.usuarios.crear"
+  ],
+  "legacy_create_admin_status": 201,
+  "promoted_login_status": 201,
+  "promoted_role": "ADMIN_DEMO",
+  "result": "tenant_local_privilege_escalation_reproduced"
+}

@@ -2,32 +2,37 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { OutboxEventBuilder, CreateOutboxEventOptions } from './outbox-event.interface';
 
-/**
- * Servicio para gestionar eventos usando Outbox Pattern
- * Garantiza persistencia y entrega atómica de eventos
- */
+export interface ClaimedOutboxEvent {
+  id: string;
+  event_id: string;
+  tenant_id: string;
+  event_type: string;
+  aggregate_type?: string;
+  aggregate_id?: string;
+  payload?: Record<string, any>;
+  event_data?: Record<string, any>;
+  created_at: string;
+  claim_token: string;
+  claimed_by: string;
+}
+
+/** Frontera única de escritura para public.outbox_events. */
 @Injectable()
 export class OutboxService {
   private readonly logger = new Logger(OutboxService.name);
 
   constructor(private readonly supabase: SupabaseService) {}
 
-  /**
-   * Persiste un evento en la tabla outbox antes de procesarlo
-   * Esto garantiza que el evento no se pierda si el servicio se reinicia
-   * @deprecated Use persistEventStandard instead for consistent structure
-   */
+  /** @deprecated Use persistEventStandard para conservar el contrato canónico. */
   async persistEvent(
     tenantId: string,
     eventType: string,
     eventData: any,
     maxRetries: number = 5,
   ): Promise<string> {
-    this.logger.warn('⚠️ persistEvent is deprecated. Use persistEventStandard instead.');
-    
-    // Extraer aggregateType y aggregateId del eventData si existen
     const aggregateType = eventData.aggregateType || eventType.split('.')[0] || 'unknown';
-    const aggregateId = eventData.aggregateId || eventData.id || eventData.ventaId || eventData.cobroId || eventData.recepcionId || 'unknown';
+    const aggregateId = eventData.aggregateId || eventData.id || eventData.ventaId
+      || eventData.cobroId || eventData.recepcionId || 'unknown';
 
     return this.persistEventStandard({
       tenantId,
@@ -39,163 +44,166 @@ export class OutboxService {
     });
   }
 
-  /**
-   * Persiste un evento en la tabla outbox con estructura estándar
-   * Garantiza consistencia en todos los campos requeridos
-   */
   async persistEventStandard(options: CreateOutboxEventOptions): Promise<string> {
-    const client = this.supabase.getClient();
+    const eventToInsert = OutboxEventBuilder.build(options);
+    const { data, error } = await this.supabase.getClient().rpc('enqueue_outbox_event_tx', {
+      p_event: eventToInsert,
+    });
 
-    try {
-      // Construir evento con estructura estándar
-      const eventToInsert = OutboxEventBuilder.build(options);
-
-      const { data: event, error } = await client
-        .from('outbox_events')
-        .insert(eventToInsert)
-        .select('id, event_id')
-        .single();
-
-      if (error) {
-        const isUniqueViolation =
-          (error as any)?.code === '23505' ||
-          (typeof (error as any)?.message === 'string' &&
-            (error as any).message.toLowerCase().includes('duplicate key'));
-
-        if (isUniqueViolation && options.idempotencyKey) {
-          const { data: existing, error: existingError } = await client
-            .from('outbox_events')
-            .select('event_id')
-            .eq('tenant_id', options.tenantId)
-            .eq('idempotency_key', options.idempotencyKey)
-            .maybeSingle();
-
-          if (!existingError && existing?.event_id) {
-            this.logger.warn(
-              `♻️ Evento idempotente detectado (tenant=${options.tenantId}, idempotency_key=${options.idempotencyKey}). Retornando event_id existente ${existing.event_id}`,
-            );
-            return existing.event_id;
-          }
-        }
-
-        this.logger.error(`❌ Error persistiendo evento ${options.eventType}:`, error);
-        throw new Error(`No se pudo persistir evento: ${error.message}`);
-      }
-
-      this.logger.log(
-        `✅ Evento ${options.eventType} persistido en outbox (ID: ${event.id}, Event ID: ${event.event_id})`
-      );
-      return event.event_id;
-    } catch (error) {
-      this.logger.error(`❌ Error persistiendo evento ${options.eventType}:`, error);
-      throw error;
+    if (error) {
+      this.logger.error(`Error encolando ${options.eventType}: ${error.message}`);
+      throw new Error(`No se pudo persistir evento: ${error.message}`);
     }
+
+    const result = data as { event_id?: string } | null;
+    if (!result?.event_id) {
+      throw new Error('enqueue_outbox_event_tx no devolvió event_id');
+    }
+
+    return result.event_id;
   }
 
-  /**
-   * Obtiene eventos pendientes para procesar
-   */
+  async claimPendingEvents(options: {
+    worker: string;
+    limit?: number;
+    eventTypes?: readonly string[];
+    excludedEventTypes?: readonly string[];
+    tenantId?: string;
+    maxRetries?: number;
+  }): Promise<ClaimedOutboxEvent[]> {
+    const { data, error } = await this.supabase.getClient({ silent: true }).rpc(
+      'claim_outbox_events_tx',
+      {
+        p_worker: options.worker,
+        p_limit: options.limit ?? 100,
+        p_event_types: options.eventTypes?.length ? [...options.eventTypes] : null,
+        p_excluded_event_types: options.excludedEventTypes?.length
+          ? [...options.excludedEventTypes]
+          : null,
+        p_tenant_id: options.tenantId ?? null,
+        p_max_retries: options.maxRetries ?? 5,
+      },
+    );
+
+    if (error) {
+      throw new Error(`No se pudieron reclamar eventos outbox: ${error.message}`);
+    }
+
+    const events = (data ?? []) as ClaimedOutboxEvent[];
+    for (const event of events) {
+      if (!event.id || !event.claim_token || !event.tenant_id) {
+        throw new Error('claim_outbox_events_tx devolvió un claim incompleto');
+      }
+    }
+    return events;
+  }
+
+  /** Lectura pasiva para diagnóstico/administración; no reclama eventos. */
   async getPendingEvents(limit: number = 100, tenantId?: string): Promise<any[]> {
-    try {
-      const client = this.supabase.getClient({ silent: true });
-
-      const { data, error } = await client.rpc('get_pending_outbox_events', {
+    const { data, error } = await this.supabase.getClient({ silent: true }).rpc(
+      'list_outbox_events_492',
+      {
+        p_tenant_id: tenantId ?? null,
+        p_statuses: ['pending', 'failed'],
+        p_event_type: null,
+        p_event_id: null,
         p_limit: limit,
-        p_tenant_id: tenantId || null,
-      });
+        p_max_retries: 5,
+      },
+    );
+    if (error) {
+      throw new Error(`No se pudieron leer eventos outbox: ${error.message}`);
+    }
+    return (data ?? []) as any[];
+  }
 
-      if (error) {
-        this.logger.error('❌ Error obteniendo eventos pendientes:', error);
-        throw new Error(`No se pudieron obtener eventos pendientes: ${error.message}`);
-      }
-
-      return data || [];
-    } catch (error) {
-      // Silenciar errores de tenant context
-      if (error.message === 'Tenant context required') {
-        return [];
-      }
-      throw error;
+  async markEventCompleted(eventId: string, claimToken: string): Promise<void> {
+    this.assertClaim(eventId, claimToken);
+    const { data, error } = await this.supabase.getClient().rpc('complete_outbox_event_tx', {
+      p_id: eventId,
+      p_claim_token: claimToken,
+    });
+    if (error) {
+      throw new Error(`No se pudo completar evento outbox: ${error.message}`);
+    }
+    if (data !== true) {
+      throw new Error(`OUTBOX_CLAIM_LOST:${eventId}`);
     }
   }
 
-  /**
-   * Marca un evento como en procesamiento
-   */
-  async markEventProcessing(eventId: string): Promise<void> {
-    const client = this.supabase.getClient();
-
-    const { error } = await client.rpc('mark_outbox_event_processing', {
-      p_event_id: eventId,
-    });
-
+  async heartbeatEvent(eventId: string, claimToken: string): Promise<void> {
+    this.assertClaim(eventId, claimToken);
+    const { data, error } = await this.supabase.getClient({ silent: true }).rpc(
+      'heartbeat_outbox_event_tx',
+      { p_id: eventId, p_claim_token: claimToken },
+    );
     if (error) {
-      this.logger.error(`❌ Error marcando evento ${eventId} como procesando:`, error);
-      throw new Error(`No se pudo marcar evento como procesando: ${error.message}`);
+      throw new Error(`No se pudo renovar claim outbox: ${error.message}`);
+    }
+    if (data !== true) {
+      throw new Error(`OUTBOX_CLAIM_LOST:${eventId}`);
     }
   }
 
-  /**
-   * Marca un evento como completado exitosamente
-   */
-  async markEventCompleted(eventId: string): Promise<void> {
-    const client = this.supabase.getClient();
-
-    const { error } = await client.rpc('mark_outbox_event_completed', {
-      p_event_id: eventId,
+  async markEventFailed(
+    eventId: string,
+    claimToken: string,
+    errorMessage: string,
+    maxRetries: number = 5,
+  ): Promise<'failed' | 'dead_letter'> {
+    this.assertClaim(eventId, claimToken);
+    const { data, error } = await this.supabase.getClient().rpc('fail_outbox_event_tx', {
+      p_id: eventId,
+      p_claim_token: claimToken,
+      p_error: errorMessage,
+      p_next_retry_at: null,
+      p_max_retries: maxRetries,
     });
-
     if (error) {
-      this.logger.error(`❌ Error marcando evento ${eventId} como completado:`, error);
-      throw new Error(`No se pudo marcar evento como completado: ${error.message}`);
+      throw new Error(`No se pudo fallar evento outbox: ${error.message}`);
     }
 
-    const { error: clearError } = await client
-      .from('outbox_events')
-      .update({ error_message: null, next_retry_at: null, updated_at: new Date().toISOString() })
-      .eq('id', eventId)
-      .eq('status', 'completed');
-
-    if (clearError) {
-      this.logger.error(`❌ Error limpiando estado de error del evento completado ${eventId}:`, clearError);
-      throw new Error(`No se pudo limpiar estado de error del evento completado: ${clearError.message}`);
+    const result = data as { updated?: boolean; status?: 'failed' | 'dead_letter' } | null;
+    if (!result?.updated || !result.status) {
+      throw new Error(`OUTBOX_CLAIM_LOST:${eventId}`);
     }
-
-    this.logger.log(`✅ Evento ${eventId} marcado como completado`);
+    return result.status;
   }
 
-  /**
-   * Marca un evento como fallido y programa reintento
-   */
-  async markEventFailed(eventId: string, errorMessage: string): Promise<void> {
-    const client = this.supabase.getClient();
-
-    const { data: current, error: currentError } = await client
-      .from('outbox_events')
-      .select('status')
-      .eq('id', eventId)
-      .maybeSingle();
-
-    if (currentError) {
-      this.logger.error(`❌ Error leyendo estado del evento ${eventId}:`, currentError);
-      throw new Error(`No se pudo leer estado del evento: ${currentError.message}`);
-    }
-
-    if (String(current?.status ?? '').toLowerCase() === 'completed') {
-      this.logger.warn(`⚠️ Evento ${eventId} ya estaba completado; no se degrada a fallido`);
-      return;
-    }
-
-    const { error } = await client.rpc('mark_outbox_event_failed', {
-      p_event_id: eventId,
-      p_error_message: errorMessage,
-    });
-
+  async resetStuckEvents(ttlMinutes: number = 15, limit: number = 500): Promise<number> {
+    const cutoff = new Date(Date.now() - Math.max(ttlMinutes, 1) * 60_000).toISOString();
+    const { data, error } = await this.supabase.getClient({ silent: true }).rpc(
+      'reset_stuck_outbox_events_tx',
+      { p_stale_before: cutoff, p_limit: limit },
+    );
     if (error) {
-      this.logger.error(`❌ Error marcando evento ${eventId} como fallido:`, error);
-      throw new Error(`No se pudo marcar evento como fallido: ${error.message}`);
+      throw new Error(`No se pudieron resetear claims vencidos: ${error.message}`);
     }
+    return Number(data ?? 0);
+  }
 
-    this.logger.warn(`⚠️ Evento ${eventId} marcado como fallido: ${errorMessage}`);
+  async resetEvent(
+    tenantId: string,
+    actorId: string,
+    eventId: string,
+    reason: string,
+  ): Promise<boolean> {
+    const { data, error } = await this.supabase.getClient().rpc('reset_outbox_event_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_event_id: eventId,
+      p_reason: reason,
+      p_max_restarts: 3,
+    });
+    if (error) {
+      throw new Error(`No se pudo reintentar evento outbox: ${error.message}`);
+    }
+    return Boolean((data as { updated?: boolean } | null)?.updated);
+  }
+
+  private assertClaim(eventId: string, claimToken: string): void {
+    if (!eventId || !claimToken) {
+      throw new Error('eventId y claimToken son obligatorios para cambiar un claim outbox');
+    }
   }
 }

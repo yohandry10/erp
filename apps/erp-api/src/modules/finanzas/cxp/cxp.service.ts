@@ -278,7 +278,9 @@ export class CxpService {
         },
       });
 
-      const outboxResult: any = await client.from('outbox_events').insert(eventToInsert);
+      const outboxResult: any = await client.rpc('enqueue_outbox_event_tx', {
+        p_event: eventToInsert,
+      });
       const outboxError = outboxResult?.error;
       if (outboxError) {
         // No bloquear; pero queda trazado en logs.
@@ -917,8 +919,7 @@ export class CxpService {
     });
 
     const { error: errorEvento } = await client
-      .from('outbox_events')
-      .insert(eventToInsert);
+      .rpc('enqueue_outbox_event_tx', { p_event: eventToInsert });
 
     if (errorEvento) {
       console.error('Error emitiendo evento CuentaPorPagarAnulada:', errorEvento);

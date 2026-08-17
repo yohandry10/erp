@@ -1,22 +1,19 @@
-import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { SupabaseService } from '../supabase/supabase.service';
-import { OutboxService } from '../outbox/outbox.service';
+import { ClaimedOutboxEvent, OutboxService } from './outbox.service';
 import { EventBusService, ERPEvent } from '../events/event-bus.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { ACCOUNTING_EVENT_TYPES } from './accounting-event-types';
 
-/**
- * Worker que procesa eventos pendientes de la tabla outbox
- * Garantiza entrega atómica de eventos con reintentos automáticos
- */
+/** Worker genérico. El claim SQL es la fuente única de propiedad del evento. */
 @Injectable()
-export class OutboxWorker implements OnModuleInit {
+export class OutboxWorker implements OnApplicationBootstrap {
   private readonly logger = new Logger(OutboxWorker.name);
+  private readonly workerName = `outbox-generic:${process.env.RENDER_INSTANCE_ID ?? process.pid}`;
   private readonly cronLockKey = 'worker:outbox:shared';
   private readonly cronLockTtlSeconds = 240;
   private isProcessing = false;
-  private readonly accountingOwnedEvents = new Set<string>(ACCOUNTING_EVENT_TYPES);
 
   constructor(
     private readonly supabase: SupabaseService,
@@ -25,128 +22,61 @@ export class OutboxWorker implements OnModuleInit {
     private readonly tenantContext: TenantContextService,
   ) {}
 
-  onModuleInit() {
-    this.logger.log('🚀 [OutboxWorker] Worker iniciado');
-    // No procesar eventos al iniciar para evitar errores de tenant context
-    // El cron se encargará de procesarlos cada minuto
+  onApplicationBootstrap(): void {
+    this.logger.log('[OutboxWorker] Worker iniciado; programando catch-up inmediato');
+    setImmediate(() => {
+      void this.processPendingEvents().catch((error) => {
+        this.logger.error('[OutboxWorker] Catch-up inicial falló', error);
+      });
+    });
   }
 
-  /**
-   * 🔴 CRÍTICO FIX: Procesa eventos pendientes de la tabla outbox
-   * Se ejecuta cada minuto para procesar eventos pendientes
-   */
   @Cron(CronExpression.EVERY_MINUTE)
   async processPendingEvents(): Promise<void> {
-    if (process.env.OUTBOX_WORKER_CRON_ENABLED === 'false') {
-      return;
-    }
-
-    if (this.isProcessing) {
-      this.logger.debug('⏳ [OutboxWorker] Ya hay un proceso en ejecución, saltando...');
+    if (process.env.OUTBOX_WORKER_CRON_ENABLED === 'false' || this.isProcessing) {
       return;
     }
 
     this.isProcessing = true;
     let lockAcquired = false;
-
     try {
       const backoffMs = this.supabase.getNetworkBackoffRemainingMs();
       if (backoffMs > 0) {
-        this.logger.warn(
-          `⚠️ [OutboxWorker] Supabase no disponible, reintentando en ${Math.ceil(backoffMs / 1000)}s`,
-        );
-        return;
+        throw new Error(`SUPABASE_BACKOFF_ACTIVE:${backoffMs}`);
       }
 
       lockAcquired = await this.tryAcquireJobLock();
       if (!lockAcquired) {
-        this.logger.debug('⏭️ [OutboxWorker] Otro nodo tiene el lock distribuido, saltando...');
+        this.logger.debug('[OutboxWorker] Otro nodo posee el lock distribuido');
         return;
       }
 
-      await this.tenantContext.run({ tenantId: null, userId: 'outbox-worker', isSuperAdmin: true }, async () => {
-        this.logger.log('🔄 [OutboxWorker] Procesando eventos pendientes...');
-
-        // Evitar eventos atascados en PROCESSING por ejecuciones previas (TTL 15 min)
-        await this.resetStuckEvents(15);
-
-        // Obtener eventos pendientes (máximo 100 por ejecución) usando superadmin para poder traer de todos los tenants
-        const pendingEvents = await this.outboxService.getPendingEvents(100);
-
-        if (pendingEvents.length === 0) {
-          this.logger.debug('✅ [OutboxWorker] No hay eventos pendientes');
-          return;
-        }
-
-        this.logger.log(`📦 [OutboxWorker] Procesando ${pendingEvents.length} eventos pendientes`);
-
-        for (const event of pendingEvents) {
-          if (this.accountingOwnedEvents.has(event.event_type)) {
-            // Check if the event has been pending for too long (>30 minutes)
-            const eventAge = Date.now() - new Date(event.created_at).getTime();
-            const staleThresholdMs = 30 * 60 * 1000; // 30 minutes
-            if (eventAge > staleThresholdMs) {
-              this.logger.warn(
-                `STALE_ACCOUNTING_EVENT ${event.event_type} (ID: ${event.id}) tenant=${event.tenant_id} ` +
-                `pending for ${Math.round(eventAge / 60000)}min. ContabilidadEventsListener may not be processing it.`,
-              );
-            }
-            continue;
+      await this.tenantContext.run(
+        { tenantId: null, userId: 'outbox-worker', isSuperAdmin: true },
+        async () => {
+          const reset = await this.outboxService.resetStuckEvents(15);
+          if (reset > 0) {
+            this.logger.warn(`[OutboxWorker] Claims vencidos reiniciados: ${reset}`);
           }
 
-          // Procesar cada evento con el tenant real para cumplir RLS
-          await this.tenantContext.run(
-            { tenantId: event.tenant_id, userId: 'outbox-worker', isSuperAdmin: false },
-            async () => {
-              try {
-                // Marcar evento como procesando
-                await this.outboxService.markEventProcessing(event.id);
+          const claimed = await this.outboxService.claimPendingEvents({
+            worker: this.workerName,
+            limit: 100,
+            excludedEventTypes: ACCOUNTING_EVENT_TYPES,
+          });
+          if (claimed.length === 0) {
+            this.logger.debug('[OutboxWorker] No hay eventos reclamables');
+            return;
+          }
 
-                // Construir evento ERP
-                const erpEvent: ERPEvent = {
-                  type: event.event_type,
-                  data: {
-                    ...(event.event_data ?? event.payload ?? {}),
-                    eventId: event.id, // Incluir eventId para que los listeners puedan rastrearlo
-                  },
-                  timestamp: new Date(event.created_at),
-                  module: 'outbox-worker',
-                };
-
-                // Emitir evento en el event bus (esto disparará los listeners)
-                // Para emails, los listeners marcarán el evento como completado/fallido
-                // Para otros eventos, marcamos como completado aquí
-                if (event.event_type === 'email.send') {
-                  // Para emails, solo emitir - el EmailOutboxWorker manejará el estado
-                  this.eventBus.emit(event.event_type, erpEvent.data, 'outbox-worker');
-                } else {
-                  // Emitir y ESPERAR a que todos los listeners terminen antes de marcar completado
-                  await this.eventBus.emitAndAwait(event.event_type, erpEvent.data, 'outbox-worker');
-                  await this.outboxService.markEventCompleted(event.id);
-                  this.logger.log(
-                    `✅ [OutboxWorker] Evento ${event.event_type} (ID: ${event.id}) procesado exitosamente`,
-                  );
-                }
-              } catch (error) {
-                this.logger.error(
-                  `❌ [OutboxWorker] Error procesando evento ${event.event_type} (ID: ${event.id}) tenant ${event.tenant_id}:`,
-                  error,
-                );
-
-                // Marcar evento como fallido y programar reintento
-                await this.outboxService.markEventFailed(event.id, error.message || String(error));
-              }
-            },
+          const { completed, failed } = await this.processClaimBatch(claimed);
+          this.logger.log(
+            `[OutboxWorker] Lote cerrado: claimed=${claimed.length}, completed=${completed}, failed=${failed}`,
           );
-        }
-
-        this.logger.log(`✅ [OutboxWorker] Procesamiento completado: ${pendingEvents.length} eventos`);
-      });
+        },
+      );
     } catch (error) {
-      // Silenciar errores de tenant context - es normal cuando no hay eventos con tenant
-      if (error.message !== 'Tenant context required') {
-        this.logger.error('❌ [OutboxWorker] Error general procesando eventos pendientes:', error);
-      }
+      this.logger.error('[OutboxWorker] Fallo procesando lote', error);
     } finally {
       if (lockAcquired) {
         await this.releaseJobLock();
@@ -155,134 +85,133 @@ export class OutboxWorker implements OnModuleInit {
     }
   }
 
-  private async tryAcquireJobLock(): Promise<boolean> {
-    try {
-      const client = this.supabase.getPublicClient();
-      const rpc = (client as any)?.rpc;
-      if (typeof rpc !== 'function') {
-        return true;
-      }
-
-      const { data, error } = await rpc('acquire_job_lock', {
-        p_lock_key: this.cronLockKey,
-        p_lock_ttl_seconds: this.cronLockTtlSeconds,
-      });
-
-      if (error) {
-        this.logger.warn(`⚠️ [OutboxWorker] No se pudo adquirir lock distribuido: ${error.message}`);
-        return this.shouldContinueWithoutDistributedLock(error);
-      }
-
-      return data === true || data === 'true';
-    } catch (error) {
-      this.logger.warn(`⚠️ [OutboxWorker] Error adquiriendo lock distribuido: ${error?.message || error}`);
-      return this.shouldContinueWithoutDistributedLock(error);
-    }
-  }
-
-  private shouldContinueWithoutDistributedLock(error: any): boolean {
-    const message = String(error?.message || error || '').toLowerCase();
-    const lockUnavailable =
-      message.includes('permission denied') ||
-      message.includes('does not exist') ||
-      message.includes('could not find') ||
-      message.includes('schema cache') ||
-      message.includes('blocked for rpc');
-
-    if (lockUnavailable) {
-      this.logger.warn(
-        '⚠️ [OutboxWorker] Lock distribuido no disponible; se continua con claim idempotente por evento.',
-      );
-      return true;
-    }
-
-    return false;
-  }
-
-  private async releaseJobLock(): Promise<void> {
-    try {
-      const client = this.supabase.getPublicClient();
-      const rpc = (client as any)?.rpc;
-      if (typeof rpc !== 'function') {
-        return;
-      }
-
-      await rpc('release_job_lock', { p_lock_key: this.cronLockKey });
-    } catch (error) {
-      this.logger.warn(`⚠️ [OutboxWorker] Error liberando lock distribuido: ${error?.message || error}`);
-    }
-  }
-
-  /**
-   * Recoloca en PENDING los eventos que quedaron en PROCESSING por más de ttlMinutes
-   * para evitar atascos si un worker murió a mitad de ejecución.
-   */
-  private async resetStuckEvents(ttlMinutes: number = 10): Promise<void> {
-    try {
-      // Usamos el cliente público (service role) para no requerir contexto de tenant al limpiar.
-      const client = this.supabase.getPublicClient();
-      const cutoff = new Date(Date.now() - ttlMinutes * 60 * 1000).toISOString();
-
-      const { error, count } = await client
-        .from('outbox_events')
-        .update({
-          status: 'pending',
-          next_retry_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('status', 'processing')
-        .lt('updated_at', cutoff);
-
-      if (error) {
-        this.logger.warn(`⚠️ [OutboxWorker] No se pudieron limpiar eventos atascados: ${error.message}`);
-        return;
-      }
-
-      if ((count || 0) > 0) {
-        this.logger.warn(`⚠️ [OutboxWorker] Reestablecidos ${count} eventos atascados en PROCESSING`);
-      }
-    } catch (err) {
-      this.logger.warn('[OutboxWorker] Error limpiando eventos atascados:', err);
-    }
-  }
-
-  /**
-   * Procesa eventos pendientes de forma manual (útil para testing o procesamiento inmediato)
-   */
   async processPendingEventsManual(limit: number = 100): Promise<{ processed: number; failed: number }> {
     return this.tenantContext.run(
       { tenantId: null, userId: 'outbox-worker', isSuperAdmin: true },
       async () => {
-        const pendingEvents = await this.outboxService.getPendingEvents(limit);
-        let processed = 0;
-        let failed = 0;
-
-        for (const event of pendingEvents) {
-          if (this.accountingOwnedEvents.has(event.event_type)) {
-            continue;
-          }
-
-          try {
-            await this.outboxService.markEventProcessing(event.id);
-
-            const erpEvent: ERPEvent = {
-              type: event.event_type,
-              data: event.event_data ?? event.payload ?? {},
-              timestamp: new Date(event.created_at),
-              module: 'outbox-worker',
-            };
-
-            await this.eventBus.emitAndAwait(event.event_type, erpEvent.data, 'outbox-worker');
-            await this.outboxService.markEventCompleted(event.id);
-            processed++;
-          } catch (error) {
-            await this.outboxService.markEventFailed(event.id, error.message || String(error));
-            failed++;
-          }
-        }
-
-        return { processed, failed };
+        const claimed = await this.outboxService.claimPendingEvents({
+          worker: `${this.workerName}:manual`,
+          limit,
+          excludedEventTypes: ACCOUNTING_EVENT_TYPES,
+        });
+        const { completed, failed } = await this.processClaimBatch(claimed);
+        return { processed: completed, failed };
       },
     );
+  }
+
+  private async processClaimBatch(
+    claimed: ClaimedOutboxEvent[],
+  ): Promise<{ completed: number; failed: number }> {
+    const active = new Map(claimed.map((event) => [event.id, event]));
+    const heartbeatTimer = setInterval(() => {
+      void this.heartbeatClaimBatch([...active.values()]);
+    }, 60_000);
+    heartbeatTimer.unref?.();
+
+    let completed = 0;
+    let failed = 0;
+    try {
+      for (const event of claimed) {
+        const ok = await this.processClaimedEvent(event);
+        active.delete(event.id);
+        if (ok) {
+          completed += 1;
+        } else {
+          failed += 1;
+        }
+      }
+      return { completed, failed };
+    } finally {
+      clearInterval(heartbeatTimer);
+    }
+  }
+
+  private async heartbeatClaimBatch(events: ClaimedOutboxEvent[]): Promise<void> {
+    const results = await Promise.allSettled(
+      events.map((event) => this.outboxService.heartbeatEvent(event.id, event.claim_token)),
+    );
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          `[OutboxWorker] Heartbeat falló para claim ${events[index]?.id}`,
+          result.reason,
+        );
+      }
+    });
+  }
+
+  private async processClaimedEvent(event: ClaimedOutboxEvent): Promise<boolean> {
+    return this.tenantContext.run(
+      {
+        tenantId: event.tenant_id,
+        userId: 'outbox-worker',
+        isSuperAdmin: false,
+        outboxEventRowId: event.id,
+        outboxEventId: event.event_id,
+        outboxClaimToken: event.claim_token,
+        outboxWorker: event.claimed_by,
+      },
+      async () => {
+        try {
+          await this.outboxService.heartbeatEvent(event.id, event.claim_token);
+          const erpEvent: ERPEvent = {
+            type: event.event_type,
+            data: {
+              ...(event.event_data ?? event.payload ?? {}),
+              outboxRowId: event.id,
+              outboxClaimToken: event.claim_token,
+            },
+            timestamp: new Date(event.created_at),
+            module: 'outbox-worker',
+          };
+          await this.eventBus.emitAndAwait(event.event_type, erpEvent.data, 'outbox-worker');
+          await this.outboxService.markEventCompleted(event.id, event.claim_token);
+          return true;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          try {
+            await this.outboxService.markEventFailed(event.id, event.claim_token, message);
+          } catch (transitionError) {
+            this.logger.error(
+              `[OutboxWorker] No se pudo cerrar claim ${event.id}; requiere reconciliación`,
+              transitionError,
+            );
+          }
+          this.logger.error(`[OutboxWorker] Evento ${event.event_type} (${event.id}) falló`, error);
+          return false;
+        }
+      },
+    );
+  }
+
+  private async tryAcquireJobLock(): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase.getPublicClient().rpc('acquire_job_lock', {
+        p_lock_key: this.cronLockKey,
+        p_lock_ttl_seconds: this.cronLockTtlSeconds,
+      });
+      if (error) {
+        this.logger.warn(`[OutboxWorker] Lock distribuido no disponible: ${error.message}`);
+        return false;
+      }
+      return data === true || data === 'true';
+    } catch (error) {
+      this.logger.warn(`[OutboxWorker] Error adquiriendo lock: ${error?.message ?? error}`);
+      return false;
+    }
+  }
+
+  private async releaseJobLock(): Promise<void> {
+    try {
+      const { error } = await this.supabase.getPublicClient().rpc('release_job_lock', {
+        p_lock_key: this.cronLockKey,
+      });
+      if (error) {
+        this.logger.warn(`[OutboxWorker] Error liberando lock: ${error.message}`);
+      }
+    } catch (error) {
+      this.logger.warn(`[OutboxWorker] Error liberando lock: ${error?.message ?? error}`);
+    }
   }
 }

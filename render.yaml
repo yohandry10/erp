@@ -11,9 +11,15 @@ services:
   - type: web
     name: erp-api
     runtime: docker
-    plan: free
+    # La API contiene workers cron/outbox: una instancia que se duerme rompe su
+    # contrato operativo. Aplicar este cambio en Render sí implica costo y debe
+    # aprobarse al promover el Blueprint; este commit no despliega nada.
+    plan: starter
     region: oregon
     branch: main
+    # Render sólo construye main después de que CI, PostgreSQL y Playwright
+    # hayan pasado; un commit con esquema/pruebas rotos no inicia despliegue.
+    autoDeployTrigger: checksPass
     # El Dockerfile copia package.json, pnpm-workspace.yaml, libs/ y apps/erp-api
     # desde la raiz: el contexto tiene que ser el repo entero, no apps/erp-api.
     dockerfilePath: ./apps/erp-api/Dockerfile
@@ -31,11 +37,6 @@ services:
       # al activarla conserva lo que cargo.
       - key: DEMO_API_ENABLED
         value: true
-      - key: FEATURE_POS_ENABLED
-        value: true
-      - key: FEATURE_RRHH_ENABLED
-        value: true
-
       # Los módulos cerrados para Perú quedan activos por defecto. Una
       # desactivación de emergencia debe ser explícita en el panel.
       - key: FEATURE_RRHH_ENABLED
@@ -54,6 +55,26 @@ services:
         sync: false
       - key: REDIS_PASSWORD
         sync: false
+
+      # Los dos propietarios del outbox hacen catch-up al arrancar y luego
+      # procesan por cron. Readiness falla si el contrato/ACL o el backlog
+      # exceden estos límites; nunca muta la base para comprobarla.
+      - key: OUTBOX_WORKER_CRON_ENABLED
+        value: true
+      - key: ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED
+        value: true
+      - key: OUTBOX_READY_MAX_CLAIMABLE
+        value: 5000
+      - key: OUTBOX_READY_MAX_OLDEST_SECONDS
+        value: 900
+      - key: OUTBOX_READY_MAX_DEAD_LETTER
+        value: 100
+      - key: OUTBOX_READY_STALE_SECONDS
+        value: 900
+      # Readiness compara este valor con la historia real de migraciones. El
+      # contenedor no recibe tráfico si PROD aún no alcanzó este esquema.
+      - key: REQUIRED_DATABASE_SCHEMA_VERSION
+        value: 496
 
       # Base de datos de produccion. EXPECTED_SUPABASE_PROJECT_REF hace que la
       # API se niegue a arrancar si la apuntan a otro proyecto por error.

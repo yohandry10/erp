@@ -265,30 +265,14 @@ export class ContabilidadAsientosController {
     data: { tipo: string; cantidad: number }[];
     message: string;
   }> {
-    try {
-      console.log(
-        `📊 [Contabilidad] Obteniendo estadísticas de asientos por tipo para tenant ${tenantId}`,
-      );
+    const estadisticas =
+      await this.asientosService.obtenerEstadisticasAsientosPorTipo(tenantId);
 
-      const estadisticas =
-        await this.asientosService.obtenerEstadisticasAsientosPorTipo(tenantId);
-
-      return {
-        success: true,
-        data: estadisticas,
-        message: `Estadísticas de ${estadisticas.length} tipo(s) de asientos obtenidas`,
-      };
-    } catch (error) {
-      console.error(
-        "❌ [Contabilidad] Error obteniendo estadísticas de asientos por tipo:",
-        error,
-      );
-      return {
-        success: false,
-        data: [],
-        message: "Error obteniendo estadísticas de asientos por tipo",
-      };
-    }
+    return {
+      success: true,
+      data: estadisticas,
+      message: `Estadísticas de ${estadisticas.length} tipo(s) de asientos obtenidas`,
+    };
   }
 
   @Get("asientos/:id")
@@ -341,7 +325,8 @@ export class ContabilidadAsientosController {
   @ApiResponse({ status: 200, type: AsientoResponseDto })
   @ApiResponse({
     status: 400,
-    description: "El asiento no está en BORRADOR, no cuadra, o el período está cerrado",
+    description:
+      "El asiento no está en BORRADOR, no cuadra, o el período está cerrado",
   })
   async actualizarAsiento(
     @CurrentTenant() tenantId: string,
@@ -394,7 +379,8 @@ export class ContabilidadAsientosController {
   @ApiResponse({ status: 200, type: AsientoResponseDto })
   @ApiResponse({
     status: 400,
-    description: "El asiento no está en BORRADOR, no cuadra, o el período está cerrado",
+    description:
+      "El asiento no está en BORRADOR, no cuadra, o el período está cerrado",
   })
   async confirmarAsiento(
     @CurrentTenant() tenantId: string,

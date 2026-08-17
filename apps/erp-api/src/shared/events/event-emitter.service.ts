@@ -64,10 +64,7 @@ export class EventEmitterService {
 
       const { data, error } = await this.supabaseService
         .getClient()
-        .from('outbox_events')
-        .insert(eventToInsert)
-        .select()
-        .single();
+        .rpc('enqueue_outbox_event_tx', { p_event: eventToInsert });
 
       if (error) {
         this.logger.error(
@@ -81,7 +78,12 @@ export class EventEmitterService {
         `✅ [EventEmitter] Event emitted successfully: ${eventId}`
       );
 
-      return eventId;
+      const persistedEventId = (data as { event_id?: string } | null)?.event_id;
+      if (!persistedEventId) {
+        throw new Error('enqueue_outbox_event_tx no devolvió event_id');
+      }
+
+      return persistedEventId;
     } catch (error) {
       this.logger.error(
         `❌ [EventEmitter] Exception emitting event ${eventType}:`,

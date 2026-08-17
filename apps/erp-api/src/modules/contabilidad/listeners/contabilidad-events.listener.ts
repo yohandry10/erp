@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AsientosGeneratorService } from '../services/asientos-generator.service';
 import { OutboxEventsService, OutboxEvent } from '../services/outbox-events.service';
@@ -15,12 +15,13 @@ import { ACCOUNTING_EVENT_TYPES } from '../../../shared/outbox/accounting-event-
  * y genera asientos contables automáticamente
  */
 @Injectable()
-export class ContabilidadEventsListener implements OnModuleInit {
+export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBootstrap {
   private readonly logger = new Logger(ContabilidadEventsListener.name);
   private readonly cronLockKey = 'worker:outbox:contabilidad';
   private readonly cronLockTtlSeconds = 240;
   private static isProcessing = false;
   private readonly accountingEventTypes = new Set<string>(ACCOUNTING_EVENT_TYPES);
+  private readonly workerName = `outbox-accounting:${process.env.RENDER_INSTANCE_ID ?? process.pid}`;
 
   constructor(
     private readonly asientosGenerator: AsientosGeneratorService,
@@ -41,8 +42,14 @@ export class ContabilidadEventsListener implements OnModuleInit {
     // Suscribirse a eventos del EventBus en tiempo real
     this.suscribirseAEventos();
     
-    // No procesar eventos pendientes al iniciar para evitar errores de tenant context
-    // El cron se encargará de procesarlos cada 5 minutos
+  }
+
+  onApplicationBootstrap(): void {
+    setImmediate(() => {
+      void this.procesarEventosPendientes().catch((error) => {
+        this.logger.error('[ContabilidadEventsListener] Catch-up inicial falló', error);
+      });
+    });
   }
 
   /**
@@ -102,10 +109,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
     try {
       const tenantId = eventData.tenantId || eventData.tenant_id;
       if (!tenantId) {
-        this.logger.warn(
-          `⚠️ [ContabilidadEventsListener] Evento ${eventType} sin tenantId, se omite persistencia`
-        );
-        return;
+        throw new Error(`Evento ${eventType} sin tenantId`);
       }
 
       const aggregateId =
@@ -129,32 +133,6 @@ export class ContabilidadEventsListener implements OnModuleInit {
         `💾 [ContabilidadEventsListener] Persistiendo evento ${eventType} en outbox`
       );
 
-      if (idempotencyKey) {
-        const { data: existingEvent, error: existingError } = await this.supabaseService
-          .getClient()
-          .from('outbox_events')
-          .select('event_id')
-          .eq('tenant_id', tenantId)
-          .eq('event_type', eventType)
-          .eq('idempotency_key', idempotencyKey)
-          .maybeSingle();
-
-        if (existingError) {
-          this.logger.error(
-            `❌ [ContabilidadEventsListener] Error verificando idempotencia de ${eventType}:`,
-            existingError,
-          );
-          return;
-        }
-
-        if (existingEvent?.event_id) {
-          this.logger.log(
-            `ℹ️ [ContabilidadEventsListener] Evento ${eventType} ya existe para idempotency_key ${idempotencyKey}; se omite duplicado`,
-          );
-          return;
-        }
-      }
-
       // Usar el builder para garantizar estructura consistente
       const eventToInsert = OutboxEventBuilder.build({
         tenantId,
@@ -168,21 +146,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
       const { error } = await this.supabaseService
         .getClient()
-        .from('outbox_events')
-        .insert(eventToInsert);
+        .rpc('enqueue_outbox_event_tx', { p_event: eventToInsert });
 
       if (error) {
-        if (error.code === '23505') {
-          this.logger.log(
-            `ℹ️ [ContabilidadEventsListener] Evento ${eventType} ya persistido (idempotente), se omite duplicado`
-          );
-          return;
-        }
-        this.logger.error(
-          `❌ [ContabilidadEventsListener] Error persistiendo evento ${eventType}:`,
-          error
-        );
-        return;
+        throw new Error(`No se pudo encolar ${eventType}: ${error.message}`);
       }
 
       this.logger.log(
@@ -193,6 +160,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         `❌ [ContabilidadEventsListener] Excepción persistiendo evento ${eventType}:`,
         error
       );
+      throw error;
     }
   }
 
@@ -237,8 +205,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
       }
 
       // Leer eventos pendientes con límite de reintentos
-      const eventos = (await this.outboxEventsService.leerEventosPendientesConReintentos(3, 50))
-        .filter((evento) => this.accountingEventTypes.has(evento.event_type));
+      const eventos = await this.outboxEventsService.reclamarEventosContables(
+        this.workerName,
+        3,
+        50,
+      );
 
       if (eventos.length === 0) {
         this.logger.debug('ℹ️ [ContabilidadEventsListener] No hay eventos pendientes para procesar');
@@ -247,16 +218,33 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
       this.logger.log(`📋 [ContabilidadEventsListener] Procesando ${eventos.length} eventos pendientes`);
 
-      // Procesar eventos en orden
-      for (const evento of eventos) {
-        try {
-          await this.procesarEvento(evento);
-        } catch (error) {
-          this.logger.error(
-            `❌ [ContabilidadEventsListener] Evento ${evento.event_id} falló; se continúa con el siguiente evento del lote:`,
-            error,
-          );
+      const activeClaims = new Map(eventos.map((evento) => [evento.id, evento]));
+      const heartbeatTimer = setInterval(() => {
+        void this.renovarClaimsContables([...activeClaims.values()]);
+      }, 60_000);
+      heartbeatTimer.unref?.();
+
+      try {
+        // Procesar eventos en orden. El heartbeat mantiene también los claims
+        // que esperan turno dentro del lote para que no los recupere otro nodo.
+        for (const evento of eventos) {
+          try {
+            await this.outboxEventsService.renovarClaimContable(
+              evento.id,
+              evento.claim_token ?? '',
+            );
+            await this.procesarEvento(evento);
+          } catch (error) {
+            this.logger.error(
+              `❌ [ContabilidadEventsListener] Evento ${evento.event_id} falló; se continúa con el siguiente evento del lote:`,
+              error,
+            );
+          } finally {
+            activeClaims.delete(evento.id);
+          }
         }
+      } finally {
+        clearInterval(heartbeatTimer);
       }
 
       this.logger.log(`✅ [ContabilidadEventsListener] Procesamiento completado: ${eventos.length} eventos`);
@@ -271,6 +259,20 @@ export class ContabilidadEventsListener implements OnModuleInit {
       }
       ContabilidadEventsListener.isProcessing = false;
     }
+  }
+
+  private async renovarClaimsContables(eventos: OutboxEvent[]): Promise<void> {
+    const results = await Promise.allSettled(eventos.map((evento) =>
+      this.outboxEventsService.renovarClaimContable(evento.id, evento.claim_token ?? ''),
+    ));
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          `[ContabilidadEventsListener] Heartbeat falló para claim ${eventos[index]?.id}`,
+          result.reason,
+        );
+      }
+    });
   }
 
   private async tryAcquireJobLock(): Promise<boolean> {
@@ -288,33 +290,14 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
       if (error) {
         this.logger.warn(`⚠️ [ContabilidadEventsListener] No se pudo adquirir lock distribuido: ${error.message}`);
-        return this.shouldContinueWithoutDistributedLock(error);
+        return false;
       }
 
       return data === true || data === 'true';
     } catch (error) {
       this.logger.warn(`⚠️ [ContabilidadEventsListener] Error adquiriendo lock distribuido: ${error?.message || error}`);
-      return this.shouldContinueWithoutDistributedLock(error);
+      return false;
     }
-  }
-
-  private shouldContinueWithoutDistributedLock(error: any): boolean {
-    const message = String(error?.message || error || '').toLowerCase();
-    const lockUnavailable =
-      message.includes('permission denied') ||
-      message.includes('does not exist') ||
-      message.includes('could not find') ||
-      message.includes('schema cache') ||
-      message.includes('blocked for rpc');
-
-    if (lockUnavailable) {
-      this.logger.warn(
-        '⚠️ [ContabilidadEventsListener] Lock distribuido no disponible; se continua con claim idempotente por evento.',
-      );
-      return true;
-    }
-
-    return false;
   }
 
   private async releaseJobLock(): Promise<void> {
@@ -437,16 +420,15 @@ export class ContabilidadEventsListener implements OnModuleInit {
       return;
     }
 
-    await this.tenantContext.run({ tenantId, isSuperAdmin: true }, async () => {
+    await this.tenantContext.run({
+      tenantId,
+      isSuperAdmin: true,
+      outboxEventRowId: evento.id,
+      outboxEventId: evento.event_id,
+      outboxClaimToken: evento.claim_token,
+      outboxWorker: evento.claimed_by,
+    }, async () => {
       try {
-        const claimed = await this.claimEventoParaProcesamiento(evento);
-        if (!claimed) {
-          this.logger.debug(
-            `⏭️ [ContabilidadEventsListener] Evento ${evento.event_id} ya fue reclamado o procesado por otro worker`
-          );
-          return;
-        }
-
         this.logger.log(
           `🎯 [ContabilidadEventsListener] Procesando evento: ${evento.event_type} (${evento.event_id}) - Intento ${retryCount + 1}/${maxRetries}`
         );
@@ -659,26 +641,6 @@ export class ContabilidadEventsListener implements OnModuleInit {
     });
   }
 
-  private async claimEventoParaProcesamiento(evento: OutboxEvent): Promise<boolean> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('outbox_events')
-      .update({
-        status: 'processing',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('event_id', evento.event_id)
-      .in('status', ['pending', 'failed', 'PENDING', 'FAILED'])
-      .select('event_id')
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`No se pudo reclamar evento contable ${evento.event_id}: ${error.message}`);
-    }
-
-    return Boolean(data?.event_id);
-  }
-
   /**
    * Determina si un error es recuperable y se puede reintentar
    */
@@ -790,32 +752,17 @@ export class ContabilidadEventsListener implements OnModuleInit {
    */
   private async marcarEventoNoManejado(evento: OutboxEvent, motivo: string): Promise<void> {
     try {
-      const { data: current } = await this.supabaseService
-        .getClient()
-        .from('outbox_events')
-        .select('status')
-        .eq('event_id', evento.event_id)
-        .maybeSingle();
-
-      if (String(current?.status ?? '').toLowerCase() === 'completed') {
-        this.logger.warn(
-          `⚠️ [ContabilidadEventsListener] Evento ${evento.event_id} ya estaba completado; no se marca como no manejado`
-        );
-        return;
-      }
-
       const truncated = motivo.length > 500 ? `${motivo.slice(0, 497)}...` : motivo;
-      await this.supabaseService
+      const { data, error } = await this.supabaseService
         .getClient()
-        .from('outbox_events')
-        .update({
-          status: 'dead_letter',
-          retry_count: 3, // forzar salida del ciclo de reintentos
-          error_message: truncated,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('event_id', evento.event_id)
-        .neq('status', 'completed');
+        .rpc('dead_letter_outbox_event_tx', {
+          p_id: evento.id,
+          p_claim_token: evento.claim_token,
+          p_error: truncated,
+        });
+      if (error || data !== true) {
+        throw new Error(error?.message || `OUTBOX_CLAIM_LOST:${evento.id}`);
+      }
 
       this.logger.debug(
         `⚠️ [ContabilidadEventsListener] Evento ${evento.event_id} marcado como dead_letter por no ser manejado (${evento.event_type})`
@@ -1983,14 +1930,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
       // procese y genere las alertas correspondientes. Este listener ya maneja deduplicación.
       this.eventBus.emit(evento.event_type, eventData, 'outbox-worker');
 
-      // Marcar como procesado en outbox para evitar que quede en dead_letter
-      await this.asientosGenerator.marcarEventoComoProcesado(evento.event_id);
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleProductoStockBajo:`, error);
-      await this.asientosGenerator.marcarEventoComoFallido(
-        evento.event_id,
-        `Error manejando stock_bajo: ${error?.message || error}`
-      );
       throw error;
     }
   }
@@ -2012,14 +1953,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
       // Reemitir si otros listeners necesitan enterarse; no afecta contabilidad
       this.eventBus.emit(evento.event_type, eventData, 'outbox-worker');
 
-      // Marcar como procesado para que no se reintente
-      await this.asientosGenerator.marcarEventoComoProcesado(evento.event_id);
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleStockMovimiento:`, error);
-      await this.asientosGenerator.marcarEventoComoFallido(
-        evento.event_id,
-        `Error manejando stock.movimiento: ${error?.message || error}`
-      );
       throw error;
     }
   }
@@ -2112,17 +2047,17 @@ export class ContabilidadEventsListener implements OnModuleInit {
       }
 
       if (planillaData.planilla_id) {
-        const { error: flagError } = await this.supabaseService.getClient()
-          .from('planillas')
-          .update({
-            asientos_generados: 'true',
-            fecha_asientos: new Date().toISOString(),
-          })
-          .eq('id', planillaData.planilla_id)
-          .eq('tenant_id', tenantId);
-        if (flagError) {
+        const { data: projection, error: flagError } = await this.supabaseService
+          .getClient()
+          .rpc('marcar_planilla_contabilizada_tx_492', {
+            p_tenant_id: tenantId,
+            p_planilla_id: planillaData.planilla_id,
+            p_event_id: eventId,
+            p_claim_token: evento.claim_token,
+          });
+        if (flagError || (projection as { updated?: boolean } | null)?.updated !== true) {
           throw new Error(
-            `El asiento existe pero no se pudo sincronizar el flag de planilla: ${flagError.message}`,
+            `El asiento existe pero no se pudo sincronizar el flag de planilla: ${flagError?.message || 'RPC no confirmó la proyección'}`,
           );
         }
       }
@@ -2139,6 +2074,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
     try {
       const eventData = evento.event_data;
       const tenantId = this.ensureEventTenant(eventData, 'planilla.pagada');
+      const cuentaTesoreria = await this.resolverCuentaTesoreriaLaboral(evento, tenantId);
 
       const pagoData = {
         tenant_id: tenantId,
@@ -2149,6 +2085,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         referencia: `PAGO-PLANILLA-${eventData.planillaId}`,
         source_event_id: evento.event_id || eventData.eventId || eventData.planillaId || evento.aggregate_id,
         event_id: evento.event_id || eventData.eventId,
+        ...cuentaTesoreria,
       };
 
       const asientoCreado = await this.asientosGenerator.generarAsientoPagoPlanilla(pagoData);
@@ -2174,6 +2111,47 @@ export class ContabilidadEventsListener implements OnModuleInit {
     }
   }
 
+  private async resolverCuentaTesoreriaLaboral(
+    evento: OutboxEvent,
+    tenantId: string,
+  ): Promise<{
+    metodo_pago: 'transferencia' | 'efectivo';
+    cuenta_tesoreria_id: string;
+    cuenta_tesoreria_codigo: string;
+    cuenta_bancaria_id?: string;
+    movimiento_bancario_id?: string;
+    sesion_caja_id?: string;
+    movimiento_caja_id?: string;
+  }> {
+    if (!evento.id || !evento.claim_token) {
+      throw new Error(`LABOR_TREASURY_OUTBOX_CLAIM_REQUIRED:${evento.event_id || evento.id}`);
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'resolver_cuenta_tesoreria_laboral_492',
+      {
+        p_tenant_id: tenantId,
+        p_outbox_id: evento.id,
+        p_claim_token: evento.claim_token,
+      },
+    );
+    if (error) {
+      throw new Error(`No se pudo resolver la cuenta tesorera laboral: ${error.message}`);
+    }
+    const result = (data ?? {}) as Record<string, unknown>;
+    const metodo = String(result.metodo_pago ?? '').toLowerCase();
+    const cuentaId = String(result.cuenta_tesoreria_id ?? '').trim();
+    const cuentaCodigo = String(result.cuenta_tesoreria_codigo ?? '').trim();
+    if (!['transferencia', 'efectivo'].includes(metodo) || !cuentaId || !cuentaCodigo) {
+      throw new Error('La resolución tesorera laboral no retornó una cuenta contable válida');
+    }
+    return {
+      ...(result as any),
+      metodo_pago: metodo as 'transferencia' | 'efectivo',
+      cuenta_tesoreria_id: cuentaId,
+      cuenta_tesoreria_codigo: cuentaCodigo,
+    };
+  }
+
   private async handleLiquidacionAprobada(evento: OutboxEvent): Promise<void> {
     const eventData = evento.event_data;
     const tenantId = this.ensureEventTenant(eventData, 'liquidacion.aprobada');
@@ -2184,6 +2162,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
       fecha: eventData.fecha || eventData.fechaTerminacion || new Date().toISOString(),
       monto: eventData.totalLiquidacion,
       liquidacion_id: eventData.liquidacionId,
+      componentes_liquidacion:
+        eventData.componentesLiquidacion ?? eventData.componentes_liquidacion,
       referencia,
       source_event_id: eventId,
       event_id: eventId,
@@ -2199,6 +2179,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handleLiquidacionPagada(evento: OutboxEvent): Promise<void> {
     const eventData = evento.event_data;
     const tenantId = this.ensureEventTenant(eventData, 'liquidacion.pagada');
+    const cuentaTesoreria = await this.resolverCuentaTesoreriaLaboral(evento, tenantId);
     const eventId = evento.event_id || eventData.eventId;
     const referencia = `PAGO-LIQUIDACION-${eventData.liquidacionId}`;
     const asiento = await this.asientosGenerator.generarAsientoPagoLiquidacion({
@@ -2209,6 +2190,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
       referencia,
       source_event_id: eventId,
       event_id: eventId,
+      ...cuentaTesoreria,
     });
     if (eventId) {
       const verificado = await this.verificarAsientoCreado(tenantId, eventId, referencia);
@@ -2221,6 +2203,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handlePagoLiquidacionRevertido(evento: OutboxEvent): Promise<void> {
     const eventData = evento.event_data;
     const tenantId = this.ensureEventTenant(eventData, 'liquidacion.pago.revertido');
+    const cuentaTesoreria = await this.resolverCuentaTesoreriaLaboral(evento, tenantId);
     const eventId = evento.event_id || eventData.eventId;
     const referencia = `REVERSA-PAGO-LIQUIDACION-${eventData.liquidacionId}`;
     const asiento = await this.asientosGenerator.generarAsientoReversaPagoLiquidacion({
@@ -2231,6 +2214,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
       referencia,
       source_event_id: eventId,
       event_id: eventId,
+      ...cuentaTesoreria,
     });
     if (eventId) {
       const verificado = await this.verificarAsientoCreado(tenantId, eventId, referencia);
@@ -2243,6 +2227,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handleCtsDepositado(evento: OutboxEvent): Promise<void> {
     const eventData = evento.event_data;
     const tenantId = this.ensureEventTenant(eventData, 'cts.depositado');
+    const cuentaTesoreria = await this.resolverCuentaTesoreriaLaboral(evento, tenantId);
     const eventId = evento.event_id || eventData.eventId;
     const referencia = `CTS-${eventData.depositoId}`;
     const asiento = await this.asientosGenerator.generarAsientoDepositoCts({
@@ -2253,6 +2238,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
       referencia,
       source_event_id: eventId,
       event_id: eventId,
+      ...cuentaTesoreria,
     });
     if (eventId) {
       const verificado = await this.verificarAsientoCreado(tenantId, eventId, referencia);

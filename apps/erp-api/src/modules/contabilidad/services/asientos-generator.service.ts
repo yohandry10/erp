@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { PeriodosService } from './periodos.service';
 import { PlanCuenta, PlanCuentasService } from './plan-cuentas.service';
 import { DocumentoFiscalGeneradoEvent } from '../../../shared/events/event-bus.service';
+import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 
 export interface AsientoContable {
   id?: string;
@@ -37,7 +38,8 @@ export class AsientosGeneratorService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly periodosService: PeriodosService,
-    private readonly planCuentasService: PlanCuentasService
+    private readonly planCuentasService: PlanCuentasService,
+    @Optional() private readonly tenantContext?: TenantContextService,
   ) {}
 
   /**
@@ -80,7 +82,6 @@ export class AsientosGeneratorService {
           localLockKey
         );
         if (asientoCreadoPorOtroFlujo) {
-          await this.marcarEventoComoProcesado(sourceEventId);
           return asientoCreadoPorOtroFlujo;
         }
 
@@ -106,9 +107,6 @@ export class AsientosGeneratorService {
           this.logger.warn(
             `⚠️ [Asientos] Asiento ya existe para evento ${sourceEventId}, retornando existente`
           );
-          // Si el asiento ya existe, el evento igualmente debe salir del outbox
-          // para evitar que quede en pending indefinidamente.
-          await this.marcarEventoComoProcesado(sourceEventId);
           return asientoExistente;
         }
       }
@@ -146,7 +144,6 @@ export class AsientosGeneratorService {
             this.logger.warn(
               `⚠️ [Asientos] Inserción idempotente detectó asiento existente para evento ${sourceEventId}; retornando ${asientoExistente.id}`
             );
-            await this.marcarEventoComoProcesado(sourceEventId);
             return asientoExistente;
           }
         }
@@ -164,11 +161,6 @@ export class AsientosGeneratorService {
       const asientoFinal = sourceEventId
         ? await this.consolidarAsientoUnicoPorEvento(tenantId, sourceEventId, asiento as AsientoContable)
         : asiento;
-
-      // Marcar evento como procesado en outbox si existe sourceEventId
-      if (sourceEventId) {
-        await this.marcarEventoComoProcesado(sourceEventId);
-      }
 
       return asientoFinal as AsientoContable;
     } finally {
@@ -231,36 +223,19 @@ export class AsientosGeneratorService {
    * @param eventId - ID del evento a marcar como procesado
    */
   async marcarEventoComoProcesado(eventId: string): Promise<void> {
-    try {
-      const { error } = await this.supabaseService
-        .getClient()
-        .from('outbox_events')
-        .update({
-          status: 'completed',
-          processed_at: new Date().toISOString(),
-          error_message: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('event_id', eventId);
-
-      if (error) {
-        this.logger.error(
-          `❌ [Asientos] Error marcando evento ${eventId} como procesado:`,
-          error
-        );
-        // No lanzamos error para no afectar la creación del asiento
-        // El evento quedará en estado pending y podrá ser reprocesado
-      } else {
-        this.logger.log(
-          `✅ [Asientos] Evento ${eventId} marcado como procesado en outbox`
-        );
-      }
-    } catch (error) {
-      this.logger.error(
-        `❌ [Asientos] Excepción marcando evento ${eventId} como procesado:`,
-        error
-      );
-      // No lanzamos error para no afectar la creación del asiento
+    const claim = this.tenantContext?.getOutboxClaim();
+    if (!claim || (claim.eventId && claim.eventId !== eventId)) {
+      return;
+    }
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'complete_outbox_event_tx',
+      { p_id: claim.eventRowId, p_claim_token: claim.claimToken },
+    );
+    if (error) {
+      throw new Error(`No se pudo completar evento ${eventId}: ${error.message}`);
+    }
+    if (data !== true && !(await this.eventoTieneEstado(eventId, ['completed']))) {
+      throw new Error(`OUTBOX_CLAIM_LOST:${claim.eventRowId}`);
     }
   }
 
@@ -274,82 +249,29 @@ export class AsientosGeneratorService {
     errorMessage: string
   ): Promise<void> {
     const maxRetries = 3;
-    
-    try {
-      // Obtener el evento actual para incrementar retry_count
-      const { data: evento, error: fetchError } = await this.supabaseService
-        .getClient()
-        .from('outbox_events')
-        .select('retry_count, status')
-        .eq('event_id', eventId)
-        .maybeSingle();
-
-      if (fetchError) {
-        this.logger.error(
-          `❌ [Asientos] Error obteniendo evento ${eventId}:`,
-          fetchError
-        );
-        return;
-      }
-
-      // Si no existe el evento, no podemos marcarlo; evitar reventar el worker
-      if (!evento) {
-        this.logger.warn(
-          `⚠️ [Asientos] Evento ${eventId} no encontrado al marcar como fallido; se omite`
-        );
-        return;
-      }
-
-      if (String(evento.status).toLowerCase() === 'completed') {
-        this.logger.warn(
-          `⚠️ [Asientos] Evento ${eventId} ya estaba completado; no se degrada a fallido`
-        );
-        return;
-      }
-
-      const retryCount = (evento?.retry_count || 0) + 1;
-      const isPermanentFailure = retryCount >= maxRetries;
-
-      // Truncar mensaje de error si es muy largo
-      const truncatedMessage = errorMessage.length > 500 
-        ? errorMessage.substring(0, 497) + '...'
-        : errorMessage;
-
-      const updateData: any = {
-        status: isPermanentFailure ? 'dead_letter' : 'failed',
-        error_message: truncatedMessage,
-        retry_count: retryCount,
-        updated_at: new Date().toISOString()
-      };
-
-      const { error } = await this.supabaseService
-        .getClient()
-        .from('outbox_events')
-        .update(updateData)
-        .eq('event_id', eventId)
-        .neq('status', 'completed');
-
-      if (error) {
-        this.logger.error(
-          `❌ [Asientos] Error marcando evento ${eventId} como fallido:`,
-          error
-        );
-      } else {
-        if (isPermanentFailure) {
-          this.logger.error(
-            `🚫 [Asientos] Evento ${eventId} marcado como DEAD_LETTER después de ${retryCount} intentos: ${truncatedMessage}`
-          );
-        } else {
-          this.logger.warn(
-            `⚠️ [Asientos] Evento ${eventId} marcado como fallido (intento ${retryCount}/${maxRetries}): ${truncatedMessage}`
-          );
-        }
-      }
-    } catch (error) {
-      this.logger.error(
-        `❌ [Asientos] Excepción marcando evento ${eventId} como fallido:`,
-        error
-      );
+    const claim = this.tenantContext?.getOutboxClaim();
+    if (!claim || (claim.eventId && claim.eventId !== eventId)) {
+      return;
+    }
+    const truncatedMessage = errorMessage.length > 500
+      ? `${errorMessage.substring(0, 497)}...`
+      : errorMessage;
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'fail_outbox_event_tx',
+      {
+        p_id: claim.eventRowId,
+        p_claim_token: claim.claimToken,
+        p_error: truncatedMessage,
+        p_next_retry_at: null,
+        p_max_retries: maxRetries,
+      },
+    );
+    if (error) {
+      throw new Error(`No se pudo fallar evento ${eventId}: ${error.message}`);
+    }
+    const updated = Boolean((data as { updated?: boolean } | null)?.updated);
+    if (!updated && !(await this.eventoTieneEstado(eventId, ['completed', 'failed', 'dead_letter']))) {
+      throw new Error(`OUTBOX_CLAIM_LOST:${claim.eventRowId}`);
     }
   }
 
@@ -358,66 +280,37 @@ export class AsientosGeneratorService {
    * @param eventId - ID del evento a reiniciar
    * @returns true si se reinició exitosamente
    */
-  async reiniciarEventoFallido(eventId: string): Promise<boolean> {
-    try {
-      const MAX_RESTARTS = 3;
-
-      // Check current restart count before resetting
-      const { data: evento, error: fetchError } = await this.supabaseService
-        .getClient()
-        .from('outbox_events')
-        .select('id, retry_count, payload')
-        .eq('event_id', eventId)
-        .in('status', ['failed', 'dead_letter'])
-        .maybeSingle();
-
-      if (fetchError || !evento) {
-        console.warn(`⚠️ [Asientos] Evento ${eventId} no encontrado o no está en estado fallido`);
-        return false;
-      }
-
-      const restartCount = (evento.payload as any)?.restart_count ?? 0;
-      if (restartCount >= MAX_RESTARTS) {
-        console.error(`❌ [Asientos] Evento ${eventId} alcanzó el límite de ${MAX_RESTARTS} reinicios`);
-        return false;
-      }
-
-      const { error } = await this.supabaseService
-        .getClient()
-        .from('outbox_events')
-        .update({
-          status: 'pending',
-          retry_count: 0,
-          error_message: null,
-          processed_at: null,
-          updated_at: new Date().toISOString(),
-          payload: {
-            ...(evento.payload as object),
-            restart_count: restartCount + 1,
-          },
-        })
-        .eq('event_id', eventId)
-        .in('status', ['failed', 'dead_letter']);
-
-      if (error) {
-        this.logger.error(
-          `❌ [Asientos] Error reiniciando evento ${eventId}:`,
-          error
-        );
-        return false;
-      }
-
-      this.logger.log(
-        `✅ [Asientos] Evento ${eventId} reiniciado para reprocesamiento`
-      );
-      return true;
-    } catch (error) {
-      this.logger.error(
-        `❌ [Asientos] Excepción reiniciando evento ${eventId}:`,
-        error
-      );
-      return false;
+  async reiniciarEventoFallido(
+    tenantId: string,
+    actorId: string,
+    eventId: string,
+  ): Promise<boolean> {
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'reset_outbox_event_tx',
+      {
+        p_tenant_id: tenantId,
+        p_actor_id: actorId,
+        p_event_id: eventId,
+        p_reason: 'MANUAL_RETRY',
+        p_max_restarts: 3,
+      },
+    );
+    if (error) {
+      throw new Error(error.message);
     }
+    return Boolean((data as { updated?: boolean } | null)?.updated);
+  }
+
+  private async eventoTieneEstado(eventId: string, estados: string[]): Promise<boolean> {
+    const { data, error } = await this.supabaseService.getClient()
+      .from('outbox_events')
+      .select('status')
+      .eq('event_id', eventId)
+      .maybeSingle();
+    if (error) {
+      throw new Error(`No se pudo reconciliar estado outbox ${eventId}: ${error.message}`);
+    }
+    return estados.includes(String(data?.status ?? '').toLowerCase());
   }
 
   /**
@@ -425,23 +318,19 @@ export class AsientosGeneratorService {
    * @param tenantId - ID del tenant (opcional)
    * @returns Estadísticas de eventos fallidos
    */
-  async obtenerEstadisticasEventosFallidos(tenantId?: string): Promise<{
+  async obtenerEstadisticasEventosFallidos(
+    tenantId: string,
+    actorId: string,
+  ): Promise<{
     total_fallidos: number;
     total_dead_letter: number;
     por_tipo: Record<string, number>;
   }> {
     try {
-      let query = this.supabaseService
-        .getClient()
-        .from('outbox_events')
-        .select('event_type, status')
-        .in('status', ['failed', 'dead_letter']);
-
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await this.supabaseService.getClient().rpc(
+        'outbox_tenant_stats_492',
+        { p_tenant_id: tenantId, p_actor_id: actorId },
+      );
 
       if (error) {
         this.logger.error(
@@ -451,26 +340,12 @@ export class AsientosGeneratorService {
         throw error;
       }
 
-      const stats = {
-        total_fallidos: 0,
-        total_dead_letter: 0,
-        por_tipo: {} as Record<string, number>
+      const raw = (data ?? {}) as Record<string, unknown>;
+      return {
+        total_fallidos: Number(raw.failed ?? 0),
+        total_dead_letter: Number(raw.dead_letter ?? 0),
+        por_tipo: (raw.por_tipo ?? {}) as Record<string, number>,
       };
-
-      if (data) {
-        for (const evento of data) {
-          if (evento.status === 'failed') {
-            stats.total_fallidos++;
-          } else if (evento.status === 'dead_letter') {
-            stats.total_dead_letter++;
-          }
-
-          stats.por_tipo[evento.event_type] = 
-            (stats.por_tipo[evento.event_type] || 0) + 1;
-        }
-      }
-
-      return stats;
     } catch (error) {
       this.logger.error(
         '❌ [Asientos] Excepción obteniendo estadísticas de eventos fallidos:',
@@ -2490,98 +2365,153 @@ export class AsientosGeneratorService {
   /**
    * Genera asiento de pago de planilla
    * Dr 411 Remuneraciones por Pagar [monto]
-   *   Cr 10 Bancos [monto]
+   *   Cr cuenta tesorera exacta validada contra banco/caja [monto]
    */
   async generarAsientoPagoPlanilla(evento: any): Promise<AsientoContable> {
-    try {
-      const { tenant_id, fecha, monto } = evento;
-      const montoNum = Number(monto ?? 0);
-      const sourceEventId = evento.source_event_id || evento.planilla_id || evento.event_id;
+    const { tenant_id, fecha, monto } = evento;
+    const montoNum = this.round2(Number(monto ?? 0));
+    const cuentaTesoreriaId = String(evento.cuenta_tesoreria_id ?? '').trim();
+    const cuentaTesoreriaCodigo = String(evento.cuenta_tesoreria_codigo ?? '').trim();
+    const metodoPago = String(evento.metodo_pago ?? '').toLowerCase();
+    if (!tenant_id || !Number.isFinite(montoNum) || montoNum <= 0
+        || !cuentaTesoreriaId || !cuentaTesoreriaCodigo
+        || !['transferencia', 'efectivo'].includes(metodoPago)) {
+      throw new Error('Pago de planilla: cuenta tesorera o importe inválido');
+    }
+    const sourceEventId = evento.source_event_id || evento.planilla_id || evento.event_id;
+    const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenant_id, ['411']);
+    const cuentaRemuneracionesId = cuentas.get('411')!.id;
+    if (cuentaRemuneracionesId === cuentaTesoreriaId) {
+      throw new Error('Pago de planilla: la cuenta tesorera no puede ser la cuenta de remuneraciones');
+    }
 
-      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
-        tenant_id,
-        ['411', '10'],
-      );
-
-      const detalles: DetalleAsiento[] = [
+    return this.generarAsiento(
+      tenant_id,
+      new Date(fecha),
+      `Pago de planilla ${evento.referencia || ''}`.trim(),
+      [
         {
-          cuenta_id: cuentas.get('411')!.id,
+          cuenta_id: cuentaRemuneracionesId,
           debe: montoNum,
           haber: 0,
           concepto: 'Pago de remuneraciones',
         },
         {
-          cuenta_id: cuentas.get('10')!.id,
+          cuenta_id: cuentaTesoreriaId,
           debe: 0,
           haber: montoNum,
-          concepto: 'Bancos - Pago planilla',
+          concepto: `${metodoPago === 'efectivo' ? 'Caja' : 'Banco'} ${cuentaTesoreriaCodigo} - Pago planilla`,
         },
-      ];
-
-      return await this.generarAsiento(
-        tenant_id,
-        new Date(fecha),
-        `Pago de planilla ${evento.referencia || ''}`.trim(),
-        detalles,
-        evento.referencia,
-        sourceEventId,
-      );
-    } catch (error) {
-      if (evento.event_id) {
-        await this.marcarEventoComoFallido(
-          evento.event_id,
-          `Error generando asiento de pago planilla: ${error.message}`,
-        );
-      }
-      throw error;
-    }
+      ],
+      evento.referencia,
+      sourceEventId,
+    );
   }
 
   async generarAsientoDevengoLiquidacion(evento: any): Promise<AsientoContable> {
-    return this.generarAsientoMovimientoLaboral(evento, {
-      cuentaDebe: '621',
-      cuentaHaber: '411',
-      concepto: 'Devengo de liquidación laboral',
-      detalleDebe: 'Beneficios y liquidación del personal',
-      detalleHaber: 'Liquidaciones por pagar',
+    const componentes = evento.componentes_liquidacion ?? evento.componentesLiquidacion;
+    const total = this.round2(Number(evento.monto ?? evento.totalLiquidacion ?? 0));
+    const montoCts = this.round2(Number(componentes?.montoCts));
+    const indemnizacion = this.round2(Number(componentes?.indemnizacion));
+    const beneficios = this.round2(Number(componentes?.beneficiosSociales));
+    const remuneracionesOtros = this.round2(Number(componentes?.remuneracionesYOtros));
+    const version = Number(componentes?.version);
+    const esperadoBeneficios = this.round2(Math.min(total, montoCts + indemnizacion));
+
+    if (!componentes || !Number.isInteger(version) || version < 492
+        || ![total, montoCts, indemnizacion, beneficios, remuneracionesOtros]
+          .every((importe) => Number.isFinite(importe) && importe >= 0)
+        || total <= 0
+        || montoCts + indemnizacion > total
+        || Math.abs(beneficios - esperadoBeneficios) > 0.01
+        || Math.abs(this.round2(beneficios + remuneracionesOtros) - total) > 0.01
+        || Math.abs(this.round2(Number(componentes.total)) - total) > 0.01) {
+      throw new Error('Devengo de liquidación laboral: snapshot de componentes inválido o desbalanceado');
+    }
+
+    const codigos = ['411'];
+    if (beneficios > 0) codigos.push('629');
+    if (remuneracionesOtros > 0) codigos.push('621');
+    const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+      evento.tenant_id,
+      codigos,
+    );
+    const detalles: DetalleAsiento[] = [];
+    if (beneficios > 0) {
+      detalles.push({
+        cuenta_id: cuentas.get('629')!.id,
+        debe: beneficios,
+        haber: 0,
+        concepto: `Beneficios sociales (CTS e indemnización) - snapshot ${version}`,
+      });
+    }
+    if (remuneracionesOtros > 0) {
+      detalles.push({
+        cuenta_id: cuentas.get('621')!.id,
+        debe: remuneracionesOtros,
+        haber: 0,
+        concepto: `Vacaciones y otros conceptos remunerativos - snapshot ${version}`,
+      });
+    }
+    detalles.push({
+      cuenta_id: cuentas.get('411')!.id,
+      debe: 0,
+      haber: total,
+      concepto: 'Liquidación laboral por pagar',
     });
+
+    return this.generarAsiento(
+      evento.tenant_id,
+      new Date(evento.fecha),
+      'Devengo de liquidación laboral',
+      detalles,
+      evento.referencia,
+      evento.source_event_id || evento.event_id,
+    );
   }
 
   async generarAsientoPagoLiquidacion(evento: any): Promise<AsientoContable> {
     return this.generarAsientoMovimientoLaboral(evento, {
       cuentaDebe: '411',
-      cuentaHaber: '10',
+      cuentaHaber: null,
+      tesoreriaEn: 'haber',
       concepto: 'Pago de liquidación laboral',
       detalleDebe: 'Liquidaciones por pagar',
-      detalleHaber: 'Caja y bancos',
+      detalleHaber: 'Tesorería del pago de liquidación',
     });
   }
 
   async generarAsientoReversaPagoLiquidacion(evento: any): Promise<AsientoContable> {
     return this.generarAsientoMovimientoLaboral(evento, {
-      cuentaDebe: '10',
+      cuentaDebe: null,
       cuentaHaber: '411',
+      tesoreriaEn: 'debe',
       concepto: 'Reversa de pago de liquidación laboral',
-      detalleDebe: 'Caja y bancos',
+      detalleDebe: 'Reingreso a la tesorería original',
       detalleHaber: 'Liquidaciones por pagar restauradas',
     });
   }
 
   async generarAsientoDepositoCts(evento: any): Promise<AsientoContable> {
     return this.generarAsientoMovimientoLaboral(evento, {
-      cuentaDebe: '621',
-      cuentaHaber: '10',
+      // No existe aún un evento separado de provisión CTS. En este release el
+      // depósito reconoce el beneficio y lo cancela en el mismo asiento; usar
+      // 415 aquí inventaría un pasivo previo que el sistema no ha devengado.
+      cuentaDebe: '629',
+      cuentaHaber: null,
+      tesoreriaEn: 'haber',
       concepto: 'Depósito semestral de CTS',
-      detalleDebe: 'Compensación por tiempo de servicios',
-      detalleHaber: 'Caja y bancos',
+      detalleDebe: 'Beneficio social CTS reconocido al depósito',
+      detalleHaber: 'Banco exacto del depósito CTS',
     });
   }
 
   private async generarAsientoMovimientoLaboral(
     evento: any,
     config: {
-      cuentaDebe: string;
-      cuentaHaber: string;
+      cuentaDebe: string | null;
+      cuentaHaber: string | null;
+      tesoreriaEn?: 'debe' | 'haber';
       concepto: string;
       detalleDebe: string;
       detalleHaber: string;
@@ -2598,10 +2528,25 @@ export class AsientosGeneratorService {
     if (!Number.isFinite(monto) || monto <= 0) {
       throw new Error(`${config.concepto}: importe inválido`);
     }
-    const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
-      evento.tenant_id,
-      [config.cuentaDebe, config.cuentaHaber],
-    );
+    const cuentaTesoreriaId = String(evento.cuenta_tesoreria_id ?? '').trim();
+    const cuentaTesoreriaCodigo = String(evento.cuenta_tesoreria_codigo ?? '').trim();
+    const metodoPago = String(evento.metodo_pago ?? '').toLowerCase();
+    if (config.tesoreriaEn && (!cuentaTesoreriaId || !cuentaTesoreriaCodigo
+        || !['transferencia', 'efectivo'].includes(metodoPago))) {
+      throw new Error(`${config.concepto}: cuenta tesorera exacta requerida`);
+    }
+    const codigos = [config.cuentaDebe, config.cuentaHaber]
+      .filter((codigo): codigo is string => Boolean(codigo));
+    const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(evento.tenant_id, codigos);
+    const cuentaDebeId = config.tesoreriaEn === 'debe'
+      ? cuentaTesoreriaId
+      : cuentas.get(config.cuentaDebe!)!.id;
+    const cuentaHaberId = config.tesoreriaEn === 'haber'
+      ? cuentaTesoreriaId
+      : cuentas.get(config.cuentaHaber!)!.id;
+    if (!cuentaDebeId || !cuentaHaberId || cuentaDebeId === cuentaHaberId) {
+      throw new Error(`${config.concepto}: cuentas contables inválidas o coincidentes`);
+    }
     const sourceEventId = evento.source_event_id || evento.event_id;
     return this.generarAsiento(
       evento.tenant_id,
@@ -2609,16 +2554,20 @@ export class AsientosGeneratorService {
       config.concepto,
       [
         {
-          cuenta_id: cuentas.get(config.cuentaDebe)!.id,
+          cuenta_id: cuentaDebeId,
           debe: monto,
           haber: 0,
-          concepto: config.detalleDebe,
+          concepto: config.tesoreriaEn === 'debe'
+            ? `${config.detalleDebe} (${cuentaTesoreriaCodigo})`
+            : config.detalleDebe,
         },
         {
-          cuenta_id: cuentas.get(config.cuentaHaber)!.id,
+          cuenta_id: cuentaHaberId,
           debe: 0,
           haber: monto,
-          concepto: config.detalleHaber,
+          concepto: config.tesoreriaEn === 'haber'
+            ? `${config.detalleHaber} (${cuentaTesoreriaCodigo})`
+            : config.detalleHaber,
         },
       ],
       evento.referencia,

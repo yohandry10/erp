@@ -1,0 +1,348 @@
+{
+  "run": "qa-pos-10-1786606539634",
+  "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+  "users": [
+    {
+      "email": "demo-pe-5ae0eacc@temp.local",
+      "id": "f42dec1c-46ec-4d90-a42f-4ec766a7fa68",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    },
+    {
+      "email": "aprobador-5ae0eacc@temp.local",
+      "id": "8ca3060b-5d23-42bf-a410-f71cf905a336",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    },
+    {
+      "email": "qa10-user-01@temp.local",
+      "id": "27ed9985-9026-493b-bb62-89347dfa3202",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    },
+    {
+      "email": "qa10-user-02@temp.local",
+      "id": "a07a22c4-773d-42ca-8241-c9b1605bd675",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    },
+    {
+      "email": "qa10-user-03@temp.local",
+      "id": "1857feed-0975-4bf0-917d-1c5a22dbfd42",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    },
+    {
+      "email": "qa10-user-04@temp.local",
+      "id": "07fcec61-e7dd-4867-81ed-9f422b8b0767",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    },
+    {
+      "email": "qa10-user-05@temp.local",
+      "id": "47f20fc2-dd0a-4e21-8da1-29a228361887",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    },
+    {
+      "email": "qa10-user-06@temp.local",
+      "id": "37d67531-8404-4005-949c-0cb6ed258776",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    },
+    {
+      "email": "qa10-user-07@temp.local",
+      "id": "dd62990d-ac76-4fa2-92f2-57d1b6d6a4af",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    },
+    {
+      "email": "qa10-user-08@temp.local",
+      "id": "475cad90-6b66-4c23-be5b-9ff12cebdba3",
+      "tenant": "5ae0eacc-82df-4690-835c-d71476cf43ee"
+    }
+  ],
+  "sessions": [
+    {
+      "email": "demo-pe-5ae0eacc@temp.local",
+      "userId": "f42dec1c-46ec-4d90-a42f-4ec766a7fa68",
+      "reused": true
+    },
+    {
+      "email": "aprobador-5ae0eacc@temp.local",
+      "userId": "8ca3060b-5d23-42bf-a410-f71cf905a336",
+      "cajaId": "f7c13134-82ea-48dc-a52d-bdc02ba22cf1",
+      "sessionId": "d131e6c8-c15e-4f23-8d07-3c9c1cd71243",
+      "reused": false
+    },
+    {
+      "email": "qa10-user-01@temp.local",
+      "userId": "27ed9985-9026-493b-bb62-89347dfa3202",
+      "cajaId": "4d2863c8-9362-41ee-9c34-0616cfc16f43",
+      "sessionId": "e0c45fc6-fae9-4752-b2c7-0849de6a113d",
+      "reused": false
+    },
+    {
+      "email": "qa10-user-02@temp.local",
+      "userId": "a07a22c4-773d-42ca-8241-c9b1605bd675",
+      "cajaId": "209e75b1-a528-451c-8d53-f8aab2bfa345",
+      "sessionId": "84b74947-0140-4ea5-896d-d7127ad58b67",
+      "reused": false
+    },
+    {
+      "email": "qa10-user-03@temp.local",
+      "userId": "1857feed-0975-4bf0-917d-1c5a22dbfd42",
+      "cajaId": "d8949b5c-732e-4686-b4ec-0bd54093c69f",
+      "sessionId": "9419117e-8c13-4b80-860e-34fcb57ab083",
+      "reused": false
+    },
+    {
+      "email": "qa10-user-04@temp.local",
+      "userId": "07fcec61-e7dd-4867-81ed-9f422b8b0767",
+      "cajaId": "23413800-ece4-462a-9481-5d3348f1b568",
+      "sessionId": "e53997c0-0879-4958-b8e5-a06e6f470a5b",
+      "reused": false
+    },
+    {
+      "email": "qa10-user-05@temp.local",
+      "userId": "47f20fc2-dd0a-4e21-8da1-29a228361887",
+      "cajaId": "ac51da77-d3ec-4bfd-9712-fe5308783197",
+      "sessionId": "faba4140-c5f3-4b8a-a160-c9a1eeeceebf",
+      "reused": false
+    },
+    {
+      "email": "qa10-user-06@temp.local",
+      "userId": "37d67531-8404-4005-949c-0cb6ed258776",
+      "cajaId": "4c52345e-9610-42d9-a374-e209bc278b2b",
+      "sessionId": "f19c1952-df62-4172-80d2-ed571e9a2977",
+      "reused": false
+    },
+    {
+      "email": "qa10-user-07@temp.local",
+      "userId": "dd62990d-ac76-4fa2-92f2-57d1b6d6a4af",
+      "cajaId": "1b8ab36d-90a7-4c48-a8de-8074b0515acd",
+      "sessionId": "b09ba38a-edcc-4780-af18-e7021ce7bc92",
+      "reused": false
+    },
+    {
+      "email": "qa10-user-08@temp.local",
+      "userId": "475cad90-6b66-4c23-be5b-9ff12cebdba3",
+      "cajaId": "16eb59ab-3565-40b0-8f41-0218a94f64b0",
+      "sessionId": "3d13f0ce-9cef-4e03-9c22-ac45c0675189",
+      "reused": false
+    }
+  ],
+  "sales": [
+    {
+      "index": 1,
+      "status": 409,
+      "ms": 277,
+      "message": "Debe abrir la caja antes de registrar ventas en el POS.",
+      "error": {
+        "tipo": "CAJA_CERRADA",
+        "codigo": "POS_CAJA_REQUERIDA",
+        "mensaje": "Abra la caja con el monto inicial para continuar."
+      }
+    },
+    {
+      "index": 2,
+      "status": 500,
+      "ms": 438,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 3,
+      "status": 500,
+      "ms": 517,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 4,
+      "status": 201,
+      "ms": 418,
+      "success": true,
+      "ventaId": "9016dbc6-7170-4893-b98c-0d321fdc4506",
+      "ticket": "T001-00000001",
+      "idempotent": false,
+      "message": "Venta confirmada como ticket interno canjeable; sin correlativo fiscal reservado"
+    },
+    {
+      "index": 5,
+      "status": 500,
+      "ms": 454,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 6,
+      "status": 500,
+      "ms": 536,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 7,
+      "status": 500,
+      "ms": 478,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 8,
+      "status": 500,
+      "ms": 559,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 9,
+      "status": 500,
+      "ms": 577,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 10,
+      "status": 500,
+      "ms": 499,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    }
+  ],
+  "retries": [
+    {
+      "index": 1,
+      "status": 409,
+      "ms": 264,
+      "message": "Debe abrir la caja antes de registrar ventas en el POS.",
+      "error": {
+        "tipo": "CAJA_CERRADA",
+        "codigo": "POS_CAJA_REQUERIDA",
+        "mensaje": "Abra la caja con el monto inicial para continuar."
+      }
+    },
+    {
+      "index": 2,
+      "status": 500,
+      "ms": 254,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 3,
+      "status": 500,
+      "ms": 257,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 4,
+      "status": 201,
+      "ms": 271,
+      "success": true,
+      "ventaId": "9016dbc6-7170-4893-b98c-0d321fdc4506",
+      "ticket": "T001-00000001",
+      "idempotent": true,
+      "message": "Ticket interno ya confirmado; reintento validado sin recalcular la lista"
+    },
+    {
+      "index": 5,
+      "status": 500,
+      "ms": 276,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 6,
+      "status": 500,
+      "ms": 269,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 7,
+      "status": 500,
+      "ms": 260,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 8,
+      "status": 500,
+      "ms": 285,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 9,
+      "status": 500,
+      "ms": 280,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    },
+    {
+      "index": 10,
+      "status": 500,
+      "ms": 305,
+      "message": "A record with this information already exists",
+      "error": {
+        "tipo": "DATABASE_ERROR",
+        "mensaje": "duplicate key value violates unique constraint \"ux_documentos_tenant_tipo_serie_numero_runtime\"",
+        "codigo": "23505"
+      }
+    }
+  ]
+}

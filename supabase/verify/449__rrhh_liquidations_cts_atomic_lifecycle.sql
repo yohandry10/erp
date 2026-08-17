@@ -111,6 +111,8 @@ DECLARE
   v_contrato_id uuid := gen_random_uuid();
   v_contrato_cts_id uuid := gen_random_uuid();
   v_banco_id uuid := gen_random_uuid();
+  v_bank_account_id uuid := gen_random_uuid();
+  v_cash_account_id uuid := gen_random_uuid();
   v_other_banco_id uuid := gen_random_uuid();
   v_liquidacion_id uuid;
   v_liquidacion_rollback_id uuid;
@@ -155,14 +157,23 @@ BEGIN
     (v_contrato_cts_id, v_tenant_id, v_empleado_cts_id, v_empleado_cts_id, 'indefinido',
      '2024-05-01', 'vigente', true, 2500, 2500, 'PEN', 'ONP', 'tiempo_completo');
 
+  INSERT INTO public.plan_cuentas(
+    id, tenant_id, codigo, nombre, estado, activo, acepta_movimiento,
+    tipo, tipo_cuenta, nivel
+  ) VALUES
+    (v_bank_account_id, v_tenant_id, '104491', 'Banco RRHH Verify 449',
+     'ACTIVO', true, true, 'ACTIVO', 'ACTIVO', 6),
+    (v_cash_account_id, v_tenant_id, '10111', 'Caja RRHH Verify 449',
+     'ACTIVO', true, true, 'ACTIVO', 'ACTIVO', 5);
+
   INSERT INTO public.cuentas_bancarias (
     id, tenant_id, nombre, codigo, banco, numero_cuenta, tipo_cuenta,
     moneda, estado, activa, activo, saldo, saldo_actual, saldo_contable,
-    permite_sobregiro, created_by, updated_by
+    permite_sobregiro, cuenta_contable_id, created_by, updated_by
   ) VALUES (
     v_banco_id, v_tenant_id, 'Banco Verify 449', 'BANCO-449', 'Banco Verify',
     '449-000001', 'CORRIENTE', 'PEN', 'ACTIVO', true, true,
-    10000, 10000, 10000, false, v_user_id, v_user_id
+    10000, 10000, 10000, false, v_bank_account_id, v_user_id, v_user_id
   );
   INSERT INTO public.cuentas_bancarias (
     id, tenant_id, nombre, codigo, banco, numero_cuenta, tipo_cuenta,
@@ -278,13 +289,13 @@ BEGIN
   END;
 
   BEGIN
-    PERFORM public.confirmar_liquidacion_tx(v_tenant_id, v_liquidacion_id, NULL);
+    PERFORM app.confirmar_liquidacion_tx(v_tenant_id, v_liquidacion_id, NULL);
     RAISE EXCEPTION 'La confirmacion sin actor debio fallar';
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM = 'La confirmacion sin actor debio fallar' THEN RAISE; END IF;
   END;
 
-  SELECT public.confirmar_liquidacion_tx(
+  SELECT app.confirmar_liquidacion_tx(
     v_tenant_id, v_liquidacion_id, v_user_id
   ) INTO v_result;
   IF lower((SELECT estado::text FROM public.liquidaciones WHERE id = v_liquidacion_id)) <> 'aprobada'
@@ -297,13 +308,32 @@ BEGIN
          WHERE tenant_id = v_tenant_id AND event_type = 'liquidacion.aprobada'
            AND aggregate_id = v_liquidacion_id::text) <> 1
      OR NOT COALESCE((SELECT (payload->>'accountingHandledByOutbox')::boolean
-                      FROM public.outbox_events
-                      WHERE tenant_id = v_tenant_id AND event_type = 'liquidacion.aprobada'
-                        AND aggregate_id = v_liquidacion_id::text), false) THEN
+                       FROM public.outbox_events
+                       WHERE tenant_id = v_tenant_id AND event_type = 'liquidacion.aprobada'
+                         AND aggregate_id = v_liquidacion_id::text), false)
+     OR (SELECT (payload->'componentesLiquidacion'->>'version')::integer
+         FROM public.outbox_events
+         WHERE tenant_id = v_tenant_id AND event_type = 'liquidacion.aprobada'
+           AND aggregate_id = v_liquidacion_id::text) <> 492
+     OR (SELECT round((payload->'componentesLiquidacion'->>'beneficiosSociales')::numeric, 2)
+         FROM public.outbox_events
+         WHERE tenant_id = v_tenant_id AND event_type = 'liquidacion.aprobada'
+           AND aggregate_id = v_liquidacion_id::text) <> 500
+     OR (SELECT round((payload->'componentesLiquidacion'->>'remuneracionesYOtros')::numeric, 2)
+         FROM public.outbox_events
+         WHERE tenant_id = v_tenant_id AND event_type = 'liquidacion.aprobada'
+           AND aggregate_id = v_liquidacion_id::text) <> 1000
+     OR (SELECT round(
+           (payload->'componentesLiquidacion'->>'beneficiosSociales')::numeric
+           + (payload->'componentesLiquidacion'->>'remuneracionesYOtros')::numeric, 2
+         )
+         FROM public.outbox_events
+         WHERE tenant_id = v_tenant_id AND event_type = 'liquidacion.aprobada'
+           AND aggregate_id = v_liquidacion_id::text) <> 1500 THEN
     RAISE EXCEPTION 'La confirmacion no cerro cese/CTS/outbox atomicamente: %', v_result;
   END IF;
 
-  SELECT public.confirmar_liquidacion_tx(
+  SELECT app.confirmar_liquidacion_tx(
     v_tenant_id, v_liquidacion_id, v_user_id
   ) INTO v_result;
   IF NOT (v_result->>'idempotent')::boolean
@@ -320,7 +350,7 @@ BEGIN
     IF SQLERRM = 'El update directo de estado debio fallar' THEN RAISE; END IF;
   END;
 
-  SELECT public.pagar_liquidacion_tx(
+  SELECT app.pagar_liquidacion_tx(
     v_tenant_id, v_liquidacion_id,
     jsonb_build_object(
       'metodo_pago', 'transferencia', 'cuenta_bancaria_id', v_banco_id,
@@ -339,6 +369,11 @@ BEGIN
          WHERE tenant_id = v_tenant_id AND liquidacion_id = v_liquidacion_id
            AND estado = 'APLICADO') <> 1
      OR (SELECT tipo FROM public.movimientos_bancarios WHERE id = v_movimiento_pago_id) <> 'CARGO'
+     OR app.to_uuid_or_null((SELECT metadata->>'cuenta_contable_id'
+                             FROM public.movimientos_bancarios WHERE id = v_movimiento_pago_id))
+          IS DISTINCT FROM v_bank_account_id
+     OR (SELECT metadata->>'ledger_frozen_by'
+         FROM public.movimientos_bancarios WHERE id = v_movimiento_pago_id) <> '492'
      OR (SELECT count(*) FROM public.outbox_events
          WHERE event_id = v_pago_event_id AND event_type = 'liquidacion.pagada') <> 1
      OR NOT COALESCE((SELECT (payload->>'accountingHandledByOutbox')::boolean
@@ -355,7 +390,7 @@ BEGIN
     IF SQLERRM = 'El pago acepto una cuenta bancaria de otro tenant' THEN RAISE; END IF;
   END;
 
-  SELECT public.pagar_liquidacion_tx(
+  SELECT app.pagar_liquidacion_tx(
     v_tenant_id, v_liquidacion_id,
     jsonb_build_object(
       'metodo_pago', 'transferencia', 'cuenta_bancaria_id', v_banco_id,
@@ -372,7 +407,7 @@ BEGIN
   END IF;
 
   BEGIN
-    PERFORM public.pagar_liquidacion_tx(
+    PERFORM app.pagar_liquidacion_tx(
       v_tenant_id, v_liquidacion_id,
       jsonb_build_object(
         'metodo_pago', 'transferencia', 'cuenta_bancaria_id', v_banco_id,
@@ -385,7 +420,16 @@ BEGIN
     IF SQLERRM = 'El retry de pago con payload distinto debio fallar' THEN RAISE; END IF;
   END;
 
-  SELECT public.revertir_pago_liquidacion_tx(
+  -- El movimiento original ya congeló la cuenta. Desactivar después el banco
+  -- y el ledger no puede impedir la reversa ni redirigirla a otra cuenta.
+  UPDATE public.cuentas_bancarias
+  SET activa = false, activo = false, estado = 'INACTIVO'
+  WHERE id = v_banco_id AND tenant_id = v_tenant_id;
+  UPDATE public.plan_cuentas
+  SET activo = false, estado = 'INACTIVO', acepta_movimiento = false
+  WHERE id = v_bank_account_id AND tenant_id = v_tenant_id;
+
+  SELECT app.revertir_pago_liquidacion_tx(
     v_tenant_id, v_liquidacion_id, 'Transferencia rechazada', v_user_id
   ) INTO v_result;
   v_reversion_event_id := (v_result->>'eventId')::uuid;
@@ -396,12 +440,19 @@ BEGIN
      OR (SELECT estado FROM public.pagos_liquidaciones WHERE id = v_pago_id) <> 'REVERTIDO'
      OR (SELECT movimiento_relacionado_id FROM public.movimientos_bancarios
          WHERE id = (v_result->>'movimientoBancarioId')::uuid) IS DISTINCT FROM v_movimiento_pago_id
+     OR app.to_uuid_or_null((SELECT metadata->>'cuenta_contable_id'
+                             FROM public.movimientos_bancarios
+                             WHERE id = (v_result->>'movimientoBancarioId')::uuid))
+           IS DISTINCT FROM v_bank_account_id
+     OR (SELECT metadata->>'cuenta_contable_codigo'
+         FROM public.movimientos_bancarios
+         WHERE id = (v_result->>'movimientoBancarioId')::uuid) <> '104491'
      OR (SELECT count(*) FROM public.outbox_events
          WHERE event_id = v_reversion_event_id AND event_type = 'liquidacion.pago.revertido') <> 1 THEN
     RAISE EXCEPTION 'La reversa no restauro obligacion/tesoreria/outbox: %', v_result;
   END IF;
 
-  SELECT public.revertir_pago_liquidacion_tx(
+  SELECT app.revertir_pago_liquidacion_tx(
     v_tenant_id, v_liquidacion_id, 'Transferencia rechazada', v_user_id
   ) INTO v_result;
   IF NOT (v_result->>'idempotent')::boolean
@@ -412,7 +463,7 @@ BEGIN
   END IF;
 
   BEGIN
-    PERFORM public.revertir_pago_liquidacion_tx(
+    PERFORM app.revertir_pago_liquidacion_tx(
       v_tenant_id, v_liquidacion_id, 'Motivo diferente', v_user_id
     );
     RAISE EXCEPTION 'El retry de reversa con motivo distinto debio fallar';
@@ -421,7 +472,7 @@ BEGIN
   END;
 
   BEGIN
-    PERFORM public.pagar_liquidacion_tx(
+    PERFORM app.pagar_liquidacion_tx(
       v_tenant_id, v_liquidacion_id,
       jsonb_build_object(
         'metodo_pago', 'transferencia', 'cuenta_bancaria_id', v_banco_id,
@@ -441,7 +492,7 @@ BEGIN
 
   -- La misma liquidacion puede volver a pagarse tras una reversa. En efectivo
   -- crea otra evidencia sin inventar un movimiento bancario.
-  SELECT public.pagar_liquidacion_tx(
+  SELECT app.pagar_liquidacion_tx(
     v_tenant_id, v_liquidacion_id,
     jsonb_build_object(
       'metodo_pago', 'efectivo', 'fecha_pago', '2026-08-12T12:00:00Z'
@@ -450,11 +501,17 @@ BEGIN
   ) INTO v_result;
   IF (v_result->>'movimientoBancarioId') IS NOT NULL
      OR (SELECT saldo FROM public.cuentas_bancarias WHERE id = v_banco_id) <> 10000
+     OR app.to_uuid_or_null((SELECT metadata->>'cuenta_contable_id'
+                             FROM public.pagos_liquidaciones
+                             WHERE id = (v_result->>'pagoId')::uuid))
+          IS DISTINCT FROM v_cash_account_id
+     OR (SELECT metadata->>'ledger_frozen_by'
+         FROM public.pagos_liquidaciones WHERE id = (v_result->>'pagoId')::uuid) <> '492'
      OR (SELECT count(*) FROM public.pagos_liquidaciones
          WHERE tenant_id = v_tenant_id AND liquidacion_id = v_liquidacion_id) <> 2 THEN
     RAISE EXCEPTION 'El repago en efectivo afecto tesoreria o no conservo historial: %', v_result;
   END IF;
-  PERFORM public.revertir_pago_liquidacion_tx(
+  PERFORM app.revertir_pago_liquidacion_tx(
     v_tenant_id, v_liquidacion_id, 'Pago en efectivo anulado', v_user_id
   );
   IF (SELECT saldo FROM public.cuentas_bancarias WHERE id = v_banco_id) <> 10000
@@ -464,6 +521,14 @@ BEGIN
            AND estado = 'REVERTIDO') <> 2 THEN
     RAISE EXCEPTION 'La reversa del pago efectivo no conservo historial o altero banco';
   END IF;
+
+  UPDATE public.plan_cuentas
+  SET activo = true, estado = 'ACTIVO', acepta_movimiento = true
+  WHERE id = v_bank_account_id AND tenant_id = v_tenant_id;
+  UPDATE public.cuentas_bancarias
+  SET activa = true, activo = true, estado = 'ACTIVO',
+      cuenta_contable_id = v_bank_account_id
+  WHERE id = v_banco_id AND tenant_id = v_tenant_id;
 
   -- CTS independiente: calculo atomico, deposito bancario, outbox e
   -- imposibilidad de recalcular lo ya depositado.
@@ -481,7 +546,7 @@ BEGIN
   ) INTO v_result;
   v_deposito_cts_id := (v_result->'depositosIds'->>0)::uuid;
 
-  SELECT public.depositar_cts_tx(
+  SELECT app.depositar_cts_tx(
     v_tenant_id, v_deposito_cts_id,
     jsonb_build_object(
       'cuenta_bancaria_id', v_banco_id, 'referencia', 'CTS-VERIFY-449',
@@ -493,13 +558,15 @@ BEGIN
   IF upper((SELECT estado FROM public.depositos_cts WHERE id = v_deposito_cts_id)) <> 'DEPOSITADO'
      OR v_saldo <> 9600
      OR (SELECT count(*) FROM public.movimientos_bancarios
-         WHERE id = (v_result->>'movimientoBancarioId')::uuid AND tipo = 'CARGO') <> 1
+         WHERE id = (v_result->>'movimientoBancarioId')::uuid AND tipo = 'CARGO'
+           AND app.to_uuid_or_null(metadata->>'cuenta_contable_id') = v_bank_account_id
+           AND metadata->>'ledger_frozen_by' = '492') <> 1
      OR (SELECT count(*) FROM public.outbox_events
          WHERE event_id = (v_result->>'eventId')::uuid AND event_type = 'cts.depositado') <> 1 THEN
     RAISE EXCEPTION 'El deposito CTS no sincronizo libro/tesoreria/outbox: %', v_result;
   END IF;
 
-  SELECT public.depositar_cts_tx(
+  SELECT app.depositar_cts_tx(
     v_tenant_id, v_deposito_cts_id,
     jsonb_build_object(
       'cuenta_bancaria_id', v_banco_id, 'referencia', 'CTS-VERIFY-449',
@@ -545,11 +612,11 @@ BEGIN
     v_user_id
   ) INTO v_result;
   v_liquidacion_rollback_id := (v_result->'data'->>'id')::uuid;
-  PERFORM public.confirmar_liquidacion_tx(
+  PERFORM app.confirmar_liquidacion_tx(
     v_tenant_id, v_liquidacion_rollback_id, v_user_id
   );
   BEGIN
-    PERFORM public.pagar_liquidacion_tx(
+    PERFORM app.pagar_liquidacion_tx(
       v_tenant_id, v_liquidacion_rollback_id,
       jsonb_build_object(
         'metodo_pago', 'transferencia', 'cuenta_bancaria_id', v_banco_id,

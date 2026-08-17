@@ -1,0 +1,174 @@
+{
+  "generatedAt": "2026-08-13T07:39:19.331Z",
+  "tenantId": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+  "users": 10,
+  "distinctIpLogin": {
+    "statuses": {
+      "201": 10
+    },
+    "tenantMismatches": [],
+    "uniqueSessions": 10,
+    "details": [
+      {
+        "email": "demo-pe-5ae0eacc@temp.local",
+        "status": 201,
+        "latencyMs": 127.91750000000002,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "aprobador-5ae0eacc@temp.local",
+        "status": 201,
+        "latencyMs": 89.52229999999999,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-01@temp.local",
+        "status": 201,
+        "latencyMs": 89.84410000000001,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-02@temp.local",
+        "status": 201,
+        "latencyMs": 85.26950000000001,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-03@temp.local",
+        "status": 201,
+        "latencyMs": 89.5413,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-04@temp.local",
+        "status": 201,
+        "latencyMs": 86.96970000000002,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-05@temp.local",
+        "status": 201,
+        "latencyMs": 81.6676,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-06@temp.local",
+        "status": 201,
+        "latencyMs": 89.3623,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-07@temp.local",
+        "status": 201,
+        "latencyMs": 90.32220000000001,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-08@temp.local",
+        "status": 201,
+        "latencyMs": 82.66040000000001,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      }
+    ]
+  },
+  "workload": {
+    "requests": 400,
+    "statuses": {
+      "200": 400
+    },
+    "errors": 0,
+    "tenantMismatches": 0,
+    "p50Ms": 402,
+    "p95Ms": 583,
+    "p99Ms": 663,
+    "maxMs": 664
+  },
+  "sharedIpLogin": {
+    "statuses": {
+      "201": 5,
+      "429": 5
+    },
+    "details": [
+      {
+        "email": "demo-pe-5ae0eacc@temp.local",
+        "status": 201,
+        "latencyMs": 32.83740000000034,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "aprobador-5ae0eacc@temp.local",
+        "status": 201,
+        "latencyMs": 43.80039999999917,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-01@temp.local",
+        "status": 201,
+        "latencyMs": 42.08649999999943,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-02@temp.local",
+        "status": 201,
+        "latencyMs": 34.274499999999534,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-03@temp.local",
+        "status": 201,
+        "latencyMs": 46.27530000000024,
+        "returnedTenant": "5ae0eacc-82df-4690-835c-d71476cf43ee",
+        "message": null
+      },
+      {
+        "email": "qa10-user-04@temp.local",
+        "status": 429,
+        "latencyMs": 9.199099999999817,
+        "returnedTenant": null,
+        "message": "ThrottlerException: Too Many Requests"
+      },
+      {
+        "email": "qa10-user-05@temp.local",
+        "status": 429,
+        "latencyMs": 10.604299999999967,
+        "returnedTenant": null,
+        "message": "ThrottlerException: Too Many Requests"
+      },
+      {
+        "email": "qa10-user-06@temp.local",
+        "status": 429,
+        "latencyMs": 11.784100000000763,
+        "returnedTenant": null,
+        "message": "ThrottlerException: Too Many Requests"
+      },
+      {
+        "email": "qa10-user-07@temp.local",
+        "status": 429,
+        "latencyMs": 12.80909999999949,
+        "returnedTenant": null,
+        "message": "ThrottlerException: Too Many Requests"
+      },
+      {
+        "email": "qa10-user-08@temp.local",
+        "status": 429,
+        "latencyMs": 13.89470000000074,
+        "returnedTenant": null,
+        "message": "ThrottlerException: Too Many Requests"
+      }
+    ]
+  }
+}

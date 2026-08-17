@@ -28,6 +28,31 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** Comprobación activa de Redis usada sólo por readiness. */
+  async getRuntimeHealth(): Promise<{
+    ready: boolean;
+    required: boolean;
+    status: string;
+    mode: 'redis' | 'memory';
+  }> {
+    const configured = this.configService.get<string | boolean>('REDIS_REQUIRED');
+    const required = configured === true || configured === 'true'
+      || this.configService.get<string>('NODE_ENV') === 'production';
+    const status = String(this.redisClient?.status ?? 'missing');
+    if (!required) {
+      return { ready: true, required, status, mode: this.useRedis ? 'redis' : 'memory' };
+    }
+    if (!this.redisClient || status !== 'ready') {
+      return { ready: false, required, status, mode: 'memory' };
+    }
+    try {
+      const pong = await this.redisClient.ping();
+      return { ready: pong === 'PONG', required, status, mode: 'redis' };
+    } catch {
+      return { ready: false, required, status: String(this.redisClient.status ?? 'error'), mode: 'redis' };
+    }
+  }
+
   /**
    * Obtiene un valor del cache
    */
