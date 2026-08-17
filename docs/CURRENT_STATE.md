@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-13.
+Actualizado: 2026-08-17.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
@@ -9,11 +9,12 @@ migraciones verificados, prevalece la implementación actual.
 ## Resumen ejecutivo
 
 - El código core está en estado **release candidate local hasta `496`**. PROD
-  continúa verificado hasta `490`; `491..496` no se han promovido. La API
-  pública responde, pero el despliegue vigente aún no acredita commit ni fecha
-  de build porque `/api/health/version` devuelve esos campos como `unknown`.
-  No se atribuye a Render ningún SHA hasta desplegar el contrato de versión y
-  comprobarlo después de la promoción coordinada.
+  continúa verificado hasta `490`; la consulta read-only del 2026-08-17 confirmó
+  que `491..496` no se han promovido. La API pública responde y su readiness
+  vigente sólo informa `database=ok`, pero el despliegue aún no acredita commit
+  ni fecha de build porque `/api/health/version` devuelve esos campos como
+  `unknown`. No se atribuye a Render ningún SHA hasta desplegar el contrato de
+  versión y comprobarlo después de la promoción coordinada.
 - El alcance operativo activo es Perú (`PE`, `pais_id=1`, `PEN`, SUNAT),
   Argentina (`AR`, `pais_id=5`, `ARS`, ARCA) y Colombia (`CO`, `pais_id=2`,
   `COP`, DIAN).
@@ -26,6 +27,13 @@ migraciones verificados, prevalece la implementación actual.
   generó además un respaldo nuevo de PROD `490`, se restauró en PostgreSQL 17
   local y el upgrade realista `490→496`, sus seis verificadores y readiness
   `496` pasaron sin escribir en PROD.
+- El candidato está versionado en el commit `03370c6` de la rama
+  `codex/peru-prod-only-closure` y publicado en el PR draft
+  [#79](https://github.com/yohandry10/erp/pull/79). Al 2026-08-17 el PR está
+  `MERGEABLE` y todos sus gates concluyeron correctamente: PostgreSQL 16 y
+  contratos SQL, lint, type-check, tests, build, Playwright aislado, auditoría
+  de seguridad, CodeQL, NPM Audit y preview de Vercel. El PR no está fusionado
+  y esos checks no equivalen a promoción PROD.
 - El cierre Web del 2026-08-13 reporta type-check limpio, build Next 131/131 y
   un perfil Playwright aislado de 16/16 pruebas: autenticación, maestro de
   inventario, gate fiscal de NC/ND, monitor outbox contable con `failed` y
@@ -318,11 +326,11 @@ productivo autorizado.
 - Completar secretos productivos y ejecutar smoke controlado.
 - Promover de forma coordinada `491..496`: el preflight, respaldo verificable y
   ensayo local sobre la copia de PROD pasaron el 2026-08-13; repetir el
-  preflight justo antes de la ventana autorizada, aplicar migraciones, API/worker con
-  `REQUIRED_DATABASE_SCHEMA_VERSION=496`, Web y postchecks. Render debe exponer
-  el SHA/fecha reales y su readiness debe comprobar DB, Redis y outbox; el plan
-  `starter` propuesto implica costo y requiere aprobación antes de aplicar el
-  Blueprint.
+  preflight justo antes de la ventana autorizada, aprobar/fusionar el PR #79 y
+  aplicar migraciones, API/worker con `REQUIRED_DATABASE_SCHEMA_VERSION=496`,
+  Web y postchecks. Render debe exponer el SHA/fecha reales y su readiness debe
+  comprobar DB, Redis y outbox; el plan `starter` propuesto implica costo y
+  requiere aprobación antes de aplicar el Blueprint.
 - La migración `395` ya está aplicada. Falta que cada contribuyente cargue sus
   credenciales API SUNAT y active SIRE explícitamente antes de una aceptación
   controlada RVIE/RCE; no hay smoke real posible sin consentimiento y datos de

@@ -56,6 +56,15 @@ La evidencia sin datos de negocio está en
 reduce el riesgo técnico, pero no autoriza la escritura PROD ni el cambio de
 plan de Render.
 
+El candidato reproducible está en el commit `03370c6` y en el PR draft
+[#79](https://github.com/yohandry10/erp/pull/79). Al 2026-08-17 el PR permanece
+abierto y mergeable; PostgreSQL/contratos SQL, lint, type-check, tests, build,
+Playwright, seguridad, CodeQL, NPM Audit y preview Vercel están verdes. La
+consulta read-only de PROD del mismo día confirmó que la última migración sigue
+siendo `490`; Render continúa respondiendo con `commit=unknown` y
+`buildDate=unknown`. No fusionar ni desplegar el runtime antes de promover la DB
+y configurar el gate de esquema en la misma ventana coordinada.
+
 ## Go-live
 
 Orden recomendado:
