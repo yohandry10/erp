@@ -12,3 +12,68 @@
 export function fechaHoyEnPeru(referencia: Date = new Date()): string {
   return referencia.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
 }
+
+/**
+ * Zona horaria del país del tenant.
+ *
+ * Espeja exactamente `app.zona_horaria_pais` de la migración 370, que arregló
+ * este mismo problema del lado de la base. Aquella migración documenta el efecto:
+ * «pasadas las 19:00 de Lima la base ya creía estar en la fecha siguiente», con
+ * lo que una cuenta se marcaba vencida cinco horas antes y un documento nacía con
+ * la fecha del día siguiente, empujado al periodo tributario equivocado.
+ *
+ * Los normalizadores de la base ya usan esa función; lo que quedó sin arreglar es
+ * todo lo que se calcula en Node, que sigue resolviendo el día en UTC. Mantener
+ * las dos tablas idénticas es lo que evita que la aplicación y la base discrepen
+ * sobre qué día es.
+ */
+export function zonaHorariaDePais(pais?: string | null): string {
+  switch (String(pais ?? '').trim().toUpperCase() || 'PE') {
+    case 'PE': return 'America/Lima';
+    case 'CO': return 'America/Bogota';
+    case 'EC': return 'America/Guayaquil';
+    case 'BO': return 'America/La_Paz';
+    case 'CL': return 'America/Santiago';
+    case 'AR': return 'America/Argentina/Buenos_Aires';
+    case 'MX': return 'America/Mexico_City';
+    default: return 'America/Lima';
+  }
+}
+
+/**
+ * Fecha de calendario del país indicado, en formato YYYY-MM-DD.
+ *
+ * Es la versión multi-país de `fechaHoyEnPeru`: el alcance operativo incluye
+ * Colombia (UTC-5) y Argentina (UTC-3), así que fechar en UTC desplaza el día en
+ * los tres países, no sólo en Perú.
+ */
+export function fechaHoyEnPais(pais?: string | null, referencia: Date = new Date()): string {
+  return referencia.toLocaleDateString('en-CA', { timeZone: zonaHorariaDePais(pais) });
+}
+
+/**
+ * Inicio y fin del día local del país, como marcas ISO en UTC.
+ *
+ * Filtrar `created_at` con `${hoy}T00:00:00` compara una marca local contra una
+ * columna `timestamptz`: para un tenant peruano la ventana quedaba corrida cinco
+ * horas y «los movimientos de hoy» abarcaban desde las 19:00 de ayer.
+ */
+export function rangoDelDiaEnPais(
+  pais?: string | null,
+  referencia: Date = new Date(),
+): { desde: string; hasta: string } {
+  const zona = zonaHorariaDePais(pais);
+  const dia = referencia.toLocaleDateString('en-CA', { timeZone: zona });
+
+  // El desfase de la zona en ese instante, deducido comparando la hora local con
+  // la UTC. Evita depender de una tabla de offsets propia.
+  const local = new Date(referencia.toLocaleString('en-US', { timeZone: zona }));
+  const utc = new Date(referencia.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const offsetMs = local.getTime() - utc.getTime();
+
+  const inicioLocal = new Date(`${dia}T00:00:00.000Z`).getTime() - offsetMs;
+  return {
+    desde: new Date(inicioLocal).toISOString(),
+    hasta: new Date(inicioLocal + 24 * 60 * 60 * 1000).toISOString(),
+  };
+}

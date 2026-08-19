@@ -299,6 +299,22 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   se reutiliza mientras el carrito, el cliente y los pagos no cambien, se renueva
   si cambian —evitando `POS_IDEMPOTENCY_PAYLOAD_MISMATCH`— y se descarta sólo al
   confirmarse la venta. Cambio de frontend; sin migración.
+- Las fechas de negocio calculadas en Node dejaron de resolverse en UTC. La
+  migración 370 arregló esto del lado de la base con `app.hoy_tenant`, pero esa
+  función vive en el esquema `app` y PostgREST no la alcanza, así que la
+  aplicación seguía contradiciendo a la base sobre qué día era. El efecto que
+  documenta la propia 370: pasadas las 19:00 de Lima el sistema ya cree estar en
+  la fecha siguiente. Se corrigieron los sitios donde la fecha decide o se
+  persiste —marca de asistencia, filtro de CxC vencidas, ventana de movimientos de
+  inventario, cierre diario de ventas, métricas del dashboard, estadística de CPE
+  del día, rango por defecto de reportes de centro de costo, fecha de emisión de
+  respaldo del CPE y el `IssueDate` del AttachedDocument de DIAN—. La tabla de
+  zonas horarias de `fecha-peru.util.ts` espeja exactamente `app.zona_horaria_pais`
+  y una prueba lo comprueba, para que no vuelvan a divergir.
+- Quedan cuatro usos de fecha UTC, todos justificados y cubiertos por un guardián
+  automatizado (`fecha-utc-guard.spec.ts`): dos nombres de archivo exportado, un
+  respaldo inalcanzable de planillas y `accounting-entries.service.ts`, que no está
+  inyectado en ningún módulo y debería retirarse.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.

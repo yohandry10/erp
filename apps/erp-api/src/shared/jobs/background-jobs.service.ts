@@ -3,6 +3,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { EventBusService, CierreVentasDiarioEvent, ProductoStockBajoEvent, VencimientoPagoEvent, ReporteSireGeneradoEvent, InventarioCiclicoEvent } from '../events/event-bus.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { v4 as uuidv4 } from 'uuid';
+import { fechaHoyDelTenant, rangoDelDiaDelTenant } from '../utils/fecha-tenant.util';
 
 @Injectable()
 export class BackgroundJobsService {
@@ -296,8 +297,11 @@ export class BackgroundJobsService {
     try {
       console.log(`🌙 [BackgroundJobs] Iniciando cierre de ventas diario (tenant ${tenantId})...`);
       
-      const hoy = new Date().toISOString().split('T')[0];
-      
+      // La ventana del cierre se toma en la zona del tenant. En UTC abarcaba desde
+      // las 19:00 del día anterior y dejaba fuera las últimas cinco horas de venta.
+      const { desde, hasta } = await rangoDelDiaDelTenant(this.supabase.getClient(), tenantId);
+      const hoy = await fechaHoyDelTenant(this.supabase.getClient(), tenantId);
+
       // Usar query builder de Supabase en lugar de getClient directamente
       const ventasQuery = this.supabase.query('ventas_pos')
         .select(`
@@ -305,8 +309,8 @@ export class BackgroundJobsService {
           detalle_ventas_pos(*)
         `)
         .eq('tenant_id', tenantId)
-        .gte('created_at', `${hoy}T00:00:00`)
-        .lt('created_at', `${hoy}T23:59:59`);
+        .gte('created_at', desde)
+        .lt('created_at', hasta);
 
       const { data: ventas, error: ventasError } = await ventasQuery;
 
@@ -565,8 +569,8 @@ export class BackgroundJobsService {
 
   async actualizarMetricasDashboard(tenantId: string) {
     try {
-      const hoy = new Date().toISOString().split('T')[0];
-      const mesActual = new Date().toISOString().substring(0, 7);
+      const { desde: inicioDia } = await rangoDelDiaDelTenant(this.supabase.getClient(), tenantId);
+      const mesActual = (await fechaHoyDelTenant(this.supabase.getClient(), tenantId)).substring(0, 7);
 
       // TODO: Implement isMockMode() in SupabaseService if needed
       const isMockMode = false; // Placeholder
@@ -600,7 +604,7 @@ export class BackgroundJobsService {
       const greQuery = this.supabase.query('gre_documentos').select('id', { count: 'exact' }).eq('tenant_id', tenantId);
       const usersQuery = this.supabase.query('usuarios_sistema').select('id', { count: 'exact' }).eq('tenant_id', tenantId);
       const productosQuery = this.supabase.query('productos').select('*').eq('tenant_id', tenantId);
-      const ventasHoyQuery = this.supabase.query('ventas_pos').select('total').eq('tenant_id', tenantId).gte('created_at', `${hoy}T00:00:00`);
+      const ventasHoyQuery = this.supabase.query('ventas_pos').select('total').eq('tenant_id', tenantId).gte('created_at', inicioDia);
       const ventasMesQuery = this.supabase.query('ventas_pos').select('total').eq('tenant_id', tenantId).gte('created_at', `${mesActual}-01T00:00:00`);
       const comprasQuery = this.supabase.query('orden_compra').select('total').eq('tenant_id', tenantId).gte('created_at', `${mesActual}-01T00:00:00`);
       const cotizacionesQuery = this.supabase.query('cotizaciones').select('*').eq('tenant_id', tenantId);

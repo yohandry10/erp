@@ -15,6 +15,7 @@ import { DianApiClientService, DianConfig } from './colombia/dian-api-client.ser
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 import { decryptBuffer, decryptText } from '../../shared/utils/secure-config.utils';
+import { fechaHoyEnPais, zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
 
 @Injectable()
 export class DianFiscalService extends FiscalServiceAbstract {
@@ -233,15 +234,17 @@ export class DianFiscalService extends FiscalServiceAbstract {
   // ========== MÉTODOS PRIVADOS ==========
 
   private generarAttachedDocument(documento: DocumentoElectronico): string {
-    // Generar ApplicationResponse (documento adjunto requerido por DIAN)
+    // Generar ApplicationResponse (documento adjunto requerido por DIAN).
+    // La fecha y la hora van en horario de Bogotá: en UTC, un documento adjuntado
+    // pasadas las 19:00 salía fechado al día siguiente ante la DIAN.
     return `<?xml version="1.0" encoding="UTF-8"?>
 <ApplicationResponse xmlns="urn:oasis:names:specification:ubl:schema:xsd:ApplicationResponse-2">
   <cbc:UBLVersionID>UBL 2.1</cbc:UBLVersionID>
   <cbc:CustomizationID>1</cbc:CustomizationID>
   <cbc:ProfileID>DIAN 2.1</cbc:ProfileID>
   <cbc:ID>${documento.serie}${documento.numero}</cbc:ID>
-  <cbc:IssueDate>${new Date().toISOString().split('T')[0]}</cbc:IssueDate>
-  <cbc:IssueTime>${new Date().toISOString().split('T')[1].split('.')[0]}</cbc:IssueTime>
+  <cbc:IssueDate>${fechaHoyEnPais('CO')}</cbc:IssueDate>
+  <cbc:IssueTime>${new Date().toLocaleTimeString('en-GB', { timeZone: zonaHorariaDePais('CO'), hour12: false })}</cbc:IssueTime>
 </ApplicationResponse>`;
   }
 
