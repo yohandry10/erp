@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
@@ -72,22 +72,16 @@ export class ConfiguracionFiscalController {
           },
         };
       } catch (err) {
+        // Sin fallback a Perú. Este endpoint alimenta la pantalla de configuración
+        // fiscal: devolver `success: true` con 18 %/PEN le afirmaba a un
+        // contribuyente colombiano o argentino que su tasa era la peruana, y lo
+        // hacía con la misma confianza que un dato real. Es preferible que la
+        // pantalla muestre que la configuración no se pudo resolver.
         console.error('Error obteniendo configuración fiscal desde TaxCalculator:', err);
-        
-        // Último fallback: valores hardcodeados de Perú
-        return {
-          success: true,
-          data: {
-            pais_id: 1,
-            tasa_igv: 0.18,
-            moneda_principal: 'PEN',
-            impuesto_principal_nombre: 'IGV',
-            impuesto_principal_porcentaje: 0.18,
-            retencion_renta_porcentaje: 0.08,
-            percepcion_porcentaje: 0.01,
-            detraccion_porcentaje: 0.10,
-          },
-        };
+        throw new ServiceUnavailableException(
+          'No se pudo resolver la configuración fiscal del contribuyente. '
+          + 'Revise el país y la configuración fiscal antes de operar.',
+        );
       }
     }
 
