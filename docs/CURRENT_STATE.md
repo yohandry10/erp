@@ -8,7 +8,10 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- El código core y PROD están verificados hasta `496`. El 2026-08-17 se creó un
+- El código core está verificado hasta `498`; PROD sigue en `496`. La `497`
+  cierra el bloqueador de cierre de caja de la demo y añade la autorización real
+  de supervisor por PIN; la `498` deja la planilla demo en manos del motor.
+  Ambas están pendientes de promoción coordinada. El 2026-08-17 se creó un
   respaldo nuevo de PROD `490`, se aplicaron y registraron `491..496` en orden y
   el postcheck remoto confirmó esquema requerido `496`, Redis listo y outbox sin
   filas claimable, processing, failed ni dead-letter. Render sirve el commit
@@ -187,6 +190,115 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   laboral y terminó con readiness remoto listo en esquema `496`; su evidencia
   operativa está en
   `artifacts/qa-10-questions/prod-491-496-promotion-20260817.json`.
+- `497` está validada sólo localmente y **no** promovida a PROD. Corrige el
+  bloqueador por el que la sesión de caja de la demo peruana no podía cerrarse
+  nunca: `app.hydrate_demo_business_sample_tx` creaba la venta POS con un INSERT
+  directo sobre `ventas_pos`, sin `accounting_event_id`, `atomic_result` ni
+  `documento_id`, y con `cpe_pendiente` puesto sobre un ticket interno `T001`
+  puro. Eso hacía fallar `cerrar_caja_tx` con `CASH_CLOSE_HAS_PENDING_CPE` y
+  después con `CASH_CLOSE_HAS_INCOMPLETE_POS_SALE`, y contradecía el invariante
+  de `MODULES.md` según el cual un ticket interno puro no bloquea el cierre.
+  Ahora el seed llama a `public.pos_registrar_venta_atomic_tx` con
+  `emitir_cpe = false` y se eliminan las escrituras que duplicaba a mano
+  (detalle, pagos, dos movimientos de inventario, movimiento de caja y el UPDATE
+  de la sesión): queda una sola forma de crear una venta POS en todo el sistema.
+  La migración no toca el esquema de `supervisor_pins`; sólo añade las RPC
+  `registrar_pin_supervisor_tx` y `verificar_pin_supervisor_tx` sobre el modelo
+  que ya existía desde `185`/`186`, porque el backend aceptaba como válido
+  cualquier código de seis dígitos. La reconstrucción limpia `000..497` con sus
+  siete verificadores pasó en PostgreSQL 16, y el ensayo de aceptación creó un
+  tenant demo por su RPC productiva y cerró su caja (`estado=CERRADA`,
+  `diferencia=0.00`).
+- Los importes de la venta POS demo cambian con esa corrección: el seed los
+  escribía como 53.39 / 9.61 / 63 tratando el precio de catálogo como IGV
+  incluido, mientras el motor de precios lo trata como neto. Derivados del
+  catálogo pasan a subtotal 63.00, IGV 11.34 y total 74.34, con la caja demo en
+  174.34. Ningún test ni verificador dependía de los valores anteriores.
+- El runtime exige el esquema de la última migración (`render.yaml`,
+  `env.schema.ts` y `app.controller.ts`). Como en promociones anteriores, la
+  base debe alcanzarlo antes de desplegar el runtime nuevo.
+- La retención de quinta categoría de Perú se reescribió según el artículo 40 del
+  Reglamento de la LIR (sin migración; el historial se deriva de los datos que ya
+  existen). El motor anterior tomaba el ingreso del mes, lo multiplicaba por doce,
+  restaba 7 UIT y dividía siempre entre doce. Eso fallaba de dos maneras: en un mes
+  con gratificación la proyección anual se duplicaba —con sueldo 3 200 retenía
+  349.65 en julio donde correspondían 34.38— y, al no descontar lo ya retenido ni
+  cambiar el divisor, el total del ejercicio nunca cuadraba con el impuesto anual.
+  Ahora la regla vive aislada en `renta-quinta-peru.util.ts`, se proyecta la renta
+  con las gratificaciones del ejercicio sin contarlas dos veces, se descuenta el
+  acumulado leído del concepto `105` de periodos anteriores y se aplica el divisor
+  del mes (12/12/12/9/8/8/8/5/4/4/4, diciembre regulariza el saldo). El cálculo
+  peruano exige ahora el periodo `YYYY-MM`: sin él falla cerrado en vez de retener
+  cero, que sería una retención omitida.
+- Efecto operativo del cambio anterior: cambia el neto mensual de todo trabajador
+  cuya renta proyectada supere las 7 UIT. Deja de haber picos en julio y diciembre
+  y aparece una retención estable el resto del año; el total del ejercicio pasa a
+  coincidir con el impuesto anual. No cubre las rentas de un empleador anterior
+  (certificado de rentas y retenciones), que sigue pendiente.
+- El régimen pensionario peruano dejó de suponerse. Las dos rutas de planilla
+  discrepaban ante la misma entrada: `calcularEmpleado` caía a `|| 'AFP'` y
+  descontaba cerca del 13 % a un trabajador cuyo régimen nunca se declaró, mientras
+  `calcularEmpleadoPersonalizado` rechazaba ese mismo dato. Ahora ambas fallan
+  cerrado, `validarContratoPeru` exige AFP u ONP en contratos laborales, y una
+  afiliación AFP debe declarar administradora y tipo de comisión en vez de caer a
+  Integra/FLUJO en silencio. El frontend ya enviaba el régimen, así que el alta de
+  contratos no cambia. Las tasas del motor (10 % + 1,55 % + 1,37 % = 12,92 %) ya
+  eran correctas; queda pendiente el catálogo por AFP, que hoy usa las de Integra
+  para las cuatro administradoras.
+- `498` está validada sólo localmente y **no** promovida a PROD. La planilla de la
+  demo traía los importes escritos a mano y el del trabajador con contrato AFP
+  estaba mal: 416 sobre 3 200 es el 13 % de la ONP, no el 12,92 % de una AFP. Es el
+  mismo patrón que cerró la `497` con la venta POS —dato derivado escrito a mano en
+  vez de producido por el motor—, y reaparece solo cada vez que cambia una tasa o
+  una regla. Como no existe un writer SQL de planilla al que delegar, la planilla
+  demo pasa a nacer en borrador y sin líneas por empleado: el usuario pulsa
+  «Calcular» y ve lo que produce el motor real. El readiness sólo exige que la
+  planilla exista.
+- El runtime exige ahora esquema `498`.
+- La configuración fiscal dejó de fallar abierta. `TaxCalculatorService` devolvía
+  Perú 18 %/PEN ante cualquier fallo —error de consulta, país sin resolver, fila
+  ausente o tasa inválida—, de modo que un tenant colombiano facturaba al 18 % en
+  vez del 19 % y uno argentino al 18 % en vez del 21 %, sin señal alguna. La
+  validación de tasa inválida ni siquiera llegaba al llamador: la atrapaba su
+  propio `catch`. Además la lectura de `empresa_config` descartaba el error y caía
+  a `pais_id = 1`, y como esa tabla no tiene índice único por tenant, una fila
+  duplicada bastaba para volver peruano a cualquiera. Ahora todo eso lanza. El
+  endpoint `configuracion-fiscal` también tenía su propio fallback a 18 %/PEN con
+  `success: true`, que afirmaba una tasa falsa con la confianza de un dato real;
+  ahora responde 503. El redondeo pasó de punto flotante a Decimal.js:
+  `round(1.005)` daba 1 y ahora da 1.01.
+- Consecuencia operativa: un tenant sin país o sin configuración fiscal resoluble
+  ya no puede cobrar, en vez de cobrar mal. Es lo que fija el README —«operaciones
+  fiscales y financieras fallan cerrado»—: un cobro detenido se nota y se corrige;
+  un impuesto mal calculado se declara. El catálogo global cubre PE, CO, CL, MX y
+  AR, así que un tenant correctamente dado de alta resuelve.
+- Un timeout del cliente dejó de confundirse con estar sin conexión. `use-api`
+  aborta a los 12 s (30 s en el POS) y `offline-store` trataba ese aborto como
+  desconexión: encolaba la escritura y devolvía 202 con `success: true`. Pero un
+  timeout significa que el servidor pudo haberla procesado y sólo se perdió la
+  respuesta, así que reenviarla arriesgaba un duplicado —una venta, un pago o un
+  CPE cobrados dos veces— y encima el llamador creía que había terminado bien. El
+  propio `use-api` documenta que no reintenta escrituras por ese motivo; la cola lo
+  contradecía por debajo. Ahora un `AbortError` se propaga y sólo se encola cuando
+  la petición no llegó a salir. Alcanza a los ~130 puntos de escritura del
+  dashboard, que pasan todos por ese cliente.
+- El POS tampoco da por cobrada una respuesta encolada. Sólo miraba
+  `success === true` e ignoraba el `queued: true` que ya venía en el cuerpo, de
+  modo que ante una caída de red marcaba PAGADA, limpiaba el carrito y mostraba un
+  número de ticket inexistente en el servidor. Ahora avisa que la venta quedó
+  pendiente de sincronizar y no la confirma.
+- La venta POS dejó de poder duplicarse por un reintento del cajero. El backend
+  deduplica una venta POS **sólo** por la clave de idempotencia del cliente —el
+  índice único y `pos_reintento_comercial_469` se apoyan únicamente en ella; el
+  `request_fingerprint` sirve para rechazar una clave reusada con otro payload, no
+  para detectar el mismo payload bajo otra clave—, y el POS la borraba justo en el
+  `catch`, cuando un fallo de red o un timeout hacen más probable que el servidor
+  sí haya procesado la venta. Además la leía del estado de React en el mismo tick
+  en que la escribía, así que la clave guardada nunca era la enviada. Ahora vive en
+  un ref, atada a una huella de la intención (`apps/web/lib/pos-idempotencia.ts`):
+  se reutiliza mientras el carrito, el cliente y los pagos no cambien, se renueva
+  si cambian —evitando `POS_IDEMPOTENCY_PAYLOAD_MISMATCH`— y se descarta sólo al
+  confirmarse la venta. Cambio de frontend; sin migración.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
