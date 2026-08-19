@@ -125,3 +125,77 @@ describe('AnalyticsController', () => {
     expect(from).toHaveBeenCalledWith('documento_detalles');
   });
 });
+
+/**
+ * Regresión del aging de cuentas por cobrar.
+ *
+ * El gráfico sólo clasificaba las cuentas ya vencidas, así que una cartera sana
+ * salía entera en cero mientras el total por cobrar mostraba saldo. Esa es la
+ * contradicción que se veía en pantalla: cifras de deuda junto a «sin saldos
+ * pendientes».
+ */
+describe('AnalyticsController — aging de cuentas por cobrar', () => {
+  const dias = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const aging = async (rows: any[]) => {
+    const supabase = createSupabaseMock(rows);
+    const controller = new AnalyticsController(supabase.service as any, {} as any);
+    const r: any = await controller.getDeudasClientes('tenant-aging', {});
+    const { labels, data } = r.data.graficoEdadSaldos;
+    const porTramo: Record<string, number> = {};
+    labels.forEach((l: string, i: number) => { porTramo[l] = data[i]; });
+    return { porTramo, totales: r.data.totales };
+  };
+
+  it('clasifica una cuenta vigente en «Por vencer» en vez de descartarla', async () => {
+    const { porTramo, totales } = await aging([
+      { saldo: 500, fecha_vencimiento: dias(15), numero: 'F001-1' },
+    ]);
+
+    expect(porTramo['Por vencer']).toBe(500);
+    expect(totales.totalPorCobrar).toBe(500);
+    expect(totales.vencido).toBe(0);
+  });
+
+  it('la suma de los tramos iguala el total por cobrar', async () => {
+    const { porTramo, totales } = await aging([
+      { saldo: 100, fecha_vencimiento: dias(20), numero: 'vigente' },
+      { saldo: 200, fecha_vencimiento: dias(-10), numero: 'vencida-corta' },
+      { saldo: 300, fecha_vencimiento: dias(-45), numero: 'vencida-media' },
+      { saldo: 400, fecha_vencimiento: dias(-120), numero: 'vencida-larga' },
+    ]);
+
+    const suma = Object.values(porTramo).reduce((a, b) => a + b, 0);
+    expect(suma).toBe(1000);
+    expect(totales.totalPorCobrar).toBe(1000);
+    // Antes la suma de los tramos era 900 y no cuadraba con el total.
+    expect(totales.vencido).toBe(900);
+  });
+
+  it('ubica cada cuenta vencida en su tramo de antigüedad', async () => {
+    const { porTramo } = await aging([
+      { saldo: 200, fecha_vencimiento: dias(-10), numero: 'a' },
+      { saldo: 300, fecha_vencimiento: dias(-45), numero: 'b' },
+      { saldo: 400, fecha_vencimiento: dias(-75), numero: 'c' },
+      { saldo: 500, fecha_vencimiento: dias(-120), numero: 'd' },
+    ]);
+
+    expect(porTramo['0-30 días']).toBe(200);
+    expect(porTramo['31-60 días']).toBe(300);
+    expect(porTramo['61-90 días']).toBe(400);
+    expect(porTramo['90+ días']).toBe(500);
+  });
+
+  it('expone un color por tramo, incluido el nuevo', async () => {
+    const supabase = createSupabaseMock([]);
+    const controller = new AnalyticsController(supabase.service as any, {} as any);
+    const r: any = await controller.getDeudasClientes('tenant-aging', {});
+    const { labels, backgroundColor } = r.data.graficoEdadSaldos;
+    expect(labels).toHaveLength(5);
+    expect(backgroundColor).toHaveLength(5);
+  });
+});

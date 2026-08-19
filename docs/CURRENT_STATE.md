@@ -323,6 +323,19 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   motor colombiano siempre supo calcularlos —35 % y 90 % sobre la hora ordinaria de
   210 horas mensuales, las mismas tasas que usa el preview—; lo que faltaba era el
   transporte. No requiere migración: los valores viajan por la petición de cálculo.
+- Analytics: el aging de cuentas por cobrar sólo clasificaba las vencidas, así que
+  una cartera sana salía entera en cero mientras el total mostraba saldo —de ahí la
+  contradicción de ver cifras de deuda junto a «sin saldos pendientes»—. Ahora
+  existe el tramo «Por vencer» y la suma de los tramos iguala el total. El caché
+  del panel usaba una clave global de `localStorage`: al cerrar una empresa y
+  entrar a otra en la misma pestaña se pintaban las cifras de la anterior hasta que
+  llegaba la respuesta nueva. La clave lleva ahora el tenant y el snapshot antiguo
+  se retira.
+- Los indicadores de liquidez y rentabilidad de Analytics **no** se corrigieron: su
+  fórmula no es contable —liquidez se calcula como ventas del mes más CxC entre
+  CxP, que no es la razón corriente, y rentabilidad ignora el costo de ventas, por
+  eso marca cerca de 100 %—. Quedan rotulados en pantalla como estimación no
+  contable, con el detalle en el propio aviso, hasta que se defina el criterio.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
