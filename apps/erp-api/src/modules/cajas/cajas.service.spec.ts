@@ -61,6 +61,7 @@ describe('CajasService', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
 
     await service.cerrarCaja(
@@ -112,6 +113,7 @@ describe('CajasService', () => {
       {} as any,
       {} as any,
       movementsService as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,

@@ -201,6 +201,20 @@ export class CajasController {
     return { success: true, data };
   }
 
+  /**
+   * Supervisores habilitados para autorizar una diferencia de cierre.
+   *
+   * Va con el permiso de cierre, no con `users.manage`: quien cierra la caja
+   * necesita elegir a quién pedirle la autorización, y un cajero no administra
+   * usuarios. Sólo se exponen nombre e identificador, nunca el PIN ni su hash.
+   */
+  @Get('supervisores-autorizados')
+  @RequirePermission('cajas.cierre')
+  async listarSupervisoresAutorizados(@CurrentTenant() tenantId: string) {
+    const data = await this.service.listarSupervisoresAutorizados(tenantId);
+    return { success: true, data };
+  }
+
   @Post('cerrar/:sesionId')
   @RequirePermission('cajas.cierre_administrativo')
   async cerrarCajaAvanzado(
