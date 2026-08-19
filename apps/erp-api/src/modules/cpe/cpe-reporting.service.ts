@@ -1,5 +1,6 @@
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
+import { rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 
 /** Consultas y exportaciones CPE; no participa en emisión ni anulación. */
 export class CpeReportingService {
@@ -192,15 +193,17 @@ async getStatsFromDatabase(tenantId?: string) {
         throw new Error('Cliente de Supabase no disponible');
       }
 
-      const hoy = new Date().toISOString().split('T')[0];
+      // «Hoy» es el día del contribuyente, no el de UTC: con el servidor en UTC la
+      // ventana empezaba a las 19:00 de la víspera en Lima y en Bogotá.
+      const { desde: inicioDia, hasta: finDia } = await rangoDelDiaDelTenant(client, tenantId);
       const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
 
       // CPE emitidos hoy
       let queryHoy = client
         .from('cpe')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', `${hoy}T00:00:00Z`)
-        .lte('created_at', `${hoy}T23:59:59Z`);
+        .gte('created_at', inicioDia)
+        .lt('created_at', finDia);
 
       if (tenantId) {
         queryHoy = queryHoy.eq('tenant_id', tenantId);

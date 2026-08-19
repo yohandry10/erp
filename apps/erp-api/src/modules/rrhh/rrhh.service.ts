@@ -24,6 +24,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { decryptText, encryptText } from '../../shared/utils/secure-config.utils';
+import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
 
 // Respaldo si normativa_peru_periodos no tiene fila para el periodo consultado.
 const RMV_PERU_FALLBACK = 1130;
@@ -908,7 +909,10 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const hoy = new Date().toISOString().split('T')[0];
+    // La marca de asistencia se persiste con esta fecha. En UTC, quien fichaba
+    // pasadas las 19:00 de Lima quedaba registrado al día siguiente, con lo que el
+    // día trabajado y la tardanza caían en la jornada equivocada.
+    const hoy = await fechaHoyDelTenant(this.supabaseService.getClient(), currentTenantId);
     const horaActual = new Date().toTimeString().split(' ')[0];
     const data = await this.ejecutarOperacionRrhh(
       'ATTENDANCE_MARK',
