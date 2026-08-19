@@ -179,7 +179,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "496"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "498"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5432
@@ -210,7 +210,7 @@ jobs:
         run: |
           echo "## PostgreSQL 16 schema gate" >> "$GITHUB_STEP_SUMMARY"
           echo '- Reconstrucción limpia de todas las migraciones.' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Todos los verificadores SQL desde 491 hasta el esquema requerido 496.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Todos los verificadores SQL desde 491 hasta el esquema requerido 498.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Una migración nueva sin verificador del mismo prefijo falla el job.' >> "$GITHUB_STEP_SUMMARY"
 
   build:

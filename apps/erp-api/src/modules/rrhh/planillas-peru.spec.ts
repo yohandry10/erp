@@ -100,7 +100,10 @@ const conceptos = ['001', '002', '006', '007', '008', '101', '102', '103', '104'
 
 const service = new PlanillasService({ getClient: jest.fn() } as any, {} as any);
 
-const calcular = (empleado: any, sueldo: number, periodo?: string, diasVacaciones = 0) =>
+// Toda planilla tiene periodo: el divisor y la proyección del Art. 40 dependen del
+// mes, así que el cálculo peruano lo exige. Se da uno por defecto —marzo, que no es
+// mes de gratificación— para que las pruebas de base asegurable sigan aisladas.
+const calcular = (empleado: any, sueldo: number, periodo: string | undefined = '2026-03', diasVacaciones = 0) =>
   (service as any).calcularEmpleado(empleado, sueldo, conceptos, normativa, periodo, diasVacaciones);
 
 const montoDe = (r: any, codigo: string) =>
@@ -262,8 +265,8 @@ describe('calcularEmpleado — remuneracion vacacional', () => {
 });
 
 describe('calcularEmpleadoPersonalizado — contrato autoritativo', () => {
-  const calcularPersonalizado = (empleado: any) =>
-    (service as any).calcularEmpleadoPersonalizado(empleado, conceptos, normativa);
+  const calcularPersonalizado = (empleado: any, periodo = '2026-01') =>
+    (service as any).calcularEmpleadoPersonalizado(empleado, conceptos, normativa, periodo);
 
   it('respeta cero dias trabajados y no lo convierte en treinta', () => {
     const r = calcularPersonalizado({
@@ -278,7 +281,15 @@ describe('calcularEmpleadoPersonalizado — contrato autoritativo', () => {
     expect(r.netoPagar).toBe(0);
   });
 
-  it('incluye quinta categoria usando la normativa del periodo', () => {
+  // La retención sigue el Art. 40 del Reglamento de la LIR, no una anualización
+  // plana del ingreso del mes. Para enero, con sueldo 10 000 y UIT 5 500:
+  //   proyección = 10 000 x 12 + 2 gratificaciones de 10 000 x 1,09 = 141 800
+  //   renta neta = 141 800 - 7 UIT (38 500)                         = 103 300
+  //   impuesto   = 27 500 x 8 % + 75 800 x 14 %                     =  12 812
+  //   retención  = 12 812 / 12 (divisor de enero)                   =  1 067,67
+  // El valor anterior (813,33) omitía las gratificaciones del ejercicio, que sí
+  // son renta de quinta, y dividía siempre entre doce.
+  it('incluye quinta categoria usando la normativa y el divisor del periodo', () => {
     const r = calcularPersonalizado({
       id: 'empleado-2',
       nombres: 'Renta alta',
@@ -287,7 +298,43 @@ describe('calcularEmpleadoPersonalizado — contrato autoritativo', () => {
       contratos: [{ estado: 'vigente', regimen_pensionario: 'ONP' }],
     });
 
-    expect(montoDe(r, '105')).toBe(813.33);
+    expect(montoDe(r, '105')).toBe(1067.67);
+  });
+
+  it('usa el divisor de agosto y descuenta lo ya retenido en el ejercicio', () => {
+    const r = (service as any).calcularEmpleadoPersonalizado(
+      {
+        id: 'empleado-2b',
+        nombres: 'Renta alta',
+        sueldo_base: 10000,
+        dias_trabajados: 30,
+        contratos: [{ estado: 'vigente', regimen_pensionario: 'ONP' }],
+      },
+      conceptos,
+      normativa,
+      '2026-08',
+      { percibido: 80000, retenido: 6000 },
+    );
+
+    // Agosto divide entre 5 y resta el acumulado; el importe cambia respecto de
+    // enero, que es justo lo que el motor anterior no hacía.
+    expect(montoDe(r, '105')).not.toBe(1067.67);
+    expect(montoDe(r, '105')).toBeGreaterThan(0);
+  });
+
+  it('falla cerrado si la planilla no trae periodo', () => {
+    expect(() => (service as any).calcularEmpleadoPersonalizado(
+      {
+        id: 'empleado-2c',
+        nombres: 'Sin periodo',
+        sueldo_base: 10000,
+        dias_trabajados: 30,
+        contratos: [{ estado: 'vigente', regimen_pensionario: 'ONP' }],
+      },
+      conceptos,
+      normativa,
+      undefined,
+    )).toThrow(/periodo/i);
   });
 
   it('falla cerrado cuando no existe contrato vigente', () => {

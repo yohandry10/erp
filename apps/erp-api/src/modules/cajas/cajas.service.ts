@@ -10,6 +10,7 @@ import { CashReconciliationService, Denominaciones } from './services/cash-recon
 import { CashReportsService } from './services/cash-reports.service';
 import { CashMovementsService } from './services/cash-movements.service';
 import { CashClosingService, DatosCierre } from './services/cash-closing.service';
+import { CashAuthorizationService } from './services/cash-authorization.service';
 import { CashWithdrawalsService } from './services/cash-withdrawals.service';
 import { CashShiftChangesService } from './services/cash-shift-changes.service';
 import {
@@ -31,6 +32,7 @@ export class CajasService {
     private readonly cashReportsService: CashReportsService,
     private readonly movementsService: CashMovementsService,
     private readonly cashClosingService: CashClosingService,
+    private readonly authorizationService: CashAuthorizationService,
     private readonly withdrawalsService: CashWithdrawalsService,
     private readonly shiftChangesService: CashShiftChangesService,
   ) { }
@@ -515,6 +517,24 @@ export class CajasService {
     if (!actorId) {
       throw new ForbiddenException('El cierre requiere un usuario autenticado');
     }
+
+    // Autorización de supervisor. `cerrar_caja_tx` es quien decide si hacía falta
+    // (compara la diferencia contra la tolerancia del tenant); aquí sólo se
+    // comprueba que, si viene, sea auténtica. Verificar antes de llamar a la RPC
+    // evita registrar el cierre y descubrir después que la credencial era falsa.
+    if (dto.supervisor_id) {
+      if (dto.supervisor_id === actorId) {
+        throw new ForbiddenException(
+          'El supervisor que autoriza no puede ser el mismo cajero que cierra',
+        );
+      }
+      await this.authorizationService.validarAutorizacionSupervisor(
+        dto.supervisor_id,
+        dto.codigo_supervisor ?? '',
+        tenantId,
+      );
+    }
+
     const { data, error } = await this.supabase.getClient().rpc('cerrar_caja_tx', {
       p_tenant_id: tenantId,
       p_sesion_id: sesion.id,
@@ -525,6 +545,7 @@ export class CajasService {
         resumen: dto.resumen ?? null,
         denominaciones: {},
         cierre_administrativo: false,
+        supervisor_id: dto.supervisor_id ?? null,
       },
     });
     if (error || !data) {
@@ -631,6 +652,74 @@ export class CajasService {
   async obtenerSaldoEsperado(tenantId: string, sesionId: string) {
     const saldo = await this.movementsService.recalcularSaldoEsperado(sesionId, tenantId);
     return { saldo };
+  }
+
+  /**
+   * Supervisores del tenant que pueden autorizar una diferencia de cierre: rol
+   * SUPERVISOR o ADMIN y un PIN activo registrado. Se filtra por PIN porque un
+   * supervisor sin PIN no puede autorizar nada, y ofrecerlo en el selector sólo
+   * llevaría al cajero a un rechazo sin explicación.
+   *
+   * Nunca se devuelve `hash_pin` ni `codigo`.
+   */
+  async listarSupervisoresAutorizados(tenantId: string) {
+    const client = this.supabase.getClient();
+
+    const { data: pines, error: pinesError } = await client
+      .from('supervisor_pins')
+      .select('usuario_id')
+      .eq('tenant_id', tenantId)
+      .eq('activo', true);
+
+    if (pinesError) {
+      throw new BadRequestException('No se pudieron consultar los supervisores habilitados');
+    }
+
+    const conPin = [...new Set((pines || []).map((p: any) => p.usuario_id).filter(Boolean))];
+    if (conPin.length === 0) {
+      return [];
+    }
+
+    const { data: roles, error: rolesError } = await client
+      .from('user_roles')
+      .select('usuario_sistema_id, roles(nombre)')
+      .eq('tenant_id', tenantId)
+      .in('usuario_sistema_id', conPin);
+
+    if (rolesError) {
+      throw new BadRequestException('No se pudieron resolver los roles de supervisor');
+    }
+
+    const habilitados = [...new Set(
+      (roles || [])
+        .filter((fila: any) => {
+          const nombre = String((fila.roles as any)?.nombre ?? '').toUpperCase();
+          return nombre === 'SUPERVISOR' || nombre === 'ADMIN';
+        })
+        .map((fila: any) => fila.usuario_sistema_id),
+    )];
+
+    if (habilitados.length === 0) {
+      return [];
+    }
+
+    const { data: usuarios, error: usuariosError } = await client
+      .from('usuarios_sistema')
+      .select('id, nombre, apellido')
+      .eq('tenant_id', tenantId)
+      .eq('activo', true)
+      .in('id', habilitados);
+
+    if (usuariosError) {
+      throw new BadRequestException('No se pudieron obtener los datos de los supervisores');
+    }
+
+    return (usuarios || [])
+      .map((u: any) => ({
+        id: u.id,
+        nombre: [u.nombre, u.apellido].filter(Boolean).join(' ').trim() || 'Supervisor',
+      }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
   }
 
   async cerrarCajaAvanzado(

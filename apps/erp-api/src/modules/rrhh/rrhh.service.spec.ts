@@ -96,11 +96,14 @@ describe('RrhhService createContrato — normativa laboral peruana', () => {
     return builder;
   };
 
+  // Un contrato laboral peruano siempre declara régimen pensionario: sin él no se
+  // puede liquidar la planilla, y desde ahora el alta lo exige.
   const base = {
     empleado_id: 'emp-1',
     tipo_contrato: 'indefinido',
     fecha_inicio: '2026-07-01',
     moneda: 'PEN',
+    regimen_pensionario: 'ONP',
   };
 
   beforeEach(() => {
@@ -170,6 +173,91 @@ describe('RrhhService createContrato — normativa laboral peruana', () => {
       { ...base, periodo_prueba_meses: 18, sueldo_bruto: 2000 },
       'tenant-1',
     )).rejects.toThrow(/periodo de prueba/i);
+  });
+
+  // El régimen pensionario decide cuánto se le descuenta al trabajador. Antes no se
+  // exigía al crear el contrato y el motor de planilla lo suplía con AFP, de modo
+  // que alguien que nunca eligió terminaba con cerca de 13 % descontado.
+  it('rechaza un contrato laboral peruano sin regimen pensionario', async () => {
+    client.from
+      .mockReturnValueOnce(normativaChain(null))
+      .mockReturnValueOnce(normativaChain(1130));
+    const { regimen_pensionario: _omitido, ...sinRegimen } = base;
+    await expect(service.createContrato(
+      { ...sinRegimen, sueldo_bruto: 2000 },
+      'tenant-1',
+    )).rejects.toThrow(/régimen pensionario/i);
+  });
+
+  it('rechaza un regimen pensionario que no sea AFP ni ONP', async () => {
+    client.from
+      .mockReturnValueOnce(normativaChain(null))
+      .mockReturnValueOnce(normativaChain(1130));
+    await expect(service.createContrato(
+      { ...base, regimen_pensionario: 'NINGUNO', sueldo_bruto: 2000 },
+      'tenant-1',
+    )).rejects.toThrow(/régimen pensionario/i);
+  });
+
+  it('exige la administradora cuando el afiliado va a AFP', async () => {
+    client.from
+      .mockReturnValueOnce(normativaChain(null))
+      .mockReturnValueOnce(normativaChain(1130));
+    await expect(service.createContrato(
+      { ...base, regimen_pensionario: 'AFP', tipo_comision_afp: 'FLUJO', sueldo_bruto: 2000 },
+      'tenant-1',
+    )).rejects.toThrow(/administradora/i);
+  });
+
+  it('exige el tipo de comision cuando el afiliado va a AFP', async () => {
+    client.from
+      .mockReturnValueOnce(normativaChain(null))
+      .mockReturnValueOnce(normativaChain(1130));
+    await expect(service.createContrato(
+      { ...base, regimen_pensionario: 'AFP', afp_codigo: 'PRIMA', sueldo_bruto: 2000 },
+      'tenant-1',
+    )).rejects.toThrow(/tipo de comisión/i);
+  });
+
+  // No se cae a Integra en silencio: un afiliado a Prima quedaba registrado con una
+  // administradora que no era la suya.
+  it('conserva la administradora declarada en vez de sustituirla por Integra', async () => {
+    client.from
+      .mockReturnValueOnce(normativaChain(null))
+      .mockReturnValueOnce(normativaChain(1130));
+    client.rpc.mockResolvedValueOnce({ data: { id: 'ctr-afp' }, error: null });
+
+    await service.createContrato(
+      {
+        ...base,
+        regimen_pensionario: 'AFP',
+        afp_codigo: 'prima',
+        tipo_comision_afp: 'saldo',
+        sueldo_bruto: 2000,
+      },
+      'tenant-1',
+      'actor-1',
+      'contract-afp-emp-1',
+    );
+
+    const payload = client.rpc.mock.calls.at(-1)?.[1];
+    const metadata = payload?.p_payload?.metadata ?? payload?.p_contrato?.metadata ?? {};
+    expect(metadata.afp_codigo).toBe('PRIMA');
+    expect(metadata.tipo_comision_afp).toBe('SALDO');
+  });
+
+  it('no exige regimen pensionario en locacion de servicios por no ser contrato laboral', async () => {
+    client.rpc.mockResolvedValueOnce({ data: { id: 'ctr-loc' }, error: null });
+    const { regimen_pensionario: _omitido, ...sinRegimen } = base;
+
+    const result = await service.createContrato(
+      { ...sinRegimen, tipo_contrato: 'locacion_servicios', sueldo_bruto: 500 },
+      'tenant-1',
+      'actor-1',
+      'contract-locacion-sin-regimen',
+    );
+
+    expect(result).toBeDefined();
   });
 
   it('no exige RMV en locacion de servicios por no ser contrato laboral', async () => {

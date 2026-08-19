@@ -181,20 +181,42 @@ export class CashAuthorizationService {
     }
 
     /**
-     * Valida el código PIN de un supervisor
-     * Nota: Validación de PIN contra hash requiere tabla supervisor_pins (pendiente de schema).
-     * Por ahora valida formato + verifica rol SUPERVISOR/ADMIN.
+     * Comprueba que un supervisor sea quien dice ser antes de autorizar una
+     * operación de caja. Lanza `UnauthorizedException` si el rol, el PIN o el
+     * estado del PIN no habilitan la autorización.
+     *
+     * Es la entrada pública a la misma verificación que usa el cierre con
+     * diferencia; existe para que quien sólo necesita autenticar al supervisor no
+     * tenga que reimplementarla ni reproducir el cálculo de tolerancia.
+     */
+    async validarAutorizacionSupervisor(
+        supervisorId: string,
+        codigo: string,
+        tenantId: string,
+    ): Promise<void> {
+        await this.validarCodigoSupervisor(supervisorId, codigo, tenantId);
+    }
+
+    /**
+     * Valida el PIN de un supervisor contra su hash almacenado.
+     *
+     * Antes esta función aceptaba como válido cualquier código de seis dígitos:
+     * comprobaba el formato y el rol, y dejaba la verificación real como TODO. En
+     * la práctica eso convertía la autorización por diferencia de caja en un
+     * trámite, porque el cajero podía teclear cualquier número.
+     *
+     * La verificación vive ahora en `verificar_pin_supervisor_tx`. Está en SQL y no
+     * aquí porque el contador de intentos es un read-modify-write: resolverlo en la
+     * aplicación abre una carrera que permite probar PIN en paralelo sin que el
+     * bloqueo llegue a contar. La RPC toma el lock, compara contra el hash bcrypt,
+     * acumula intentos y bloquea quince minutos tras cinco fallos, todo en la misma
+     * transacción. Si el supervisor no tiene PIN registrado falla cerrado.
      */
     private async validarCodigoSupervisor(
         supervisorId: string,
         codigo: string,
         tenantId: string,
     ): Promise<void> {
-        // Validar formato del código (debe ser 6 dígitos)
-        if (!/^\d{6}$/.test(codigo)) {
-            throw new UnauthorizedException('Código de supervisor inválido (debe ser 6 dígitos)');
-        }
-
         // Verificar que el usuario tenga rol de supervisor o admin
         const { data: supervisorRoles } = await this.supabase.getClient()
             .from('user_roles')
@@ -210,9 +232,43 @@ export class CashAuthorizationService {
             throw new UnauthorizedException('El usuario no tiene permisos de supervisor');
         }
 
-        // TODO: Validar código PIN contra hash almacenado (requiere tabla supervisor_pins)
+        const { data, error } = await this.supabase.getClient().rpc('verificar_pin_supervisor_tx', {
+            p_tenant_id: tenantId,
+            p_usuario_id: supervisorId,
+            p_pin: String(codigo ?? ''),
+        });
 
-        this.logger.log(`Código de supervisor validado (rol verificado): ${supervisorId}`);
+        if (error) {
+            this.logger.error(`No se pudo verificar el PIN de supervisor: ${error.message}`);
+            throw new UnauthorizedException('No se pudo verificar el código de supervisor');
+        }
+
+        // La RPC devuelve el veredicto en lugar de lanzarlo, porque un RAISE en
+        // PL/pgSQL revierte el mismo UPDATE que acumula el intento fallido. Aquí se
+        // exige `valido === true` de forma estricta: cualquier otra cosa —incluido
+        // un `data` ausente o malformado— es un rechazo. Un resultado ignorado
+        // equivaldría a autorizar.
+        const resultado = (data ?? {}) as { valido?: boolean; motivo?: string };
+        if (resultado.valido !== true) {
+            // El motivo se traduce sin revelar si el PIN existe o cuántos intentos
+            // quedan: eso sólo ayudaría a quien está probando códigos.
+            this.logger.warn(
+                `PIN de supervisor rechazado para ${supervisorId}: ${resultado.motivo ?? 'SIN_MOTIVO'}`,
+            );
+            if (resultado.motivo === 'SUPERVISOR_PIN_LOCKED') {
+                throw new UnauthorizedException(
+                    'El PIN del supervisor está bloqueado temporalmente por intentos fallidos.',
+                );
+            }
+            if (resultado.motivo === 'SUPERVISOR_PIN_NOT_REGISTERED') {
+                throw new UnauthorizedException(
+                    'El supervisor no tiene un PIN registrado. Regístrelo antes de autorizar.',
+                );
+            }
+            throw new UnauthorizedException('Código de supervisor inválido');
+        }
+
+        this.logger.log(`PIN de supervisor verificado: ${supervisorId}`);
     }
 
     /**
