@@ -348,6 +348,17 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
 - Siguen pendientes como trabajo de producto, no de QA: la edición de orden de
   compra y de cotización en borrador, el detalle de CxC, y los dos stubs que ya
   avisan al usuario («exportar órdenes» y «editar planilla»).
+- Los verificadores de web (`test:offline`, `test:onboarding` y los dos nuevos de
+  POS) ya se ejecutan en CI. Existían en `package.json` desde hacía tiempo pero
+  ningún workflow los corría, así que no protegían de nada. Van antes de instalar
+  Chromium, para que fallen rápido.
+- El caché de configuración fiscal se invalida junto con el resto del tenant.
+  `invalidateTenantCache` existía sin que nadie lo llamara: cambiar la tasa o el
+  país de un contribuyente tardaba hasta cinco minutos en surtir efecto, y por cada
+  instancia del API.
+- La contraseña del aprobador de la demo se genera con `randomInt` y no con
+  `Math.random`, que no es criptográfico y cuyo estado interno se reconstruye a
+  partir de unas pocas salidas. Es una credencial de acceso real.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.

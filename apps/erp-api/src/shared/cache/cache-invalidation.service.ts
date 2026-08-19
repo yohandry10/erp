@@ -1,11 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { CacheService } from './cache.service';
+import { TaxCalculatorService } from '../utils/tax-calculator';
 
 @Injectable()
 export class CacheInvalidationService {
   private readonly logger = new Logger(CacheInvalidationService.name);
 
-  constructor(private readonly cacheService: CacheService) {}
+  /**
+   * `TaxCalculatorService` es opcional para no romper a quien construya este
+   * servicio a mano en pruebas. En runtime siempre está: su módulo es `@Global`.
+   */
+  constructor(
+    private readonly cacheService: CacheService,
+    @Optional() private readonly taxCalculator?: TaxCalculatorService,
+  ) {}
 
   /**
    * Invalida el cache del dashboard para un tenant específico
@@ -96,6 +104,12 @@ export class CacheInvalidationService {
       this.cacheService.del(`config:country:${tenantId}`),
       this.cacheService.del(`config:status:${tenantId}`),
     ]);
+
+    // La configuración fiscal se cachea cinco minutos en memoria del proceso y
+    // `invalidateTenantCache` existía sin que nadie lo llamara: cambiar la tasa o
+    // el país de un contribuyente tardaba hasta cinco minutos en surtir efecto, y
+    // por cada instancia del API. Se invalida junto con el resto del tenant.
+    this.taxCalculator?.invalidateTenantCache(tenantId);
   }
 }
 
