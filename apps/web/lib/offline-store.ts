@@ -808,6 +808,17 @@ function bodyToString(body: BodyInit | null | undefined): string | null {
   return null
 }
 
+/**
+ * Distingue un aborto del cliente (timeout de `use-api` o cancelación explícita)
+ * de un fallo de red real. `fetch` rechaza con un `DOMException` de nombre
+ * `AbortError`; en entornos sin `DOMException` se comprueba el nombre igual.
+ */
+function esAbortoDeCliente(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const nombre = (error as { name?: unknown }).name
+  return nombre === 'AbortError' || nombre === 'TimeoutError'
+}
+
 function canQueue(method: string, body: BodyInit | null | undefined) {
   if (method === 'GET' || method === 'HEAD') return false
   if (typeof Blob !== 'undefined' && body instanceof Blob) return false
@@ -976,6 +987,20 @@ export async function fetchWithOfflineSupport(
     }
     return response
   } catch (error) {
+    // Un timeout NO es estar sin conexión, y la diferencia importa mucho.
+    //
+    // `use-api` aborta la petición a los 12 s (30 s en el POS). Cuando eso ocurre
+    // el servidor pudo perfectamente haberla recibido y procesado: lo único que se
+    // perdió fue la respuesta. Tratarlo como desconexión y encolar la escritura
+    // significa reenviarla más tarde y arriesgar un duplicado —una venta, un pago,
+    // un CPE cobrados dos veces—, y encima devolver 202 con `success: true`, así
+    // que quien llamó cree que terminó bien. El propio `use-api` comenta que no
+    // reintenta escrituras por ese motivo; encolarlas por debajo lo contradecía.
+    //
+    // Un abort se propaga como el fallo que es. Sólo se encola cuando la petición
+    // no llegó a salir, que es para lo que existe el modo offline.
+    if (esAbortoDeCliente(error)) throw error
+
     // Una prueba de conectividad debe informar el fallo en vivo. Encolarla
     // produciría un falso positivo y podría repetir una operación diagnóstica.
     if (isLiveConnectivityTestEndpoint(meta.endpoint)) throw error
