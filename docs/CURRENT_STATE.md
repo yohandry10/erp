@@ -315,6 +315,14 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   automatizado (`fecha-utc-guard.spec.ts`): dos nombres de archivo exportado, un
   respaldo inalcanzable de planillas y `accounting-entries.service.ts`, que no está
   inyectado en ningún módulo y debería retirarse.
+- El recargo nocturno y el trabajo en dominical o festivo de Colombia dejaron de
+  perderse. La pantalla de cálculo los capturaba en campos editables y los sumaba
+  al neto que mostraba, pero no viajaban al backend: el DTO no los declaraba y, con
+  `forbidNonWhitelisted` activo, enviarlos habría devuelto 400. El motor los
+  liquidaba en cero y el trabajador aprobaba un neto que no era el que cobraba. El
+  motor colombiano siempre supo calcularlos —35 % y 90 % sobre la hora ordinaria de
+  210 horas mensuales, las mismas tasas que usa el preview—; lo que faltaba era el
+  transporte. No requiere migración: los valores viajan por la petición de cálculo.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.

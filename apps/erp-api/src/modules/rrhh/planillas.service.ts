@@ -1700,6 +1700,10 @@ export class PlanillasService {
         tardanzas_minutos: entrada.tardanzas_minutos,
         faltas: entrada.faltas,
         bonos_adicionales: entrada.bonos_adicionales,
+        // Recargos colombianos: se capturaban en pantalla y se perdían aquí, así
+        // que el motor los liquidaba en cero.
+        horas_recargo_nocturno: entrada.horas_recargo_nocturno,
+        horas_dominicales_festivas: entrada.horas_dominicales_festivas,
         sueldo_base: contrato.sueldo_bruto,
       };
       const calculoEmpleado =
