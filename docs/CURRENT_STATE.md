@@ -336,6 +336,18 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   CxP, que no es la razón corriente, y rentabilidad ignora el costo de ventas, por
   eso marca cerca de 100 %—. Quedan rotulados en pantalla como estimación no
   contable, con el detalle en el propio aviso, hasta que se defina el criterio.
+- Se cerraron las cinco rutas que llevaban a 404 sin crear pantallas nuevas: «Ver
+  recepciones» de una orden apunta al listado de recepciones y el pago masivo a la
+  página de tesorería, que sí existen. Se retiraron los botones «Editar» de orden
+  de compra y de cotización en borrador, porque no hay pantalla de edición y
+  ofrecerlos era prometer algo inexistente; la página de detalle conserva aprobar,
+  enviar y cancelar. También se retiró «Detalle» de CxC: además de apuntar a una
+  ruta inexistente, era el único botón de esa fila sin `ProtectedComponent`, así que
+  reapuntarlo al historial habría abierto una vía sin permiso `finanzas.cxc.read` al
+  mismo dato que el botón «Historial» sí protege.
+- Siguen pendientes como trabajo de producto, no de QA: la edición de orden de
+  compra y de cotización en borrador, el detalle de CxC, y los dos stubs que ya
+  avisan al usuario («exportar órdenes» y «editar planilla»).
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.

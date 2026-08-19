@@ -543,11 +543,10 @@ export default function OrdenesCompraPage() {
                               <Button type="button" size="sm" onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}`)} className="bg-blue-600 text-white hover:bg-blue-500" title="Ver detalle">
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              {orden.estado === 'BORRADOR' && (
-                                <Button type="button" size="sm" onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/editar`)} variant="outline" className="border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground" title="Editar">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              )}
+                              {/* No hay pantalla de edición de orden de compra: la
+                                  ruta `/editar` no existe y el botón terminaba en un
+                                  404. Se retira en vez de prometer algo que no está.
+                                  La página de detalle permite aprobar y cancelar. */}
                             </div>
                           </td>
                         </tr>
