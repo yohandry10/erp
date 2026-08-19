@@ -217,6 +217,16 @@ export default function PlanillaCalcularModal({
           tardanzas_minutos: emp.tardanzas_minutos,
           faltas: emp.faltas,
           bonos_adicionales: emp.bonos_adicionales,
+          // El recargo nocturno y el dominical/festivo se capturaban en esta misma
+          // pantalla y se sumaban al neto que se mostraba, pero no viajaban: el
+          // backend los liquidaba en cero y el trabajador cobraba de menos un
+          // recargo que sí había trabajado. Sólo aplican al régimen colombiano.
+          ...(isColombia
+            ? {
+                horas_recargo_nocturno: emp.horas_recargo_nocturno,
+                horas_dominicales_festivas: emp.horas_dominicales_festivas,
+              }
+            : {}),
         })),
       };
 
