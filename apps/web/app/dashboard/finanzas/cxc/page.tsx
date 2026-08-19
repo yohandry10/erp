@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { AlertCircle, CheckCircle, Clock, DollarSign, Download, Eye, FileText, History, RefreshCw, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle, Clock, DollarSign, Download, FileText, History, RefreshCw, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { parseDateLocal } from '@/lib/date-utils'
 import { usePermission } from '@/hooks/use-permission'
@@ -83,7 +82,6 @@ const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-prima
 
 export default function CuentasPorCobrarPage() {
   const country = useCountryContext()
-  const router = useRouter()
   const { get } = useApi({ showErrorToast: false })
   const { hasPermission: canReadClientes, loading: clientesPermissionLoading } = usePermission('ventas', 'ver', 'clientes')
 
@@ -463,10 +461,12 @@ export default function CuentasPorCobrarPage() {
                                   Historial
                                 </Button>
                               </ProtectedComponent>
-                              <Button type="button" size="sm" onClick={() => router.push(`/dashboard/finanzas/cxc/${cuenta.id}`)} variant="outline" className={actionButtonClass}>
-                                <Eye className="h-3.5 w-3.5" />
-                                Detalle
-                              </Button>
+                              {/* «Detalle» apuntaba a /finanzas/cxc/{id}, que no
+                                  existe: siempre daba 404. No se reapunta al drawer
+                                  de historial porque ese botón sí exige el permiso
+                                  finanzas.cxc.read y éste no estaba protegido:
+                                  duplicarlo abriría una vía sin permiso al mismo
+                                  dato. «Historial», al lado, ya lo muestra. */}
                             </div>
                           </td>
                         </tr>

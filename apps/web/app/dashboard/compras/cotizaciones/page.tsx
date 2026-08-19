@@ -412,14 +412,9 @@ export default function CotizacionesCompraPage() {
                             >
                               <Eye size={16} />
                             </button>
-                            {cotizacion.estado === 'BORRADOR' && (
-                              <button
-                                onClick={() => router.push(`/dashboard/compras/cotizaciones/${cotizacion.id}/editar`)} className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground"
-                                title="Editar"
-                              >
-                                <Edit size={16} />
-                              </button>
-                            )}
+                            {/* No hay pantalla de edición de cotización: la ruta
+                                `/editar` no existe y el botón terminaba en un 404.
+                                Se retira en vez de prometer algo que no está. */}
                           </div>
                         </td>
                       </tr>
