@@ -217,7 +217,12 @@ export class AnalyticsController {
       if (error) throw error;
 
       const ahora = new Date();
+      // El tramo «Por vencer» faltaba, y su ausencia producía la contradicción que
+      // se ve en pantalla: el total por cobrar muestra saldo mientras el gráfico
+      // sale entero en cero y el panel dice «sin saldos pendientes». Una cartera
+      // sana, con todo al día, quedaba representada como si no existiera.
       const edadSaldos = {
+        'Por vencer': 0,
         '0-30 días': 0,
         '31-60 días': 0,
         '61-90 días': 0,
@@ -236,11 +241,14 @@ export class AnalyticsController {
         
         if (diasVencido > 0) {
           totalVencido += monto;
-          
+
           if (diasVencido <= 30) edadSaldos['0-30 días'] += monto;
           else if (diasVencido <= 60) edadSaldos['31-60 días'] += monto;
           else if (diasVencido <= 90) edadSaldos['61-90 días'] += monto;
           else edadSaldos['90+ días'] += monto;
+        } else {
+          // Vigente: aún no vence. Suma a la cartera pero no a lo vencido.
+          edadSaldos['Por vencer'] += monto;
         }
 
         topDeudores.push({
@@ -257,7 +265,7 @@ export class AnalyticsController {
           graficoEdadSaldos: {
             labels: Object.keys(edadSaldos),
             data: Object.values(edadSaldos),
-            backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#7c2d12']
+            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#7c2d12']
           },
           topDeudores: topDeudores.slice(0, 10),
           alertasCobranza: this.generarAlertasCobranza(cuentasPorCobrar),
