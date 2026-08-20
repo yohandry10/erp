@@ -345,11 +345,26 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   ruta inexistente, era el único botón de esa fila sin `ProtectedComponent`, así que
   reapuntarlo al historial habría abierto una vía sin permiso `finanzas.cxc.read` al
   mismo dato que el botón «Historial» sí protege.
-- Siguen pendientes como trabajo de producto, no de QA: la edición de orden de
-  compra y de cotización en borrador, el detalle de CxC, y los dos stubs que ya
-  avisan al usuario («exportar órdenes» y «editar planilla»).
-- Los verificadores de web (`test:offline`, `test:onboarding` y los dos nuevos de
-  POS) ya se ejecutan en CI. Existían en `package.json` desde hacía tiempo pero
+- Esos botones volvieron, ahora contra los writers que ya existían. Los tres
+  documentos tienen modal de edición de cabecera limitado a lo que aceptan
+  `actualizar_orden_compra_tx`, `actualizar_cotizacion_compra_tx` y
+  `actualizar_planilla_borrador_tx_495`: payload parcial, sin tocar el detalle y
+  sólo en borrador. Cambiar líneas sigue exigiendo el formulario de alta. El
+  detalle de CxC no se repone: el drawer «Historial», protegido por
+  `finanzas.cxc.read`, ya muestra ese dato.
+- «Editar planilla» no era un stub visible: la función existía y ningún botón la
+  llamaba, así que el aviso de «en desarrollo» nunca llegó a mostrarse. «Exportar
+  órdenes» ya baja un CSV con los filtros aplicados.
+- Los errores del writer se muestran dentro del modal y no en un toast detrás de
+  él: `useApi` devuelve `null` por defecto y sólo notifica por toast, así que los
+  modales de edición usan `throwOnError`. Comprobado con el rechazo por período
+  de planilla duplicado.
+- Las fechas de calendario se pintaban un día antes. `new Date("2026-08-19")` se
+  interpreta como medianoche UTC y en Lima retrocede al día previo; estaba en 30
+  puntos de 27 archivos. Se resuelven con `parseDateLocal`, y `test:fechas`
+  impide que el patrón vuelva.
+- Los verificadores de web (`test:offline`, `test:onboarding`, los dos de POS y
+  `test:fechas`) ya se ejecutan en CI. Existían en `package.json` desde hacía tiempo pero
   ningún workflow los corría, así que no protegían de nada. Van antes de instalar
   Chromium, para que fallen rápido.
 - El caché de configuración fiscal se invalida junto con el resto del tenant.
