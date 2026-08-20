@@ -38,6 +38,16 @@ migraciones verificados, prevalece la implementación actual.
   once a catorce días, todos de tenants QA y demo (`LLAMA PE QA SAC`,
   `DEMO COMERCIAL S.A.C.`): son restos de pruebas contra beta, no de un
   contribuyente real.
+- **La GRE automática completaba de su cosecha campos que declara SUNAT.** El peso
+  bruto salía del importe de la venta («1 kg por cada S/ 100») y la fecha de
+  traslado era «mañana» sobre el reloj UTC; ninguno procede de un dato real, y
+  `productos` ni siquiera tiene columna de peso. El camino legado, además, no
+  validaba nada y componía el destinatario como `Cliente <uuid>`. Estaba latente:
+  de las treinta guías emitidas ninguna salió por ahí y el único contribuyente con
+  la creación automática activa es una demo, pero se dispara en cuanto la habilite
+  alguien real. Ahora los dos caminos pasan por `assertAutoGreSaleDataValida`, que
+  exige peso y fecha además del destinatario y remite al flujo manual cuando
+  faltan; el estimador de peso se retira.
 - **Falta desplegar el runtime.** La rama `fix/qa-bloqueadores-criticos` no está
   publicada y Render sirve todavía el código anterior, así
   que el cierre de caja de la demo sigue fallando con el precheck viejo («ventas
