@@ -383,6 +383,18 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   CO, y siete fechas UTC), `accounting-reports` y `dashboard-integration` (con
   dieciocho rangos por fecha en UTC). Eran instanciados por Nest y nunca usados;
   su única consecuencia real era contaminar cada auditoría.
+- Se retiró el job de inventario cíclico automático. Fabricaba el conteo físico
+  con `Math.random()` sobre el stock del sistema, calculaba la «diferencia» contra
+  ese número inventado y la publicaba con `requiereAjuste`. Un conteo físico no se
+  calcula, se cuenta. Nadie escuchaba el evento y el flag estaba apagado, así que
+  no cambia nada operativo; lo que se elimina es la posibilidad de corromper el
+  inventario si alguien lo encendía.
+- La proyección de flujo de caja dejó de añadir ruido aleatorio sobre el promedio
+  histórico: la misma proyección cambiaba en cada recarga y dos personas mirando la
+  pantalla a la vez veían cifras distintas. La incertidumbre ya la expresan los
+  escenarios optimista y pesimista, que son bandas explícitas.
+- Los únicos `Math.random()` que quedan en el API son el *jitter* de reintento de
+  contabilidad y de SUNAT, que es su uso correcto.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
