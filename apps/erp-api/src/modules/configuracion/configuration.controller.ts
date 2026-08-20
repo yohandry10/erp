@@ -28,6 +28,8 @@ import { ConfigService } from '@nestjs/config';
 import { encryptText } from '../../shared/utils/secure-config.utils';
 import { DianFiscalService } from '../fiscal/dian-fiscal.service';
 import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
+import { ActualizarEmpresaConfigurationDto } from './dto/actualizar-empresa-configuration.dto';
+import { CompletarConfiguracionDto } from '../shared-dto/acciones-simples.dto';
 import {
   INITIAL_ACTIVE_COUNTRY_CODE,
   INITIAL_ACTIVE_COUNTRY_ID,
@@ -380,7 +382,7 @@ export class ConfigurationController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async completeConfiguration(
     @CurrentUser() user: User | undefined,
-    @Body() body: { configuration: any },
+    @Body() body: CompletarConfiguracionDto,
     @CurrentTenant() tenantId?: string,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
@@ -700,7 +702,7 @@ export class ConfigurationController {
   @ApiOperation({ summary: 'Update company data' })
   @ApiResponse({ status: 200, description: 'Company data updated successfully' })
   async updateEmpresaData(
-    @Body() datosEmpresa: any,
+    @Body() datosEmpresa: ActualizarEmpresaConfigurationDto,
     @CurrentTenant() tenantId?: string,
     @CurrentUser() user?: User,
     @Headers('idempotency-key') idempotencyKey?: string,

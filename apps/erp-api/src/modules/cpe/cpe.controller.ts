@@ -32,6 +32,8 @@ import {
 import { CrearNotaReferenciadaDto } from './dto/referenced-note.dto';
 import { ReferencedNotesService } from './referenced-notes.service';
 import { DesktopSignedCpeDto } from './dto/desktop-signed-cpe.dto';
+
+import { CrearComprobanteUiDto } from './dto/crear-comprobante-ui.dto';
 
 @ApiTags('cpe')
 @Controller('cpe')
@@ -209,7 +211,7 @@ export class CpeController {
   @RequirePermission('cpe.comprobantes.emitir')
   @ApiOperation({ summary: 'Crear comprobante CPE desde UI' })
   async createComprobante(
-    @Body() payload: any,
+    @Body() payload: CrearComprobanteUiDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
   ): Promise<FacturaDto> {

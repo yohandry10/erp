@@ -16,6 +16,8 @@ import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import { CentrosCostoService } from "../services/centros-costo.service";
 
+import { CrearCentroCostoDto } from "../../shared-dto/acciones-simples.dto";
+
 @ApiTags("contabilidad")
 @Controller("contabilidad")
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -105,7 +107,7 @@ export class ContabilidadCentrosCostoController {
   async crearCentroCosto(
     @CurrentTenant() tenantId: string,
     @CurrentUser("id") userId:string,
-    @Body() body: { codigo: string; nombre: string; descripcion?: string },
+    @Body() body: CrearCentroCostoDto,
     @Headers('idempotency-key') idempotencyKey?:string,
   ): Promise<{ success: boolean; data: any; message: string }> {
     try {

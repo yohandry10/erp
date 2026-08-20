@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Denominaciones } from './services/cash-reconciliation.service';
+import { CerrarCajaAvanzadoDto } from './dto/cerrar-caja-avanzado.dto';
 import {
   CancelarCambioTurnoCajaDto,
   CompletarCambioTurnoCajaDto,
@@ -221,13 +222,7 @@ export class CajasController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('sesionId') sesionId: string,
-    @Body() dto: {
-      monto_contado: number;
-      denominaciones: Denominaciones;
-      notas?: string;
-      supervisor_id?: string;
-      codigo_autorizacion?: string;
-    },
+    @Body() dto: CerrarCajaAvanzadoDto,
   ) {
     const data = await this.service.cerrarCajaAvanzado(
       tenantId,

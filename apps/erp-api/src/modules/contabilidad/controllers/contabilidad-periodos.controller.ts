@@ -16,6 +16,8 @@ import { PermissionGuard } from "../../../common/guards/permission.guard";
 import { RequirePermission } from "../../../common/decorators/require-permission.decorator";
 import { CreatePeriodoDto, PeriodoResponseDto } from "@erp-suite/dtos";
 import { PeriodosService } from "../services/periodos.service";
+
+import { PeriodoContableDto } from '../dto/periodo-contable.dto';
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -405,7 +407,7 @@ export class ContabilidadPeriodosController {
   async realizarCierreContable(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
-    @Body() cierreData: any,
+    @Body() cierreData: PeriodoContableDto,
   ) {
     const anio = Number(cierreData?.anio);
     const mes = Number(cierreData?.mes);
