@@ -30,7 +30,12 @@ export function limpiarCachePaisTenant(tenantId?: string): void {
   else cachePais.clear();
 }
 
-async function paisDelTenant(client: any, tenantId?: string | null): Promise<string> {
+/**
+ * País del tenant, cacheado. Se exporta porque hay presentaciones que necesitan la
+ * zona horaria y no sólo la fecha de hoy: por ejemplo formatear la fecha de cada
+ * comprobante de un listado, donde pedir la fecha actual no sirve de nada.
+ */
+export async function paisDelTenant(client: any, tenantId?: string | null): Promise<string> {
   const clave = String(tenantId ?? '').trim();
   if (!clave || !client) return 'PE';
 
