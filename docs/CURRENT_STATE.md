@@ -384,8 +384,8 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   con eñe, `estado_civil`, y cuatro campos que viajan como arreglos por ser
   `jsonb`). `body-tipado.guard.spec` impide que reaparezca cualquiera de las dos
   formas.
-- Los verificadores de web (`test:offline`, `test:onboarding`, los dos de POS y
-  `test:fechas`) ya se ejecutan en CI. Existían en `package.json` desde hacía tiempo pero
+- Los verificadores de web (`test:offline`, `test:onboarding`, los dos de POS,
+  `test:fechas` y `test:etiquetas`) ya se ejecutan en CI. Existían en `package.json` desde hacía tiempo pero
   ningún workflow los corría, así que no protegían de nada. Van antes de instalar
   Chromium, para que fallen rápido.
 - El caché de configuración fiscal se invalida junto con el resto del tenant.
@@ -615,18 +615,37 @@ productivo autorizado.
 
 ### Producto y riesgo residual
 
-- Decidir si `modo_venta_rapida` tendrá comportamiento real o se retirará.
-- Resolver etiquetas de formulario ambiguas restantes sin codemod automático.
+- `modo_venta_rapida` se retiró de la interfaz. El interruptor «Venta rápida»
+  del POS no cambiaba nada: ni la pantalla, ni el servicio, ni el writer lo
+  leían. Un control visible que no hace nada es peor que no tenerlo, y darle
+  comportamiento real habría sido inventar producto —¿omite el cliente?, ¿el
+  modal de cobro?— con consecuencias fiscales. El campo sigue declarado en el
+  DTO, aceptado y descartado, porque los binarios de escritorio ya distribuidos
+  lo envían y `forbidNonWhitelisted` convertiría esa venta en un 400.
+- Las etiquetas de formulario están cerradas: los 957 controles de `apps/web`
+  tienen etiqueta programática y `test:etiquetas` lo verifica en CI. El
+  pendiente anterior era inmedible («ambiguas restantes»), así que se sustituyó
+  por un criterio objetivo: `id` + `<label htmlFor>`, `aria-label`,
+  `aria-labelledby` o una `<label>` que envuelva. Un `placeholder` no cuenta:
+  desaparece justo cuando el usuario escribe. Partía de 342 controles sin
+  nombre; el texto nunca se inventó, sale de la etiqueta, la cabecera o el
+  campo que el propio control ya declaraba.
 - Ejecutar PVS con datos reales de cada empleador, corregir su reporte y cargar
   en SOL el ZIP generado por PVS antes de considerar presentada una planilla;
   el ERP ya prepara/versiona las fuentes, pero no suplanta esa validación legal.
 - GRE SOAP beta continúa rechazando con `2112`; la ruta prevista es GRE REST.
-- La paridad contable con Odoo 19 no es total: quedan fuera la sincronización
-  bancaria automática y sus modelos de matching, importación masiva de mapeos
-  de consolidación, multilibros, eliminaciones intercompañía automáticas,
-  variantes/columnas/agrupaciones avanzadas del motor de reportes y métodos de
-  activo no lineales con prorrata. Son ampliaciones de producto, no condiciones
-  ocultas del alcance implementado.
+- **La paridad con Odoo 19 queda fuera de alcance** y sale de esta lista. No es
+  un requisito: «Odoo» no aparece en ninguna otra parte de la documentación, y
+  mantener funcionalidades de meses junto a «cargar el certificado PFX» hacía
+  que la lista mintiera sobre qué bloquea de verdad. Ninguna de las piezas es un
+  defecto: todas tienen hoy un camino manual que funciona —conciliación bancaria
+  con importación CSV, plantillas y marcado de partidas; consolidación con
+  grupos, mapeos, tasas y eliminaciones declaradas a mano—. Lo que falta es la
+  capa automática encima: modelos de emparejamiento, importación masiva de
+  mapeos, eliminaciones intercompañía automáticas, variantes avanzadas del motor
+  de reportes y amortización no lineal con prorrata. Multilibros es la única
+  ausencia estructural y es una decisión de diseño, no un olvido. Si alguna se
+  quiere, entra como alta de producto con su propio alcance.
 
 ## Jerarquía de verdad
 
