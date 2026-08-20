@@ -199,3 +199,94 @@ describe('AnalyticsController — aging de cuentas por cobrar', () => {
     expect(backgroundColor).toHaveLength(5);
   });
 });
+
+/**
+ * Regresión de los indicadores gerenciales.
+ *
+ * «Liquidez» se calculaba como (ventas del mes + CxC) / CxP, que no es un ratio de
+ * liquidez: las ventas no son un activo, y las que fueron a crédito ya estaban
+ * dentro de CxC, así que se contaban dos veces. «Rentabilidad» descontaba los
+ * gastos pero no el costo de ventas, así que marcaba cerca de 100 % y lo daba por
+ * OK: se comprobó en producción con `rentabilidad: {valor: 100, estado: "OK"}`.
+ */
+describe('AnalyticsController — indicadores contables estándar', () => {
+  const construir = (porTabla: Record<string, any[]>) => {
+    const from = jest.fn((tabla: string) => {
+      const builder: any = {
+        select: () => builder,
+        eq: () => builder,
+        in: () => builder,
+        not: () => builder,
+        gte: () => builder,
+        lte: () => builder,
+        lt: () => builder,
+        order: () => builder,
+        then: (resolve: (v: any) => void) => resolve({ data: porTabla[tabla] ?? [], error: null }),
+      };
+      return builder;
+    });
+    return new AnalyticsController({ getClient: () => ({ from }) } as any, {} as any);
+  };
+
+  it('liquidez es la razón corriente: activo corriente entre pasivo corriente', async () => {
+    const controller = construir({
+      documentos: [{ id: 'd1', fecha_emision: '2026-08-01', total: 1000 }],
+      documento_detalles: [{ producto_id: 'p1', cantidad: 2 }],
+      productos: [{ id: 'p1', costo: 100, stock_actual: 10, precio_compra: 100 }],
+      gastos: [{ monto: 50 }],
+      cuentas_por_cobrar: [{ saldo: 400 }],
+      cuentas_por_pagar: [{ saldo: 500 }],
+      cuentas_bancarias: [{ saldo_actual: 600 }],
+    });
+
+    const r: any = await controller.getKpisVisuales('tenant-kpi');
+
+    // activo corriente = bancos 600 + CxC 400 + inventario (10 x 100) = 2000
+    // pasivo corriente = 500  ->  razón corriente = 4.0
+    expect(r.data.liquidez.valor).toBeCloseTo(4, 1);
+  });
+
+  it('rentabilidad descuenta el costo de ventas y ya no marca 100 %', async () => {
+    const controller = construir({
+      documentos: [{ id: 'd1', fecha_emision: '2026-08-01', total: 1000 }],
+      documento_detalles: [{ producto_id: 'p1', cantidad: 2 }],
+      productos: [{ id: 'p1', costo: 300, stock_actual: 0, precio_compra: 300 }],
+      gastos: [{ monto: 100 }],
+      cuentas_por_cobrar: [],
+      cuentas_por_pagar: [],
+      cuentas_bancarias: [],
+    });
+
+    const r: any = await controller.getKpisVisuales('tenant-kpi');
+
+    // ventas 1000 - costo (2 x 300 = 600) - gastos 100 = 300  ->  30 %
+    expect(r.data.rentabilidad.valor).toBeCloseTo(30, 1);
+    expect(r.data.rentabilidad.valor).toBeLessThan(100);
+  });
+
+  it('sin costo ni gastos el margen es total, pero por dato y no por omisión', async () => {
+    const controller = construir({
+      documentos: [{ id: 'd1', fecha_emision: '2026-08-01', total: 500 }],
+      documento_detalles: [],
+      productos: [],
+      gastos: [],
+      cuentas_por_cobrar: [],
+      cuentas_por_pagar: [],
+      cuentas_bancarias: [],
+    });
+
+    const r: any = await controller.getKpisVisuales('tenant-kpi');
+    expect(r.data.rentabilidad.valor).toBeCloseTo(100, 1);
+  });
+
+  it('sin ventas no inventa rentabilidad', async () => {
+    const controller = construir({
+      documentos: [], documento_detalles: [], productos: [],
+      gastos: [], cuentas_por_cobrar: [], cuentas_por_pagar: [], cuentas_bancarias: [],
+    });
+
+    const r: any = await controller.getKpisVisuales('tenant-kpi');
+    expect(r.data.rentabilidad.valor).toBe(0);
+    expect(r.data.liquidez.valor).toBe(0);
+  });
+});

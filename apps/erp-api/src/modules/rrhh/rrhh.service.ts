@@ -2462,6 +2462,22 @@ export class RrhhService {
           'Un contrato afiliado a AFP debe indicar el tipo de comisión (FLUJO, SALDO o MIXTA).',
         );
       }
+
+      // Las tasas también se declaran. Las publica la SBS, cambian por trimestre y
+      // difieren entre las cuatro administradoras: el motor caía a las de Integra
+      // para todas, así que un afiliado a Prima, Profuturo o Hábitat se liquidaba
+      // con una comisión que no era la suya. Cablear un catálogo aquí sólo
+      // trasladaría el problema a la fecha en que la SBS lo cambie.
+      const comision = Number(contratoData?.tasa_comision_afp);
+      const seguro = Number(contratoData?.tasa_seguro_afp);
+      for (const [valor, campo] of [[comision, 'la comisión'], [seguro, 'la prima de seguro']] as const) {
+        if (!Number.isFinite(valor) || valor < 0 || valor > 0.5) {
+          throw new BadRequestException(
+            `Un contrato afiliado a AFP debe indicar ${campo} vigente de su administradora, `
+            + 'expresada en fracción (por ejemplo 0.0155 para 1.55 %).',
+          );
+        }
+      }
     }
   }
 
@@ -2620,8 +2636,8 @@ export class RrhhService {
         ? {
             afp_codigo: String(contratoData.afp_codigo).trim().toUpperCase(),
             tipo_comision_afp: String(contratoData.tipo_comision_afp).trim().toUpperCase(),
-            tasa_comision_afp: Number(contratoData?.tasa_comision_afp ?? 0.0155),
-            tasa_seguro_afp: Number(contratoData?.tasa_seguro_afp ?? 0.0137),
+            tasa_comision_afp: Number(contratoData.tasa_comision_afp),
+            tasa_seguro_afp: Number(contratoData.tasa_seguro_afp),
           }
         : {}),
     };

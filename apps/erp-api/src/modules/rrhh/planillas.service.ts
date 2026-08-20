@@ -891,9 +891,11 @@ export class PlanillasService {
         totalDescuentos += aporteAFP;
       }
 
-      // AFP - Comisión (varía por AFP — usar tasas vigentes SBS)
-      // TODO: Estas tasas deben ser configurables por tenant y AFP del empleado
-      // Tasa por defecto: AFP Integra comisión flujo 1.55% (vigente 2024-2025)
+      // Comisión AFP. Las tasas las publica la SBS, cambian por trimestre y
+      // difieren entre las cuatro administradoras, así que se toman del contrato,
+      // donde el empleador las declara. El respaldo de la normativa se conserva
+      // para contratos anteriores a que el alta lo exigiera; a partir de ahora
+      // `validarContratoPeru` no deja crear un contrato AFP sin ellas.
       const tasaComisionAFP = contratoActual?.tasa_comision_afp ??
         contratoActual?.metadata?.tasa_comision_afp ??
         normativa.afpComisionFlujoDefault;
