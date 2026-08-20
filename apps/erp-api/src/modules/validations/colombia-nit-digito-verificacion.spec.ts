@@ -1,4 +1,8 @@
 import { ColombiaValidationService } from './colombia-validation.service';
+import {
+  calcularDigitoVerificacionNit,
+  validateColombiaNit,
+} from '../paises/initial-country';
 
 /**
  * Dígito de verificación del NIT colombiano, contra NIT reales.
@@ -30,6 +34,19 @@ describe('NIT colombiano: dígito de verificación', () => {
   it.each(conocidos)('rechaza %s con un dígito equivocado', (base, dv) => {
     const otro = String((Number(dv) + 1) % 10);
     expect(servicio.validateNIT(`${base}-${otro}`).isValid).toBe(false);
+  });
+
+  // Había dos implementaciones con el mismo error, y la que de verdad se usaba
+  // —al dar de alta un proveedor y al configurar el contribuyente— era la de
+  // `initial-country`. Ahora sólo hay una; esto comprueba las dos puertas.
+  it.each(conocidos)('validateColombiaNit acepta %s-%s (%s)', (base, dv) => {
+    expect(validateColombiaNit(`${base}-${dv}`)).toBe(true);
+    expect(validateColombiaNit(`${base}${dv}`)).toBe(true);
+  });
+
+  it.each(conocidos)('las dos puertas coinciden para %s', (base, dv) => {
+    expect(calcularDigitoVerificacionNit(base)).toBe(Number(dv));
+    expect(servicio.validateNIT(`${base}-${dv}`).isValid).toBe(true);
   });
 
   it('no exige dígito de verificación cuando no se envía', () => {

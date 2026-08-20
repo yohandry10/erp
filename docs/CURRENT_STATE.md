@@ -676,6 +676,12 @@ crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
   Rechazaba NIT válidos. Corregido y fijado con esos mismos cuatro. Sin efecto
   hoy: no hay ningún contribuyente con país CO.
 
+  Había **dos copias** de esa fórmula con el mismo error, y la que de verdad se
+  usa —alta de proveedor y configuración del contribuyente— era la de
+  `paises/initial-country`. Ahora hay una sola implementación exportada y la
+  prueba comprueba las dos puertas de entrada, que es lo que impide que vuelvan a
+  divergir.
+
 ### Pendientes de auditar a fondo
 
 Catorce módulos, en orden de riesgo decreciente:

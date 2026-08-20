@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-
+
+import { calcularDigitoVerificacionNit } from '../paises/initial-country';
 /**
  * Colombia-specific validation service
  * Handles DIAN-specific validation rules for Colombian companies
@@ -34,7 +35,7 @@ export class ColombiaValidationService {
 
     // If verification digit is provided, validate it
     if (verificationDigit) {
-      const calculatedDigit = this.calculateNITVerificationDigit(baseNumber);
+      const calculatedDigit = calcularDigitoVerificacionNit(baseNumber);
       const providedDigit = verificationDigit.replace('-', '');
       
       if (calculatedDigit.toString() !== providedDigit) {
@@ -51,28 +52,6 @@ export class ColombiaValidationService {
   /**
    * Calculate NIT verification digit using Colombian algorithm
    */
-  private calculateNITVerificationDigit(nit: string): number {
-    // Pesos de la DIAN, del dígito más a la derecha hacia la izquierda. Estaban
-    // en orden inverso —el último dígito pesaba 71 en vez de 3—, así que el
-    // verificador salía mal y sólo coincidía por casualidad: de cuatro NIT reales
-    // comprobados (Bancolombia, Ecopetrol, DIAN, Claro) acertaba uno. El efecto
-    // era rechazar NIT válidos y aceptar alguno inválido.
-    const weights = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
-    const nitDigits = nit.split('').reverse().map(Number);
-    
-    let sum = 0;
-    for (let i = 0; i < nitDigits.length; i++) {
-      sum += nitDigits[i] * weights[i];
-    }
-
-    const remainder = sum % 11;
-    
-    if (remainder === 0 || remainder === 1) {
-      return remainder;
-    }
-    
-    return 11 - remainder;
-  }
 
   /**
    * Validate DIAN document limits
