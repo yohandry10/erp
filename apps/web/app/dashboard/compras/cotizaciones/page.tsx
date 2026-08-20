@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { CotizacionCompra, Proveedor } from '@/types/compras'
 import toast from 'react-hot-toast'
+import CompraEditarCabeceraModal from '@/components/modals/CompraEditarCabeceraModal'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
   Search,
@@ -38,6 +39,7 @@ export default function CotizacionesCompraPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCotizaciones, setTotalCotizaciones] = useState(0)
   const itemsPerPage = 10
+  const [cotizacionEditando, setCotizacionEditando] = useState<CotizacionCompra | null>(null)
 
   const loadCotizaciones = useCallback(async () => {
     try {
@@ -412,9 +414,15 @@ export default function CotizacionesCompraPage() {
                             >
                               <Eye size={16} />
                             </button>
-                            {/* No hay pantalla de edición de cotización: la ruta
-                                `/editar` no existe y el botón terminaba en un 404.
-                                Se retira en vez de prometer algo que no está. */}
+                            {cotizacion.estado === 'BORRADOR' && (
+                              <button
+                                onClick={() => setCotizacionEditando(cotizacion)}
+                                className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground"
+                                title="Editar cabecera"
+                              >
+                                <Edit size={16} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -472,6 +480,17 @@ export default function CotizacionesCompraPage() {
           )}
         </div>
       </div>
+
+      <CompraEditarCabeceraModal
+        tipo="cotizacion"
+        isOpen={cotizacionEditando !== null}
+        onClose={() => setCotizacionEditando(null)}
+        onSuccess={() => {
+          setCotizacionEditando(null)
+          loadCotizaciones()
+        }}
+        documento={cotizacionEditando}
+      />
     </div>
   )
 }
