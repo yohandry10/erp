@@ -52,7 +52,12 @@ export class ColombiaValidationService {
    * Calculate NIT verification digit using Colombian algorithm
    */
   private calculateNITVerificationDigit(nit: string): number {
-    const weights = [71, 67, 59, 53, 47, 43, 41, 37, 29, 23, 19, 17, 13, 7, 3];
+    // Pesos de la DIAN, del dígito más a la derecha hacia la izquierda. Estaban
+    // en orden inverso —el último dígito pesaba 71 en vez de 3—, así que el
+    // verificador salía mal y sólo coincidía por casualidad: de cuatro NIT reales
+    // comprobados (Bancolombia, Ecopetrol, DIAN, Claro) acertaba uno. El efecto
+    // era rechazar NIT válidos y aceptar alguno inválido.
+    const weights = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
     const nitDigits = nit.split('').reverse().map(Number);
     
     let sum = 0;
