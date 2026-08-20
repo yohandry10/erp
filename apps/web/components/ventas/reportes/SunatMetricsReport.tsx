@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Check, FileWarning, Loader2, AlertTriangle } from 'lucide-react'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface SunatIncidencia {
   id: string
@@ -207,7 +208,7 @@ export default function SunatMetricsReport({ filters }: Props) {
                   <div>
                     <p className="text-sm font-medium text-foreground">{incidencia.documento}</p>
                     <p className="text-xs text-muted-foreground">
-                      {incidencia.tipo_documento} &middot; {new Date(incidencia.fecha).toLocaleDateString()}
+                      {incidencia.tipo_documento} &middot; {parseDateLocal(incidencia.fecha).toLocaleDateString()}
                     </p>
                   </div>
                   <Badge className={statusColors[incidencia.estado] ?? 'bg-muted text-foreground/85'}>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
+import { parseDateLocal } from '@/lib/date-utils'
 import toast from 'react-hot-toast'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
@@ -101,7 +102,7 @@ export default function DevolucionesPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(locale, {
+    return parseDateLocal(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { FileText, RefreshCw, Download, Filter } from 'lucide-react'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface MovimientoBancario {
   id: string
@@ -57,7 +58,7 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
   }, [loadMovimientos])
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString(country.locale || 'es-PE', {
       day: '2-digit',
       month: 'short',
       year: 'numeric'

@@ -446,7 +446,7 @@ const PlanillasPage = () => {
           locale,
         );
       }
-      return new Date(dateString).toLocaleDateString(locale);
+      return parseDateLocal(dateString).toLocaleDateString(locale);
     } catch (error: any) {
       return "N/A";
     }

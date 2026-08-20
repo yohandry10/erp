@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { parseDateLocal } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
@@ -134,7 +135,7 @@ export default function ProgramacionPagosPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(locale, {
+    return parseDateLocal(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'

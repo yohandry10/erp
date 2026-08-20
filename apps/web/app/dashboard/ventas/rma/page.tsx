@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import { SaldoFavorMovimientosModal } from '@/components/ventas/SaldoFavorMovimientosModal'
+import { parseDateLocal } from '@/lib/date-utils'
 
 type Rma = {
   id: string
@@ -262,7 +263,7 @@ export default function RmaPage() {
                     <td className="p-4"><div>{rma.clientes?.razon_social ?? rma.clientes?.nombre ?? 'Cliente'}</div><div className="text-xs text-muted-foreground">{rma.clientes?.ruc ?? ''}</div></td>
                     <td className="max-w-md p-4 text-sm text-muted-foreground">{rma.motivo_general ?? '—'}</td>
                     <td className="p-4"><Status value={rma.estado} /></td>
-                    <td className="p-4 text-sm">{new Date(rma.created_at).toLocaleDateString('es-PE')}</td>
+                    <td className="p-4 text-sm">{parseDateLocal(rma.created_at).toLocaleDateString('es-PE')}</td>
                     <td className="p-4 text-right"><Button asChild variant="outline" size="sm"><Link href={`/dashboard/ventas/rma/${rma.id}`}>Ver flujo <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></td>
                   </tr>
                 ))}

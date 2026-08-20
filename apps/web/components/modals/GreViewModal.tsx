@@ -131,7 +131,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
           <div class="empresa">EMISOR CONFIGURADO EN EL ERP</div>
           <div class="tipo-doc">GUÍA DE REMISIÓN ELECTRÓNICA</div>
           <div class="numero">${escapeHtml(greData.numero)}</div>
-          <div class="fecha">Emisión: ${escapeHtml(new Date(greData.fechaCreacion).toLocaleDateString('es-PE'))}</div>
+          <div class="fecha">Emisión: ${escapeHtml(parseDateLocal(greData.fechaCreacion).toLocaleDateString('es-PE'))}</div>
         </div>
 
         <div class="seccion">
@@ -326,7 +326,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                           </div>
                           <div className="text-sm">
                             <p className="mb-[4px] my-[4px] mx-0">
-                              <strong>Fecha Emisión:</strong> {new Date(greData.fechaCreacion).toLocaleDateString('es-PE')}
+                              <strong>Fecha Emisión:</strong> {parseDateLocal(greData.fechaCreacion).toLocaleDateString('es-PE')}
                             </p>
                             <p className="mb-[4px] my-[4px] mx-0">
                               <strong>Fecha Traslado:</strong> {parseDateLocal(greData.fechaTraslado).toLocaleDateString('es-PE')}

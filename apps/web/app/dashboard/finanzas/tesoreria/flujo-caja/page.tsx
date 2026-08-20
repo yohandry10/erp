@@ -28,6 +28,7 @@ import {
 import { useApi } from '@/hooks/use-api'
 import { cn } from '@/lib/utils'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface CuentaBancaria {
   id: string
@@ -171,7 +172,7 @@ export default function FlujoCajaPage() {
   }
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString(locale, {
+    parseDateLocal(dateString).toLocaleDateString(locale, {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
