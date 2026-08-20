@@ -1,3 +1,7 @@
+export {};
+// Sin import ni export el archivo no es un módulo y sus declaraciones caen en
+// el ámbito global, donde chocan con las de otro script: dos `main()` bastan.
+
 /**
  * Script de presentación de asientos contables generados
  * Muestra ejemplos de los 7 tipos de asientos implementados
