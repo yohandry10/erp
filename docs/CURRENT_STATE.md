@@ -18,6 +18,18 @@ migraciones verificados, prevalece la implementación actual.
   Comprobado sobre una demo nueva: la venta POS nace con `documento_id`,
   `accounting_event_id` y `atomic_result`, que es lo que `cerrar_caja_tx` exige,
   y la planilla nace en `borrador` sin líneas escritas a mano.
+- **La cola de dead-letter de PROD se estaba envenenando sola.** La migración 464
+  emite `demo.lista` y `configuracion.wizard.completado` como constancia, y nunca
+  hubo suscriptor: el worker falla cerrado ante un evento sin handler, así que
+  cada demo creada y cada wizard completado dejaba un `dead_letter` permanente.
+  Había doce y crecían. No era sólo ruido: `outbox_runtime_health_492` deja de
+  reportar `ready` al pasar de cien, de modo que la cola habría acabado bloqueando
+  el readiness por eventos que funcionaban bien, mientras tapaba los fallos de
+  verdad. Se resuelve con un registro explícito de eventos sin suscriptor
+  (`eventos-sin-suscriptor.ts`): esos se dan por procesados sin despachar y todo
+  lo demás sigue fallando cerrado. **Tras el despliegue** conviene reencolar los
+  doce que ya están en `dead_letter` para que se cierren; antes de desplegar
+  volverían a caer.
 - **Falta desplegar el runtime.** La rama `fix/qa-bloqueadores-criticos` no está
   publicada y Render sirve todavía el código anterior, así
   que el cierre de caja de la demo sigue fallando con el precheck viejo («ventas
