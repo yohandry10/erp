@@ -403,10 +403,10 @@ export default function AsientoDetallePage() {
 
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
+                  <label htmlFor="id-motivo" className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
                     Motivo {accionPendiente === 'anular' ? '(obligatorio)' : '(opcional)'}
                   </label>
-                  <textarea
+                  <textarea id="id-motivo"
                     value={motivo}
                     onChange={(event) => setMotivo(event.target.value)}
                     rows={2}
@@ -417,10 +417,10 @@ export default function AsientoDetallePage() {
 
                 {accionPendiente === 'reversar' && (
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
+                    <label htmlFor="id-fecha-de-reversion" className="block text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
                       Fecha de reversión
                     </label>
-                    <input
+                    <input id="id-fecha-de-reversion"
                       type="date"
                       value={fechaReversion}
                       onChange={(event) => setFechaReversion(event.target.value)}

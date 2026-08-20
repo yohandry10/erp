@@ -266,7 +266,7 @@ export default function FlujoCajaPage() {
                 </div>
 
                 <Select value={String(diasProyeccion)} onValueChange={(value) => setDiasProyeccion(Number(value))}>
-                  <SelectTrigger className={cn(fieldClass, 'w-full md:w-44')}>
+                  <SelectTrigger className={cn(fieldClass, 'w-full md:w-44')} aria-label="Días de proyección">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="border-cyan-400/20 bg-background text-foreground group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
@@ -279,7 +279,7 @@ export default function FlujoCajaPage() {
 
                 {monedasDisponibles.length > 1 && (
                   <Select value={monedaFiltro} onValueChange={setMonedaFiltro}>
-                    <SelectTrigger className={cn(fieldClass, 'w-full md:w-52')}>
+                    <SelectTrigger className={cn(fieldClass, 'w-full md:w-52')} aria-label="Moneda">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="border-cyan-400/20 bg-background text-foreground group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">

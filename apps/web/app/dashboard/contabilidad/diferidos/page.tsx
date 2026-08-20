@@ -234,8 +234,8 @@ export default function DiferidosPage() {
 
           <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-4">
             <div>
-              <label className={labelClass}>Año</label>
-              <input
+              <label htmlFor="diferidos-ano" className={labelClass}>Año</label>
+              <input id="diferidos-ano"
                 type="number"
                 value={anio}
                 onChange={(e) => setAnio(Number(e.target.value))}
@@ -243,8 +243,8 @@ export default function DiferidosPage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Mes</label>
-              <input
+              <label htmlFor="diferidos-mes" className={labelClass}>Mes</label>
+              <input id="diferidos-mes"
                 type="number"
                 min={1}
                 max={12}

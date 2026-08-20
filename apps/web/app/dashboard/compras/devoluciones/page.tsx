@@ -185,10 +185,10 @@ export default function DevolucionesPage() {
         <div className="bg-card border rounded-xl p-5 mb-6">
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-4">
             <div>
-              <label className="block mb-[6px] text-[13px] font-medium">
+              <label htmlFor="devoluciones-estado" className="block mb-[6px] text-[13px] font-medium">
                 Estado
               </label>
-              <select
+              <select id="devoluciones-estado"
                 value={filtros.estado}
                 onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-sm"
               >
@@ -200,10 +200,10 @@ export default function DevolucionesPage() {
             </div>
 
             <div>
-              <label className="block mb-[6px] text-[13px] font-medium">
+              <label htmlFor="devoluciones-fecha-desde" className="block mb-[6px] text-[13px] font-medium">
                 Fecha Desde
               </label>
-              <input
+              <input id="devoluciones-fecha-desde"
                 type="date"
                 value={filtros.fecha_desde}
                 onChange={(e) => setFiltros({ ...filtros, fecha_desde: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-sm"
@@ -211,10 +211,10 @@ export default function DevolucionesPage() {
             </div>
 
             <div>
-              <label className="block mb-[6px] text-[13px] font-medium">
+              <label htmlFor="devoluciones-fecha-hasta" className="block mb-[6px] text-[13px] font-medium">
                 Fecha Hasta
               </label>
-              <input
+              <input id="devoluciones-fecha-hasta"
                 type="date"
                 value={filtros.fecha_hasta}
                 onChange={(e) => setFiltros({ ...filtros, fecha_hasta: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-sm"

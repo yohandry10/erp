@@ -372,7 +372,7 @@ export default function PlanillaCalcularModal({
                       </div>
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Sueldo base"
                         type="number"
                         value={empleado.sueldo_base}
                         onChange={(e) =>
@@ -386,7 +386,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Días trabajados"
                         type="number"
                         value={empleado.dias_trabajados}
                         onChange={(e) =>
@@ -402,7 +402,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Horas extra al 25%"
                         type="number"
                         value={empleado.horas_extras_25}
                         onChange={(e) =>
@@ -418,7 +418,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Horas extra al 35%"
                         type="number"
                         value={empleado.horas_extras_35}
                         onChange={(e) =>
@@ -460,7 +460,7 @@ export default function PlanillaCalcularModal({
                       </td>
                     )}
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Minutos de tardanza"
                         type="number"
                         value={empleado.tardanzas_minutos}
                         onChange={(e) =>
@@ -475,7 +475,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Faltas"
                         type="number"
                         value={empleado.faltas}
                         onChange={(e) =>
@@ -490,7 +490,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Bonos adicionales"
                         type="number"
                         value={empleado.bonos_adicionales}
                         onChange={(e) =>

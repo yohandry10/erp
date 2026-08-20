@@ -106,10 +106,10 @@ export default function ReportesPage() {
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="reportes-fecha-desde" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha Desde
               </label>
-              <input
+              <input id="reportes-fecha-desde"
                 type="date"
                 value={filters.fechaDesde}
                 onChange={(e) => handleFilterChange('fechaDesde', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
@@ -117,10 +117,10 @@ export default function ReportesPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="reportes-fecha-hasta" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha Hasta
               </label>
-              <input
+              <input id="reportes-fecha-hasta"
                 type="date"
                 value={filters.fechaHasta}
                 onChange={(e) => handleFilterChange('fechaHasta', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
@@ -128,10 +128,10 @@ export default function ReportesPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="reportes-cliente-opcional" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Cliente (opcional)
               </label>
-              <input
+              <input id="reportes-cliente-opcional"
                 type="text"
                 placeholder="Filtrar por cliente..."
                 value={filters.cliente || ''}
@@ -140,10 +140,10 @@ export default function ReportesPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="reportes-estado-opcional" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Estado (opcional)
               </label>
-              <select
+              <select id="reportes-estado-opcional"
                 value={filters.estado || ''}
                 onChange={(e) => handleFilterChange('estado', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               >

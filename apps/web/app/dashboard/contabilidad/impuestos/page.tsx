@@ -209,8 +209,8 @@ export default function ImpuestosMensualesPage() {
             </div>
             <div className="flex items-end gap-2">
               <div>
-                <label className={labelClass}>Período</label>
-                <input type="month" value={periodo} onChange={(event) => setPeriodo(event.target.value)} className={inputClass} />
+                <label htmlFor="impuestos-periodo" className={labelClass}>Período</label>
+                <input id="impuestos-periodo" type="month" value={periodo} onChange={(event) => setPeriodo(event.target.value)} className={inputClass} />
               </div>
               <Button type="button" variant="outline" onClick={cargar} disabled={cargando} className="gap-2">
                 <RefreshCw className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} /> Actualizar

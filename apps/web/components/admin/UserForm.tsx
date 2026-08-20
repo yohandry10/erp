@@ -251,7 +251,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
           onValueChange={handleRoleSelect}
           disabled={loading || loadingRoles}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-label="Roles to assign">
             <SelectValue placeholder="Select roles to assign..." />
           </SelectTrigger>
           <SelectContent>

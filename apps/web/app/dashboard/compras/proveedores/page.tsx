@@ -179,7 +179,7 @@ export default function ProveedoresPage() {
             <Search
               size={20} className="absolute left-4 top-[50%] -translate-y-1/2 text-muted-foreground"
             />
-            <input
+            <input aria-label="Buscar"
               type="text"
               placeholder={`Buscar por ${taxIdLabel}, razón social o nombre comercial...`}
               value={searchTerm}
@@ -187,7 +187,7 @@ export default function ProveedoresPage() {
             />
           </div>
 
-          <select
+          <select aria-label="Filtrar por estado"
             value={activoFilter}
             onChange={(e) => handleActivoFilterChange(e.target.value)} className="py-3 px-4 rounded-lg border text-[0.875rem] bg-card min-w-[150px]"
           >
@@ -196,7 +196,7 @@ export default function ProveedoresPage() {
             <option value="false">Inactivos</option>
           </select>
 
-          <select
+          <select aria-label="Filtrar por condiciones de pago"
             value={condicionesPagoFilter}
             onChange={(e) => handleCondicionesPagoFilterChange(e.target.value)} className="py-3 px-4 rounded-lg border text-[0.875rem] bg-card min-w-[180px]"
           >

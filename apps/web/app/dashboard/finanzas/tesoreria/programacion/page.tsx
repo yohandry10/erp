@@ -311,10 +311,10 @@ export default function ProgramacionPagosPage() {
 
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2">
+            <label htmlFor="programacion-fecha-desde" className="block text-[0.875rem] font-medium mb-2">
               Fecha Desde
             </label>
-            <input
+            <input id="programacion-fecha-desde"
               type="date"
               value={fechaDesde}
               onChange={(e) => setFechaDesde(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
@@ -322,10 +322,10 @@ export default function ProgramacionPagosPage() {
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2">
+            <label htmlFor="programacion-fecha-hasta" className="block text-[0.875rem] font-medium mb-2">
               Fecha Hasta
             </label>
-            <input
+            <input id="programacion-fecha-hasta"
               type="date"
               value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
@@ -333,10 +333,10 @@ export default function ProgramacionPagosPage() {
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2">
+            <label htmlFor="programacion-estado" className="block text-[0.875rem] font-medium mb-2">
               Estado
             </label>
-            <select
+            <select id="programacion-estado"
               value={estado}
               onChange={(e) => setEstado(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
             >
@@ -348,10 +348,10 @@ export default function ProgramacionPagosPage() {
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2">
+            <label htmlFor="programacion-urgencia" className="block text-[0.875rem] font-medium mb-2">
               Urgencia
             </label>
-            <select
+            <select id="programacion-urgencia"
               value={urgenciaFilter}
               onChange={(e) => setUrgenciaFilter(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
             >
@@ -389,7 +389,7 @@ export default function ProgramacionPagosPage() {
                   <thead>
                     <tr>
                       <th className="p-4 w-10">
-                        <input
+                        <input aria-label="Importe"
                           type="checkbox"
                           checked={selectedPagos.size === pagos.length && pagos.length > 0}
                           onChange={handleSelectAll} className="cursor-pointer"
@@ -430,7 +430,7 @@ export default function ProgramacionPagosPage() {
                         key={pago.id} className="border-b"
                       >
                         <td className="p-4">
-                          <input
+                          <input aria-label="Has"
                             type="checkbox"
                             checked={selectedPagos.has(pago.id)}
                             onChange={() => handleSelectPago(pago.id)} className="cursor-pointer"

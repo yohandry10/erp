@@ -272,10 +272,10 @@ export function OCWizard({
 
           <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="ocwizard-numero-de-orden" className={fieldLabelClass}>
                 Número de Orden <span className={requiredMarkClass}>*</span>
               </label>
-              <input
+              <input id="ocwizard-numero-de-orden"
                 type="text"
                 {...register('numero')}
                 className={cn(fieldBaseClass, 'font-mono', errors.numero ? fieldErrorClass : fieldNormalClass)}
@@ -288,10 +288,10 @@ export function OCWizard({
             </div>
 
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="ocwizard-proveedor" className={fieldLabelClass}>
                 Proveedor <span className={requiredMarkClass}>*</span>
               </label>
-              <select
+              <select id="ocwizard-proveedor"
                 {...register('proveedor_id')}
                 className={cn(fieldBaseClass, errors.proveedor_id ? fieldErrorClass : fieldNormalClass)}
                 disabled={loadingProveedores}
@@ -311,10 +311,10 @@ export function OCWizard({
             </div>
 
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="ocwizard-fecha-de-orden" className={fieldLabelClass}>
                 Fecha de Orden <span className={requiredMarkClass}>*</span>
               </label>
-              <input
+              <input id="ocwizard-fecha-de-orden"
                 type="date"
                 {...register('fecha_orden')}
                 className={cn(fieldBaseClass, errors.fecha_orden ? fieldErrorClass : fieldNormalClass)}
@@ -327,10 +327,10 @@ export function OCWizard({
             </div>
 
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="ocwizard-fecha-de-entrega-esperada" className={fieldLabelClass}>
                 Fecha de Entrega Esperada
               </label>
-              <input
+              <input id="ocwizard-fecha-de-entrega-esperada"
                 type="date"
                 {...register('fecha_entrega_esperada')}
                 className={cn(fieldBaseClass, fieldNormalClass)}
@@ -338,10 +338,10 @@ export function OCWizard({
             </div>
 
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="ocwizard-condiciones-de-pago" className={fieldLabelClass}>
                 Condiciones de Pago
               </label>
-              <select
+              <select id="ocwizard-condiciones-de-pago"
                 {...register('condiciones_pago')}
                 className={cn(fieldBaseClass, fieldNormalClass)}
               >
@@ -356,10 +356,10 @@ export function OCWizard({
             </div>
 
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="ocwizard-dias-de-credito" className={fieldLabelClass}>
                 Días de Crédito
               </label>
-              <input
+              <input id="ocwizard-dias-de-credito"
                 type="number"
                 {...register('dias_credito', { valueAsNumber: true })}
                 min="0"
@@ -368,10 +368,10 @@ export function OCWizard({
             </div>
 
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="ocwizard-almacen-destino" className={fieldLabelClass}>
                 Almacén Destino
               </label>
-              <select
+              <select id="ocwizard-almacen-destino"
                 {...register('almacen_destino_id')}
                 className={cn(fieldBaseClass, fieldNormalClass)}
                 disabled={loadingAlmacenes}
@@ -386,10 +386,10 @@ export function OCWizard({
             </div>
 
             <div className="col-span-full">
-              <label className={fieldLabelClass}>
+              <label htmlFor="ocwizard-observaciones" className={fieldLabelClass}>
                 Observaciones
               </label>
-              <textarea
+              <textarea id="ocwizard-observaciones"
                 {...register('observaciones')}
                 rows={3}
                 placeholder="Notas adicionales sobre la orden de compra..."
@@ -520,10 +520,10 @@ function Step2AddProducts({
       <div className={cn(panelSoftClass, 'mb-6')}>
         <div className="grid items-end gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(140px,1fr)_minmax(140px,1fr)_auto]">
           <div>
-            <label className={fieldLabelClass}>
+            <label htmlFor="ocwizard-producto" className={fieldLabelClass}>
               Producto
             </label>
-            <select
+            <select id="ocwizard-producto"
               value={selectedProducto}
               onChange={(e) => setSelectedProducto(e.target.value)}
               disabled={loadingProductos}
@@ -539,10 +539,10 @@ function Step2AddProducts({
           </div>
 
           <div>
-            <label className={fieldLabelClass}>
+            <label htmlFor="ocwizard-cantidad" className={fieldLabelClass}>
               Cantidad
             </label>
-            <input
+            <input id="ocwizard-cantidad"
               type="number"
               value={cantidad}
               onChange={(e) => setCantidad(Number(e.target.value))}
@@ -553,10 +553,10 @@ function Step2AddProducts({
           </div>
 
           <div>
-            <label className={fieldLabelClass}>
+            <label htmlFor="ocwizard-precio-unit" className={fieldLabelClass}>
               Precio Unit.
             </label>
-            <input
+            <input id="ocwizard-precio-unit"
               type="number"
               value={precio}
               onChange={(e) => setPrecio(Number(e.target.value))}

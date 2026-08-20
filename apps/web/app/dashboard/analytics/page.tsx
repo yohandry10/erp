@@ -1057,7 +1057,7 @@ export default function AnalyticsPage() {
       description="Indicadores gerenciales, cuentas por cobrar, cuentas por pagar y tendencias del periodo."
       actions={
         <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:flex xl:w-auto xl:items-center">
-          <select
+          <select aria-label="Periodo"
             disabled={!isHydrated}
             value={periodo}
             onChange={(e) => {

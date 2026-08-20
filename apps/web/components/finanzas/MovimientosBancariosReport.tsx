@@ -125,10 +125,10 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
       {/* Filters */}
       <div className="flex gap-4 mb-6 flex-wrap">
         <div>
-          <label className="text-xs font-semibold text-muted-foreground block mb-1">
+          <label htmlFor="movimientosbancariosreport-tipo" className="text-xs font-semibold text-muted-foreground block mb-1">
             Tipo
           </label>
-          <select
+          <select id="movimientosbancariosreport-tipo"
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value as any)} className="p-2 rounded-[6px] border text-[0.875rem]"
           >
@@ -138,10 +138,10 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
           </select>
         </div>
         <div>
-          <label className="text-xs font-semibold text-muted-foreground block mb-1">
+          <label htmlFor="movimientosbancariosreport-conciliado" className="text-xs font-semibold text-muted-foreground block mb-1">
             Conciliado
           </label>
-          <select
+          <select id="movimientosbancariosreport-conciliado"
             value={filtroConciliado}
             onChange={(e) => setFiltroConciliado(e.target.value as any)} className="p-2 rounded-[6px] border text-[0.875rem]"
           >

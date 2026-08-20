@@ -325,8 +325,8 @@ export default function ActivosFijosPage() {
 
           <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-4">
             <div>
-              <label className={labelClass}>Año</label>
-              <input
+              <label htmlFor="activos-fijos-ano" className={labelClass}>Año</label>
+              <input id="activos-fijos-ano"
                 type="number"
                 value={anio}
                 onChange={(e) => setAnio(Number(e.target.value))}
@@ -334,8 +334,8 @@ export default function ActivosFijosPage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Mes</label>
-              <input
+              <label htmlFor="activos-fijos-mes" className={labelClass}>Mes</label>
+              <input id="activos-fijos-mes"
                 type="number"
                 min={1}
                 max={12}

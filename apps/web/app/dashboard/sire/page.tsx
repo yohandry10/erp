@@ -360,6 +360,7 @@ export default function SIREPage() {
           <CardContent className="grid gap-3 p-4 lg:grid-cols-[160px_220px_180px_auto] lg:items-end">
             <input
               ref={periodoInputRef}
+              aria-label="Periodo tributario"
               type="month"
               defaultValue={filters.periodo}
               onChange={(event) => {
@@ -372,7 +373,7 @@ export default function SIREPage() {
               }}
               className={inputClass}
             />
-            <select
+            <select aria-label="Tipo reporte"
               value={filters.tipoReporte}
               onChange={(event) => {
                 const { value } = event.currentTarget
@@ -384,7 +385,7 @@ export default function SIREPage() {
               <option value="REGISTRO_VENTAS">Registro de Ventas</option>
               <option value="REGISTRO_COMPRAS">Registro de Compras</option>
             </select>
-            <select
+            <select aria-label="Estado"
               value={filters.estado}
               onChange={(event) => {
                 const { value } = event.currentTarget

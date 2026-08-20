@@ -142,7 +142,7 @@ export function CertificateUploadStep() {
             Certificado Digital <span className="text-muted-foreground">(opcional)</span>
           </Label>
           
-          <input
+          <input aria-label="(opcional)"
             ref={fileInputRef}
             type="file"
             accept=".pfx,.p12"
