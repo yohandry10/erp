@@ -49,7 +49,6 @@ import {
   Trash2,
   UserRound,
   WalletCards,
-  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -226,7 +225,6 @@ export default function POSPage() {
 
   // Nuevos estados para funcionalidades avanzadas
 const [descuentoGlobal, setDescuentoGlobal] = useState<Descuento>({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
-const [modoVentaRapida, setModoVentaRapida] = useState(false)
 const [ventaSinStock, setVentaSinStock] = useState(false)
   const [estadoVentaActual, setEstadoVentaActual] = useState<EstadoVenta>({ estado: 'EN_PROGRESO', fecha_estado: new Date().toISOString() })
   const [busquedaPorCodigoBarras, setBusquedaPorCodigoBarras] = useState('')
@@ -1237,7 +1235,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           tipo: comprobante.tipo,
           numero: comprobante.numero,
         },
-        modo_venta_rapida: modoVentaRapida,
         permite_venta_sin_stock: ventaSinStock
       }
 
@@ -2199,21 +2196,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                     />
                   </div>
 
-                  {/* Switches de Modo */}
-                  <div className="flex gap-4">
-                    <label
-                      className="flex cursor-pointer items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={modoVentaRapida}
-                        onChange={(e) => setModoVentaRapida(e.target.checked)}
-                        className="scale-125"
-                      />
-                       <Zap className="h-4 w-4" /> Venta rápida
-                    </label>
-
-                  </div>
                   <div className="ml-auto hidden items-center gap-1.5 lg:flex" aria-label="Atajos del punto de venta">
                     {[
                       ['F2', 'Buscar'],
@@ -2611,7 +2593,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                             </Button>
                           </div>
                           {metodo?.requiere_referencia && (
-                            <Input
+                            <Input aria-label="Referencia de operación"
                               className="mt-2"
                               value={pago.referencia || ''}
                               onChange={(event) => actualizarPago(index, 'referencia', event.target.value)}

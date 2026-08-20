@@ -246,6 +246,13 @@ export class CreateVentaPosDto {
   @Type(() => VentaPosDescuentoGlobalDto)
   descuento_global?: VentaPosDescuentoGlobalDto;
 
+  /**
+   * Aceptado y descartado. El interruptor "Venta rápida" del POS no cambiaba
+   * nada: ni la pantalla, ni el servicio, ni el writer lo leían. Se retiró de la
+   * interfaz, pero el campo se mantiene declarado porque los binarios de
+   * escritorio ya distribuidos lo siguen enviando y `forbidNonWhitelisted`
+   * convertiría esa venta en un 400.
+   */
   @IsOptional()
   @IsBoolean()
   modo_venta_rapida?: boolean;
