@@ -18,8 +18,8 @@ migraciones verificados, prevalece la implementación actual.
   Comprobado sobre una demo nueva: la venta POS nace con `documento_id`,
   `accounting_event_id` y `atomic_result`, que es lo que `cerrar_caja_tx` exige,
   y la planilla nace en `borrador` sin líneas escritas a mano.
-- **Falta desplegar el runtime.** La rama `fix/qa-bloqueadores-criticos` va 15
-  commits por delante de `main` y Render sirve todavía el código anterior, así
+- **Falta desplegar el runtime.** La rama `fix/qa-bloqueadores-criticos` no está
+  publicada y Render sirve todavía el código anterior, así
   que el cierre de caja de la demo sigue fallando con el precheck viejo («ventas
   sin comprobante electrónico»). La base ya está lista para ese despliegue.
 - El 2026-08-17 se creó un respaldo nuevo de PROD `490`, se aplicaron y
