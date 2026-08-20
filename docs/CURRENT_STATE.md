@@ -623,6 +623,68 @@ productivo autorizado.
   los permisos globales permanecen prohibidos y ningún writer alterno puede
   asignar `ADMIN_DEMO` sin la autorización administrativa real del actor.
 
+## Cobertura de la auditoría de QA
+
+Mapa de qué se ha revisado y con qué profundidad, para no repetir análisis en
+sesiones posteriores. «A fondo» significa leer el código del módulo buscando
+fallos de lógica; «barrido» significa que lo cruzó una comprobación de patrón
+pero nadie lo leyó.
+
+### Barridos transversales (cubren TODO el repositorio)
+
+Ya ejecutados y con guardián que impide la regresión:
+
+- Fechas resueltas en UTC: `fecha-utc-guard.spec` (backend) y `test:fechas` (web).
+- `@Body()` sin DTO, en sus dos formas: `body-tipado.guard.spec`.
+- Controles de formulario sin etiqueta: `test:etiquetas`.
+- `Math.random` en decisiones, código muerto no inyectado, type-check de
+  `scripts/`, idempotencia y offline de POS.
+
+Un barrido **no sustituye** a leer el módulo: los defectos más caros de esta
+auditoría —quinta categoría, tasas AFP por administradora, saldo teórico del
+arqueo, peso inventado en la GRE— aparecieron leyendo, no barriendo.
+
+### Auditados a fondo
+
+`rrhh` · `cajas` · `cpe` · `pos` · `gre` · `compras` · `configuracion` ·
+`analytics` · `usuarios` · `demo` · `permissions` · `auth` · `tenants` ·
+y las utilidades compartidas (tax-calculator, fechas, outbox, event-bus, caché,
+jobs en segundo plano).
+
+### Tocados sólo de refilón
+
+Aparecen en el historial pero **no fueron revisados**: `contabilidad` (sólo el
+DTO de período y las fechas de asiento), `finanzas` (sólo el DTO de análisis de
+crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
+`sire` (sólo la ventana de estadísticas).
+
+### Pendientes de auditar a fondo
+
+Catorce módulos, en orden de riesgo decreciente:
+
+1. `retenciones` — cálculo tributario, la familia donde ya salieron errores.
+2. `ose` — transporte a SUNAT.
+3. `documentos` · `validations` · `paises`.
+4. `notifications` · `audit` · `security` · `sunat-retry`.
+5. `dashboard` · `reports` · `import-export` · `metrics` · `help`.
+
+### Resultado de la frontera de seguridad (cerrado, no repetir)
+
+`permissions`, `auth` y `tenants` están leídos y **no tienen agujero explotable**.
+El guard falla cerrado, valida el tenant dos veces —en el rol y en el permiso— y
+rechaza usuarios inactivos; la caché de permisos está desactivada
+(`CACHE_TTL = 0`), así que no puede servir permisos revocados. Se comprobó contra
+producción con el token de una demo: listar tenants, leer otro tenant y sus
+usuarios devuelven 403, y el endpoint de `system.debug` está restringido. La vía
+de escalada por crear un rol llamado `ADMIN` no funciona: la RPC exige
+`users.manage` mediante filas reales de permiso.
+
+Queda una fragilidad conocida, sin explotación hoy: `checkUserPermission` concede
+todo a cualquier rol llamado exactamente `ADMIN`, de modo que **revocar un permiso
+a ese rol no surte efecto**. No cambia nada ahora mismo porque ADMIN tiene 256 de
+256 permisos en los 55 tenants reales; sólo difieren siete demos, cuyos usuarios
+usan `ADMIN_DEMO`.
+
 ## Pendientes reales
 
 ### Antes de completar el go-live
