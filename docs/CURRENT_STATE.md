@@ -30,6 +30,14 @@ migraciones verificados, prevalece la implementación actual.
   lo demás sigue fallando cerrado. **Tras el despliegue** conviene reencolar los
   doce que ya están en `dead_letter` para que se cierren; antes de desplegar
   volverían a caer.
+- **Barrido de integridad sobre PROD el 2026-08-20**, sólo lectura: 170 asientos
+  contables, todos cuadrados y con detalle; el invariante de stock
+  (`productos.stock_actual` = suma de `producto_existencias`) se cumple en todos
+  los productos; ningún `empresa_config` sin `pais_id`; ningún evento de outbox
+  atascado en `processing`. Quedan cinco CPE en `FIRMADO` sin aceptación, de hace
+  once a catorce días, todos de tenants QA y demo (`LLAMA PE QA SAC`,
+  `DEMO COMERCIAL S.A.C.`): son restos de pruebas contra beta, no de un
+  contribuyente real.
 - **Falta desplegar el runtime.** La rama `fix/qa-bloqueadores-criticos` no está
   publicada y Render sirve todavía el código anterior, así
   que el cierre de caja de la demo sigue fallando con el precheck viejo («ventas
