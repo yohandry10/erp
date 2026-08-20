@@ -106,6 +106,7 @@ export function LogoUploader({
     <div className="w-[100%]">
       <input
         ref={fileInputRef}
+        aria-label="Archivo de logo"
         type="file"
         accept={acceptedFormats.join(',')}
         onChange={handleFileSelect} className="hidden"

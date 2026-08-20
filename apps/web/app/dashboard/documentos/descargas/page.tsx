@@ -132,8 +132,8 @@ export default function DescargasPage() {
         <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
           <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
             <div>
-              <label className="text-sm font-medium text-foreground/85">Fecha desde</label>
-              <input
+              <label htmlFor="descargas-fecha-desde" className="text-sm font-medium text-foreground/85">Fecha desde</label>
+              <input id="descargas-fecha-desde"
                 type="date"
                 value={filtros.fecha_desde}
                 onChange={(e) => handleFiltro('fecha_desde', e.target.value)}
@@ -141,8 +141,8 @@ export default function DescargasPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground/85">Fecha hasta</label>
-              <input
+              <label htmlFor="descargas-fecha-hasta" className="text-sm font-medium text-foreground/85">Fecha hasta</label>
+              <input id="descargas-fecha-hasta"
                 type="date"
                 value={filtros.fecha_hasta}
                 onChange={(e) => handleFiltro('fecha_hasta', e.target.value)}
@@ -150,8 +150,8 @@ export default function DescargasPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground/85">Tipo</label>
-              <select
+              <label htmlFor="descargas-tipo" className="text-sm font-medium text-foreground/85">Tipo</label>
+              <select id="descargas-tipo"
                 className="input"
                 value={filtros.tipo_documento}
                 onChange={(e) => handleFiltro('tipo_documento', e.target.value)}
@@ -162,8 +162,8 @@ export default function DescargasPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground/85">Serie</label>
-              <input
+              <label htmlFor="descargas-serie" className="text-sm font-medium text-foreground/85">Serie</label>
+              <input id="descargas-serie"
                 type="text"
                 value={filtros.serie}
                 placeholder={country.paisCodigo === 'AR' ? 'Ej.: 00001' : country.paisCodigo === 'CO' ? 'Ej.: FE' : 'Ej.: F001'}

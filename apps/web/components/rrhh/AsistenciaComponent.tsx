@@ -188,7 +188,7 @@ export default function AsistenciaComponent() {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className="text-sm text-primary">Fecha de consulta</div>
-              <input
+              <input aria-label="Fecha de consulta"
                 type="date"
                 value={fechaConsulta}
                 onChange={(e) => setFechaConsulta(e.target.value)}

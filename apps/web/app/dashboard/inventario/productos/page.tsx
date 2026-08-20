@@ -154,11 +154,11 @@ export default function ProductosPage() {
         </div>
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
           <div>
-            <label className="block mb-2 text-[0.875rem]">
+            <label htmlFor="productos-buscar" className="block mb-2 text-[0.875rem]">
               <Search size={16} className="mr-1" />
               Buscar
             </label>
-            <input
+            <input id="productos-buscar"
               type="text"
               value={filters.search}
               onChange={(e) =>
@@ -169,8 +169,8 @@ export default function ProductosPage() {
             />
           </div>
           <div>
-            <label className="block mb-2 text-[0.875rem]">Categoría</label>
-            <select
+            <label htmlFor="productos-categoria" className="block mb-2 text-[0.875rem]">Categoría</label>
+            <select id="productos-categoria"
               value={filters.categoria}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, categoria: e.target.value }))
@@ -186,8 +186,8 @@ export default function ProductosPage() {
             </select>
           </div>
           <div>
-            <label className="block mb-2 text-[0.875rem]">Estado</label>
-            <select
+            <label htmlFor="productos-estado" className="block mb-2 text-[0.875rem]">Estado</label>
+            <select id="productos-estado"
               value={filters.estado}
               onChange={(e) =>
                 setFilters((prev) => ({

@@ -250,11 +250,11 @@ export default function EditarCuentaBancariaPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Nombre */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="editar-nombre-de-la-cuenta" className="block text-sm font-medium text-foreground/85 mb-2">
                     <FileText className="inline h-4 w-4 mr-1" />
                     Nombre de la Cuenta *
                   </label>
-                  <input
+                  <input id="editar-nombre-de-la-cuenta"
                     type="text"
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
@@ -269,11 +269,11 @@ export default function EditarCuentaBancariaPage() {
 
                 {/* Banco */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="editar-banco" className="block text-sm font-medium text-foreground/85 mb-2">
                     <Building2 className="inline h-4 w-4 mr-1" />
                     Banco *
                   </label>
-                  <input
+                  <input id="editar-banco"
                     type="text"
                     value={banco}
                     onChange={(e) => setBanco(e.target.value)}
@@ -285,11 +285,11 @@ export default function EditarCuentaBancariaPage() {
 
                 {/* Número de Cuenta */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="editar-numero-de-cuenta" className="block text-sm font-medium text-foreground/85 mb-2">
                     <Hash className="inline h-4 w-4 mr-1" />
                     Número de Cuenta *
                   </label>
-                  <input
+                  <input id="editar-numero-de-cuenta"
                     type="text"
                     value={numeroCuenta}
                     onChange={(e) => setNumeroCuenta(e.target.value)}
@@ -301,11 +301,11 @@ export default function EditarCuentaBancariaPage() {
 
                 {/* Tipo de Cuenta */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="editar-tipo-de-cuenta" className="block text-sm font-medium text-foreground/85 mb-2">
                     <CreditCard className="inline h-4 w-4 mr-1" />
                     Tipo de Cuenta *
                   </label>
-                  <select
+                  <select id="editar-tipo-de-cuenta"
                     value={tipoCuenta}
                     onChange={(e) => setTipoCuenta(e.target.value)}
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

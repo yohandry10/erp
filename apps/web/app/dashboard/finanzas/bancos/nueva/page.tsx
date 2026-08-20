@@ -188,11 +188,11 @@ export default function NuevaCuentaBancariaPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Nombre */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="nueva-nombre-de-la-cuenta" className="block text-sm font-medium text-foreground/85 mb-2">
                     <FileText className="inline h-4 w-4 mr-1" />
                     Nombre de la Cuenta *
                   </label>
-                  <input
+                  <input id="nueva-nombre-de-la-cuenta"
                     type="text"
                     value={nombre}
                     onChange={(e) => {
@@ -216,11 +216,11 @@ export default function NuevaCuentaBancariaPage() {
 
                 {/* Banco */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="nueva-banco" className="block text-sm font-medium text-foreground/85 mb-2">
                     <Building2 className="inline h-4 w-4 mr-1" />
                     Banco *
                   </label>
-                  <input
+                  <input id="nueva-banco"
                     type="text"
                     value={banco}
                     onChange={(e) => {
@@ -241,11 +241,11 @@ export default function NuevaCuentaBancariaPage() {
 
                 {/* Número de Cuenta */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="nueva-numero-de-cuenta" className="block text-sm font-medium text-foreground/85 mb-2">
                     <Hash className="inline h-4 w-4 mr-1" />
                     Número de Cuenta *
                   </label>
-                  <input
+                  <input id="nueva-numero-de-cuenta"
                     type="text"
                     value={numeroCuenta}
                     onChange={(e) => {
@@ -266,11 +266,11 @@ export default function NuevaCuentaBancariaPage() {
 
                 {/* Tipo de Cuenta */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="nueva-tipo-de-cuenta" className="block text-sm font-medium text-foreground/85 mb-2">
                     <CreditCard className="inline h-4 w-4 mr-1" />
                     Tipo de Cuenta *
                   </label>
-                  <select
+                  <select id="nueva-tipo-de-cuenta"
                     value={tipoCuenta}
                     onChange={(e) => setTipoCuenta(e.target.value)}
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -295,10 +295,10 @@ export default function NuevaCuentaBancariaPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="nueva-cuenta-contable-bancaria" className="block text-sm font-medium text-foreground/85 mb-2">
                     Cuenta contable bancaria *
                   </label>
-                  <select
+                  <select id="nueva-cuenta-contable-bancaria"
                     value={cuentaContableId}
                     onChange={(event) => {
                       setCuentaContableId(event.target.value)
@@ -320,11 +320,11 @@ export default function NuevaCuentaBancariaPage() {
                 </div>
                 {/* Moneda */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="nueva-moneda" className="block text-sm font-medium text-foreground/85 mb-2">
                     <DollarSign className="inline h-4 w-4 mr-1" />
                     Moneda *
                   </label>
-                  <select
+                  <select id="nueva-moneda"
                     value={moneda}
                     onChange={(e) => setMoneda(e.target.value)}
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -340,11 +340,11 @@ export default function NuevaCuentaBancariaPage() {
 
                 {/* Saldo Inicial */}
                 <div>
-                  <label className="block text-sm font-medium text-foreground/85 mb-2">
+                  <label htmlFor="nueva-saldo-inicial" className="block text-sm font-medium text-foreground/85 mb-2">
                     <DollarSign className="inline h-4 w-4 mr-1" />
                     Saldo Inicial
                   </label>
-                  <input
+                  <input id="nueva-saldo-inicial"
                     type="text"
                     value={saldo}
                     onChange={(e) => handleSaldoChange(e.target.value)}

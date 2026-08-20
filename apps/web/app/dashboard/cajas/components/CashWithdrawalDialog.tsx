@@ -159,7 +159,7 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                 <span className="text-muted-foreground sm:text-sm">{currencySymbol}</span>
                                             </div>
-                                            <input
+                                            <input aria-label="Monto"
                                                 type="number"
                                                 min="0.01"
                                                 step="0.01"
@@ -172,8 +172,8 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground/85">Motivo</label>
-                                        <select
+                                        <label htmlFor="cashwithdrawaldialog-motivo" className="block text-sm font-medium text-foreground/85">Motivo</label>
+                                        <select id="cashwithdrawaldialog-motivo"
                                             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                                             value={motivo}
                                             onChange={(e) => {
@@ -208,8 +208,8 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
                                                 </select>
                                             </div>
                                             <div>
-                                            <label className="block text-sm font-medium text-foreground/85">URL de evidencia del depósito</label>
-                                            <input
+                                            <label htmlFor="cashwithdrawaldialog-url-de-evidencia-del-deposito" className="block text-sm font-medium text-foreground/85">URL de evidencia del depósito</label>
+                                            <input id="cashwithdrawaldialog-url-de-evidencia-del-deposito"
                                                 type="text"
                                                 className="mt-1 block w-full sm:text-sm border border-border rounded-md p-2"
                                                 placeholder="https://..."
@@ -249,8 +249,8 @@ export function CashWithdrawalDialog({ isOpen, onClose, onSuccess, sesionId }: C
                                     )}
 
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground/85">Detalle / Observaciones</label>
-                                        <textarea
+                                        <label htmlFor="cashwithdrawaldialog-detalle-observaciones" className="block text-sm font-medium text-foreground/85">Detalle / Observaciones</label>
+                                        <textarea id="cashwithdrawaldialog-detalle-observaciones"
                                             rows={3}
                                             className="shadow-sm focus:ring-blue-500 focus:border-blue-500 mt-1 block w-full sm:text-sm border border-border rounded-md"
                                             placeholder="Detalle adicional..."

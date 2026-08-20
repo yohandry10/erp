@@ -89,7 +89,7 @@ export default function ComparacionPresupuestoPage() {
         {/* Selector de Período */}
         <div className="flex items-center gap-3">
           <Calendar size={20} className="text-muted-foreground" />
-          <select
+          <select aria-label="Periodo"
             value={selectedPeriodoId}
             onChange={(e) => setSelectedPeriodoId(e.target.value)}
             disabled={loading || periodos.length === 0} className="py-3 px-4 rounded-lg border bg-card text-[0.875rem] font-semibold text-foreground/85 cursor-pointer min-w-[200px]"

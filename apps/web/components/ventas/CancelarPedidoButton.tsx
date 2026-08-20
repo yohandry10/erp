@@ -119,7 +119,7 @@ export default function CancelarPedidoButton({
             <label className="block text-sm font-medium text-foreground/85 mb-2">
               Motivo de cancelación *
             </label>
-            <Textarea
+            <Textarea aria-label="Motivo"
               value={motivo}
               onChange={(e) => {
                 setMotivo(e.target.value)

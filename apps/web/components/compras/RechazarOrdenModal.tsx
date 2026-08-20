@@ -80,10 +80,10 @@ export default function RechazarOrdenModal({
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-semibold text-[var(--primary-700)] mb-2">
+            <label htmlFor="rechazarordenmodal-motivo-del-rechazo" className="block text-[0.875rem] font-semibold text-[var(--primary-700)] mb-2">
               Motivo del rechazo <span className="text-[var(--red-500)]">*</span>
             </label>
-            <textarea
+            <textarea id="rechazarordenmodal-motivo-del-rechazo"
               value={motivoRechazo}
               onChange={(e) => {
                 setMotivoRechazo(e.target.value)

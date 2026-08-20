@@ -290,7 +290,7 @@ export default function NuevaDevolucionPage() {
               <Search
                 size={18} className="absolute left-3 top-[50%] -translate-y-1/2 text-[var(--text-tertiary)]"
               />
-              <input
+              <input aria-label="Buscar"
                 type="text"
                 placeholder="Buscar por número de recepción, orden o proveedor..."
                 value={searchTerm}
@@ -380,10 +380,10 @@ export default function NuevaDevolucionPage() {
             </h3>
 
             <div className="mb-4">
-              <label className="block mb-[6px] text-[13px] font-medium">
+              <label htmlFor="nueva-motivo-general" className="block mb-[6px] text-[13px] font-medium">
                 Motivo General *
               </label>
-              <select
+              <select id="nueva-motivo-general"
                 value={motivoGeneral}
                 onChange={(e) => setMotivoGeneral(e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-lg text-sm"
               >
@@ -397,10 +397,10 @@ export default function NuevaDevolucionPage() {
             </div>
 
             <div>
-              <label className="block mb-[6px] text-[13px] font-medium">
+              <label htmlFor="nueva-observaciones-generales" className="block mb-[6px] text-[13px] font-medium">
                 Observaciones Generales
               </label>
-              <textarea
+              <textarea id="nueva-observaciones-generales"
                 value={observacionesGenerales}
                 onChange={(e) => setObservacionesGenerales(e.target.value)}
                 rows={3} className="w-[100%] py-2.5 px-3 border rounded-lg text-sm"
@@ -446,7 +446,7 @@ export default function NuevaDevolucionPage() {
                             </div>
                           </div>
                         ) : (
-                          <input
+                          <input aria-label="ID del producto"
                             type="text"
                             placeholder="ID del producto"
                             value={item.producto_id}
@@ -459,7 +459,7 @@ export default function NuevaDevolucionPage() {
                         <label className="block mb-[6px] text-xs font-medium">
                           Cantidad *
                         </label>
-                        <input
+                        <input aria-label="Cantidad"
                           type="number"
                           min="0"
                           step="1"
@@ -472,7 +472,7 @@ export default function NuevaDevolucionPage() {
                         <label className="block mb-[6px] text-xs font-medium">
                           Motivo *
                         </label>
-                        <select
+                        <select aria-label="Motivo"
                           value={item.motivo}
                           onChange={(e) => updateItem(index, 'motivo', e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-sm"
                         >
@@ -494,10 +494,10 @@ export default function NuevaDevolucionPage() {
                     </div>
 
                     <div className="mt-3">
-                      <label className="block mb-[6px] text-xs font-medium">
+                      <label htmlFor="nueva-observaciones-del-item" className="block mb-[6px] text-xs font-medium">
                         Observaciones del Item
                       </label>
-                      <input
+                      <input id="nueva-observaciones-del-item"
                         type="text"
                         placeholder="Detalles específicos de este item..."
                         value={item.observaciones || ''}

@@ -224,7 +224,7 @@ export function UserList() {
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
+          <Input aria-label="Search"
             placeholder="Search by name, email, position..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -232,7 +232,7 @@ export function UserList() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filter by status">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>

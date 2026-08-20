@@ -261,7 +261,7 @@ function RecepcionesContent() {
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:text-blue-700">
                 <Search size={18} />
               </span>
-              <input
+              <input aria-label="Buscar por número, proveedor u orden"
                 type="text"
                 placeholder="Buscar por número, proveedor u orden"
                 value={filters.search}
@@ -279,7 +279,7 @@ function RecepcionesContent() {
               </label>
               <div className="relative">
                 <Filter size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <select
+                <select aria-label="Estado"
                   value={filters.estado}
                 onChange={(event) => {
                   setFilters((prev) => ({ ...prev, estado: event.target.value as RecepcionFilters['estado'] }))

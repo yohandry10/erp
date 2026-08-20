@@ -277,10 +277,10 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
               ) : (
               <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-5">
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-2">
+                  <label htmlFor="viewtenantmodal-email-demo" className="block text-xs font-semibold text-muted-foreground mb-2">
                     Email demo
                   </label>
-                  <input
+                  <input id="viewtenantmodal-email-demo"
                     type="email"
                     autoComplete="username"
                     value={demoEmail}
@@ -289,10 +289,10 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-2">
+                  <label htmlFor="viewtenantmodal-contrasena-demo" className="block text-xs font-semibold text-muted-foreground mb-2">
                     Contraseña demo
                   </label>
-                  <input
+                  <input id="viewtenantmodal-contrasena-demo"
                     type="password"
                     autoComplete="new-password"
                     value={demoPassword}
@@ -301,10 +301,10 @@ export default function ViewTenantModal({ tenant, onClose }: ViewTenantModalProp
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-2">
+                  <label htmlFor="viewtenantmodal-dias-de-demo" className="block text-xs font-semibold text-muted-foreground mb-2">
                     Días de demo
                   </label>
-                  <input
+                  <input id="viewtenantmodal-dias-de-demo"
                     type="number"
                     min={1}
                     max={90}

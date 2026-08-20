@@ -28,6 +28,7 @@
     "test:pos-idempotencia": "node tests/pos/verify-pos-idempotencia.mjs",
     "test:pos-offline": "node tests/pos/verify-offline-abort.mjs",
     "test:fechas": "node tests/fechas/verify-fecha-local.mjs",
+    "test:etiquetas": "node tests/formularios/verify-etiquetas.mjs",
     "playwright:install": "playwright install chromium"
   },
   "dependencies": {

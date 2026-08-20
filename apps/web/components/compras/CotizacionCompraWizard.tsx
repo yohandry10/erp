@@ -242,10 +242,10 @@ export function CotizacionCompraWizard({
 
           <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="cotizacioncomprawizard-numero-de-cotizacion" className={fieldLabelClass}>
                 Número de Cotización <span className={requiredMarkClass}>*</span>
               </label>
-              <input
+              <input id="cotizacioncomprawizard-numero-de-cotizacion"
                 type="text"
                 {...register('numero')}
                 className={cn(fieldBaseClass, 'font-mono', errors.numero ? fieldErrorClass : fieldNormalClass)}
@@ -258,10 +258,10 @@ export function CotizacionCompraWizard({
             </div>
 
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="cotizacioncomprawizard-proveedor" className={fieldLabelClass}>
                 Proveedor <span className={requiredMarkClass}>*</span>
               </label>
-              <select
+              <select id="cotizacioncomprawizard-proveedor"
                 {...register('proveedor_id')}
                 className={cn(fieldBaseClass, errors.proveedor_id ? fieldErrorClass : fieldNormalClass)}
                 disabled={loadingProveedores}
@@ -281,10 +281,10 @@ export function CotizacionCompraWizard({
             </div>
 
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="cotizacioncomprawizard-fecha-de-cotizacion" className={fieldLabelClass}>
                 Fecha de Cotización <span className={requiredMarkClass}>*</span>
               </label>
-              <input
+              <input id="cotizacioncomprawizard-fecha-de-cotizacion"
                 type="date"
                 {...register('fecha_cotizacion')}
                 className={cn(fieldBaseClass, errors.fecha_cotizacion ? fieldErrorClass : fieldNormalClass)}
@@ -297,10 +297,10 @@ export function CotizacionCompraWizard({
             </div>
 
             <div>
-              <label className={fieldLabelClass}>
+              <label htmlFor="cotizacioncomprawizard-dias-de-validez" className={fieldLabelClass}>
                 Días de Validez <span className={requiredMarkClass}>*</span>
               </label>
-              <input
+              <input id="cotizacioncomprawizard-dias-de-validez"
                 type="number"
                 {...register('validez_dias', { valueAsNumber: true })}
                 className={cn(fieldBaseClass, errors.validez_dias ? fieldErrorClass : fieldNormalClass)}
@@ -313,10 +313,10 @@ export function CotizacionCompraWizard({
             </div>
 
             <div className="col-span-full">
-              <label className={fieldLabelClass}>
+              <label htmlFor="cotizacioncomprawizard-observaciones" className={fieldLabelClass}>
                 Observaciones
               </label>
-              <textarea
+              <textarea id="cotizacioncomprawizard-observaciones"
                 {...register('observaciones')}
                 rows={3}
                 placeholder="Notas adicionales sobre la cotización..."
@@ -439,10 +439,10 @@ function Step2AddProducts({
       <div className={cn(panelSoftClass, 'mb-6')}>
         <div className="grid items-end gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(140px,1fr)_minmax(140px,1fr)_auto]">
           <div>
-            <label className={fieldLabelClass}>
+            <label htmlFor="cotizacioncomprawizard-producto" className={fieldLabelClass}>
               Producto
             </label>
-            <select
+            <select id="cotizacioncomprawizard-producto"
               value={selectedProducto}
               onChange={(e) => setSelectedProducto(e.target.value)}
               disabled={loadingProductos}
@@ -458,10 +458,10 @@ function Step2AddProducts({
           </div>
 
           <div>
-            <label className={fieldLabelClass}>
+            <label htmlFor="cotizacioncomprawizard-cantidad" className={fieldLabelClass}>
               Cantidad
             </label>
-            <input
+            <input id="cotizacioncomprawizard-cantidad"
               type="number"
               value={cantidad}
               onChange={(e) => setCantidad(Number(e.target.value))}
@@ -472,10 +472,10 @@ function Step2AddProducts({
           </div>
 
           <div>
-            <label className={fieldLabelClass}>
+            <label htmlFor="cotizacioncomprawizard-precio-unit" className={fieldLabelClass}>
               Precio Unit.
             </label>
-            <input
+            <input id="cotizacioncomprawizard-precio-unit"
               type="number"
               value={precio}
               onChange={(e) => setPrecio(Number(e.target.value))}

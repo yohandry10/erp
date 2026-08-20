@@ -108,10 +108,10 @@ export function ProveedorForm({
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
           {/* RUC */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="proveedorform-ruc" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               {taxIdLabel} <span className="text-red-500">*</span>
             </label>
-            <input
+            <input id="proveedorform-ruc"
               type="text"
               {...register('ruc')}
               placeholder={country.paisCodigo === 'AR' ? '30710158229' : country.paisCodigo === 'CO' ? '900123456-8' : '20123456789'} className="w-[100%] p-3 rounded-lg text-[0.875rem]"
@@ -125,10 +125,10 @@ export function ProveedorForm({
 
           {/* Razón Social */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="proveedorform-razon-social" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Razón Social <span className="text-red-500">*</span>
             </label>
-            <input
+            <input id="proveedorform-razon-social"
               type="text"
               {...register('razon_social')}
               placeholder={country.paisCodigo === 'CO' ? 'DISTRIBUIDORA ABC S.A.S.' : country.paisCodigo === 'AR' ? 'DISTRIBUIDORA ABC S.A.' : 'DISTRIBUIDORA ABC S.A.C.'} className="w-[100%] p-3 rounded-lg text-[0.875rem]"
@@ -142,10 +142,10 @@ export function ProveedorForm({
 
           {/* Nombre Comercial */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="proveedorform-nombre-comercial" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Nombre Comercial
             </label>
-            <input
+            <input id="proveedorform-nombre-comercial"
               type="text"
               {...register('nombre_comercial')}
               placeholder="ABC Distribuidora" className="w-[100%] p-3 rounded-lg text-[0.875rem]"
@@ -159,14 +159,14 @@ export function ProveedorForm({
 
           {/* Email */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="proveedorform-email" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Email <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <Mail
                 size={16} className="absolute left-3 top-[50%] -translate-y-1/2 text-muted-foreground"
               />
-              <input
+              <input id="proveedorform-email"
                 type="email"
                 {...register('email')}
                 placeholder="contacto@abc.com" className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-lg text-[0.875rem]"
@@ -191,10 +191,10 @@ export function ProveedorForm({
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
           {/* Contacto */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="proveedorform-nombre-del-contacto" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Nombre del Contacto
             </label>
-            <input
+            <input id="proveedorform-nombre-del-contacto"
               type="text"
               {...register('contacto')}
               placeholder="Juan Pérez" className="w-[100%] p-3 rounded-lg text-[0.875rem]"
@@ -208,14 +208,14 @@ export function ProveedorForm({
 
           {/* Teléfono */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="proveedorform-telefono" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Teléfono
             </label>
             <div className="relative">
               <Phone
                 size={16} className="absolute left-3 top-[50%] -translate-y-1/2 text-muted-foreground"
               />
-              <input
+              <input id="proveedorform-telefono"
                 type="text"
                 {...register('telefono')}
                 placeholder={country.paisCodigo === 'CO' ? '+57 300 123 4567' : country.paisCodigo === 'AR' ? '+54 11 5555 5555' : '+51 999 888 777'} className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-lg text-[0.875rem]"
@@ -230,14 +230,14 @@ export function ProveedorForm({
 
           {/* Dirección */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="proveedorform-direccion" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Dirección
             </label>
             <div className="relative">
               <MapPin
                 size={16} className="absolute left-3 top-3 text-muted-foreground"
               />
-              <textarea
+              <textarea id="proveedorform-direccion"
                 {...register('direccion')}
                 placeholder={country.paisCodigo === 'CO' ? 'Carrera 7 # 72-41, Bogotá D.C.' : country.paisCodigo === 'AR' ? 'Av. Corrientes 1234, CABA' : 'Av. Principal 123, Lima'}
                 rows={2} className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-lg text-[0.875rem]"
@@ -262,10 +262,10 @@ export function ProveedorForm({
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
           {/* Condiciones de Pago */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="proveedorform-condiciones-de-pago" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Condiciones de Pago
             </label>
-            <select
+            <select id="proveedorform-condiciones-de-pago"
               {...register('condiciones_pago')} className="w-[100%] p-3 rounded-lg text-[0.875rem] bg-card"
             >
               <option value="CONTADO">Contado</option>
@@ -284,10 +284,10 @@ export function ProveedorForm({
 
           {/* Límite de Crédito */}
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="proveedorform-limite-de-credito" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Límite de Crédito ({country.moneda})
             </label>
-            <input
+            <input id="proveedorform-limite-de-credito"
               type="number"
               step="0.01"
               {...register('limite_credito', { valueAsNumber: true })}
