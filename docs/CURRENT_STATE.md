@@ -359,6 +359,30 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
 - La contraseña del aprobador de la demo se genera con `randomInt` y no con
   `Math.random`, que no es criptográfico y cuyo estado interno se reconstruye a
   partir de unas pocas salidas. Es una credencial de acceso real.
+- El **Bloqueador 2 «CPE invisible» no se reproduce** y queda descartado. Se
+  verificó el 2026-08-19 sobre una demo peruana creada por el endpoint productivo:
+  `GET /api/cpe/comprobantes` respondió `200` con `success: true`, un comprobante y
+  `meta.total = 1`, y el módulo lo listó junto con sus indicadores. Antes se habían
+  descartado contra base limpia las seis causas plausibles (fila ausente,
+  `activo=false`, permiso inexistente, permiso no concedido, ruta mal construida y
+  filtros del listado). La hipótesis que queda es un fallo transitorio de lectura
+  tragado en silencio por el cliente, que es justo lo que cierra el arreglo del
+  timeout: una lectura fallida ya no puede confundirse con una respuesta vacía.
+- Esa misma sesión dejó dos defectos comprobados en producción, ambos ya
+  corregidos en esta rama. El listado de CPE derivaba la fecha del comprobante con
+  `toISOString()`: a las 20:15 de Lima mostraba la factura demo fechada
+  `2026-08-20`, es decir con fecha futura y en el periodo tributario equivocado.
+  Y `deudas-clientes` devolvía el gráfico de antigüedad en `[0,0,0,0]` mientras el
+  total por cobrar era `179.80`, porque la única cuenta estaba vigente y ningún
+  tramo la recogía.
+- El barrido de fechas se amplió a la variante `new Date(valor).toISOString()`, que
+  convierte un `timestamptz` ya guardado y lo presenta en UTC. El guardián
+  automatizado cubre ahora ambas formas.
+- Se retiraron tres servicios de `shared/integration/` que no estaban inyectados en
+  ningún módulo: `accounting-entries` (con un IGV `1.18` cableado, roto para AR y
+  CO, y siete fechas UTC), `accounting-reports` y `dashboard-integration` (con
+  dieciocho rangos por fecha en UTC). Eran instanciados por Nest y nunca usados;
+  su única consecuencia real era contaminar cada auditoría.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.

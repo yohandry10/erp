@@ -16,7 +16,12 @@ import path from 'node:path';
  * servicio contable que no está conectado a nada.
  */
 
-const PATRON = String.raw`new Date()\.toISOString()\.split('T')\[0\]`;
+// Dos variantes, y la segunda es la que se escapó primero. `new Date()` sin
+// argumento fecha «hoy» en UTC; `new Date(valor)` convierte un timestamptz ya
+// guardado y lo presenta en UTC. Las dos muestran el día equivocado al sur de
+// Greenwich, y la segunda se detectó en producción: a las 20:15 de Lima el
+// listado de CPE mostraba una factura fechada al día siguiente.
+const PATRON = String.raw`new Date(.*)\.toISOString()\.split('T')\[0\]`;
 
 /**
  * Excepciones justificadas. Cualquier archivo nuevo que aparezca aquí debe
@@ -32,8 +37,8 @@ const PERMITIDOS = new Map<string, string>([
     'nombre del archivo XLSX exportado; no decide ni se persiste',
   ],
   [
-    'shared/integration/accounting-entries.service.ts',
-    'servicio sin inyectar en ningún módulo: código muerto pendiente de retirar',
+    'modules/contabilidad/services/centros-costo.service.ts',
+    'inicio de año por defecto de un reporte; el fin sí usa la fecha del tenant',
   ],
   [
     'modules/rrhh/planillas.service.ts',
