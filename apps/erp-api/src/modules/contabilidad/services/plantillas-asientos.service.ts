@@ -13,7 +13,8 @@ import {
   AsientoResponseDto
 } from '@erp-suite/dtos';
 import { buildDeterministicUuid } from '../../../common/util/deterministic-uuid.util';
-
+
+import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 @Injectable()
 export class PlantillasAsientosService {
   private readonly logger = new Logger(PlantillasAsientosService.name);
@@ -218,7 +219,7 @@ export class PlantillasAsientosService {
     const detalles = dto.detalles?.length ? dto.detalles : plantilla.detalles ?? [];
     this.validarDetalles(detalles);
 
-    const fecha = dto.fecha ?? new Date().toISOString().slice(0, 10);
+    const fecha = dto.fecha ?? (await fechaHoyDelTenant(this.supabaseService.getClient(), tenantId));
     const periodo = PlantillasAsientosService.periodoDe(new Date(fecha));
     const sourceEventId = buildDeterministicUuid(
       `plantilla-asiento:${tenantId}:${plantillaId}:${periodo}`
@@ -326,7 +327,14 @@ export class PlantillasAsientosService {
   }
 
   /** Plantillas recurrentes cuya fecha de generación ya venció. */
-  async obtenerVencidas(hasta: string): Promise<Array<{ id: string; tenant_id: string }>> {
+  /** Fecha de calendario del tenant, para no fechar nada con el reloj del servidor. */
+  async fechaHoyDe(tenantId: string): Promise<string> {
+    return fechaHoyDelTenant(this.supabaseService.getClient(), tenantId);
+  }
+
+  async obtenerVencidas(
+    hasta: string,
+  ): Promise<Array<{ id: string; tenant_id: string; proxima_ejecucion: string }>> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('plantillas_asientos')
@@ -340,7 +348,7 @@ export class PlantillasAsientosService {
       throw new Error(`Error obteniendo plantillas vencidas: ${error.message}`);
     }
 
-    return (data || []) as Array<{ id: string; tenant_id: string }>;
+    return (data || []) as Array<{ id: string; tenant_id: string; proxima_ejecucion: string }>;
   }
 
   // --------------------------------------------------------------------------

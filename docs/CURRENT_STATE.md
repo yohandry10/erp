@@ -30,6 +30,23 @@ migraciones verificados, prevalece la implementación actual.
   lo demás sigue fallando cerrado. **Tras el despliegue** conviene reencolar los
   doce que ya están en `dead_letter` para que se cierren; antes de desplegar
   volverían a caer.
+- **El guardián de fechas UTC estaba inerte y tapaba diez sitios.** Sólo miraba
+  `.split('T')[0]`, y al ampliarlo a `.slice(0, 10)` y `.slice(0, 7)` resultó que
+  `git grep` usa expresión básica: los paréntesis y la barra eran literales, la
+  alternancia no casaba con nada y el guardián pasaba en verde sin comprobar nada.
+  Con `-E` aparecieron diez ficheros nunca vistos. Seis eran defectos reales, no
+  cosméticos: la **fecha del asiento contable del cierre de caja**, la de
+  conciliación de partidas, la de las plantillas recurrentes —que además alimenta
+  el UUID determinista del período—, el **período con el que RRHH elige la
+  normativa vigente** (UIT, RMV, tasas AFP) y el que valida la RMV de un contrato,
+  y el planificador de plantillas, que corre a las 02:00 UTC —21:00 de Lima del día
+  anterior— y disparaba las plantillas un día antes con fecha futura. Todos pasan
+  ya por la zona del contribuyente; el planificador filtra por el calendario de
+  cada tenant. Queda anotado y sin resolver el caso de ARCA: el QR y el XML leen
+  `fechaEmision` en UTC y coinciden entre sí, pero una emisión nocturna en
+  Argentina quedaría fechada al día siguiente. No afecta hoy —ningún contribuyente
+  tiene `arca_activo` y no hay tenants AR— y al homologar habrá que decidir si ese
+  campo es el instante o el día fiscal.
 - **Barrido de integridad sobre PROD el 2026-08-20**, sólo lectura: 170 asientos
   contables, todos cuadrados y con detalle; el invariante de stock
   (`productos.stock_actual` = suma de `producto_existencias`) se cumple en todos

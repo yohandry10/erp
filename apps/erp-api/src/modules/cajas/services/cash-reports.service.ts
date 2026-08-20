@@ -4,7 +4,8 @@ import { CashMovementsService, TipoMovimiento } from './cash-movements.service';
 import { CashReconciliationService } from './cash-reconciliation.service';
 import PDFDocument from 'pdfkit';
 import * as crypto from 'crypto';
-
+
+import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 export interface ResumenFiscal {
     base_imponible: number;
     igv: number;
@@ -876,7 +877,7 @@ export class CashReportsService {
 
         const asientoPayload = {
             tenant_id: tenantId,
-            fecha: new Date().toISOString().slice(0, 10),
+            fecha: await fechaHoyDelTenant(this.supabase.getClient(), tenantId),
             tipo_asiento: 'POS_CIERRE',
             origen: 'POS',
             concepto: asientoConcepto,

@@ -10,7 +10,8 @@ import {
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { OseService } from '../ose/ose.service';
 import { ValidationService } from '../validations/validation.service';
-
+
+import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
 @Injectable()
 export class GreService {
   private readonly logger = new Logger(GreService.name);
@@ -1628,7 +1629,7 @@ ${lines}
         acc[guia.estado] = (acc[guia.estado] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = await fechaHoyDelTenant(this.supabaseService.getClient(), tenantId);
       const stats = {
         total: guias.length,
         estados,
