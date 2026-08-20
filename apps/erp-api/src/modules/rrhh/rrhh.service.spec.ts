@@ -233,6 +233,8 @@ describe('RrhhService createContrato — normativa laboral peruana', () => {
         regimen_pensionario: 'AFP',
         afp_codigo: 'prima',
         tipo_comision_afp: 'saldo',
+        tasa_comision_afp: 0.016,
+        tasa_seguro_afp: 0.0174,
         sueldo_bruto: 2000,
       },
       'tenant-1',
@@ -244,6 +246,64 @@ describe('RrhhService createContrato — normativa laboral peruana', () => {
     const metadata = payload?.p_payload?.metadata ?? payload?.p_contrato?.metadata ?? {};
     expect(metadata.afp_codigo).toBe('PRIMA');
     expect(metadata.tipo_comision_afp).toBe('SALDO');
+  });
+
+  // Las tasas AFP las publica la SBS, cambian por trimestre y difieren entre las
+  // cuatro administradoras. El motor caía a las de Integra para todas, así que un
+  // afiliado a Prima, Profuturo o Hábitat se liquidaba con una comisión ajena.
+  it('exige declarar la comision y la prima de la AFP', async () => {
+    client.from
+      .mockReturnValueOnce(normativaChain(null))
+      .mockReturnValueOnce(normativaChain(1130));
+    await expect(service.createContrato(
+      { ...base, regimen_pensionario: 'AFP', afp_codigo: 'PRIMA', tipo_comision_afp: 'FLUJO', sueldo_bruto: 2000 },
+      'tenant-1',
+    )).rejects.toThrow(/comisión|prima de seguro/i);
+  });
+
+  it('rechaza una tasa fuera de rango en vez de liquidar con ella', async () => {
+    client.from
+      .mockReturnValueOnce(normativaChain(null))
+      .mockReturnValueOnce(normativaChain(1130));
+    await expect(service.createContrato(
+      {
+        ...base,
+        regimen_pensionario: 'AFP',
+        afp_codigo: 'PRIMA',
+        tipo_comision_afp: 'FLUJO',
+        tasa_comision_afp: 155, // porcentaje en vez de fracción
+        tasa_seguro_afp: 0.0174,
+        sueldo_bruto: 2000,
+      },
+      'tenant-1',
+    )).rejects.toThrow(/fracción/i);
+  });
+
+  it('conserva las tasas declaradas y no las sustituye por las de Integra', async () => {
+    client.from
+      .mockReturnValueOnce(normativaChain(null))
+      .mockReturnValueOnce(normativaChain(1130));
+    client.rpc.mockResolvedValueOnce({ data: { id: 'ctr-tasas' }, error: null });
+
+    await service.createContrato(
+      {
+        ...base,
+        regimen_pensionario: 'AFP',
+        afp_codigo: 'PROFUTURO',
+        tipo_comision_afp: 'FLUJO',
+        tasa_comision_afp: 0.0169,
+        tasa_seguro_afp: 0.0174,
+        sueldo_bruto: 2000,
+      },
+      'tenant-1',
+      'actor-1',
+      'contract-tasas-propias',
+    );
+
+    const payload = client.rpc.mock.calls.at(-1)?.[1];
+    const metadata = payload?.p_payload?.metadata ?? payload?.p_contrato?.metadata ?? {};
+    expect(metadata.tasa_comision_afp).toBe(0.0169);
+    expect(metadata.tasa_seguro_afp).toBe(0.0174);
   });
 
   it('no exige regimen pensionario en locacion de servicios por no ser contrato laboral', async () => {

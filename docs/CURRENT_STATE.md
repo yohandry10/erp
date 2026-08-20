@@ -395,6 +395,21 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   escenarios optimista y pesimista, que son bandas explícitas.
 - Los únicos `Math.random()` que quedan en el API son el *jitter* de reintento de
   contabilidad y de SUNAT, que es su uso correcto.
+- Los indicadores de Analytics pasan a la definición contable estándar. Liquidez
+  es la razón corriente —activo corriente (bancos + cuentas por cobrar +
+  inventario valorizado) entre pasivo corriente— en vez de
+  `(ventas del mes + CxC) / CxP`, que no es un ratio de liquidez y contaba dos
+  veces las ventas a crédito. Rentabilidad es el margen neto: descuenta el costo
+  de ventas además de los gastos, con lo que deja de marcar cerca de 100 % y darlo
+  por bueno. El costo se calcula por ítem vendido contra el costo actual del
+  producto; es una aproximación, no un costeo por capas, y así se rotula.
+- Las tasas AFP dejan de caer a las de Integra. Las publica la SBS, cambian por
+  trimestre y difieren entre las cuatro administradoras, así que el alta de un
+  contrato AFP exige declarar comisión y prima. El frontend ya las enviaba
+  diferenciadas por AFP (Hábitat 1,47 %, Integra 1,55 %, Prima 1,60 %, Profuturo
+  1,69 %); era el backend el que las descartaba, de modo que un afiliado a Prima,
+  Profuturo o Hábitat se liquidaba con la comisión de Integra. No se cablea un
+  catálogo de tasas en el código: quedaría obsoleto en el próximo cambio de la SBS.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.

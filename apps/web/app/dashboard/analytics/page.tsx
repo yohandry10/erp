@@ -1125,13 +1125,13 @@ export default function AnalyticsPage() {
             <MetricTile
               label="Liquidez"
               data={kpisVisuales?.liquidez}
-              aviso="Estimación no contable: se calcula sobre ventas del último mes más cuentas por cobrar, dividido entre cuentas por pagar. No es la razón corriente. Pendiente de definir el criterio contable."
+              aviso="Razón corriente: activo corriente (bancos + cuentas por cobrar + inventario valorizado) entre pasivo corriente (cuentas por pagar)."
             />
             <MetricTile
               label="Rentabilidad"
               data={kpisVisuales?.rentabilidad}
               format="percentage"
-              aviso="Estimación no contable: descuenta gastos registrados pero no el costo de ventas, así que sobrestima el margen. Pendiente de definir el criterio contable."
+              aviso="Margen neto: ventas del periodo menos costo de ventas y gastos, sobre ventas. El costo usa el valor actual del producto, no un costeo por capas."
             />
             <MetricTile label="Crecimiento" data={kpisVisuales?.crecimiento} format="percentage" />
             <EfficiencyTile data={kpisVisuales?.eficiencia} />
