@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
-import { EventBusService, CierreVentasDiarioEvent, ProductoStockBajoEvent, VencimientoPagoEvent, ReporteSireGeneradoEvent, InventarioCiclicoEvent } from '../events/event-bus.service';
+import { EventBusService, CierreVentasDiarioEvent, ProductoStockBajoEvent, VencimientoPagoEvent, ReporteSireGeneradoEvent } from '../events/event-bus.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { v4 as uuidv4 } from 'uuid';
 import { fechaHoyDelTenant, rangoDelDiaDelTenant } from '../utils/fecha-tenant.util';
@@ -53,12 +53,11 @@ export class BackgroundJobsService {
     // Consolidación de métricas del dashboard - cada 30 minutos
     this.scheduleInterval(30 * 60 * 1000, () => this.runPerTenant('metricas-dashboard', (t) => this.actualizarMetricasDashboard(t)));
     
-    // Inventario cíclico - cada lunes a las 6:00 AM (opcional)
-    if (process.env.BACKGROUND_JOBS_INVENTARIO_ENABLED === 'true') {
-      this.scheduleWeekly(1, '06:00:00', () => this.runPerTenant('inventario-ciclico', (t) => this.ejecutarInventarioCiclico(t)));
-    } else {
-      console.log('⏸️ [BackgroundJobs] Inventario cíclico deshabilitado (BACKGROUND_JOBS_INVENTARIO_ENABLED!=true)');
-    }
+    // El inventario cíclico automático se retiró: fabricaba el conteo físico con
+    // `Math.random()` sobre el stock del sistema, calculaba la "diferencia" contra
+    // ese número inventado y la publicaba con `requiereAjuste`. Un conteo físico no
+    // se calcula, se cuenta; nadie escuchaba el evento y el flag estaba apagado,
+    // así que sólo era una mina esperando a que alguien lo encendiera.
     
     // Procesamiento de asistencias pendientes - cada hora (opcional)
     if (process.env.BACKGROUND_JOBS_ASISTENCIAS_ENABLED === 'true') {
@@ -678,58 +677,6 @@ export class BackgroundJobsService {
       
     } catch (error) {
       console.error('❌ [BackgroundJobs] Error actualizando métricas del dashboard:', error);
-    }
-  }
-
-  async ejecutarInventarioCiclico(tenantId: string) {
-    if (process.env.BACKGROUND_JOBS_INVENTARIO_ENABLED !== 'true') {
-      return;
-    }
-    try {
-      console.log(`📋 [BackgroundJobs] Ejecutando inventario cíclico automático (tenant ${tenantId})...`);
-      
-      const productosQuery = this.supabase.query('productos')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .limit(50)
-        .order('updated_at', { ascending: true });
-
-      const { data: productos, error } = await productosQuery;
-
-      if (error) throw error;
-
-      if (!productos || productos.length === 0) {
-        console.log('ℹ️ [BackgroundJobs] No hay productos para inventario cíclico');
-        return;
-      }
-
-      for (const producto of productos) {
-        const stockSistema = parseFloat((producto as any).stock || '0');
-        const variacion = (Math.random() - 0.5) * 0.1;
-        const stockFisico = Math.max(0, Math.round(stockSistema * (1 + variacion)));
-        const diferencia = stockFisico - stockSistema;
-
-        if (Math.abs(diferencia) > 0) {
-          const eventoInventario: InventarioCiclicoEvent = {
-            productoId: producto.id,
-            ubicacion: producto.ubicacion || 'ALMACEN-PRINCIPAL',
-            stockSistema,
-            stockFisico,
-            diferencia,
-            valorDiferencia:
-              diferencia *
-              parseFloat(((producto as any).precio_venta ?? (producto as any).precio) || '0'),
-            responsable: 'SISTEMA-AUTO',
-            fechaConteo: new Date().toISOString(),
-            requiereAjuste: Math.abs(diferencia) > 2
-          };
-
-          this.eventBus.emitInventarioCiclico(eventoInventario);
-        }
-      }
-      
-    } catch (error) {
-      console.error('❌ [BackgroundJobs] Error en inventario cíclico:', error);
     }
   }
 
