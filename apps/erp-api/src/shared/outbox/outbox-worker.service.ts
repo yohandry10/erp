@@ -5,7 +5,8 @@ import { ClaimedOutboxEvent, OutboxService } from './outbox.service';
 import { EventBusService, ERPEvent } from '../events/event-bus.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { ACCOUNTING_EVENT_TYPES } from './accounting-event-types';
-
+
+import { esEventoSinSuscriptor } from './eventos-sin-suscriptor';
 /** Worker genérico. El claim SQL es la fuente única de propiedad del evento. */
 @Injectable()
 export class OutboxWorker implements OnApplicationBootstrap {
@@ -165,7 +166,12 @@ export class OutboxWorker implements OnApplicationBootstrap {
             timestamp: new Date(event.created_at),
             module: 'outbox-worker',
           };
-          await this.eventBus.emitAndAwait(event.event_type, erpEvent.data, 'outbox-worker');
+          // Un evento declarado sin suscriptor se da por procesado sin despachar.
+          // El resto sigue fallando cerrado: si le falta el handler, cae a
+          // dead_letter, que es donde debe verse.
+          if (!esEventoSinSuscriptor(event.event_type)) {
+            await this.eventBus.emitAndAwait(event.event_type, erpEvent.data, 'outbox-worker');
+          }
           await this.outboxService.markEventCompleted(event.id, event.claim_token);
           return true;
         } catch (error) {
