@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { CotizacionCompra, Proveedor } from '@/types/compras'
 import toast from 'react-hot-toast'
+import { parseDateLocal } from '@/lib/date-utils'
 import CompraEditarCabeceraModal from '@/components/modals/CompraEditarCabeceraModal'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
@@ -148,7 +149,7 @@ export default function CotizacionesCompraPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(locale, {
+    return parseDateLocal(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'

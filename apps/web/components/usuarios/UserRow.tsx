@@ -1,6 +1,7 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface UserRowProps {
   usuario: any
@@ -66,13 +67,13 @@ export default function UserRow({ usuario, currentUserId, onEdit, onChangeStatus
         <div>{getTimeAgo(usuario.fecha_ultimo_acceso)}</div>
         <div className="text-xs text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
           {usuario.fecha_ultimo_acceso ?
-            new Date(usuario.fecha_ultimo_acceso).toLocaleDateString('es-PE') :
+            parseDateLocal(usuario.fecha_ultimo_acceso).toLocaleDateString('es-PE') :
             'Nunca'
           }
         </div>
       </td>
       <td className="p-4">
-        {new Date(usuario.created_at).toLocaleDateString('es-PE')}
+        {parseDateLocal(usuario.created_at).toLocaleDateString('es-PE')}
       </td>
       <td className="p-4 text-center">
         <Badge className={getStatusClass(usuario.estado)}>

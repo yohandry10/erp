@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useApi } from '@/hooks/use-api'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface CuentaPorCobrarResumen {
   id: string
@@ -32,7 +33,7 @@ interface ReprogramarModalProps {
 const formatDate = (iso?: string | null) => {
   if (!iso) return '—'
   try {
-    return new Date(iso).toLocaleDateString('es-PE')
+    return parseDateLocal(iso).toLocaleDateString('es-PE')
   } catch {
     return iso
   }

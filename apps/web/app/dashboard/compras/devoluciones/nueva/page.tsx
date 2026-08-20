@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, Search, Plus, Trash2, AlertCircle, PackageX } from 'lucide-react'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface Recepcion {
   id: string
@@ -231,7 +232,7 @@ export default function NuevaDevolucionPage() {
   )
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'

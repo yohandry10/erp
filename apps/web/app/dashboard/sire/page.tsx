@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { apiSucceeded, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
+import { parseDateLocal } from '@/lib/date-utils'
 
 const getCurrentPeriod = () => new Date().toISOString().slice(0, 7)
 
@@ -452,7 +453,7 @@ export default function SIREPage() {
                           </div>
                         </td>
                         <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-muted-foreground">
-                          {report.created_at ? new Date(report.created_at).toLocaleDateString('es-PE') : 'N/A'}
+                          {report.created_at ? parseDateLocal(report.created_at).toLocaleDateString('es-PE') : 'N/A'}
                         </td>
                         <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-right font-bold text-primary">
                           {(report.total_registros || 0).toLocaleString()}

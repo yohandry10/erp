@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface DevolucionItem {
   id: string
@@ -179,7 +180,7 @@ export default function DevolucionDetallePage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(locale, {
+    return parseDateLocal(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'

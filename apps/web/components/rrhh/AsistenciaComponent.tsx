@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface Empleado {
   id: string
@@ -271,7 +272,7 @@ export default function AsistenciaComponent() {
       {/* Lista de empleados con controles */}
       <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
         <div className="bg-muted/30 px-6 py-3 border-b border-border">
-          <h3 className="text-lg font-semibold text-foreground">👥 Estado de Empleados - {new Date(fechaConsulta).toLocaleDateString(locale)}</h3>
+          <h3 className="text-lg font-semibold text-foreground">👥 Estado de Empleados - {parseDateLocal(fechaConsulta).toLocaleDateString(locale)}</h3>
         </div>
 
         <div className="divide-y divide-gray-100">

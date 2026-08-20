@@ -291,7 +291,7 @@ export default function PeriodoDetailPage() {
                 Fecha de Creación
               </p>
               <p className="m-0 text-[0.875rem] font-medium text-foreground">
-                {new Date(periodo.created_at).toLocaleDateString('es-PE', {
+                {parseDateLocal(periodo.created_at).toLocaleDateString('es-PE', {
                   year: 'numeric',
                   month: 'short',
                   day: 'numeric'

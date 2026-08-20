@@ -7,6 +7,7 @@ import { Badge } from '../ui/badge';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { parseDateLocal } from '@/lib/date-utils'
 import {
   Select,
   SelectContent,
@@ -295,11 +296,11 @@ export function SeleccionarCxpLote({
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <div className="text-muted-foreground">Emisión</div>
-                        <div>{new Date(cxp.fecha_emision).toLocaleDateString()}</div>
+                        <div>{parseDateLocal(cxp.fecha_emision).toLocaleDateString()}</div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">Vencimiento</div>
-                        <div>{new Date(cxp.fecha_vencimiento).toLocaleDateString()}</div>
+                        <div>{parseDateLocal(cxp.fecha_vencimiento).toLocaleDateString()}</div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">Total</div>

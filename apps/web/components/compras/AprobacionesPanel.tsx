@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { parseDateLocal } from '@/lib/date-utils'
 import {
   CheckCircle,
   XCircle,
@@ -89,7 +90,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
   }, [loadAprobaciones])
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

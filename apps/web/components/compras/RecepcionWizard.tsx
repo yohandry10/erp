@@ -6,6 +6,7 @@ import { useApi } from '@/hooks/use-api'
 import { useToast } from '@/components/ui/use-toast'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { cn } from '@/lib/utils'
+import { parseDateLocal } from '@/lib/date-utils'
 
 const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
 const fieldClass = 'w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
@@ -1017,7 +1018,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                           )}
                           {item.fecha_expiracion && (
                             <div>
-                              <strong>Exp:</strong> {new Date(item.fecha_expiracion).toLocaleDateString()}
+                              <strong>Exp:</strong> {parseDateLocal(item.fecha_expiracion).toLocaleDateString()}
                             </div>
                           )}
                           {!item.almacen_id && !item.lote && !item.serie && !item.fecha_expiracion && '-'}
