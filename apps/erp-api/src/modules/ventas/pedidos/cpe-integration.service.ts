@@ -7,6 +7,7 @@ import { AFECTACION_IGV, calcularDesgloseIgv, esGravado } from '../../../shared/
 import { CondicionPago, CreateFacturaDto, TipoDocumento, ItemFacturaDto } from '@erp-suite/dtos';
 import { PedidoVenta, PedidoDetalle } from './entities';
 import { IntegrationAlertsService } from '../../notifications/integration-alerts.service';
+import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 
 /**
  * CPEIntegrationService
@@ -125,7 +126,10 @@ export class CPEIntegrationService {
         serie: factura.serie ?? facturaData.serie,
         numero: factura.numero ?? facturaData.numero,
         moneda: factura.moneda ?? facturaData.moneda ?? 'PEN',
-        fecha_emision: (factura as any).fecha_emision ?? new Date().toISOString().split('T')[0],
+        // Fecha fiscal: si el writer no la devolvió, se toma la del contribuyente y
+        // no la de UTC, que pasadas las 19:00 de Lima sería el día siguiente.
+        fecha_emision: (factura as any).fecha_emision
+          ?? await fechaHoyDelTenant(this.supabase.getClient(), tenantId),
         total: factura.total_venta ?? facturaData.total_venta,
         documento_id: documentoId,
       };

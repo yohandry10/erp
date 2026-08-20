@@ -5,6 +5,7 @@ import { AlertTriangle, Calendar, RefreshCw, TrendingDown, TrendingUp } from 'lu
 
 import { useApi } from '@/hooks/use-api'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface FlujoCajaItem {
   tipo: 'INGRESO' | 'EGRESO'
@@ -111,7 +112,7 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
   }, [currency, flujoCaja?.resumen.length])
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
+    parseDateLocal(dateString).toLocaleDateString(country.locale || 'es-PE', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',

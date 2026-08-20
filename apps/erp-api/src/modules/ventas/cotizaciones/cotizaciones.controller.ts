@@ -21,6 +21,8 @@ import { CotizacionesService } from './cotizaciones.service';
 import { CreateCotizacionDto, UpdateCotizacionDto, ConvertirPedidoDto } from './dto';
 import { EstadoCotizacion } from './entities';
 
+import { MotivoOpcionalDto } from '../../shared-dto/acciones-simples.dto';
+
 /**
  * CotizacionesController
  * Controlador para gestionar cotizaciones del módulo de ventas
@@ -184,7 +186,7 @@ export class CotizacionesController {
   @ApiOperation({ summary: 'Aprobar cotización con actor segregado' })
   async aprobar(
     @Param('id') id: string,
-    @Body() body: { motivo?: string },
+    @Body() body: MotivoOpcionalDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
@@ -199,7 +201,7 @@ export class CotizacionesController {
   @ApiOperation({ summary: 'Rechazar cotización con actor segregado' })
   async rechazar(
     @Param('id') id: string,
-    @Body() body: { motivo?: string },
+    @Body() body: MotivoOpcionalDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {

@@ -386,10 +386,10 @@ export default function KardexPage() {
             onSubmit={applyFilters} className="flex flex-wrap gap-4 items-end border rounded-[0.875rem] p-5 bg-muted/40"
           >
             <div className="flex-[1_1_220px] min-w-[200px]">
-              <label className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
+              <label htmlFor="kardex-producto" className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
                 Producto
               </label>
-              <select
+              <select id="kardex-producto"
                 value={pendingFilters.productoId}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, productoId: event.target.value }))}
                 disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
@@ -404,10 +404,10 @@ export default function KardexPage() {
             </div>
 
             <div className="flex-[1_1_220px] min-w-[200px]">
-              <label className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
+              <label htmlFor="kardex-almacen" className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
                 Almacén
               </label>
-              <select
+              <select id="kardex-almacen"
                 value={pendingFilters.almacenId}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, almacenId: event.target.value }))}
                 disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
@@ -422,10 +422,10 @@ export default function KardexPage() {
             </div>
 
             <div className="flex-[1_1_180px] min-w-[180px]">
-              <label className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
+              <label htmlFor="kardex-desde" className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
                 Desde
               </label>
-              <input
+              <input id="kardex-desde"
                 type="date"
                 value={pendingFilters.desde}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, desde: event.target.value }))} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"
@@ -433,10 +433,10 @@ export default function KardexPage() {
             </div>
 
             <div className="flex-[1_1_180px] min-w-[180px]">
-              <label className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
+              <label htmlFor="kardex-hasta" className="block text-[0.8rem] font-semibold text-foreground/85 mb-1.5">
                 Hasta
               </label>
-              <input
+              <input id="kardex-hasta"
                 type="date"
                 value={pendingFilters.hasta}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, hasta: event.target.value }))} className="w-[100%] py-[0.7rem] px-4 rounded-[0.625rem] border text-[0.875rem] bg-card"

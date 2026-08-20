@@ -480,10 +480,10 @@ export function ConfigurationSummaryStep() {
         <h2 className="text-[0.875rem] mb-3 text-foreground/90 border-b pb-2">🖼️ Logo de la Empresa (para tickets y facturas)</h2>
 
         <div className="mb-3">
-          <label className="block mb-1.5 text-foreground/90 text-[0.8rem]">
+          <label htmlFor="configurationsummarystep-url-del-logo" className="block mb-1.5 text-foreground/90 text-[0.8rem]">
             URL del Logo:
           </label>
-          <input
+          <input id="configurationsummarystep-url-del-logo"
             type="url"
             value={logoUrl}
             onChange={(e) => setLogoUrl(e.target.value)}

@@ -131,7 +131,7 @@ const AsistenciaPage = () => {
           <p className="mt-2 text-base text-muted-foreground">Marcado de entrada y salida del personal</p>
         </div>
         <div className="flex gap-4 items-center">
-          <input
+          <input aria-label="Marcado de entrada y salida del personal"
             type="date"
             value={fecha}
             onChange={(e) => setFecha(e.target.value)}

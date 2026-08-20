@@ -12,7 +12,8 @@
  * @version 2.0.0
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import Decimal from 'decimal.js';
 import { SupabaseService } from '../supabase/supabase.service';
 
 /**
@@ -184,13 +185,28 @@ export class TaxCalculatorService {
       // Obtener país del tenant si no se proporciona
       let paisIdToUse = paisId;
       if (!paisIdToUse) {
-        const { data: empresaConfig } = await this.supabase.getClient()
+        // El error de esta consulta se descartaba y `|| 1` resolvía Perú en
+        // silencio. Con `empresa_config` sin índice único por tenant, una fila
+        // duplicada o ilegible bastaba para que un tenant colombiano facturara con
+        // la configuración peruana. El país del contribuyente no se adivina.
+        const { data: empresaConfig, error: empresaError } = await this.supabase.getClient()
           .from('empresa_config')
           .select('pais_id')
           .eq('tenant_id', tenantId)
-          .single();
+          .maybeSingle();
 
-        paisIdToUse = String(empresaConfig?.pais_id || 1); // Perú sólo para datos históricos sin país
+        if (empresaError) {
+          throw new ServiceUnavailableException(
+            `No se pudo resolver el país fiscal del tenant ${tenantId}: ${empresaError.message}`,
+          );
+        }
+        if (!empresaConfig?.pais_id) {
+          throw new ServiceUnavailableException(
+            `El tenant ${tenantId} no tiene país fiscal configurado; no se puede calcular impuestos.`,
+          );
+        }
+
+        paisIdToUse = String(empresaConfig.pais_id);
       }
 
       // Consultar configuración fiscal con las columnas correctas
@@ -215,23 +231,41 @@ export class TaxCalculatorService {
         .maybeSingle();
 
       if (error) {
-        this.logger.warn(
-          `No se encontró configuración fiscal para tenant ${tenantId}, usando defaults`,
-          error
+        throw new ServiceUnavailableException(
+          `No se pudo leer la configuración fiscal del tenant ${tenantId}: ${error.message}`,
+        );
+      }
+      if (!data) {
+        // Antes se seguía adelante y la tasa caía a 18 %. El catálogo global cubre
+        // los países operativos, así que llegar aquí significa un país sin
+        // configuración fiscal: cobrar un impuesto inventado es peor que no cobrar.
+        throw new ServiceUnavailableException(
+          `No existe configuración fiscal activa para el país ${paisIdToUse} del tenant ${tenantId}.`,
         );
       }
 
       // ✅ FIX: paises es un array, acceder al primer elemento
       const paisData = Array.isArray(data?.paises) ? data.paises[0] : data?.paises;
-      const tasaConfigurada = Number(
-        data?.tasa_igv ?? data?.impuesto_principal_porcentaje ?? 0.18,
-      );
+      // Sin `?? 0.18`: una fila que existe pero no declara tasa es configuración
+      // incompleta, no una invitación a asumir la peruana. Cero sí es válido
+      // (operaciones inafectas), por eso se usa `??` y no `||`.
+      const tasaDeclarada = data?.tasa_igv ?? data?.impuesto_principal_porcentaje;
+      if (tasaDeclarada === null || tasaDeclarada === undefined) {
+        throw new ServiceUnavailableException(
+          `La configuración fiscal del tenant ${tenantId} no declara tasa de impuesto.`,
+        );
+      }
+      const tasaConfigurada = Number(tasaDeclarada);
       const tasaNormalizada = tasaConfigurada > 1
         ? tasaConfigurada / 100
         : tasaConfigurada;
 
       if (!Number.isFinite(tasaNormalizada) || tasaNormalizada < 0 || tasaNormalizada > 1) {
-        throw new Error(`Tasa tributaria inválida: ${String(tasaConfigurada)}`);
+        // Este throw existía pero lo atrapaba el catch de más abajo y se convertía
+        // en 18 %: la validación estaba muerta. Ahora propaga.
+        throw new ServiceUnavailableException(
+          `Tasa tributaria inválida para el tenant ${tenantId}: ${String(tasaConfigurada)}`,
+        );
       }
 
       const config: TaxConfig = {
@@ -254,17 +288,13 @@ export class TaxCalculatorService {
 
       return config;
     } catch (error) {
+      // Sin fallback. Devolver Perú 18 %/PEN ante cualquier fallo hacía que un
+      // tenant colombiano facturara al 18 % en vez del 19 %, y uno argentino al
+      // 18 % en vez del 21 %, sin que nada lo delatara. El README fija lo
+      // contrario: «operaciones fiscales y financieras fallan cerrado». Un cobro
+      // detenido se nota y se corrige; un impuesto mal calculado se declara.
       this.logger.error(`Error obteniendo configuración fiscal para tenant ${tenantId}:`, error);
-      
-      // Fallback a configuración por defecto (Perú)
-      const defaultConfig: TaxConfig = {
-        tasaIgv: 0.18,
-        pais: 'PE',
-        moneda: 'PEN',
-        nombreImpuesto: 'IGV',
-      };
-
-      return defaultConfig;
+      throw error;
     }
   }
 
@@ -288,8 +318,11 @@ export class TaxCalculatorService {
    * @private
    */
   private round(value: number): number {
-    const multiplier = Math.pow(10, this.PRECISION);
-    return Math.round(value * multiplier) / multiplier;
+    // Con aritmética de punto flotante `Math.round(1.005 * 100) / 100` da 1, no
+    // 1.01, porque 1.005 no es representable en binario. El resto del sistema
+    // (POS, asientos, CxP) ya usa Decimal.js; este calculador era la excepción.
+    if (!Number.isFinite(value)) return 0;
+    return new Decimal(value).toDecimalPlaces(this.PRECISION, Decimal.ROUND_HALF_UP).toNumber();
   }
 
   /**

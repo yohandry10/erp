@@ -106,7 +106,8 @@ export default function PagoLotePage() {
   };
 
   const handleViewDetails = () => {
-    router.push('/dashboard/finanzas/tesoreria/pagos');
+    // `/tesoreria/pagos` no existe: el pago masivo terminaba llevando a un 404.
+    router.push('/dashboard/finanzas/tesoreria');
   };
 
   const handleNewBatch = () => {

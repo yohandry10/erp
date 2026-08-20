@@ -446,6 +446,7 @@ export function ImportarExtractoCSV({
               </p>
               <input
                 ref={fileInputRef}
+                aria-label="Archivo CSV del extracto bancario"
                 type="file"
                 accept=".csv"
                 onChange={handleFileSelect}

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { createHash } from 'crypto';
+import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 
 export interface CentroCosto {
   id: string;
@@ -377,7 +378,10 @@ export class CentrosCostoService {
 
       // Establecer fechas por defecto si no se proporcionan
       const fechaDesde = filters?.fecha_desde || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-      const fechaHasta = filters?.fecha_hasta || new Date().toISOString().split('T')[0];
+      // «Hasta hoy» es el hoy del contribuyente: en UTC el reporte se extendía un
+      // día de más y arrastraba movimientos que localmente son de mañana.
+      const fechaHasta = filters?.fecha_hasta
+        || await fechaHoyDelTenant(this.supabaseService.getClient(), tenantId);
 
       // Obtener todos los detalles de asientos para este centro de costo
       let detalleQuery = this.supabaseService

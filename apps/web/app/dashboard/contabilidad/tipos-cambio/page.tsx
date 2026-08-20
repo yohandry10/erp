@@ -154,8 +154,8 @@ export default function TiposCambioPage() {
           </CardHeader>
           <CardContent className="grid gap-3 p-5 md:grid-cols-5">
             <div>
-              <label className={labelClass}>Moneda</label>
-              <input
+              <label htmlFor="tipos-cambio-moneda" className={labelClass}>Moneda</label>
+              <input id="tipos-cambio-moneda"
                 value={form.moneda_origen}
                 onChange={(e) => setForm({ ...form, moneda_origen: e.target.value })}
                 maxLength={3}
@@ -164,8 +164,8 @@ export default function TiposCambioPage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Fecha</label>
-              <input
+              <label htmlFor="tipos-cambio-fecha" className={labelClass}>Fecha</label>
+              <input id="tipos-cambio-fecha"
                 type="date"
                 value={form.fecha}
                 onChange={(e) => setForm({ ...form, fecha: e.target.value })}
@@ -173,8 +173,8 @@ export default function TiposCambioPage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Compra</label>
-              <input
+              <label htmlFor="tipos-cambio-compra" className={labelClass}>Compra</label>
+              <input id="tipos-cambio-compra"
                 type="number"
                 step="0.000001"
                 value={form.compra}
@@ -184,8 +184,8 @@ export default function TiposCambioPage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Venta</label>
-              <input
+              <label htmlFor="tipos-cambio-venta" className={labelClass}>Venta</label>
+              <input id="tipos-cambio-venta"
                 type="number"
                 step="0.000001"
                 value={form.venta}

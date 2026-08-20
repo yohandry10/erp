@@ -5,6 +5,7 @@ import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { CalendarClock, CheckCircle2, Clock3, Loader2, PackageMinus, Truck } from 'lucide-react'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface BackorderDetalle {
   pedido_id: string
@@ -298,7 +299,7 @@ export default function FillRateReport({ filters }: Props) {
                               </span>
                               <span>
                                 {pendiente.proxima_fecha_compromiso
-                                  ? new Date(pendiente.proxima_fecha_compromiso).toLocaleDateString('es-PE')
+                                  ? parseDateLocal(pendiente.proxima_fecha_compromiso).toLocaleDateString('es-PE')
                                   : 'Sin fecha'}
                               </span>
                               <span className="px-2 py-0.5 rounded-full bg-muted text-foreground/80">
@@ -379,7 +380,7 @@ export default function FillRateReport({ filters }: Props) {
                     </td>
                     <td className="px-3 py-2 text-foreground/80">
                       {item.proxima_fecha_compromiso
-                        ? new Date(item.proxima_fecha_compromiso).toLocaleDateString('es-PE')
+                        ? parseDateLocal(item.proxima_fecha_compromiso).toLocaleDateString('es-PE')
                         : 'Sin fecha'}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{item.estado}</td>

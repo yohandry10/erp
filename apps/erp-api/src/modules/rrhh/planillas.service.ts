@@ -2,6 +2,12 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService, PlanillaCalculadaEvent } from '../../shared/events/event-bus.service';
 import Decimal from 'decimal.js';
+import {
+  anioDelPeriodo,
+  calcularRetencionQuintaPeru,
+  gratificacionesPendientesDelEjercicio,
+  mesDelPeriodo,
+} from './renta-quinta-peru.util';
 import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import {
   calcularGratificacionTrunca,
@@ -128,6 +134,9 @@ const NORMATIVA_PERU_2026_DEFAULT: NormativaPeruPeriodo = {
 // el trigger normalize_contratos_row para derivar contratos.activo: un contrato
 // renovado o en periodo de prueba sigue vigente y debe entrar a planilla.
 export const ESTADOS_CONTRATO_VIGENTE = ['vigente', 'renovado', 'en_periodo_prueba'];
+
+/** Concepto de retención de quinta categoría; ancla el historial del ejercicio. */
+const CODIGO_CONCEPTO_QUINTA = '105';
 
 /**
  * Contrato que rige la planilla del empleado. Si hay varios vigentes (una
@@ -404,6 +413,16 @@ export class PlanillasService {
       tenantId,
     );
 
+    // El Art. 40 necesita lo percibido y lo ya retenido en el ejercicio. Se
+    // resuelve una sola vez para todos los empleados, no dentro del bucle.
+    const historialQuinta = paisLaboral === 'PE'
+      ? await this.obtenerHistorialQuintaEjercicio(
+          tenantId as string,
+          (empleados || []).map((e: any) => String(e.id)),
+          planillaEstado.periodo,
+        )
+      : new Map<string, { percibido: number; retenido: number }>();
+
     // Procesar cada empleado
     for (const empleado of empleados) {
       const contratoActual = contratoVigenteDe(empleado);
@@ -439,6 +458,7 @@ export class PlanillasService {
               normativaPeru ?? NORMATIVA_PERU_2026_DEFAULT,
               planillaEstado.periodo,
               vacacionesPorEmpleado.get(empleado.id) ?? 0,
+              historialQuinta.get(empleado.id),
             );
 
       calculosPersistencia.push({
@@ -753,6 +773,7 @@ export class PlanillasService {
     normativa: NormativaPeruPeriodo = NORMATIVA_PERU_2026_DEFAULT,
     periodo?: string,
     diasVacaciones = 0,
+    historialQuinta?: { percibido: number; retenido: number },
   ) {
     const conceptosDetalle = [];
     let totalIngresos = 0;
@@ -843,7 +864,18 @@ export class PlanillasService {
     }
 
     const contratoActual = contratoVigenteDe(empleado);
-    const regimenPensionario = contratoActual?.regimen_pensionario || 'AFP';
+
+    // El régimen pensionario no se supone. Antes esta ruta caía a `|| 'AFP'` y
+    // descontaba cerca del 13 % a un trabajador cuyo régimen nunca se declaró,
+    // mientras la ruta personalizada rechazaba el mismo dato: dos respuestas
+    // distintas para la misma entrada. Ahora ambas fallan cerrado, porque elegir
+    // entre AFP y ONP es una decisión del trabajador, no un valor por defecto.
+    const regimenPensionario = String(contratoActual?.regimen_pensionario || '').toUpperCase();
+    if (!['AFP', 'ONP'].includes(regimenPensionario)) {
+      throw new BadRequestException(
+        `El empleado ${empleado?.nombres || empleado?.id} no tiene régimen pensionario válido (AFP u ONP).`,
+      );
+    }
 
     if (regimenPensionario === 'AFP') {
       // AFP - Aporte obligatorio (10%)
@@ -859,9 +891,11 @@ export class PlanillasService {
         totalDescuentos += aporteAFP;
       }
 
-      // AFP - Comisión (varía por AFP — usar tasas vigentes SBS)
-      // TODO: Estas tasas deben ser configurables por tenant y AFP del empleado
-      // Tasa por defecto: AFP Integra comisión flujo 1.55% (vigente 2024-2025)
+      // Comisión AFP. Las tasas las publica la SBS, cambian por trimestre y
+      // difieren entre las cuatro administradoras, así que se toman del contrato,
+      // donde el empleador las declara. El respaldo de la normativa se conserva
+      // para contratos anteriores a que el alta lo exigiera; a partir de ahora
+      // `validarContratoPeru` no deja crear un contrato AFP sin ellas.
       const tasaComisionAFP = contratoActual?.tasa_comision_afp ??
         contratoActual?.metadata?.tasa_comision_afp ??
         normativa.afpComisionFlujoDefault;
@@ -904,8 +938,19 @@ export class PlanillasService {
       }
     }
 
-    // Impuesto a la Renta (solo si supera las 7 UIT anuales)
-    const impuestoRenta = this.calcularImpuestoRenta(totalIngresos, normativa);
+    // Retención de quinta categoría (Art. 40 del Reglamento de la LIR).
+    //
+    // Se pasa la remuneración ordinaria —`baseAsegurable`, fijada antes de sumar
+    // la gratificación— y por separado lo gratificado en el mes. Antes se enviaba
+    // el ingreso total y se multiplicaba por doce, de modo que en julio y
+    // diciembre la proyección anual se duplicaba y la retención se disparaba.
+    const impuestoRenta = this.calcularRetencionQuintaDelMes({
+      periodo,
+      remuneracionOrdinariaMes: baseAsegurable,
+      gratificacionesDelMes: Math.max(0, totalIngresos - baseAsegurable),
+      historial: historialQuinta,
+      normativa,
+    });
     if (impuestoRenta > 0) {
       const conceptoImpuesto = conceptos.find(c => c.codigo === '105');
       if (conceptoImpuesto) {
@@ -1062,6 +1107,148 @@ export class PlanillasService {
   }
 
   // Calcular impuesto a la renta 5ta categoría (Perú 2026).
+  /**
+   * Historial de quinta categoría del ejercicio para un conjunto de empleados:
+   * lo percibido y lo ya retenido en los periodos anteriores del mismo año.
+   *
+   * El artículo 40 necesita ambos datos y hasta ahora no se leían: la retención se
+   * calculaba con el ingreso del mes aislado. Se resuelven en una sola pasada
+   * antes del bucle de empleados para no disparar una consulta por trabajador.
+   *
+   * Ante cualquier fallo se devuelve un historial vacío. Eso equivale a tratar el
+   * mes como el primero del ejercicio, que es el criterio conservador: proyecta
+   * sobre el sueldo del mes y no descuenta retenciones que no se pudieron probar.
+   */
+  private async obtenerHistorialQuintaEjercicio(
+    tenantId: string,
+    empleadoIds: string[],
+    periodo: string,
+  ): Promise<Map<string, { percibido: number; retenido: number }>> {
+    const historial = new Map<string, { percibido: number; retenido: number }>();
+    const anio = anioDelPeriodo(periodo);
+    if (!tenantId || !anio || empleadoIds.length === 0) return historial;
+
+    try {
+      const client = this.supabaseService.getClient();
+
+      const { data: planillasPrevias } = await client
+        .from('planillas')
+        .select('id, periodo, estado')
+        .eq('tenant_id', tenantId)
+        .gte('periodo', `${anio}-01`)
+        .lt('periodo', periodo);
+
+      const idsPlanilla = (planillasPrevias || [])
+        .filter((fila: any) => !['anulada', 'anulado'].includes(String(fila?.estado ?? '').toLowerCase()))
+        .map((fila: any) => fila.id)
+        .filter(Boolean);
+      if (idsPlanilla.length === 0) return historial;
+
+      const { data: detalles } = await client
+        .from('empleado_planilla')
+        .select('id, empleado_id, id_empleado, planilla_id, id_planilla, total_ingresos')
+        .eq('tenant_id', tenantId);
+
+      const detallesPrevios = (detalles || []).filter((fila: any) => {
+        const planilla = String(fila?.planilla_id ?? fila?.id_planilla ?? '');
+        const empleado = String(fila?.empleado_id ?? fila?.id_empleado ?? '');
+        return idsPlanilla.includes(planilla) && empleadoIds.includes(empleado);
+      });
+      if (detallesPrevios.length === 0) return historial;
+
+      const empleadoPorDetalle = new Map<string, string>();
+      for (const fila of detallesPrevios) {
+        const empleado = String((fila as any).empleado_id ?? (fila as any).id_empleado ?? '');
+        empleadoPorDetalle.set(String((fila as any).id), empleado);
+        const acumulado = historial.get(empleado) ?? { percibido: 0, retenido: 0 };
+        acumulado.percibido += Number((fila as any).total_ingresos ?? 0) || 0;
+        historial.set(empleado, acumulado);
+      }
+
+      const { data: conceptoRenta } = await client
+        .from('conceptos_planilla')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('codigo', CODIGO_CONCEPTO_QUINTA)
+        .maybeSingle();
+      const conceptoRentaId = (conceptoRenta as any)?.id;
+      if (!conceptoRentaId) return historial;
+
+      const { data: montos } = await client
+        .from('empleado_planilla_conceptos')
+        .select('empleado_planilla_id, id_empleado_planilla, concepto_id, id_concepto, monto')
+        .eq('tenant_id', tenantId);
+
+      for (const fila of montos || []) {
+        const concepto = String((fila as any).concepto_id ?? (fila as any).id_concepto ?? '');
+        if (concepto !== String(conceptoRentaId)) continue;
+        const detalle = String((fila as any).empleado_planilla_id ?? (fila as any).id_empleado_planilla ?? '');
+        const empleado = empleadoPorDetalle.get(detalle);
+        if (!empleado) continue;
+        const acumulado = historial.get(empleado) ?? { percibido: 0, retenido: 0 };
+        acumulado.retenido += Number((fila as any).monto ?? 0) || 0;
+        historial.set(empleado, acumulado);
+      }
+
+      return historial;
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo leer el historial de quinta del ejercicio; se calcula sin acumulado previo: ${(error as Error)?.message ?? error}`,
+      );
+      return new Map();
+    }
+  }
+
+  /**
+   * Retención de quinta categoría del mes, según el artículo 40 del Reglamento de
+   * la LIR. La regla vive en `renta-quinta-peru.util`; aquí sólo se arman sus
+   * entradas a partir del periodo y del historial del ejercicio.
+   *
+   * Sin un periodo `YYYY-MM` válido no hay procedimiento posible: el divisor y la
+   * proyección dependen del mes. Se falla cerrado en lugar de devolver cero, que
+   * sería una retención omitida y un incumplimiento silencioso del empleador.
+   */
+  private calcularRetencionQuintaDelMes(params: {
+    periodo?: string;
+    remuneracionOrdinariaMes: number;
+    ingresosExtraordinariosMes?: number;
+    gratificacionesDelMes?: number;
+    historial?: { percibido: number; retenido: number };
+    normativa: NormativaPeruPeriodo;
+  }): number {
+    const mes = mesDelPeriodo(params.periodo);
+    if (!mes) {
+      throw new BadRequestException(
+        'No se puede calcular la retención de quinta categoría sin un periodo YYYY-MM: '
+        + 'el divisor y la proyección anual dependen del mes.',
+      );
+    }
+
+    const ordinaria = Number(params.remuneracionOrdinariaMes ?? 0) || 0;
+    if (ordinaria <= 0) return 0;
+
+    // Las gratificaciones del propio mes ya vienen calculadas por el motor (pueden
+    // ser truncas); las de los meses que faltan se estiman sobre la ordinaria.
+    const delMes = Number(params.gratificacionesDelMes ?? 0) || 0;
+    const pendientesEstimadas = gratificacionesPendientesDelEjercicio(
+      mes === 7 || mes === 12 ? mes + 1 : mes,
+      ordinaria,
+    );
+
+    const resultado = calcularRetencionQuintaPeru({
+      mes,
+      remuneracionOrdinariaMes: ordinaria,
+      percibidoMesesAnteriores: params.historial?.percibido ?? 0,
+      gratificacionesPendientes: delMes + pendientesEstimadas,
+      ingresosExtraordinariosMes: params.ingresosExtraordinariosMes ?? 0,
+      retencionesPrevias: params.historial?.retenido ?? 0,
+      uit: params.normativa.uit,
+      deduccionUit: params.normativa.quintaDeduccionUit,
+    });
+
+    return resultado.retencionMes;
+  }
+
   private calcularImpuestoRenta(
     ingresoMensual: number,
     normativa: NormativaPeruPeriodo = NORMATIVA_PERU_2026_DEFAULT,
@@ -1488,6 +1675,16 @@ export class PlanillasService {
 
     const calculosPersistencia: CalculoEmpleadoPersistencia[] = [];
 
+    // Igual que en el cálculo estándar: el acumulado del ejercicio se resuelve
+    // una vez para todos los empleados, antes de entrar al bucle.
+    const historialQuintaPersonalizada = paisLaboral === 'PE'
+      ? await this.obtenerHistorialQuintaEjercicio(
+          tenantId,
+          (empleadosCanonicos || []).map((e: any) => String(e.id)),
+          String(planillaInfo?.periodo ?? ''),
+        )
+      : new Map<string, { percibido: number; retenido: number }>();
+
     for (const empleadoCanonico of empleadosCanonicos || []) {
       const entrada = entradasPorId.get(empleadoCanonico.id);
       const contrato = contratoVigenteDe(empleadoCanonico);
@@ -1505,6 +1702,10 @@ export class PlanillasService {
         tardanzas_minutos: entrada.tardanzas_minutos,
         faltas: entrada.faltas,
         bonos_adicionales: entrada.bonos_adicionales,
+        // Recargos colombianos: se capturaban en pantalla y se perdían aquí, así
+        // que el motor los liquidaba en cero.
+        horas_recargo_nocturno: entrada.horas_recargo_nocturno,
+        horas_dominicales_festivas: entrada.horas_dominicales_festivas,
         sueldo_base: contrato.sueldo_bruto,
       };
       const calculoEmpleado =
@@ -1525,6 +1726,8 @@ export class PlanillasService {
               empleado,
               conceptos,
               normativa ?? NORMATIVA_PERU_2026_DEFAULT,
+              planillaInfo?.periodo,
+              historialQuintaPersonalizada.get(String(empleadoCanonico.id)),
             );
 
       calculosPersistencia.push({
@@ -1675,6 +1878,8 @@ export class PlanillasService {
     empleado: any,
     conceptos: any[],
     normativa: NormativaPeruPeriodo = NORMATIVA_PERU_2026_DEFAULT,
+    periodo?: string,
+    historialQuinta?: { percibido: number; retenido: number },
   ) {
     const conceptosDetalle = [];
     let totalIngresos = 0;
@@ -1885,8 +2090,15 @@ export class PlanillasService {
       }
     }
 
-    const impuestoRenta = this.calcularImpuestoRenta(totalIngresos, normativa);
-    const conceptoImpuesto = conceptos.find(c => c.codigo === '105');
+    // Esta ruta no liquida gratificaciones, así que el total del mes es la
+    // remuneración ordinaria sobre la que se proyecta el ejercicio.
+    const impuestoRenta = this.calcularRetencionQuintaDelMes({
+      periodo,
+      remuneracionOrdinariaMes: totalIngresos,
+      historial: historialQuinta,
+      normativa,
+    });
+    const conceptoImpuesto = conceptos.find(c => c.codigo === CODIGO_CONCEPTO_QUINTA);
     if (conceptoImpuesto && impuestoRenta > 0) {
       conceptosDetalle.push({
         id: conceptoImpuesto.id,

@@ -125,8 +125,8 @@ export function CashIncomeExpenseDialog({
 
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground/85">Tipo</label>
-                                        <select
+                                        <label htmlFor="cashincomeexpensedialog-tipo" className="block text-sm font-medium text-foreground/85">Tipo</label>
+                                        <select id="cashincomeexpensedialog-tipo"
                                             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                                             value={tipo}
                                             onChange={(e) => {
@@ -145,7 +145,7 @@ export function CashIncomeExpenseDialog({
                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                 <span className="text-muted-foreground sm:text-sm">{currencySymbol}</span>
                                             </div>
-                                            <input
+                                            <input aria-label="Monto"
                                                 type="number"
                                                 min="0.01"
                                                 step="0.01"
@@ -181,8 +181,8 @@ export function CashIncomeExpenseDialog({
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground/85">Motivo</label>
-                                        <textarea
+                                        <label htmlFor="cashincomeexpensedialog-motivo" className="block text-sm font-medium text-foreground/85">Motivo</label>
+                                        <textarea id="cashincomeexpensedialog-motivo"
                                             rows={3}
                                             className="shadow-sm focus:ring-blue-500 focus:border-blue-500 mt-1 block w-full sm:text-sm border border-border rounded-md"
                                             placeholder="Detalle del ingreso/gasto..."

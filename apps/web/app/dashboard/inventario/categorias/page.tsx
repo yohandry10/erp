@@ -99,7 +99,7 @@ function CampoExtraEditor({
 
           <div className="flex-1 space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Nombre del campo</label>
-            <Input
+            <Input aria-label="Label"
               value={campo.label}
               onChange={(e) => {
                 const label = e.target.value
@@ -115,8 +115,8 @@ function CampoExtraEditor({
           </div>
 
           <div className="w-full space-y-1 md:w-36">
-            <label className="text-xs font-medium text-muted-foreground">Tipo</label>
-            <select
+            <label htmlFor="categorias-tipo" className="text-xs font-medium text-muted-foreground">Tipo</label>
+            <select id="categorias-tipo"
               value={campo.tipo}
               onChange={(e) => updateCampo(index, { tipo: e.target.value as CampoExtra['tipo'] })}
               className="h-9 w-full rounded-md border border-border bg-card px-2.5 text-sm"
@@ -134,6 +134,7 @@ function CampoExtraEditor({
                 Opciones (separadas por coma)
               </label>
               <Input
+                aria-label="Opciones (separadas por coma)"
                 value={campo.opciones?.join(', ') ?? ''}
                 onChange={(e) =>
                   updateCampo(index, {
@@ -193,7 +194,7 @@ function CategoriaForm({
           <label className="mb-1 block text-sm font-medium text-foreground/85">
             Nombre <span className="text-destructive">*</span>
           </label>
-          <Input
+          <Input aria-label="Nombre"
             value={form.nombre}
             onChange={(e) => setForm((prev) => ({ ...prev, nombre: e.target.value }))}
             placeholder="Ej: Electrónica"
@@ -201,7 +202,7 @@ function CategoriaForm({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-foreground/85">Código</label>
-          <Input
+          <Input aria-label="Código"
             value={form.codigo}
             onChange={(e) => setForm((prev) => ({ ...prev, codigo: e.target.value }))}
             placeholder="Ej: ELEC"
@@ -209,7 +210,7 @@ function CategoriaForm({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-foreground/85">Descripción</label>
-          <Input
+          <Input aria-label="Descripción breve"
             value={form.descripcion}
             onChange={(e) => setForm((prev) => ({ ...prev, descripcion: e.target.value }))}
             placeholder="Descripción breve"

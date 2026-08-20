@@ -139,8 +139,8 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
           {!tenant.is_demo && (
           <div className="grid gap-3">
             <div>
-              <label className="text-xs font-semibold text-muted-foreground">Email</label>
-              <input
+              <label htmlFor="demotenantmodal-email" className="text-xs font-semibold text-muted-foreground">Email</label>
+              <input id="demotenantmodal-email"
                 type="email"
                 autoComplete="username"
                 value={email}
@@ -149,8 +149,8 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground">Contraseña</label>
-              <input
+              <label htmlFor="demotenantmodal-contrasena" className="text-xs font-semibold text-muted-foreground">Contraseña</label>
+              <input id="demotenantmodal-contrasena"
                 type="password"
                 autoComplete="new-password"
                 value={password}
@@ -159,8 +159,8 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground">Días de demo</label>
-              <input
+              <label htmlFor="demotenantmodal-dias-de-demo" className="text-xs font-semibold text-muted-foreground">Días de demo</label>
+              <input id="demotenantmodal-dias-de-demo"
                 type="number"
                 min={1}
                 max={90}

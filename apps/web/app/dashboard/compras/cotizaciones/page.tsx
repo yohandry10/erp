@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { CotizacionCompra, Proveedor } from '@/types/compras'
 import toast from 'react-hot-toast'
+import { parseDateLocal } from '@/lib/date-utils'
+import CompraEditarCabeceraModal from '@/components/modals/CompraEditarCabeceraModal'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
   Search,
@@ -38,6 +40,7 @@ export default function CotizacionesCompraPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCotizaciones, setTotalCotizaciones] = useState(0)
   const itemsPerPage = 10
+  const [cotizacionEditando, setCotizacionEditando] = useState<CotizacionCompra | null>(null)
 
   const loadCotizaciones = useCallback(async () => {
     try {
@@ -146,7 +149,7 @@ export default function CotizacionesCompraPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(locale, {
+    return parseDateLocal(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -232,10 +235,10 @@ export default function CotizacionesCompraPage() {
       <div className="relative rounded-2xl border border-border bg-card/95 p-6 text-card-foreground shadow-md backdrop-blur-xl">
         <div className="flex gap-4 mb-6 flex-wrap items-end">
           <div className="flex-[1] min-w-[200px]">
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="cotizaciones-estado" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Estado
             </label>
-            <select
+            <select id="cotizaciones-estado"
               value={estadoFilter}
               onChange={(e) => handleEstadoFilterChange(e.target.value)} className="w-[100%] py-3 px-4 rounded-lg border text-[0.875rem] bg-card"
             >
@@ -249,10 +252,10 @@ export default function CotizacionesCompraPage() {
           </div>
 
           <div className="flex-[1] min-w-[200px]">
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="cotizaciones-proveedor" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Proveedor
             </label>
-            <select
+            <select id="cotizaciones-proveedor"
               value={proveedorFilter}
               onChange={(e) => handleProveedorFilterChange(e.target.value)} className="w-[100%] py-3 px-4 rounded-lg border text-[0.875rem] bg-card"
             >
@@ -266,10 +269,10 @@ export default function CotizacionesCompraPage() {
           </div>
 
           <div className="flex-[1] min-w-[180px]">
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="cotizaciones-fecha-desde" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Fecha Desde
             </label>
-            <input
+            <input id="cotizaciones-fecha-desde"
               type="date"
               value={fechaDesde}
               onChange={(e) => handleFechaDesdeChange(e.target.value)} className="w-[100%] py-3 px-4 rounded-lg border text-[0.875rem] bg-card"
@@ -277,10 +280,10 @@ export default function CotizacionesCompraPage() {
           </div>
 
           <div className="flex-[1] min-w-[180px]">
-            <label className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+            <label htmlFor="cotizaciones-fecha-hasta" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
               Fecha Hasta
             </label>
-            <input
+            <input id="cotizaciones-fecha-hasta"
               type="date"
               value={fechaHasta}
               onChange={(e) => handleFechaHastaChange(e.target.value)} className="w-[100%] py-3 px-4 rounded-lg border text-[0.875rem] bg-card"
@@ -414,8 +417,9 @@ export default function CotizacionesCompraPage() {
                             </button>
                             {cotizacion.estado === 'BORRADOR' && (
                               <button
-                                onClick={() => router.push(`/dashboard/compras/cotizaciones/${cotizacion.id}/editar`)} className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground"
-                                title="Editar"
+                                onClick={() => setCotizacionEditando(cotizacion)}
+                                className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground"
+                                title="Editar cabecera"
                               >
                                 <Edit size={16} />
                               </button>
@@ -477,6 +481,17 @@ export default function CotizacionesCompraPage() {
           )}
         </div>
       </div>
+
+      <CompraEditarCabeceraModal
+        tipo="cotizacion"
+        isOpen={cotizacionEditando !== null}
+        onClose={() => setCotizacionEditando(null)}
+        onSuccess={() => {
+          setCotizacionEditando(null)
+          loadCotizaciones()
+        }}
+        documento={cotizacionEditando}
+      />
     </div>
   )
 }

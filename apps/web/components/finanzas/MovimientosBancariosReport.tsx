@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { FileText, RefreshCw, Download, Filter } from 'lucide-react'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface MovimientoBancario {
   id: string
@@ -57,7 +58,7 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
   }, [loadMovimientos])
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(country.locale || 'es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString(country.locale || 'es-PE', {
       day: '2-digit',
       month: 'short',
       year: 'numeric'
@@ -124,10 +125,10 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
       {/* Filters */}
       <div className="flex gap-4 mb-6 flex-wrap">
         <div>
-          <label className="text-xs font-semibold text-muted-foreground block mb-1">
+          <label htmlFor="movimientosbancariosreport-tipo" className="text-xs font-semibold text-muted-foreground block mb-1">
             Tipo
           </label>
-          <select
+          <select id="movimientosbancariosreport-tipo"
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value as any)} className="p-2 rounded-[6px] border text-[0.875rem]"
           >
@@ -137,10 +138,10 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
           </select>
         </div>
         <div>
-          <label className="text-xs font-semibold text-muted-foreground block mb-1">
+          <label htmlFor="movimientosbancariosreport-conciliado" className="text-xs font-semibold text-muted-foreground block mb-1">
             Conciliado
           </label>
-          <select
+          <select id="movimientosbancariosreport-conciliado"
             value={filtroConciliado}
             onChange={(e) => setFiltroConciliado(e.target.value as any)} className="p-2 rounded-[6px] border text-[0.875rem]"
           >

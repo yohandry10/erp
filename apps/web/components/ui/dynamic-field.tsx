@@ -96,7 +96,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
 
       case 'number':
         return (
-          <Input
+          <Input aria-label={label}
             type="number"
             value={value}
             onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
@@ -110,7 +110,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
 
       case 'date':
         return (
-          <Input
+          <Input aria-label={label}
             type="date"
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -121,7 +121,7 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
 
       default:
         return (
-          <Input
+          <Input aria-label={label}
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}

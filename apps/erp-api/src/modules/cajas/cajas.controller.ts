@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Denominaciones } from './services/cash-reconciliation.service';
+import { CerrarCajaAvanzadoDto } from './dto/cerrar-caja-avanzado.dto';
 import {
   CancelarCambioTurnoCajaDto,
   CompletarCambioTurnoCajaDto,
@@ -201,19 +202,27 @@ export class CajasController {
     return { success: true, data };
   }
 
+  /**
+   * Supervisores habilitados para autorizar una diferencia de cierre.
+   *
+   * Va con el permiso de cierre, no con `users.manage`: quien cierra la caja
+   * necesita elegir a quién pedirle la autorización, y un cajero no administra
+   * usuarios. Sólo se exponen nombre e identificador, nunca el PIN ni su hash.
+   */
+  @Get('supervisores-autorizados')
+  @RequirePermission('cajas.cierre')
+  async listarSupervisoresAutorizados(@CurrentTenant() tenantId: string) {
+    const data = await this.service.listarSupervisoresAutorizados(tenantId);
+    return { success: true, data };
+  }
+
   @Post('cerrar/:sesionId')
   @RequirePermission('cajas.cierre_administrativo')
   async cerrarCajaAvanzado(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('sesionId') sesionId: string,
-    @Body() dto: {
-      monto_contado: number;
-      denominaciones: Denominaciones;
-      notas?: string;
-      supervisor_id?: string;
-      codigo_autorizacion?: string;
-    },
+    @Body() dto: CerrarCajaAvanzadoDto,
   ) {
     const data = await this.service.cerrarCajaAvanzado(
       tenantId,

@@ -106,8 +106,8 @@ export default function RevaluacionPage() {
 
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <div>
-              <label className={labelClass}>Fecha de corte</label>
-              <input
+              <label htmlFor="revaluacion-fecha-de-corte" className={labelClass}>Fecha de corte</label>
+              <input id="revaluacion-fecha-de-corte"
                 type="date"
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}

@@ -210,10 +210,10 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
                                         </div>
 
                                         <div>
-                                            <label className="block text-sm font-medium text-foreground/85 mb-1">
+                                            <label htmlFor="cashclosingdialog-justificacion-notas-obligatorio" className="block text-sm font-medium text-foreground/85 mb-1">
                                                 Justificación / Notas (Obligatorio)
                                             </label>
-                                            <textarea
+                                            <textarea id="cashclosingdialog-justificacion-notas-obligatorio"
                                                 rows={4}
                                                 className="w-full border border-border rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
                                                 value={notas}

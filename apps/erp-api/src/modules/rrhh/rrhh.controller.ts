@@ -11,6 +11,12 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PlanillaElectronicaPeruService } from './planilla-electronica-peru.service';
 import { CalcularPlanillaPersonalizadaDto } from './dto/calcular-planilla-personalizada.dto';
+
+import { ConfiguracionLaboralArgentinaDto, ConfiguracionLaboralColombiaDto } from './dto/configuracion-laboral.dto';
+import { ActualizarEmpleadoDto, CrearEmpleadoDto } from './dto/empleado-request.dto';
+import { ActualizarCandidatoDto, CrearCandidatoDto, CrearContratoDto, CrearDepartamentoDto, CrearSolicitudDto, CrearVacanteDto, EvaluacionRequestDto } from './dto/rrhh-operaciones.dto';
+import { GuardarFichaLaboralPeruDto, PagarEmpleadosSeleccionadosDto, RegistrarEvidenciaPlanillaElectronicaDto } from './dto/planilla-electronica-peru.dto';
+import { AgregarDocumentoExpedienteDto, AprobarSolicitudDto, AsignarBeneficioDto, AsignarHorarioDto, CalcularDepositosCtsDto, CalcularLiquidacionDto, CambiarEstadoCandidatoDto, DepositarCtsDto, FinalizarContratoDto, GenerarPaquetePlanillaElectronicaDto, InscribirCapacitacionDto, JornadaPlanillaElectronicaDto, MarcarAsistenciaDto, PagarLiquidacionDto, RechazarSolicitudDto, RenovarContratoDto, RevertirPagoLiquidacionDto } from './dto/rrhh-acciones.dto';
 import {
   ActualizarPlanillaBorradorDto,
   CrearPlanillaFinancieraDto,
@@ -57,7 +63,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() configuracion: any,
+    @Body() configuracion: ConfiguracionLaboralArgentinaDto,
   ) {
     return this.rrhhService.updateConfiguracionLaboralArgentina(
       tenantId, configuracion, userId, idempotencyKey,
@@ -69,7 +75,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() configuracion: any,
+    @Body() configuracion: ConfiguracionLaboralColombiaDto,
   ) {
     return this.rrhhService.updateConfiguracionLaboralColombia(
       tenantId, configuracion, userId, idempotencyKey,
@@ -90,7 +96,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() empleadoData: any
+    @Body() empleadoData: CrearEmpleadoDto
   ) {
     this.logger.debug(`➕ [RRHH] Creando empleado para tenant: ${tenantId}`);
     return this.rrhhService.createEmpleado(empleadoData, tenantId, userId, idempotencyKey);
@@ -102,7 +108,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') id: string,
-    @Body() empleadoData: any
+    @Body() empleadoData: ActualizarEmpleadoDto
   ) {
     this.logger.debug(`✏️ [RRHH] Actualizando empleado ${id} para tenant: ${tenantId}`);
     return this.rrhhService.updateEmpleado(id, empleadoData, tenantId, userId, idempotencyKey);
@@ -124,7 +130,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() departamentoData: any
+    @Body() departamentoData: CrearDepartamentoDto
   ) {
     this.logger.debug(`➕ [RRHH] Creando departamento para tenant: ${tenantId}`);
     return this.rrhhService.createDepartamento(departamentoData, tenantId, userId, idempotencyKey);
@@ -288,7 +294,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Param('id') planillaId: string,
-    @Body() pagoData: any
+    @Body() pagoData: PagarEmpleadosSeleccionadosDto
   ) {
     this.logger.debug(`💰 [RRHH] Delegando ruta legada de empleados al pago atómico de planilla ${planillaId}`);
     return this.planillasService.pagarEmpleadosSeleccionados(planillaId, pagoData, tenantId, userId);
@@ -321,7 +327,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('empleadoId') empleadoId: string,
-    @Body() payload: any,
+    @Body() payload: GuardarFichaLaboralPeruDto,
   ) {
     return { success: true, data: await this.planillaElectronicaPeru.guardarFicha(
       tenantId, userId, empleadoId, payload, idempotencyKey,
@@ -335,7 +341,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('detalleId') detalleId: string,
-    @Body() payload: { horas_ordinarias: number; dias_no_laborados: number },
+    @Body() payload: JornadaPlanillaElectronicaDto,
   ) {
     return { success: true, data: await this.planillaElectronicaPeru.guardarJornada(
       tenantId, userId, detalleId, payload, idempotencyKey,
@@ -348,7 +354,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Param('planillaId') planillaId: string,
-    @Body() payload: { notas?: string },
+    @Body() payload: GenerarPaquetePlanillaElectronicaDto,
   ) {
     return { success: true, data: await this.planillaElectronicaPeru.guardarPaquete(tenantId, userId, planillaId, payload?.notas) };
   }
@@ -368,7 +374,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
-    @Body() payload: any,
+    @Body() payload: RegistrarEvidenciaPlanillaElectronicaDto,
   ) {
     return { success: true, data: await this.planillaElectronicaPeru.registrarEvidencia(tenantId, userId, id, payload) };
   }
@@ -433,7 +439,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() contratoData: any
+    @Body() contratoData: CrearContratoDto
   ) {
     this.logger.debug(`➕ [RRHH] Creando contrato para tenant: ${tenantId}`);
     return this.rrhhService.createContrato(contratoData, tenantId, userId, idempotencyKey);
@@ -445,7 +451,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') contratoId: string,
-    @Body() data: { meses: number }
+    @Body() data: RenovarContratoDto
   ) {
     this.logger.debug(`🔄 [RRHH] Renovando contrato ${contratoId} para tenant: ${tenantId}`);
     return this.rrhhService.renovarContrato(
@@ -459,7 +465,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') contratoId: string,
-    @Body() data: { motivo_finalizacion: string; fecha_finalizacion: string }
+    @Body() data: FinalizarContratoDto
   ) {
     this.logger.debug(`🛑 [RRHH] Finalizando contrato ${contratoId} para tenant: ${tenantId}`);
     return this.rrhhService.finalizarContrato(
@@ -496,7 +502,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() data: { empleado_id: string; fecha: string; tipo: 'entrada' | 'salida'; hora: string }
+    @Body() data: MarcarAsistenciaDto
   ) {
     this.logger.debug(`⏰ [RRHH] Marcando asistencia para empleado ${data.empleado_id}, tenant: ${tenantId}`);
     return this.rrhhService.marcarAsistencia(
@@ -516,7 +522,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() vacanteData: any
+    @Body() vacanteData: CrearVacanteDto
   ) {
     this.logger.debug(`➕ [RRHH] Creando vacante para tenant: ${tenantId}`);
     return this.rrhhService.createVacante(vacanteData, tenantId, userId, idempotencyKey);
@@ -536,7 +542,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() candidatoData: any
+    @Body() candidatoData: CrearCandidatoDto
   ) {
     this.logger.debug(`➕ [RRHH] Creando candidato para tenant: ${tenantId}`);
     return this.rrhhService.createCandidato(candidatoData, tenantId, userId, idempotencyKey);
@@ -548,7 +554,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') candidatoId: string,
-    @Body() candidatoData: any,
+    @Body() candidatoData: ActualizarCandidatoDto,
   ) {
     return this.rrhhService.updateCandidato(
       candidatoId, candidatoData, tenantId, userId, idempotencyKey,
@@ -561,7 +567,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') candidatoId: string,
-    @Body() data: { estado: string; observaciones?: string }
+    @Body() data: CambiarEstadoCandidatoDto
   ) {
     this.logger.debug(`✏️ [RRHH] Actualizando estado de candidato ${candidatoId} para tenant: ${tenantId}`);
     return this.rrhhService.updateEstadoCandidato(
@@ -623,7 +629,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() solicitudData: any
+    @Body() solicitudData: CrearSolicitudDto
   ) {
     this.logger.debug(`➕ [RRHH] Creando solicitud para tenant: ${tenantId}`);
     return this.rrhhService.createSolicitud(solicitudData, tenantId, userId, idempotencyKey);
@@ -635,7 +641,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') solicitudId: string,
-    @Body() data: { aprobado_por: string; observaciones?: string }
+    @Body() data: AprobarSolicitudDto
   ) {
     this.logger.debug(`✅ [RRHH] Aprobando solicitud ${solicitudId} para tenant: ${tenantId}`);
     return this.rrhhService.aprobarSolicitud(
@@ -649,7 +655,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') solicitudId: string,
-    @Body() data: { aprobado_por: string; observaciones: string }
+    @Body() data: RechazarSolicitudDto
   ) {
     this.logger.debug(`❌ [RRHH] Rechazando solicitud ${solicitudId} para tenant: ${tenantId}`);
     return this.rrhhService.rechazarSolicitud(
@@ -679,7 +685,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') empleadoId: string,
-    @Body() data: { beneficio_id: string; fecha_inicio: string }
+    @Body() data: AsignarBeneficioDto
   ) {
     this.logger.debug(`➕ [RRHH] Asignando beneficio al empleado ${empleadoId} para tenant: ${tenantId}`);
     return this.rrhhService.asignarBeneficio(
@@ -702,7 +708,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
-    @Body() evaluacionData: any
+    @Body() evaluacionData: EvaluacionRequestDto
   ) {
     this.logger.debug(`➕ [RRHH] Creando evaluación para tenant: ${tenantId}`);
     return this.rrhhService.createEvaluacion(
@@ -716,7 +722,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') id: string,
-    @Body() evaluacionData: any
+    @Body() evaluacionData: EvaluacionRequestDto
   ) {
     this.logger.debug(`✏️ [RRHH] Actualizando evaluación ${id} para tenant: ${tenantId}`);
     return this.rrhhService.updateEvaluacion(
@@ -746,7 +752,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') empleadoId: string,
-    @Body() data: { capacitacion_id: string }
+    @Body() data: InscribirCapacitacionDto
   ) {
     this.logger.debug(`➕ [RRHH] Inscribiendo empleado ${empleadoId} en capacitación para tenant: ${tenantId}`);
     return this.rrhhService.inscribirCapacitacion(
@@ -767,7 +773,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
     @Param('id') empleadoId: string,
-    @Body() data: { motivo_terminacion: string; fecha_terminacion: string }
+    @Body() data: CalcularLiquidacionDto
   ) {
     this.logger.debug(`💼 [RRHH] Calculando liquidación para empleado ${empleadoId}, tenant: ${tenantId}`);
     return this.rrhhService.calcularLiquidacion(
@@ -796,13 +802,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
     @Param('id') liquidacionId: string,
-    @Body() pago: {
-      metodo_pago: 'efectivo' | 'transferencia';
-      cuenta_bancaria_id?: string;
-      referencia?: string;
-      fecha_pago?: string;
-      idempotency_key?: string;
-    },
+    @Body() pago: PagarLiquidacionDto,
   ) {
     return this.rrhhService.pagarLiquidacion(liquidacionId, pago, tenantId, usuarioId);
   }
@@ -813,7 +813,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
     @Param('id') liquidacionId: string,
-    @Body() data: { motivo: string },
+    @Body() data: RevertirPagoLiquidacionDto,
   ) {
     return this.rrhhService.revertirPagoLiquidacion(
       liquidacionId,
@@ -839,7 +839,7 @@ export class RrhhController {
   async calcularDepositosCts(
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
-    @Body() data: { periodo: string },
+    @Body() data: CalcularDepositosCtsDto,
   ) {
     this.logger.debug(`💰 [RRHH] Calculando depósitos de CTS del periodo ${data?.periodo}, tenant: ${tenantId}`);
     return this.rrhhService.calcularDepositosCts(data?.periodo, tenantId, usuarioId);
@@ -851,7 +851,7 @@ export class RrhhController {
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') usuarioId: string,
     @Param('id') depositoId: string,
-    @Body() pago: { cuenta_bancaria_id: string; referencia: string; fecha_deposito?: string },
+    @Body() pago: DepositarCtsDto,
   ) {
     return this.rrhhService.depositarCts(depositoId, pago, tenantId, usuarioId);
   }
@@ -869,7 +869,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') empleadoId: string,
-    @Body() data: { horario_id: string; fecha_inicio: string }
+    @Body() data: AsignarHorarioDto
   ) {
     this.logger.debug(`➕ [RRHH] Asignando horario al empleado ${empleadoId} para tenant: ${tenantId}`);
     return this.rrhhService.asignarHorario(
@@ -893,12 +893,7 @@ export class RrhhController {
     @CurrentUser('id') userId: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id') empleadoId: string,
-    @Body() data: {
-      tipo_documento: string;
-      nombre_archivo: string;
-      archivo_url: string;
-      subido_por: string;
-    }
+    @Body() data: AgregarDocumentoExpedienteDto
   ) {
     this.logger.debug(`📤 [RRHH] Subiendo documento al expediente del empleado ${empleadoId} para tenant: ${tenantId}`);
     return this.rrhhService.subirDocumento(

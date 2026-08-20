@@ -10,6 +10,8 @@ import { WorkerAuthGuard } from '../../shared/guards/worker-auth.guard';
 import { CreateVentaPosDto } from './dto/create-venta-pos.dto';
 import { CanjearTicketPosDto } from './dto/canjear-ticket-pos.dto';
 
+import { AbrirCajaPosDto, CerrarCajaPosDto, ConfigurarCertificadoPosDto } from './dto/caja-pos.dto';
+
 @Controller('pos')
 export class PosController {
   constructor(
@@ -111,19 +113,7 @@ export class PosController {
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.caja.write') // HARDENING: apertura de caja protegida.
-  async abrirCaja(@Body() data: {
-    monto_inicial: number;
-    caja_id?: string;
-    dispositivo?: string;
-    moneda?: string;
-    supervisor_id?: string;
-    razon_autorizacion?: string;
-    denominaciones_apertura?: Record<string, any>;
-    ip_address?: string;
-    geolocalizacion?: Record<string, any>;
-    foto_apertura?: string;
-    user_agent?: string;
-  }, @Req() req: any) {
+  async abrirCaja(@Body() data: AbrirCajaPosDto, @Req() req: any) {
     if (data?.supervisor_id || data?.razon_autorizacion) {
       throw new ForbiddenException('La autorización de supervisor debe validarse en un flujo dedicado');
     }
@@ -134,7 +124,7 @@ export class PosController {
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.caja.write') // HARDENING: cierre de caja protegido.
-  async cerrarCaja(@Body() data: { monto_contado: number; notas?: string; caja_id?: string; sesion_id?: string; sesionId?: string }, @Req() req: any) {
+  async cerrarCaja(@Body() data: CerrarCajaPosDto, @Req() req: any) {
     return this.posService.cerrarCaja(data, req.user);
   }
 
@@ -151,7 +141,7 @@ export class PosController {
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.configuracion.write') // HARDENING: configurar certificado POS.
   async configurarCertificado(
-    @Body() data: { certificado_base64: string; password: string },
+    @Body() data: ConfigurarCertificadoPosDto,
     @Req() req: any
   ) {
     return this.posService.configurarCertificado(

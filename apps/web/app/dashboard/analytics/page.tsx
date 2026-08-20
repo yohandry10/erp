@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useApiCall } from '@/hooks/use-api'
+import { customAuth } from '@/lib/auth-service'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,7 +43,16 @@ import {
 // DESIGN TOKENS
 // ============================================================================
 
-const ANALYTICS_CACHE_KEY = 'erp-analytics-dashboard-snapshot'
+// La clave del snapshot lleva el tenant. Con una clave global, al cerrar una
+// empresa y entrar a otra en la misma pestaña el panel pintaba las cifras de la
+// anterior hasta que llegaba la respuesta nueva: ventas, deuda de clientes y de
+// proveedores de un tenant mostradas dentro de otro.
+const ANALYTICS_CACHE_PREFIX = 'erp-analytics-dashboard-snapshot'
+
+const analyticsCacheKey = () => {
+  const tenantId = customAuth.getCachedSession().session?.user?.tenant_id
+  return tenantId ? `${ANALYTICS_CACHE_PREFIX}:${tenantId}` : null
+}
 
 const PALETTE = {
   primary: '#22d3ee',     // cyan-400 — ventas / cobrar
@@ -102,7 +112,15 @@ const hasAnalyticsData = (data: AnalyticsData) =>
 const getCachedAnalytics = (): AnalyticsData => {
   if (typeof window === 'undefined') return EMPTY_ANALYTICS_DATA
   try {
-    const raw = window.localStorage.getItem(ANALYTICS_CACHE_KEY)
+    // Sin tenant resuelto no se lee nada: es preferible el panel vacío un instante
+    // a mostrar cifras que podrían ser de otra empresa.
+    const clave = analyticsCacheKey()
+    if (!clave) return EMPTY_ANALYTICS_DATA
+
+    // Se retira el snapshot antiguo sin tenant, que quedó de la clave global.
+    window.localStorage.removeItem(ANALYTICS_CACHE_PREFIX)
+
+    const raw = window.localStorage.getItem(clave)
     if (!raw) return EMPTY_ANALYTICS_DATA
     return { ...EMPTY_ANALYTICS_DATA, ...JSON.parse(raw) }
   } catch {
@@ -113,7 +131,9 @@ const getCachedAnalytics = (): AnalyticsData => {
 const cacheAnalytics = (data: AnalyticsData) => {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(ANALYTICS_CACHE_KEY, JSON.stringify(data))
+    const clave = analyticsCacheKey()
+    if (!clave) return
+    window.localStorage.setItem(clave, JSON.stringify(data))
   } catch {
     /* ignore */
   }
@@ -173,10 +193,13 @@ function MetricTile({
   label,
   data,
   format = 'decimal',
+  aviso,
 }: {
   label: string
   data?: Kpi
   format?: 'decimal' | 'percentage'
+  /** Advertencia cuando el indicador no sigue una definición contable. */
+  aviso?: string
 }) {
   const valor = Number(data?.valor ?? 0)
   const objetivo = Math.max(Number(data?.objetivo ?? 1), 0.0001)
@@ -192,7 +215,18 @@ function MetricTile({
   return (
     <div className={`${surface} flex h-full flex-col gap-3 p-5`}>
       <div className="flex items-start justify-between gap-2">
-        <span className={eyebrow}>{label}</span>
+        <span className={eyebrow}>
+          {label}
+          {aviso ? (
+            <span
+              title={aviso}
+              className="ml-1.5 cursor-help font-bold text-amber-500"
+              aria-label={aviso}
+            >
+              *
+            </span>
+          ) : null}
+        </span>
         <span
           className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold ${cls.bg} ${cls.border} ${cls.text}`}
         >
@@ -1023,7 +1057,7 @@ export default function AnalyticsPage() {
       description="Indicadores gerenciales, cuentas por cobrar, cuentas por pagar y tendencias del periodo."
       actions={
         <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:flex xl:w-auto xl:items-center">
-          <select
+          <select aria-label="Periodo"
             disabled={!isHydrated}
             value={periodo}
             onChange={(e) => {
@@ -1088,8 +1122,17 @@ export default function AnalyticsPage() {
           </>
         ) : (
           <>
-            <MetricTile label="Liquidez" data={kpisVisuales?.liquidez} />
-            <MetricTile label="Rentabilidad" data={kpisVisuales?.rentabilidad} format="percentage" />
+            <MetricTile
+              label="Liquidez"
+              data={kpisVisuales?.liquidez}
+              aviso="Razón corriente: activo corriente (bancos + cuentas por cobrar + inventario valorizado) entre pasivo corriente (cuentas por pagar)."
+            />
+            <MetricTile
+              label="Rentabilidad"
+              data={kpisVisuales?.rentabilidad}
+              format="percentage"
+              aviso="Margen neto: ventas del periodo menos costo de ventas y gastos, sobre ventas. El costo usa el valor actual del producto, no un costeo por capas."
+            />
             <MetricTile label="Crecimiento" data={kpisVisuales?.crecimiento} format="percentage" />
             <EfficiencyTile data={kpisVisuales?.eficiencia} />
           </>

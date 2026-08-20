@@ -264,7 +264,7 @@ export default function GREPage() {
             <CardTitle className="text-base text-foreground">Filtros GRE</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 lg:items-end">
-            <select
+            <select aria-label="Modalidad"
               value={filters.modalidad}
               onChange={(event) => setFilters(prev => ({ ...prev, modalidad: event.target.value }))}
               className={inputClass}
@@ -273,7 +273,7 @@ export default function GREPage() {
               <option value="TRANSPORTE_PUBLICO">Transporte Publico</option>
               <option value="TRANSPORTE_PRIVADO">Transporte Privado</option>
             </select>
-            <select
+            <select aria-label="Estado"
               value={filters.estado}
               onChange={(event) => setFilters(prev => ({ ...prev, estado: event.target.value }))}
               className={inputClass}
@@ -287,13 +287,13 @@ export default function GREPage() {
               <option value="ERROR">Error técnico</option>
               <option value="ANULADO">Anulado</option>
             </select>
-            <input
+            <input aria-label="Fecha desde"
               type="date"
               value={filters.fechaDesde}
               onChange={(event) => setFilters(prev => ({ ...prev, fechaDesde: event.target.value }))}
               className={inputClass}
             />
-            <input
+            <input aria-label="Fecha hasta"
               type="date"
               value={filters.fechaHasta}
               onChange={(event) => setFilters(prev => ({ ...prev, fechaHasta: event.target.value }))}

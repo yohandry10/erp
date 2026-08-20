@@ -532,14 +532,15 @@ describe('migration/473 canonical writer coverage', () => {
     },
   );
 
-  it('writers contables compartido y revaluación usan crear_asiento_con_detalles_tx', () => {
-    const integration = readRepoFile('apps/erp-api/src/shared/integration/accounting-entries.service.ts');
+  it('writers contables usan crear_asiento_con_detalles_tx', () => {
+    // `shared/integration/accounting-entries.service.ts` se retiró: no estaba
+    // inyectado en ningún módulo y arrastraba un IGV 1.18 cableado y fechas UTC.
     const revaluation = readRepoFile(
       'apps/erp-api/src/modules/contabilidad/services/revaluacion.service.ts',
     );
     const entries = readRepoFile('apps/erp-api/src/modules/contabilidad/services/asientos.service.ts');
 
-    for (const source of [integration, revaluation]) {
+    for (const source of [revaluation]) {
       expect(source).toContain("rpc('crear_asiento_con_detalles_tx'");
       expect(source).not.toContain("from('detalle_asientos').insert(");
       expect(source).not.toContain("from('asientos_contables').insert(");

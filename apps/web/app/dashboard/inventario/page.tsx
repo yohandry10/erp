@@ -246,14 +246,14 @@ export default function InventarioPage() {
               </CardHeader>
               <CardContent className="space-y-4">
               <div className="grid gap-3 md:grid-cols-4">
-                <Input
+                <Input aria-label="Buscar por nombre, código o categoría"
                   type="text"
                   value={filters.search}
                   onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
                   placeholder="Buscar por nombre, código o categoría"
                   className="bg-card/70 text-foreground group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground"
                 />
-                <select
+                <select aria-label="Estado"
                   value={filters.estado}
                   onChange={(event) =>
                     setFilters((prev) => ({ ...prev, estado: event.target.value as Filters['estado'] }))
@@ -266,7 +266,7 @@ export default function InventarioPage() {
                     </option>
                   ))}
                 </select>
-                <select
+                <select aria-label="Categoria"
                   value={filters.categoria}
                   onChange={(event) => setFilters((prev) => ({ ...prev, categoria: event.target.value }))}
                   className="h-10 rounded-md border border-cyan-400/20 bg-card/70 px-3 text-sm text-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground"

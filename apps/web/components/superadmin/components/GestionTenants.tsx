@@ -117,7 +117,7 @@ export default function GestionTenants({
 
       <CardContent className="space-y-5 p-6">
         <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
-          <label className="relative block">
+          <label htmlFor="gestiontenants-onsearchchange-e-target-value-classname-" className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/80 group-data-[erp-theme=light]/dashboard:text-muted-foreground" />
             <Input
               placeholder="Buscar por nombre, email, RUC, telefono o direccion"
@@ -127,7 +127,7 @@ export default function GestionTenants({
             />
           </label>
 
-          <select
+          <select id="gestiontenants-onsearchchange-e-target-value-classname-"
             value={statusFilter}
             onChange={(e) => onStatusChange(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
             className={`${field} rounded-md px-3 text-sm outline-none`}

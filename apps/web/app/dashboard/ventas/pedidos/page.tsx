@@ -188,7 +188,7 @@ export default function PedidosPage() {
             <Search
               size={20} className="absolute left-4 top-[50%] -translate-y-1/2 text-muted-foreground"
             />
-            <input
+            <input aria-label="Buscar"
               type="text"
               placeholder="Buscar por número o cliente..."
               value={searchTerm}
@@ -216,10 +216,10 @@ export default function PedidosPage() {
         {showFilters && (
           <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-6 p-4 bg-muted rounded-lg border">
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="pedidos-estado" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Estado
               </label>
-              <select
+              <select id="pedidos-estado"
                 value={estadoFilter}
                 onChange={(e) => setEstadoFilter(e.target.value as EstadoPedido | '')} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               >
@@ -231,10 +231,10 @@ export default function PedidosPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="pedidos-cliente" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Cliente
               </label>
-              <input
+              <input id="pedidos-cliente"
                 type="text"
                 placeholder="Filtrar por cliente..."
                 value={clienteFilter}
@@ -243,10 +243,10 @@ export default function PedidosPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="pedidos-fecha-desde" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha Desde
               </label>
-              <input
+              <input id="pedidos-fecha-desde"
                 type="date"
                 value={fechaDesde}
                 onChange={(e) => setFechaDesde(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
@@ -254,10 +254,10 @@ export default function PedidosPage() {
             </div>
 
             <div>
-              <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+              <label htmlFor="pedidos-fecha-hasta" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                 Fecha Hasta
               </label>
-              <input
+              <input id="pedidos-fecha-hasta"
                 type="date"
                 value={fechaHasta}
                 onChange={(e) => setFechaHasta(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"

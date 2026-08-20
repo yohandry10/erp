@@ -47,6 +47,7 @@ import { useConfigurationStatus } from './hooks/useConfigurationStatus'
 import { ConfigurationBanner } from './components/ConfigurationBanner'
 import { ConfigurationModal } from './components/ConfigurationModal'
 import { DashboardNotificationBanners } from '@/components/notifications'
+import { parseDateLocal } from '@/lib/date-utils'
 
 // ============================================================================
 // TYPES
@@ -606,7 +607,7 @@ function ActivityTimeline({
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-[0.7rem] text-muted-foreground group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                     <span className="tabular-nums">
-                      {new Date(activity.date).toLocaleDateString(locale, {
+                      {parseDateLocal(activity.date).toLocaleDateString(locale, {
                         day: '2-digit',
                         month: '2-digit',
                         hour: '2-digit',

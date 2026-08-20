@@ -12,7 +12,7 @@ import { AuthService } from "../auth/auth.service";
 import * as bcrypt from "bcrypt";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import {
   CreateDemoTenantDto,
   ConvertDemoToRealDto,
@@ -407,7 +407,15 @@ export class DemoService {
     const aprobadorId = randomUUID();
     const tenantShort = tenantId.slice(0, 8);
     const email = `aprobador-${tenantShort}@temp.local`;
-    const password = `APR${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+    // `Math.random` no es criptográfico: su estado interno se puede reconstruir a
+    // partir de unas pocas salidas, y esto es una credencial de acceso real, no un
+    // identificador decorativo. `user-management.service` ya usaba `randomInt`
+    // para lo mismo; aquí había quedado la versión débil.
+    const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const password = `APR${Array.from(
+      { length: 10 },
+      () => alfabeto[randomInt(0, alfabeto.length)],
+    ).join("")}`;
     const passwordHash = await bcrypt.hash(password, 10);
 
     // 1. usuarios_sistema (auth)

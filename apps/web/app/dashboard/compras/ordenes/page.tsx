@@ -19,6 +19,8 @@ import {
 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { parseDateLocal } from '@/lib/date-utils'
+import { downloadCsv } from '@/lib/csv-export'
+import CompraEditarCabeceraModal from '@/components/modals/CompraEditarCabeceraModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import toast from 'react-hot-toast'
@@ -155,6 +157,7 @@ export default function OrdenesCompraPage() {
   const { get } = useApi()
 
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([])
+  const [ordenEditando, setOrdenEditando] = useState<OrdenCompra | null>(null)
   const [proveedores, setProveedores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
@@ -231,7 +234,30 @@ export default function OrdenesCompraPage() {
   }
 
   const handleExport = () => {
-    toast('Funcionalidad de exportacion proximamente')
+    if (ordenes.length === 0) {
+      toast('No hay órdenes que exportar con los filtros actuales')
+      return
+    }
+
+    // Exporta lo que el usuario está viendo, con los filtros ya aplicados: es lo
+    // que espera de un botón junto a la tabla. `downloadCsv` neutraliza las celdas
+    // que Excel interpretaría como fórmula.
+    downloadCsv(
+      `ordenes-compra-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Numero', 'Proveedor', 'RUC', 'Fecha orden', 'Entrega esperada', 'Estado', 'Moneda', 'Subtotal', 'IGV', 'Total'],
+      ordenes.map((orden) => [
+        orden.numero,
+        orden.proveedores?.razon_social ?? '',
+        orden.proveedores?.ruc ?? '',
+        orden.fecha_orden?.slice(0, 10) ?? '',
+        orden.fecha_entrega_esperada?.slice(0, 10) ?? '',
+        orden.estado,
+        orden.moneda,
+        orden.subtotal,
+        orden.igv,
+        orden.total,
+      ]),
+    )
   }
 
   const formatCurrency = (amount: number | undefined) => {
@@ -544,7 +570,7 @@ export default function OrdenesCompraPage() {
                                 <Eye className="h-4 w-4" />
                               </Button>
                               {orden.estado === 'BORRADOR' && (
-                                <Button type="button" size="sm" onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/editar`)} variant="outline" className="border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground" title="Editar">
+                                <Button type="button" size="sm" onClick={() => setOrdenEditando(orden)} variant="outline" className="border-cyan-400/20 bg-muted/30 text-primary hover:bg-muted/50 hover:text-foreground" title="Editar cabecera">
                                   <Edit className="h-4 w-4" />
                                 </Button>
                               )}
@@ -595,6 +621,17 @@ export default function OrdenesCompraPage() {
           </CardContent>
         </Card>
       </div>
+
+      <CompraEditarCabeceraModal
+        tipo="orden"
+        isOpen={ordenEditando !== null}
+        onClose={() => setOrdenEditando(null)}
+        onSuccess={() => {
+          setOrdenEditando(null)
+          loadOrdenes()
+        }}
+        documento={ordenEditando}
+      />
     </div>
   )
 }

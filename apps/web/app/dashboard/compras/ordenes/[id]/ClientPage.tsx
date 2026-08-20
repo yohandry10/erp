@@ -469,7 +469,9 @@ export default function OrdenCompraDetallePage() {
                 <progress className="h-3 w-full accent-blue-500" value={porcentajeRecibido()} max={100} />
               </div>
 
-              <button onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/recepciones`)} className={`${primaryActionClass} w-full`}>
+              {/* La ruta anidada de recepciones por orden no existe; el listado
+                  general sí, y es donde vive la recepción de esta orden. */}
+              <button onClick={() => router.push('/dashboard/compras/recepciones')} className={`${primaryActionClass} w-full`}>
                 <Truck size={16} />
                 Ver Recepciones
               </button>

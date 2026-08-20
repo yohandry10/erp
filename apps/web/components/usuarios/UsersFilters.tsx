@@ -17,7 +17,7 @@ export default function UsersFilters({
 }: UsersFiltersProps) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
-      <select
+      <select aria-label="Filtro rol"
         value={filtroRol}
         onChange={(e) => onRolChange(e.target.value)} className="h-10 rounded-md border border-cyan-400/20 bg-card/70 px-3 text-sm text-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground"
       >
@@ -27,7 +27,7 @@ export default function UsersFilters({
         ))}
       </select>
 
-      <select
+      <select aria-label="Filtro estado"
         value={filtroEstado}
         onChange={(e) => onEstadoChange(e.target.value)} className="h-10 rounded-md border border-cyan-400/20 bg-card/70 px-3 text-sm text-foreground group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground"
       >
