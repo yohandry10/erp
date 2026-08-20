@@ -226,7 +226,7 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
                         {step === 'USER_SELECT' && (
                             <div className="space-y-4">
                                 <p className="text-sm text-muted-foreground">Seleccione el usuario que recibirá la caja:</p>
-                                <select
+                                <select aria-label="Seleccione el usuario que recibirá la caja"
                                     className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                                     value={selectedUserId}
                                     onChange={(e) => {
@@ -266,8 +266,8 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
                             <div className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground/85 mb-2">Confirmación del usuario saliente</label>
-                                        <input
+                                        <label htmlFor="shiftchangedialog-confirmacion-del-usuario-saliente" className="block text-sm font-medium text-foreground/85 mb-2">Confirmación del usuario saliente</label>
+                                        <input id="shiftchangedialog-confirmacion-del-usuario-saliente"
                                             type="password"
                                             autoComplete="new-password"
                                             className="w-full border border-border rounded-md p-2"
@@ -283,8 +283,8 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
                                         </p>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-foreground/85 mb-2">Confirmación del usuario entrante</label>
-                                        <input
+                                        <label htmlFor="shiftchangedialog-confirmacion-del-usuario-entrante" className="block text-sm font-medium text-foreground/85 mb-2">Confirmación del usuario entrante</label>
+                                        <input id="shiftchangedialog-confirmacion-del-usuario-entrante"
                                             type="password"
                                             autoComplete="new-password"
                                             className="w-full border border-border rounded-md p-2"
@@ -298,8 +298,8 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-foreground/85 mb-2">URL Foto Arqueo</label>
-                                    <input
+                                    <label htmlFor="shiftchangedialog-url-foto-arqueo" className="block text-sm font-medium text-foreground/85 mb-2">URL Foto Arqueo</label>
+                                    <input id="shiftchangedialog-url-foto-arqueo"
                                         type="text"
                                         className="w-full border border-border rounded-md p-2"
                                         placeholder="https://..."

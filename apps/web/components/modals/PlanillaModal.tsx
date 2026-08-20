@@ -468,7 +468,7 @@ export default function PlanillaModal({
                       >
                         {/* Checkbox selección */}
                         <div className="flex items-center justify-center">
-                          <input
+                          <input aria-label="Incluir"
                             type="checkbox"
                             checked={empleado.incluir}
                             onChange={(e) =>
@@ -495,7 +495,7 @@ export default function PlanillaModal({
                         </div>
                         {/* Sueldo Base */}
                         <div className="text-center">
-                          <input
+                          <input aria-label="Sueldo base"
                             type="number"
                             value={empleado.sueldo_base}
                             onChange={(e) =>
@@ -518,7 +518,7 @@ export default function PlanillaModal({
 
                         {/* Días Trabajados */}
                         <div className="text-center">
-                          <input
+                          <input aria-label="Días trabajados"
                             type="number"
                             value={empleado.dias_trabajados}
                             onChange={(e) =>
@@ -540,7 +540,7 @@ export default function PlanillaModal({
 
                         {/* Horas Extras 25% */}
                         <div className="text-center">
-                          <input
+                          <input aria-label="Horas extra al 25%"
                             type="number"
                             value={empleado.horas_extras_25}
                             onChange={(e) =>
@@ -562,7 +562,7 @@ export default function PlanillaModal({
 
                         {/* Horas Extras 35% */}
                         <div className="text-center">
-                          <input
+                          <input aria-label="Horas extra al 35%"
                             type="number"
                             value={empleado.horas_extras_35}
                             onChange={(e) =>
@@ -584,7 +584,7 @@ export default function PlanillaModal({
 
                         {/* Tardanzas */}
                         <div className="text-center">
-                          <input
+                          <input aria-label="Minutos de tardanza"
                             type="number"
                             value={empleado.tardanzas_minutos}
                             onChange={(e) =>
@@ -614,7 +614,7 @@ export default function PlanillaModal({
 
                         {/* Faltas */}
                         <div className="text-center">
-                          <input
+                          <input aria-label="Faltas"
                             type="number"
                             value={empleado.faltas}
                             onChange={(e) =>
@@ -639,7 +639,7 @@ export default function PlanillaModal({
 
                         {/* Bonos Adicionales */}
                         <div className="text-center">
-                          <input
+                          <input aria-label="Bonos adicionales"
                             type="number"
                             value={empleado.bonos_adicionales}
                             onChange={(e) =>

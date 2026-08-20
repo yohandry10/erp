@@ -141,7 +141,6 @@ export class GreService {
       const cpeId = datos.cpeId;
       const clienteId = datos.clienteId;
       const total = datos.total;
-      const productos = datos.productos || [];
       let tenantId = datos.tenantId || datos.tenant_id; // Obtener tenantId de los datos
 
       if (!tenantId) {
@@ -174,18 +173,27 @@ export class GreService {
       if (requiereGREAutomatica) {
         console.log('🚚 [GRE] ✅ Cliente configurado para GRE automática, creando...');
 
-        if (!datos.clienteDireccion) {
-          throw new BadRequestException('No se puede crear GRE automática: falta dirección de destino del cliente');
-        }
+        // Este camino nacía sin validar y componía el destinatario con el UUID del
+        // cliente, además de inventar peso y fecha. Todo eso va en un documento que
+        // recibe SUNAT, así que ahora pasa por la misma comprobación que el camino
+        // nuevo y se niega a completar lo que no sabe.
+        this.assertAutoGreSaleDataValida({
+          clienteNombre: datos.clienteNombre,
+          clienteDireccion: datos.clienteDireccion,
+          pesoTotal: datos.pesoTotal,
+          fechaTraslado: datos.fechaTraslado,
+          modalidad: 'TRANSPORTE_PUBLICO',
+          transportista: datos.transportista,
+          transportistaDocumento: datos.transportistaDocumento,
+        });
 
-        // Crear GRE automática con datos validados (con certificado)
         const greAutomatica = await this.createGuia({
-          destinatario: `Cliente ${clienteId}`,
+          destinatario: datos.clienteNombre,
           direccionDestino: datos.clienteDireccion,
-          fechaTraslado: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Mañana
+          fechaTraslado: datos.fechaTraslado,
           modalidad: 'TRANSPORTE_PUBLICO',
           motivo: 'VENTA',
-          pesoTotal: this.calcularPesoEstimado(productos, total),
+          pesoTotal: Number(datos.pesoTotal),
           observaciones: `GRE automática generada para CPE ${cpeId} - Total: S/ ${total}`,
           transportista: datos.transportista || undefined,
           placaVehiculo: datos.placaVehiculo || undefined,
@@ -230,26 +238,6 @@ export class GreService {
     const habilitar = total >= umbralGREAutomatico;
     console.log(`🔎 [GRE] Umbral ${umbralGREAutomatico}, total ${total}, crear=${habilitar}`);
     return habilitar;
-  }
-
-  private calcularPesoEstimado(productos: any[], total: number): number {
-    console.log(`🚚 [GRE] Calculando peso estimado para ${productos.length} productos, total S/ ${total}`);
-
-    // Peso estimado básico: 1kg por cada S/ 100 de valor, más peso base de productos
-    let pesoEstimado = total / 100; // 1kg por cada S/ 100
-
-    // Si hay productos, agregar peso base
-    if (productos.length > 0) {
-      pesoEstimado += productos.length * 0.5; // 500g por producto
-    } else {
-      // Si no hay detalle de productos, usar peso base según total
-      pesoEstimado = total / 50; // 1kg por cada S/ 50 cuando no hay detalle
-    }
-
-    const pesoFinal = Math.max(Math.round(pesoEstimado * 100) / 100, 1); // Mínimo 1kg, redondear a 2 decimales
-    console.log(`🚚 [GRE] Peso estimado calculado: ${pesoFinal} kg`);
-
-    return pesoFinal;
   }
 
   async findAllGuias(
@@ -1745,6 +1733,8 @@ ${lines}
       clienteId: string;
       clienteNombre?: string;
       clienteDireccion?: string;
+      pesoTotal?: number;
+      fechaTraslado?: string;
       total: number;
       productos?: any[];
       modalidad?: 'TRANSPORTE_PUBLICO' | 'TRANSPORTE_PRIVADO';
@@ -1763,18 +1753,16 @@ ${lines}
 
       this.assertAutoGreSaleDataValida(saleData);
 
-      // Calculate estimated weight
-      const pesoEstimado = this.calcularPesoEstimado(saleData.productos || [], saleData.total);
       const modalidad = saleData.modalidad || 'TRANSPORTE_PUBLICO';
 
       // Prepare GRE data
       const greData: CreateGuiaRemisionDto = {
-        destinatario: saleData.clienteNombre || `Cliente ${saleData.clienteId}`,
+        destinatario: saleData.clienteNombre!,
         direccionDestino: saleData.clienteDireccion!,
-        fechaTraslado: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
+        fechaTraslado: saleData.fechaTraslado!,
         modalidad,
         motivo: 'VENTA',
-        pesoTotal: pesoEstimado,
+        pesoTotal: Number(saleData.pesoTotal),
         observaciones: `GRE automática - Venta ${saleId} - Total: S/ ${saleData.total}`,
         transportista: saleData.transportista,
         transportistaDocumento: saleData.transportistaDocumento,
@@ -1804,9 +1792,19 @@ ${lines}
     }
   }
 
+  /**
+   * Datos sin los cuales una GRE automática no se puede declarar.
+   *
+   * El peso bruto y la fecha de inicio de traslado son campos que SUNAT recibe.
+   * Ningún producto del catálogo guarda peso —no existe la columna—, así que no
+   * hay de dónde deducirlo: exigirlos es la única forma de no declarar un número
+   * inventado. Cuando faltan, el mensaje ya remite al flujo manual.
+   */
   private assertAutoGreSaleDataValida(saleData: {
     clienteNombre?: string;
     clienteDireccion?: string;
+    pesoTotal?: number;
+    fechaTraslado?: string;
     modalidad?: 'TRANSPORTE_PUBLICO' | 'TRANSPORTE_PRIVADO';
     transportista?: string;
     transportistaDocumento?: string;
@@ -1821,6 +1819,8 @@ ${lines}
 
     if (!saleData.clienteNombre?.trim()) missing.push('destinatario real');
     if (!saleData.clienteDireccion?.trim()) missing.push('dirección de destino real');
+    if (!(Number(saleData.pesoTotal) > 0)) missing.push('peso bruto declarado');
+    if (!saleData.fechaTraslado?.trim()) missing.push('fecha de inicio de traslado');
 
     if (modalidad === 'TRANSPORTE_PUBLICO') {
       if (!saleData.transportista?.trim()) missing.push('transportista');

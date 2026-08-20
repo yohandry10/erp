@@ -97,8 +97,19 @@ export class CashClosingService {
             return { valido: false, errores, warnings };
         }
 
-        // Validación 2: Q45 - Verificar que TODAS las ventas tengan CPE
-        // 2a. Ventas con cpe_pendiente = true (en proceso de facturación)
+        // Validación 2: intención fiscal reservada sin finalizar.
+        //
+        // Este prechequeo sólo existe para anticipar con un mensaje legible lo que
+        // `cerrar_caja_tx` va a decidir; nunca debe ser más estricto que el writer,
+        // porque entonces la caja se bloquea en pantalla por una regla que la
+        // transacción no aplica. Se replica su condición exacta: bloquea el cierre
+        // una venta viva con `cpe_pendiente`, y nada más.
+        //
+        // Un ticket interno puro (Txxx, `tipo_emision = 'TICKET'`) tiene por
+        // postcondición `cpe_id` nulo y `cpe_pendiente` en false: es una venta
+        // completa que puede seguir siendo canjeable después del corte. Así lo fija
+        // docs/MODULES.md: "un ticket interno puro no es un CPE pendiente y no
+        // bloquea el cierre; un canje fiscal reservado sí debe finalizar".
         const { data: ventasPendientes, error: ventasError } = await this.supabase
             .getClient()
             .from('ventas_pos')
@@ -106,6 +117,7 @@ export class CashClosingService {
             .eq('tenant_id', tenantId)
             .eq('sesion_caja_id', sesionId)
             .eq('cpe_pendiente', true)
+            .neq('estado', 'ANULADA')
             .limit(5);
 
         if (!ventasError && ventasPendientes && ventasPendientes.length > 0) {
@@ -117,22 +129,28 @@ export class CashClosingService {
             );
         }
 
-        // 2b. Ventas sin CPE asociado (nunca se intentó facturar)
-        const { data: ventasSinCpe, error: ventasSinCpeError } = await this.supabase
+        // Validación 2b: venta incompleta según el writer canónico.
+        //
+        // Antes se exigía aquí un `cpe_id` a toda venta, lo que rechazaba
+        // precisamente la salida válida del writer para un ticket interno puro y
+        // dejaba la caja imposible de cerrar desde esta pantalla. La condición
+        // correcta es la que evalúa `cerrar_caja_tx`: una venta viva sin efecto
+        // contable, sin resultado atómico o sin documento asociado.
+        const { data: ventasIncompletas, error: ventasIncompletasError } = await this.supabase
             .getClient()
             .from('ventas_pos')
-            .select('id, numero_ticket, cpe_id')
+            .select('id, numero_ticket, accounting_event_id, atomic_result, documento_id')
             .eq('tenant_id', tenantId)
             .eq('sesion_caja_id', sesionId)
-            .is('cpe_id', null)
-            .eq('cpe_pendiente', false)
+            .neq('estado', 'ANULADA')
+            .or('accounting_event_id.is.null,atomic_result.is.null,documento_id.is.null')
             .limit(10);
 
-        if (!ventasSinCpeError && ventasSinCpe && ventasSinCpe.length > 0) {
+        if (!ventasIncompletasError && ventasIncompletas && ventasIncompletas.length > 0) {
             errores.push(
-                `Hay ${ventasSinCpe.length} ventas sin comprobante electrónico asociado. ` +
-                `Tickets: ${ventasSinCpe.slice(0, 5).map(v => v.numero_ticket).join(', ')}${ventasSinCpe.length > 5 ? '...' : ''}. ` +
-                'Debe completar la emisión antes del cierre.',
+                `Hay ${ventasIncompletas.length} ventas POS incompletas (sin efecto contable, resultado atómico o documento). ` +
+                `Tickets: ${ventasIncompletas.slice(0, 5).map(v => v.numero_ticket).join(', ')}${ventasIncompletas.length > 5 ? '...' : ''}. ` +
+                'Deben regularizarse antes del cierre.',
             );
         }
 

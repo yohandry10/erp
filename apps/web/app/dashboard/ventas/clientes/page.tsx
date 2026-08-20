@@ -135,7 +135,7 @@ export default function ClientesPage() {
             <Search
               size={20} className="absolute left-4 top-[50%] -translate-y-1/2 text-muted-foreground"
             />
-            <input
+            <input aria-label="Buscar"
               type="text"
               placeholder={`Buscar por ${taxIdLabel}, nombre o razón social...`}
               value={searchTerm}
@@ -143,7 +143,7 @@ export default function ClientesPage() {
             />
           </div>
 
-          <select
+          <select aria-label="Filtrar por tipo"
             value={tipoFilter}
             onChange={(e) => handleFilterChange(e.target.value)} className="py-3 px-4 rounded-lg border text-[0.875rem] bg-card"
           >

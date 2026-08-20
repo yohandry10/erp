@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import { SaldoFavorMovimientosModal } from '@/components/ventas/SaldoFavorMovimientosModal'
+import { parseDateLocal } from '@/lib/date-utils'
 
 type Rma = {
   id: string
@@ -237,9 +238,9 @@ export default function RmaPage() {
           <div className="flex flex-1 flex-col gap-2 sm:flex-row lg:max-w-3xl">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Buscar por número, cliente o motivo" value={search} onChange={(event) => setSearch(event.target.value)} />
+              <Input aria-label="Buscar por número, cliente o motivo" className="pl-9" placeholder="Buscar por número, cliente o motivo" value={search} onChange={(event) => setSearch(event.target.value)} />
             </div>
-            <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={estado} onChange={(event) => setEstado(event.target.value)}>
+            <select aria-label="Estado" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={estado} onChange={(event) => setEstado(event.target.value)}>
               <option value="">Todos los estados</option>
               {(view === 'rma'
                 ? ['CREADA', 'APROBADA', 'PARCIAL', 'RECIBIDA', 'CERRADA', 'RECHAZADA']
@@ -262,7 +263,7 @@ export default function RmaPage() {
                     <td className="p-4"><div>{rma.clientes?.razon_social ?? rma.clientes?.nombre ?? 'Cliente'}</div><div className="text-xs text-muted-foreground">{rma.clientes?.ruc ?? ''}</div></td>
                     <td className="max-w-md p-4 text-sm text-muted-foreground">{rma.motivo_general ?? '—'}</td>
                     <td className="p-4"><Status value={rma.estado} /></td>
-                    <td className="p-4 text-sm">{new Date(rma.created_at).toLocaleDateString('es-PE')}</td>
+                    <td className="p-4 text-sm">{parseDateLocal(rma.created_at).toLocaleDateString('es-PE')}</td>
                     <td className="p-4 text-right"><Button asChild variant="outline" size="sm"><Link href={`/dashboard/ventas/rma/${rma.id}`}>Ver flujo <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></td>
                   </tr>
                 ))}
@@ -296,14 +297,14 @@ export default function RmaPage() {
           <div className="w-full max-w-lg rounded-2xl border border-border bg-background p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4"><div><h2 className="text-xl font-bold">{accion === 'aplicar' ? 'Aplicar saldo a una CxC' : 'Reembolsar saldo a favor'}</h2><p className="mt-1 text-sm text-muted-foreground">Disponible: {formatCurrency(Number(saldoActivo.monto_disponible), saldoActivo.moneda)}</p></div><Button variant="ghost" size="icon" onClick={closeAction}><X className="h-4 w-4" /></Button></div>
             <div className="mt-6 space-y-4">
-              <Field label={`Monto (${saldoActivo.moneda})`}><Input type="number" min="0.01" step="0.01" max={saldoActivo.monto_disponible} value={monto} onChange={(event) => setMonto(event.target.value)} /></Field>
+              <Field label={`Monto (${saldoActivo.moneda})`}><Input aria-label="Monto" type="number" min="0.01" step="0.01" max={saldoActivo.monto_disponible} value={monto} onChange={(event) => setMonto(event.target.value)} /></Field>
               {accion === 'aplicar' ? (
-                <Field label="Cuenta por cobrar compatible"><select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={cxcId} onChange={(event) => setCxcId(event.target.value)}><option value="">Selecciona una CxC</option>{cxc.map((item) => <option key={item.id} value={item.id}>{item.numero_documento ?? item.id.slice(0, 8)} · {formatCurrency(Number(item.monto_pendiente ?? item.saldo_pendiente ?? item.saldo ?? 0), item.moneda)}</option>)}</select>{cxc.length === 0 && <p className="mt-2 text-xs text-amber-600">No hay CxC pendientes del mismo cliente y moneda.</p>}</Field>
+                <Field label="Cuenta por cobrar compatible"><select aria-label="Cxc" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={cxcId} onChange={(event) => setCxcId(event.target.value)}><option value="">Selecciona una CxC</option>{cxc.map((item) => <option key={item.id} value={item.id}>{item.numero_documento ?? item.id.slice(0, 8)} · {formatCurrency(Number(item.monto_pendiente ?? item.saldo_pendiente ?? item.saldo ?? 0), item.moneda)}</option>)}</select>{cxc.length === 0 && <p className="mt-2 text-xs text-amber-600">No hay CxC pendientes del mismo cliente y moneda.</p>}</Field>
               ) : (
                 <>
                   <Field label="Medio"><div className="grid grid-cols-2 gap-2"><Button type="button" variant={medio === 'BANCO' ? 'default' : 'outline'} onClick={() => { setMedio('BANCO'); setMedioId('') }}>Banco</Button><Button type="button" variant={medio === 'CAJA' ? 'default' : 'outline'} onClick={() => { setMedio('CAJA'); setMedioId('') }}>Caja</Button></div></Field>
-                  <Field label={medio === 'BANCO' ? 'Cuenta bancaria explícita' : 'Sesión propia de caja abierta'}><select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={medioId} onChange={(event) => setMedioId(event.target.value)}><option value="">Selecciona una opción</option>{(medio === 'BANCO' ? medios.bancos : medios.sesiones_caja).filter((item) => item.moneda === saldoActivo.moneda).map((item: any) => <option key={item.id} value={item.id}>{medio === 'BANCO' ? `${item.nombre ?? item.banco} · ${item.moneda}` : `${item.cajas?.nombre ?? item.cajas?.codigo ?? 'Caja'} · ${item.moneda}`}</option>)}</select></Field>
-                  {medio === 'BANCO' && <Field label="Referencia bancaria"><Input value={referencia} onChange={(event) => setReferencia(event.target.value)} placeholder="Operación o transferencia" /></Field>}
+                  <Field label={medio === 'BANCO' ? 'Cuenta bancaria explícita' : 'Sesión propia de caja abierta'}><select aria-label="Medio" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={medioId} onChange={(event) => setMedioId(event.target.value)}><option value="">Selecciona una opción</option>{(medio === 'BANCO' ? medios.bancos : medios.sesiones_caja).filter((item) => item.moneda === saldoActivo.moneda).map((item: any) => <option key={item.id} value={item.id}>{medio === 'BANCO' ? `${item.nombre ?? item.banco} · ${item.moneda}` : `${item.cajas?.nombre ?? item.cajas?.codigo ?? 'Caja'} · ${item.moneda}`}</option>)}</select></Field>
+                  {medio === 'BANCO' && <Field label="Referencia bancaria"><Input aria-label="Operación o transferencia" value={referencia} onChange={(event) => setReferencia(event.target.value)} placeholder="Operación o transferencia" /></Field>}
                 </>
               )}
             </div>

@@ -21,6 +21,8 @@ import { RequirePermission } from "../../../common/decorators/require-permission
 import { CurrentTenant } from "../../../common/decorators/current-tenant.decorator";
 import { CurrentUser } from "../../auth/current-user.decorator";
 
+import { ConvertirCotizacionOcDto } from '../../shared-dto/acciones-simples.dto';
+
 @ApiTags("compras/cotizaciones")
 @Controller("compras/cotizaciones")
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: proteger cotizaciones con permisos granulares.
@@ -301,7 +303,7 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.CREATED)
   async convertirAOrdenCompra(
     @Param("id") id: string,
-    @Body() body: { numero_oc?: string },
+    @Body() body: ConvertirCotizacionOcDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {

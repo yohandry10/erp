@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { parseDateLocal } from "@/lib/date-utils";
 import PlanillaModal from "@/components/modals/PlanillaModal";
 import PlanillaCalcularModal from "@/components/modals/PlanillaCalcularModal";
+import PlanillaEditarModal from "@/components/modals/PlanillaEditarModal";
 import PlanillaPagarModal from "@/components/modals/PlanillaPagarModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useApi } from "@/hooks/use-api";
@@ -63,6 +64,7 @@ const PlanillasPage = () => {
   const [showPlanillaModal, setShowPlanillaModal] = useState(false);
   const [showCalcularModal, setShowCalcularModal] = useState(false);
   const [showPagarModal, setShowPagarModal] = useState(false);
+  const [showEditarModal, setShowEditarModal] = useState(false);
   const [planillaSeleccionada, setPlanillaSeleccionada] = useState<any>(null);
 
   // Estado para diálogo de confirmación
@@ -110,10 +112,14 @@ const PlanillasPage = () => {
   };
 
   const editarPlanilla = (planilla: any) => {
-    // TODO: Implementar modal de edición de planilla
-    alert(
-      `🚧 Función en desarrollo\n\nPronto podrás editar la planilla ${planilla?.periodo}\n\nPor ahora puedes:\n• Ver el detalle\n• Generar reportes\n• Aprobar si está calculada`,
-    );
+    setPlanillaSeleccionada(planilla);
+    setShowEditarModal(true);
+  };
+
+  const handleEditarSuccess = () => {
+    setShowEditarModal(false);
+    setPlanillaSeleccionada(null);
+    loadPlanillas();
   };
 
   const abrirCalcularPlanilla = (planilla: any) => {
@@ -440,7 +446,7 @@ const PlanillasPage = () => {
           locale,
         );
       }
-      return new Date(dateString).toLocaleDateString(locale);
+      return parseDateLocal(dateString).toLocaleDateString(locale);
     } catch (error: any) {
       return "N/A";
     }
@@ -765,6 +771,22 @@ const PlanillasPage = () => {
                               </button>
                             )}
 
+                          {/* Editar - sólo período y observaciones, sólo en borrador */}
+                          {canCreatePayroll &&
+                            planilla?.estado === "borrador" && (
+                              <button
+                                className="py-[4px] px-2 text-[0.7rem] font-semibold bg-muted text-foreground border border-border rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-accent"
+                                onClick={() => editarPlanilla(planilla)}
+                                title="Editar período y observaciones"
+                              >
+                                <FileEdit
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />{" "}
+                                Editar
+                              </button>
+                            )}
+
                           {/* El pago sólo existe después de aprobar y devengar. */}
                           {canPayPayroll && planilla?.estado === "aprobada" && (
                             <button
@@ -985,6 +1007,19 @@ const PlanillasPage = () => {
             setPlanillaSeleccionada(null);
           }}
           onSuccess={handleCalcularSuccess}
+          planilla={planillaSeleccionada}
+        />
+      )}
+
+      {/* Modal de Editar Planilla */}
+      {canCreatePayroll && (
+        <PlanillaEditarModal
+          isOpen={showEditarModal}
+          onClose={() => {
+            setShowEditarModal(false);
+            setPlanillaSeleccionada(null);
+          }}
+          onSuccess={handleEditarSuccess}
           planilla={planillaSeleccionada}
         />
       )}

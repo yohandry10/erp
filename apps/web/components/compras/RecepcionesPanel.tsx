@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Package, Calendar, User, CheckCircle, XCircle, AlertCircle, Eye } from 'lucide-react'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface RecepcionItem {
   id: string
@@ -108,7 +109,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
   }, [loadRecepciones])
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+    return parseDateLocal(dateString).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'

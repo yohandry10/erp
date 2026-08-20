@@ -8,8 +8,52 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- El código core y PROD están verificados hasta `496`. El 2026-08-17 se creó un
-  respaldo nuevo de PROD `490`, se aplicaron y registraron `491..496` en orden y
+- **PROD está en `498`.** El 2026-08-20 se promovieron `497` y `498`, ambas de
+  sólo funciones —sin DDL de tabla ni migración de datos—, tras pasar el gate
+  completo en un cluster efímero (495 migraciones, verificadores `497` y `498`
+  en verde). Se respaldó la definición previa de
+  `app.hydrate_demo_business_sample_tx` antes de reemplazarla. El historial se
+  selló a mano en `supabase_migrations.schema_migrations`, que psql no toca, y
+  `outbox_runtime_health_492` devuelve `ready: true` con `schema_version 498`.
+  Comprobado sobre una demo nueva: la venta POS nace con `documento_id`,
+  `accounting_event_id` y `atomic_result`, que es lo que `cerrar_caja_tx` exige,
+  y la planilla nace en `borrador` sin líneas escritas a mano.
+- **La cola de dead-letter de PROD se estaba envenenando sola.** La migración 464
+  emite `demo.lista` y `configuracion.wizard.completado` como constancia, y nunca
+  hubo suscriptor: el worker falla cerrado ante un evento sin handler, así que
+  cada demo creada y cada wizard completado dejaba un `dead_letter` permanente.
+  Había doce y crecían. No era sólo ruido: `outbox_runtime_health_492` deja de
+  reportar `ready` al pasar de cien, de modo que la cola habría acabado bloqueando
+  el readiness por eventos que funcionaban bien, mientras tapaba los fallos de
+  verdad. Se resuelve con un registro explícito de eventos sin suscriptor
+  (`eventos-sin-suscriptor.ts`): esos se dan por procesados sin despachar y todo
+  lo demás sigue fallando cerrado. **Tras el despliegue** conviene reencolar los
+  doce que ya están en `dead_letter` para que se cierren; antes de desplegar
+  volverían a caer.
+- **Barrido de integridad sobre PROD el 2026-08-20**, sólo lectura: 170 asientos
+  contables, todos cuadrados y con detalle; el invariante de stock
+  (`productos.stock_actual` = suma de `producto_existencias`) se cumple en todos
+  los productos; ningún `empresa_config` sin `pais_id`; ningún evento de outbox
+  atascado en `processing`. Quedan cinco CPE en `FIRMADO` sin aceptación, de hace
+  once a catorce días, todos de tenants QA y demo (`LLAMA PE QA SAC`,
+  `DEMO COMERCIAL S.A.C.`): son restos de pruebas contra beta, no de un
+  contribuyente real.
+- **La GRE automática completaba de su cosecha campos que declara SUNAT.** El peso
+  bruto salía del importe de la venta («1 kg por cada S/ 100») y la fecha de
+  traslado era «mañana» sobre el reloj UTC; ninguno procede de un dato real, y
+  `productos` ni siquiera tiene columna de peso. El camino legado, además, no
+  validaba nada y componía el destinatario como `Cliente <uuid>`. Estaba latente:
+  de las treinta guías emitidas ninguna salió por ahí y el único contribuyente con
+  la creación automática activa es una demo, pero se dispara en cuanto la habilite
+  alguien real. Ahora los dos caminos pasan por `assertAutoGreSaleDataValida`, que
+  exige peso y fecha además del destinatario y remite al flujo manual cuando
+  faltan; el estimador de peso se retira.
+- **Falta desplegar el runtime.** La rama `fix/qa-bloqueadores-criticos` no está
+  publicada y Render sirve todavía el código anterior, así
+  que el cierre de caja de la demo sigue fallando con el precheck viejo («ventas
+  sin comprobante electrónico»). La base ya está lista para ese despliegue.
+- El 2026-08-17 se creó un respaldo nuevo de PROD `490`, se aplicaron y
+  registraron `491..496` en orden y
   el postcheck remoto confirmó esquema requerido `496`, Redis listo y outbox sin
   filas claimable, processing, failed ni dead-letter. Render sirve el commit
   `85f35175eaa6d51d4a0d19afe65930481a9c29c4`; `/api/health/version` ya acredita
@@ -187,6 +231,251 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   laboral y terminó con readiness remoto listo en esquema `496`; su evidencia
   operativa está en
   `artifacts/qa-10-questions/prod-491-496-promotion-20260817.json`.
+- `497` está validada sólo localmente y **no** promovida a PROD. Corrige el
+  bloqueador por el que la sesión de caja de la demo peruana no podía cerrarse
+  nunca: `app.hydrate_demo_business_sample_tx` creaba la venta POS con un INSERT
+  directo sobre `ventas_pos`, sin `accounting_event_id`, `atomic_result` ni
+  `documento_id`, y con `cpe_pendiente` puesto sobre un ticket interno `T001`
+  puro. Eso hacía fallar `cerrar_caja_tx` con `CASH_CLOSE_HAS_PENDING_CPE` y
+  después con `CASH_CLOSE_HAS_INCOMPLETE_POS_SALE`, y contradecía el invariante
+  de `MODULES.md` según el cual un ticket interno puro no bloquea el cierre.
+  Ahora el seed llama a `public.pos_registrar_venta_atomic_tx` con
+  `emitir_cpe = false` y se eliminan las escrituras que duplicaba a mano
+  (detalle, pagos, dos movimientos de inventario, movimiento de caja y el UPDATE
+  de la sesión): queda una sola forma de crear una venta POS en todo el sistema.
+  La migración no toca el esquema de `supervisor_pins`; sólo añade las RPC
+  `registrar_pin_supervisor_tx` y `verificar_pin_supervisor_tx` sobre el modelo
+  que ya existía desde `185`/`186`, porque el backend aceptaba como válido
+  cualquier código de seis dígitos. La reconstrucción limpia `000..497` con sus
+  siete verificadores pasó en PostgreSQL 16, y el ensayo de aceptación creó un
+  tenant demo por su RPC productiva y cerró su caja (`estado=CERRADA`,
+  `diferencia=0.00`).
+- Los importes de la venta POS demo cambian con esa corrección: el seed los
+  escribía como 53.39 / 9.61 / 63 tratando el precio de catálogo como IGV
+  incluido, mientras el motor de precios lo trata como neto. Derivados del
+  catálogo pasan a subtotal 63.00, IGV 11.34 y total 74.34, con la caja demo en
+  174.34. Ningún test ni verificador dependía de los valores anteriores.
+- El runtime exige el esquema de la última migración (`render.yaml`,
+  `env.schema.ts` y `app.controller.ts`). Como en promociones anteriores, la
+  base debe alcanzarlo antes de desplegar el runtime nuevo.
+- La retención de quinta categoría de Perú se reescribió según el artículo 40 del
+  Reglamento de la LIR (sin migración; el historial se deriva de los datos que ya
+  existen). El motor anterior tomaba el ingreso del mes, lo multiplicaba por doce,
+  restaba 7 UIT y dividía siempre entre doce. Eso fallaba de dos maneras: en un mes
+  con gratificación la proyección anual se duplicaba —con sueldo 3 200 retenía
+  349.65 en julio donde correspondían 34.38— y, al no descontar lo ya retenido ni
+  cambiar el divisor, el total del ejercicio nunca cuadraba con el impuesto anual.
+  Ahora la regla vive aislada en `renta-quinta-peru.util.ts`, se proyecta la renta
+  con las gratificaciones del ejercicio sin contarlas dos veces, se descuenta el
+  acumulado leído del concepto `105` de periodos anteriores y se aplica el divisor
+  del mes (12/12/12/9/8/8/8/5/4/4/4, diciembre regulariza el saldo). El cálculo
+  peruano exige ahora el periodo `YYYY-MM`: sin él falla cerrado en vez de retener
+  cero, que sería una retención omitida.
+- Efecto operativo del cambio anterior: cambia el neto mensual de todo trabajador
+  cuya renta proyectada supere las 7 UIT. Deja de haber picos en julio y diciembre
+  y aparece una retención estable el resto del año; el total del ejercicio pasa a
+  coincidir con el impuesto anual. No cubre las rentas de un empleador anterior
+  (certificado de rentas y retenciones), que sigue pendiente.
+- El régimen pensionario peruano dejó de suponerse. Las dos rutas de planilla
+  discrepaban ante la misma entrada: `calcularEmpleado` caía a `|| 'AFP'` y
+  descontaba cerca del 13 % a un trabajador cuyo régimen nunca se declaró, mientras
+  `calcularEmpleadoPersonalizado` rechazaba ese mismo dato. Ahora ambas fallan
+  cerrado, `validarContratoPeru` exige AFP u ONP en contratos laborales, y una
+  afiliación AFP debe declarar administradora y tipo de comisión en vez de caer a
+  Integra/FLUJO en silencio. El frontend ya enviaba el régimen, así que el alta de
+  contratos no cambia. Las tasas del motor (10 % + 1,55 % + 1,37 % = 12,92 %) ya
+  eran correctas; queda pendiente el catálogo por AFP, que hoy usa las de Integra
+  para las cuatro administradoras.
+- `498` está validada sólo localmente y **no** promovida a PROD. La planilla de la
+  demo traía los importes escritos a mano y el del trabajador con contrato AFP
+  estaba mal: 416 sobre 3 200 es el 13 % de la ONP, no el 12,92 % de una AFP. Es el
+  mismo patrón que cerró la `497` con la venta POS —dato derivado escrito a mano en
+  vez de producido por el motor—, y reaparece solo cada vez que cambia una tasa o
+  una regla. Como no existe un writer SQL de planilla al que delegar, la planilla
+  demo pasa a nacer en borrador y sin líneas por empleado: el usuario pulsa
+  «Calcular» y ve lo que produce el motor real. El readiness sólo exige que la
+  planilla exista.
+- El runtime exige ahora esquema `498`.
+- La configuración fiscal dejó de fallar abierta. `TaxCalculatorService` devolvía
+  Perú 18 %/PEN ante cualquier fallo —error de consulta, país sin resolver, fila
+  ausente o tasa inválida—, de modo que un tenant colombiano facturaba al 18 % en
+  vez del 19 % y uno argentino al 18 % en vez del 21 %, sin señal alguna. La
+  validación de tasa inválida ni siquiera llegaba al llamador: la atrapaba su
+  propio `catch`. Además la lectura de `empresa_config` descartaba el error y caía
+  a `pais_id = 1`, y como esa tabla no tiene índice único por tenant, una fila
+  duplicada bastaba para volver peruano a cualquiera. Ahora todo eso lanza. El
+  endpoint `configuracion-fiscal` también tenía su propio fallback a 18 %/PEN con
+  `success: true`, que afirmaba una tasa falsa con la confianza de un dato real;
+  ahora responde 503. El redondeo pasó de punto flotante a Decimal.js:
+  `round(1.005)` daba 1 y ahora da 1.01.
+- Consecuencia operativa: un tenant sin país o sin configuración fiscal resoluble
+  ya no puede cobrar, en vez de cobrar mal. Es lo que fija el README —«operaciones
+  fiscales y financieras fallan cerrado»—: un cobro detenido se nota y se corrige;
+  un impuesto mal calculado se declara. El catálogo global cubre PE, CO, CL, MX y
+  AR, así que un tenant correctamente dado de alta resuelve.
+- Un timeout del cliente dejó de confundirse con estar sin conexión. `use-api`
+  aborta a los 12 s (30 s en el POS) y `offline-store` trataba ese aborto como
+  desconexión: encolaba la escritura y devolvía 202 con `success: true`. Pero un
+  timeout significa que el servidor pudo haberla procesado y sólo se perdió la
+  respuesta, así que reenviarla arriesgaba un duplicado —una venta, un pago o un
+  CPE cobrados dos veces— y encima el llamador creía que había terminado bien. El
+  propio `use-api` documenta que no reintenta escrituras por ese motivo; la cola lo
+  contradecía por debajo. Ahora un `AbortError` se propaga y sólo se encola cuando
+  la petición no llegó a salir. Alcanza a los ~130 puntos de escritura del
+  dashboard, que pasan todos por ese cliente.
+- El POS tampoco da por cobrada una respuesta encolada. Sólo miraba
+  `success === true` e ignoraba el `queued: true` que ya venía en el cuerpo, de
+  modo que ante una caída de red marcaba PAGADA, limpiaba el carrito y mostraba un
+  número de ticket inexistente en el servidor. Ahora avisa que la venta quedó
+  pendiente de sincronizar y no la confirma.
+- La venta POS dejó de poder duplicarse por un reintento del cajero. El backend
+  deduplica una venta POS **sólo** por la clave de idempotencia del cliente —el
+  índice único y `pos_reintento_comercial_469` se apoyan únicamente en ella; el
+  `request_fingerprint` sirve para rechazar una clave reusada con otro payload, no
+  para detectar el mismo payload bajo otra clave—, y el POS la borraba justo en el
+  `catch`, cuando un fallo de red o un timeout hacen más probable que el servidor
+  sí haya procesado la venta. Además la leía del estado de React en el mismo tick
+  en que la escribía, así que la clave guardada nunca era la enviada. Ahora vive en
+  un ref, atada a una huella de la intención (`apps/web/lib/pos-idempotencia.ts`):
+  se reutiliza mientras el carrito, el cliente y los pagos no cambien, se renueva
+  si cambian —evitando `POS_IDEMPOTENCY_PAYLOAD_MISMATCH`— y se descarta sólo al
+  confirmarse la venta. Cambio de frontend; sin migración.
+- Las fechas de negocio calculadas en Node dejaron de resolverse en UTC. La
+  migración 370 arregló esto del lado de la base con `app.hoy_tenant`, pero esa
+  función vive en el esquema `app` y PostgREST no la alcanza, así que la
+  aplicación seguía contradiciendo a la base sobre qué día era. El efecto que
+  documenta la propia 370: pasadas las 19:00 de Lima el sistema ya cree estar en
+  la fecha siguiente. Se corrigieron los sitios donde la fecha decide o se
+  persiste —marca de asistencia, filtro de CxC vencidas, ventana de movimientos de
+  inventario, cierre diario de ventas, métricas del dashboard, estadística de CPE
+  del día, rango por defecto de reportes de centro de costo, fecha de emisión de
+  respaldo del CPE y el `IssueDate` del AttachedDocument de DIAN—. La tabla de
+  zonas horarias de `fecha-peru.util.ts` espeja exactamente `app.zona_horaria_pais`
+  y una prueba lo comprueba, para que no vuelvan a divergir.
+- Quedan cuatro usos de fecha UTC, todos justificados y cubiertos por un guardián
+  automatizado (`fecha-utc-guard.spec.ts`): dos nombres de archivo exportado, un
+  respaldo inalcanzable de planillas y `accounting-entries.service.ts`, que no está
+  inyectado en ningún módulo y debería retirarse.
+- El recargo nocturno y el trabajo en dominical o festivo de Colombia dejaron de
+  perderse. La pantalla de cálculo los capturaba en campos editables y los sumaba
+  al neto que mostraba, pero no viajaban al backend: el DTO no los declaraba y, con
+  `forbidNonWhitelisted` activo, enviarlos habría devuelto 400. El motor los
+  liquidaba en cero y el trabajador aprobaba un neto que no era el que cobraba. El
+  motor colombiano siempre supo calcularlos —35 % y 90 % sobre la hora ordinaria de
+  210 horas mensuales, las mismas tasas que usa el preview—; lo que faltaba era el
+  transporte. No requiere migración: los valores viajan por la petición de cálculo.
+- Analytics: el aging de cuentas por cobrar sólo clasificaba las vencidas, así que
+  una cartera sana salía entera en cero mientras el total mostraba saldo —de ahí la
+  contradicción de ver cifras de deuda junto a «sin saldos pendientes»—. Ahora
+  existe el tramo «Por vencer» y la suma de los tramos iguala el total. El caché
+  del panel usaba una clave global de `localStorage`: al cerrar una empresa y
+  entrar a otra en la misma pestaña se pintaban las cifras de la anterior hasta que
+  llegaba la respuesta nueva. La clave lleva ahora el tenant y el snapshot antiguo
+  se retira.
+- Los indicadores de liquidez y rentabilidad de Analytics **no** se corrigieron: su
+  fórmula no es contable —liquidez se calcula como ventas del mes más CxC entre
+  CxP, que no es la razón corriente, y rentabilidad ignora el costo de ventas, por
+  eso marca cerca de 100 %—. Quedan rotulados en pantalla como estimación no
+  contable, con el detalle en el propio aviso, hasta que se defina el criterio.
+- Se cerraron las cinco rutas que llevaban a 404 sin crear pantallas nuevas: «Ver
+  recepciones» de una orden apunta al listado de recepciones y el pago masivo a la
+  página de tesorería, que sí existen. Se retiraron los botones «Editar» de orden
+  de compra y de cotización en borrador, porque no hay pantalla de edición y
+  ofrecerlos era prometer algo inexistente; la página de detalle conserva aprobar,
+  enviar y cancelar. También se retiró «Detalle» de CxC: además de apuntar a una
+  ruta inexistente, era el único botón de esa fila sin `ProtectedComponent`, así que
+  reapuntarlo al historial habría abierto una vía sin permiso `finanzas.cxc.read` al
+  mismo dato que el botón «Historial» sí protege.
+- Esos botones volvieron, ahora contra los writers que ya existían. Los tres
+  documentos tienen modal de edición de cabecera limitado a lo que aceptan
+  `actualizar_orden_compra_tx`, `actualizar_cotizacion_compra_tx` y
+  `actualizar_planilla_borrador_tx_495`: payload parcial, sin tocar el detalle y
+  sólo en borrador. Cambiar líneas sigue exigiendo el formulario de alta. El
+  detalle de CxC no se repone: el drawer «Historial», protegido por
+  `finanzas.cxc.read`, ya muestra ese dato.
+- «Editar planilla» no era un stub visible: la función existía y ningún botón la
+  llamaba, así que el aviso de «en desarrollo» nunca llegó a mostrarse. «Exportar
+  órdenes» ya baja un CSV con los filtros aplicados.
+- Los errores del writer se muestran dentro del modal y no en un toast detrás de
+  él: `useApi` devuelve `null` por defecto y sólo notifica por toast, así que los
+  modales de edición usan `throwOnError`. Comprobado con el rechazo por período
+  de planilla duplicado.
+- Las fechas de calendario se pintaban un día antes. `new Date("2026-08-19")` se
+  interpreta como medianoche UTC y en Lima retrocede al día previo; estaba en 30
+  puntos de 27 archivos. Se resuelven con `parseDateLocal`, y `test:fechas`
+  impide que el patrón vuelva.
+- Los 59 `@Body()` sin DTO están cerrados: 27 declaraban `any` y 32 un tipo
+  estructural en línea, que TypeScript borra al compilar. En ambos casos el
+  `ValidationPipe` global no tenía esquema y el body entraba sin comprobar.
+  Cada DTO se construyó contra las dos puntas —la lista blanca del servicio o
+  del writer y el payload real de la pantalla— porque con `forbidNonWhitelisted`
+  un campo legítimo sin declarar convierte un alta que funciona en un 400. Eso
+  destapó tres que la pantalla envía y el writer descartaba (`experiencia_años`
+  con eñe, `estado_civil`, y cuatro campos que viajan como arreglos por ser
+  `jsonb`). `body-tipado.guard.spec` impide que reaparezca cualquiera de las dos
+  formas.
+- Los verificadores de web (`test:offline`, `test:onboarding`, los dos de POS,
+  `test:fechas` y `test:etiquetas`) ya se ejecutan en CI. Existían en `package.json` desde hacía tiempo pero
+  ningún workflow los corría, así que no protegían de nada. Van antes de instalar
+  Chromium, para que fallen rápido.
+- El caché de configuración fiscal se invalida junto con el resto del tenant.
+  `invalidateTenantCache` existía sin que nadie lo llamara: cambiar la tasa o el
+  país de un contribuyente tardaba hasta cinco minutos en surtir efecto, y por cada
+  instancia del API.
+- La contraseña del aprobador de la demo se genera con `randomInt` y no con
+  `Math.random`, que no es criptográfico y cuyo estado interno se reconstruye a
+  partir de unas pocas salidas. Es una credencial de acceso real.
+- El **Bloqueador 2 «CPE invisible» no se reproduce** y queda descartado. Se
+  verificó el 2026-08-19 sobre una demo peruana creada por el endpoint productivo:
+  `GET /api/cpe/comprobantes` respondió `200` con `success: true`, un comprobante y
+  `meta.total = 1`, y el módulo lo listó junto con sus indicadores. Antes se habían
+  descartado contra base limpia las seis causas plausibles (fila ausente,
+  `activo=false`, permiso inexistente, permiso no concedido, ruta mal construida y
+  filtros del listado). La hipótesis que queda es un fallo transitorio de lectura
+  tragado en silencio por el cliente, que es justo lo que cierra el arreglo del
+  timeout: una lectura fallida ya no puede confundirse con una respuesta vacía.
+- Esa misma sesión dejó dos defectos comprobados en producción, ambos ya
+  corregidos en esta rama. El listado de CPE derivaba la fecha del comprobante con
+  `toISOString()`: a las 20:15 de Lima mostraba la factura demo fechada
+  `2026-08-20`, es decir con fecha futura y en el periodo tributario equivocado.
+  Y `deudas-clientes` devolvía el gráfico de antigüedad en `[0,0,0,0]` mientras el
+  total por cobrar era `179.80`, porque la única cuenta estaba vigente y ningún
+  tramo la recogía.
+- El barrido de fechas se amplió a la variante `new Date(valor).toISOString()`, que
+  convierte un `timestamptz` ya guardado y lo presenta en UTC. El guardián
+  automatizado cubre ahora ambas formas.
+- Se retiraron tres servicios de `shared/integration/` que no estaban inyectados en
+  ningún módulo: `accounting-entries` (con un IGV `1.18` cableado, roto para AR y
+  CO, y siete fechas UTC), `accounting-reports` y `dashboard-integration` (con
+  dieciocho rangos por fecha en UTC). Eran instanciados por Nest y nunca usados;
+  su única consecuencia real era contaminar cada auditoría.
+- Se retiró el job de inventario cíclico automático. Fabricaba el conteo físico
+  con `Math.random()` sobre el stock del sistema, calculaba la «diferencia» contra
+  ese número inventado y la publicaba con `requiereAjuste`. Un conteo físico no se
+  calcula, se cuenta. Nadie escuchaba el evento y el flag estaba apagado, así que
+  no cambia nada operativo; lo que se elimina es la posibilidad de corromper el
+  inventario si alguien lo encendía.
+- La proyección de flujo de caja dejó de añadir ruido aleatorio sobre el promedio
+  histórico: la misma proyección cambiaba en cada recarga y dos personas mirando la
+  pantalla a la vez veían cifras distintas. La incertidumbre ya la expresan los
+  escenarios optimista y pesimista, que son bandas explícitas.
+- Los únicos `Math.random()` que quedan en el API son el *jitter* de reintento de
+  contabilidad y de SUNAT, que es su uso correcto.
+- Los indicadores de Analytics pasan a la definición contable estándar. Liquidez
+  es la razón corriente —activo corriente (bancos + cuentas por cobrar +
+  inventario valorizado) entre pasivo corriente— en vez de
+  `(ventas del mes + CxC) / CxP`, que no es un ratio de liquidez y contaba dos
+  veces las ventas a crédito. Rentabilidad es el margen neto: descuenta el costo
+  de ventas además de los gastos, con lo que deja de marcar cerca de 100 % y darlo
+  por bueno. El costo se calcula por ítem vendido contra el costo actual del
+  producto; es una aproximación, no un costeo por capas, y así se rotula.
+- Las tasas AFP dejan de caer a las de Integra. Las publica la SBS, cambian por
+  trimestre y difieren entre las cuatro administradoras, así que el alta de un
+  contrato AFP exige declarar comisión y prima. El frontend ya las enviaba
+  diferenciadas por AFP (Hábitat 1,47 %, Integra 1,55 %, Prima 1,60 %, Profuturo
+  1,69 %); era el backend el que las descartaba, de modo que un afiliado a Prima,
+  Profuturo o Hábitat se liquidaba con la comisión de Integra. No se cablea un
+  catálogo de tasas en el código: quedaría obsoleto en el próximo cambio de la SBS.
 - Antes de aplicar migraciones, comprobar que no existan prefijos duplicados.
 - Las migraciones son la fuente de verdad; los inventarios forenses son evidencia
   auxiliar y viven en `artifacts/db-forensics/`.
@@ -356,22 +645,41 @@ productivo autorizado.
 
 ### Producto y riesgo residual
 
-- Decidir si `modo_venta_rapida` tendrá comportamiento real o se retirará.
-- Resolver etiquetas de formulario ambiguas restantes sin codemod automático.
+- `modo_venta_rapida` se retiró de la interfaz. El interruptor «Venta rápida»
+  del POS no cambiaba nada: ni la pantalla, ni el servicio, ni el writer lo
+  leían. Un control visible que no hace nada es peor que no tenerlo, y darle
+  comportamiento real habría sido inventar producto —¿omite el cliente?, ¿el
+  modal de cobro?— con consecuencias fiscales. El campo sigue declarado en el
+  DTO, aceptado y descartado, porque los binarios de escritorio ya distribuidos
+  lo envían y `forbidNonWhitelisted` convertiría esa venta en un 400.
+- Las etiquetas de formulario están cerradas: los 957 controles de `apps/web`
+  tienen etiqueta programática y `test:etiquetas` lo verifica en CI. El
+  pendiente anterior era inmedible («ambiguas restantes»), así que se sustituyó
+  por un criterio objetivo: `id` + `<label htmlFor>`, `aria-label`,
+  `aria-labelledby` o una `<label>` que envuelva. Un `placeholder` no cuenta:
+  desaparece justo cuando el usuario escribe. Partía de 342 controles sin
+  nombre; el texto nunca se inventó, sale de la etiqueta, la cabecera o el
+  campo que el propio control ya declaraba.
 - Ejecutar PVS con datos reales de cada empleador, corregir su reporte y cargar
   en SOL el ZIP generado por PVS antes de considerar presentada una planilla;
   el ERP ya prepara/versiona las fuentes, pero no suplanta esa validación legal.
 - GRE SOAP beta continúa rechazando con `2112`; la ruta prevista es GRE REST.
-- La paridad contable con Odoo 19 no es total: quedan fuera la sincronización
-  bancaria automática y sus modelos de matching, importación masiva de mapeos
-  de consolidación, multilibros, eliminaciones intercompañía automáticas,
-  variantes/columnas/agrupaciones avanzadas del motor de reportes y métodos de
-  activo no lineales con prorrata. Son ampliaciones de producto, no condiciones
-  ocultas del alcance implementado.
+- **La paridad con Odoo 19 queda fuera de alcance** y sale de esta lista. No es
+  un requisito: «Odoo» no aparece en ninguna otra parte de la documentación, y
+  mantener funcionalidades de meses junto a «cargar el certificado PFX» hacía
+  que la lista mintiera sobre qué bloquea de verdad. Ninguna de las piezas es un
+  defecto: todas tienen hoy un camino manual que funciona —conciliación bancaria
+  con importación CSV, plantillas y marcado de partidas; consolidación con
+  grupos, mapeos, tasas y eliminaciones declaradas a mano—. Lo que falta es la
+  capa automática encima: modelos de emparejamiento, importación masiva de
+  mapeos, eliminaciones intercompañía automáticas, variantes avanzadas del motor
+  de reportes y amortización no lineal con prorrata. Multilibros es la única
+  ausencia estructural y es una decisión de diseño, no un olvido. Si alguna se
+  quiere, entra como alta de producto con su propio alcance.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `490` en PROD.
+1. Código y migraciones actuales; estado remoto verificado hasta `498` en PROD.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.

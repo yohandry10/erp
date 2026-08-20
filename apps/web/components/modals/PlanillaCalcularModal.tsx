@@ -217,6 +217,16 @@ export default function PlanillaCalcularModal({
           tardanzas_minutos: emp.tardanzas_minutos,
           faltas: emp.faltas,
           bonos_adicionales: emp.bonos_adicionales,
+          // El recargo nocturno y el dominical/festivo se capturaban en esta misma
+          // pantalla y se sumaban al neto que se mostraba, pero no viajaban: el
+          // backend los liquidaba en cero y el trabajador cobraba de menos un
+          // recargo que sí había trabajado. Sólo aplican al régimen colombiano.
+          ...(isColombia
+            ? {
+                horas_recargo_nocturno: emp.horas_recargo_nocturno,
+                horas_dominicales_festivas: emp.horas_dominicales_festivas,
+              }
+            : {}),
         })),
       };
 
@@ -362,7 +372,7 @@ export default function PlanillaCalcularModal({
                       </div>
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Sueldo base"
                         type="number"
                         value={empleado.sueldo_base}
                         onChange={(e) =>
@@ -376,7 +386,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Días trabajados"
                         type="number"
                         value={empleado.dias_trabajados}
                         onChange={(e) =>
@@ -392,7 +402,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Horas extra al 25%"
                         type="number"
                         value={empleado.horas_extras_25}
                         onChange={(e) =>
@@ -408,7 +418,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Horas extra al 35%"
                         type="number"
                         value={empleado.horas_extras_35}
                         onChange={(e) =>
@@ -450,7 +460,7 @@ export default function PlanillaCalcularModal({
                       </td>
                     )}
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Minutos de tardanza"
                         type="number"
                         value={empleado.tardanzas_minutos}
                         onChange={(e) =>
@@ -465,7 +475,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Faltas"
                         type="number"
                         value={empleado.faltas}
                         onChange={(e) =>
@@ -480,7 +490,7 @@ export default function PlanillaCalcularModal({
                       />
                     </td>
                     <td className="p-2 border">
-                      <input
+                      <input aria-label="Bonos adicionales"
                         type="number"
                         value={empleado.bonos_adicionales}
                         onChange={(e) =>

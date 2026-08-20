@@ -6,6 +6,7 @@ import { useApi } from '@/hooks/use-api'
 import { useToast } from '@/components/ui/use-toast'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { cn } from '@/lib/utils'
+import { parseDateLocal } from '@/lib/date-utils'
 
 const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
 const fieldClass = 'w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
@@ -610,7 +611,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                           >
                             -
                           </button>
-                          <input
+                          <input aria-label="Cantidad recibir"
                              type="number"
                              min="0"
                              step="0.01"
@@ -742,10 +743,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                     {/* Observations */}
                     {(item.calidad === 'OBSERVADO' || item.calidad === 'RECHAZADO') && (
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
+                        <label htmlFor="recepcionwizard-observaciones" className="mb-2 block text-xs font-semibold text-foreground/85">
                           Observaciones {item.calidad === 'RECHAZADO' && '(requerido)'}
                         </label>
-                        <textarea
+                        <textarea id="recepcionwizard-observaciones"
                           value={item.observaciones || ''}
                           onChange={(e) => updateItemObservaciones(originalIndex, e.target.value)}
                           placeholder="Describa el problema encontrado..."
@@ -794,10 +795,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         <div className="mb-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                       {/* Almacén */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
+                        <label htmlFor="recepcionwizard-almacen" className="mb-2 block text-xs font-semibold text-foreground/85">
                           Almacén <span className="text-muted-foreground">*</span>
                         </label>
-                        <select
+                        <select id="recepcionwizard-almacen"
                           value={item.almacen_id || ''}
                           onChange={(e) => updateItemAlmacen(originalIndex, e.target.value)}
                           className={fieldClass}
@@ -813,10 +814,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
                       {/* Ubicación */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
+                        <label htmlFor="recepcionwizard-ubicacion" className="mb-2 block text-xs font-semibold text-foreground/85">
                           Ubicación
                         </label>
-                        <select
+                        <select id="recepcionwizard-ubicacion"
                           value={item.ubicacion_id || ''}
                           onChange={(e) => updateItemUbicacion(originalIndex, e.target.value)}
                           disabled={!item.almacen_id}
@@ -836,10 +837,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                         <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                       {/* Lote */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
+                        <label htmlFor="recepcionwizard-numero-de-lote" className="mb-2 block text-xs font-semibold text-foreground/85">
                           Número de Lote
                         </label>
-                        <input
+                        <input id="recepcionwizard-numero-de-lote"
                           type="text"
                           value={item.lote || ''}
                           onChange={(e) => updateItemLote(originalIndex, e.target.value)}
@@ -850,10 +851,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
                       {/* Serie */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
+                        <label htmlFor="recepcionwizard-numero-de-serie" className="mb-2 block text-xs font-semibold text-foreground/85">
                           Número de Serie
                         </label>
-                        <input
+                        <input id="recepcionwizard-numero-de-serie"
                           type="text"
                           value={item.serie || ''}
                           onChange={(e) => updateItemSerie(originalIndex, e.target.value)}
@@ -864,10 +865,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
                       {/* Fecha Expiración */}
                       <div>
-                        <label className="mb-2 block text-xs font-semibold text-foreground/85">
+                        <label htmlFor="recepcionwizard-fecha-de-expiracion" className="mb-2 block text-xs font-semibold text-foreground/85">
                           Fecha de Expiración
                         </label>
-                        <input
+                        <input id="recepcionwizard-fecha-de-expiracion"
                           type="date"
                           value={item.fecha_expiracion || ''}
                           onChange={(e) => updateItemFechaExpiracion(originalIndex, e.target.value)}
@@ -1017,7 +1018,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                           )}
                           {item.fecha_expiracion && (
                             <div>
-                              <strong>Exp:</strong> {new Date(item.fecha_expiracion).toLocaleDateString()}
+                              <strong>Exp:</strong> {parseDateLocal(item.fecha_expiracion).toLocaleDateString()}
                             </div>
                           )}
                           {!item.almacen_id && !item.lote && !item.serie && !item.fecha_expiracion && '-'}

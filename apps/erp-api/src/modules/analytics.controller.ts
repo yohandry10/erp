@@ -157,6 +157,54 @@ export class AnalyticsController {
    * flujos reales escriben en pedidos_venta / ventas_pos → documentos), por eso
    * los KPIs quedaban en 0. Se excluyen comprobantes anulados/cancelados.
    */
+  /**
+   * Costo de ventas del periodo: por cada ítem vendido, su cantidad por el costo
+   * del producto. Es lo que faltaba para que el margen fuera margen y no ingreso
+   * bruto disfrazado.
+   *
+   * Se toma el costo actual del producto porque el detalle del documento no
+   * guarda el costo histórico. Es una aproximación, no un costeo por capas, y por
+   * eso el indicador se presenta como margen y no como resultado contable.
+   */
+  private async calcularCostoDeVentas(tenantId: string, desdeIso: string): Promise<number> {
+    const client = this.supabase.getClient();
+
+    const { data: documentos } = await client
+      .from('documentos')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .in('tipo_documento', ['FACTURA', 'BOLETA'])
+      .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")')
+      .gte('fecha_emision', desdeIso);
+
+    const ids = (documentos || []).map((d: any) => d.id).filter(Boolean);
+    if (ids.length === 0) return 0;
+
+    const { data: detalles } = await client
+      .from('documento_detalles')
+      .select('producto_id, cantidad')
+      .eq('tenant_id', tenantId)
+      .in('documento_id', ids);
+
+    const productoIds = [...new Set((detalles || []).map((d: any) => d.producto_id).filter(Boolean))];
+    if (productoIds.length === 0) return 0;
+
+    const { data: productos } = await client
+      .from('productos')
+      .select('id, costo, precio_compra')
+      .eq('tenant_id', tenantId)
+      .in('id', productoIds);
+
+    const costoPorProducto = new Map<string, number>(
+      (productos || []).map((p: any) => [String(p.id), Number(p.costo || p.precio_compra || 0)]),
+    );
+
+    return (detalles || []).reduce((total: number, d: any) => {
+      const costo = costoPorProducto.get(String(d.producto_id)) ?? 0;
+      return total + Number(d.cantidad || 0) * costo;
+    }, 0);
+  }
+
   private async obtenerVentasEmitidas(
     tenantId: string,
     opts: { gte: string; lte?: string; lt?: string },
@@ -217,7 +265,12 @@ export class AnalyticsController {
       if (error) throw error;
 
       const ahora = new Date();
+      // El tramo «Por vencer» faltaba, y su ausencia producía la contradicción que
+      // se ve en pantalla: el total por cobrar muestra saldo mientras el gráfico
+      // sale entero en cero y el panel dice «sin saldos pendientes». Una cartera
+      // sana, con todo al día, quedaba representada como si no existiera.
       const edadSaldos = {
+        'Por vencer': 0,
         '0-30 días': 0,
         '31-60 días': 0,
         '61-90 días': 0,
@@ -236,11 +289,14 @@ export class AnalyticsController {
         
         if (diasVencido > 0) {
           totalVencido += monto;
-          
+
           if (diasVencido <= 30) edadSaldos['0-30 días'] += monto;
           else if (diasVencido <= 60) edadSaldos['31-60 días'] += monto;
           else if (diasVencido <= 90) edadSaldos['61-90 días'] += monto;
           else edadSaldos['90+ días'] += monto;
+        } else {
+          // Vigente: aún no vence. Suma a la cartera pero no a lo vencido.
+          edadSaldos['Por vencer'] += monto;
         }
 
         topDeudores.push({
@@ -257,7 +313,7 @@ export class AnalyticsController {
           graficoEdadSaldos: {
             labels: Object.keys(edadSaldos),
             data: Object.values(edadSaldos),
-            backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#7c2d12']
+            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#7c2d12']
           },
           topDeudores: topDeudores.slice(0, 10),
           alertasCobranza: this.generarAlertasCobranza(cuentasPorCobrar),
@@ -419,20 +475,41 @@ export class AnalyticsController {
       const desde = new Date();
       desde.setMonth(desde.getMonth() - 1);
 
-      const [ventasRows, gastosResult, cxcResult, cxpResult] = await Promise.all([
-        this.obtenerVentasEmitidas(tenantId, { gte: desde.toISOString() }),
-        this.supabase.getClient().from('gastos').select('monto').eq('tenant_id', tenantId).gte('fecha', desde.toISOString()),
-        this.supabase.getClient().from('cuentas_por_cobrar').select('saldo, monto').eq('tenant_id', tenantId),
-        this.supabase.getClient().from('cuentas_por_pagar').select('saldo, total').eq('tenant_id', tenantId),
-      ]);
+      const client = this.supabase.getClient();
+      const [ventasRows, gastosResult, cxcResult, cxpResult, bancosResult, inventarioResult] =
+        await Promise.all([
+          this.obtenerVentasEmitidas(tenantId, { gte: desde.toISOString() }),
+          client.from('gastos').select('monto').eq('tenant_id', tenantId).gte('fecha', desde.toISOString()),
+          client.from('cuentas_por_cobrar').select('saldo, monto').eq('tenant_id', tenantId),
+          client.from('cuentas_por_pagar').select('saldo, total').eq('tenant_id', tenantId),
+          client.from('cuentas_bancarias').select('saldo_actual').eq('tenant_id', tenantId).eq('activo', true),
+          client.from('productos').select('stock_actual, costo, precio_compra').eq('tenant_id', tenantId).eq('activo', true),
+        ]);
 
       const ventas = ventasRows.reduce((sum, row) => sum + Number(row.total || 0), 0) || 0;
       const gastos = gastosResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.monto || 0), 0) || 0;
       const porCobrar = cxcResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.saldo ?? row.monto ?? 0), 0) || 0;
       const porPagar = cxpResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.saldo ?? row.total ?? 0), 0) || 0;
+      const bancos = bancosResult.data?.reduce((sum: number, row: any) => sum + Number(row.saldo_actual || 0), 0) || 0;
+      const inventario = inventarioResult.data?.reduce(
+        (sum: number, row: any) =>
+          sum + Number(row.stock_actual || 0) * Number(row.costo || row.precio_compra || 0),
+        0,
+      ) || 0;
 
-      const liquidez = porPagar > 0 ? (ventas + porCobrar) / porPagar : ventas > 0 ? 2 : 0;
-      const rentabilidad = ventas > 0 ? ((ventas - gastos) / ventas) * 100 : 0;
+      const costoVentas = await this.calcularCostoDeVentas(tenantId, desde.toISOString());
+
+      // Razón corriente: activo corriente entre pasivo corriente. Antes se
+      // calculaba como (ventas del mes + CxC) / CxP, que no es un ratio de
+      // liquidez —las ventas no son un activo, y las que fueron a crédito ya
+      // están contadas dentro de CxC, así que se sumaban dos veces—.
+      const activoCorriente = bancos + porCobrar + inventario;
+      const liquidez = porPagar > 0 ? activoCorriente / porPagar : activoCorriente > 0 ? 999 : 0;
+
+      // Margen neto: descuenta el costo de ventas además de los gastos. Omitirlo
+      // hacía que el indicador marcara cerca de 100 % y lo diera por OK, porque
+      // trataba todo el ingreso como utilidad.
+      const rentabilidad = ventas > 0 ? ((ventas - costoVentas - gastos) / ventas) * 100 : 0;
 
       return {
         success: true,

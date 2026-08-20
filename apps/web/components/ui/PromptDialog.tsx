@@ -120,7 +120,7 @@ export default function PromptDialog({
           </DialogHeader>
 
           {multiline ? (
-            <Textarea
+            <Textarea aria-label={title}
               value={value}
               onChange={(event) => setValue(event.target.value)}
               placeholder={placeholder}
@@ -130,7 +130,7 @@ export default function PromptDialog({
               className="min-h-28 resize-y"
             />
           ) : (
-            <Input
+            <Input aria-label={title}
               value={value}
               onChange={(event) => setValue(event.target.value)}
               onKeyDown={(event) => {

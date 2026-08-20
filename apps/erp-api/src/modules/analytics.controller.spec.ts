@@ -125,3 +125,168 @@ describe('AnalyticsController', () => {
     expect(from).toHaveBeenCalledWith('documento_detalles');
   });
 });
+
+/**
+ * Regresión del aging de cuentas por cobrar.
+ *
+ * El gráfico sólo clasificaba las cuentas ya vencidas, así que una cartera sana
+ * salía entera en cero mientras el total por cobrar mostraba saldo. Esa es la
+ * contradicción que se veía en pantalla: cifras de deuda junto a «sin saldos
+ * pendientes».
+ */
+describe('AnalyticsController — aging de cuentas por cobrar', () => {
+  const dias = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const aging = async (rows: any[]) => {
+    const supabase = createSupabaseMock(rows);
+    const controller = new AnalyticsController(supabase.service as any, {} as any);
+    const r: any = await controller.getDeudasClientes('tenant-aging', {});
+    const { labels, data } = r.data.graficoEdadSaldos;
+    const porTramo: Record<string, number> = {};
+    labels.forEach((l: string, i: number) => { porTramo[l] = data[i]; });
+    return { porTramo, totales: r.data.totales };
+  };
+
+  it('clasifica una cuenta vigente en «Por vencer» en vez de descartarla', async () => {
+    const { porTramo, totales } = await aging([
+      { saldo: 500, fecha_vencimiento: dias(15), numero: 'F001-1' },
+    ]);
+
+    expect(porTramo['Por vencer']).toBe(500);
+    expect(totales.totalPorCobrar).toBe(500);
+    expect(totales.vencido).toBe(0);
+  });
+
+  it('la suma de los tramos iguala el total por cobrar', async () => {
+    const { porTramo, totales } = await aging([
+      { saldo: 100, fecha_vencimiento: dias(20), numero: 'vigente' },
+      { saldo: 200, fecha_vencimiento: dias(-10), numero: 'vencida-corta' },
+      { saldo: 300, fecha_vencimiento: dias(-45), numero: 'vencida-media' },
+      { saldo: 400, fecha_vencimiento: dias(-120), numero: 'vencida-larga' },
+    ]);
+
+    const suma = Object.values(porTramo).reduce((a, b) => a + b, 0);
+    expect(suma).toBe(1000);
+    expect(totales.totalPorCobrar).toBe(1000);
+    // Antes la suma de los tramos era 900 y no cuadraba con el total.
+    expect(totales.vencido).toBe(900);
+  });
+
+  it('ubica cada cuenta vencida en su tramo de antigüedad', async () => {
+    const { porTramo } = await aging([
+      { saldo: 200, fecha_vencimiento: dias(-10), numero: 'a' },
+      { saldo: 300, fecha_vencimiento: dias(-45), numero: 'b' },
+      { saldo: 400, fecha_vencimiento: dias(-75), numero: 'c' },
+      { saldo: 500, fecha_vencimiento: dias(-120), numero: 'd' },
+    ]);
+
+    expect(porTramo['0-30 días']).toBe(200);
+    expect(porTramo['31-60 días']).toBe(300);
+    expect(porTramo['61-90 días']).toBe(400);
+    expect(porTramo['90+ días']).toBe(500);
+  });
+
+  it('expone un color por tramo, incluido el nuevo', async () => {
+    const supabase = createSupabaseMock([]);
+    const controller = new AnalyticsController(supabase.service as any, {} as any);
+    const r: any = await controller.getDeudasClientes('tenant-aging', {});
+    const { labels, backgroundColor } = r.data.graficoEdadSaldos;
+    expect(labels).toHaveLength(5);
+    expect(backgroundColor).toHaveLength(5);
+  });
+});
+
+/**
+ * Regresión de los indicadores gerenciales.
+ *
+ * «Liquidez» se calculaba como (ventas del mes + CxC) / CxP, que no es un ratio de
+ * liquidez: las ventas no son un activo, y las que fueron a crédito ya estaban
+ * dentro de CxC, así que se contaban dos veces. «Rentabilidad» descontaba los
+ * gastos pero no el costo de ventas, así que marcaba cerca de 100 % y lo daba por
+ * OK: se comprobó en producción con `rentabilidad: {valor: 100, estado: "OK"}`.
+ */
+describe('AnalyticsController — indicadores contables estándar', () => {
+  const construir = (porTabla: Record<string, any[]>) => {
+    const from = jest.fn((tabla: string) => {
+      const builder: any = {
+        select: () => builder,
+        eq: () => builder,
+        in: () => builder,
+        not: () => builder,
+        gte: () => builder,
+        lte: () => builder,
+        lt: () => builder,
+        order: () => builder,
+        then: (resolve: (v: any) => void) => resolve({ data: porTabla[tabla] ?? [], error: null }),
+      };
+      return builder;
+    });
+    return new AnalyticsController({ getClient: () => ({ from }) } as any, {} as any);
+  };
+
+  it('liquidez es la razón corriente: activo corriente entre pasivo corriente', async () => {
+    const controller = construir({
+      documentos: [{ id: 'd1', fecha_emision: '2026-08-01', total: 1000 }],
+      documento_detalles: [{ producto_id: 'p1', cantidad: 2 }],
+      productos: [{ id: 'p1', costo: 100, stock_actual: 10, precio_compra: 100 }],
+      gastos: [{ monto: 50 }],
+      cuentas_por_cobrar: [{ saldo: 400 }],
+      cuentas_por_pagar: [{ saldo: 500 }],
+      cuentas_bancarias: [{ saldo_actual: 600 }],
+    });
+
+    const r: any = await controller.getKpisVisuales('tenant-kpi');
+
+    // activo corriente = bancos 600 + CxC 400 + inventario (10 x 100) = 2000
+    // pasivo corriente = 500  ->  razón corriente = 4.0
+    expect(r.data.liquidez.valor).toBeCloseTo(4, 1);
+  });
+
+  it('rentabilidad descuenta el costo de ventas y ya no marca 100 %', async () => {
+    const controller = construir({
+      documentos: [{ id: 'd1', fecha_emision: '2026-08-01', total: 1000 }],
+      documento_detalles: [{ producto_id: 'p1', cantidad: 2 }],
+      productos: [{ id: 'p1', costo: 300, stock_actual: 0, precio_compra: 300 }],
+      gastos: [{ monto: 100 }],
+      cuentas_por_cobrar: [],
+      cuentas_por_pagar: [],
+      cuentas_bancarias: [],
+    });
+
+    const r: any = await controller.getKpisVisuales('tenant-kpi');
+
+    // ventas 1000 - costo (2 x 300 = 600) - gastos 100 = 300  ->  30 %
+    expect(r.data.rentabilidad.valor).toBeCloseTo(30, 1);
+    expect(r.data.rentabilidad.valor).toBeLessThan(100);
+  });
+
+  it('sin costo ni gastos el margen es total, pero por dato y no por omisión', async () => {
+    const controller = construir({
+      documentos: [{ id: 'd1', fecha_emision: '2026-08-01', total: 500 }],
+      documento_detalles: [],
+      productos: [],
+      gastos: [],
+      cuentas_por_cobrar: [],
+      cuentas_por_pagar: [],
+      cuentas_bancarias: [],
+    });
+
+    const r: any = await controller.getKpisVisuales('tenant-kpi');
+    expect(r.data.rentabilidad.valor).toBeCloseTo(100, 1);
+  });
+
+  it('sin ventas no inventa rentabilidad', async () => {
+    const controller = construir({
+      documentos: [], documento_detalles: [], productos: [],
+      gastos: [], cuentas_por_cobrar: [], cuentas_por_pagar: [], cuentas_bancarias: [],
+    });
+
+    const r: any = await controller.getKpisVisuales('tenant-kpi');
+    expect(r.data.rentabilidad.valor).toBe(0);
+    expect(r.data.liquidez.valor).toBe(0);
+  });
+});

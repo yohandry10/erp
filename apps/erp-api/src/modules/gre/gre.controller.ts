@@ -26,6 +26,8 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { GreReporteQueryDto } from './dto/gre-reporte.dto';
 
+import { EvaluarCreacionAutomaticaGreDto } from '../shared-dto/acciones-simples.dto';
+
 @ApiTags('gre')
 @Controller('gre')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -260,7 +262,7 @@ export class GreController {
   @RequirePermission('gre.configuracion.evaluar')
   async evaluateAutoCreation(
     @CurrentTenant() tenantId: string,
-    @Body() body: { saleId: string; total: number; cpeId?: string },
+    @Body() body: EvaluarCreacionAutomaticaGreDto,
   ) {
     const shouldCreate = await this.greService.evaluateAutoGRECreation({
       tenantId,

@@ -24,6 +24,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { decryptText, encryptText } from '../../shared/utils/secure-config.utils';
+import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
 
 // Respaldo si normativa_peru_periodos no tiene fila para el periodo consultado.
 const RMV_PERU_FALLBACK = 1130;
@@ -908,7 +909,10 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const hoy = new Date().toISOString().split('T')[0];
+    // La marca de asistencia se persiste con esta fecha. En UTC, quien fichaba
+    // pasadas las 19:00 de Lima quedaba registrado al día siguiente, con lo que el
+    // día trabajado y la tardanza caían en la jornada equivocada.
+    const hoy = await fechaHoyDelTenant(this.supabaseService.getClient(), currentTenantId);
     const horaActual = new Date().toTimeString().split(' ')[0];
     const data = await this.ejecutarOperacionRrhh(
       'ATTENDANCE_MARK',
@@ -2432,6 +2436,49 @@ export class RrhhService {
         );
       }
     }
+
+    // El régimen pensionario define cuánto se le descuenta al trabajador y no
+    // admite valor por defecto: elegir entre AFP y ONP es una decisión suya. Sin
+    // él la planilla no puede calcularse, así que se exige al crear el contrato en
+    // vez de dejar que reviente meses después al liquidar. Se valida al final para
+    // no tapar los errores de RMV, modalidad o periodo de prueba, que son más
+    // específicos y ya existían.
+    const regimen = String(contratoData?.regimen_pensionario ?? '').trim().toUpperCase();
+    if (esContratoLaboral && !['AFP', 'ONP'].includes(regimen)) {
+      throw new BadRequestException(
+        'Debe indicar el régimen pensionario del trabajador (AFP u ONP) en un contrato laboral peruano.',
+      );
+    }
+    if (regimen === 'AFP') {
+      const administradora = String(contratoData?.afp_codigo ?? '').trim();
+      const tipoComision = String(contratoData?.tipo_comision_afp ?? '').trim().toUpperCase();
+      if (!administradora) {
+        throw new BadRequestException(
+          'Un contrato afiliado a AFP debe indicar la administradora (afp_codigo).',
+        );
+      }
+      if (!['FLUJO', 'SALDO', 'MIXTA'].includes(tipoComision)) {
+        throw new BadRequestException(
+          'Un contrato afiliado a AFP debe indicar el tipo de comisión (FLUJO, SALDO o MIXTA).',
+        );
+      }
+
+      // Las tasas también se declaran. Las publica la SBS, cambian por trimestre y
+      // difieren entre las cuatro administradoras: el motor caía a las de Integra
+      // para todas, así que un afiliado a Prima, Profuturo o Hábitat se liquidaba
+      // con una comisión que no era la suya. Cablear un catálogo aquí sólo
+      // trasladaría el problema a la fecha en que la SBS lo cambie.
+      const comision = Number(contratoData?.tasa_comision_afp);
+      const seguro = Number(contratoData?.tasa_seguro_afp);
+      for (const [valor, campo] of [[comision, 'la comisión'], [seguro, 'la prima de seguro']] as const) {
+        if (!Number.isFinite(valor) || valor < 0 || valor > 0.5) {
+          throw new BadRequestException(
+            `Un contrato afiliado a AFP debe indicar ${campo} vigente de su administradora, `
+            + 'expresada en fracción (por ejemplo 0.0155 para 1.55 %).',
+          );
+        }
+      }
+    }
   }
 
   private async validarContratoArgentina(contratoData: any, tenantId: string): Promise<void> {
@@ -2579,12 +2626,18 @@ export class RrhhService {
     const metadata = {
       ...metadataBase,
       ...(contratoData?.cargo ? { cargo: String(contratoData.cargo).trim() } : {}),
-      ...(paisLaboral === 'PE' && contratoData?.regimen_pensionario === 'AFP'
+      // La administradora y el tipo de comisión ya vienen validados arriba: no se
+      // inventan. Antes se caía a Integra/FLUJO en silencio, de modo que un
+      // afiliado a otra AFP quedaba registrado con datos que no eran los suyos.
+      // Las tasas sí conservan un valor por defecto porque son las vigentes del
+      // mercado y el motor las usa como referencia; declararlas sigue siendo
+      // preferible y por eso se respeta lo que envíe el empleador.
+      ...(paisLaboral === 'PE' && String(contratoData?.regimen_pensionario ?? '').toUpperCase() === 'AFP'
         ? {
-            afp_codigo: String(contratoData?.afp_codigo || 'INTEGRA').toUpperCase(),
-            tipo_comision_afp: String(contratoData?.tipo_comision_afp || 'FLUJO').toUpperCase(),
-            tasa_comision_afp: Number(contratoData?.tasa_comision_afp ?? 0.0155),
-            tasa_seguro_afp: Number(contratoData?.tasa_seguro_afp ?? 0.0137),
+            afp_codigo: String(contratoData.afp_codigo).trim().toUpperCase(),
+            tipo_comision_afp: String(contratoData.tipo_comision_afp).trim().toUpperCase(),
+            tasa_comision_afp: Number(contratoData.tasa_comision_afp),
+            tasa_seguro_afp: Number(contratoData.tasa_seguro_afp),
           }
         : {}),
     };

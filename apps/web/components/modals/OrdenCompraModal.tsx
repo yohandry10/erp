@@ -429,7 +429,7 @@ export default function OrdenCompraModal({
                       <td className="p-3">
                         {item.esNuevoProducto ? (
                           <div className="flex gap-2 items-center">
-                            <input
+                            <input aria-label="Nombre del nuevo producto"
                               type="text"
                               placeholder="Nombre del nuevo producto"
                               value={item.producto_nombre || ''}
@@ -446,7 +446,7 @@ export default function OrdenCompraModal({
                           </div>
                         ) : (
                           <div className="flex gap-2 items-center">
-                            <select
+                            <select aria-label="Producto"
                               value={item.producto_id}
                               onChange={(e) => updateItem(index, 'producto_id', e.target.value)}
                               required className="flex-[1] py-1 px-2 border rounded text-[0.875rem]"
@@ -469,7 +469,7 @@ export default function OrdenCompraModal({
                         )}
                       </td>
                       <td className="p-3 text-center">
-                        <input
+                        <input aria-label="Cantidad"
                           type="number"
                           min="1"
                           value={item.cantidad || ''}
@@ -477,7 +477,7 @@ export default function OrdenCompraModal({
                         />
                       </td>
                       <td className="p-3 text-right">
-                        <input
+                        <input aria-label="Precio unitario"
                           type="number"
                           step="0.01"
                           min="0"

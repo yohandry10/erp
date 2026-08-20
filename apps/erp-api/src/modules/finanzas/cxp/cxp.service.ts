@@ -9,6 +9,7 @@ import Decimal from 'decimal.js';
 import { DevolucionProveedorEmitidaEvent } from '../../../shared/events/event-bus.service';
 import { TesoreriaService } from '../tesoreria/tesoreria.service';
 import { createHash } from 'crypto';
+import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 
 @Injectable()
 export class CxpService {
@@ -1458,7 +1459,7 @@ export class CxpService {
       return {
         success: true,
         data: {
-          fecha_reporte: new Date().toISOString().split('T')[0],
+          fecha_reporte: await fechaHoyDelTenant(this.supabase.getClient(), tenantId),
           proveedores: [],
           total_deuda: 0,
           total_proveedores: 0,
@@ -1521,7 +1522,7 @@ export class CxpService {
     return {
       success: true,
       data: {
-        fecha_reporte: new Date().toISOString().split('T')[0],
+        fecha_reporte: await fechaHoyDelTenant(this.supabase.getClient(), tenantId),
         proveedores: proveedoresArray,
         total_deuda: this.round2(totalDeuda),
         total_proveedores: proveedoresArray.length,

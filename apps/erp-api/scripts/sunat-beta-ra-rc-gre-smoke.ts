@@ -200,7 +200,10 @@ async function main() {
     emit: () => undefined,
     eventEmitter: { eventNames: () => [] },
   };
-  const greService = new GreService(supabase as any, greEventBus as any, {} as any, oseService, {} as any) as any;
+  // El constructor recibe (supabase, eventBus, oseService, validationService).
+  // El script pasaba cinco argumentos y desplazaba todo: el OSE real caía en el
+  // hueco de validación y el smoke no ejercitaba OSE en absoluto.
+  const greService = new GreService(supabase as any, greEventBus as any, oseService, {} as any) as any;
 
   const steps: SmokeStep[] = [];
   const stamp = randomInt(10000000, 99999999);

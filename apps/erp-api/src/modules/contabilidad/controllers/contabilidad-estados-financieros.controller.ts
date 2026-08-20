@@ -17,6 +17,8 @@ import { RequirePermission } from "../../../common/decorators/require-permission
 import { EstadosFinancierosService } from "../services/estados-financieros.service";
 import { CashflowService } from "../services/cashflow.service";
 import { PeriodoQueryDto } from "../dto/periodo-query.dto";
+
+import { PeriodoContableDto } from '../dto/periodo-contable.dto';
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -543,7 +545,7 @@ export class ContabilidadEstadosFinancierosController {
   })
   async refrescarEstadosFinancieros(
     @CurrentTenant() tenantId: string,
-    @Body() body: { anio: number; mes: number },
+    @Body() body: PeriodoContableDto,
   ): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       const { anio, mes } = body;

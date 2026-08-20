@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { apiSucceeded, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
+import { parseDateLocal } from '@/lib/date-utils'
 
 const getCurrentPeriod = () => new Date().toISOString().slice(0, 7)
 
@@ -359,6 +360,7 @@ export default function SIREPage() {
           <CardContent className="grid gap-3 p-4 lg:grid-cols-[160px_220px_180px_auto] lg:items-end">
             <input
               ref={periodoInputRef}
+              aria-label="Periodo tributario"
               type="month"
               defaultValue={filters.periodo}
               onChange={(event) => {
@@ -371,7 +373,7 @@ export default function SIREPage() {
               }}
               className={inputClass}
             />
-            <select
+            <select aria-label="Tipo reporte"
               value={filters.tipoReporte}
               onChange={(event) => {
                 const { value } = event.currentTarget
@@ -383,7 +385,7 @@ export default function SIREPage() {
               <option value="REGISTRO_VENTAS">Registro de Ventas</option>
               <option value="REGISTRO_COMPRAS">Registro de Compras</option>
             </select>
-            <select
+            <select aria-label="Estado"
               value={filters.estado}
               onChange={(event) => {
                 const { value } = event.currentTarget
@@ -452,7 +454,7 @@ export default function SIREPage() {
                           </div>
                         </td>
                         <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-muted-foreground">
-                          {report.created_at ? new Date(report.created_at).toLocaleDateString('es-PE') : 'N/A'}
+                          {report.created_at ? parseDateLocal(report.created_at).toLocaleDateString('es-PE') : 'N/A'}
                         </td>
                         <td className="!border-cyan-400/10 !bg-transparent px-4 py-3 text-right font-bold text-primary">
                           {(report.total_registros || 0).toLocaleString()}

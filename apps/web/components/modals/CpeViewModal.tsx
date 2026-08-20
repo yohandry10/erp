@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface CpeViewModalProps {
   isOpen: boolean
@@ -373,7 +374,7 @@ export default function CpeViewModal({
                     </p>
                   </div>
                   <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                    <p><strong>Fecha:</strong> {new Date(cpeData.created_at).toLocaleDateString(locale)}</p>
+                    <p><strong>Fecha:</strong> {parseDateLocal(cpeData.created_at).toLocaleDateString(locale)}</p>
                     <p><strong>Estado:</strong> {cpeData.estado}</p>
                     <p><strong>Moneda:</strong> {cpeData.moneda}</p>
                   </div>

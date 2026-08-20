@@ -51,6 +51,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Contratos de web que no necesitan navegador. Van antes de instalar
+      # Chromium para que fallen rapido: existian en package.json desde hacia
+      # tiempo pero ningun workflow los ejecutaba, asi que no protegian de nada.
+      - name: Run web contract checks
+        run: |
+          pnpm --filter @erp-suite/web test:offline
+          pnpm --filter @erp-suite/web test:onboarding
+          pnpm --filter @erp-suite/web test:pos-idempotencia
+          pnpm --filter @erp-suite/web test:pos-offline
+          pnpm --filter @erp-suite/web test:fechas
+          pnpm --filter @erp-suite/web test:etiquetas
+
       - name: Install Chromium
         run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
 
@@ -77,3 +89,4 @@ jobs:
           echo '- Monitor outbox: failed/dead-letter, retry real y snapshot degradado.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Kardex/unidades y pagos RRHH con contratos financieros 495/496.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Login responsive y guard de orígenes exclusivamente locales.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Contratos de web sin navegador: outbox offline, tours, idempotencia POS y timeout frente a desconexión.' >> "$GITHUB_STEP_SUMMARY"

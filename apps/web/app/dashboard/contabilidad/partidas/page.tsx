@@ -155,8 +155,8 @@ export default function PartidasAbiertasPage() {
 
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <div className="min-w-[280px]">
-              <label className={labelClass}>Cuenta conciliable</label>
-              <select
+              <label htmlFor="partidas-cuenta-conciliable" className={labelClass}>Cuenta conciliable</label>
+              <select id="partidas-cuenta-conciliable"
                 value={cuentaId}
                 onChange={(e) => setCuentaId(e.target.value)}
                 className="mt-2 w-full rounded-xl border border-cyan-400/20 bg-card/70 px-3 py-2 text-sm text-foreground outline-none focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
@@ -259,7 +259,7 @@ export default function PartidasAbiertasPage() {
                             }`}
                           >
                             <td className="px-4 py-3">
-                              <input
+                              <input aria-label="Includes"
                                 type="checkbox"
                                 checked={seleccion.includes(partida.detalle_id)}
                                 onChange={() => alternar(partida.detalle_id)}

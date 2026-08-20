@@ -10,6 +10,7 @@ import { DocumentoFiscal } from '../../documentos/interfaces/documento-fiscal.in
 import { sanitizePostgrestSearch } from '../../../common/util/postgrest.util';
 import Decimal from 'decimal.js';
 import { createHash } from 'crypto';
+import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 
 interface ListarCxcFilters {
   estado?: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO';
@@ -101,7 +102,11 @@ export class CxcService {
     }
 
     if (filters.vencidas) {
-      const hoy = new Date().toISOString().split('T')[0];
+      // Es el caso que documenta la migración 370: en UTC, entre las 19:00 y la
+      // medianoche de Lima, una cuenta que vence hoy se listaba como vencida cinco
+      // horas antes de tiempo. El trigger de la base ya usa la fecha local del
+      // tenant; este filtro seguía en UTC y contradecía a la propia columna.
+      const hoy = await fechaHoyDelTenant(this.supabase.getClient(), tenantId);
       query = query.lt('fecha_vencimiento', hoy).neq('estado', 'CANCELADO');
     }
 

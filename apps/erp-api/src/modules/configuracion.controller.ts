@@ -10,6 +10,10 @@ import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 import { DocumentosService } from './documentos.service';
 import { ConfigurationService } from './configuracion/configuration.service';
 
+
+import { ActualizarDatosEmpresaDto, ActualizarParametrosFacturacionDto, ActualizarSerieDto } from './configuracion/dto/configuracion-request.dto';
+import { ProbarFirmaXmlDto } from './shared-dto/acciones-simples.dto';
+
 /**
  * @deprecated Este controlador está DEPRECADO. 
  * Usar /api/configuration/* en su lugar (configuration.controller.ts)
@@ -218,7 +222,7 @@ export class ConfiguracionController {
   @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Actualizar datos de la empresa' })
   async updateDatosEmpresa(
-    @Body() datosEmpresa: any,
+    @Body() datosEmpresa: ActualizarDatosEmpresaDto,
     @CurrentTenant() tenantId: string,
     @Req() req: any,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -283,7 +287,7 @@ export class ConfiguracionController {
   @ApiOperation({ summary: 'Actualizar configuración de serie' })
   async updateSerie(
     @Param('tipo') tipo: string,
-    @Body() serieData: any,
+    @Body() serieData: ActualizarSerieDto,
     @CurrentTenant() tenantId: string,
     @Req() req: any,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -364,7 +368,7 @@ export class ConfiguracionController {
   @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Actualizar parámetros de facturación' })
   async updateParametrosFacturacion(
-    @Body() parametros: any,
+    @Body() parametros: ActualizarParametrosFacturacionDto,
     @CurrentTenant() tenantId: string,
     @Req() req: any,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -407,7 +411,7 @@ export class ConfiguracionController {
   @Post('certificado/upload')
   @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Endpoint legacy deshabilitado; usar el wizard de configuración' })
-  async uploadCertificado(@Body() _certificadoData: any) {
+  async uploadCertificado() {
     throw new BadRequestException(
       'Endpoint legacy deshabilitado: valide y guarde el certificado mediante /api/configuration/wizard/validate-certificate y el flujo de configuración.',
     );
@@ -669,7 +673,7 @@ export class ConfiguracionController {
   @Post('test-firma-xml')
   @RequirePermission('system.debug')
   @ApiOperation({ summary: 'Probar firma XML sin enviar a SUNAT (POST con XML personalizado)' })
-  async testFirmaXml(@Body() body: { xmlContent?: string }) {
+  async testFirmaXml(@Body() body: ProbarFirmaXmlDto) {
     try {
       if (isProduction()) {
         throw new ForbiddenException('Endpoint restringido en producción');

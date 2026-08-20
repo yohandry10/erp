@@ -16,6 +16,7 @@ import {
 import { SeleccionarCxpLote } from './SeleccionarCxpLote';
 import { Badge } from '../ui/badge';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface CuentaBancaria {
   id: string;
@@ -390,7 +391,7 @@ export function PagoLoteWizard({
             <div>
               <div className="text-muted-foreground">Fecha de Pago</div>
               <div className="font-semibold">
-                {new Date(fechaPago).toLocaleDateString()}
+                {parseDateLocal(fechaPago).toLocaleDateString()}
               </div>
             </div>
             <div>

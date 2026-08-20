@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useApi } from "@/hooks/use-api";
 import { AlertTriangle, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { useLocalizedMoney } from "@/hooks/use-localized-money";
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface VencimientoItem {
   id: string;
@@ -80,7 +81,7 @@ export default function VencimientosAlert({
   }, [loadVencimientos]);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(country.locale || "es-PE", {
+    return parseDateLocal(dateString).toLocaleDateString(country.locale || "es-PE", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

@@ -25,6 +25,7 @@ import {
   UpdateUbicacionDto,
 } from './dto/maestro-inventario.dto';
 import { MAX_PRODUCT_IMAGE_BYTES, ProductImagesService, ProductImageUpload } from './product-images.service';
+import { rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -344,13 +345,16 @@ export class InventarioController {
           p => parseFloat((p as any).stock_actual || 0) <= parseFloat(p.stock_minimo || 0),
         ).length || 0;
 
-      const hoy = new Date().toISOString().split('T')[0];
+      // `created_at` es timestamptz: comparar contra un literal sin zona hacía que
+      // «los movimientos de hoy» abarcaran desde las 19:00 de ayer para un tenant
+      // peruano. Y el borde superior dejaba fuera el último milisegundo del día.
+      const { desde, hasta } = await rangoDelDiaDelTenant(client, tenantId);
       const { count: movimientosHoy, error: movimientosError } = await client
         .from('movimientos_inventario')
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
-        .gte('created_at', `${hoy}T00:00:00`)
-        .lt('created_at', `${hoy}T23:59:59.999`);
+        .gte('created_at', desde)
+        .lt('created_at', hasta);
       if (movimientosError) throw movimientosError;
 
       return {

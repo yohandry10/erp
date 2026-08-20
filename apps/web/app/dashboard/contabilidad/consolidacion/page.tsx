@@ -224,15 +224,15 @@ export default function ConsolidacionPage() {
                 <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /> Grupos empresariales</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-2 md:grid-cols-4 [&>*]:min-w-0">
-                    <Input placeholder="Código" value={nuevoGrupo.codigo} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, codigo: e.target.value })} />
-                    <Input className="md:col-span-2" placeholder="Nombre del grupo" value={nuevoGrupo.nombre} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, nombre: e.target.value })} />
+                    <Input aria-label="Código" placeholder="Código" value={nuevoGrupo.codigo} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, codigo: e.target.value })} />
+                    <Input aria-label="Nombre del grupo" className="md:col-span-2" placeholder="Nombre del grupo" value={nuevoGrupo.nombre} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, nombre: e.target.value })} />
                     <div className="flex gap-2">
-                      <Input maxLength={3} value={nuevoGrupo.moneda_presentacion} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, moneda_presentacion: e.target.value.toUpperCase() })} />
+                      <Input aria-label="Moneda de presentación" maxLength={3} value={nuevoGrupo.moneda_presentacion} onChange={(e) => setNuevoGrupo({ ...nuevoGrupo, moneda_presentacion: e.target.value.toUpperCase() })} />
                       <Button onClick={crearGrupo} disabled={working || !nuevoGrupo.codigo || !nuevoGrupo.nombre}><Plus className="h-4 w-4" /></Button>
                     </div>
                   </div>
 
-                  <select className={`${campo} w-full`} value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
+                  <select aria-label="Grupo" className={`${campo} w-full`} value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
                     <option value="">Reporte individual, sin grupo</option>
                     {grupos.map((item) => <option key={item.id} value={item.id}>{item.nombre} · {item.moneda_presentacion}</option>)}
                   </select>
@@ -250,8 +250,8 @@ export default function ConsolidacionPage() {
                       </div>
                       {grupo.es_controladora ? (
                         <div className="grid gap-2 md:grid-cols-[1fr_120px_auto]">
-                          <Input placeholder="RUC exacto de la empresa" value={invitacion.ruc} onChange={(e) => setInvitacion({ ...invitacion, ruc: e.target.value })} />
-                          <Input type="number" min="0.01" max="100" value={invitacion.participacion} onChange={(e) => setInvitacion({ ...invitacion, participacion: e.target.value })} />
+                          <Input aria-label="RUC exacto de la empresa" placeholder="RUC exacto de la empresa" value={invitacion.ruc} onChange={(e) => setInvitacion({ ...invitacion, ruc: e.target.value })} />
+                          <Input aria-label="Participación" type="number" min="0.01" max="100" value={invitacion.participacion} onChange={(e) => setInvitacion({ ...invitacion, participacion: e.target.value })} />
                           <Button onClick={invitar} disabled={working || !invitacion.ruc} className="gap-2"><Send className="h-4 w-4" /> Invitar</Button>
                         </div>
                       ) : invitacionPendiente ? (
@@ -271,37 +271,37 @@ export default function ConsolidacionPage() {
                   <div>
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Homologación de cuentas</div>
                     <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] [&>*]:min-w-0">
-                      <select className={campo} value={mapeo.tenant_miembro_id} onChange={(e) => setMapeo({ ...mapeo, tenant_miembro_id: e.target.value })}>
+                      <select aria-label="Tenant miembro" className={campo} value={mapeo.tenant_miembro_id} onChange={(e) => setMapeo({ ...mapeo, tenant_miembro_id: e.target.value })}>
                         <option value="">Empresa miembro</option>
                         {grupo?.miembros.filter((m) => m.estado === 'ACTIVO' && !m.es_controladora).map((m) => <option key={m.tenant_id} value={m.tenant_id}>{m.empresa?.razon_social || m.tenant_id}</option>)}
                       </select>
-                      <Input placeholder="Cuenta origen" value={mapeo.cuenta_codigo_origen} onChange={(e) => setMapeo({ ...mapeo, cuenta_codigo_origen: e.target.value })} />
-                      <Input placeholder="Cuenta destino" value={mapeo.cuenta_codigo_destino} onChange={(e) => setMapeo({ ...mapeo, cuenta_codigo_destino: e.target.value })} />
+                      <Input aria-label="Cuenta origen" placeholder="Cuenta origen" value={mapeo.cuenta_codigo_origen} onChange={(e) => setMapeo({ ...mapeo, cuenta_codigo_origen: e.target.value })} />
+                      <Input aria-label="Cuenta destino" placeholder="Cuenta destino" value={mapeo.cuenta_codigo_destino} onChange={(e) => setMapeo({ ...mapeo, cuenta_codigo_destino: e.target.value })} />
                       <Button onClick={registrarMapeo} disabled={working || !grupo?.es_controladora || !mapeo.tenant_miembro_id || !mapeo.cuenta_codigo_origen || !mapeo.cuenta_codigo_destino}><Plus className="h-4 w-4" /></Button>
                     </div>
                   </div>
                   <div>
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tasa de presentación</div>
                     <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-[minmax(0,2fr)_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_auto] [&>*]:min-w-0">
-                      <select className={campo} value={tasa.tenant_miembro_id} onChange={(e) => setTasa({ ...tasa, tenant_miembro_id: e.target.value })}>
+                      <select aria-label="Tenant miembro" className={campo} value={tasa.tenant_miembro_id} onChange={(e) => setTasa({ ...tasa, tenant_miembro_id: e.target.value })}>
                         <option value="">Empresa miembro</option>
                         {grupo?.miembros.filter((m) => m.estado === 'ACTIVO' && !m.es_controladora).map((m) => <option key={m.tenant_id} value={m.tenant_id}>{m.empresa?.razon_social || m.tenant_id}</option>)}
                       </select>
-                      <Input type="date" value={tasa.fecha} onChange={(e) => setTasa({ ...tasa, fecha: e.target.value })} />
-                      <select className={campo} value={tasa.tipo} onChange={(e) => setTasa({ ...tasa, tipo: e.target.value })}><option>CIERRE</option><option>PROMEDIO</option><option>HISTORICA</option></select>
-                      <Input type="number" step="0.000001" placeholder="Factor" value={tasa.factor_conversion} onChange={(e) => setTasa({ ...tasa, factor_conversion: e.target.value })} />
+                      <Input aria-label="Fecha" type="date" value={tasa.fecha} onChange={(e) => setTasa({ ...tasa, fecha: e.target.value })} />
+                      <select aria-label="Tipo" className={campo} value={tasa.tipo} onChange={(e) => setTasa({ ...tasa, tipo: e.target.value })}><option>CIERRE</option><option>PROMEDIO</option><option>HISTORICA</option></select>
+                      <Input aria-label="Factor" type="number" step="0.000001" placeholder="Factor" value={tasa.factor_conversion} onChange={(e) => setTasa({ ...tasa, factor_conversion: e.target.value })} />
                       <Button onClick={registrarTasa} disabled={working || !grupo?.es_controladora || !tasa.tenant_miembro_id || !tasa.factor_conversion}><Plus className="h-4 w-4" /></Button>
                     </div>
                   </div>
                   <div>
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Eliminación o reclasificación</div>
                     <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-4 [&>*]:min-w-0">
-                      <Input type="date" value={ajuste.fecha} onChange={(e) => setAjuste({ ...ajuste, fecha: e.target.value })} />
-                      <select className={campo} value={ajuste.tipo} onChange={(e) => setAjuste({ ...ajuste, tipo: e.target.value })}><option>ELIMINACION</option><option>RECLASIFICACION</option></select>
-                      <Input placeholder="Cuenta" value={ajuste.cuenta_codigo} onChange={(e) => setAjuste({ ...ajuste, cuenta_codigo: e.target.value })} />
-                      <Input placeholder="Descripción" value={ajuste.descripcion} onChange={(e) => setAjuste({ ...ajuste, descripcion: e.target.value })} />
-                      <Input type="number" step="0.01" placeholder="Debe" value={ajuste.debe} onChange={(e) => setAjuste({ ...ajuste, debe: e.target.value, haber: '' })} />
-                      <Input type="number" step="0.01" placeholder="Haber" value={ajuste.haber} onChange={(e) => setAjuste({ ...ajuste, haber: e.target.value, debe: '' })} />
+                      <Input aria-label="Fecha" type="date" value={ajuste.fecha} onChange={(e) => setAjuste({ ...ajuste, fecha: e.target.value })} />
+                      <select aria-label="Tipo" className={campo} value={ajuste.tipo} onChange={(e) => setAjuste({ ...ajuste, tipo: e.target.value })}><option>ELIMINACION</option><option>RECLASIFICACION</option></select>
+                      <Input aria-label="Cuenta" placeholder="Cuenta" value={ajuste.cuenta_codigo} onChange={(e) => setAjuste({ ...ajuste, cuenta_codigo: e.target.value })} />
+                      <Input aria-label="Descripción" placeholder="Descripción" value={ajuste.descripcion} onChange={(e) => setAjuste({ ...ajuste, descripcion: e.target.value })} />
+                      <Input aria-label="Debe" type="number" step="0.01" placeholder="Debe" value={ajuste.debe} onChange={(e) => setAjuste({ ...ajuste, debe: e.target.value, haber: '' })} />
+                      <Input aria-label="Haber" type="number" step="0.01" placeholder="Haber" value={ajuste.haber} onChange={(e) => setAjuste({ ...ajuste, haber: e.target.value, debe: '' })} />
                       <Button className="md:col-span-2" onClick={registrarAjuste} disabled={working || !grupo?.es_controladora || !ajuste.cuenta_codigo || (!ajuste.debe && !ajuste.haber)}>Registrar sin tocar libros</Button>
                     </div>
                   </div>
@@ -313,21 +313,21 @@ export default function ConsolidacionPage() {
               <CardHeader><CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5 text-primary" /> Diseñador de reportes</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-2 md:grid-cols-3">
-                  <Input placeholder="Código" value={reporteForm.codigo} onChange={(e) => setReporteForm({ ...reporteForm, codigo: e.target.value })} />
-                  <Input className="md:col-span-2" placeholder="Nombre" value={reporteForm.nombre} onChange={(e) => setReporteForm({ ...reporteForm, nombre: e.target.value })} />
+                  <Input aria-label="Código" placeholder="Código" value={reporteForm.codigo} onChange={(e) => setReporteForm({ ...reporteForm, codigo: e.target.value })} />
+                  <Input aria-label="Nombre" className="md:col-span-2" placeholder="Nombre" value={reporteForm.nombre} onChange={(e) => setReporteForm({ ...reporteForm, nombre: e.target.value })} />
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1100px] text-sm">
                     <thead><tr className="border-b border-border text-left text-xs uppercase text-muted-foreground"><th className="p-2">Código</th><th className="p-2">Nombre</th><th className="p-2">Tipo</th><th className="p-2">Prefijos o fórmula</th><th className="p-2">Naturaleza</th><th className="p-2">Fechas</th><th className="p-2">Tasa</th><th /></tr></thead>
                     <tbody>{lineas.map((linea, indice) => (
                       <tr key={indice} className="border-b border-border/50">
-                        <td className="p-1"><Input value={linea.codigo} onChange={(e) => modificarLinea(indice, { codigo: e.target.value })} /></td>
-                        <td className="p-1"><Input value={linea.nombre} onChange={(e) => modificarLinea(indice, { nombre: e.target.value })} /></td>
-                        <td className="p-1"><select className={campo} value={linea.tipo} onChange={(e) => modificarLinea(indice, { tipo: e.target.value as any })}><option>CUENTAS</option><option>FORMULA</option></select></td>
-                        <td className="p-1"><Input value={linea.definicion} placeholder={linea.tipo === 'CUENTAS' ? '10,11,12' : 'A:1,B:-1'} onChange={(e) => modificarLinea(indice, { definicion: e.target.value })} /></td>
-                        <td className="p-1"><select className={campo} value={linea.naturaleza} disabled={linea.tipo === 'FORMULA'} onChange={(e) => modificarLinea(indice, { naturaleza: e.target.value as any })}><option>SALDO</option><option>DEBE</option><option>HABER</option></select></td>
-                        <td className="p-1"><select className={campo} value={linea.alcance_fecha} disabled={linea.tipo === 'FORMULA'} onChange={(e) => modificarLinea(indice, { alcance_fecha: e.target.value as any })}><option>PERIODO</option><option>HASTA_FECHA</option></select></td>
-                        <td className="p-1"><select className={campo} value={linea.tipo_tasa} disabled={linea.tipo === 'FORMULA'} onChange={(e) => modificarLinea(indice, { tipo_tasa: e.target.value as any })}><option>CIERRE</option><option>PROMEDIO</option><option>HISTORICA</option></select></td>
+                        <td className="p-1"><Input aria-label="Código" value={linea.codigo} onChange={(e) => modificarLinea(indice, { codigo: e.target.value })} /></td>
+                        <td className="p-1"><Input aria-label="Nombre" value={linea.nombre} onChange={(e) => modificarLinea(indice, { nombre: e.target.value })} /></td>
+                        <td className="p-1"><select aria-label="Tipo" className={campo} value={linea.tipo} onChange={(e) => modificarLinea(indice, { tipo: e.target.value as any })}><option>CUENTAS</option><option>FORMULA</option></select></td>
+                        <td className="p-1"><Input aria-label="Definición" value={linea.definicion} placeholder={linea.tipo === 'CUENTAS' ? '10,11,12' : 'A:1,B:-1'} onChange={(e) => modificarLinea(indice, { definicion: e.target.value })} /></td>
+                        <td className="p-1"><select aria-label="Naturaleza" className={campo} value={linea.naturaleza} disabled={linea.tipo === 'FORMULA'} onChange={(e) => modificarLinea(indice, { naturaleza: e.target.value as any })}><option>SALDO</option><option>DEBE</option><option>HABER</option></select></td>
+                        <td className="p-1"><select aria-label="Alcance fecha" className={campo} value={linea.alcance_fecha} disabled={linea.tipo === 'FORMULA'} onChange={(e) => modificarLinea(indice, { alcance_fecha: e.target.value as any })}><option>PERIODO</option><option>HASTA_FECHA</option></select></td>
+                        <td className="p-1"><select aria-label="Tipo tasa" className={campo} value={linea.tipo_tasa} disabled={linea.tipo === 'FORMULA'} onChange={(e) => modificarLinea(indice, { tipo_tasa: e.target.value as any })}><option>CIERRE</option><option>PROMEDIO</option><option>HISTORICA</option></select></td>
                         <td className="p-1"><Button variant="ghost" onClick={() => setLineas((actuales) => actuales.filter((_, i) => i !== indice))}><Trash2 className="h-4 w-4" /></Button></td>
                       </tr>
                     ))}</tbody>
@@ -344,9 +344,9 @@ export default function ConsolidacionPage() {
               <CardHeader><CardTitle>Generar estado financiero</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-2 md:grid-cols-5">
-                  <select className={`${campo} md:col-span-2`} value={reporteId} onChange={(e) => setReporteId(e.target.value)}><option value="">Seleccione reporte</option>{reportes.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}</select>
-                  <Input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
-                  <Input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+                  <select aria-label="Reporte" className={`${campo} md:col-span-2`} value={reporteId} onChange={(e) => setReporteId(e.target.value)}><option value="">Seleccione reporte</option>{reportes.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}</select>
+                  <Input aria-label="Fecha desde" type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
+                  <Input aria-label="Fecha hasta" type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
                   <Button onClick={generar} disabled={working || !reporteId}>{working ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generar'}</Button>
                 </div>
                 {resultado && (

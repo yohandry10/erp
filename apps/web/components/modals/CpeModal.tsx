@@ -381,10 +381,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
                 <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4">
                   <div>
-                    <label className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor="cpemodal-codigo" className="block mb-2 font-semibold text-foreground/85">
                       Código
                     </label>
-                    <input
+                    <input id="cpemodal-codigo"
                       type="text"
                       value={item.codigo}
                       onChange={(e) => handleItemChange(index, 'codigo', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
@@ -392,10 +392,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor="cpemodal-descripcion" className="block mb-2 font-semibold text-foreground/85">
                       Descripción *
                     </label>
-                    <input
+                    <input id="cpemodal-descripcion"
                       type="text"
                       value={item.descripcion}
                       onChange={(e) => handleItemChange(index, 'descripcion', e.target.value)}
@@ -404,10 +404,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor="cpemodal-cantidad" className="block mb-2 font-semibold text-foreground/85">
                       Cantidad *
                     </label>
-                    <input
+                    <input id="cpemodal-cantidad"
                       type="number"
                       value={item.cantidad}
                       onChange={(e) => handleItemChange(index, 'cantidad', parseFloat(e.target.value) || 0)}
@@ -418,10 +418,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor="cpemodal-valor-unitario" className="block mb-2 font-semibold text-foreground/85">
                       Valor Unitario *
                     </label>
-                    <input
+                    <input id="cpemodal-valor-unitario"
                       type="number"
                       value={item.valorUnitario}
                       onChange={(e) => handleItemChange(index, 'valorUnitario', parseFloat(e.target.value) || 0)}
@@ -432,10 +432,11 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor={`cpe-item-impuesto-${index}`} className="block mb-2 font-semibold text-foreground/85">
                       {nombreImpuesto}
                     </label>
                     <input
+                      id={`cpe-item-impuesto-${index}`}
                       type="number"
                       value={item.igv.toFixed(2)}
                       readOnly className="w-[100%] p-2 border rounded-[4px] text-sm bg-muted"
@@ -443,10 +444,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   </div>
 
                   <div>
-                    <label className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor="cpemodal-total" className="block mb-2 font-semibold text-foreground/85">
                       Total
                     </label>
-                    <input
+                    <input id="cpemodal-total"
                       type="number"
                       value={item.total.toFixed(2)}
                       readOnly className="w-[100%] p-2 border rounded-[4px] text-sm bg-muted font-semibold"

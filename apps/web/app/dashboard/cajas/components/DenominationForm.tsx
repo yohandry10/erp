@@ -94,6 +94,7 @@ export function DenominationForm({
                                         min="0"
                                         step="1"
                                         value={billetes[denom] || ''}
+                                        aria-label={`Cantidad de billetes de ${currencySymbol} ${denom}`}
                                         onChange={(e) => handleBilleteChange(denom, e.target.value)}
                                         disabled={readOnly}
                                         className="w-24 px-3 py-1 border border-border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right disabled:bg-muted"
@@ -125,6 +126,7 @@ export function DenominationForm({
                                         min="0"
                                         step="1"
                                         value={monedas[denom] || ''}
+                                        aria-label={`Cantidad de monedas de ${currencySymbol} ${denom}`}
                                         onChange={(e) => handleMonedaChange(denom, e.target.value)}
                                         disabled={readOnly}
                                         className="w-24 px-3 py-1 border border-border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right disabled:bg-muted"

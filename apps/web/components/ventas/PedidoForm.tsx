@@ -357,10 +357,10 @@ const hasStockShortage = stockAlerts.length > 0
                 <div className="grid grid-cols-[repeat(12,_1fr)] gap-4">
                   {/* Producto Selector */}
                   <div>
-                    <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
+                    <label htmlFor="pedidoform-producto" className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Producto
                     </label>
-                    <select
+                    <select id="pedidoform-producto"
                       value={item.producto_id}
                       onChange={(e) => handleProductoChange(index, e.target.value)}
                       disabled={disabled} className="w-[100%] py-3 px-4 text-base bg-card text-[var(--primary-800)] cursor-pointer"
@@ -390,7 +390,7 @@ const hasStockShortage = stockAlerts.length > 0
                     <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Cantidad
                     </label>
-                    <Input
+                    <Input aria-label="Cantidad"
                       type="number"
                       min="1"
                       step="1"
@@ -423,7 +423,7 @@ const hasStockShortage = stockAlerts.length > 0
                     <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Precio Unit.
                     </label>
-                    <Input
+                    <Input aria-label="Precio unitario"
                       type="number"
                       min="0"
                       step="0.01"
@@ -444,6 +444,7 @@ const hasStockShortage = stockAlerts.length > 0
                       Subtotal
                     </label>
                     <Input
+                      aria-label="Subtotal de la línea"
                       type="text"
                       value={`${currencySymbol} ${item.subtotal.toFixed(2)}`}
                       disabled className="bg-[var(--primary-50)]"
@@ -503,7 +504,7 @@ const hasStockShortage = stockAlerts.length > 0
           <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
             Observaciones (Opcional)
           </label>
-          <Textarea
+          <Textarea aria-label="Observaciones"
             value={observaciones}
             onChange={(e) => setObservaciones(e.target.value)}
             disabled={disabled}

@@ -306,8 +306,14 @@ export class FinancialIntegrationService {
         const fecha = new Date();
         fecha.setMonth(fecha.getMonth() + i);
 
-        const ingresos = promedioVentas * (1 + (Math.random() * 0.2 - 0.1)); // ±10% variación
-        const egresos = promedioGastos * (1 + (Math.random() * 0.15 - 0.05)); // ±5% variación
+        // Sin ruido aleatorio. El promedio histórico ya es la mejor estimación
+        // central disponible, y `generarEscenarios` expresa la incertidumbre con
+        // bandas explícitas (optimista +20 %/-10 %, pesimista -20 %/+10 %).
+        // Sumar un ±10 % al azar no añadía información: sólo hacía que la misma
+        // proyección cambiara en cada recarga, de modo que dos personas mirando la
+        // pantalla a la vez veían cifras distintas y ninguna era reproducible.
+        const ingresos = promedioVentas;
+        const egresos = promedioGastos;
         const saldoNeto = ingresos - egresos;
         saldoAcumulado += saldoNeto;
 

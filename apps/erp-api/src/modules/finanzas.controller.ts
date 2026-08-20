@@ -7,6 +7,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../common/guards/permission.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 
+import { AnalisisCreditoDto } from './finanzas/dto/analisis-credito.dto';
+
 @ApiTags('finanzas')
 @Controller('finanzas')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -59,12 +61,7 @@ export class FinanzasController {
   @RequirePermission('finanzas.write')
   @ApiOperation({ summary: 'Análisis de crédito basado en datos reales' })
   @ApiResponse({ status: 200, description: 'Análisis crediticio completo' })
-  async getAnalisisCredito(@Body() solicitudData: {
-    montoSolicitado: number;
-    plazoMeses: number;
-    ingresosMensuales: number;
-    historialCrediticio: 'EXCELENTE' | 'BUENO' | 'REGULAR' | 'MALO';
-  }) {
+  async getAnalisisCredito(@Body() solicitudData: AnalisisCreditoDto) {
     return this.financialService.getAnalisisCredito(solicitudData);
   }
 

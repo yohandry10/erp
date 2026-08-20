@@ -6,7 +6,6 @@ import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { AlertCircle, Plus, Trash2, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { normalizeTaxId, validateCountryTaxId } from '@/lib/country-tax-id'
@@ -385,7 +384,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
             <h3 className="mb-4 text-base font-semibold text-foreground">Información del documento</h3>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <Field label="Tipo de documento *">
-                <select
+                <select aria-label="Información del documento"
                   value={formData.tipo_documento}
                   onChange={(e) => setFormData(prev => ({ ...prev, tipo_documento: e.target.value }))}
                   required
@@ -478,7 +477,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
             <h3 className="mb-4 text-base font-semibold text-foreground">Información del cliente</h3>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <Field label="Tipo de documento">
-                <select
+                <select aria-label="Información del cliente"
                   value={formData.receptor_tipo_doc}
                   onChange={(e) => setFormData(prev => ({ ...prev, receptor_tipo_doc: e.target.value }))}
                   className={cn('h-10 w-full rounded-md px-3 text-sm', fieldClass)}
@@ -683,7 +682,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
             <h3 className="mb-4 text-base font-semibold text-foreground">Totales</h3>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <Field label="Subtotal">
-                <input
+                <input aria-label="Total"
                   type="number"
                   value={formData.subtotal.toFixed(2)}
                   readOnly
@@ -692,7 +691,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
               </Field>
 
               <Field label={`${nombreImpuesto} (${Number((tasaIgv * 100).toFixed(2))}%)`}>
-                <input
+                <input aria-label="Total"
                   type="number"
                   value={formData.impuesto_igv.toFixed(2)}
                   readOnly
@@ -762,10 +761,14 @@ function Field({
   className?: string
   children: React.ReactNode
 }) {
+  // Envuelve al control en <label> en vez de dejar el rótulo como hermano: así
+  // la asociación es implícita y no hace falta tocar los veinte sitios que
+  // usan este componente. El <span> conserva las mismas clases que tenía el
+  // <Label>, que a su vez renderiza un <label> y aquí anidaría.
   return (
-    <div className={cn('space-y-2', className)}>
-      <Label className="text-xs font-semibold uppercase text-muted-foreground">{label}</Label>
+    <label className={cn('block space-y-2', className)}>
+      <span className="text-xs font-semibold uppercase text-muted-foreground">{label}</span>
       {children}
-    </div>
+    </label>
   )
 }

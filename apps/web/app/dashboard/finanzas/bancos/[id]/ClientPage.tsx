@@ -452,10 +452,10 @@ export default function CuentaBancariaDetallePage() {
           <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl mb-6">
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+                <label htmlFor="id-fecha-desde" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                   Fecha Desde
                 </label>
-                <input
+                <input id="id-fecha-desde"
                   type="date"
                   value={filters.fecha_desde || ''}
                   onChange={(e) => handleFilterChange('fecha_desde', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
@@ -463,10 +463,10 @@ export default function CuentaBancariaDetallePage() {
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+                <label htmlFor="id-fecha-hasta" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                   Fecha Hasta
                 </label>
-                <input
+                <input id="id-fecha-hasta"
                   type="date"
                   value={filters.fecha_hasta || ''}
                   onChange={(e) => handleFilterChange('fecha_hasta', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
@@ -474,10 +474,10 @@ export default function CuentaBancariaDetallePage() {
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+                <label htmlFor="id-tipo" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                   Tipo
                 </label>
-                <select
+                <select id="id-tipo"
                   value={filters.tipo || ''}
                   onChange={(e) => handleFilterChange('tipo', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
                 >
@@ -488,10 +488,10 @@ export default function CuentaBancariaDetallePage() {
               </div>
 
               <div>
-                <label className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
+                <label htmlFor="id-conciliado" className="block text-[0.875rem] font-medium text-foreground/85 mb-2">
                   Conciliado
                 </label>
-                <select
+                <select id="id-conciliado"
                   value={filters.conciliado === '' ? '' : filters.conciliado?.toString()}
                   onChange={(e) => handleFilterChange('conciliado', e.target.value === '' ? '' : e.target.value === 'true')} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
                 >

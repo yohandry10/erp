@@ -164,8 +164,8 @@ export default function SecurityDashboard() {
 
         {/* Period Selector */}
         <div>
-          <label>Período</label>
-          <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(Number(e.target.value))}>
+          <label htmlFor="security-periodo">Período</label>
+          <select id="security-periodo" value={selectedPeriod} onChange={(e) => setSelectedPeriod(Number(e.target.value))}>
             <option value={1}>Últimas 24 horas</option>
             <option value={7}>Últimos 7 días</option>
             <option value={30}>Últimos 30 días</option>

@@ -337,17 +337,17 @@ export default function ComercialVentasPage() {
         <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
           <Panel title="Nueva lista" subtitle="El producto exacto prevalece sobre marca; luego aplican vendedor/cliente, prioridad y vigencia.">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <Field label="Código"><Input value={listaForm.codigo} onChange={(e) => setListaForm({ ...listaForm, codigo: e.target.value })} placeholder="MAYORISTA-LIMA" /></Field>
-              <Field label="Nombre"><Input value={listaForm.nombre} onChange={(e) => setListaForm({ ...listaForm, nombre: e.target.value })} placeholder="Mayoristas Lima" /></Field>
+              <Field label="Código"><Input aria-label="MAYORISTA-LIMA" value={listaForm.codigo} onChange={(e) => setListaForm({ ...listaForm, codigo: e.target.value })} placeholder="MAYORISTA-LIMA" /></Field>
+              <Field label="Nombre"><Input aria-label="Mayoristas Lima" value={listaForm.nombre} onChange={(e) => setListaForm({ ...listaForm, nombre: e.target.value })} placeholder="Mayoristas Lima" /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Moneda"><Input maxLength={3} value={listaForm.moneda} onChange={(e) => setListaForm({ ...listaForm, moneda: e.target.value.toUpperCase() })} /></Field>
-                <Field label="Prioridad"><Input type="number" value={listaForm.prioridad} onChange={(e) => setListaForm({ ...listaForm, prioridad: e.target.value })} /></Field>
+                <Field label="Moneda"><Input aria-label="Moneda" maxLength={3} value={listaForm.moneda} onChange={(e) => setListaForm({ ...listaForm, moneda: e.target.value.toUpperCase() })} /></Field>
+                <Field label="Prioridad"><Input aria-label="Prioridad" type="number" value={listaForm.prioridad} onChange={(e) => setListaForm({ ...listaForm, prioridad: e.target.value })} /></Field>
               </div>
               <Field label="Vendedor (opcional)"><Select value={listaForm.vendedor_id} onChange={(value) => setListaForm({ ...listaForm, vendedor_id: value })} options={catalogos.vendedores.map((v) => ({ value: v.id, label: `${v.nombre || ''} ${v.apellido || ''}`.trim() || v.email || v.id }))} empty="Todos" /></Field>
               <Field label="Cliente (opcional)"><Select value={listaForm.cliente_id} onChange={(value) => setListaForm({ ...listaForm, cliente_id: value })} options={catalogos.clientes.map((c) => ({ value: c.id, label: c.razon_social || c.nombre || c.codigo || c.id }))} empty="Todos" /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Desde"><Input type="date" value={listaForm.vigencia_desde} onChange={(e) => setListaForm({ ...listaForm, vigencia_desde: e.target.value })} /></Field>
-                <Field label="Hasta"><Input type="date" value={listaForm.vigencia_hasta} onChange={(e) => setListaForm({ ...listaForm, vigencia_hasta: e.target.value })} /></Field>
+                <Field label="Desde"><Input aria-label="Vigencia desde" type="date" value={listaForm.vigencia_desde} onChange={(e) => setListaForm({ ...listaForm, vigencia_desde: e.target.value })} /></Field>
+                <Field label="Hasta"><Input aria-label="Vigencia hasta" type="date" value={listaForm.vigencia_hasta} onChange={(e) => setListaForm({ ...listaForm, vigencia_hasta: e.target.value })} /></Field>
               </div>
             </div>
             <div className="mt-5 space-y-3 border-t border-border pt-4">
@@ -359,10 +359,10 @@ export default function ComercialVentasPage() {
                   </div>
                   {line.scope === 'PRODUCTO' ? (
                     <Select value={line.producto_id} onChange={(value) => setPriceLines((rows) => rows.map((row, i) => i === index ? { ...row, producto_id: value } : row))} options={catalogos.productos.map((p) => ({ value: p.id, label: `${p.codigo || ''} · ${p.nombre}` }))} empty="Selecciona producto" />
-                  ) : <Input value={line.marca} onChange={(e) => setPriceLines((rows) => rows.map((row, i) => i === index ? { ...row, marca: e.target.value } : row))} placeholder="Marca exacta" />}
+                  ) : <Input aria-label="Marca exacta" value={line.marca} onChange={(e) => setPriceLines((rows) => rows.map((row, i) => i === index ? { ...row, marca: e.target.value } : row))} placeholder="Marca exacta" />}
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    <Input type="number" min="0" step="0.01" value={line.cantidad_minima} onChange={(e) => setPriceLines((rows) => rows.map((row, i) => i === index ? { ...row, cantidad_minima: e.target.value } : row))} placeholder="Cantidad mínima" />
-                    <Input type="number" min="0" step="0.01" value={line.precio_unitario} onChange={(e) => setPriceLines((rows) => rows.map((row, i) => i === index ? { ...row, precio_unitario: e.target.value } : row))} placeholder="Precio" />
+                    <Input aria-label="Cantidad mínima" type="number" min="0" step="0.01" value={line.cantidad_minima} onChange={(e) => setPriceLines((rows) => rows.map((row, i) => i === index ? { ...row, cantidad_minima: e.target.value } : row))} placeholder="Cantidad mínima" />
+                    <Input aria-label="Precio" type="number" min="0" step="0.01" value={line.precio_unitario} onChange={(e) => setPriceLines((rows) => rows.map((row, i) => i === index ? { ...row, precio_unitario: e.target.value } : row))} placeholder="Precio" />
                   </div>
                 </div>
               ))}
@@ -380,13 +380,13 @@ export default function ComercialVentasPage() {
         <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
           <Panel title="Nueva regla" subtitle="El devengo nace sólo de venta/factura válida; NC y anulaciones agregan reversas.">
             <div className="space-y-3">
-              <Field label="Código"><Input value={comisionForm.codigo} onChange={(e) => setComisionForm({ ...comisionForm, codigo: e.target.value })} placeholder="COM-MARCA-A" /></Field>
-              <Field label="Nombre"><Input value={comisionForm.nombre} onChange={(e) => setComisionForm({ ...comisionForm, nombre: e.target.value })} /></Field>
+              <Field label="Código"><Input aria-label="COM-MARCA-A" value={comisionForm.codigo} onChange={(e) => setComisionForm({ ...comisionForm, codigo: e.target.value })} placeholder="COM-MARCA-A" /></Field>
+              <Field label="Nombre"><Input aria-label="Nombre" value={comisionForm.nombre} onChange={(e) => setComisionForm({ ...comisionForm, nombre: e.target.value })} /></Field>
               <Field label="Vendedor (opcional)"><Select value={comisionForm.vendedor_id} onChange={(value) => setComisionForm({ ...comisionForm, vendedor_id: value })} options={catalogos.vendedores.map((v) => ({ value: v.id, label: `${v.nombre || ''} ${v.apellido || ''}`.trim() || v.email || v.id }))} empty="Todos" /></Field>
               <Field label="Producto (opcional)"><Select value={comisionForm.producto_id} onChange={(value) => setComisionForm({ ...comisionForm, producto_id: value })} options={catalogos.productos.map((p) => ({ value: p.id, label: `${p.codigo || ''} · ${p.nombre}` }))} empty="Todos" /></Field>
-              <Field label="Marca (opcional)"><Input value={comisionForm.marca} onChange={(e) => setComisionForm({ ...comisionForm, marca: e.target.value })} /></Field>
-              <div className="grid grid-cols-2 gap-3"><Field label="Porcentaje"><Input type="number" min="0" max="100" step="0.01" value={comisionForm.porcentaje} onChange={(e) => setComisionForm({ ...comisionForm, porcentaje: e.target.value })} /></Field><Field label="Prioridad"><Input type="number" value={comisionForm.prioridad} onChange={(e) => setComisionForm({ ...comisionForm, prioridad: e.target.value })} /></Field></div>
-              <div className="grid grid-cols-2 gap-3"><Field label="Desde"><Input type="date" value={comisionForm.vigencia_desde} onChange={(e) => setComisionForm({ ...comisionForm, vigencia_desde: e.target.value })} /></Field><Field label="Hasta"><Input type="date" value={comisionForm.vigencia_hasta} onChange={(e) => setComisionForm({ ...comisionForm, vigencia_hasta: e.target.value })} /></Field></div>
+              <Field label="Marca (opcional)"><Input aria-label="Marca" value={comisionForm.marca} onChange={(e) => setComisionForm({ ...comisionForm, marca: e.target.value })} /></Field>
+              <div className="grid grid-cols-2 gap-3"><Field label="Porcentaje"><Input aria-label="Porcentaje" type="number" min="0" max="100" step="0.01" value={comisionForm.porcentaje} onChange={(e) => setComisionForm({ ...comisionForm, porcentaje: e.target.value })} /></Field><Field label="Prioridad"><Input aria-label="Prioridad" type="number" value={comisionForm.prioridad} onChange={(e) => setComisionForm({ ...comisionForm, prioridad: e.target.value })} /></Field></div>
+              <div className="grid grid-cols-2 gap-3"><Field label="Desde"><Input aria-label="Vigencia desde" type="date" value={comisionForm.vigencia_desde} onChange={(e) => setComisionForm({ ...comisionForm, vigencia_desde: e.target.value })} /></Field><Field label="Hasta"><Input aria-label="Vigencia hasta" type="date" value={comisionForm.vigencia_hasta} onChange={(e) => setComisionForm({ ...comisionForm, vigencia_hasta: e.target.value })} /></Field></div>
               <Button className="w-full gap-2" onClick={() => void saveCommission()} disabled={saving}><Save className="h-4 w-4" /> Guardar regla</Button>
             </div>
             <div className="mt-6 space-y-2 border-t border-border pt-4">{reglas.map((row) => <div key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3"><div><strong>{row.codigo}</strong><div className="text-xs text-muted-foreground">{row.porcentaje}% · prioridad {row.prioridad}</div></div><Button size="sm" variant="outline" onClick={() => void toggleRule('comisiones/reglas', row)}>{row.activo ? 'Activa' : 'Inactiva'}</Button></div>)}</div>
@@ -404,7 +404,7 @@ export default function ComercialVentasPage() {
           <div className="space-y-6">
             <Panel title="Cerrar bloque" subtitle="El reporte congela cabeceras y líneas; no vuelve a generar asientos.">
               <div className="rounded-xl bg-muted/50 p-4"><div className="text-sm text-muted-foreground">Seleccionadas</div><div className="text-3xl font-black">{selectedRows.length}</div><div className="mt-2 text-sm text-muted-foreground">Total del bloque</div><div className="text-2xl font-bold">{money(selectedTotal, selectedRows[0]?.moneda || 'PEN')}</div></div>
-              <Field label="Notas"><Input value={batchNotes} onChange={(e) => setBatchNotes(e.target.value)} placeholder="Turno mañana, ruta norte…" /></Field>
+              <Field label="Notas"><Input aria-label="Turno mañana, ruta norte…" value={batchNotes} onChange={(e) => setBatchNotes(e.target.value)} placeholder="Turno mañana, ruta norte…" /></Field>
               <Button className="mt-3 w-full gap-2" onClick={() => void consolidate()} disabled={saving || selectedRows.length === 0}><Boxes className="h-4 w-4" /> Generar consolidado</Button>
             </Panel>
             <Panel title="Historial" subtitle="Los bloques emitidos no se editan ni eliminan.">
@@ -431,6 +431,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Select({ value, onChange, options, empty }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; empty: string }) {
+  // etiqueta-por-composicion: este Select siempre se renderiza dentro de <Field>,
+  // que envuelve a sus hijos en una <label>. Poner aquí un aria-label pisaría esa
+  // etiqueta con un nombre peor.
   return <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">{empty}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
 }
 

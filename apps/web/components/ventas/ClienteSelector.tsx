@@ -195,7 +195,7 @@ export default function ClienteSelector({
           {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-4 top-[50%] -translate-y-1/2 text-[var(--primary-400)] w-5 h-5" />
-            <input
+            <input aria-label="Buscar"
               type="text"
               placeholder={`Buscar por ${country.paisCodigo === 'AR' ? 'CUIT/DNI' : country.paisCodigo === 'CO' ? 'NIT/CC' : 'RUC/DNI'} o nombre...`}
               value={searchTerm}

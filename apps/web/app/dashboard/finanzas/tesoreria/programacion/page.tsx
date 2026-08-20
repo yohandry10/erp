@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { parseDateLocal } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import {
@@ -134,7 +135,7 @@ export default function ProgramacionPagosPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(locale, {
+    return parseDateLocal(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
@@ -310,10 +311,10 @@ export default function ProgramacionPagosPage() {
 
         <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2">
+            <label htmlFor="programacion-fecha-desde" className="block text-[0.875rem] font-medium mb-2">
               Fecha Desde
             </label>
-            <input
+            <input id="programacion-fecha-desde"
               type="date"
               value={fechaDesde}
               onChange={(e) => setFechaDesde(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
@@ -321,10 +322,10 @@ export default function ProgramacionPagosPage() {
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2">
+            <label htmlFor="programacion-fecha-hasta" className="block text-[0.875rem] font-medium mb-2">
               Fecha Hasta
             </label>
-            <input
+            <input id="programacion-fecha-hasta"
               type="date"
               value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
@@ -332,10 +333,10 @@ export default function ProgramacionPagosPage() {
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2">
+            <label htmlFor="programacion-estado" className="block text-[0.875rem] font-medium mb-2">
               Estado
             </label>
-            <select
+            <select id="programacion-estado"
               value={estado}
               onChange={(e) => setEstado(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
             >
@@ -347,10 +348,10 @@ export default function ProgramacionPagosPage() {
           </div>
 
           <div>
-            <label className="block text-[0.875rem] font-medium mb-2">
+            <label htmlFor="programacion-urgencia" className="block text-[0.875rem] font-medium mb-2">
               Urgencia
             </label>
-            <select
+            <select id="programacion-urgencia"
               value={urgenciaFilter}
               onChange={(e) => setUrgenciaFilter(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
             >
@@ -388,7 +389,7 @@ export default function ProgramacionPagosPage() {
                   <thead>
                     <tr>
                       <th className="p-4 w-10">
-                        <input
+                        <input aria-label="Importe"
                           type="checkbox"
                           checked={selectedPagos.size === pagos.length && pagos.length > 0}
                           onChange={handleSelectAll} className="cursor-pointer"
@@ -429,7 +430,7 @@ export default function ProgramacionPagosPage() {
                         key={pago.id} className="border-b"
                       >
                         <td className="p-4">
-                          <input
+                          <input aria-label="Has"
                             type="checkbox"
                             checked={selectedPagos.has(pago.id)}
                             onChange={() => handleSelectPago(pago.id)} className="cursor-pointer"

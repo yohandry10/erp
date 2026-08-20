@@ -401,8 +401,8 @@ export default function LiquidacionesPage() {
             {normalizedStatus(selectedLiquidation.estado) === "aprobada" ? (
               <>
                 <div>
-                  <Label>Medio</Label>
-                  <Input value="Transferencia bancaria" disabled />
+                  <Label htmlFor="liquidacion-medio-pago">Medio</Label>
+                  <Input id="liquidacion-medio-pago" value="Transferencia bancaria" disabled />
                   <p className="mt-1 text-xs text-muted-foreground">
                     El pago en efectivo permanece deshabilitado hasta contar con una sesión de caja y egreso tesorero explícitos.
                   </p>
@@ -413,7 +413,7 @@ export default function LiquidacionesPage() {
                     value={bankAccountId}
                     onValueChange={setBankAccountId}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Cuenta bancaria">
                       <SelectValue placeholder="Selecciona cuenta" />
                     </SelectTrigger>
                     <SelectContent>
@@ -489,7 +489,7 @@ export default function LiquidacionesPage() {
               <div>
                 <Label>Cuenta bancaria de origen</Label>
                 <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Cuenta bancaria de origen">
                     <SelectValue placeholder="Selecciona cuenta" />
                   </SelectTrigger>
                   <SelectContent>

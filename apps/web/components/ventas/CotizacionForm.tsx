@@ -350,7 +350,7 @@ export default function CotizacionForm({
                     <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Producto
                     </label>
-                    <select
+                    <select aria-label="Producto"
                       value={item.producto_id}
                       onChange={(e) => handleProductoChange(index, e.target.value)}
                       disabled={disabled} className="w-[100%] py-3 px-4 text-base bg-card text-[var(--primary-800)] cursor-pointer"
@@ -380,7 +380,7 @@ export default function CotizacionForm({
                     <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Cantidad
                     </label>
-                    <Input
+                    <Input aria-label="Cantidad"
                       type="number"
                       min="1"
                       step="1"
@@ -414,7 +414,7 @@ export default function CotizacionForm({
                     <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Precio Unit.
                     </label>
-                    <Input
+                    <Input aria-label="Precio unitario"
                       type="number"
                       min="0"
                       step="0.01"
@@ -435,6 +435,7 @@ export default function CotizacionForm({
                       Subtotal
                     </label>
                     <Input
+                      aria-label="Subtotal de la línea"
                       type="text"
                       value={`${currencySymbol} ${item.subtotal.toFixed(2)}`}
                       disabled className="bg-[var(--primary-50)]"
@@ -495,7 +496,7 @@ export default function CotizacionForm({
             <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
               Fecha de Vencimiento (Opcional)
             </label>
-            <Input
+            <Input aria-label="Fecha vencimiento"
               type="date"
               value={fechaVencimiento}
               onChange={(e) => setFechaVencimiento(e.target.value)}
@@ -506,7 +507,7 @@ export default function CotizacionForm({
             <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
               Notas (Opcional)
             </label>
-            <Textarea
+            <Textarea aria-label="Notas"
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               disabled={disabled}

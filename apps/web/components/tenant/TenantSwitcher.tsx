@@ -101,7 +101,7 @@ export function TenantSwitcher() {
         onValueChange={handleTenantSwitch}
         disabled={loading || switching}
       >
-        <SelectTrigger className="w-[100%] bg-muted/30 border rounded-lg py-2.5 px-3 text-[0.875rem] font-medium text-foreground cursor-pointer transition flex items-center justify-between">
+        <SelectTrigger aria-label="Empresa activa" className="w-[100%] bg-muted/30 border rounded-lg py-2.5 px-3 text-[0.875rem] font-medium text-foreground cursor-pointer transition flex items-center justify-between">
           {switching ? (
             <div className="flex items-center gap-2">
               <RefreshCw className="w-3.5 h-3.5" />

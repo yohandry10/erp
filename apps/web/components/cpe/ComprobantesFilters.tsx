@@ -31,13 +31,13 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
 
   return (
     <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-      <input
+      <input aria-label="Cliente"
         className="rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         placeholder={`Cliente / ${isArgentina ? 'CUIT' : isColombia ? 'NIT/CC' : 'RUC'}`}
         value={local.cliente}
         onChange={(e) => handleChange('cliente', e.target.value)}
       />
-      <select
+      <select aria-label="Tipo comprobante"
         className="rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         value={local.tipoComprobante}
         onChange={(e) => handleChange('tipoComprobante', e.target.value)}
@@ -48,7 +48,7 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
         <option value="07">Nota Crédito</option>
         <option value="08">Nota Débito</option>
       </select>
-      <select
+      <select aria-label="Estado"
         className="rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         value={local.estado}
         onChange={(e) => handleChange('estado', e.target.value)}
@@ -59,13 +59,13 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
         <option value="RECHAZADO">Rechazado</option>
         <option value="BORRADOR">Borrador</option>
       </select>
-      <input
+      <input aria-label="Fecha desde"
         type="date"
         className="rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         value={local.fechaDesde}
         onChange={(e) => handleChange('fechaDesde', e.target.value)}
       />
-      <input
+      <input aria-label="Fecha hasta"
         type="date"
         className="rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         value={local.fechaHasta}

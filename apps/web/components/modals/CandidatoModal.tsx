@@ -718,27 +718,27 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <input
+                      <input aria-label="Empresa"
                         type="text"
                         value={exp.empresa}
                         onChange={(e) => actualizarExperiencia(index, 'empresa', e.target.value)}
                         className="p-2 border border-border rounded-lg"
                         placeholder="Empresa"
                       />
-                      <input
+                      <input aria-label="Puesto"
                         type="text"
                         value={exp.puesto}
                         onChange={(e) => actualizarExperiencia(index, 'puesto', e.target.value)}
                         className="p-2 border border-border rounded-lg"
                         placeholder="Puesto"
                       />
-                      <input
+                      <input aria-label="Fecha inicio"
                         type="date"
                         value={exp.fecha_inicio}
                         onChange={(e) => actualizarExperiencia(index, 'fecha_inicio', e.target.value)}
                         className="p-2 border border-border rounded-lg"
                       />
-                      <input
+                      <input aria-label="Fecha fin"
                         type="date"
                         value={exp.fecha_fin}
                         onChange={(e) => actualizarExperiencia(index, 'fecha_fin', e.target.value)}
@@ -759,7 +759,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                       </label>
                     </div>
 
-                    <textarea
+                    <textarea aria-label="Actualmente trabajo aquí"
                       value={exp.descripcion}
                       onChange={(e) => actualizarExperiencia(index, 'descripcion', e.target.value)}
                       className="w-full p-2 border border-border rounded-lg mt-3"
@@ -795,21 +795,21 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <input
+                      <input aria-label="Institución"
                         type="text"
                         value={form.institucion}
                         onChange={(e) => actualizarFormacion(index, 'institucion', e.target.value)}
                         className="p-2 border border-border rounded-lg"
                         placeholder="Institución"
                       />
-                      <input
+                      <input aria-label="Título obtenido"
                         type="text"
                         value={form.titulo}
                         onChange={(e) => actualizarFormacion(index, 'titulo', e.target.value)}
                         className="p-2 border border-border rounded-lg"
                         placeholder="Título obtenido"
                       />
-                      <select
+                      <select aria-label="Nivel"
                         value={form.nivel}
                         onChange={(e) => actualizarFormacion(index, 'nivel', e.target.value)}
                         className="p-2 border border-border rounded-lg"
@@ -836,7 +836,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
                 <h3 className="text-lg font-semibold text-amber-400 mb-4">🔧 Habilidades Técnicas</h3>
 
                 <div className="mb-4">
-                  <input
+                  <input aria-label="🔧 Habilidades Técnicas"
                     type="text"
                     placeholder="Escriba una habilidad y presione Enter"
                     className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -901,7 +901,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
               {/* Observaciones */}
               <div className="bg-muted/30 border border-border rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-foreground mb-4">📝 Observaciones del proceso</h3>
-                <textarea
+                <textarea aria-label="📝 Observaciones del proceso"
                   value={formData.observaciones}
                   onChange={(e) => handleInputChange('observaciones', e.target.value)}
                   className="w-full p-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"

@@ -19,6 +19,7 @@ import { useApi } from '@/hooks/use-api'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { parseDateLocal } from '@/lib/date-utils'
 
 interface ConfigurationStatus {
   isComplete: boolean
@@ -455,7 +456,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
               label="Vencimiento"
               value={
                 status?.certificate?.expiresAt
-                  ? new Date(status.certificate.expiresAt).toLocaleDateString(country.locale || 'es-PE')
+                  ? parseDateLocal(status.certificate.expiresAt).toLocaleDateString(country.locale || 'es-PE')
                   : status?.isDemo
                     ? 'No aplica en demo'
                     : null

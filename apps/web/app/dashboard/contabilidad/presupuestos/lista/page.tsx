@@ -321,7 +321,7 @@ export default function PresupuestosListaPage() {
                 <Label className="text-xs font-semibold uppercase text-muted-foreground">Buscar</Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300/70" />
-                  <Input
+                  <Input aria-label="Buscar"
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     placeholder="Centro, cuenta o notas..."
@@ -558,7 +558,7 @@ function FilterSelect({
     <div className="space-y-2">
       <Label className="text-xs font-semibold uppercase text-muted-foreground">{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className={fieldClass}>
+        <SelectTrigger className={fieldClass} aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className={selectContentClass}>{children}</SelectContent>

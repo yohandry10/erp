@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { resolverIntencionVenta, type IntencionRegistrada } from '@/lib/pos-idempotencia'
 import { ConfigStatusBanner } from '@/components/pos/config-status-banner'
 import { usePosConfig } from '@/hooks/use-pos-config'
 import { ConfigurationStatus } from '@/app/dashboard/hooks/useConfigurationStatus'
@@ -48,7 +49,6 @@ import {
   Trash2,
   UserRound,
   WalletCards,
-  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -225,7 +225,6 @@ export default function POSPage() {
 
   // Nuevos estados para funcionalidades avanzadas
 const [descuentoGlobal, setDescuentoGlobal] = useState<Descuento>({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
-const [modoVentaRapida, setModoVentaRapida] = useState(false)
 const [ventaSinStock, setVentaSinStock] = useState(false)
   const [estadoVentaActual, setEstadoVentaActual] = useState<EstadoVenta>({ estado: 'EN_PROGRESO', fecha_estado: new Date().toISOString() })
   const [busquedaPorCodigoBarras, setBusquedaPorCodigoBarras] = useState('')
@@ -249,6 +248,13 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   const [montoInicialInput, setMontoInicialInput] = useState('')
   const [montoContadoInput, setMontoContadoInput] = useState('')
   const [notasCierreInput, setNotasCierreInput] = useState('')
+  // Autorización de supervisor para cerrar con diferencia. `cerrar_caja_tx` exige
+  // un supervisor cuando lo contado se aparta de lo esperado más de la tolerancia
+  // del tenant; antes el POS sólo enviaba monto y notas, así que una caja
+  // descuadrada no tenía forma de cerrarse desde aquí.
+  const [supervisoresCierre, setSupervisoresCierre] = useState<Array<{ id: string; nombre: string }>>([])
+  const [supervisorCierreId, setSupervisorCierreId] = useState('')
+  const [codigoSupervisorCierre, setCodigoSupervisorCierre] = useState('')
   const [isLoading, setIsLoading] = useState(true);
   const [empresaInfo, setEmpresaInfo] = useState<any | null>(null);
   const [detallesFactura, setDetallesFactura] = useState<any[]>([]);
@@ -260,7 +266,17 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   const [datosInicializados, setDatosInicializados] = useState(false);
   const [hayCajasDisponibles, setHayCajasDisponibles] = useState(true);
   const [productoSeleccionado, setProductoSeleccionado] = useState<string | null>(null);
-  const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
+  // Clave de idempotencia de la venta en curso, atada a una huella de la intención.
+  //
+  // Vive en un ref y no en estado por una razón concreta: antes se leía el estado en
+  // el mismo tick en que se acababa de escribir, así que la clave que quedaba
+  // guardada nunca era la que se enviaba. Un ref se lee de forma sincrónica.
+  //
+  // El backend deduplica una venta POS únicamente por esta clave —el índice único
+  // `ux_ventas_pos_tenant_idempotency_key_runtime` y `pos_reintento_comercial_469`
+  // se apoyan sólo en ella—, de modo que perderla entre dos intentos del cajero
+  // significa registrar la venta dos veces.
+  const intencionVentaRef = useRef<IntencionRegistrada | null>(null);
   const cargandoRef = useRef(false);
   const sesionGuardadaRef = useRef<string | null>(null);
   const busquedaInputRef = useRef<HTMLInputElement>(null)
@@ -1149,10 +1165,38 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       // 5. Preparar datos mejorados para envío
       const clienteActual = clientes.find(c => c.id === clienteSeleccionado);
 
-      if (!currentIdempotencyKey) {
-        setCurrentIdempotencyKey(`${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
-      }
-      const idempotencyKey = currentIdempotencyKey || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      // La clave se reutiliza mientras la intención no cambie: eso convierte el
+      // reintento del cajero en idempotente. Si cambió el carrito, el cliente o los
+      // pagos es otra venta y necesita clave nueva. La regla vive en
+      // `lib/pos-idempotencia` para poder verificarla aparte.
+      intencionVentaRef.current = resolverIntencionVenta(
+        intencionVentaRef.current,
+        {
+          clienteId: clienteSeleccionado,
+          clienteDocumento: getClienteDocumento(clienteActual) || '00000000',
+          tipoComprobante,
+          metodoPagoId: pagosMixtos ? null : metodoPagoSeleccionado,
+          referenciaPago: pagosMixtos ? null : referenciaPago,
+          descuentoGlobalTipo: descuentoGlobal.tipo,
+          descuentoGlobalValor: descuentoGlobal.valor,
+          items: carrito.map((item) => ({
+            productoId: item.producto.id,
+            cantidad: item.cantidad,
+            precioUnitario: item.precio_unitario,
+            descuentoMonto: item.descuento_monto,
+            subtotal: item.subtotal,
+          })),
+          pagos: pagosMixtos
+            ? pagos.map((p) => ({
+                metodoPagoId: p.metodo_pago_id,
+                monto: parseFloat(p.monto) || 0,
+                referencia: p.referencia,
+              }))
+            : null,
+        },
+        () => crearClaveIdempotenciaPos('pos-venta'),
+      )
+      const idempotencyKey = intencionVentaRef.current.clave
 
       const ventaData: any = {
         idempotency_key: idempotencyKey,
@@ -1191,7 +1235,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           tipo: comprobante.tipo,
           numero: comprobante.numero,
         },
-        modo_venta_rapida: modoVentaRapida,
         permite_venta_sin_stock: ventaSinStock
       }
 
@@ -1231,6 +1274,23 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         throw new Error('No se recibió respuesta del servidor. Verifica el historial de ventas para confirmar si se procesó.')
       }
 
+      // Una respuesta encolada no es una venta cobrada. Cuando no hay red, el
+      // cliente offline devuelve 202 con `success: true` y `queued: true`; el POS
+      // sólo miraba `success` y daba la venta por PAGADA, limpiaba el carrito y
+      // mostraba un número de ticket que no existe en el servidor. Se corta aquí:
+      // la operación quedó pendiente de sincronizar y hay que decirlo.
+      if (resultado?.queued === true || resultado?.offline === true) {
+        setEstadoVentaActual({ estado: 'PENDIENTE_PAGO', fecha_estado: new Date().toISOString() })
+        toast({
+          variant: 'destructive',
+          title: '⚠️ Venta sin confirmar',
+          description:
+            'No hay conexión con el servidor. La venta quedó guardada localmente y NO está cobrada. '
+            + 'Sincronice desde el indicador de conexión y verifique el historial antes de entregar.',
+        })
+        return
+      }
+
       const ventaInfo = resultado?.data || resultado || {}
       const totalServidor = ventaInfo?.total ?? ventaInfo?.totales_servidor?.total
       const subtotalServidor = ventaInfo?.subtotal ?? ventaInfo?.totales_servidor?.subtotal
@@ -1249,7 +1309,9 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           setPagosMixtos(false)
         }
         setDescuentoGlobal({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
-        setCurrentIdempotencyKey(null)
+        // Venta confirmada: se descarta la intención para que la siguiente —aunque
+        // sea idéntica— sea una venta distinta y no un reintento idempotente.
+        intencionVentaRef.current = null
 
         const itemsActualizados = Array.isArray(ventaInfo?.items_actualizados) ? ventaInfo.items_actualizados : []
         if (itemsActualizados.length > 0) {
@@ -1308,7 +1370,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     } catch (error) {
       // Error en el proceso - cambiar estado a CANCELADA
       setEstadoVentaActual({ estado: 'CANCELADA', fecha_estado: new Date().toISOString() })
-      setCurrentIdempotencyKey(null)
+      // La clave NO se descarta aquí. Ese borrado era el defecto: un fallo de red o
+      // un timeout dejaban al cajero reintentando con una clave nueva, y si el
+      // primer intento sí había llegado al servidor la venta quedaba registrada dos
+      // veces. Se conserva para que el reintento sea idempotente; si el cajero
+      // cambia el carrito, la huella deja de coincidir y se genera otra.
 
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
 
@@ -1521,6 +1587,19 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         setMontoContadoInput(formatMoney(saldoEsperado))
       }
 
+      // La lista de supervisores se pide aqui y no al montar la pantalla: solo
+      // hace falta si el cajero llega a cerrar, y evita una consulta por sesion.
+      try {
+        const supervisoresResp = await api.get('/cajas/supervisores-autorizados')
+        const lista = (supervisoresResp?.data ?? supervisoresResp) as unknown
+        setSupervisoresCierre(Array.isArray(lista) ? lista as Array<{ id: string; nombre: string }> : [])
+      } catch {
+        // Sin lista, el cierre cuadrado sigue funcionando; el descuadrado avisara.
+        setSupervisoresCierre([])
+      }
+      setSupervisorCierreId('')
+      setCodigoSupervisorCierre('')
+
       // Mostrar modal de cierre de caja con el saldo calculado por el backend.
       setMostrarModalCerrarCaja(true)
     } catch (error) {
@@ -1544,7 +1623,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         sesion_id: sesionCajaId,
         monto_cierre: montoFinal,
         monto_contado: montoFinal,
-        notas: 'Cierre manual desde POS'
+        notas: 'Cierre manual desde POS',
+        // Solo viajan si el cajero las completo. Quien decide si eran obligatorias
+        // es la transaccion de cierre, que compara la diferencia con la tolerancia.
+        ...(supervisorCierreId ? { supervisor_id: supervisorCierreId } : {}),
+        ...(codigoSupervisorCierre ? { codigo_supervisor: codigoSupervisorCierre } : {}),
       })
 
       if (resultado) {
@@ -1569,6 +1652,8 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       }
       setMostrarModalCerrarCaja(false)
       setMontoContadoInput('')
+      setSupervisorCierreId('')
+      setCodigoSupervisorCierre('')
     } catch (error) {
       console.error('❌ Error cerrando caja:', error)
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido'
@@ -2111,21 +2196,6 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                     />
                   </div>
 
-                  {/* Switches de Modo */}
-                  <div className="flex gap-4">
-                    <label
-                      className="flex cursor-pointer items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={modoVentaRapida}
-                        onChange={(e) => setModoVentaRapida(e.target.checked)}
-                        className="scale-125"
-                      />
-                       <Zap className="h-4 w-4" /> Venta rápida
-                    </label>
-
-                  </div>
                   <div className="ml-auto hidden items-center gap-1.5 lg:flex" aria-label="Atajos del punto de venta">
                     {[
                       ['F2', 'Buscar'],
@@ -2523,7 +2593,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                             </Button>
                           </div>
                           {metodo?.requiere_referencia && (
-                            <Input
+                            <Input aria-label="Referencia de operación"
                               className="mt-2"
                               value={pago.referencia || ''}
                               onChange={(event) => actualizarPago(index, 'referencia', event.target.value)}
@@ -2830,7 +2900,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
             open={mostrarModalCerrarCaja}
             onOpenChange={(open) => {
               setMostrarModalCerrarCaja(open)
-              if (!open) setMontoContadoInput('')
+              if (!open) {
+                setMontoContadoInput('')
+                setSupervisorCierreId('')
+                setCodigoSupervisorCierre('')
+              }
             }}
           >
             <DialogContent className="border-border bg-card text-card-foreground sm:max-w-[500px]">
@@ -2875,10 +2949,59 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                 <p className="text-xs text-muted-foreground">Ingrese el total físico contado, incluyendo monedas y billetes.</p>
               </div>
 
-              <div className="flex gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
-                <p className="text-muted-foreground">La diferencia definitiva se calculará al confirmar, considerando ventas y movimientos de caja.</p>
-              </div>
+              {Math.abs((parseFloat(montoContadoInput) || 0) - (estadoCaja?.montoFinal || 0)) > 0.001 ? (
+                <div className="space-y-3 rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
+                  <div className="flex gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                    <p className="text-sm text-muted-foreground">
+                      El monto contado no coincide con el esperado. Un cierre con diferencia
+                      requiere que un supervisor lo autorice con su PIN.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="supervisor-cierre">Supervisor que autoriza</Label>
+                    <select
+                      id="supervisor-cierre"
+                      name="supervisor-cierre"
+                      value={supervisorCierreId}
+                      onChange={(event) => setSupervisorCierreId(event.target.value)}
+                      className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                    >
+                      <option value="">Seleccione un supervisor…</option>
+                      {supervisoresCierre.map((supervisor) => (
+                        <option key={supervisor.id} value={supervisor.id}>{supervisor.nombre}</option>
+                      ))}
+                    </select>
+                    {supervisoresCierre.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        No hay supervisores con PIN registrado. Regístrelo antes de cerrar con diferencia.
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="codigo-supervisor-cierre">PIN del supervisor</Label>
+                    <Input
+                      id="codigo-supervisor-cierre"
+                      name="codigo-supervisor-cierre"
+                      type="password"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={6}
+                      value={codigoSupervisorCierre}
+                      onChange={(event) => setCodigoSupervisorCierre(event.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="6 dígitos"
+                      className="h-11 tracking-[0.4em]"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+                  <p className="text-muted-foreground">La diferencia definitiva se calculará al confirmar, considerando ventas y movimientos de caja.</p>
+                </div>
+              )}
 
               <DialogFooter>
                 <Button
@@ -2887,11 +3010,22 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                   onClick={() => {
                     setMostrarModalCerrarCaja(false)
                     setMontoContadoInput('')
+                    setSupervisorCierreId('')
+                    setCodigoSupervisorCierre('')
                   }}
                 >
                   Cancelar
                 </Button>
-                <Button type="button" variant="destructive" onClick={confirmarCerrarCaja} disabled={!montoContadoInput.trim()}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={confirmarCerrarCaja}
+                  disabled={
+                    !montoContadoInput.trim()
+                    || (Math.abs((parseFloat(montoContadoInput) || 0) - (estadoCaja?.montoFinal || 0)) > 0.001
+                      && (!supervisorCierreId || codigoSupervisorCierre.length !== 6))
+                  }
+                >
                   <Check className="mr-2 h-4 w-4" aria-hidden="true" />
                   Confirmar cierre
                 </Button>

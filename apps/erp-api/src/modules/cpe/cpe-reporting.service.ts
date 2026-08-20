@@ -1,5 +1,7 @@
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
+import { paisDelTenant, rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
+import { zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
 
 /** Consultas y exportaciones CPE; no participa en emisión ni anulación. */
 export class CpeReportingService {
@@ -83,6 +85,20 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
 
       console.log(`📊 Datos CPE encontrados:`, cpeData?.length || 0);
 
+      // La fecha del comprobante se presenta en la zona del contribuyente. Con
+      // `toISOString()` se mostraba en UTC: a las 20:15 de Lima un comprobante
+      // emitido en ese momento aparecía fechado al día siguiente, es decir con
+      // fecha futura y en el periodo tributario equivocado. Se comprobó en
+      // producción el 2026-08-19: la factura demo salía como 2026-08-20.
+      const zonaTenant = zonaHorariaDePais(await paisDelTenant(client, tenantId));
+      const fechaLocal = (valor: unknown): string => {
+        if (!valor) return '';
+        const fecha = new Date(String(valor));
+        return Number.isNaN(fecha.getTime())
+          ? ''
+          : fecha.toLocaleDateString('en-CA', { timeZone: zonaTenant });
+      };
+
       // Transformar datos al formato esperado por el frontend
       const comprobantesFormateados = (cpeData || []).map(cpe => ({
         id: cpe.id,
@@ -90,7 +106,7 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
         tipoComprobante: this.getTipoComprobanteText(cpe.tipo_documento),
         serie: cpe.serie,
         numero: cpe.numero,
-        fechaEmision: cpe.created_at ? new Date(cpe.created_at).toISOString().split('T')[0] : '',
+        fechaEmision: fechaLocal(cpe.fecha_emision ?? cpe.created_at),
         cliente: cpe.razon_social_receptor || 'Cliente General',
         clienteRuc: cpe.documento_receptor || '',
         total: parseFloat(cpe.total_venta || 0),
@@ -192,15 +208,17 @@ async getStatsFromDatabase(tenantId?: string) {
         throw new Error('Cliente de Supabase no disponible');
       }
 
-      const hoy = new Date().toISOString().split('T')[0];
+      // «Hoy» es el día del contribuyente, no el de UTC: con el servidor en UTC la
+      // ventana empezaba a las 19:00 de la víspera en Lima y en Bogotá.
+      const { desde: inicioDia, hasta: finDia } = await rangoDelDiaDelTenant(client, tenantId);
       const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
 
       // CPE emitidos hoy
       let queryHoy = client
         .from('cpe')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', `${hoy}T00:00:00Z`)
-        .lte('created_at', `${hoy}T23:59:59Z`);
+        .gte('created_at', inicioDia)
+        .lt('created_at', finDia);
 
       if (tenantId) {
         queryHoy = queryHoy.eq('tenant_id', tenantId);
