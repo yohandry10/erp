@@ -658,6 +658,24 @@ DTO de período y las fechas de asiento), `finanzas` (sólo el DTO de análisis 
 crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
 `sire` (sólo la ventana de estadísticas).
 
+### Auditados a fondo en la segunda vuelta (cerrados, no repetir)
+
+- `retenciones`: limpio. Valida `monto` contra `base × tasa` y lo rechaza si no
+  cuadra, exige que el tercero corresponda al origen, usa Decimal en todo el
+  cálculo y escribe por RPC atómica con actor e idempotencia. El controlador pide
+  `finanzas.read`/`finanzas.write` y toma el tenant del JWT.
+- `ose`: limpio. El éxito exige código `0` en el CDR de SUNAT, no un HTTP 200; el
+  cortacircuitos devuelve `success: false` explícito y ningún `catch` finge
+  aceptación. La rama que sí devuelve éxito directo es la del ticket, donde la
+  aceptación se resuelve después al consultarlo.
+- `validations`: los tres `catch` devuelven `isValid: false`, es decir fallan
+  cerrado. **Pero el dígito de verificación del NIT colombiano estaba mal**: los
+  pesos de la DIAN se aplicaban en orden inverso, con lo que el dígito de más a la
+  derecha pesaba 71 en vez de 3. Comprobado contra cuatro NIT reales y públicos
+  (Bancolombia, Ecopetrol, DIAN, Claro): acertaba uno de cuatro por casualidad.
+  Rechazaba NIT válidos. Corregido y fijado con esos mismos cuatro. Sin efecto
+  hoy: no hay ningún contribuyente con país CO.
+
 ### Pendientes de auditar a fondo
 
 Catorce módulos, en orden de riesgo decreciente:
