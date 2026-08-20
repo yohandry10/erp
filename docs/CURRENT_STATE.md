@@ -8,11 +8,22 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- El código core está verificado hasta `498`; PROD sigue en `496`. La `497`
-  cierra el bloqueador de cierre de caja de la demo y añade la autorización real
-  de supervisor por PIN; la `498` deja la planilla demo en manos del motor.
-  Ambas están pendientes de promoción coordinada. El 2026-08-17 se creó un
-  respaldo nuevo de PROD `490`, se aplicaron y registraron `491..496` en orden y
+- **PROD está en `498`.** El 2026-08-20 se promovieron `497` y `498`, ambas de
+  sólo funciones —sin DDL de tabla ni migración de datos—, tras pasar el gate
+  completo en un cluster efímero (495 migraciones, verificadores `497` y `498`
+  en verde). Se respaldó la definición previa de
+  `app.hydrate_demo_business_sample_tx` antes de reemplazarla. El historial se
+  selló a mano en `supabase_migrations.schema_migrations`, que psql no toca, y
+  `outbox_runtime_health_492` devuelve `ready: true` con `schema_version 498`.
+  Comprobado sobre una demo nueva: la venta POS nace con `documento_id`,
+  `accounting_event_id` y `atomic_result`, que es lo que `cerrar_caja_tx` exige,
+  y la planilla nace en `borrador` sin líneas escritas a mano.
+- **Falta desplegar el runtime.** La rama `fix/qa-bloqueadores-criticos` va 15
+  commits por delante de `main` y Render sirve todavía el código anterior, así
+  que el cierre de caja de la demo sigue fallando con el precheck viejo («ventas
+  sin comprobante electrónico»). La base ya está lista para ese despliegue.
+- El 2026-08-17 se creó un respaldo nuevo de PROD `490`, se aplicaron y
+  registraron `491..496` en orden y
   el postcheck remoto confirmó esquema requerido `496`, Redis listo y outbox sin
   filas claimable, processing, failed ni dead-letter. Render sirve el commit
   `85f35175eaa6d51d4a0d19afe65930481a9c29c4`; `/api/health/version` ya acredita
@@ -363,6 +374,16 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   interpreta como medianoche UTC y en Lima retrocede al día previo; estaba en 30
   puntos de 27 archivos. Se resuelven con `parseDateLocal`, y `test:fechas`
   impide que el patrón vuelva.
+- Los 59 `@Body()` sin DTO están cerrados: 27 declaraban `any` y 32 un tipo
+  estructural en línea, que TypeScript borra al compilar. En ambos casos el
+  `ValidationPipe` global no tenía esquema y el body entraba sin comprobar.
+  Cada DTO se construyó contra las dos puntas —la lista blanca del servicio o
+  del writer y el payload real de la pantalla— porque con `forbidNonWhitelisted`
+  un campo legítimo sin declarar convierte un alta que funciona en un 400. Eso
+  destapó tres que la pantalla envía y el writer descartaba (`experiencia_años`
+  con eñe, `estado_civil`, y cuatro campos que viajan como arreglos por ser
+  `jsonb`). `body-tipado.guard.spec` impide que reaparezca cualquiera de las dos
+  formas.
 - Los verificadores de web (`test:offline`, `test:onboarding`, los dos de POS y
   `test:fechas`) ya se ejecutan en CI. Existían en `package.json` desde hacía tiempo pero
   ningún workflow los corría, así que no protegían de nada. Van antes de instalar
@@ -609,7 +630,7 @@ productivo autorizado.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `490` en PROD.
+1. Código y migraciones actuales; estado remoto verificado hasta `498` en PROD.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.
