@@ -8,7 +8,8 @@ import { EventBusService, ERPEvent } from '../../shared/events/event-bus.service
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 import { SireApiClientService, SireLibro } from './sire-api-client.service';
-
+
+import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
 type SireReportType = 'REG_VEN' | 'REG_COM';
 
 interface SireGenerationRequest {
@@ -100,7 +101,7 @@ export class SireService {
 
   async getStats(tenantId?: string) {
     const currentTenantId = this.ensureTenant(tenantId);
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonth = (await fechaHoyDelTenant(this.supabaseService.getClient(), currentTenantId)).slice(0, 7);
     const nextMonth = this.getNextMonth(currentMonth);
     const client = this.supabaseService.getClient();
 
