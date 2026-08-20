@@ -682,6 +682,21 @@ crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
   prueba comprueba las dos puertas de entrada, que es lo que impide que vuelvan a
   divergir.
 
+- `paises`: los `catch` degradan bien —caché del catálogo o `false` al validar— y
+  las tasas de `initial-country` sólo siembran la configuración de un tenant nuevo.
+  Pero el barrido de esas tasas destapó **un tercer respaldo peruano silencioso**,
+  en `cpe/fiscal-adapter`, que yo había dado por auditado: sin fila de país o sin
+  configuración fiscal devolvía la identidad peruana entera —código PE, IGV, 18 %
+  y soles— para el país que fuese. Ahora se detiene. Hoy no dispara, porque
+  `configuracion_fiscal` tiene fila para los cinco países.
+
+  Al escribir la prueba apareció además un hueco del propio arreglo: `Number(null)`
+  es 0, así que una tasa ausente pasaba como 0 % válido. Se rechaza explícitamente.
+
+  Lección para la lista de arriba: **«auditado a fondo» no significa exhaustivo.**
+  De los tres respaldos peruanos, dos se quitaron en la primera vuelta y el tercero
+  apareció por un camino lateral, buscando otra cosa.
+
 ### Pendientes de auditar a fondo
 
 Catorce módulos, en orden de riesgo decreciente:

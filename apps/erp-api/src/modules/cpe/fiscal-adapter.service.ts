@@ -9,7 +9,7 @@
  * @module FiscalAdapterService
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { FiscalServiceFactory } from '../fiscal/fiscal-service.factory';
 import { DocumentoElectronico, FiscalResponse } from '../../shared/integration/fiscal.interfaces';
@@ -294,14 +294,43 @@ export class FiscalAdapterService {
 
     const typedPais = pais as any;
     const typedConfigFiscal = configFiscal as any;
+
+    // Sin país o sin configuración fiscal se caía a la identidad de Perú: código
+    // PE, IGV, 18 % y soles, fuese cual fuese el país del contribuyente. Un
+    // documento argentino habría salido con la tasa peruana sin que nadie lo
+    // notara. Es el mismo fallo abierto que ya se retiró de TaxCalculatorService:
+    // detenerse es peor que seguir sólo si lo que se emite es correcto, y aquí no
+    // lo sería.
+    if (!typedPais?.codigo_iso || !typedPais?.moneda_codigo) {
+      throw new ServiceUnavailableException(
+        `No se pudo resolver el país ${paisId} del contribuyente; no se emite con valores por defecto.`,
+      );
+    }
+    // `Number(null)` es 0, así que comprobar sólo que sea finito convertiría una
+    // tasa ausente en un 0 % perfectamente válido a ojos del código.
+    const tasaCruda = typedConfigFiscal?.impuesto_principal_porcentaje;
+    const tasa = Number(tasaCruda);
+    if (
+      !typedConfigFiscal?.impuesto_principal_nombre ||
+      tasaCruda === null ||
+      tasaCruda === undefined ||
+      tasaCruda === '' ||
+      !Number.isFinite(tasa) ||
+      tasa <= 0
+    ) {
+      throw new ServiceUnavailableException(
+        `Falta la configuración fiscal del país ${paisId}; no se emite con una tasa supuesta.`,
+      );
+    }
+
     return {
       paisId,
-      paisCodigo: typedPais?.codigo_iso || 'PE',
-      paisNombre: typedPais?.nombre || 'Perú',
+      paisCodigo: typedPais.codigo_iso,
+      paisNombre: typedPais.nombre,
       servicioFiscal: await this.obtenerNombreServicioFiscal(tenantId),
-      impuestoPrincipal: typedConfigFiscal?.impuesto_principal_nombre || 'IGV',
-      tasaImpuesto: typedConfigFiscal?.impuesto_principal_porcentaje || 0.18,
-      moneda: typedPais?.moneda_codigo || 'PEN',
+      impuestoPrincipal: typedConfigFiscal.impuesto_principal_nombre,
+      tasaImpuesto: tasa,
+      moneda: typedPais.moneda_codigo,
       requiereGRE: paisId === 1
     };
   }
