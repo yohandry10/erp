@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Query, Param, UseGuards, ForbiddenException, GoneException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Query, Param, UseGuards, ForbiddenException, GoneException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SupabaseService } from '../shared/supabase/supabase.service';
@@ -213,8 +213,7 @@ export class ComprasController {
 
   @Post()
   @RequirePermission('compras.ordenes.crear')
-  async crearOrden(@Body() ordenData: any) {
-    void ordenData;
+  async crearOrden() {
     throw new GoneException(
       'Ruta de alta obsoleta. Use POST /compras/ordenes, que crea cabecera y detalles atómicamente.',
     );
@@ -222,9 +221,7 @@ export class ComprasController {
 
   @Put(':id/recibir')
   @RequirePermission('compras.ordenes.actualizar')
-  async recibirMercancia(@Param('id') ordenId: string, @Body() recepcionData: any) {
-    void ordenId;
-    void recepcionData;
+  async recibirMercancia() {
     throw new GoneException(
       'Ruta de recepción obsoleta. Use POST /compras/recepciones/ordenes/:ordenId y luego POST /compras/recepciones/:id/cerrar.',
     );
@@ -232,9 +229,7 @@ export class ComprasController {
 
   @Put(':id/cancelar')
   @RequirePermission('compras.ordenes.cancelar')
-  async cancelarOrden(@Param('id') ordenId: string, @Body() motivoData: any) {
-    void ordenId;
-    void motivoData;
+  async cancelarOrden() {
     throw new GoneException(
       'Ruta de cancelación obsoleta. Use POST /compras/ordenes/:id/cancelar.',
     );

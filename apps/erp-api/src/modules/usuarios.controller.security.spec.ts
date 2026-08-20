@@ -1,5 +1,7 @@
 import { UsuariosController } from './usuarios.controller';
 import { PERMISSION_KEY } from '../common/decorators/require-permission.decorator';
+
+import { ActualizarUsuarioRequestDto } from './usuarios/dto/usuario-request.dto';
 
 const createController = (client: any, userManagement: any = {}) =>
   new UsuariosController(
@@ -44,10 +46,13 @@ describe('UsuariosController security', () => {
     const controller = createController({}, { updateUser });
     await controller.actualizarUsuario(
       'user-1',
+      // Se fuerza el tipo a propósito: el DTO ya no admite estos campos, y esta
+      // prueba comprueba la segunda barrera, la del propio controlador, para el
+      // caso de que alguien invoque el método sin pasar por el ValidationPipe.
       {
         nombre: 'Seguro', rol_id: 'role-1', password_hash: 'no',
         password_reset_token: 'no', is_super_admin: true,
-      },
+      } as unknown as ActualizarUsuarioRequestDto,
       { tenantId: 'tenant-1', user: { id: 'admin-1' } },
     );
     expect(updateUser).toHaveBeenCalledWith(

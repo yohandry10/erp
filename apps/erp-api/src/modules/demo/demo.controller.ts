@@ -7,6 +7,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 
+import { MotivoOpcionalDto } from '../shared-dto/acciones-simples.dto';
+
 @ApiTags('Demo')
 @Controller('demo')
 export class DemoController {
@@ -114,7 +116,7 @@ export class DemoController {
   @ApiResponse({ status: 201, description: 'Solicitud rechazada' })
   async rechazarConversion(
     @Param('id') id: string,
-    @Body() body: { motivo?: string },
+    @Body() body: MotivoOpcionalDto,
   ) {
     const motivo = String(body?.motivo || '').trim();
     if (!motivo) {

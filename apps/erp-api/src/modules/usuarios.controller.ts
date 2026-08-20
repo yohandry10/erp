@@ -21,6 +21,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionService } from './permissions/permission.service';
 import { UserEstado } from './usuarios/dto';
 import { UserManagementService } from './usuarios/user-management.service';
+
+import { ActualizarUsuarioRequestDto, CambiarEstadoUsuarioRequestDto, CrearUsuarioRequestDto } from './usuarios/dto/usuario-request.dto';
 
 const USER_SAFE_COLUMNS = `
   id, tenant_id, email, nombre, apellido, telefono, cargo, departamento,
@@ -170,7 +172,7 @@ export class UsuariosController {
   @RequirePermission('users.manage')
   @ApiOperation({ summary: 'Crear usuario mediante el writer RBAC canónico' })
   @ApiResponse({ status: 201, description: 'Usuario y rol creados atómicamente' })
-  async crearUsuario(@Body() body: any, @Req() req: any) {
+  async crearUsuario(@Body() body: CrearUsuarioRequestDto, @Req() req: any) {
     const tenantId = this.resolveTenantOrThrow(req);
     const actor = this.requireActor(req);
     const created = await this.userManagementService.createUser(tenantId, {
@@ -194,7 +196,7 @@ export class UsuariosController {
   @Put('/:id')
   @RequirePermission('users.manage')
   @ApiOperation({ summary: 'Actualizar usuario y rol en una transacción' })
-  async actualizarUsuario(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+  async actualizarUsuario(@Param('id') id: string, @Body() body: ActualizarUsuarioRequestDto, @Req() req: any) {
     const tenantId = this.resolveTenantOrThrow(req);
     const updated = await this.userManagementService.updateUser(tenantId, id, {
       nombre: body.nombre,
@@ -212,7 +214,7 @@ export class UsuariosController {
   @Put('/:id/estado')
   @RequirePermission('users.manage')
   @ApiOperation({ summary: 'Cambiar estado y revocar sesiones cuando corresponda' })
-  async cambiarEstado(@Param('id') id: string, @Body() body: { estado: string }, @Req() req: any) {
+  async cambiarEstado(@Param('id') id: string, @Body() body: CambiarEstadoUsuarioRequestDto, @Req() req: any) {
     const estado = this.normalizeEstado(body.estado);
     const updated = await this.userManagementService.updateUser(
       this.resolveTenantOrThrow(req), id, { estado }, this.requireActor(req),
