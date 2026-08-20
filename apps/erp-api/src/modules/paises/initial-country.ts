@@ -108,19 +108,33 @@ export function validatePeruRuc(value: unknown): boolean {
   return /^\d{11}$/.test(ruc);
 }
 
+/**
+ * Dígito de verificación del NIT según la DIAN.
+ *
+ * Los pesos se aplican desde el dígito más a la derecha hacia la izquierda,
+ * empezando por 3. Estuvieron en orden inverso —el último dígito pesaba 71—, y
+ * así el resultado sólo coincidía por casualidad: de cuatro NIT reales
+ * comprobados acertaba uno.
+ *
+ * Se exporta para que exista una sola implementación: había una copia en
+ * `ColombiaValidationService` con el mismo error, y dos copias divergen.
+ */
+export function calcularDigitoVerificacionNit(base: string): number {
+  const weights = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
+  const sum = base
+    .split('')
+    .reverse()
+    .reduce((total, digit, index) => total + Number(digit) * weights[index], 0);
+  const remainder = sum % 11;
+  return remainder === 0 || remainder === 1 ? remainder : 11 - remainder;
+}
+
 export function validateColombiaNit(value: unknown): boolean {
   const normalized = String(value ?? '').trim().replace(/\s+/g, '');
   const compactMatch = normalized.match(/^(\d{9})(\d)$/);
   const match = normalized.match(/^(\d{9,10})-(\d)$/) ?? compactMatch;
   if (!match) return false;
-  const weights = [71, 67, 59, 53, 47, 43, 41, 37, 29, 23, 19, 17, 13, 7, 3];
-  const sum = match[1]
-    .split('')
-    .reverse()
-    .reduce((total, digit, index) => total + Number(digit) * weights[index], 0);
-  const remainder = sum % 11;
-  const verificationDigit = remainder === 0 || remainder === 1 ? remainder : 11 - remainder;
-  return verificationDigit === Number(match[2]);
+  return calcularDigitoVerificacionNit(match[1]) === Number(match[2]);
 }
 
 export function validateCountryTaxId(country: unknown, value: unknown): boolean {
