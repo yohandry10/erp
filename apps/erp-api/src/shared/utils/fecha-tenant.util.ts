@@ -60,6 +60,44 @@ export async function paisDelTenant(client: any, tenantId?: string | null): Prom
   }
 }
 
+/**
+ * Año y mes contables a los que pertenece una fecha, para este contribuyente.
+ *
+ * `fecha.getFullYear()` y `fecha.getMonth()` resuelven en la zona del servidor, que
+ * en Render es UTC. Como `asientos_contables.fecha` es `timestamptz` y hereda el
+ * instante del documento de origen, un comprobante emitido a las 19:30 de Lima se
+ * guarda ya en el día siguiente UTC: de los 179 asientos de producción, 23 tienen
+ * un día distinto en UTC que en Lima. Hoy ninguno cruza un cambio de mes, pero el
+ * que lo cruce se valida contra el periodo equivocado, y ése es el que importa:
+ * puede colarse en un periodo cerrado, o quedarse fuera de uno abierto.
+ *
+ * La distinción que hay que respetar es la misma que resuelve `parseDateLocal` en
+ * el frontend: **una fecha de calendario no es un instante**. Un valor a
+ * medianoche UTC exacta viene de una columna `date` o de una cadena `YYYY-MM-DD`,
+ * y convertirlo a la zona del contribuyente lo retrasaría un día sin motivo. Sólo
+ * se convierte lo que lleva hora.
+ */
+export async function periodoContableDelTenant(
+  client: any,
+  tenantId: string | null | undefined,
+  fecha: Date,
+): Promise<{ anio: number; mes: number }> {
+  const esFechaDeCalendario =
+    fecha.getUTCHours() === 0 &&
+    fecha.getUTCMinutes() === 0 &&
+    fecha.getUTCSeconds() === 0 &&
+    fecha.getUTCMilliseconds() === 0;
+
+  if (esFechaDeCalendario) {
+    return { anio: fecha.getUTCFullYear(), mes: fecha.getUTCMonth() + 1 };
+  }
+
+  const [anio, mes] = fechaHoyEnPais(await paisDelTenant(client, tenantId), fecha)
+    .split('-')
+    .map(Number);
+  return { anio, mes };
+}
+
 /** Fecha de calendario del tenant en formato YYYY-MM-DD. */
 export async function fechaHoyDelTenant(
   client: any,
