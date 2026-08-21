@@ -761,12 +761,33 @@ crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
   diferencias de redondeo de quien envía el dato. Con las dos partes en Decimal,
   la tolerancia vuelve a medir lo que dice medir.
 
-### Pendiente de auditar a fondo
+### Los seis últimos (contabilidad, finanzas, ventas, inventario, fiscal, migration)
 
-Ninguno de los dieciocho iniciales. Quedan sólo los **tocados de refilón** que
-siguen sin lectura completa: `contabilidad`, `finanzas`, `ventas`, `inventario`,
-`fiscal` y `migration`.
+Son 49 000 líneas, el triple de los dieciocho anteriores. Se auditaron por clases
+de defecto confirmadas en este código, leyendo cada coincidencia, más las
+invariantes comprobadas contra los datos de producción, que valen más que leer:
 
+- **Aislamiento entre tenants, comprobado en los datos.** Ningún `detalle_asientos`
+  pertenece a un tenant distinto del de su cabecera, y ninguna cuenta por cobrar a
+  uno distinto del de su cliente. Los asientos cuadran y el invariante de stock se
+  cumple en todos los productos.
+- El barrido estático dejó 14 candidatos a consulta sin filtro de tenant; se
+  revisaron 8 y **todos eran legítimos**: el id venía siempre de una consulta ya
+  acotada. El patrón que genera los falsos positivos conviene recordarlo: en un
+  `insert` el `tenant_id` va en el payload, **arriba** del `.from`, y en un `select`
+  con columnas anidadas el filtro queda veinte líneas **abajo**. Una ventana en un
+  solo sentido reporta lo que no es.
+- Sin `catch` permisivos y sin datos fabricados en los seis.
+
+Lo que sí apareció está en los commits: los respaldos a soles en tres caminos que
+escriben, la dirección inventada en el comprobante y el dinero redondeado con coma
+flotante en cuatro sitios.
+
+### Ninguno pendiente
+
+La auditoría cubre los 36 módulos del API. Lo que queda son ampliaciones de
+producto y los pendientes operativos que dependen de credenciales o de terceros,
+ambos listados más abajo.
 ### Resultado de la frontera de seguridad (cerrado, no repetir)
 
 `permissions`, `auth` y `tenants` están leídos y **no tienen agujero explotable**.
