@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { createHash } from 'crypto';
+import { periodoContableDelTenant } from '../../../shared/utils/fecha-tenant.util';
 
 export enum EstadoPeriodo {
   ABIERTO = 'ABIERTO',
@@ -31,8 +32,16 @@ export class PeriodosService {
    * @throws BadRequestException si el período está cerrado o bloqueado
    */
   async validarPeriodoAbierto(tenantId: string, fecha: Date): Promise<void> {
-    const anio = fecha.getFullYear();
-    const mes = fecha.getMonth() + 1; // JavaScript months are 0-indexed
+    // El periodo se resuelve en la zona del contribuyente, no en la del servidor.
+    // `getFullYear()/getMonth()` sobre un `timestamptz` en un servidor UTC mete un
+    // comprobante de las 19:30 de Lima en el día —y en el cambio de mes, en el mes—
+    // siguiente. Las fechas de calendario, que llegan a medianoche UTC exacta, se
+    // dejan como están: convertirlas las retrasaría un día sin motivo.
+    const { anio, mes } = await periodoContableDelTenant(
+      this.supabaseService.getClient(),
+      tenantId,
+      fecha,
+    );
 
     const periodo = await this.obtenerPeriodo(tenantId, anio, mes);
 
