@@ -926,14 +926,68 @@ vez de un límite de palabra: hay que construirlas con `String.fromCharCode(92)`
 literales. Cada detector lleva un control con una función verificada a mano; si no la
 clasifica bien, aborta en vez de devolver hallazgos.
 
-### Pendiente de esta capa
+### apps/web (cerrado por clases de defecto)
 
-`apps/web` (25 651 líneas) tiene hechos los barridos de XSS —dos
-`dangerouslySetInnerHTML`, ambos con contenido estático—, secretos en el paquete
-—sólo `NEXT_PUBLIC_*` legítimos, la clave anónima de Supabase está pensada para ser
-pública—, `eval`/`innerHTML` —ninguno— y la caché por tenant. **No está leído módulo**
-**a módulo.**
+Son **115 019 líneas** en 487 ficheros, no las 25 651 de una medición anterior mal
+filtrada. No están leídas línea a línea; están barridas por las clases de defecto que
+este código ha demostrado tener, leyendo cada coincidencia.
 
+Lo que salió mal:
+
+- **Crear una GRE desde un pedido devolvía 400.** `GreModal` mandaba `tenantId` en el
+  cuerpo y `CreateGuiaRemisionDto` no lo declara: con `forbidNonWhitelisted` el pipe
+  rechazaba la petición entera. El usuario sólo veía «Error al crear la guía de
+  remisión», porque el mensaje del pipe no llega a la pantalla. Lo fija
+  `test:contrato`.
+- **El céntimo.** `Math.round(importe * factor * 100) / 100` no es redondeo a
+  céntimos: 1,25 al 18 % debe dar 0,23 y daba 0,22. Son 2 524 importes equivocados
+  sobre 1,2 millones con las tres tasas. El servidor calcula con Decimal y es quien
+  fija los importes, así que nunca se emitió un comprobante mal; lo que se hacía era
+  enseñar un total distinto del que se iba a emitir. `multiplicarMoneda` no sale de
+  los enteros. Lo fija `test:dinero`, que ejecuta la aritmética real contra una
+  referencia entera exacta.
+- **El POS presentaba como peruano a un contribuyente sin resolver**: SUNAT, RUC, S/
+  e IGV (18 %) por defecto, y encima incoherente consigo mismo, porque `impuestoRate`
+  vale 0 hasta que resuelve y el ticket habría cobrado 0 bajo una etiqueta que decía
+  18 %. Ya no se inventa nada y no se puede cobrar sin país resuelto.
+- **`use-fiscal-config.ts` fabricaba la identidad fiscal peruana entera** en dos
+  ramas, sin ningún consumidor. Borrado.
+- **Tres acciones fallaban en silencio**: aprobar una planilla (`catch {}`), extender
+  la demo, y el informe de diferencias de la conciliación bancaria, que vacío es
+  indistinguible de «no hay diferencias».
+- La caché de react-query sobrevivía al cambio de empresa (ya cerrado antes).
+
+Barridos limpios, para no repetirlos: cero `eval` y cero `innerHTML`; los dos
+`dangerouslySetInnerHTML` interpolan tipos unión, no datos de usuario; los
+`NEXT_PUBLIC_*` son todos legítimos —la clave anónima de Supabase está pensada para
+ser pública—; los `Math.random` son respaldos de clave de idempotencia; y los
+«Sin nombre» de los listados son marcadores honestos, no datos inventados dentro de
+un documento.
+
+Lo que **no** está hecho: leer los módulos grandes de negocio uno a uno
+—contabilidad (11 007 líneas), modales (9 050), ventas (8 678), finanzas (7 345)—
+buscando fallos de lógica propios de cada flujo, que es lo que en el API destapó los
+defectos más caros. Los barridos no sustituyen a eso.
+
+### Sobre los guardianes de esta auditoría
+
+Tres de los detectores que escribí daban verde con el fallo delante, y los tres los
+cazó un control, no yo:
+
+- El de rutas contaba `@Public()` como autorización, que es lo contrario de lo que
+  significa.
+- El de writers medía sólo el esquema `public`, y 80 de esas funciones son
+  envoltorios de una línea que delegan en `app`.
+- El de payloads miraba 15 líneas hacia delante y la llamada estaba 17 más abajo; su
+  control era **más fácil que el caso real**, que es la forma exacta de no probar
+  nada.
+
+De ahí dos reglas para quien siga: **un guardián que no se ha visto en rojo no está
+verificado**, y **el control tiene que reproducir la forma y la distancia del caso
+real**. Además, en este entorno las barras invertidas dentro de una cadena se
+colapsan al escribir un fichero, así que `new RegExp('\\b' + x)` acaba buscando un
+carácter de retroceso; hay que componerlas con `String.fromCharCode(92)` o usar
+literales de expresión regular.
 ### Ninguno pendiente
 
 La auditoría cubre los 36 módulos del API. Lo que queda son ampliaciones de
