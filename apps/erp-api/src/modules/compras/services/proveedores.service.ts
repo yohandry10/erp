@@ -4,7 +4,7 @@ import { CreateProveedorDto } from '../dto/create-proveedor.dto';
 import { UpdateProveedorDto } from '../dto/update-proveedor.dto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { validarCuilArgentina } from '../../rrhh/planillas-argentina.util';
-import { validateColombiaNit } from '../../paises/initial-country';
+import {  ACTIVE_COUNTRY_MESSAGE,  ActiveCountryCode,  getActiveCountryByCode,  validateColombiaNit,} from '../../paises/initial-country';
 
 @Injectable()
 export class ProveedoresService {
@@ -129,16 +129,23 @@ export class ProveedoresService {
   }
 
   // Métodos de validación privados
-  private async getCountryCode(tenantId: string): Promise<'PE' | 'AR' | 'CO'> {
-    let pais = 'PE';
+  private async getCountryCode(tenantId: string): Promise<ActiveCountryCode> {
     const { data } = await this.supabaseService
       .getClient()
       .from('empresa_config')
       .select('pais')
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    pais = String(data?.pais || 'PE').toUpperCase();
-    return pais === 'AR' || pais === 'CO' ? pais : 'PE';
+
+    // Este país decide si el documento del proveedor se valida como RUC, CUIT o
+    // NIT. Suponer Perú comprobaba un CUIT con el algoritmo equivocado.
+    const perfil = getActiveCountryByCode((data as any)?.pais);
+    if (!perfil) {
+      throw new BadRequestException(
+        `No se puede validar el documento del proveedor: la empresa no declara un país soportado. ${ACTIVE_COUNTRY_MESSAGE}`,
+      );
+    }
+    return perfil.codigo;
   }
 
   private async validateTaxIdentity(

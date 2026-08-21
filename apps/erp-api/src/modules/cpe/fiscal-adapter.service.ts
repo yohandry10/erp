@@ -10,6 +10,8 @@
  */
 
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { getActiveCountryById } from '../paises/initial-country';
+import { perfilPaisDelTenant } from './pais-del-tenant';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { FiscalServiceFactory } from '../fiscal/fiscal-service.factory';
 import { DocumentoElectronico, FiscalResponse } from '../../shared/integration/fiscal.interfaces';
@@ -220,36 +222,16 @@ export class FiscalAdapterService {
 
     const paisId = await this.obtenerPaisTenant(tenantId);
     
-    switch (paisId) {
-      case 1:
-        return 'SUNAT';
-      case 2:
-        return 'DIAN';
-      case 3:
-        return 'SII'; // Chile
-      case 4:
-        return 'SAT'; // México
-      case 5:
-        return 'ARCA';
-      default:
-        return 'Servicio Fiscal';
-    }
+    // La tabla de autoridades vivía repetida aquí, en `cpe-helper` y en
+    // `pdf-format-helper`; las otras dos se habían quedado sin Argentina.
+    return getActiveCountryById(paisId)?.autoridadFiscal ?? 'Servicio Fiscal';
   }
 
   /**
    * Obtiene el código ISO del país del tenant
    */
   async obtenerCodigoPais(tenantId: string): Promise<string> {
-    const paisId = await this.obtenerPaisTenant(tenantId);
-    
-    const { data } = await this.supabaseService.getClient()
-      .from('paises')
-      .select('codigo_iso')
-      .eq('id', paisId)
-      .single();
-
-    const typedData = data as any;
-    return typedData?.codigo_iso || 'PE';
+    return (await perfilPaisDelTenant(this.supabaseService.getClient(), tenantId)).codigo;
   }
 
   /**
@@ -419,34 +401,16 @@ export class FiscalAdapterService {
    * Implementa cache para optimizar performance
    */
   private async obtenerPaisTenant(tenantId: string): Promise<number> {
-    // Verificar cache
     if (this.paisCache.has(tenantId)) {
       return this.paisCache.get(tenantId)!;
     }
 
-    try {
-      const { data, error } = await this.supabaseService.getClient()
-        .from('empresa_config')
-        .select('pais_id')
-        .eq('tenant_id', tenantId)
-        .single();
-
-      const typedPaisData = data as any;
-      if (error || !typedPaisData) {
-        this.logger.warn(`⚠️ No se encontró país para tenant ${tenantId}, usando Perú por defecto`);
-        return 1; // Default: Perú
-      }
-
-      const paisId = typedPaisData.pais_id || 1;
-      
-      // Guardar en cache
-      this.paisCache.set(tenantId, paisId);
-      
-      return paisId;
-    } catch (error) {
-      this.logger.error(`❌ Error obteniendo país del tenant:`, error);
-      return 1; // Default: Perú
-    }
+    // Antes devolvía 1 (Perú) en los tres caminos de error y lo dejaba cacheado,
+    // así que un fallo momentáneo de lectura convertía al contribuyente en peruano
+    // para el resto de la vida del proceso.
+    const perfil = await perfilPaisDelTenant(this.supabaseService.getClient(), tenantId);
+    this.paisCache.set(tenantId, perfil.id);
+    return perfil.id;
   }
 
   private async obtenerRucTenant(tenantId: string): Promise<string> {

@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { getActiveCountryByCode } from '../paises/initial-country';
+import { perfilPaisDelTenant } from './pais-del-tenant';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { PdfFormatHelperService } from './pdf-format-helper.service';
 import { buildSunatQrDataUrl } from './sunat-qr.util';
@@ -63,30 +65,9 @@ export class PdfGeneratorService {
    * Get country code for tenant
    */
   private async getCountryCode(tenantId: string): Promise<string> {
-    try {
-      const { data: empresa } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .select('pais_id')
-        .eq('tenant_id', tenantId)
-        .single();
-
-      if (!empresa?.pais_id) {
-        return 'PE'; // Default to Peru
-      }
-
-      const { data: pais } = await this.supabaseService
-        .getClient()
-        .from('paises')
-        .select('codigo_iso')
-        .eq('id', empresa.pais_id)
-        .single();
-
-      return pais?.codigo_iso || 'PE';
-    } catch (error) {
-      this.logger.error('Error getting country code:', error);
-      return 'PE';
-    }
+    // Devolvía 'PE' sin fila, sin `pais_id` y también desde el `catch`: un fallo
+    // de lectura imprimía un comprobante argentino con formato peruano.
+    return (await perfilPaisDelTenant(this.supabaseService.getClient(), tenantId)).codigo;
   }
 
   /**
@@ -496,7 +477,7 @@ export class PdfGeneratorService {
     const pageHeight = doc.page.height;
     const footerY = pageHeight - 50;
 
-    const authority = countryCode === 'AR' ? 'ARCA' : countryCode === 'CO' ? 'DIAN' : 'SUNAT';
+    const authority = getActiveCountryByCode(countryCode)?.autoridadFiscal ?? 'SUNAT';
     const locale = countryCode === 'AR' ? 'es-AR' : countryCode === 'CO' ? 'es-CO' : 'es-PE';
     const status =
       cpeData.dian_status ||

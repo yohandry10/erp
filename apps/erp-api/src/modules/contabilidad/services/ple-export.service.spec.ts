@@ -46,7 +46,7 @@ describe("PleExportService", () => {
         from: jest.fn((table: string) => {
           if (table === "empresa_config") {
             return createQuery({
-              data: { ruc: "20616053575", razon_social: "NEXTELCO" },
+              data: { ruc: "20616053575", razon_social: "NEXTELCO", pais: "PE" },
               error: null,
             });
           }
