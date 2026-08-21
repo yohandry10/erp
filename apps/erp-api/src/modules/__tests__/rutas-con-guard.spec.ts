@@ -11,17 +11,27 @@ import { join } from 'node:path';
  * entra. Eso es correcto para la ayuda o para leer lo propio, y no lo es para
  * casi nada más.
  *
- * De las 687 rutas del API, 683 declaran guard. Esta prueba fija esa cuenta: si
+ * De las 687 rutas del API, 676 declaran guard. Esta prueba fija esa cuenta: si
  * aparece una ruta nueva sin autorización, hay que decidir a conciencia si
  * pertenece a la lista de abajo.
+ *
+ * Esta prueba contaba `@Public()` como autorización, que es exactamente lo
+ * contrario de lo que significa: apaga el guard global. Con ese hueco tapaba
+ * ocho rutas públicas —el webhook de Stripe, dos de métricas y cinco de
+ * observabilidad—. Las ocho resultaron estar bien protegidas, por firma o por
+ * token comprobado en el método, pero eso hay que verlo, no suponerlo.
  *
  * Nota sobre cómo se mide, que costó acertar: los decoradores de una ruta pueden
  * estar hasta una decena de líneas por debajo de ella, y una ventana corta los
  * pierde y reporta falsos positivos —la primera versión daba 90 rutas «sin
  * permiso» y eran 4—. Se recorre desde la ruta hasta la firma del método.
  */
+// `@Public()` NO cuenta como autorización: es justo lo contrario, apaga el guard
+// global. Contarlo era un hueco de esta misma prueba —lo habría dejado pasar una
+// ruta pública sin nada más—. Ahora una ruta pública tiene que traer su propio
+// guard, o estar enumerada abajo con el motivo.
 const AUTORIZACION =
-  /RequirePermission|Public\(\)|SkipAuth|SuperAdminGuard|WorkerGuard|ApiKeyGuard|HealthTokenGuard|InternalGuard/;
+  /RequirePermission|SkipAuth|SuperAdminGuard|WorkerAuthGuard|ApiKeyGuard|HealthTokenGuard|InternalGuard/;
 
 function rutasSinAutorizacion(): string[] {
   const raiz = join(__dirname, '..', '..', '..');
@@ -59,9 +69,24 @@ describe('autorización de rutas HTTP', () => {
       // Contexto de configuración del propio tenant de quien pregunta.
       'modules/configuracion/configuration-context.controller.ts:29',
       'modules/configuracion/configuration-context.controller.ts:66',
+      // Webhook de Stripe. Tiene que ser público —Stripe no manda un JWT— y lo
+      // autentica `verifyWebhookSignature` sobre el cuerpo crudo, que es el
+      // mecanismo correcto. Además está limitado por `@Throttle` y devuelve 400 si
+      // Stripe no está configurado.
+      'modules/demo/webhook.controller.ts:17',
       // Buscador de ayuda: contenido de documentación, igual para todos.
       'modules/help/help.controller.ts:11',
       'modules/help/help.controller.ts:45',
+      // Métricas y observabilidad. Se autentican con METRICS_TOKEN comprobado en el
+      // propio método, no con un guard, porque los recolectores no llevan sesión.
+      // Fallan cerradas en producción: sin METRICS_TOKEN configurado devuelven 401.
+      'modules/metrics/metrics.controller.ts:20',
+      'modules/metrics/metrics.controller.ts:34',
+      'shared/observability/observability.controller.ts:16',
+      'shared/observability/observability.controller.ts:30',
+      'shared/observability/observability.controller.ts:55',
+      'shared/observability/observability.controller.ts:78',
+      'shared/observability/observability.controller.ts:90',
     ]);
   });
 
