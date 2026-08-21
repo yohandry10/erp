@@ -400,7 +400,9 @@ export default function GreModal({
                 value={formData.pesoTotal}
                 onChange={handleChange}
                 step="0.01"
-                min="0"
+                // El DTO exige @Min(0.001): con min="0" el navegador dejaba pasar
+                // un peso cero que el servidor rechazaba despues.
+                min="0.001"
                 required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
