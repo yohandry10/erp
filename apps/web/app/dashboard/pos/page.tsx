@@ -1474,14 +1474,35 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     const factor = subtotal > 0 ? 1 - calcularDescuentoGlobalMonto() / subtotal : 1
     const codigoDe = (item: ItemVenta) => String(item.producto?.afectacion_igv ?? '').trim()
     const acumular = (predicado: (item: ItemVenta) => boolean) =>
-      Number((carrito.filter(predicado).reduce((suma, item) => suma + item.subtotal, 0) * factor).toFixed(2))
+      multiplicarMoneda(
+        carrito.filter(predicado).reduce((suma, item) => suma + item.subtotal, 0),
+        factor,
+      )
 
-    return {
+    const tramos = {
       gravadas: acumular(esBaseGravada),
       exoneradas: acumular((item) => codigoDe(item).charAt(0) === '2'),
       inafectas: acumular((item) => codigoDe(item).charAt(0) === '3'),
       exportacion: acumular((item) => codigoDe(item) === '40'),
     }
+
+    // Cada tramo redondea por su cuenta, así que la suma de los cuatro puede
+    // separarse del total por un céntimo: con 33,33 + 33,33 + 33,34 y un 10 % de
+    // descuento salían 90,01 donde la venta son 90,00. En una representación
+    // impresa las bases tienen que sumar el importe, así que el residuo se lleva
+    // al tramo mayor, que es la práctica habitual al prorratear.
+    const objetivo = redondearMoneda(subtotal - calcularDescuentoGlobalMonto())
+    const residuo = redondearMoneda(
+      objetivo - (tramos.gravadas + tramos.exoneradas + tramos.inafectas + tramos.exportacion),
+    )
+    if (residuo !== 0) {
+      const mayor = (Object.keys(tramos) as Array<keyof typeof tramos>).reduce((a, b) =>
+        tramos[b] > tramos[a] ? b : a,
+      )
+      tramos[mayor] = redondearMoneda(tramos[mayor] + residuo)
+    }
+
+    return tramos
   }
 
   const totalPagosMixtos = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0)

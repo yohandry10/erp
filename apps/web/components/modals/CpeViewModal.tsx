@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { parseDateLocal } from '@/lib/date-utils'
+import { multiplicarMoneda } from '@/lib/format-utils'
 
 interface CpeViewModalProps {
   isOpen: boolean
@@ -121,7 +122,7 @@ export default function CpeViewModal({
       ? cpeData.items.map((item, idx) => {
           const qty = item.cantidad ?? 1
           const unit = item.precio_unitario ?? 0
-          const total = item.valor_venta ?? item.subtotal ?? qty * unit
+          const total = item.valor_venta ?? item.subtotal ?? multiplicarMoneda(qty, unit)
           return `
             <div>
               <span>${escapeHtml(qty)}x ${escapeHtml(item.nombre_producto || item.descripcion || 'Producto')}</span>
@@ -412,6 +413,10 @@ export default function CpeViewModal({
                       cpeData.items.map((item, index) => {
                         const qty = item.cantidad ?? 1
                         const unit = item.precio_unitario ?? 0
+                        // El importe que dice el documento, no uno recalculado. Más arriba en este
+                        // mismo fichero ya se usaba esta precedencia y la tabla no, así que el modal
+                        // podía enseñar dos cifras distintas del mismo comprobante emitido.
+                        const totalLinea = item.valor_venta ?? item.subtotal ?? multiplicarMoneda(qty, unit)
                         return (
                           <TableRow key={`${index}-${item.nombre_producto ?? item.descripcion ?? 'item'}`} className="border-cyan-400/10">
                             <TableCell className="text-center">{index + 1}</TableCell>
@@ -423,7 +428,7 @@ export default function CpeViewModal({
                               {cpeData.moneda} {unit.toFixed(2)}
                             </TableCell>
                             <TableCell className="text-right font-semibold text-primary">
-                              {cpeData.moneda} {(qty * unit).toFixed(2)}
+                              {cpeData.moneda} {totalLinea.toFixed(2)}
                             </TableCell>
                           </TableRow>
                         )
