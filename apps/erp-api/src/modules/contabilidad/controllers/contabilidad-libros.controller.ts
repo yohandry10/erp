@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
+import { cuadranImportes, diferenciaImportes, sumarImportes, tieneSaldo } from '../../../shared/utils/cuadre-contable.util';
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
@@ -195,9 +196,9 @@ export class ContabilidadLibrosController {
           );
 
         // Calcular totales
-        const totalDebe = balance.reduce((sum, item) => sum + item.debe, 0);
-        const totalHaber = balance.reduce((sum, item) => sum + item.haber, 0);
-        const diferencia = totalDebe - totalHaber;
+        const totalDebe = sumarImportes(balance.map((item) => item.debe));
+        const totalHaber = sumarImportes(balance.map((item) => item.haber));
+        const diferencia = diferenciaImportes(totalDebe, totalHaber);
 
         return {
           success: true,
@@ -212,12 +213,12 @@ export class ContabilidadLibrosController {
               debe: totalDebe,
               haber: totalHaber,
               diferencia: diferencia,
-              cuadrado: Math.abs(diferencia) < 0.01,
+              cuadrado: cuadranImportes(totalDebe, totalHaber),
             },
             resumen: {
               total_cuentas: balance.length,
               cuentas_con_saldo: balance.filter(
-                (c) => Math.abs(c.saldo_final) > 0.01,
+                (c) => tieneSaldo(c.saldo_final),
               ).length,
             },
           },

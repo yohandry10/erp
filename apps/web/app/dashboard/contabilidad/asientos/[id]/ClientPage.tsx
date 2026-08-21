@@ -123,7 +123,8 @@ export default function AsientoDetallePage() {
 
   const isBalanced = () => {
     if (!asiento) return false
-    return Math.abs(asiento.total_debe - asiento.total_haber) < 0.01
+    // Al céntimo y sin margen, como el writer.
+    return Math.round(Number(asiento.total_debe || 0) * 100) === Math.round(Number(asiento.total_haber || 0) * 100)
   }
 
   const descargarPdf = async () => {
