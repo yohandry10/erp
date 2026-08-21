@@ -862,6 +862,78 @@ contesta la especificación, no el producto: `CbteFch` es una **fecha de
 calendario**. Se usa `fechaHoyEnPais`, que ya existía y cubre Argentina, y se
 retira la excepción del guardián de fechas UTC, que ahora tiene nueve.
 
+### Los writers atómicos, el worker y las librerías (cerrado, no repetir)
+
+La capa que la auditoría del API nunca había leído: **286 funciones `_tx`, 284 con**
+**`SECURITY DEFINER`**, es decir que corren con privilegios del propietario y se
+saltan RLS. Importa porque el API habla como `service_role`: las políticas de la
+base no protegen nada, y estas funciones son la última frontera.
+
+Lo que está bien, medido para no volver a medirlo:
+
+- **289 sentencias de escritura** sobre tablas con `tenant_id`: 231 lo filtran en la
+  propia sentencia, 46 lo derivan de una lectura previa ya acotada, **ninguna sin**
+  **comprobar**. Exentas sólo login/sesión (anteriores al tenant) y la fontanería del
+  outbox (autorizada por *claim token*).
+- **375 lecturas**: 353 filtran por tenant directamente, el resto derivan de una fila
+  ya acotada.
+- **216 INSERT** escriben `tenant_id` y **ninguno** lo toma de un payload JSON.
+- **Cero** funciones sin `SET search_path` y **cero** `EXECUTE`: los dos vectores
+  clásicos de `SECURITY DEFINER` no existen aquí.
+- **154 writers reciben un actor**; 104 lo validan contra el tenant con
+  `assert_*_actor_*` o `actor_comercial_valido_469`. Los 43 restantes sólo lo estampan
+  en columnas de auditoría, y el actor siempre sale del JWT en la capa API: es
+  profundidad de defensa, no un agujero vivo.
+- **`libs/dtos`**: 224 clases llegan por `@Body()` y **ninguna** propiedad sin
+  validador.
+- **`libs/crypto`**: los tres caminos de firma fallan cerrados. El respaldo a
+  certificado autofirmado se pide con `allowDemoFallback`, nunca se hereda;
+  `CertificateOwnershipError` no se traga; y `resolveDemoSignerConfig` lanza si no hay
+  `PFX_PATH`/`PFX_PASS`, así que la rama «sin PFX → modo demo» del constructor no es
+  alcanzable desde el servicio.
+- **Worker**: acuña un JWT de cinco minutos por tenant con su propio secreto; las
+  rutas worker son `@Public()` y las cubre `WorkerAuthGuard`, que compara el tenant
+  del token contra el solicitado. La ruta de emisión exige además un `actor_id` UUID.
+
+Lo que no estaba bien:
+
+- **Migración 499**: diez writers de contabilidad e inventario fijaban `search_path`
+  sin nombrar `pg_temp`, y Postgres entonces busca el esquema temporal **el primero**
+  para resolver nombres de tabla. Aplicada y verificada en producción. El verificador
+  exige la propiedad a **todas** las `_tx`, no sólo a esas diez.
+- **Consolidación**: `obtenerGrupo` se conformaba con cualquier fila de membresía, así
+  que una empresa que había **rechazado** la invitación seguía viendo el RUC y la
+  razón social del resto del grupo indefinidamente.
+- **Mi propio guardián de rutas contaba `@Public()` como autorización**, que es lo
+  contrario de lo que significa. Tapaba **ocho** rutas públicas: el webhook de Stripe,
+  dos de métricas y cinco de observabilidad. Las ocho resultaron bien protegidas —por
+  firma del cuerpo crudo o por `METRICS_TOKEN` comprobado en el método, que falla
+  cerrado en producción— pero eso hay que verlo, no suponerlo. Ahora están enumeradas.
+- **`jwt.verify` sin algoritmos fijados** en `WorkerAuthGuard`. jsonwebtoken 9 ya
+  restringe a HMAC con secreto de cadena, así que hoy no cambia nada; deja de ser
+  cierto en cuanto el secreto pase a ser una clave.
+- **La caché de react-query sobrevivía al cambio de empresa.** Sólo una de las ocho
+  claves lleva el tenant, así que un superadministrador que cambiaba de empresa seguía
+  viendo RRHH, usuarios y la configuración de impuestos de la anterior. El API no
+  entrega nada de más; el problema es decidir sobre las cifras equivocadas.
+
+Cómo medirlo, que costó tres intentos: las definiciones hay que sacarlas del esquema
+vivo y de **los dos** esquemas, `public` y `app` —80 funciones de `public` son
+envoltorios de una línea que delegan en `app`, y medir sólo `public` produjo catorce
+hallazgos falsos—. Y en este entorno **las barras invertidas de una cadena se**
+**colapsan**, así que `new RegExp('\b'+x)` acaba buscando un carácter de retroceso en
+vez de un límite de palabra: hay que construirlas con `String.fromCharCode(92)` o usar
+literales. Cada detector lleva un control con una función verificada a mano; si no la
+clasifica bien, aborta en vez de devolver hallazgos.
+
+### Pendiente de esta capa
+
+`apps/web` (25 651 líneas) tiene hechos los barridos de XSS —dos
+`dangerouslySetInnerHTML`, ambos con contenido estático—, secretos en el paquete
+—sólo `NEXT_PUBLIC_*` legítimos, la clave anónima de Supabase está pensada para ser
+pública—, `eval`/`innerHTML` —ninguno— y la caché por tenant. **No está leído módulo**
+**a módulo.**
+
 ### Ninguno pendiente
 
 La auditoría cubre los 36 módulos del API. Lo que queda son ampliaciones de

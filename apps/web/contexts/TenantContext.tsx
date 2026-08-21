@@ -6,6 +6,7 @@ import type { Tenant, User, TenantContextValue } from './types'
 import type { Session } from '@/lib/auth-service'
 import { useAuth } from './AuthContext'
 import { fetchApi } from '@/lib/api-fetch'
+import { useQueryClient } from '@tanstack/react-query'
 
 const TenantContext = createContext<TenantContextValue | undefined>(undefined)
 
@@ -121,6 +122,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, [extractFromSession])
 
+  const queryClient = useQueryClient()
+
   const switchTenant = useCallback(async (targetTenantId: string) => {
     if (!user?.is_super_admin) {
       throw new Error('Only super-admins can switch tenants')
@@ -140,6 +143,13 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         throw new Error(errorData.message || 'Failed to switch tenant')
       }
 
+      // Cambiar de empresa tiene que tirar lo que se leyó de la anterior. Sólo
+      // siete de las ocho claves de react-query llevan el tenant, así que sin esto
+      // el panel de RRHH, el de usuarios y la configuración de impuestos seguirían
+      // mostrando las cifras de la empresa anterior bajo el nombre de la nueva. El
+      // API no filtra nada de más —cada petición va acotada— pero un superadmin
+      // decidiendo sobre los números equivocados es igual de grave.
+      queryClient.clear()
       await refreshTenant()
     } catch (err) {
       console.error('Error switching tenant:', err)
@@ -148,7 +158,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [user, refreshTenant])
+  }, [user, refreshTenant, queryClient])
 
   useEffect(() => {
     if (authLoading) {
