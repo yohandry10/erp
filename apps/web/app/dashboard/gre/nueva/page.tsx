@@ -93,7 +93,6 @@ function NuevaGreContent() {
       numero: pedido.numero,
       clienteNombre: cliente?.razon_social || cliente?.nombre_comercial || 'Cliente sin nombre',
       clienteDireccion: cliente?.direccion || '',
-      tenantId: pedido.tenant_id || pedido.tenantId || '',
     }
   }, [cliente, pedido])
 

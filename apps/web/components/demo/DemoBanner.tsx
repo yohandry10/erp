@@ -18,6 +18,7 @@ export function DemoBanner() {
   const [status, setStatus] = useState<DemoStatus | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [extendError, setExtendError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDemoStatus();
@@ -41,6 +42,7 @@ export function DemoBanner() {
   };
 
   const handleExtend = async () => {
+    setExtendError(null);
     try {
       const response = await fetchApi("/api/demo/extend", {
         method: "POST",
@@ -52,9 +54,13 @@ export function DemoBanner() {
 
       if (response.ok) {
         await fetchDemoStatus();
+      } else {
+        // Sin esto, «extender» no hacía nada visible cuando fallaba.
+        setExtendError('No se pudo extender la demostración. Vuelva a intentarlo.');
       }
     } catch (error) {
       console.warn("Demo extension unavailable:", error);
+      setExtendError('No se pudo extender la demostración. Vuelva a intentarlo.');
     }
   };
 
@@ -96,6 +102,11 @@ export function DemoBanner() {
           <StatusIcon className="h-4 w-4" />
         </span>
         <span className="min-w-0 text-sm font-semibold leading-5">{getMessage()}</span>
+        {extendError && (
+          <span role="alert" className="min-w-0 text-sm font-medium leading-5 text-white/90">
+            {extendError}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">

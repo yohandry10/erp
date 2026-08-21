@@ -154,6 +154,12 @@ export default function ConciliacionDetailPage() {
         const normalized = normalizeConciliacion(data.data);
         setConciliacion(normalized);
         await loadMovimientos(normalized);
+      } else {
+        toast({
+          title: 'No se pudo cargar la conciliación',
+          description: 'Vuelva a intentarlo; la pantalla no refleja el estado real.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error loading conciliación:', error);
@@ -270,9 +276,23 @@ export default function ConciliacionDetailPage() {
       if (response.ok) {
         const data = await response.json();
         setReporteDiferencias(data.data);
+      } else {
+        // Sin esto, un fallo de carga se ve igual que «no hay diferencias», y en
+        // una conciliación la ausencia de diferencias es una afirmación, no un
+        // hueco. Es el mismo caso que la traza de auditoría del backend.
+        toast({
+          title: 'No se pudo cargar el informe de diferencias',
+          description: 'El informe no está disponible; lo que ve no significa que no haya diferencias.',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       console.error('Error loading diferencias:', error);
+      toast({
+        title: 'No se pudo cargar el informe de diferencias',
+        description: error instanceof Error ? error.message : 'El informe no está disponible.',
+        variant: 'destructive',
+      });
     } finally {
       setLoadingDiferencias(false);
     }
