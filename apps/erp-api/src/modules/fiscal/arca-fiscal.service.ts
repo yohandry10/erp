@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as forge from 'node-forge';
 import { FiscalServiceAbstract } from '../../shared/integration/fiscal-service.abstract';
+import { fechaHoyEnPais } from '../../shared/utils/fecha-peru.util';
 import {
   ConsultaEstado,
   DocumentoElectronico,
@@ -75,14 +76,20 @@ function soapValue(xml: string, tag: string): string | null {
   return match?.[1]?.trim() ?? null;
 }
 
+/**
+ * `CbteFch` en el formato AAAAMMDD que espera WSFEv1.
+ *
+ * Usaba los getters UTC sobre `fecha_emision`, que es `timestamptz`. En
+ * Argentina (UTC-3) una factura emitida entre las 00:00 y las 03:00 salía
+ * fechada al día siguiente, y ARCA compara `CbteFch` contra su propia fecha.
+ *
+ * `CbteFch` es una fecha de calendario, no un instante: el día fiscal del
+ * contribuyente. Como ARCA sólo emite para Argentina, la zona es fija.
+ */
 function formatArcaDate(value: Date | string): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) throw new Error('Fecha inválida para ARCA');
-  return [
-    date.getUTCFullYear(),
-    String(date.getUTCMonth() + 1).padStart(2, '0'),
-    String(date.getUTCDate()).padStart(2, '0'),
-  ].join('');
+  return fechaHoyEnPais('AR', date).replace(/-/g, '');
 }
 
 function resolveArcaDocumentType(type: string): number {
@@ -559,7 +566,9 @@ ${iva ? `<ar:Iva>${iva}</ar:Iva>` : ''}
   ): string {
     const payload = {
       ver: 1,
-      fecha: new Date(document.fechaEmision).toISOString().slice(0, 10),
+      // El QR tiene que declarar la misma fecha que el XML, y por el mismo
+      // motivo: el día fiscal argentino, no el día UTC.
+      fecha: fechaHoyEnPais('AR', new Date(document.fechaEmision)),
       cuit: Number(config.cuit),
       ptoVta: config.puntoVenta,
       tipoCmp: type,

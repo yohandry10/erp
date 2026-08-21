@@ -79,14 +79,6 @@ const PERMITIDOS = new Map<string, string>([
     'modules/rrhh/rrhh.service.ts',
     'fin de semestre derivado de una fecha explícita, no del reloj',
   ],
-  [
-    'modules/fiscal/arca-fiscal.service.ts',
-    'PENDIENTE, no resuelto: el QR y el XML leen fechaEmision en UTC y coinciden ' +
-      'entre sí, pero en Argentina (UTC-3) una emisión nocturna quedaría fechada al ' +
-      'día siguiente. Sin efecto hoy: ningún contribuyente tiene arca_activo y no ' +
-      'hay tenants AR. Al homologar hay que decidir si fechaEmision es el instante ' +
-      'o el día fiscal, y usar la zona del contribuyente.',
-  ],
 ]);
 
 describe('fechas UTC en lógica de negocio', () => {
@@ -123,7 +115,7 @@ describe('fechas UTC en lógica de negocio', () => {
   it('la lista de excepciones no crece sin justificación', () => {
     // Si esto falla es porque se añadió una excepción: cada entrada debe explicar
     // por qué esa fecha no necesita la zona del tenant.
-    expect(PERMITIDOS.size).toBe(10);
+    expect(PERMITIDOS.size).toBe(9);
     for (const [, motivo] of PERMITIDOS) {
       expect(motivo.length).toBeGreaterThan(20);
     }
