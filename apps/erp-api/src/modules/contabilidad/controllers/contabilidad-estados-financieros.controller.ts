@@ -7,6 +7,7 @@ import {
   UseGuards,
   BadRequestException,
 } from "@nestjs/common";
+import { cuadranImportes, diferenciaImportes, sumarImportes, tieneSaldo } from '../../../shared/utils/cuadre-contable.util';
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { AccountingBooksService } from "../../../shared/integration/accounting-books.service";
 import { SupabaseService } from "../../../shared/supabase/supabase.service";
@@ -82,9 +83,11 @@ export class ContabilidadEstadosFinancierosController {
         );
 
       // Calcular totales
-      const totalDebe = balance.reduce((sum, item) => sum + item.debe, 0);
-      const totalHaber = balance.reduce((sum, item) => sum + item.haber, 0);
-      const diferencia = totalDebe - totalHaber;
+      // En Decimal: sumar `number` deriva ~1e-13, y esa deriva era justo lo que la
+      // tolerancia de un céntimo venía a absorber. Sin deriva, sobra la tolerancia.
+      const totalDebe = sumarImportes(balance.map((item) => item.debe));
+      const totalHaber = sumarImportes(balance.map((item) => item.haber));
+      const diferencia = diferenciaImportes(totalDebe, totalHaber);
 
       return {
         success: true,
@@ -99,12 +102,12 @@ export class ContabilidadEstadosFinancierosController {
             debe: totalDebe,
             haber: totalHaber,
             diferencia: diferencia,
-            cuadrado: Math.abs(diferencia) < 0.01, // Tolerancia de 1 centavo
+            cuadrado: cuadranImportes(totalDebe, totalHaber),
           },
           resumen: {
             total_cuentas: balance.length,
             cuentas_con_saldo: balance.filter(
-              (c) => Math.abs(c.saldo_final) > 0.01,
+              (c) => tieneSaldo(c.saldo_final),
             ).length,
           },
         },
@@ -258,7 +261,7 @@ export class ContabilidadEstadosFinancierosController {
         balanceGeneral.patrimonio.total_patrimonio;
       const diferencia =
         balanceGeneral.activos.total_activos - totalActivosPasivosPatrimonio;
-      const ecuacionCuadra = Math.abs(diferencia) < 0.01; // Tolerancia de 1 centavo
+      const ecuacionCuadra = cuadranImportes(balanceGeneral.activos.total_activos, totalActivosPasivosPatrimonio);
 
       return {
         success: true,
@@ -765,7 +768,7 @@ export class ContabilidadEstadosFinancierosController {
           balanceGeneral.patrimonio.total_patrimonio;
         const diferencia =
           balanceGeneral.activos.total_activos - totalActivosPasivosPatrimonio;
-        const ecuacionCuadra = Math.abs(diferencia) < 0.01;
+        const ecuacionCuadra = cuadranImportes(balanceGeneral.activos.total_activos, totalActivosPasivosPatrimonio);
 
         return {
           success: true,

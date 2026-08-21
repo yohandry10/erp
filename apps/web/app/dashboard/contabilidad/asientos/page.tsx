@@ -128,7 +128,10 @@ export default function AsientosPage() {
     )
   }
 
-  const isBalanced = (asiento: AsientoContable) => Math.abs(asiento.total_debe - asiento.total_haber) < 0.01
+  // Al céntimo y sin margen, como el writer: `< 0.01` declaraba «Balanceado»
+  // un asiento descuadrado en nueve milésimas, y el libro no lo acepta.
+  const isBalanced = (asiento: AsientoContable) =>
+    Math.round(Number(asiento.total_debe || 0) * 100) === Math.round(Number(asiento.total_haber || 0) * 100)
 
   const filteredAsientos = asientos.filter((asiento) => {
     if (numeroAsientoSearch && !asiento.numero_asiento.toLowerCase().includes(numeroAsientoSearch.toLowerCase())) {
