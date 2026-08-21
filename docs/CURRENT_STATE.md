@@ -936,9 +936,9 @@ Lo que salió mal:
 
 - **Crear una GRE desde un pedido devolvía 400.** `GreModal` mandaba `tenantId` en el
   cuerpo y `CreateGuiaRemisionDto` no lo declara: con `forbidNonWhitelisted` el pipe
-  rechazaba la petición entera. El usuario sólo veía «Error al crear la guía de
-  remisión», porque el mensaje del pipe no llega a la pantalla. Lo fija
-  `test:contrato`.
+  rechazaba la petición entera. El cliente sí propaga el mensaje del pipe, así que
+  en pantalla salía «property tenantId should not exist»: un error en inglés, del que
+  nadie deduce que hay que tocar el frontend. Lo fija `test:contrato`.
 - **El céntimo.** `Math.round(importe * factor * 100) / 100` no es redondeo a
   céntimos: 1,25 al 18 % debe dar 0,23 y daba 0,22. Son 2 524 importes equivocados
   sobre 1,2 millones con las tres tasas. El servidor calcula con Decimal y es quien

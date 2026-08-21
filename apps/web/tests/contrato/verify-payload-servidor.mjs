@@ -10,9 +10,9 @@
  *
  * No es hipotético. `GreModal` mandaba `tenantId` en el cuerpo y
  * `CreateGuiaRemisionDto` no lo declara, así que **crear una guía de remisión
- * desde un pedido devolvía 400** y el usuario sólo veía «Error al crear la guía
- * de remisión». No lo detectó nadie porque el mensaje del pipe no llega a la
- * pantalla; se encontró leyendo el cliente contra el contrato del servidor.
+ * desde un pedido devolvía 400**. En pantalla salía «property tenantId should not
+ * exist», que es el mensaje del pipe: correcto pero en inglés y sin pista de que el
+ * arreglo está en el cliente. Se encontró leyendo el frontend contra el DTO.
  *
  * Uso: node tests/contrato/verify-payload-servidor.mjs
  */
