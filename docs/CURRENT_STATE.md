@@ -936,9 +936,21 @@ Lo que salió mal:
 
 - **Crear una GRE desde un pedido devolvía 400.** `GreModal` mandaba `tenantId` en el
   cuerpo y `CreateGuiaRemisionDto` no lo declara: con `forbidNonWhitelisted` el pipe
-  rechazaba la petición entera. El cliente sí propaga el mensaje del pipe, así que
-  en pantalla salía «property tenantId should not exist»: un error en inglés, del que
-  nadie deduce que hay que tocar el frontend. Lo fija `test:contrato`.
+  rechazaba la petición entera. En pantalla salía «property tenantId should not
+  exist»: correcto, pero en inglés y sin pista de que el arreglo estaba en el
+  cliente.
+
+  **La raíz no era ese campo, era que nada comprobaba el contrato.** `test:contrato`
+  resuelve cada llamada de escritura de la web contra la ruta del API, saca el DTO de
+  su `@Body()` siguiendo `extends`, y comprueba que ninguna clave enviada falte en
+  él. Compara 17 llamadas e imprime cuántas quedan fuera —3 con payload no resoluble,
+  7 sin ruta emparejable, 6 sin DTO— para que nadie confunda «verde» con «revisado».
+
+  Construirlo destapó **dos DTOs señuelo**: `libs/dtos/src/gre/guia-remision.dto.ts`,
+  obsoleto y sin importadores mientras el controlador usa `gre.types.ts`; y
+  `ProductModal.tsx`, sin importadores, que mandaba doce campos en camelCase a un DTO
+  snake_case. Los dos borrados: el próximo que fuera a tocar el contrato editaba el
+  fichero equivocado.
 - **El céntimo.** `Math.round(importe * factor * 100) / 100` no es redondeo a
   céntimos: 1,25 al 18 % debe dar 0,23 y daba 0,22. Son 2 524 importes equivocados
   sobre 1,2 millones con las tres tasas. El servidor calcula con Decimal y es quien
