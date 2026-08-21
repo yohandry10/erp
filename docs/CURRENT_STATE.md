@@ -630,6 +630,14 @@ sesiones posteriores. «A fondo» significa leer el código del módulo buscando
 fallos de lógica; «barrido» significa que lo cruzó una comprobación de patrón
 pero nadie lo leyó.
 
+> **Cuidado con los «hoy no dispara» de este documento.** Varias notas de abajo
+> se apoyan en datos de los tenants de producción —que ningún usuario esté en
+> dos tenants, que todos tengan `moneda_defecto`, que ADMIN tenga los 256
+> permisos—. Salvo el superadministrador, esos tenants son **desechables**: son
+> demos y pruebas, no clientes. Esa evidencia no dice que un fallo sea inocuo,
+> dice que todavía no hay nadie a quien pueda dañar. Los fallos abiertos que
+> encontró esta auditoría no están latentes: están **sin estrenar**.
+
 ### Barridos transversales (cubren TODO el repositorio)
 
 Ya ejecutados y con guardián que impide la regresión:
@@ -771,17 +779,88 @@ invariantes comprobadas contra los datos de producción, que valen más que leer
   pertenece a un tenant distinto del de su cabecera, y ninguna cuenta por cobrar a
   uno distinto del de su cliente. Los asientos cuadran y el invariante de stock se
   cumple en todos los productos.
-- El barrido estático dejó 14 candidatos a consulta sin filtro de tenant; se
-  revisaron 8 y **todos eran legítimos**: el id venía siempre de una consulta ya
-  acotada. El patrón que genera los falsos positivos conviene recordarlo: en un
-  `insert` el `tenant_id` va en el payload, **arriba** del `.from`, y en un `select`
-  con columnas anidadas el filtro queda veinte líneas **abajo**. Una ventana en un
-  solo sentido reporta lo que no es.
+- **Aislamiento entre contribuyentes, barrido completo y cerrado.** De las **31**
+  consultas sin `tenant_id` sobre tablas que lo tienen, **29 son legítimas** y **2**
+  no lo eran. Las legítimas caen en tres grupos: derivadas (el id ya viene de un
+  `select` acotado al tenant), anteriores al tenant (el login no lo tiene todavía,
+  por eso `auth_login_attempts` se cuenta por correo y no por IP) y transversales a
+  propósito (catálogos globales y el panel de seguridad, tras `SuperAdminGuard`).
+  Las dos reales estaban en `calcularMontoRecepcionParcial`, que leía
+  `orden_compra_detalles` y `recepcion_items` **sin usar el `tenantId` que el propio
+  evento traía**: un `ordenId` equivocado tomaba los precios de otra empresa en
+  silencio. Corregidas. Lo fija `filtro-tenant.guard.spec`, verificado en rojo.
+
+  Esto importa más de lo que parece: el API habla con Postgres como `service_role`,
+  que **se salta RLS**. Las políticas de la base no protegen nada del lado de la
+  aplicación; el filtro de la consulta es la única frontera.
+
+  Medirlo bien costó tres intentos y conviene no repetirlos. La lista de tablas
+  tiene que salir del **esquema real**, no de las migraciones:
+  `002__domain_tables_skeleton.sql` le pone `tenant_id` a sus 168 tablas y las
+  migraciones de normalización luego se lo quitan a los catálogos, de modo que medir
+  sobre migraciones daba 242 tablas y **cero hallazgos**. Y la ventana tiene que ser
+  ancha por los dos lados: en un `insert` el `tenant_id` va en el objeto, **arriba**
+  del `.from`; en un `select` anidado el filtro queda veinte líneas **abajo**.
+  El fichero `tablas-con-tenant-id.json` guarda las 267 tablas y lleva la consulta
+  para regenerarlo.
 - Sin `catch` permisivos y sin datos fabricados en los seis.
 
 Lo que sí apareció está en los commits: los respaldos a soles en tres caminos que
 escriben, la dirección inventada en el comprobante y el dinero redondeado con coma
 flotante en cuatro sitios.
+
+### Tercera vuelta: el país por descarte (cerrado, no repetir)
+
+El barrido de respaldos peruanos que empezó en `tax-calculator` y siguió en
+`fiscal-adapter` tenía más alcance del que parecía. La pregunta «¿de qué país es
+este contribuyente?» tenía **cuatro respuestas independientes** —`fiscal-adapter`,
+`cpe-helper`, `pdf-generator` y `proveedores`— y las cuatro contestaban Perú
+cuando no lo sabían: sin fila en `empresa_config`, con `pais_id` vacío, o ante un
+error de lectura. `fiscal-adapter` además **cacheaba** esa respuesta, así que un
+fallo momentáneo de lectura dejaba al contribuyente convertido en peruano durante
+toda la vida del proceso.
+
+El país decide el documento de identidad (RUC, CUIT o NIT), la autoridad (SUNAT,
+ARCA o DIAN), el impuesto (IGV 18 %, IVA 21 %, IVA 19 %), la moneda y el formato
+del comprobante. Equivocarse produce un documento con **buen aspecto** y reglas de
+otro país, que es la peor forma de fallar en algo que va firmado a una
+administración tributaria.
+
+Ahora hay una sola respuesta, `perfilPaisDelTenant`, que falla cerrada y sale de
+`ACTIVE_COUNTRY_PROFILES`, que ya era la fuente canónica. Lo fija
+`pais-del-tenant.spec`. Junto a eso:
+
+- **Tres compuertas de país fallaban abiertas** por `|| 'PE'`: tributos anuales,
+  tributos mensuales y la exportación PLE dejaban pasar a una empresa sin país
+  configurado. El repositorio ya tenía el patrón correcto (`|| ''`) en
+  `planilla-electronica-peru`, `sire-api-client`, `arca-fiscal` y `dian-fiscal`.
+- **La compuerta de la GRE no llegaba a cerrarse nunca.** Era `config.pais &&
+  config.pais !== 'PE'`, pero `obtenerConfiguracionGRE` sellaba `'PE'` cuando no
+  había país, así que la condición nunca era cierta.
+- **Las tablas de autoridad fiscal estaban repetidas cuatro veces y derivaron.**
+  Tres se habían quedado **sin Argentina** mientras listaban Chile, México y
+  Ecuador, que no son países soportados: un comprobante argentino imprimía
+  «Autoridad Fiscal» en lugar de ARCA.
+- `validateTaxIdFormat` daba por bueno **cualquier documento no vacío** para un
+  país desconocido, y tenía ramas para Chile y México inalcanzables.
+- `cpe-registration` comprobaba el CUIT de un argentino con el algoritmo del RUC
+  peruano si `empresa_config` no declaraba país.
+
+Tres pruebas fallaron al cerrar esto porque **se apoyaban en el valor por defecto**
+en vez de declarar el país. Es el mismo síntoma que ya apareció con la moneda: una
+fixture que no declara algo y aprueba está midiendo el respaldo, no el código.
+
+### ARCA: la fecha del comprobante (cerrado)
+
+`cpe.fecha_emision` es `timestamptz` y `CbteFch` se armaba con los *getters* UTC.
+En Argentina (UTC−3) una factura emitida entre las 00:00 y las 03:00 salía fechada
+**al día siguiente**, y ARCA compara `CbteFch` contra su propia fecha. El QR
+llevaba el mismo desfase, así que ni siquiera se contradecían entre sí.
+
+La duda que quedaba anotada —si `fechaEmision` es el instante o el día fiscal— la
+contesta la especificación, no el producto: `CbteFch` es una **fecha de
+calendario**. Se usa `fechaHoyEnPais`, que ya existía y cubre Argentina, y se
+retira la excepción del guardián de fechas UTC, que ahora tiene nueve.
 
 ### Ninguno pendiente
 
@@ -799,11 +878,11 @@ usuarios devuelven 403, y el endpoint de `system.debug` está restringido. La v�
 de escalada por crear un rol llamado `ADMIN` no funciona: la RPC exige
 `users.manage` mediante filas reales de permiso.
 
-Queda una fragilidad conocida, sin explotación hoy: `checkUserPermission` concede
-todo a cualquier rol llamado exactamente `ADMIN`, de modo que **revocar un permiso
-a ese rol no surte efecto**. No cambia nada ahora mismo porque ADMIN tiene 256 de
-256 permisos en los 55 tenants reales; sólo difieren siete demos, cuyos usuarios
-usan `ADMIN_DEMO`.
+**Cerrado:** `checkUserPermission` concedía todo a cualquier rol llamado
+exactamente `ADMIN`, con lo que revocar un permiso a ese rol no surtía efecto y
+bastaba con renombrar un rol para saltarse la lista. Retirado. No concedía nada
+que las filas de `rol_permisos` no concedan ya: los 42 usuarios con rol ADMIN
+están en tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ## Pendientes reales
 
