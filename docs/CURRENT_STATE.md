@@ -697,6 +697,25 @@ crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
   De los tres respaldos peruanos, dos se quitaron en la primera vuelta y el tercero
   apareció por un camino lateral, buscando otra cosa.
 
+- `documentos`: limpio. Sus quince rutas declaran permiso y toman el tenant del
+  JWT.
+- **Autorización de rutas, barrido de todo el API (cerrado).** De las **687 rutas**,
+  **683 declaran guard**. Las cuatro restantes sólo exigen sesión y es correcto:
+  dos leen el contexto de configuración del propio tenant y dos son el buscador de
+  ayuda. `JwtAuthGuard` y `PermissionGuard` están registrados como `APP_GUARD`, así
+  que ninguna ruta queda sin autenticar. Lo fija `rutas-con-guard.spec`, con esas
+  cuatro enumeradas: una ruta nueva sin autorización rompe la prueba.
+
+  Medir esto bien costó tres intentos: los decoradores de una ruta pueden estar una
+  decena de líneas por debajo, y la primera ventana daba **90 rutas sin permiso**
+  cuando eran **4**. Actuar sobre aquel número habría significado «arreglar»
+  ochenta y seis rutas correctas.
+- `audit`: la vista unificada junta la tabla de auditoría con cuatro fuentes más y
+  cada una iba en su `try`; al fallar avisaba por consola y seguía, devolviendo una
+  respuesta con la misma forma que una traza completa. Quien audita no podía
+  distinguir «no hubo intentos de login» de «no se pudieron leer». Se sigue
+  devolviendo lo que sí carga, pero el hueco viaja declarado en `fuentes_fallidas`.
+
 ### Pendientes de auditar a fondo
 
 Catorce módulos, en orden de riesgo decreciente:
