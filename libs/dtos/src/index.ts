@@ -10,7 +10,6 @@ export * from './cpe/boleta.dto';
 export * from './cpe/nota-credito.dto';
 
 // GRE DTOs
-export * from './gre/guia-remision.dto';
 
 // SIRE DTOs
 export * from './sire/sire-request.dto';
