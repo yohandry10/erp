@@ -163,7 +163,7 @@ export const envSchema = Joi.object({
   REQUIRED_DATABASE_SCHEMA_VERSION: Joi.when('NODE_ENV', {
     is: 'production',
     then: Joi.number().integer().min(1).required(),
-    otherwise: Joi.number().integer().min(1).default(498),
+    otherwise: Joi.number().integer().min(1).default(499),
   }),
   APP_VERSION: Joi.string().max(100).optional(),
   APP_COMMIT_SHA: Joi.string().max(100).optional(),
