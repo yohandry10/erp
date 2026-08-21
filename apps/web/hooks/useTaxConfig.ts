@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useApi } from '@/hooks/use-api'
 import { apiSucceeded, unwrapApiData } from '@/lib/api-contract'
 import { useCountryContext } from './use-country-context'
+import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
 
 export interface TaxConfig {
   tasa_igv: number
@@ -26,13 +27,18 @@ export function useTaxConfig() {
       if (apiSucceeded(response) && config) {
         return config
       }
-      // Retornar valores por defecto si no hay respuesta
+      // Respaldo para que la pantalla pueda dibujarse sin la configuración fiscal.
+      // Sale del catálogo de países, que trae la tasa legal de cada uno; con `||`
+      // una tasa 0 —contexto de país sin resolver, donde `impuestoRate` vale 0— se
+      // convertía en el 18 % peruano. Con `??` sólo sustituye lo que falta de
+      // verdad. El importe del documento lo fija el servidor; esto es lo que ve el
+      // usuario mientras tanto.
       return {
-        tasa_igv: country.impuestoRate || 0.18,
-        moneda_principal: country.moneda || 'PEN',
-        pais_id: country.paisId || 1,
-        impuesto_principal_nombre: country.paisCodigo === 'PE' ? 'IGV' : 'IVA',
-        impuesto_principal_porcentaje: country.impuestoRate || 0.18,
+        tasa_igv: country.impuestoRate ?? 0,
+        moneda_principal: country.moneda || '',
+        pais_id: country.paisId,
+        impuesto_principal_nombre: country.impuesto || '',
+        impuesto_principal_porcentaje: country.impuestoRate ?? 0,
       } as TaxConfig
     },
     enabled: Boolean(country.paisId),
@@ -45,14 +51,15 @@ export function useTaxConfig() {
    * Calcula los impuestos para un subtotal dado
    */
   const calcularImpuestos = (subtotal: number) => {
-    const tasaIgv = data?.impuesto_principal_porcentaje ?? data?.tasa_igv ?? country.impuestoRate ?? 0.18
-    const igv = subtotal * tasaIgv
-    const total = subtotal + igv
+    const tasaIgv = data?.impuesto_principal_porcentaje ?? data?.tasa_igv ?? country.impuestoRate ?? 0
+    // `Math.round(subtotal * tasaIgv * 100) / 100` deja un céntimo de menos en 810
+    // de cada 200 000 bases al 18 %: 1,25 debe dar 0,23 y daba 0,22.
+    const igv = multiplicarMoneda(subtotal, tasaIgv)
 
     return {
-      subtotal: Math.round(subtotal * 100) / 100,
-      igv: Math.round(igv * 100) / 100,
-      total: Math.round(total * 100) / 100,
+      subtotal: redondearMoneda(subtotal),
+      igv,
+      total: redondearMoneda(subtotal + igv),
       tasaIgv,
     }
   }
@@ -61,7 +68,7 @@ export function useTaxConfig() {
    * Obtiene solo la tasa de IGV/IVA
    */
   const getTasaIgv = () => {
-    return data?.impuesto_principal_porcentaje ?? data?.tasa_igv ?? country.impuestoRate ?? 0.18
+    return data?.impuesto_principal_porcentaje ?? data?.tasa_igv ?? country.impuestoRate ?? 0
   }
 
   /**

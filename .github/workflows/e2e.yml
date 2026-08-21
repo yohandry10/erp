@@ -62,6 +62,7 @@ jobs:
           pnpm --filter @erp-suite/web test:pos-offline
           pnpm --filter @erp-suite/web test:fechas
           pnpm --filter @erp-suite/web test:etiquetas
+          pnpm --filter @erp-suite/web test:dinero
 
       - name: Install Chromium
         run: pnpm --filter @erp-suite/web exec playwright install --with-deps chromium
