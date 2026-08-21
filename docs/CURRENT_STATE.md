@@ -732,6 +732,22 @@ crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
   el nombre de un fichero exportado que ya está justificado— y con el tenant
   tomado del JWT.
 
+- **Respaldos a soles en caminos que escriben.** El mismo patrón de los tres
+  respaldos peruanos aparecía con la moneda: `|| 'PEN'` al emitir un comprobante,
+  al crear una cotización y al dar de alta una cuenta bancaria. Ninguno dispara hoy
+  —los 62 tenants tienen `moneda_defecto`— pero un contribuyente argentino sin ese
+  campo habría emitido en soles. Los tres se detienen ahora y piden configurarla.
+  Los `|| 'PEN'` que quedan en tesorería son de agrupación en un resumen, no se
+  escriben.
+- **Una dirección inventada dentro del comprobante.** `direccion_receptor` caía a
+  la cadena «DIRECCIÓN NO REGISTRADA», que viajaba a SUNAT como si fuese el
+  domicilio del cliente. El campo es opcional en el propio contrato, así que ahora
+  va vacío cuando no se conoce. Hay 177 clientes sin dirección, pero ningún
+  comprobante emitido llegó a llevar el marcador.
+
+  Al corregirlo fallaron dos pruebas de CPE cuyas fixtures no declaraban moneda:
+  se apoyaban en el respaldo sin decirlo. Ahora la declaran.
+
 ### Pendiente de auditar a fondo
 
 Ninguno de los dieciocho iniciales. Quedan sólo los **tocados de refilón** que

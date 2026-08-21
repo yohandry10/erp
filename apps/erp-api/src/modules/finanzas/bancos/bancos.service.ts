@@ -68,7 +68,14 @@ export class BancosService {
       .select('moneda_defecto')
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    const monedaDefecto = String(empresaConfig?.moneda_defecto || 'PEN').toUpperCase();
+    // La moneda de la cuenta se guarda y luego decide conversiones y saldos: si
+    // falta la configuración, es mejor pedirla que rotular la cuenta en soles.
+    const monedaDefecto = String(empresaConfig?.moneda_defecto || '').trim().toUpperCase();
+    if (!monedaDefecto) {
+      throw new BadRequestException(
+        'La empresa no tiene moneda configurada; configúrela antes de crear cuentas bancarias.',
+      );
+    }
 
     // Validar que no exista una cuenta con el mismo número para este tenant
     const { data: existente } = await client
