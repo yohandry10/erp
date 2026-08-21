@@ -137,7 +137,12 @@ export class NotificationsService {
       .getClient()
       .from('user_roles')
       .select('role_id')
-      .eq('usuario_sistema_id', usuarioId);
+      .eq('usuario_sistema_id', usuarioId)
+      // El tenant llegaba como parámetro y no se usaba. `user_roles` tiene
+      // columna de tenant, y un mismo usuario puede pertenecer a varios: el
+      // TenantSwitcher del frontend existe justo para eso. Sin este filtro, los
+      // roles de un tenant decidían el acceso a notificaciones de otro.
+      .eq('tenant_id', tenantId);
 
     if (error) {
       this.logger.error(`Error fetching user roles: ${error.message}`, error);

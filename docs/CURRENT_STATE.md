@@ -716,15 +716,27 @@ crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
   distinguir «no hubo intentos de login» de «no se pudieron leer». Se sigue
   devolviendo lo que sí carga, pero el hueco viaja declarado en `fuentes_fallidas`.
 
-### Pendientes de auditar a fondo
+- `notifications`: `getUserRoleIds` recibía el tenant y **no lo usaba**, así que
+  los roles de un tenant decidían el acceso a las notificaciones de otro. Hoy no
+  ocurre —ningún usuario pertenece a dos tenants en producción— pero es un camino
+  soportado: el `TenantSwitcher` del frontend existe justo para eso. Corregido.
+- `security`: sus doce consultas al registro de violaciones RLS no filtran por
+  tenant, y **es correcto**: el controlador lleva `SuperAdminGuard` a nivel de
+  clase y por ruta, más `security.audit.read`. Es un panel de plataforma.
+- `sunat-retry`: limpio. Sólo reintenta documentos en `ERROR` —falla técnica— y
+  nunca `RECHAZADO`, que es el rechazo fiscal; con tope de cinco intentos, ventana
+  de antigüedad y veinte por ciclo. Los reintentos automáticos están desactivados
+  salvo que se encienda `SUNAT_AUTO_RETRY_ENABLED`.
+- `dashboard`, `reports`, `import-export`, `metrics`, `help`: limpios de las clases
+  conocidas —sin `catch` permisivo, sin datos fabricados, sin fechas en UTC salvo
+  el nombre de un fichero exportado que ya está justificado— y con el tenant
+  tomado del JWT.
 
-Catorce módulos, en orden de riesgo decreciente:
+### Pendiente de auditar a fondo
 
-1. `retenciones` — cálculo tributario, la familia donde ya salieron errores.
-2. `ose` — transporte a SUNAT.
-3. `documentos` · `validations` · `paises`.
-4. `notifications` · `audit` · `security` · `sunat-retry`.
-5. `dashboard` · `reports` · `import-export` · `metrics` · `help`.
+Ninguno de los dieciocho iniciales. Quedan sólo los **tocados de refilón** que
+siguen sin lectura completa: `contabilidad`, `finanzas`, `ventas`, `inventario`,
+`fiscal` y `migration`.
 
 ### Resultado de la frontera de seguridad (cerrado, no repetir)
 
