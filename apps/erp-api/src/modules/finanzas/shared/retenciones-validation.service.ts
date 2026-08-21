@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
@@ -57,7 +58,13 @@ export class RetencionesValidationService {
     };
   }> {
     const errores: string[] = [];
-    const round2 = (value: number) => Math.round(value * 100) / 100;
+    // Decimal, igual que `RetencionesService.calcularAjuste`, que es quien calcula
+    // el importe que aquí se comprueba. Con coma flotante discrepaban en un
+    // céntimo —3 % de 5.50 daba 0.16 en vez de 0.17— y esa diferencia la absorbía
+    // la tolerancia, de modo que la tolerancia acababa tapando nuestra propia
+    // aritmética en vez de las diferencias de redondeo del cliente.
+    const round2 = (value: number) =>
+      new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
 
     // Calcular ajustes esperados según configuración
     const sujetoRetencion = clienteConfig?.sujeto_retencion ?? empresaConfig?.aplicar_retencion ?? false;
@@ -170,7 +177,13 @@ export class RetencionesValidationService {
     },
     montoPendiente: number
   ): { valido: boolean; error?: string; montoEsperado: number } {
-    const round2 = (value: number) => Math.round(value * 100) / 100;
+    // Decimal, igual que `RetencionesService.calcularAjuste`, que es quien calcula
+    // el importe que aquí se comprueba. Con coma flotante discrepaban en un
+    // céntimo —3 % de 5.50 daba 0.16 en vez de 0.17— y esa diferencia la absorbía
+    // la tolerancia, de modo que la tolerancia acababa tapando nuestra propia
+    // aritmética en vez de las diferencias de redondeo del cliente.
+    const round2 = (value: number) =>
+      new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
     
     // Fórmula: total - retención - detracción - anticipo + percepción
     // La percepción suma porque aumenta el monto a cobrar

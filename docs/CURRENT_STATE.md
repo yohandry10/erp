@@ -748,6 +748,19 @@ crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
   Al corregirlo fallaron dos pruebas de CPE cuyas fixtures no declaraban moneda:
   se apoyaban en el respaldo sin decirlo. Ahora la declaran.
 
+- **Dinero redondeado con coma flotante en cuatro sitios.** `Math.round(v*100)/100`
+  no redondea bien la mitad: el producto intermedio se queda por debajo y 3 % de
+  5.50 da 0.16 en lugar de 0.17. Estaba en la validación de retenciones, en los
+  saldos de bancos, en la conciliación y en el cálculo de renta anual e ITAN.
+  Todos pasan a Decimal, que es lo que ya usan `TaxCalculatorService` y
+  `RetencionesService`.
+
+  El de retenciones merece el matiz: **no estaba provocando rechazos**, porque la
+  comprobación tolera `> 0.01` y la diferencia es exactamente un céntimo. Pero eso
+  significaba que la tolerancia absorbía nuestra propia aritmética en vez de las
+  diferencias de redondeo de quien envía el dato. Con las dos partes en Decimal,
+  la tolerancia vuelve a medir lo que dice medir.
+
 ### Pendiente de auditar a fondo
 
 Ninguno de los dieciocho iniciales. Quedan sólo los **tocados de refilón** que

@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
@@ -798,6 +799,9 @@ export class BancosService {
   }
 
   private round2(value: number): number {
-    return Math.round(value * 100) / 100;
+    // `Math.round(v * 100) / 100` no redondea bien la mitad: 5.5 * 3 % da 0.16 en
+    // lugar de 0.17 porque el producto sale 0.16499999999999998. Con dinero eso
+    // desplaza céntimos, y el resto del repo ya usa Decimal.
+    return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
   }
 }
