@@ -50,6 +50,7 @@ certs/
 apps/web/tests/e2e/.auth/
 apps/web/playwright-report/
 apps/web/test-results/
+test-results/
 apps/web/tests/e2e/artifacts/
 
 # Respaldos PostgreSQL locales: pueden contener datos reales de PROD.
