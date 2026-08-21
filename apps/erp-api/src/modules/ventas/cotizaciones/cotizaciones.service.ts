@@ -86,6 +86,15 @@ export class CotizacionesService {
       };
     });
 
+    // La moneda queda escrita en la cotización; suponer soles la falsearía para
+    // un contribuyente que no factura en PEN.
+    const monedaCotizacion = String(empresaConfig?.moneda_defecto || '').trim().toUpperCase();
+    if (!monedaCotizacion) {
+      throw new BadRequestException(
+        'La empresa no tiene moneda configurada; configúrela antes de emitir cotizaciones.',
+      );
+    }
+
     const { data: resultado, error: createError } = await client.rpc('crear_cotizacion_comercial_tx', {
       p_tenant_id: tenantId,
       p_created_by: userId,
@@ -93,7 +102,7 @@ export class CotizacionesService {
       p_fecha_vencimiento: createCotizacionDto.fecha_vencimiento || null,
       p_observaciones: createCotizacionDto.notas || null,
       p_vendedor: vendedorNombre,
-      p_moneda: empresaConfig?.moneda_defecto || 'PEN',
+      p_moneda: monedaCotizacion,
       p_subtotal: subtotal,
       p_igv: igv,
       p_total: total,
