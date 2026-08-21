@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { ACTIVE_COUNTRY_MESSAGE, getActiveCountryByCode } from '../paises/initial-country';
 import {
   CertificateValidationResult,
   RucValidationResult,
@@ -269,12 +270,20 @@ export class ValidationService {
 
       // `paises` viene como objeto (single FK) o null si pais_id es null/orphan.
       const paisEmbed = (empresa as any).paises as { codigo_iso?: string; nombre?: string } | null;
-      const paisCodigo = paisEmbed?.codigo_iso || 'PE'; // Default to Peru
+      // Suponer Perú hacía que este informe le exigiera «RUC» a una empresa
+      // argentina y diera por buena una configuración que no declara país, que es
+      // justo lo que el informe existe para detectar.
+      const perfilPais = getActiveCountryByCode(paisEmbed?.codigo_iso);
+      if (!perfilPais) {
+        errors.push(`La empresa no tiene configurado un país soportado. ${ACTIVE_COUNTRY_MESSAGE}`);
+        isValid = false;
+      }
+      const paisCodigo = perfilPais?.codigo ?? '';
 
       // Check required fields
       if (!empresa.ruc || empresa.ruc.trim() === '') {
         missingFields.push(
-          paisCodigo === 'PE' ? 'RUC' : paisCodigo === 'AR' ? 'CUIT' : 'NIT',
+          perfilPais?.documentoFiscal ?? 'documento fiscal',
         );
         isValid = false;
       } else {
@@ -342,23 +351,14 @@ export class ValidationService {
           ? { isValid: true }
           : { isValid: false, error: 'El CUIT debe tener 11 dígitos y dígito verificador válido' };
 
-      case 'CL': // Chile - RUT
-        const rutPattern = /^\d{7,8}-[\dkK]$/;
-        if (!rutPattern.test(taxId)) {
-          return { isValid: false, error: 'El RUT debe tener formato 12345678-9 o 12345678-K' };
-        }
-        return { isValid: true };
-
-      case 'MX': // Mexico - RFC
-        const rfcPattern = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
-        if (!rfcPattern.test(taxId)) {
-          return { isValid: false, error: 'El RFC debe tener formato válido (ej: ABC123456XYZ)' };
-        }
-        return { isValid: true };
-
       default:
-        // For unknown countries, just check it's not empty
-        return { isValid: taxId.length > 0 };
+        // Sólo se llega aquí con un país fuera de los tres soportados. Antes se
+        // daba por bueno cualquier documento no vacío, y había ramas para Chile y
+        // México que ningún contribuyente podía alcanzar.
+        return {
+          isValid: false,
+          error: `No hay validación de documento fiscal para el país ${countryCode || 'no declarado'}`,
+        };
     }
   }
 

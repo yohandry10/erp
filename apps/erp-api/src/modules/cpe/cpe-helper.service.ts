@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { perfilPaisDelTenant } from './pais-del-tenant';
 
 /**
  * CPE Helper Service
@@ -7,77 +8,26 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
  */
 @Injectable()
 export class CpeHelperService {
-  private readonly logger = new Logger(CpeHelperService.name);
-
   constructor(private readonly supabaseService: SupabaseService) {}
 
   /**
-   * Get fiscal authority name based on tenant's country
-   * Returns 'SUNAT' for Peru, 'DIAN' for Colombia, etc.
+   * Nombre de la autoridad fiscal del contribuyente: SUNAT, ARCA o DIAN.
+   *
+   * Tenía su propia tabla de autoridades, y esa tabla se había quedado sin
+   * Argentina mientras listaba Chile, México y Ecuador, que no son países
+   * soportados: un contribuyente argentino leía «autoridad fiscal».
    */
   async getFiscalAuthorityName(tenantId: string): Promise<string> {
-    try {
-      const { data: empresa } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .select('pais_id')
-        .eq('tenant_id', tenantId)
-        .single();
-
-      if (!empresa?.pais_id) {
-        return 'SUNAT'; // Default to Peru
-      }
-
-      const { data: pais } = await this.supabaseService
-        .getClient()
-        .from('paises')
-        .select('codigo_iso')
-        .eq('id', empresa.pais_id)
-        .single();
-
-      const fiscalAuthorities: Record<string, string> = {
-        PE: 'SUNAT',
-        CO: 'DIAN',
-        CL: 'SII',
-        MX: 'SAT',
-        EC: 'SRI',
-      };
-
-      return fiscalAuthorities[pais?.codigo_iso] || 'autoridad fiscal';
-    } catch (error) {
-      this.logger.error(`Error getting fiscal authority name for tenant ${tenantId}:`, error);
-      return 'autoridad fiscal';
-    }
+    const perfil = await perfilPaisDelTenant(this.supabaseService.getClient(), tenantId);
+    return perfil.autoridadFiscal;
   }
 
   /**
-   * Get country code for tenant
+   * Código ISO del país del contribuyente.
    */
   async getCountryCode(tenantId: string): Promise<string> {
-    try {
-      const { data: empresa } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .select('pais_id')
-        .eq('tenant_id', tenantId)
-        .single();
-
-      if (!empresa?.pais_id) {
-        return 'PE'; // Default to Peru
-      }
-
-      const { data: pais } = await this.supabaseService
-        .getClient()
-        .from('paises')
-        .select('codigo_iso')
-        .eq('id', empresa.pais_id)
-        .single();
-
-      return pais?.codigo_iso || 'PE';
-    } catch (error) {
-      this.logger.error(`Error getting country code for tenant ${tenantId}:`, error);
-      return 'PE';
-    }
+    const perfil = await perfilPaisDelTenant(this.supabaseService.getClient(), tenantId);
+    return perfil.codigo;
   }
 
   /**

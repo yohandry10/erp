@@ -152,7 +152,7 @@ export class TributosAnualesService {
     const { data, error } = await this.supabase.getClient().from('empresa_config')
       .select('pais, regimen_tributario').eq('tenant_id', tenantId).maybeSingle();
     if (error) throw new Error(`No se pudo leer la configuración fiscal: ${error.message}`);
-    if (!data || String(data.pais || 'PE').toUpperCase() !== 'PE') {
+    if (!data || String(data.pais || '').toUpperCase() !== 'PE') {
       throw new BadRequestException('Renta Anual FV 710 está disponible sólo para empresas peruanas.');
     }
     const regimen = normalizarRegimenPeru(data.regimen_tributario);

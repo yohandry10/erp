@@ -29,6 +29,14 @@ describe('GREIntegrationService', () => {
       numero_documento: '20123456789',
     });
 
+    jest.spyOn(service as any, 'obtenerConfiguracionGRE').mockResolvedValue({
+      pais: 'PE',
+      moneda: 'PEN',
+      gre_obligatorio: false,
+      gre_automatico_habilitado: false,
+      umbral_gre_automatico: 700,
+    });
+
     jest.spyOn(service as any, 'obtenerEmpresaConfig').mockResolvedValue({
       direccion_fiscal: 'Calle Empresa 456',
       ubigeo: '150102',
@@ -51,6 +59,22 @@ describe('GREIntegrationService', () => {
     expect(result.pedidoId).toBe(pedido.id);
     expect(result.pedidoNumero).toBe(pedido.numero);
     expect(result.idempotencyKey).toBe(`ventas.gre:${tenantId}:${facturaId}`);
+  });
+
+  // La GRE es exclusiva de Perú. La compuerta era `config.pais && config.pais !==
+  // 'PE'`, y `obtenerConfiguracionGRE` sellaba 'PE' cuando no había país, así que
+  // una empresa sin configurar —o una lectura fallida— acababa con una guía de
+  // remisión peruana.
+  it('no prepara una GRE si la empresa no está configurada como peruana', async () => {
+    jest.spyOn(service as any, 'obtenerConfiguracionGRE').mockResolvedValue({
+      gre_obligatorio: false,
+      gre_automatico_habilitado: false,
+      umbral_gre_automatico: 700,
+    });
+
+    await expect(
+      service.prepararDatosGRE({ id: 'ped-1' } as any, 'cpe-1', 'tenant-1'),
+    ).rejects.toThrow(/exclusiva de Perú/);
   });
 
   it('no habilita sugerencia GRE automática si falla la lectura de configuración', async () => {
