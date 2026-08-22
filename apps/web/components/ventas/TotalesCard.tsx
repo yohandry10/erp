@@ -4,6 +4,7 @@ import { Calculator } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
 
 interface TotalesCardProps {
   subtotal?: number
@@ -33,12 +34,14 @@ export default function TotalesCard({
 
   useEffect(() => {
     if (autoCalculate && items.length > 0) {
-      const subtotal = items.reduce(
-        (sum, item) => sum + item.cantidad * item.precio_unitario,
-        0
+      // En enteros: `cantidad * precio` y `subtotal * tasa` sin redondear dejan un
+      // céntimo de menos cuando el valor exacto cae en el medio céntimo, y el
+      // usuario aprueba un total distinto del que el servidor va a registrar.
+      const subtotal = redondearMoneda(
+        items.reduce((sum, item) => sum + multiplicarMoneda(item.cantidad, item.precio_unitario), 0),
       )
-      const igv = subtotal * effectiveIgvRate
-      const total = subtotal + igv
+      const igv = multiplicarMoneda(subtotal, effectiveIgvRate)
+      const total = redondearMoneda(subtotal + igv)
 
       setCalculatedSubtotal(subtotal)
       setCalculatedIgv(igv)

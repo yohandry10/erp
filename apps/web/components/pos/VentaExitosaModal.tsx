@@ -7,6 +7,7 @@ import { useCountryContext } from '@/hooks/use-country-context'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { multiplicarMoneda } from '@/lib/format-utils'
 
 interface VentaExitosaData {
   venta_id: string | number
@@ -406,7 +407,7 @@ function mapCpeToTicketData(cpeData: CpePrintData, ventaData: NonNullable<VentaE
             nombre: item.nombre_producto || item.descripcion || 'Producto',
             cantidad,
             precio,
-            subtotal: Number(item.valor_venta ?? item.subtotal ?? cantidad * precio),
+            subtotal: Number(item.valor_venta ?? item.subtotal ?? multiplicarMoneda(cantidad, precio)),
           }
         })
       : ventaData.items,

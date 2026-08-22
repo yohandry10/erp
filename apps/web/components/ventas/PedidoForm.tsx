@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import ClienteSelector from './ClienteSelector'
 import { Plus, Trash2, Package } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
+import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
 
 interface Producto {
   id: string
@@ -188,7 +189,7 @@ const hasStockShortage = stockAlerts.length > 0
     newDetalle[index] = {
       ...newDetalle[index],
       precio_unitario: precio,
-      subtotal: newDetalle[index].cantidad * precio
+      subtotal: multiplicarMoneda(newDetalle[index].cantidad, precio)
     }
     setDetalle(newDetalle)
   }

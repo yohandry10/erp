@@ -822,7 +822,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           detalle.subtotal ??
           detalle.total_parcial ??
           detalle.total ??
-          cantidad * precioUnitario,
+          multiplicarMoneda(cantidad, precioUnitario),
         )
 
         return {
