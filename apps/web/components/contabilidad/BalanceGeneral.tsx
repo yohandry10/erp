@@ -9,6 +9,7 @@ import { ActivosVsPasivosChart } from './ActivosVsPasivosChart'
 import { exportToExcel, formatCurrencyForExcel } from '@/lib/excel-export'
 import { exportBalanceGeneralToPDF } from '@/lib/pdf-export'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface BalanceGeneralData {
   activos: {
@@ -65,6 +66,7 @@ type LineItem = {
 }
 
 export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGeneralProps) {
+  const country = useCountryContext()
   const { formatCurrency } = useLocalizedMoney()
   const { get } = useApi()
   const [loading, setLoading] = useState(true)
@@ -199,7 +201,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
       return
     }
 
-    exportBalanceGeneralToPDF(data, anio, mes)
+    exportBalanceGeneralToPDF(data, anio, mes, country.moneda)
   }
 
   const renderLine = (item: LineItem) => (

@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface EstadoResultadosData {
   ingresos: {
@@ -37,6 +38,7 @@ interface EstadoResultadosProps {
 }
 
 export function EstadoResultados({ anio, mes, showComparison = false }: EstadoResultadosProps) {
+  const country = useCountryContext()
   const { formatCurrency } = useLocalizedMoney()
   const { get } = useApi()
   const [loading, setLoading] = useState(true)
@@ -167,7 +169,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
       return
     }
 
-    exportEstadoResultadosToPDF(data, anio, mes)
+    exportEstadoResultadosToPDF(data, anio, mes, country.moneda)
   }
 
   if (loading) {

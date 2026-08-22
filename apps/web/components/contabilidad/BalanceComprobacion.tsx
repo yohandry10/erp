@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { exportToExcel, formatCurrencyForExcel } from '@/lib/excel-export'
 import { exportBalanceComprobacionToPDF } from '@/lib/pdf-export'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface BalanceComprobacionItem {
   cuenta: string
@@ -25,6 +26,7 @@ interface BalanceComprobacionProps {
 }
 
 export function BalanceComprobacion({ anio, mes, showComparison = false }: BalanceComprobacionProps) {
+  const country = useCountryContext()
   const { get } = useApi()
   const { formatCurrency } = useLocalizedMoney()
   const [loading, setLoading] = useState(true)
@@ -155,7 +157,7 @@ export function BalanceComprobacion({ anio, mes, showComparison = false }: Balan
       alert('No hay datos para exportar')
       return
     }
-    exportBalanceComprobacionToPDF(data, anio, mes, totales)
+    exportBalanceComprobacionToPDF(data, anio, mes, totales, country.moneda)
   }
 
   if (loading) {

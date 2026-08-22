@@ -147,6 +147,25 @@ if (tasasReales.length > 0) {
   fallos.push(`tasa de impuesto por defecto; el país decide la tasa, no el código:\n    ${tasasReales.join('\n    ')}`)
 }
 
+// ---------------------------------------------------------------------------
+// 4. Que no vuelva la moneda peruana fijada en un formateo
+// ---------------------------------------------------------------------------
+// `currency: 'PEN'` escrito a mano no respeta al contribuyente nunca, no sólo
+// mientras carga el país: un PDF del estado de resultados de una empresa
+// argentina salía en soles. Las dos excepciones son las pantallas de tributos
+// peruanos, que el API ya restringe a Perú.
+const TRIBUTOS_PERUANOS = /impuestos\/(anual\/)?page\.tsx/
+const monedaFijada = buscar(
+  ['currency', E('s'), '*:', E('s'), '*[' + String.fromCharCode(39) + '"]PEN'].join(''),
+  'app', 'components', 'lib',
+).filter((l) => !esComentario(l) && !TRIBUTOS_PERUANOS.test(l) && !l.includes('.md:'))
+if (monedaFijada.length > 0) {
+  fallos.push(
+    'moneda peruana fijada en un formateo; use la del contribuyente:\n    ' +
+      monedaFijada.join('\n    '),
+  )
+}
+
 if (fallos.length > 0) {
   console.error('\nAritmética de moneda incorrecta:\n')
   for (const f of fallos) console.error('  - ' + f)
