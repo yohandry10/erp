@@ -2,11 +2,12 @@ import { PlantillasSchedulerService } from './plantillas-scheduler.service';
 import { PlantillasAsientosService } from './plantillas-asientos.service';
 
 describe('PlantillasSchedulerService', () => {
-  const plantilla = { id: 'plantilla-1', tenant_id: 'tenant-1' };
+  const plantilla = { id: 'plantilla-1', tenant_id: 'tenant-1', proxima_ejecucion: '2026-08-20' };
   let plantillas: {
     obtenerVencidas: jest.Mock;
     generar: jest.Mock;
     avanzarAgenda: jest.Mock;
+    fechaHoyDe: jest.Mock;
   };
   let scheduler: PlantillasSchedulerService;
 
@@ -14,7 +15,8 @@ describe('PlantillasSchedulerService', () => {
     plantillas = {
       obtenerVencidas: jest.fn().mockResolvedValue([plantilla]),
       generar: jest.fn().mockResolvedValue({ id: 'asiento-1' }),
-      avanzarAgenda: jest.fn().mockResolvedValue(undefined)
+      avanzarAgenda: jest.fn().mockResolvedValue(undefined),
+      fechaHoyDe: jest.fn().mockResolvedValue('2026-08-20')
     };
     scheduler = new PlantillasSchedulerService(
       plantillas as unknown as PlantillasAsientosService
@@ -32,6 +34,31 @@ describe('PlantillasSchedulerService', () => {
       true
     );
     expect(plantillas.avanzarAgenda).toHaveBeenCalledTimes(1);
+  });
+
+  it('no dispara una plantilla que aún no vence en el calendario del tenant', async () => {
+    // El cron corre a las 02:00 UTC, que en Lima son las 21:00 del día anterior:
+    // sin este filtro la plantilla se generaba un día antes y con fecha futura.
+    plantillas.fechaHoyDe.mockResolvedValue('2026-08-19');
+
+    await scheduler.generarPlantillasVencidas();
+
+    expect(plantillas.generar).not.toHaveBeenCalled();
+    expect(plantillas.avanzarAgenda).not.toHaveBeenCalled();
+  });
+
+  it('fecha el asiento con el día del tenant, no con el del servidor', async () => {
+    plantillas.fechaHoyDe.mockResolvedValue('2026-08-20');
+
+    await scheduler.generarPlantillasVencidas();
+
+    expect(plantillas.generar).toHaveBeenCalledWith(
+      'tenant-1',
+      'system',
+      'plantilla-1',
+      { fecha: '2026-08-20' },
+      true,
+    );
   });
 
   it('recupera la agenda si el asiento del período ya existía', async () => {

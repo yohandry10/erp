@@ -190,7 +190,7 @@ export class TributosMensualesService {
       .maybeSingle();
     if (error) throw new Error(`No se pudo leer la configuración tributaria: ${error.message}`);
     if (!data) throw new BadRequestException('Complete la configuración fiscal de la empresa.');
-    if (String(data.pais || 'PE').toUpperCase() !== 'PE') {
+    if (String(data.pais || '').toUpperCase() !== 'PE') {
       throw new BadRequestException('Este espacio corresponde exclusivamente a tributación peruana.');
     }
     return { regimen: normalizarRegimenPeru(data.regimen_tributario) };

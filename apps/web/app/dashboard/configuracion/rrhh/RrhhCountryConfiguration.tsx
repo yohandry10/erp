@@ -107,7 +107,12 @@ export default function RrhhCountryConfiguration() {
             ...payload.configuracion,
             art_tasa: String(payload.configuracion.art_tasa ?? ''),
             sindicato_aporte_default: String(payload.configuracion.sindicato_aporte_default ?? 0),
-            contribucion_patronal: String(payload.configuracion.contribucion_patronal ?? 0.18),
+            // Sin valor guardado se deja vacío, como `art_tasa` justo encima.
+            // Prerrellenar 18 % era arbitrario: es la tasa del IGV peruano, no una
+            // contribución patronal, y en Argentina ronda el 24 %. Un número puesto
+            // por el programa en un campo que el usuario confirma sin mirar es peor
+            // que un campo vacío que le obliga a buscarlo.
+            contribucion_patronal: String(payload.configuracion.contribucion_patronal ?? ''),
             seguro_vida_monto: String(payload.configuracion.seguro_vida_monto ?? 0),
             periodo_prueba_max_meses: String(payload.configuracion.periodo_prueba_max_meses ?? 6),
           })

@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import {
@@ -405,6 +406,7 @@ export class ConciliacionService {
   }
 
   private round2(value: number): number {
-    return Math.round(value * 100) / 100;
+    // Ver bancos.service: el redondeo con coma flotante pierde el medio céntimo.
+    return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
   }
 }

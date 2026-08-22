@@ -188,6 +188,9 @@ export class AuditService {
 
     return {
       data: pagedLogs,
+      // Vacío cuando la traza está completa. Si trae fuentes, la pantalla debe
+      // decir que faltan registros en vez de dar la lista por exhaustiva.
+      fuentes_fallidas: supplemental.fuentesFallidas,
       pagination: {
         page,
         limit,
@@ -211,12 +214,17 @@ export class AuditService {
     tenantId: string,
     filters: AuditFiltersDto | undefined,
     fetchLimit: number,
-  ): Promise<{ data: AuditLog[]; count: number }> {
+  ): Promise<{ data: AuditLog[]; count: number; fuentesFallidas: string[] }> {
+    // Una traza de auditoría a la que le falta una fuente y no lo dice es peor
+    // que un error: quien audita no puede distinguir «no hubo intentos de login»
+    // de «no se pudieron leer». Se sigue devolviendo lo que sí se pudo cargar,
+    // pero el hueco viaja declarado.
+    const fuentesFallidas: string[] = [];
     const data: AuditLog[] = [];
     let count = 0;
 
     if (filters?.operation && filters.operation !== 'INSERT') {
-      return { data, count };
+      return { data, count, fuentesFallidas };
     }
 
     const client = this.supabase.getClient();
@@ -240,6 +248,7 @@ export class AuditService {
         count += filters?.user_id ? mapped.length : attemptsCount || mapped.length;
       } catch (error) {
         console.warn('⚠️ [AUDIT] No se pudieron cargar intentos de login en auditoría unificada:', error);
+        fuentesFallidas.push('auth_login_attempts');
       }
     }
 
@@ -259,6 +268,7 @@ export class AuditService {
         count += cashCount || mapped.length;
       } catch (error) {
         console.warn('⚠️ [AUDIT] No se pudieron cargar eventos de caja/POS en auditoría unificada:', error);
+        fuentesFallidas.push('caja_audit_log');
       }
     }
 
@@ -278,13 +288,14 @@ export class AuditService {
         count += posCount || mapped.length;
       } catch (error) {
         console.warn('⚠️ [AUDIT] No se pudieron cargar eventos POS en auditoría unificada:', error);
+        fuentesFallidas.push('pos_audit_log');
       }
     }
 
     if (this.shouldIncludeSupplemental(filters, 'integration_logs')) {
       try {
         if (filters?.user_id) {
-          return { data, count };
+          return { data, count, fuentesFallidas };
         }
         let query = client
           .from('integration_logs')
@@ -299,10 +310,11 @@ export class AuditService {
         count += integrationsCount || mapped.length;
       } catch (error) {
         console.warn('⚠️ [AUDIT] No se pudieron cargar integraciones en auditoría unificada:', error);
+        fuentesFallidas.push('integraciones');
       }
     }
 
-    return { data, count };
+    return { data, count, fuentesFallidas };
   }
 
   private async getUsersByEmail(tenantId: string, loginAttempts: any[]): Promise<Map<string, string>> {

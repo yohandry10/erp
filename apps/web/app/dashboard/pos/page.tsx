@@ -62,6 +62,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
 
 interface ItemVenta {
   producto: ProductoPOS
@@ -176,15 +177,22 @@ export default function POSPage() {
   const router = useRouter()
   const { toast } = useToast()
   const country = useCountryContext()
-  const paisCodigo = (country.paisCodigo || 'PE').toUpperCase()
+  // El país decide la autoridad, el documento de identidad, la moneda, el impuesto
+  // y qué comprobantes existen. Mientras no está resuelto no se inventa: esta
+  // pantalla enseñaba «SUNAT», «RUC», «S/» e «IGV (18%)» a cualquier contribuyente
+  // durante la carga, y encima se contradecía consigo misma, porque `impuestoRate`
+  // vale 0 hasta que resuelve y el ticket habría cobrado 0 bajo una etiqueta que
+  // decía 18 %.
+  const paisResuelto = Boolean(country.paisCodigo) && !country.loading
+  const paisCodigo = (country.paisCodigo || '').toUpperCase()
   const isPeru = paisCodigo === 'PE'
   const aplicaLimiteItems = paisCodigo === 'PE' || paisCodigo === 'CO'
-  const fiscalAuthority = country.servicioFiscal || 'SUNAT'
-  const documentoFiscal = country.documentoFiscal || 'RUC'
-  const currencySymbol = country.simboloMoneda || 'S/'
-  const taxLabel = country.impuesto || 'IGV (18%)'
-  const taxRate = country.impuestoRate ?? 0.18
-  const taxName = paisCodigo === 'PE' ? 'IGV' : 'IVA'
+  const fiscalAuthority = country.servicioFiscal
+  const documentoFiscal = country.documentoFiscal
+  const currencySymbol = country.simboloMoneda
+  const taxLabel = country.impuesto
+  const taxRate = country.impuestoRate
+  const taxName = isPeru ? 'IGV' : 'IVA'
   const locale = country.locale || 'es-PE'
   const consumerDocumentLabel =
     paisCodigo === 'AR' ? 'Factura B' : paisCodigo === 'CO' ? 'Factura electrónica' : 'Boleta'
@@ -814,7 +822,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           detalle.subtotal ??
           detalle.total_parcial ??
           detalle.total ??
-          cantidad * precioUnitario,
+          multiplicarMoneda(cantidad, precioUnitario),
         )
 
         return {
@@ -1002,6 +1010,18 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
   const procesarVenta = async () => {
     if (procesandoVenta) {
+      return
+    }
+
+    // Sin país resuelto no se sabe qué impuesto aplicar ni qué comprobante emitir.
+    // Antes se seguía adelante con la tasa a 0.
+    if (!paisResuelto) {
+      toast({
+        variant: 'destructive',
+        title: 'Configuración del país no disponible',
+        description:
+          'No se pudo determinar el país de la empresa, así que no se conoce el impuesto ni el tipo de comprobante. Recargue la página o revise la configuración fiscal.',
+      })
       return
     }
 
@@ -1436,12 +1456,14 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       .filter(esBaseGravada)
       .reduce((sum, item) => sum + item.subtotal, 0) * factor
 
-    return Number((Math.max(0, baseGravada) * taxRate).toFixed(2))
+    // `.toFixed(2)` sobre un producto deja un céntimo de menos cuando el valor
+    // exacto cae justo en el medio céntimo.
+    return multiplicarMoneda(Math.max(0, baseGravada), taxRate)
   }
 
   const calcularTotal = () => {
     const base = calcularSubtotal() - calcularDescuentoGlobalMonto()
-    return Math.max(0, Number((base + calcularImpuestos()).toFixed(2)))
+    return Math.max(0, redondearMoneda(base + calcularImpuestos()))
   }
 
   // Bases por afectación del Catálogo 07, con el descuento global prorrateado.
@@ -1452,14 +1474,35 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     const factor = subtotal > 0 ? 1 - calcularDescuentoGlobalMonto() / subtotal : 1
     const codigoDe = (item: ItemVenta) => String(item.producto?.afectacion_igv ?? '').trim()
     const acumular = (predicado: (item: ItemVenta) => boolean) =>
-      Number((carrito.filter(predicado).reduce((suma, item) => suma + item.subtotal, 0) * factor).toFixed(2))
+      multiplicarMoneda(
+        carrito.filter(predicado).reduce((suma, item) => suma + item.subtotal, 0),
+        factor,
+      )
 
-    return {
+    const tramos = {
       gravadas: acumular(esBaseGravada),
       exoneradas: acumular((item) => codigoDe(item).charAt(0) === '2'),
       inafectas: acumular((item) => codigoDe(item).charAt(0) === '3'),
       exportacion: acumular((item) => codigoDe(item) === '40'),
     }
+
+    // Cada tramo redondea por su cuenta, así que la suma de los cuatro puede
+    // separarse del total por un céntimo: con 33,33 + 33,33 + 33,34 y un 10 % de
+    // descuento salían 90,01 donde la venta son 90,00. En una representación
+    // impresa las bases tienen que sumar el importe, así que el residuo se lleva
+    // al tramo mayor, que es la práctica habitual al prorratear.
+    const objetivo = redondearMoneda(subtotal - calcularDescuentoGlobalMonto())
+    const residuo = redondearMoneda(
+      objetivo - (tramos.gravadas + tramos.exoneradas + tramos.inafectas + tramos.exportacion),
+    )
+    if (residuo !== 0) {
+      const mayor = (Object.keys(tramos) as Array<keyof typeof tramos>).reduce((a, b) =>
+        tramos[b] > tramos[a] ? b : a,
+      )
+      tramos[mayor] = redondearMoneda(tramos[mayor] + residuo)
+    }
+
+    return tramos
   }
 
   const totalPagosMixtos = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0)
@@ -1561,6 +1604,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       }
     } catch (error) {
       console.error('❌ Error abriendo caja:', error)
+      toast({
+        title: 'No se pudo abrir la caja',
+        description: error instanceof Error ? error.message : 'Vuelva a intentarlo; la caja sigue cerrada.',
+        variant: 'destructive',
+      })
     }
   }
 

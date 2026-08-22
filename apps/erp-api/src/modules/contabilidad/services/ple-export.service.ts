@@ -61,7 +61,7 @@ export class PleExportService {
   }
 
   private assertPeruPle(empresa?: { pais?: string | null } | null): void {
-    if (String(empresa?.pais || "PE").toUpperCase() !== "PE") {
+    if (String(empresa?.pais || "").toUpperCase() !== "PE") {
       throw new Error(
         "La exportación PLE corresponde únicamente a SUNAT Perú; Argentina utiliza Libro Diario, Mayor y libros IVA.",
       );

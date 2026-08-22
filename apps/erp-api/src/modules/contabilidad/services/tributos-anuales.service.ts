@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EstadosFinancierosService } from './estados-financieros.service';
@@ -33,7 +34,9 @@ const UIT_POR_EJERCICIO: Record<number, number> = {
 function roundMoney(value: unknown, clamp = true): number {
   const parsed = Number(value ?? 0);
   if (!Number.isFinite(parsed)) return 0;
-  const rounded = Math.round(parsed * 100) / 100;
+  // Renta anual e ITAN son cifras declaradas: el redondeo con coma flotante
+  // pierde el medio céntimo y desplaza el importe declarado.
+  const rounded = new Decimal(parsed).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
   return clamp ? Math.max(rounded, 0) : rounded;
 }
 
@@ -149,7 +152,7 @@ export class TributosAnualesService {
     const { data, error } = await this.supabase.getClient().from('empresa_config')
       .select('pais, regimen_tributario').eq('tenant_id', tenantId).maybeSingle();
     if (error) throw new Error(`No se pudo leer la configuración fiscal: ${error.message}`);
-    if (!data || String(data.pais || 'PE').toUpperCase() !== 'PE') {
+    if (!data || String(data.pais || '').toUpperCase() !== 'PE') {
       throw new BadRequestException('Renta Anual FV 710 está disponible sólo para empresas peruanas.');
     }
     const regimen = normalizarRegimenPeru(data.regimen_tributario);

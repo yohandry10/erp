@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { getActiveCountryByCode } from '../paises/initial-country';
 
 /**
  * PDF Format Helper Service
@@ -145,15 +146,8 @@ export class PdfFormatHelperService {
    * Get fiscal authority name for footer
    */
   getFiscalAuthorityName(countryCode: string): string {
-    const authorities: Record<string, string> = {
-      PE: 'SUNAT',
-      CO: 'DIAN',
-      CL: 'SII',
-      MX: 'SAT',
-      EC: 'SRI',
-    };
-
-    return authorities[countryCode] || 'Autoridad Fiscal';
+    // La tabla que había aquí no incluía Argentina y sí Chile, México y Ecuador.
+    return getActiveCountryByCode(countryCode)?.autoridadFiscal ?? 'Autoridad Fiscal';
   }
 
   /**

@@ -188,7 +188,7 @@ export class CashReconciliationService {
         const { data: sesion, error: sesionError } = await this.supabase
             .getClient()
             .from('sesiones_caja')
-            .select('monto_inicio, monto_esperado, tenant_id, moneda')
+            .select('monto_inicio, tenant_id, moneda')
             .eq('id', sesionId)
             .eq('tenant_id', tenantId)
             .single();
@@ -214,20 +214,28 @@ export class CashReconciliationService {
             );
         }
 
-        // Si no hay monto_esperado calculado, calcularlo desde movimientos
-        let saldoTeorico = sesion.monto_esperado;
+        // El saldo teórico se lee igual que en `cerrar_caja_tx`: el saldo_nuevo del
+        // último movimiento por secuencia, y monto_inicio cuando aún no hay ninguno.
+        // Antes se usaba la columna `monto_esperado`, que se escribe al abrir la
+        // sesión y nadie actualiza después: con una venta en efectivo de 74.34 sobre
+        // una apertura de 100, esta comprobación esperaba 100 y el writer 174.34. El
+        // cajero que entregaba el efectivo correcto recibía un aviso de sobrante por
+        // el importe exacto de las ventas del día y se le exigía autorización de
+        // supervisor sin motivo; quien entregaba sólo el fondo de apertura pasaba
+        // este filtro y sólo lo frenaba el writer.
+        const { data: ultimoMovimiento } = await this.supabase
+            .getClient()
+            .from('movimientos_caja')
+            .select('saldo_nuevo')
+            .eq('sesion_caja_id', sesionId)
+            .eq('tenant_id', tenantId)
+            .order('secuencia', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-        if (!saldoTeorico) {
-            const { data: movimientos } = await this.supabase
-                .getClient()
-                .from('movimientos_caja')
-                .select('monto')
-                .eq('sesion_caja_id', sesionId)
-                .eq('tenant_id', tenantId);
-
-            const sumaMovimientos = (movimientos || []).reduce((sum, m) => sum + m.monto, 0);
-            saldoTeorico = (sesion.monto_inicio || 0) + sumaMovimientos;
-        }
+        const saldoTeorico = Number(
+            ultimoMovimiento?.saldo_nuevo ?? sesion.monto_inicio ?? 0,
+        );
 
         const saldoReal = montoContado;
         const diferencia = saldoReal - saldoTeorico;

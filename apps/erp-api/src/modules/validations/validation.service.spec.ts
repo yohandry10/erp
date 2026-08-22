@@ -83,7 +83,12 @@ describe('ValidationService', () => {
       expect(result.isValid).toBe(true);
     });
 
-    it('debe validar RUT chileno con formato correcto', async () => {
+    // Chile y México tenían prueba propia y rama propia en el validador, pero el
+    // ERP opera para Perú, Argentina y Colombia: ningún contribuyente podía
+    // llegar a ellas. El informe daba por buena una configuración de un país en
+    // el que no se puede emitir, que es justo lo que este informe existe para
+    // detectar.
+    it('informa que Chile no es un país soportado en vez de validar su RUT', async () => {
       mockSupabaseClient.single.mockResolvedValueOnce({
         data: { ruc: '12345678-9', razon_social: 'Test SpA', direccion_fiscal: 'Av Chile 123', pais_id: 'pais-cl', paises: { codigo_iso: 'CL', nombre: 'Chile' } },
         error: null,
@@ -91,24 +96,25 @@ describe('ValidationService', () => {
 
       const result = await service.validateRucConfiguration(tenantId);
 
-      expect(result.isValid).toBe(true);
+      expect(result.isValid).toBe(false);
+      expect(result.errors.join(' ')).toContain('país soportado');
     });
 
-    it('debe rechazar RUT chileno con formato incorrecto', async () => {
+    it('informa cuando la empresa no declara país', async () => {
       mockSupabaseClient.single.mockResolvedValueOnce({
-        data: { ruc: '123456789', razon_social: 'Test SpA', direccion_fiscal: 'Av Chile 123', pais_id: 'pais-cl', paises: { codigo_iso: 'CL', nombre: 'Chile' } },
+        data: { ruc: '20123456789', razon_social: 'Test SAC', direccion_fiscal: 'Av Test 123', pais_id: null, paises: null },
         error: null,
       });
 
       const result = await service.validateRucConfiguration(tenantId);
 
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('El RUT debe tener formato 12345678-9 o 12345678-K');
+      expect(result.errors.join(' ')).toContain('país soportado');
     });
 
-    it('debe validar RFC mexicano con formato correcto', async () => {
+    it('valida el CUIT cuando la empresa es argentina', async () => {
       mockSupabaseClient.single.mockResolvedValueOnce({
-        data: { ruc: 'ABC123456XYZ', razon_social: 'Test SA de CV', direccion_fiscal: 'Calle MX 123', pais_id: 'pais-mx', paises: { codigo_iso: 'MX', nombre: 'México' } },
+        data: { ruc: '30500001735', razon_social: 'Test SA', direccion_fiscal: 'Av Corrientes 1', pais_id: 'pais-ar', paises: { codigo_iso: 'AR', nombre: 'Argentina' } },
         error: null,
       });
 
@@ -116,7 +122,6 @@ describe('ValidationService', () => {
 
       expect(result.isValid).toBe(true);
     });
-
     it('debe detectar campos faltantes', async () => {
       mockSupabaseClient.single.mockResolvedValueOnce({
         data: { ruc: '', razon_social: '', direccion_fiscal: '', pais_id: 'pais-pe', paises: { codigo_iso: 'PE', nombre: 'Perú' } },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -28,6 +29,7 @@ export function RoleAssignment({ userId, currentRoles, onSuccess, onCancel }: Ro
   const [assignedRoles, setAssignedRoles] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [loadingRoles, setLoadingRoles] = useState(true)
+  const { toast } = useToast()
 
   // Fetch available roles
   useEffect(() => {
@@ -82,6 +84,14 @@ export function RoleAssignment({ userId, currentRoles, onSuccess, onCancel }: Ro
       onSuccess()
     } catch (error) {
       console.error('Error assigning roles:', error)
+      // Asignar un rol es una decision de autorizacion. El `catch` solo registraba,
+      // y como la pantalla se actualiza dentro del `try`, al fallar no cambiaba nada:
+      // el administrador se quedaba creyendo que el usuario tenia el permiso.
+      toast({
+        title: 'No se pudieron asignar los roles',
+        description: error instanceof Error ? error.message : 'Vuelva a intentarlo; el usuario no los tiene.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -101,6 +111,11 @@ export function RoleAssignment({ userId, currentRoles, onSuccess, onCancel }: Ro
       onSuccess()
     } catch (error) {
       console.error('Error removing role:', error)
+      toast({
+        title: 'No se pudo quitar el rol',
+        description: error instanceof Error ? error.message : 'Vuelva a intentarlo; el usuario lo conserva.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }

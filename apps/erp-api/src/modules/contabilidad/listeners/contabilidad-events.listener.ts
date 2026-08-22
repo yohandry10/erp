@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleInit } from '@nestjs/common';
+import { cuadranImportes } from '../../../shared/utils/cuadre-contable.util';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AsientosGeneratorService } from '../services/asientos-generator.service';
 import { OutboxEventsService, OutboxEvent } from '../services/outbox-events.service';
@@ -908,8 +909,11 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
         return null;
       }
 
-      // Verificar que el asiento cuadre (debe = haber)
-      if (Math.abs(Number(asiento.total_debe) - Number(asiento.total_haber)) > 0.01) {
+      // Exacto, no `> 0.01`: con aquello un asiento descuadrado en justo un céntimo
+      // pasaba la verificación y se registraba como «verificado correctamente». El
+      // writer que lo creó exige `v_total_debe <> v_total_haber`, así que esto tiene
+      // que exigir lo mismo o no está verificando nada.
+      if (!cuadranImportes(asiento.total_debe, asiento.total_haber)) {
         this.logger.error(
           `❌ [ContabilidadEventsListener] Asiento ${asiento.id} no cuadra: Debe=${asiento.total_debe}, Haber=${asiento.total_haber}`
         );

@@ -25,7 +25,7 @@ import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { decryptText, encryptText } from '../../shared/utils/secure-config.utils';
 import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
-
+
 // Respaldo si normativa_peru_periodos no tiene fila para el periodo consultado.
 const RMV_PERU_FALLBACK = 1130;
 
@@ -140,7 +140,7 @@ export class RrhhService {
   async getConfiguracionLaboral(tenantId: string) {
     const pais = await this.obtenerPaisLaboral(tenantId);
     if (pais === 'PE') {
-      const periodo = new Date().toISOString().slice(0, 7);
+      const periodo = (await fechaHoyDelTenant(this.supabaseService.getClient(), tenantId)).slice(0, 7);
       const client = this.supabaseService.getClient();
       const selectNormativa =
         'periodo, uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, onp_aporte, essalud_aporte, quinta_deduccion_uit, bancarizacion_pen_min, bancarizacion_usd_min, igv_tasa, fuente';
@@ -2428,7 +2428,7 @@ export class RrhhService {
     const esContratoLaboral = tipo === 'indefinido' || tipo === 'temporal';
     const esJornadaCompleta = jornada === '' || jornada === 'tiempo_completo';
     if (esContratoLaboral && esJornadaCompleta && sueldo > 0) {
-      const periodo = (fechaInicio || new Date().toISOString().slice(0, 10)).slice(0, 7);
+      const periodo = (fechaInicio || (await fechaHoyDelTenant(this.supabaseService.getClient(), tenantId))).slice(0, 7);
       const rmv = await this.obtenerRmvVigente(periodo, tenantId);
       if (sueldo < rmv) {
         throw new BadRequestException(

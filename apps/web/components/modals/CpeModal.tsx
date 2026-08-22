@@ -91,7 +91,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
         clienteDireccion: '',
         fechaEmision: new Date().toISOString().split('T')[0],
         fechaVencimiento: '',
-        moneda: country.moneda || 'PEN',
+        // Sin `|| 'PEN'`: esto es el estado inicial de un comprobante y viaja al
+        // servidor. Con el país sin resolver `country.moneda` es cadena vacía, y el
+        // respaldo emitía en soles para cualquier contribuyente.
+        moneda: country.moneda,
         tipoOperacion: '0101',
         observaciones: '',
         items: [

@@ -58,7 +58,16 @@ export class ConsolidacionReportesService {
       .eq('tenant_id', tenantId);
     if (errorMembresias) this.dbError('Error obteniendo membresías', errorMembresias);
 
-    const grupoIds = [...new Set((membresias || []).map((m: any) => m.grupo_id))];
+    // Sólo las membresías vivas: una invitación rechazada no vuelve a listar el
+    // grupo. Además `obtenerGrupo` ya las rechaza, así que sin este filtro el
+    // listado entero fallaría con un 403 en cuanto hubiera una rechazada.
+    const grupoIds = [
+      ...new Set(
+        (membresias || [])
+          .filter((m: any) => ['PENDIENTE', 'ACTIVO'].includes(String(m.estado || '').toUpperCase()))
+          .map((m: any) => m.grupo_id),
+      ),
+    ];
     let query = this.client
       .from('grupos_consolidacion')
       .select('*')
@@ -95,7 +104,14 @@ export class ConsolidacionReportesService {
       .eq('grupo_id', grupoId)
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    if (grupo.tenant_id !== tenantId && !membresia) {
+    // Bastaba con tener cualquier fila de membresía: una empresa que rechazó la
+    // invitación seguía viendo el RUC, la razón social y el nombre comercial del
+    // resto del grupo, para siempre. Rechazar termina la relación. Pendiente sí
+    // ve el listado, que es lo que permite decidir si aceptar.
+    const perteneceAlGrupo =
+      grupo.tenant_id === tenantId ||
+      ['PENDIENTE', 'ACTIVO'].includes(String(membresia?.estado || '').toUpperCase());
+    if (!perteneceAlGrupo) {
       throw new ForbiddenException('La empresa actual no pertenece a este grupo.');
     }
 

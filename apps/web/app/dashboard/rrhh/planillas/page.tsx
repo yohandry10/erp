@@ -305,8 +305,16 @@ const PlanillasPage = () => {
           if (response.ok) {
             alert("✅ Planilla aprobada exitosamente");
             loadPlanillas();
+          } else {
+            // Aprobar una planilla es consecuente. El `catch {}` se tragaba el
+            // fallo y la pantalla no cambiaba: el usuario no podía saber si había
+            // aprobado, y volvía a pulsar.
+            const detalle = await response.text().catch(() => '');
+            alert(`No se pudo aprobar la planilla. ${detalle || 'Vuelva a intentarlo.'}`);
           }
-        } catch {}
+        } catch (error: any) {
+          alert(`No se pudo aprobar la planilla: ${error?.message || 'error de red'}`);
+        }
       },
     });
   };

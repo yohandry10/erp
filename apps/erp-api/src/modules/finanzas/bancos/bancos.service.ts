@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
@@ -68,7 +69,14 @@ export class BancosService {
       .select('moneda_defecto')
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    const monedaDefecto = String(empresaConfig?.moneda_defecto || 'PEN').toUpperCase();
+    // La moneda de la cuenta se guarda y luego decide conversiones y saldos: si
+    // falta la configuración, es mejor pedirla que rotular la cuenta en soles.
+    const monedaDefecto = String(empresaConfig?.moneda_defecto || '').trim().toUpperCase();
+    if (!monedaDefecto) {
+      throw new BadRequestException(
+        'La empresa no tiene moneda configurada; configúrela antes de crear cuentas bancarias.',
+      );
+    }
 
     // Validar que no exista una cuenta con el mismo número para este tenant
     const { data: existente } = await client
@@ -791,6 +799,9 @@ export class BancosService {
   }
 
   private round2(value: number): number {
-    return Math.round(value * 100) / 100;
+    // `Math.round(v * 100) / 100` no redondea bien la mitad: 5.5 * 3 % da 0.16 en
+    // lugar de 0.17 porque el producto sale 0.16499999999999998. Con dinero eso
+    // desplaza céntimos, y el resto del repo ya usa Decimal.
+    return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber();
   }
 }

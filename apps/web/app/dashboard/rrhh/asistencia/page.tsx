@@ -2,10 +2,12 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useApi } from '@/hooks/use-api';
+import { useToast } from '@/components/ui/use-toast';
 import { unwrapApiArray } from '@/lib/api-contract';
 
 const AsistenciaPage = () => {
   const [empleados, setEmpleados] = useState<any[]>([]);
+  const { toast } = useToast();
   const [asistencias, setAsistencias] = useState<any[]>([]);
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +44,11 @@ const AsistenciaPage = () => {
       setAsistencias(unwrapApiArray(asistenciasData));
     } catch (error) {
       console.error('Error cargando asistencias:', error);
+      toast({
+        title: 'No se pudo guardar la asistencia',
+        description: error instanceof Error ? error.message : 'Vuelva a intentarlo; el registro no se guardo.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -74,6 +81,14 @@ const AsistenciaPage = () => {
       loadData();
     } catch (error) {
       console.error('Error marcando asistencia:', error);
+      // Marcar asistencia es lo que decide si a alguien se le paga el dia. El `catch`
+      // solo registraba, y como el refresco esta dentro del `try`, al fallar la
+      // pantalla no cambiaba: se marcaba de nuevo, o se daba por marcado.
+      toast({
+        title: 'No se pudo marcar la asistencia',
+        description: error instanceof Error ? error.message : 'Vuelva a intentarlo; no quedo registrada.',
+        variant: 'destructive',
+      });
     }
   };
 

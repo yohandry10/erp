@@ -40,7 +40,9 @@ export class GREIntegrationService {
     try {
       // Obtener configuración del tenant
       const config = await this.obtenerConfiguracionGRE(tenantId);
-      if (config.pais && config.pais !== 'PE') {
+      // Exige Perú en vez de tolerar el vacío: `obtenerConfiguracionGRE` sellaba
+      // 'PE' cuando no había país, así que esta compuerta nunca llegaba a cerrarse.
+      if (config.pais !== 'PE') {
         return { sugerir: false, obligatorio: false, automatico: false };
       }
 
@@ -110,9 +112,9 @@ export class GREIntegrationService {
 
     try {
       const config = await this.obtenerConfiguracionGRE(tenantId);
-      if (config.pais && config.pais !== 'PE') {
+      if (config.pais !== 'PE') {
         throw new BadRequestException(
-          'La GRE es exclusiva de Perú; el tenant argentino utiliza documentación de traslado local fuera de SUNAT.',
+          'La GRE es exclusiva de Perú y la empresa no está configurada como peruana.',
         );
       }
       // Obtener datos del cliente (Requirement 22.3)
@@ -247,7 +249,7 @@ export class GREIntegrationService {
     }
 
     return {
-      pais: String(config.pais || 'PE').toUpperCase(),
+      pais: String(config.pais || '').toUpperCase(),
       moneda: String(config.moneda_defecto || 'PEN').toUpperCase(),
       gre_obligatorio: config.gre_obligatorio || false,
       gre_automatico_habilitado: config.gre_automatico_habilitado === true,

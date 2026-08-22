@@ -5,6 +5,7 @@ import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useApi } from '@/hooks/use-api'
 import { useToast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { multiplicarMoneda } from '@/lib/format-utils'
 
 interface OrdenCompraModalProps {
   isOpen: boolean
@@ -220,7 +221,7 @@ export default function OrdenCompraModal({
     if (field === 'cantidad' || field === 'precio_unitario') {
       const cantidad = Number(newItems[index].cantidad) || 0
       const precio = Number(newItems[index].precio_unitario) || 0
-      newItems[index].subtotal = cantidad * precio
+      newItems[index].subtotal = multiplicarMoneda(cantidad, precio)
     }
 
     setItems(newItems)
