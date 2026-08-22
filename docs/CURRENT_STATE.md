@@ -1053,6 +1053,38 @@ en la web y `test:dinero` lo mantiene así.
   impreso usaba el del documento. El mismo modal enseñaba dos cifras del mismo
   comprobante emitido.
 
+### Los módulos de negocio de la web, uno a uno (cerrado)
+
+Lo que quedaba pendiente en la revisión anterior. Cerrado por flujos, no por
+barridos:
+
+- **Escrituras que fallaban en silencio: 14, diez reales.** Todas con la misma
+  forma —el refresco de la pantalla vive dentro del `try`, así que al fallar nada
+  cambia y el usuario da la acción por hecha—. Las que cuestan: **asignar y quitar
+  roles** (una decisión de autorización), **renovar y finalizar un contrato**,
+  **marcar asistencia** y **abrir caja**. Las cuatro restantes se revisaron y son
+  correctas: los dos caminos de `use-permission` fallan **cerrados**.
+- **RRHH**: las tasas AFP por administradora del formulario coinciden con las del
+  servidor, y el importe sale de la tasa guardada en el contrato, no del
+  formulario. No es un defecto.
+- **Wizard**: limpio. Clave de idempotencia en cada escritura, manejo de
+  `!response.ok` y detección de encolado offline.
+- **Inventario**: `productos` tiene `stock` y `stock_actual`, y dos formularios leen
+  columnas distintas. No divergen: los 374 productos coinciden y el único writer
+  que las toca actualiza las dos. Redundante, no roto.
+- **Finanzas**: los writers validan que la moneda del pago coincida con la del
+  documento y con la de la cuenta bancaria, y fallan cerrados.
+- **Pantallas de dinero**: ninguna permite doble envío; todas tienen estado en
+  vuelo o botón deshabilitado.
+- **Divisiones sin proteger el cero**: ninguna.
+
+### Invariantes de producción tras la 500
+
+Comprobadas después de aplicar la migración: `schema_version` 500, outbox sin
+pendientes y sin cola muerta, cero asientos descuadrados, cero `detalle_asientos`
+cruzados de contribuyente, cero cuentas por cobrar cruzadas, cero filas de dinero
+sin moneda.
+
 ### Sobre los guardianes de esta auditoría
 
 Tres de los detectores que escribí daban verde con el fallo delante, y los tres los
