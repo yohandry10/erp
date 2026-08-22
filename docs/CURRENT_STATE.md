@@ -1172,6 +1172,36 @@ configuración, no vulnerabilidad.
 
 Coste: la compuerta pasa de ~10 verificadores a ~65 y tarda unos diez minutos.
 
+### Las pruebas e2e (auditadas)
+
+Mismo patrón que los verificadores SQL: **de las 29 e2e, CI ejecuta 7.** Las otras
+22 —unas 10 000 líneas— no corren.
+
+Aquí la causa **sí es legítima**: necesitan el API levantado con base y
+credenciales reales, y el job de Playwright sólo levanta la web contra
+`127.0.0.1:3001`. No es un olvido, es que no caben en ese entorno. Pero el efecto
+es el mismo: lo que afirman no lo comprueba nadie, y ya derivó.
+
+`superadmin-tenant-rbac-rls.spec.ts` fija los permisos por rol: ADMIN 195,
+CONTADOR 64, VENDEDOR 51. En producción son **251–256, 99 y 56**.
+
+Fijar un número es un contrato malo: crece solo cada vez que se añade un permiso
+ordinario, y entonces la prueba estorba y se acaba apagando. Lo estable es el
+**techo**, y ése se comprobó contra producción y **aguanta**: de los cinco permisos
+sensibles, los tres que dan poder —`tenants.manage`, `users.manage`, `system.debug`—
+no los alcanza ningún rol operativo. Los otros dos son lecturas de auditoría y las
+llevan AUDITOR, CONTADOR, FINANZAS y GERENCIA, que es para lo que existen.
+
+Ese invariante se saca de la e2e muerta y pasa a `verify_rbac_ceiling.sql`, que sí
+corre en cada compuerta: crea un contribuyente, comprueba que se sembraron roles
+—control de que está midiendo algo— y exige que ninguno operativo alcance los tres.
+Deliberadamente **no dice nada sobre ADMIN_DEMO**, porque ahí hay una decisión de
+producto pendiente y no le toca resolverla a una comprobación.
+
+**Lo que sigue sin cubrirse**: las 22 e2e como tales. Cubrirlas exigiría levantar el
+API con una base sembrada en CI, que es una decisión de infraestructura, no un
+arreglo. Queda dicho para que nadie las cuente como red de seguridad.
+
 ### Sobre los guardianes de esta auditoría
 
 Tres de los detectores que escribí daban verde con el fallo delante, y los tres los
