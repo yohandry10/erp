@@ -981,6 +981,53 @@ Lo que **no** está hecho: leer los módulos grandes de negocio uno a uno
 buscando fallos de lógica propios de cada flujo, que es lo que en el API destapó los
 defectos más caros. Los barridos no sustituyen a eso.
 
+### El respaldo peruano estaba también en el esquema (migración 500)
+
+Toda la auditoría fue retirando el «Perú por defecto» del código: el adaptador
+fiscal, el calculador de impuestos, la emisión de comprobantes, la GRE, el POS, los
+hooks de la web. Faltaba una capa: **34 columnas `moneda` del esquema llevaban**
+**`DEFAULT 'PEN'`**.
+
+Y una la usaba. `pos_registrar_venta_tx` —el writer que registra cada venta del
+POS— inserta en `ventas_pos` **sin declarar la moneda**, en sus dos sobrecargas. Es
+decir que toda venta de POS se registraba en soles, fuese cual fuese el país del
+contribuyente. Las 60 ventas de producción son de contribuyentes peruanos, así que
+la moneda coincide por casualidad; la primera venta argentina o colombiana habría
+quedado en soles.
+
+La 500 arregla el writer —resuelve la moneda de `empresa_config` y falla cerrado si
+no está—, quita el defecto de las 34 columnas y hace obligatoria la moneda donde el
+importe es el dato. El orden importa: primero el writer, después el defecto; al
+revés, entre una sentencia y la siguiente una venta se queda sin moneda.
+
+El verificador recorre las **62** columnas `moneda` del esquema, no sólo las tocadas.
+
+**Pendiente: la 500 no está aplicada en producción.** Requiere promoción coordinada.
+
+### Contabilidad: el cuadre y el periodo (cerrado)
+
+- **El cuadre era exacto abajo y tolerante arriba.** Los writers exigen
+  `v_total_debe <> v_total_haber`; encima, dos comprobaciones usaban `> 0.01`, que deja
+  pasar un descuadre de **exactamente un céntimo**: la verificación de asientos del
+  listener y la compuerta del generador, justo antes de llamar al writer que lo
+  rechaza. En los informes la tolerancia absorbía nuestra propia aritmética —sumar
+  `number` deriva ~1e-13—, el mismo defecto ya corregido en retenciones. Todo pasa a
+  Decimal y a comparación exacta. Y `cuentas_con_saldo` contaba con `> 0.01`, que deja
+  fuera una cuenta con exactamente un céntimo.
+- **El periodo se resolvía en la zona del servidor.** `validarPeriodoAbierto` usaba
+  `getFullYear()/getMonth()` sobre un `timestamptz`, con el servidor en UTC. Un
+  comprobante de las 19:30 de Lima cae en el día siguiente y, la noche del 31, en el
+  mes siguiente: el asiento se valida contra el periodo equivocado. En producción 23
+  de los 179 asientos ya tienen un día distinto en UTC que en Lima; ninguno cruza mes,
+  y eso es suerte. Se respeta la distinción de `parseDateLocal`: una fecha a
+  medianoche UTC exacta es una fecha de calendario y no se convierte.
+- **Las bases por afectación del POS no sumaban la venta.** Cada tramo redondeaba por
+  su cuenta: 33,33 + 33,33 + 33,34 con un 10 % de descuento daban 90,01 sobre una
+  venta de 90,00. El residuo va ahora al tramo mayor.
+- **`CpeViewModal` mostraba un importe recalculado** en la tabla mientras el HTML
+  impreso usaba el del documento. El mismo modal enseñaba dos cifras del mismo
+  comprobante emitido.
+
 ### Sobre los guardianes de esta auditoría
 
 Tres de los detectores que escribí daban verde con el fallo delante, y los tres los
