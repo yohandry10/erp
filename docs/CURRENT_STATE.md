@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-17.
+Actualizado: 2026-08-22.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
@@ -8,7 +8,21 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **PROD está en `498`.** El 2026-08-20 se promovieron `497` y `498`, ambas de
+- **PROD está en `500`.** El 2026-08-21 se promovieron la `499` —fijar `pg_temp` en el
+  `search_path` de diez writers `SECURITY DEFINER`— y la `500` —quitar el `DEFAULT 'PEN'`
+  de las 34 columnas `moneda` del esquema y hacer que `pos_registrar_venta_tx` fije la
+  moneda del contribuyente, porque no la declaraba y toda venta de POS tomaba
+  soles—. Las dos pasaron el gate completo en un clúster efímero antes de
+  aplicarse, con sus verificadores comprobados en rojo. `outbox_runtime_health_492`
+  devuelve `ready: true` con `schema_version 500`, y también con 499, que es lo que
+  exige el API desplegado.
+- **El API desplegado sigue siendo `main`, que pide el esquema 498.** No está roto
+  —la comprobación verifica que la fila exista, y existe— pero la base va por
+  delante del código: el writer del POS que fija la moneda ya está en producción y
+  el código que calcula en enteros no. **Lo cierra el merge de la rama**
+  `fix/arqueo-saldo-teorico` (PR #82).
+
+- **PROD estuvo en `498`.** El 2026-08-20 se promovieron `497` y `498`, ambas de
   sólo funciones —sin DDL de tabla ni migración de datos—, tras pasar el gate
   completo en un cluster efímero (495 migraciones, verificadores `497` y `498`
   en verde). Se respaldó la definición previa de
@@ -1084,6 +1098,79 @@ Comprobadas después de aplicar la migración: `schema_version` 500, outbox sin
 pendientes y sin cola muerta, cero asientos descuadrados, cero `detalle_asientos`
 cruzados de contribuyente, cero cuentas por cobrar cruzadas, cero filas de dinero
 sin moneda.
+
+### Los verificadores SQL (auditados)
+
+La capa de la que depende creer todo lo demás. Hallazgo principal: **de los 86
+verificadores del repositorio, sólo corrían 10.**
+
+La causa es que `SQL_VERIFY_FLOOR = 491` hacía dos trabajos y sólo uno era suyo:
+
+- **Legítimo**: exigir que toda migración nueva traiga verificador. Empieza en 491
+  porque ahí arrancó la práctica —417 de las 497 migraciones no tienen uno—, así que
+  el suelo **no se puede bajar**.
+- **No legítimo**: como la selección parte de las *migraciones*, ningún verificador
+  por debajo del suelo llegaba a ejecutarse. 76 quedaban muertos.
+
+Se ejecutaron los 76 contra una base recién migrada: **66 pasaban**. Es decir, 66
+protecciones escritas, mantenidas y silenciosamente inactivas. Ahora corren en una
+segunda pasada, y los 7 que no pasan están enumerados en el propio script con el
+motivo —fixtures anteriores a una migración que endureció el flujo, privilegios de
+una firma que cambió, un sembrado que ya no siembra—.
+
+Tres hallazgos más, encontrados al hacerlo:
+
+- **La base de CI no replicaba el historial de producción.** La compuerta sellaba
+  `name` con el nombre completo del fichero; producción y el CLI de Supabase lo
+  sellan sin el prefijo numérico. Cuatro verificadores que comprueban el nombre
+  fallaban aquí y pasaban allí. Corregido: tres de los cuatro pasan ya.
+- **`verify_outbox_integrity.sql` nunca se había ejecutado.** `discover()` sólo
+  reconoce ficheros `NNN__nombre.sql`, y éste no lleva número porque no le
+  corresponde ninguna migración. Comprueba seis invariantes de las que depende todo
+  el sistema de eventos —columnas del outbox, índice único de idempotencia, claves
+  duplicadas, RLS habilitado y forzado, política presente y las RPC runtime—. Pasa.
+  Ahora está conectado.
+- Los otros dos sin número, `verify_anon_access` y `verify_grants_matrix`, **no
+  afirman nada**: cero `RAISE`, son inventarios de privilegios. Correcto que no estén
+  en la compuerta; el problema es que tampoco los mira nadie.
+
+**Sobre los permisos de `anon`, que casi reporto como agujero y no lo es.** El
+verificador 437 —uno de los que no corrían— señala que las funciones
+`validar_*_runtime` tienen `EXECUTE` para `anon`, y en producción 86 de 89 lo tienen.
+La clave anónima va dentro del paquete de la web, así que la llamada se acepta. Pero
+no es explotable: corren como INVOKER y `anon` choca con las vistas de dentro
+—comprobado con una llamada anónima real contra PROD: `permission denied for view`
+`v_rls_tenant_tables_audit`—, y **hay cero funciones `SECURITY DEFINER` en `public`**
+**alcanzables por `anon`**. Es descuido de configuración, no una vulnerabilidad.
+
+**Lo que destapó el verificador 490, que tampoco corría.** Exige que un
+`ADMIN_DEMO` no tenga `tenants.manage`, `system.debug`, `security.audit.read` ni
+`documentos.audit.read`. En producción, **los 66 roles ADMIN_DEMO tienen los 256**
+**permisos del catálogo**, los cinco sensibles incluidos.
+
+Alcance real, medido y no supuesto:
+
+- **La frontera entre contribuyentes aguanta.** Las 55 rutas que exigen un permiso
+  sensible se revisaron una a una: las que piden `tenants.manage` llevan **todas**
+  `SuperAdminGuard` encima. Ya se había comprobado antes con un token de demo real
+  contra PROD: listar tenants y leer otro devuelven 403.
+- 36 de esas 55 no llevan SuperAdminGuard, y ahí el permiso es la puerta. Lo que un
+  demo alcanza por esa vía son diagnósticos y lecturas de auditoría **de su propio**
+  **tenant**: probar la conexión, probar la firma XML sin enviar a SUNAT, y leer su
+  traza. Nada de otro contribuyente.
+- `users.manage` es **deliberado**: la migración 493 es posterior al verificador y lo
+  concede a propósito —«los ADMIN/ADMIN_DEMO canónicos conservan la capacidad de
+  administrar su tenant»—. En ese punto el 490 está obsoleto por decisión.
+
+Queda una **decisión de producto**, y por eso no se toca: o el sembrado se ajusta a
+los cuatro que el 490 excluye, o el 490 se actualiza para reflejar que hoy se
+conceden a conciencia. Las dos posiciones están escritas en el repositorio y se
+contradicen; elegir una no es una corrección técnica.
+
+**Sobre `verify_anon_access` y el 437**, ya cerrado más arriba: descuido de
+configuración, no vulnerabilidad.
+
+Coste: la compuerta pasa de ~10 verificadores a ~65 y tarda unos diez minutos.
 
 ### Sobre los guardianes de esta auditoría
 
