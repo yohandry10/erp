@@ -1002,7 +1002,32 @@ revés, entre una sentencia y la siguiente una venta se queda sin moneda.
 
 El verificador recorre las **62** columnas `moneda` del esquema, no sólo las tocadas.
 
-**Pendiente: la 500 no está aplicada en producción.** Requiere promoción coordinada.
+**Aplicada en producción**: `schema_version` 500, verificador en verde contra PROD
+y `ready: true` tanto con 499 —el API que corre— como con 500.
+
+### El respaldo peruano en la web (cerrado)
+
+138 apariciones de «Perú por defecto» en `apps/web`, clasificadas una a una. Las que
+eran defecto de verdad:
+
+- **`lib/pdf-export.ts` fijaba `currency: 'PEN'`** en un `formatCurrency` que usan 43
+  sitios del fichero: el PDF del balance de comprobación, del estado de resultados y
+  del balance general de una empresa argentina salía en soles. Un PDF pesa más que
+  una pantalla: se guarda, se manda y se firma.
+- La liquidación de RRHH y `ventas/comercial` etiquetaban importes en soles.
+- `CpeModal` mandaba `moneda: country.moneda || 'PEN'` en el estado inicial del
+  comprobante, y con el país sin resolver `country.moneda` es cadena vacía.
+
+Los ~130 restantes **no se tocan, y conviene saber por qué**: son de presentación y
+sólo disparan mientras el país carga, o son `'es-PE'` como *locale*, que en es-PE,
+es-AR y es-CO da el mismo separador de miles y el mismo formato de fecha. Los dos
+«currency: 'PEN'» que quedan son las pantallas de tributos peruanos, que el API ya
+restringe a Perú.
+
+Y trece multiplicaciones de dinero sin redondear a céntimos en formularios de
+compras, ventas y POS. El servidor recalcula, así que no emitieron nada mal; lo que
+hacían era enseñar un total distinto del que se iba a registrar. Ya no queda ninguna
+en la web y `test:dinero` lo mantiene así.
 
 ### Contabilidad: el cuadre y el periodo (cerrado)
 
