@@ -341,10 +341,6 @@ const HISTORICOS_QUE_NO_PASAN = new Map([
     "470__cxc_aging_and_kardex_canonical_reports.sql",
     "Su fixture mezcla monedas en una misma antigüedad de CxC, que es justo lo que el propio verificador prohíbe.",
   ],
-  [
-    "490__demo_admin_custom_rbac_capability.sql",
-    "Espera que un ADMIN de demo no reciba un permiso global, y el sembrado actual se lo da.",
-  ],
 ]);
 
 // `discover` sólo reconoce ficheros `NNN__nombre.sql`, así que los verificadores
