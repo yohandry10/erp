@@ -138,6 +138,9 @@ export default function RrhhPage() {
       }
     } catch (error) {
       console.error('Error:', error)
+      // El `throw` de arriba llegaba aqui y moria en la consola: al fallar el alta o
+      // la edicion, el modal se quedaba abierto sin decir por que.
+      alert(error instanceof Error ? error.message : 'No se pudo guardar el empleado.')
     }
   }
 
