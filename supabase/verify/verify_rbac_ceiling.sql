@@ -17,11 +17,10 @@
 -- CONTADOR, FINANZAS y GERENCIA, que es exactamente para lo que existen: no se
 -- comprueban aquí porque prohibirlos seria describir mal el producto.
 --
--- Deliberadamente **no** se dice nada sobre qué debe tener ADMIN_DEMO. El
--- verificador 490 exige que no tenga cuatro de los sensibles y el sembrado actual
--- le da los 256; la migración 493 concede `users.manage` a propósito. Esa
--- contradicción es una decisión de producto pendiente y no le toca resolverla a
--- una comprobación.
+-- Deliberadamente **no** se dice nada sobre qué debe tener ADMIN_DEMO: de eso ya
+-- responde el verificador 501, que cubre las dos mitades --el dato sembrado y el
+-- camino de alta-- después de que la migración del mismo número cerrara el
+-- desbordamiento que le entregaba el catálogo entero.
 --
 -- Va sin número porque no le corresponde ninguna migración: es un invariante, como
 -- `verify_outbox_integrity.sql`.
