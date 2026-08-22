@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { parseDateLocal } from '@/lib/date-utils'
 import { useApi } from '@/hooks/use-api';
+import { useToast } from '@/components/ui/use-toast';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import PromptDialog from '@/components/ui/PromptDialog';
 import { fetchApi } from '@/lib/api-fetch';
@@ -33,6 +34,7 @@ const ContratosPage = () => {
   const isActiveContract = (contrato: any) =>
     contratoEstaVigente(contrato?.estado) || normalizarEstadoContrato(contrato?.estado) === 'activo';
   const [contratos, setContratos] = useState<any[]>([]);
+  const { toast } = useToast();
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroTipo, setFiltroTipo] = useState('todos');
@@ -131,6 +133,13 @@ const ContratosPage = () => {
             loadData();
           } catch (error) {
             console.error('Error renovando contrato:', error);
+            // El `catch` solo registraba, y la pantalla se refresca dentro del `try`: al
+            // fallar no cambiaba nada y el usuario creia que habia renovado.
+            toast({
+              title: 'No se pudo renovar el contrato',
+              description: error instanceof Error ? error.message : 'Vuelva a intentarlo; el contrato sigue como estaba.',
+              variant: 'destructive',
+            });
           }
         }
       }
@@ -159,6 +168,11 @@ const ContratosPage = () => {
           loadData();
         } catch (error) {
           console.error('Error finalizando contrato:', error);
+          toast({
+            title: 'No se pudo finalizar el contrato',
+            description: error instanceof Error ? error.message : 'Vuelva a intentarlo; el contrato sigue vigente.',
+            variant: 'destructive',
+          });
         }
       }
     });
@@ -181,6 +195,11 @@ const ContratosPage = () => {
       }
     } catch (error) {
       console.error('Error generando contrato:', error);
+      toast({
+        title: 'No se pudo generar el contrato',
+        description: error instanceof Error ? error.message : 'Vuelva a intentarlo.',
+        variant: 'destructive',
+      });
     }
   };
 

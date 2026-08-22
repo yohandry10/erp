@@ -1604,6 +1604,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       }
     } catch (error) {
       console.error('❌ Error abriendo caja:', error)
+      toast({
+        title: 'No se pudo abrir la caja',
+        description: error instanceof Error ? error.message : 'Vuelva a intentarlo; la caja sigue cerrada.',
+        variant: 'destructive',
+      })
     }
   }
 
