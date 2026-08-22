@@ -106,6 +106,26 @@ if (Number.parseInt(renderSchemaMatch?.[1] ?? "", 10) !== latestMigration) {
 if (!/^\s*autoDeployTrigger:\s*checksPass\s*$/m.test(renderBlueprint)) {
   fail("Render debe esperar a que los checks de CI pasen antes de desplegar");
 }
+
+// El propio workflow fija REQUIRED_DATABASE_SCHEMA_VERSION a mano, y esa copia
+// también tiene que cuadrar con la última migración. No estaba comprobada, y por
+// eso derivó: al promover la 499 y la 500 se actualizaron render.yaml y los
+// valores por defecto del código, pero no el workflow, que se quedó en 498. En
+// local no se nota —sin la variable en el entorno, la compuerta toma la última
+// migración por defecto y pasa—, así que el fallo sólo aparecía en CI. Aquí se
+// comprueba el fichero, no el entorno, para que salte también en local.
+const ciWorkflow = fs.readFileSync(
+  path.join(rootDir, ".github", "workflows", "ci.yml"),
+  "utf8",
+);
+const ciSchemaMatch = ciWorkflow.match(
+  /REQUIRED_DATABASE_SCHEMA_VERSION:\s*["']?(\d+)["']?/,
+);
+if (Number.parseInt(ciSchemaMatch?.[1] ?? "", 10) !== latestMigration) {
+  fail(
+    `.github/workflows/ci.yml debe exigir el esquema ${latestMigration}, recibido: ${ciSchemaMatch?.[1] ?? "(ausente)"}`,
+  );
+}
 if (/^\s*plan:\s*free\s*$/m.test(renderBlueprint)) {
   fail("Render no puede dormir la API que ejecuta workers/outbox");
 }
