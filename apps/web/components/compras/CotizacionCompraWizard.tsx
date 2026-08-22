@@ -11,6 +11,7 @@ import { useCountryContext } from '@/hooks/use-country-context'
 import { Proveedor } from '@/types/compras'
 import { cn } from '@/lib/utils'
 import { parseDateLocal } from '@/lib/date-utils'
+import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
 
 const fieldLabelClass = 'mb-2 block text-sm font-medium text-foreground/85'
 const requiredMarkClass = 'text-muted-foreground'
@@ -133,7 +134,7 @@ export function CotizacionCompraWizard({
   }
 
   const handleAddProducto = (producto: any, cantidad: number, precio: number) => {
-    const subtotal = cantidad * precio
+    const subtotal = multiplicarMoneda(cantidad, precio)
     const newDetalle: ProductoDetalle = {
       producto_id: producto.id,
       descripcion: producto.nombre || producto.descripcion || 'Producto',

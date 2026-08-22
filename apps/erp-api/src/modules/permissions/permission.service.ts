@@ -281,12 +281,10 @@ export class PermissionService {
       return false;
     }
 
-    // Bypass global if user tiene rol ADMIN en este tenant
-    const isAdmin = validRoles.some(r => (r as any)?.nombre?.toUpperCase() === 'ADMIN');
-    if (isAdmin) {
-      if (this.CACHE_TTL > 0) this.permissionCache.set(cacheKey, { permissions: [cacheKey], timestamp: Date.now() });
-      return true;
-    }
+    // Aquí había un atajo: cualquier rol llamado exactamente ADMIN concedía todo.
+    // Con él, revocar un permiso a ese rol no surtía efecto, y bastaba con nombrar
+    // ADMIN a un rol para saltarse la lista entera. El permiso lo dan las filas de
+    // `rol_permisos`, no el nombre del rol.
 
     const validRoleIds = validRoles.map(r => r.id);
 

@@ -44,7 +44,11 @@ export class WorkerAuthGuard implements CanActivate {
         }
 
         try {
-            const decoded = jwt.verify(token, secret) as any;
+            // Algoritmo fijado a HS256. jsonwebtoken 9 ya restringe a HMAC cuando el
+            // secreto es una cadena, así que hoy no cambia nada; deja de ser cierto en
+            // cuanto el secreto pase a ser una clave, y entonces `alg` lo elegiría quien
+            // envía el token.
+            const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as any;
 
             if (decoded.iss !== 'pos.worker') {
                 this.logger.warn(`Invalid issuer: ${decoded.iss}`);

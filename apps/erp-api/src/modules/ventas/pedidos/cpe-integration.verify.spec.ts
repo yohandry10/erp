@@ -218,6 +218,7 @@ describe('CPE Integration Verification', () => {
             data: {
                 ruc: '20987654321',
                 razon_social: 'Mi Empresa SAC',
+                moneda_defecto: 'PEN',
                 serie_factura: 'F001',
                 ultimo_numero_factura: 100,
                 pais_id: 1, // Perú
@@ -378,6 +379,7 @@ describe('CPE Integration Verification', () => {
             data: {
                 ruc: '20987654321',
                 razon_social: 'Mi Empresa SAC',
+                moneda_defecto: 'PEN',
                 direccion_fiscal: 'Av. Empresa 456',
             },
             error: null,

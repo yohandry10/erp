@@ -50,6 +50,12 @@ certs/
 apps/web/tests/e2e/.auth/
 apps/web/playwright-report/
 apps/web/test-results/
+
+# Scratch de los verificadores de apps/web (offline, POS, dinero)
+apps/web/.pos-idempotencia-tmp/
+apps/web/.offline-test-tmp/
+apps/web/.dinero-test-tmp/
+test-results/
 apps/web/tests/e2e/artifacts/
 
 # Respaldos PostgreSQL locales: pueden contener datos reales de PROD.

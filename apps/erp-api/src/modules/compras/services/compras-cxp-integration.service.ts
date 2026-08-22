@@ -434,7 +434,10 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
       const { data: ordenDetalles, error: detallesError } = await this.supabase.getClient()
         .from('orden_compra_detalles')
         .select('id, producto_id, precio_unitario, cantidad')
-        .eq('orden_id', data.ordenId);
+        .eq('orden_id', data.ordenId)
+        // El evento trae el tenant y aquí no se usaba: un `ordenId` equivocado leía
+        // los precios de otra empresa en silencio en vez de no devolver nada.
+        .eq('tenant_id', data.tenantId);
 
       if (detallesError) {
         this.logger.error(`❌ Error obteniendo detalles de orden: ${detallesError.message}`);
@@ -445,7 +448,8 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
       const { data: recepcionItems, error: itemsError } = await this.supabase.getClient()
         .from('recepcion_items')
         .select('producto_id, cantidad_recibida, detalle_id, calidad')
-        .eq('recepcion_id', data.recepcionId);
+        .eq('recepcion_id', data.recepcionId)
+        .eq('tenant_id', data.tenantId);
 
       if (itemsError) {
         this.logger.error(`❌ Error obteniendo items de recepción: ${itemsError.message}`);

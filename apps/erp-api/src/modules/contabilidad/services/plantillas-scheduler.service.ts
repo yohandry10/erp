@@ -21,11 +21,17 @@ export class PlantillasSchedulerService {
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async generarPlantillasVencidas(): Promise<void> {
-    const hoy = new Date().toISOString().slice(0, 10);
+    // El cron corre a las 02:00 del servidor, que está en UTC: son las 21:00 del
+    // día anterior en Lima. Tomar la fecha del reloj aquí adelantaba un día tanto
+    // el disparo de la plantilla como la fecha del asiento generado. Como el
+    // alcance operativo va de UTC-5 a UTC-3, la fecha UTC nunca se queda corta:
+    // sirve como corte amplio para la consulta y luego cada plantilla se filtra
+    // con el calendario de su propio tenant.
+    const corteAmplio = new Date().toISOString().slice(0, 10);
 
-    let vencidas: Array<{ id: string; tenant_id: string }>;
+    let vencidas: Array<{ id: string; tenant_id: string; proxima_ejecucion: string }>;
     try {
-      vencidas = await this.plantillas.obtenerVencidas(hoy);
+      vencidas = await this.plantillas.obtenerVencidas(corteAmplio);
     } catch (error: any) {
       this.logger.error(`No se pudieron obtener las plantillas vencidas: ${error.message}`);
       return;
@@ -40,15 +46,24 @@ export class PlantillasSchedulerService {
     for (const plantilla of vencidas) {
       // Una plantilla que falla no debe impedir que se generen las demás: cada
       // una es independiente y pertenece potencialmente a otro tenant.
+      // Fuera del try: el catch de abajo también necesita esta fecha, y
+      // `fechaHoyDelTenant` no lanza —ante cualquier fallo cae a la zona de Lima—.
+      const hoyTenant = await this.plantillas.fechaHoyDe(plantilla.tenant_id);
+      if (plantilla.proxima_ejecucion > hoyTenant) {
+        // Vencida según el reloj del servidor, pero todavía no en el calendario
+        // del contribuyente. Se deja para la próxima madrugada.
+        continue;
+      }
+
       try {
         await this.plantillas.generar(
           plantilla.tenant_id,
           'system',
           plantilla.id,
-          { fecha: hoy },
+          { fecha: hoyTenant },
           true
         );
-        await this.plantillas.avanzarAgenda(plantilla.tenant_id, plantilla.id, new Date(hoy));
+        await this.plantillas.avanzarAgenda(plantilla.tenant_id, plantilla.id, new Date(hoyTenant));
       } catch (error: any) {
         // Si una persona ya generó manualmente el asiento del período, o el
         // proceso cayó después de crear el asiento pero antes de mover la
@@ -59,7 +74,7 @@ export class PlantillasSchedulerService {
             await this.plantillas.avanzarAgenda(
               plantilla.tenant_id,
               plantilla.id,
-              new Date(hoy)
+              new Date(hoyTenant)
             );
             this.logger.warn(
               `Plantilla ${plantilla.id}: período ya generado; agenda recuperada.`

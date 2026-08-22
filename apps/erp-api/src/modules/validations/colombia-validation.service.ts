@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-
+
+import { calcularDigitoVerificacionNit } from '../paises/initial-country';
 /**
  * Colombia-specific validation service
  * Handles DIAN-specific validation rules for Colombian companies
@@ -34,7 +35,7 @@ export class ColombiaValidationService {
 
     // If verification digit is provided, validate it
     if (verificationDigit) {
-      const calculatedDigit = this.calculateNITVerificationDigit(baseNumber);
+      const calculatedDigit = calcularDigitoVerificacionNit(baseNumber);
       const providedDigit = verificationDigit.replace('-', '');
       
       if (calculatedDigit.toString() !== providedDigit) {
@@ -51,23 +52,6 @@ export class ColombiaValidationService {
   /**
    * Calculate NIT verification digit using Colombian algorithm
    */
-  private calculateNITVerificationDigit(nit: string): number {
-    const weights = [71, 67, 59, 53, 47, 43, 41, 37, 29, 23, 19, 17, 13, 7, 3];
-    const nitDigits = nit.split('').reverse().map(Number);
-    
-    let sum = 0;
-    for (let i = 0; i < nitDigits.length; i++) {
-      sum += nitDigits[i] * weights[i];
-    }
-
-    const remainder = sum % 11;
-    
-    if (remainder === 0 || remainder === 1) {
-      return remainder;
-    }
-    
-    return 11 - remainder;
-  }
 
   /**
    * Validate DIAN document limits

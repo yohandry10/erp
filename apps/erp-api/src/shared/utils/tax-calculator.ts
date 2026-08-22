@@ -246,6 +246,13 @@ export class TaxCalculatorService {
 
       // ✅ FIX: paises es un array, acceder al primer elemento
       const paisData = Array.isArray(data?.paises) ? data.paises[0] : data?.paises;
+      // El país sale del catálogo, no de un valor por defecto: sin él no se sabe
+      // ni la moneda ni qué reglas aplicar.
+      if (!paisData?.codigo_iso || !paisData?.moneda_codigo) {
+        throw new ServiceUnavailableException(
+          `La configuración fiscal del tenant ${tenantId} no resuelve el país ${paisIdToUse}.`,
+        );
+      }
       // Sin `?? 0.18`: una fila que existe pero no declara tasa es configuración
       // incompleta, no una invitación a asumir la peruana. Cero sí es válido
       // (operaciones inafectas), por eso se usa `??` y no `||`.
@@ -271,8 +278,8 @@ export class TaxCalculatorService {
       const config: TaxConfig = {
         // Cero es una tasa válida; `||` la reemplazaba indebidamente por 18 %.
         tasaIgv: tasaNormalizada,
-        pais: paisData?.codigo_iso || 'PE',
-        moneda: paisData?.moneda_codigo || 'PEN',
+        pais: paisData.codigo_iso,
+        moneda: paisData.moneda_codigo,
         nombreImpuesto: data?.impuesto_principal_nombre || 'IGV',
         paisId: data?.pais_id,
         retencionRenta: data?.retencion_renta_porcentaje || 0,

@@ -75,4 +75,46 @@ describe('ArcaFiscalService', () => {
     expect(xml).toContain('<Moneda>ARS</Moneda>');
     expect(xml).toContain('<IVA>21.00</IVA>');
   });
+
+  /**
+   * `cpe.fecha_emision` es `timestamptz` y `CbteFch` se armaba con los getters
+   * UTC. En Argentina (UTC-3) una factura emitida entre las 00:00 y las 03:00
+   * salía fechada al día siguiente, y ARCA compara `CbteFch` contra su propia
+   * fecha. El QR llevaba el mismo desfase, así que ni siquiera se contradecían
+   * entre sí: los dos mentían igual.
+   *
+   * `CbteFch` es una fecha de calendario, no un instante: el día fiscal del
+   * contribuyente.
+   */
+  describe('fecha del comprobante', () => {
+    const medianocheDeBuenosAires = new Date('2026-08-21T02:30:00Z'); // 20/08 23:30 en AR
+
+    it('fecha el comprobante en el día argentino, no en el día UTC', () => {
+      const xml = (service as any).buildAuthorizeRequest(
+        { cuit: '30710158229', puntoVenta: 1 },
+        { token: 't', sign: 's' },
+        documento({ fechaEmision: medianocheDeBuenosAires }),
+        1,
+        1,
+      );
+
+      expect(xml).toContain('<ar:CbteFch>20260820</ar:CbteFch>');
+      expect(xml).not.toContain('20260821');
+    });
+
+    it('el QR declara la misma fecha que el XML', () => {
+      const qr = (service as any).buildQrUrl(
+        { cuit: '30710158229', puntoVenta: 1 },
+        documento({ fechaEmision: medianocheDeBuenosAires }),
+        1,
+        1,
+        '75000000000000',
+      );
+
+      const datos = JSON.parse(
+        Buffer.from(new URL(qr).searchParams.get('p') as string, 'base64').toString('utf8'),
+      );
+      expect(datos.fecha).toBe('2026-08-20');
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
 import {
   ConciliarPartidasDto,
   ConciliacionResponseDto,
@@ -269,7 +270,7 @@ export class ConciliacionPartidasService {
 
     const reparto = ConciliacionPartidasService.repartir(partidas);
 
-    const fecha = dto.fecha ?? new Date().toISOString().slice(0, 10);
+    const fecha = dto.fecha ?? (await fechaHoyDelTenant(this.supabaseService.getClient(), tenantId));
     const { data: conciliacion, error: errorConciliacion } = await this.supabaseService
       .getClient()
       .rpc('conciliar_partidas_tx', {

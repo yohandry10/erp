@@ -46,6 +46,9 @@ describe('CPEIntegrationService documento de cliente', () => {
   const empresaConfig = {
     ruc: '20987654321',
     razon_social: 'Mi Empresa SAC',
+    // Declarada a propósito: antes la suplía un respaldo a PEN dentro del
+    // servicio, así que la prueba no decía en qué moneda emitía.
+    moneda_defecto: 'PEN',
   };
 
   it('usa el RUC textual cuando numero_documento no puede almacenar 11 digitos', async () => {

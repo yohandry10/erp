@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import { multiplicarMoneda, redondearMoneda } from '@/lib/format-utils'
 import { AlertCircle, Plus, Trash2, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -38,13 +39,15 @@ function createRequestKey(prefix: string) {
 function calculateLines(lines: DetalleTipo[], taxRate: number) {
   return lines.map((line) => {
     const unitNet = Math.max(Number(line.precio_unitario) - Number(line.descuento_unitario || 0), 0)
-    const base = Math.round(Number(line.cantidad) * unitNet * 100) / 100
-    const tax = Math.round(base * taxRate * 100) / 100
+    // En enteros: `Math.round(x * 100) / 100` sobre un producto deja un céntimo de
+    // menos cuando el valor exacto cae justo en el medio céntimo.
+    const base = multiplicarMoneda(Number(line.cantidad), unitNet)
+    const tax = multiplicarMoneda(base, taxRate)
     return {
       ...line,
       valor_venta: base,
       impuesto_igv: tax,
-      total_item: Math.round((base + tax) * 100) / 100,
+      total_item: redondearMoneda(base + tax),
     }
   })
 }
@@ -230,10 +233,10 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
     setDetalles(calculated)
     setFormData((current) => ({
       ...current,
-      subtotal: Math.round(subtotal * 100) / 100,
-      descuentos: Math.round(discounts * 100) / 100,
-      impuesto_igv: Math.round(tax * 100) / 100,
-      total: Math.round((subtotal + tax) * 100) / 100,
+      subtotal: redondearMoneda(subtotal),
+      descuentos: redondearMoneda(discounts),
+      impuesto_igv: redondearMoneda(tax),
+      total: redondearMoneda(subtotal + tax),
     }))
   }
 

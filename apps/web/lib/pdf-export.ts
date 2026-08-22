@@ -18,13 +18,37 @@ export interface PDFSection {
 }
 
 /**
- * Format currency for display
+ * Moneda del documento que se está exportando.
+ *
+ * `formatCurrency` fijaba 'PEN' y se usa en 43 sitios de este fichero, así que el
+ * PDF del estado de resultados de una empresa argentina salía en soles. Y un PDF
+ * es peor que una pantalla: se guarda, se manda y se firma.
+ *
+ * Se guarda en el módulo en lugar de pasarla por los 43 sitios porque la
+ * generación es síncrona: cada función de exportación la fija al empezar y nadie
+ * más escribe mientras tanto.
+ */
+let monedaDelDocumento = ''
+
+function usarMoneda(moneda?: string | null) {
+  monedaDelDocumento = String(moneda ?? '').trim().toUpperCase()
+}
+
+/**
+ * Formatea un importe con la moneda del documento. Sin moneda conocida se imprime
+ * el número solo: es preferible a etiquetarlo con una divisa que no es la suya.
  */
 export function formatCurrency(amount: number): string {
+  if (!monedaDelDocumento) {
+    return new Intl.NumberFormat('es-PE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount)
+  }
   return new Intl.NumberFormat('es-PE', {
     style: 'currency',
-    currency: 'PEN',
-    minimumFractionDigits: 2
+    currency: monedaDelDocumento,
+    minimumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -35,8 +59,10 @@ export function exportBalanceComprobacionToPDF(
   data: any[],
   anio: number,
   mes: number,
-  totales: any
+  totales: any,
+  moneda?: string,
 ) {
+  usarMoneda(moneda)
   const doc = new jsPDF('landscape')
   
   // Title
@@ -120,8 +146,10 @@ export function exportBalanceComprobacionToPDF(
 export function exportEstadoResultadosToPDF(
   data: any,
   anio: number,
-  mes: number
+  mes: number,
+  moneda?: string,
 ) {
+  usarMoneda(moneda)
   const doc = new jsPDF()
   
   // Title
@@ -213,8 +241,10 @@ export function exportEstadoResultadosToPDF(
 export function exportBalanceGeneralToPDF(
   data: any,
   anio: number,
-  mes: number
+  mes: number,
+  moneda?: string,
 ) {
+  usarMoneda(moneda)
   const doc = new jsPDF()
   
   // Title

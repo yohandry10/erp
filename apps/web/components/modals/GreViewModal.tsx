@@ -39,6 +39,7 @@ interface GreData {
 export default function GreViewModal({ isOpen, onClose, documentId }: GreViewModalProps) {
   const [greData, setGreData] = useState<GreData | null>(null)
   const [loading, setLoading] = useState(false)
+  const [errorCarga, setErrorCarga] = useState<string | null>(null)
   const { get, post } = useApiCall<GreData>()
   const [actionLoading, setActionLoading] = useState(false)
   const operationKeys = useRef(new Map<string, string>())
@@ -70,11 +71,15 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
     if (!documentId) return
 
     setLoading(true)
+    setErrorCarga(null)
     try {
       const result = await get(`/api/gre/guias/${documentId}`)
       setGreData(unwrapApiObject<GreData>(result, null as any))
     } catch (error) {
       console.error('Error cargando GRE:', error)
+      // Con `setGreData(null)` a secas, un fallo de carga se ve igual que una guia
+      // que no existe. En un documento fiscal esa distincion importa.
+      setErrorCarga(error instanceof Error ? error.message : 'No se pudo cargar la guia de remision.')
       setGreData(null)
     }
     setLoading(false)
@@ -106,6 +111,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
       }
     } catch (error) {
       console.error('Error descargando PDF:', error)
+      alert(error instanceof Error ? error.message : 'No se pudo descargar la guia.')
     }
   }
 
@@ -485,7 +491,14 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
             </div>
           ) : (
             <div className="text-center p-12 text-muted-foreground">
-              <p className="text-base">No se pudo cargar la guía de remisión</p>
+              {/* Distinguir «no se pudo leer» de «no existe»: sin esto, un fallo de
+                  red se veía igual que una guía inexistente, y en un documento
+                  fiscal esa diferencia es justo la que importa. */}
+              <p className="text-base">
+                {errorCarga
+                  ? `No se pudo cargar la guía de remisión: ${errorCarga}`
+                  : 'No se encontró la guía de remisión'}
+              </p>
             </div>
           )}
         </div>

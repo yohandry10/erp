@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-17.
+Actualizado: 2026-08-22.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
@@ -8,7 +8,21 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **PROD está en `498`.** El 2026-08-20 se promovieron `497` y `498`, ambas de
+- **PROD está en `500`.** El 2026-08-21 se promovieron la `499` —fijar `pg_temp` en el
+  `search_path` de diez writers `SECURITY DEFINER`— y la `500` —quitar el `DEFAULT 'PEN'`
+  de las 34 columnas `moneda` del esquema y hacer que `pos_registrar_venta_tx` fije la
+  moneda del contribuyente, porque no la declaraba y toda venta de POS tomaba
+  soles—. Las dos pasaron el gate completo en un clúster efímero antes de
+  aplicarse, con sus verificadores comprobados en rojo. `outbox_runtime_health_492`
+  devuelve `ready: true` con `schema_version 500`, y también con 499, que es lo que
+  exige el API desplegado.
+- **El API desplegado sigue siendo `main`, que pide el esquema 498.** No está roto
+  —la comprobación verifica que la fila exista, y existe— pero la base va por
+  delante del código: el writer del POS que fija la moneda ya está en producción y
+  el código que calcula en enteros no. **Lo cierra el merge de la rama**
+  `fix/arqueo-saldo-teorico` (PR #82).
+
+- **PROD estuvo en `498`.** El 2026-08-20 se promovieron `497` y `498`, ambas de
   sólo funciones —sin DDL de tabla ni migración de datos—, tras pasar el gate
   completo en un cluster efímero (495 migraciones, verificadores `497` y `498`
   en verde). Se respaldó la definición previa de
@@ -30,6 +44,23 @@ migraciones verificados, prevalece la implementación actual.
   lo demás sigue fallando cerrado. **Tras el despliegue** conviene reencolar los
   doce que ya están en `dead_letter` para que se cierren; antes de desplegar
   volverían a caer.
+- **El guardián de fechas UTC estaba inerte y tapaba diez sitios.** Sólo miraba
+  `.split('T')[0]`, y al ampliarlo a `.slice(0, 10)` y `.slice(0, 7)` resultó que
+  `git grep` usa expresión básica: los paréntesis y la barra eran literales, la
+  alternancia no casaba con nada y el guardián pasaba en verde sin comprobar nada.
+  Con `-E` aparecieron diez ficheros nunca vistos. Seis eran defectos reales, no
+  cosméticos: la **fecha del asiento contable del cierre de caja**, la de
+  conciliación de partidas, la de las plantillas recurrentes —que además alimenta
+  el UUID determinista del período—, el **período con el que RRHH elige la
+  normativa vigente** (UIT, RMV, tasas AFP) y el que valida la RMV de un contrato,
+  y el planificador de plantillas, que corre a las 02:00 UTC —21:00 de Lima del día
+  anterior— y disparaba las plantillas un día antes con fecha futura. Todos pasan
+  ya por la zona del contribuyente; el planificador filtra por el calendario de
+  cada tenant. Queda anotado y sin resolver el caso de ARCA: el QR y el XML leen
+  `fechaEmision` en UTC y coinciden entre sí, pero una emisión nocturna en
+  Argentina quedaría fechada al día siguiente. No afecta hoy —ningún contribuyente
+  tiene `arca_activo` y no hay tenants AR— y al homologar habrá que decidir si ese
+  campo es el instante o el día fiscal.
 - **Barrido de integridad sobre PROD el 2026-08-20**, sólo lectura: 170 asientos
   contables, todos cuadrados y con detalle; el invariante de stock
   (`productos.stock_actual` = suma de `producto_existencias`) se cumple en todos
@@ -605,6 +636,582 @@ productivo autorizado.
   tenant para probar el sistema. `users.manage` no es delegable a roles custom,
   los permisos globales permanecen prohibidos y ningún writer alterno puede
   asignar `ADMIN_DEMO` sin la autorización administrativa real del actor.
+
+## Cobertura de la auditoría de QA
+
+Mapa de qué se ha revisado y con qué profundidad, para no repetir análisis en
+sesiones posteriores. «A fondo» significa leer el código del módulo buscando
+fallos de lógica; «barrido» significa que lo cruzó una comprobación de patrón
+pero nadie lo leyó.
+
+> **Cuidado con los «hoy no dispara» de este documento.** Varias notas de abajo
+> se apoyan en datos de los tenants de producción —que ningún usuario esté en
+> dos tenants, que todos tengan `moneda_defecto`, que ADMIN tenga los 256
+> permisos—. Salvo el superadministrador, esos tenants son **desechables**: son
+> demos y pruebas, no clientes. Esa evidencia no dice que un fallo sea inocuo,
+> dice que todavía no hay nadie a quien pueda dañar. Los fallos abiertos que
+> encontró esta auditoría no están latentes: están **sin estrenar**.
+
+### Barridos transversales (cubren TODO el repositorio)
+
+Ya ejecutados y con guardián que impide la regresión:
+
+- Fechas resueltas en UTC: `fecha-utc-guard.spec` (backend) y `test:fechas` (web).
+- `@Body()` sin DTO, en sus dos formas: `body-tipado.guard.spec`.
+- Controles de formulario sin etiqueta: `test:etiquetas`.
+- `Math.random` en decisiones, código muerto no inyectado, type-check de
+  `scripts/`, idempotencia y offline de POS.
+
+Un barrido **no sustituye** a leer el módulo: los defectos más caros de esta
+auditoría —quinta categoría, tasas AFP por administradora, saldo teórico del
+arqueo, peso inventado en la GRE— aparecieron leyendo, no barriendo.
+
+### Auditados a fondo
+
+`rrhh` · `cajas` · `cpe` · `pos` · `gre` · `compras` · `configuracion` ·
+`analytics` · `usuarios` · `demo` · `permissions` · `auth` · `tenants` ·
+y las utilidades compartidas (tax-calculator, fechas, outbox, event-bus, caché,
+jobs en segundo plano).
+
+### Tocados sólo de refilón
+
+Aparecen en el historial pero **no fueron revisados**: `contabilidad` (sólo el
+DTO de período y las fechas de asiento), `finanzas` (sólo el DTO de análisis de
+crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
+`sire` (sólo la ventana de estadísticas).
+
+### Auditados a fondo en la segunda vuelta (cerrados, no repetir)
+
+- `retenciones`: limpio. Valida `monto` contra `base × tasa` y lo rechaza si no
+  cuadra, exige que el tercero corresponda al origen, usa Decimal en todo el
+  cálculo y escribe por RPC atómica con actor e idempotencia. El controlador pide
+  `finanzas.read`/`finanzas.write` y toma el tenant del JWT.
+- `ose`: limpio. El éxito exige código `0` en el CDR de SUNAT, no un HTTP 200; el
+  cortacircuitos devuelve `success: false` explícito y ningún `catch` finge
+  aceptación. La rama que sí devuelve éxito directo es la del ticket, donde la
+  aceptación se resuelve después al consultarlo.
+- `validations`: los tres `catch` devuelven `isValid: false`, es decir fallan
+  cerrado. **Pero el dígito de verificación del NIT colombiano estaba mal**: los
+  pesos de la DIAN se aplicaban en orden inverso, con lo que el dígito de más a la
+  derecha pesaba 71 en vez de 3. Comprobado contra cuatro NIT reales y públicos
+  (Bancolombia, Ecopetrol, DIAN, Claro): acertaba uno de cuatro por casualidad.
+  Rechazaba NIT válidos. Corregido y fijado con esos mismos cuatro. Sin efecto
+  hoy: no hay ningún contribuyente con país CO.
+
+  Había **dos copias** de esa fórmula con el mismo error, y la que de verdad se
+  usa —alta de proveedor y configuración del contribuyente— era la de
+  `paises/initial-country`. Ahora hay una sola implementación exportada y la
+  prueba comprueba las dos puertas de entrada, que es lo que impide que vuelvan a
+  divergir.
+
+- `paises`: los `catch` degradan bien —caché del catálogo o `false` al validar— y
+  las tasas de `initial-country` sólo siembran la configuración de un tenant nuevo.
+  Pero el barrido de esas tasas destapó **un tercer respaldo peruano silencioso**,
+  en `cpe/fiscal-adapter`, que yo había dado por auditado: sin fila de país o sin
+  configuración fiscal devolvía la identidad peruana entera —código PE, IGV, 18 %
+  y soles— para el país que fuese. Ahora se detiene. Hoy no dispara, porque
+  `configuracion_fiscal` tiene fila para los cinco países.
+
+  Al escribir la prueba apareció además un hueco del propio arreglo: `Number(null)`
+  es 0, así que una tasa ausente pasaba como 0 % válido. Se rechaza explícitamente.
+
+  Lección para la lista de arriba: **«auditado a fondo» no significa exhaustivo.**
+  De los tres respaldos peruanos, dos se quitaron en la primera vuelta y el tercero
+  apareció por un camino lateral, buscando otra cosa.
+
+- `documentos`: limpio. Sus quince rutas declaran permiso y toman el tenant del
+  JWT.
+- **Autorización de rutas, barrido de todo el API (cerrado).** De las **687 rutas**,
+  **683 declaran guard**. Las cuatro restantes sólo exigen sesión y es correcto:
+  dos leen el contexto de configuración del propio tenant y dos son el buscador de
+  ayuda. `JwtAuthGuard` y `PermissionGuard` están registrados como `APP_GUARD`, así
+  que ninguna ruta queda sin autenticar. Lo fija `rutas-con-guard.spec`, con esas
+  cuatro enumeradas: una ruta nueva sin autorización rompe la prueba.
+
+  Medir esto bien costó tres intentos: los decoradores de una ruta pueden estar una
+  decena de líneas por debajo, y la primera ventana daba **90 rutas sin permiso**
+  cuando eran **4**. Actuar sobre aquel número habría significado «arreglar»
+  ochenta y seis rutas correctas.
+- `audit`: la vista unificada junta la tabla de auditoría con cuatro fuentes más y
+  cada una iba en su `try`; al fallar avisaba por consola y seguía, devolviendo una
+  respuesta con la misma forma que una traza completa. Quien audita no podía
+  distinguir «no hubo intentos de login» de «no se pudieron leer». Se sigue
+  devolviendo lo que sí carga, pero el hueco viaja declarado en `fuentes_fallidas`.
+
+- `notifications`: `getUserRoleIds` recibía el tenant y **no lo usaba**, así que
+  los roles de un tenant decidían el acceso a las notificaciones de otro. Hoy no
+  ocurre —ningún usuario pertenece a dos tenants en producción— pero es un camino
+  soportado: el `TenantSwitcher` del frontend existe justo para eso. Corregido.
+- `security`: sus doce consultas al registro de violaciones RLS no filtran por
+  tenant, y **es correcto**: el controlador lleva `SuperAdminGuard` a nivel de
+  clase y por ruta, más `security.audit.read`. Es un panel de plataforma.
+- `sunat-retry`: limpio. Sólo reintenta documentos en `ERROR` —falla técnica— y
+  nunca `RECHAZADO`, que es el rechazo fiscal; con tope de cinco intentos, ventana
+  de antigüedad y veinte por ciclo. Los reintentos automáticos están desactivados
+  salvo que se encienda `SUNAT_AUTO_RETRY_ENABLED`.
+- `dashboard`, `reports`, `import-export`, `metrics`, `help`: limpios de las clases
+  conocidas —sin `catch` permisivo, sin datos fabricados, sin fechas en UTC salvo
+  el nombre de un fichero exportado que ya está justificado— y con el tenant
+  tomado del JWT.
+
+- **Respaldos a soles en caminos que escriben.** El mismo patrón de los tres
+  respaldos peruanos aparecía con la moneda: `|| 'PEN'` al emitir un comprobante,
+  al crear una cotización y al dar de alta una cuenta bancaria. Ninguno dispara hoy
+  —los 62 tenants tienen `moneda_defecto`— pero un contribuyente argentino sin ese
+  campo habría emitido en soles. Los tres se detienen ahora y piden configurarla.
+  Los `|| 'PEN'` que quedan en tesorería son de agrupación en un resumen, no se
+  escriben.
+- **Una dirección inventada dentro del comprobante.** `direccion_receptor` caía a
+  la cadena «DIRECCIÓN NO REGISTRADA», que viajaba a SUNAT como si fuese el
+  domicilio del cliente. El campo es opcional en el propio contrato, así que ahora
+  va vacío cuando no se conoce. Hay 177 clientes sin dirección, pero ningún
+  comprobante emitido llegó a llevar el marcador.
+
+  Al corregirlo fallaron dos pruebas de CPE cuyas fixtures no declaraban moneda:
+  se apoyaban en el respaldo sin decirlo. Ahora la declaran.
+
+- **Dinero redondeado con coma flotante en cuatro sitios.** `Math.round(v*100)/100`
+  no redondea bien la mitad: el producto intermedio se queda por debajo y 3 % de
+  5.50 da 0.16 en lugar de 0.17. Estaba en la validación de retenciones, en los
+  saldos de bancos, en la conciliación y en el cálculo de renta anual e ITAN.
+  Todos pasan a Decimal, que es lo que ya usan `TaxCalculatorService` y
+  `RetencionesService`.
+
+  El de retenciones merece el matiz: **no estaba provocando rechazos**, porque la
+  comprobación tolera `> 0.01` y la diferencia es exactamente un céntimo. Pero eso
+  significaba que la tolerancia absorbía nuestra propia aritmética en vez de las
+  diferencias de redondeo de quien envía el dato. Con las dos partes en Decimal,
+  la tolerancia vuelve a medir lo que dice medir.
+
+### Los seis últimos (contabilidad, finanzas, ventas, inventario, fiscal, migration)
+
+Son 49 000 líneas, el triple de los dieciocho anteriores. Se auditaron por clases
+de defecto confirmadas en este código, leyendo cada coincidencia, más las
+invariantes comprobadas contra los datos de producción, que valen más que leer:
+
+- **Aislamiento entre tenants, comprobado en los datos.** Ningún `detalle_asientos`
+  pertenece a un tenant distinto del de su cabecera, y ninguna cuenta por cobrar a
+  uno distinto del de su cliente. Los asientos cuadran y el invariante de stock se
+  cumple en todos los productos.
+- **Aislamiento entre contribuyentes, barrido completo y cerrado.** De las **31**
+  consultas sin `tenant_id` sobre tablas que lo tienen, **29 son legítimas** y **2**
+  no lo eran. Las legítimas caen en tres grupos: derivadas (el id ya viene de un
+  `select` acotado al tenant), anteriores al tenant (el login no lo tiene todavía,
+  por eso `auth_login_attempts` se cuenta por correo y no por IP) y transversales a
+  propósito (catálogos globales y el panel de seguridad, tras `SuperAdminGuard`).
+  Las dos reales estaban en `calcularMontoRecepcionParcial`, que leía
+  `orden_compra_detalles` y `recepcion_items` **sin usar el `tenantId` que el propio
+  evento traía**: un `ordenId` equivocado tomaba los precios de otra empresa en
+  silencio. Corregidas. Lo fija `filtro-tenant.guard.spec`, verificado en rojo.
+
+  Esto importa más de lo que parece: el API habla con Postgres como `service_role`,
+  que **se salta RLS**. Las políticas de la base no protegen nada del lado de la
+  aplicación; el filtro de la consulta es la única frontera.
+
+  Medirlo bien costó tres intentos y conviene no repetirlos. La lista de tablas
+  tiene que salir del **esquema real**, no de las migraciones:
+  `002__domain_tables_skeleton.sql` le pone `tenant_id` a sus 168 tablas y las
+  migraciones de normalización luego se lo quitan a los catálogos, de modo que medir
+  sobre migraciones daba 242 tablas y **cero hallazgos**. Y la ventana tiene que ser
+  ancha por los dos lados: en un `insert` el `tenant_id` va en el objeto, **arriba**
+  del `.from`; en un `select` anidado el filtro queda veinte líneas **abajo**.
+  El fichero `tablas-con-tenant-id.json` guarda las 267 tablas y lleva la consulta
+  para regenerarlo.
+- Sin `catch` permisivos y sin datos fabricados en los seis.
+
+Lo que sí apareció está en los commits: los respaldos a soles en tres caminos que
+escriben, la dirección inventada en el comprobante y el dinero redondeado con coma
+flotante en cuatro sitios.
+
+### Tercera vuelta: el país por descarte (cerrado, no repetir)
+
+El barrido de respaldos peruanos que empezó en `tax-calculator` y siguió en
+`fiscal-adapter` tenía más alcance del que parecía. La pregunta «¿de qué país es
+este contribuyente?» tenía **cuatro respuestas independientes** —`fiscal-adapter`,
+`cpe-helper`, `pdf-generator` y `proveedores`— y las cuatro contestaban Perú
+cuando no lo sabían: sin fila en `empresa_config`, con `pais_id` vacío, o ante un
+error de lectura. `fiscal-adapter` además **cacheaba** esa respuesta, así que un
+fallo momentáneo de lectura dejaba al contribuyente convertido en peruano durante
+toda la vida del proceso.
+
+El país decide el documento de identidad (RUC, CUIT o NIT), la autoridad (SUNAT,
+ARCA o DIAN), el impuesto (IGV 18 %, IVA 21 %, IVA 19 %), la moneda y el formato
+del comprobante. Equivocarse produce un documento con **buen aspecto** y reglas de
+otro país, que es la peor forma de fallar en algo que va firmado a una
+administración tributaria.
+
+Ahora hay una sola respuesta, `perfilPaisDelTenant`, que falla cerrada y sale de
+`ACTIVE_COUNTRY_PROFILES`, que ya era la fuente canónica. Lo fija
+`pais-del-tenant.spec`. Junto a eso:
+
+- **Tres compuertas de país fallaban abiertas** por `|| 'PE'`: tributos anuales,
+  tributos mensuales y la exportación PLE dejaban pasar a una empresa sin país
+  configurado. El repositorio ya tenía el patrón correcto (`|| ''`) en
+  `planilla-electronica-peru`, `sire-api-client`, `arca-fiscal` y `dian-fiscal`.
+- **La compuerta de la GRE no llegaba a cerrarse nunca.** Era `config.pais &&
+  config.pais !== 'PE'`, pero `obtenerConfiguracionGRE` sellaba `'PE'` cuando no
+  había país, así que la condición nunca era cierta.
+- **Las tablas de autoridad fiscal estaban repetidas cuatro veces y derivaron.**
+  Tres se habían quedado **sin Argentina** mientras listaban Chile, México y
+  Ecuador, que no son países soportados: un comprobante argentino imprimía
+  «Autoridad Fiscal» en lugar de ARCA.
+- `validateTaxIdFormat` daba por bueno **cualquier documento no vacío** para un
+  país desconocido, y tenía ramas para Chile y México inalcanzables.
+- `cpe-registration` comprobaba el CUIT de un argentino con el algoritmo del RUC
+  peruano si `empresa_config` no declaraba país.
+
+Tres pruebas fallaron al cerrar esto porque **se apoyaban en el valor por defecto**
+en vez de declarar el país. Es el mismo síntoma que ya apareció con la moneda: una
+fixture que no declara algo y aprueba está midiendo el respaldo, no el código.
+
+### ARCA: la fecha del comprobante (cerrado)
+
+`cpe.fecha_emision` es `timestamptz` y `CbteFch` se armaba con los *getters* UTC.
+En Argentina (UTC−3) una factura emitida entre las 00:00 y las 03:00 salía fechada
+**al día siguiente**, y ARCA compara `CbteFch` contra su propia fecha. El QR
+llevaba el mismo desfase, así que ni siquiera se contradecían entre sí.
+
+La duda que quedaba anotada —si `fechaEmision` es el instante o el día fiscal— la
+contesta la especificación, no el producto: `CbteFch` es una **fecha de
+calendario**. Se usa `fechaHoyEnPais`, que ya existía y cubre Argentina, y se
+retira la excepción del guardián de fechas UTC, que ahora tiene nueve.
+
+### Los writers atómicos, el worker y las librerías (cerrado, no repetir)
+
+La capa que la auditoría del API nunca había leído: **286 funciones `_tx`, 284 con**
+**`SECURITY DEFINER`**, es decir que corren con privilegios del propietario y se
+saltan RLS. Importa porque el API habla como `service_role`: las políticas de la
+base no protegen nada, y estas funciones son la última frontera.
+
+Lo que está bien, medido para no volver a medirlo:
+
+- **289 sentencias de escritura** sobre tablas con `tenant_id`: 231 lo filtran en la
+  propia sentencia, 46 lo derivan de una lectura previa ya acotada, **ninguna sin**
+  **comprobar**. Exentas sólo login/sesión (anteriores al tenant) y la fontanería del
+  outbox (autorizada por *claim token*).
+- **375 lecturas**: 353 filtran por tenant directamente, el resto derivan de una fila
+  ya acotada.
+- **216 INSERT** escriben `tenant_id` y **ninguno** lo toma de un payload JSON.
+- **Cero** funciones sin `SET search_path` y **cero** `EXECUTE`: los dos vectores
+  clásicos de `SECURITY DEFINER` no existen aquí.
+- **154 writers reciben un actor**; 104 lo validan contra el tenant con
+  `assert_*_actor_*` o `actor_comercial_valido_469`. Los 43 restantes sólo lo estampan
+  en columnas de auditoría, y el actor siempre sale del JWT en la capa API: es
+  profundidad de defensa, no un agujero vivo.
+- **`libs/dtos`**: 224 clases llegan por `@Body()` y **ninguna** propiedad sin
+  validador.
+- **`libs/crypto`**: los tres caminos de firma fallan cerrados. El respaldo a
+  certificado autofirmado se pide con `allowDemoFallback`, nunca se hereda;
+  `CertificateOwnershipError` no se traga; y `resolveDemoSignerConfig` lanza si no hay
+  `PFX_PATH`/`PFX_PASS`, así que la rama «sin PFX → modo demo» del constructor no es
+  alcanzable desde el servicio.
+- **Worker**: acuña un JWT de cinco minutos por tenant con su propio secreto; las
+  rutas worker son `@Public()` y las cubre `WorkerAuthGuard`, que compara el tenant
+  del token contra el solicitado. La ruta de emisión exige además un `actor_id` UUID.
+
+Lo que no estaba bien:
+
+- **Migración 499**: diez writers de contabilidad e inventario fijaban `search_path`
+  sin nombrar `pg_temp`, y Postgres entonces busca el esquema temporal **el primero**
+  para resolver nombres de tabla. Aplicada y verificada en producción. El verificador
+  exige la propiedad a **todas** las `_tx`, no sólo a esas diez.
+- **Consolidación**: `obtenerGrupo` se conformaba con cualquier fila de membresía, así
+  que una empresa que había **rechazado** la invitación seguía viendo el RUC y la
+  razón social del resto del grupo indefinidamente.
+- **Mi propio guardián de rutas contaba `@Public()` como autorización**, que es lo
+  contrario de lo que significa. Tapaba **ocho** rutas públicas: el webhook de Stripe,
+  dos de métricas y cinco de observabilidad. Las ocho resultaron bien protegidas —por
+  firma del cuerpo crudo o por `METRICS_TOKEN` comprobado en el método, que falla
+  cerrado en producción— pero eso hay que verlo, no suponerlo. Ahora están enumeradas.
+- **`jwt.verify` sin algoritmos fijados** en `WorkerAuthGuard`. jsonwebtoken 9 ya
+  restringe a HMAC con secreto de cadena, así que hoy no cambia nada; deja de ser
+  cierto en cuanto el secreto pase a ser una clave.
+- **La caché de react-query sobrevivía al cambio de empresa.** Sólo una de las ocho
+  claves lleva el tenant, así que un superadministrador que cambiaba de empresa seguía
+  viendo RRHH, usuarios y la configuración de impuestos de la anterior. El API no
+  entrega nada de más; el problema es decidir sobre las cifras equivocadas.
+
+Cómo medirlo, que costó tres intentos: las definiciones hay que sacarlas del esquema
+vivo y de **los dos** esquemas, `public` y `app` —80 funciones de `public` son
+envoltorios de una línea que delegan en `app`, y medir sólo `public` produjo catorce
+hallazgos falsos—. Y en este entorno **las barras invertidas de una cadena se**
+**colapsan**, así que `new RegExp('\b'+x)` acaba buscando un carácter de retroceso en
+vez de un límite de palabra: hay que construirlas con `String.fromCharCode(92)` o usar
+literales. Cada detector lleva un control con una función verificada a mano; si no la
+clasifica bien, aborta en vez de devolver hallazgos.
+
+### apps/web (cerrado por clases de defecto)
+
+Son **115 019 líneas** en 487 ficheros, no las 25 651 de una medición anterior mal
+filtrada. No están leídas línea a línea; están barridas por las clases de defecto que
+este código ha demostrado tener, leyendo cada coincidencia.
+
+Lo que salió mal:
+
+- **Crear una GRE desde un pedido devolvía 400.** `GreModal` mandaba `tenantId` en el
+  cuerpo y `CreateGuiaRemisionDto` no lo declara: con `forbidNonWhitelisted` el pipe
+  rechazaba la petición entera. En pantalla salía «property tenantId should not
+  exist»: correcto, pero en inglés y sin pista de que el arreglo estaba en el
+  cliente.
+
+  **La raíz no era ese campo, era que nada comprobaba el contrato.** `test:contrato`
+  resuelve cada llamada de escritura de la web contra la ruta del API, saca el DTO de
+  su `@Body()` siguiendo `extends`, y comprueba que ninguna clave enviada falte en
+  él. Compara 17 llamadas e imprime cuántas quedan fuera —3 con payload no resoluble,
+  7 sin ruta emparejable, 6 sin DTO— para que nadie confunda «verde» con «revisado».
+
+  Construirlo destapó **dos DTOs señuelo**: `libs/dtos/src/gre/guia-remision.dto.ts`,
+  obsoleto y sin importadores mientras el controlador usa `gre.types.ts`; y
+  `ProductModal.tsx`, sin importadores, que mandaba doce campos en camelCase a un DTO
+  snake_case. Los dos borrados: el próximo que fuera a tocar el contrato editaba el
+  fichero equivocado.
+- **El céntimo.** `Math.round(importe * factor * 100) / 100` no es redondeo a
+  céntimos: 1,25 al 18 % debe dar 0,23 y daba 0,22. Son 2 524 importes equivocados
+  sobre 1,2 millones con las tres tasas. El servidor calcula con Decimal y es quien
+  fija los importes, así que nunca se emitió un comprobante mal; lo que se hacía era
+  enseñar un total distinto del que se iba a emitir. `multiplicarMoneda` no sale de
+  los enteros. Lo fija `test:dinero`, que ejecuta la aritmética real contra una
+  referencia entera exacta.
+- **El POS presentaba como peruano a un contribuyente sin resolver**: SUNAT, RUC, S/
+  e IGV (18 %) por defecto, y encima incoherente consigo mismo, porque `impuestoRate`
+  vale 0 hasta que resuelve y el ticket habría cobrado 0 bajo una etiqueta que decía
+  18 %. Ya no se inventa nada y no se puede cobrar sin país resuelto.
+- **`use-fiscal-config.ts` fabricaba la identidad fiscal peruana entera** en dos
+  ramas, sin ningún consumidor. Borrado.
+- **Tres acciones fallaban en silencio**: aprobar una planilla (`catch {}`), extender
+  la demo, y el informe de diferencias de la conciliación bancaria, que vacío es
+  indistinguible de «no hay diferencias».
+- La caché de react-query sobrevivía al cambio de empresa (ya cerrado antes).
+
+Barridos limpios, para no repetirlos: cero `eval` y cero `innerHTML`; los dos
+`dangerouslySetInnerHTML` interpolan tipos unión, no datos de usuario; los
+`NEXT_PUBLIC_*` son todos legítimos —la clave anónima de Supabase está pensada para
+ser pública—; los `Math.random` son respaldos de clave de idempotencia; y los
+«Sin nombre» de los listados son marcadores honestos, no datos inventados dentro de
+un documento.
+
+Lo que **no** está hecho: leer los módulos grandes de negocio uno a uno
+—contabilidad (11 007 líneas), modales (9 050), ventas (8 678), finanzas (7 345)—
+buscando fallos de lógica propios de cada flujo, que es lo que en el API destapó los
+defectos más caros. Los barridos no sustituyen a eso.
+
+### El respaldo peruano estaba también en el esquema (migración 500)
+
+Toda la auditoría fue retirando el «Perú por defecto» del código: el adaptador
+fiscal, el calculador de impuestos, la emisión de comprobantes, la GRE, el POS, los
+hooks de la web. Faltaba una capa: **34 columnas `moneda` del esquema llevaban**
+**`DEFAULT 'PEN'`**.
+
+Y una la usaba. `pos_registrar_venta_tx` —el writer que registra cada venta del
+POS— inserta en `ventas_pos` **sin declarar la moneda**, en sus dos sobrecargas. Es
+decir que toda venta de POS se registraba en soles, fuese cual fuese el país del
+contribuyente. Las 60 ventas de producción son de contribuyentes peruanos, así que
+la moneda coincide por casualidad; la primera venta argentina o colombiana habría
+quedado en soles.
+
+La 500 arregla el writer —resuelve la moneda de `empresa_config` y falla cerrado si
+no está—, quita el defecto de las 34 columnas y hace obligatoria la moneda donde el
+importe es el dato. El orden importa: primero el writer, después el defecto; al
+revés, entre una sentencia y la siguiente una venta se queda sin moneda.
+
+El verificador recorre las **62** columnas `moneda` del esquema, no sólo las tocadas.
+
+**Aplicada en producción**: `schema_version` 500, verificador en verde contra PROD
+y `ready: true` tanto con 499 —el API que corre— como con 500.
+
+### El respaldo peruano en la web (cerrado)
+
+138 apariciones de «Perú por defecto» en `apps/web`, clasificadas una a una. Las que
+eran defecto de verdad:
+
+- **`lib/pdf-export.ts` fijaba `currency: 'PEN'`** en un `formatCurrency` que usan 43
+  sitios del fichero: el PDF del balance de comprobación, del estado de resultados y
+  del balance general de una empresa argentina salía en soles. Un PDF pesa más que
+  una pantalla: se guarda, se manda y se firma.
+- La liquidación de RRHH y `ventas/comercial` etiquetaban importes en soles.
+- `CpeModal` mandaba `moneda: country.moneda || 'PEN'` en el estado inicial del
+  comprobante, y con el país sin resolver `country.moneda` es cadena vacía.
+
+Los ~130 restantes **no se tocan, y conviene saber por qué**: son de presentación y
+sólo disparan mientras el país carga, o son `'es-PE'` como *locale*, que en es-PE,
+es-AR y es-CO da el mismo separador de miles y el mismo formato de fecha. Los dos
+«currency: 'PEN'» que quedan son las pantallas de tributos peruanos, que el API ya
+restringe a Perú.
+
+Y trece multiplicaciones de dinero sin redondear a céntimos en formularios de
+compras, ventas y POS. El servidor recalcula, así que no emitieron nada mal; lo que
+hacían era enseñar un total distinto del que se iba a registrar. Ya no queda ninguna
+en la web y `test:dinero` lo mantiene así.
+
+### Contabilidad: el cuadre y el periodo (cerrado)
+
+- **El cuadre era exacto abajo y tolerante arriba.** Los writers exigen
+  `v_total_debe <> v_total_haber`; encima, dos comprobaciones usaban `> 0.01`, que deja
+  pasar un descuadre de **exactamente un céntimo**: la verificación de asientos del
+  listener y la compuerta del generador, justo antes de llamar al writer que lo
+  rechaza. En los informes la tolerancia absorbía nuestra propia aritmética —sumar
+  `number` deriva ~1e-13—, el mismo defecto ya corregido en retenciones. Todo pasa a
+  Decimal y a comparación exacta. Y `cuentas_con_saldo` contaba con `> 0.01`, que deja
+  fuera una cuenta con exactamente un céntimo.
+- **El periodo se resolvía en la zona del servidor.** `validarPeriodoAbierto` usaba
+  `getFullYear()/getMonth()` sobre un `timestamptz`, con el servidor en UTC. Un
+  comprobante de las 19:30 de Lima cae en el día siguiente y, la noche del 31, en el
+  mes siguiente: el asiento se valida contra el periodo equivocado. En producción 23
+  de los 179 asientos ya tienen un día distinto en UTC que en Lima; ninguno cruza mes,
+  y eso es suerte. Se respeta la distinción de `parseDateLocal`: una fecha a
+  medianoche UTC exacta es una fecha de calendario y no se convierte.
+- **Las bases por afectación del POS no sumaban la venta.** Cada tramo redondeaba por
+  su cuenta: 33,33 + 33,33 + 33,34 con un 10 % de descuento daban 90,01 sobre una
+  venta de 90,00. El residuo va ahora al tramo mayor.
+- **`CpeViewModal` mostraba un importe recalculado** en la tabla mientras el HTML
+  impreso usaba el del documento. El mismo modal enseñaba dos cifras del mismo
+  comprobante emitido.
+
+### Los módulos de negocio de la web, uno a uno (cerrado)
+
+Lo que quedaba pendiente en la revisión anterior. Cerrado por flujos, no por
+barridos:
+
+- **Escrituras que fallaban en silencio: 14, diez reales.** Todas con la misma
+  forma —el refresco de la pantalla vive dentro del `try`, así que al fallar nada
+  cambia y el usuario da la acción por hecha—. Las que cuestan: **asignar y quitar
+  roles** (una decisión de autorización), **renovar y finalizar un contrato**,
+  **marcar asistencia** y **abrir caja**. Las cuatro restantes se revisaron y son
+  correctas: los dos caminos de `use-permission` fallan **cerrados**.
+- **RRHH**: las tasas AFP por administradora del formulario coinciden con las del
+  servidor, y el importe sale de la tasa guardada en el contrato, no del
+  formulario. No es un defecto.
+- **Wizard**: limpio. Clave de idempotencia en cada escritura, manejo de
+  `!response.ok` y detección de encolado offline.
+- **Inventario**: `productos` tiene `stock` y `stock_actual`, y dos formularios leen
+  columnas distintas. No divergen: los 374 productos coinciden y el único writer
+  que las toca actualiza las dos. Redundante, no roto.
+- **Finanzas**: los writers validan que la moneda del pago coincida con la del
+  documento y con la de la cuenta bancaria, y fallan cerrados.
+- **Pantallas de dinero**: ninguna permite doble envío; todas tienen estado en
+  vuelo o botón deshabilitado.
+- **Divisiones sin proteger el cero**: ninguna.
+
+### Invariantes de producción tras la 500
+
+Comprobadas después de aplicar la migración: `schema_version` 500, outbox sin
+pendientes y sin cola muerta, cero asientos descuadrados, cero `detalle_asientos`
+cruzados de contribuyente, cero cuentas por cobrar cruzadas, cero filas de dinero
+sin moneda.
+
+### Los verificadores SQL (auditados)
+
+La capa de la que depende creer todo lo demás. Hallazgo principal: **de los 86
+verificadores del repositorio, sólo corrían 10.**
+
+La causa es que `SQL_VERIFY_FLOOR = 491` hacía dos trabajos y sólo uno era suyo:
+
+- **Legítimo**: exigir que toda migración nueva traiga verificador. Empieza en 491
+  porque ahí arrancó la práctica —417 de las 497 migraciones no tienen uno—, así que
+  el suelo **no se puede bajar**.
+- **No legítimo**: como la selección parte de las *migraciones*, ningún verificador
+  por debajo del suelo llegaba a ejecutarse. 76 quedaban muertos.
+
+Se ejecutaron los 76 contra una base recién migrada: **66 pasaban**. Es decir, 66
+protecciones escritas, mantenidas y silenciosamente inactivas. Ahora corren en una
+segunda pasada, y los 7 que no pasan están enumerados en el propio script con el
+motivo —fixtures anteriores a una migración que endureció el flujo, privilegios de
+una firma que cambió, un sembrado que ya no siembra—.
+
+Tres hallazgos más, encontrados al hacerlo:
+
+- **La base de CI no replicaba el historial de producción.** La compuerta sellaba
+  `name` con el nombre completo del fichero; producción y el CLI de Supabase lo
+  sellan sin el prefijo numérico. Cuatro verificadores que comprueban el nombre
+  fallaban aquí y pasaban allí. Corregido: tres de los cuatro pasan ya.
+- **`verify_outbox_integrity.sql` nunca se había ejecutado.** `discover()` sólo
+  reconoce ficheros `NNN__nombre.sql`, y éste no lleva número porque no le
+  corresponde ninguna migración. Comprueba seis invariantes de las que depende todo
+  el sistema de eventos —columnas del outbox, índice único de idempotencia, claves
+  duplicadas, RLS habilitado y forzado, política presente y las RPC runtime—. Pasa.
+  Ahora está conectado.
+- Los otros dos sin número, `verify_anon_access` y `verify_grants_matrix`, **no
+  afirman nada**: cero `RAISE`, son inventarios de privilegios. Correcto que no estén
+  en la compuerta; el problema es que tampoco los mira nadie.
+
+**Sobre los permisos de `anon`, que casi reporto como agujero y no lo es.** El
+verificador 437 —uno de los que no corrían— señala que las funciones
+`validar_*_runtime` tienen `EXECUTE` para `anon`, y en producción 86 de 89 lo tienen.
+La clave anónima va dentro del paquete de la web, así que la llamada se acepta. Pero
+no es explotable: corren como INVOKER y `anon` choca con las vistas de dentro
+—comprobado con una llamada anónima real contra PROD: `permission denied for view`
+`v_rls_tenant_tables_audit`—, y **hay cero funciones `SECURITY DEFINER` en `public`**
+**alcanzables por `anon`**. Es descuido de configuración, no una vulnerabilidad.
+
+**Lo que destapó el verificador 490, que tampoco corría.** Exige que un
+`ADMIN_DEMO` no tenga `tenants.manage`, `system.debug`, `security.audit.read` ni
+`documentos.audit.read`. En producción, **los 66 roles ADMIN_DEMO tienen los 256**
+**permisos del catálogo**, los cinco sensibles incluidos.
+
+Alcance real, medido y no supuesto:
+
+- **La frontera entre contribuyentes aguanta.** Las 55 rutas que exigen un permiso
+  sensible se revisaron una a una: las que piden `tenants.manage` llevan **todas**
+  `SuperAdminGuard` encima. Ya se había comprobado antes con un token de demo real
+  contra PROD: listar tenants y leer otro devuelven 403.
+- 36 de esas 55 no llevan SuperAdminGuard, y ahí el permiso es la puerta. Lo que un
+  demo alcanza por esa vía son diagnósticos y lecturas de auditoría **de su propio**
+  **tenant**: probar la conexión, probar la firma XML sin enviar a SUNAT, y leer su
+  traza. Nada de otro contribuyente.
+- `users.manage` es **deliberado**: la migración 493 es posterior al verificador y lo
+  concede a propósito —«los ADMIN/ADMIN_DEMO canónicos conservan la capacidad de
+  administrar su tenant»—. En ese punto el 490 está obsoleto por decisión.
+
+Queda una **decisión de producto**, y por eso no se toca: o el sembrado se ajusta a
+los cuatro que el 490 excluye, o el 490 se actualiza para reflejar que hoy se
+conceden a conciencia. Las dos posiciones están escritas en el repositorio y se
+contradicen; elegir una no es una corrección técnica.
+
+**Sobre `verify_anon_access` y el 437**, ya cerrado más arriba: descuido de
+configuración, no vulnerabilidad.
+
+Coste: la compuerta pasa de ~10 verificadores a ~65 y tarda unos diez minutos.
+
+### Sobre los guardianes de esta auditoría
+
+Tres de los detectores que escribí daban verde con el fallo delante, y los tres los
+cazó un control, no yo:
+
+- El de rutas contaba `@Public()` como autorización, que es lo contrario de lo que
+  significa.
+- El de writers medía sólo el esquema `public`, y 80 de esas funciones son
+  envoltorios de una línea que delegan en `app`.
+- El de payloads miraba 15 líneas hacia delante y la llamada estaba 17 más abajo; su
+  control era **más fácil que el caso real**, que es la forma exacta de no probar
+  nada.
+
+De ahí dos reglas para quien siga: **un guardián que no se ha visto en rojo no está
+verificado**, y **el control tiene que reproducir la forma y la distancia del caso
+real**. Además, en este entorno las barras invertidas dentro de una cadena se
+colapsan al escribir un fichero, así que `new RegExp('\\b' + x)` acaba buscando un
+carácter de retroceso; hay que componerlas con `String.fromCharCode(92)` o usar
+literales de expresión regular.
+### Ninguno pendiente
+
+La auditoría cubre los 36 módulos del API. Lo que queda son ampliaciones de
+producto y los pendientes operativos que dependen de credenciales o de terceros,
+ambos listados más abajo.
+### Resultado de la frontera de seguridad (cerrado, no repetir)
+
+`permissions`, `auth` y `tenants` están leídos y **no tienen agujero explotable**.
+El guard falla cerrado, valida el tenant dos veces —en el rol y en el permiso— y
+rechaza usuarios inactivos; la caché de permisos está desactivada
+(`CACHE_TTL = 0`), así que no puede servir permisos revocados. Se comprobó contra
+producción con el token de una demo: listar tenants, leer otro tenant y sus
+usuarios devuelven 403, y el endpoint de `system.debug` está restringido. La vía
+de escalada por crear un rol llamado `ADMIN` no funciona: la RPC exige
+`users.manage` mediante filas reales de permiso.
+
+**Cerrado:** `checkUserPermission` concedía todo a cualquier rol llamado
+exactamente `ADMIN`, con lo que revocar un permiso a ese rol no surtía efecto y
+bastaba con renombrar un rol para saltarse la lista. Retirado. No concedía nada
+que las filas de `rol_permisos` no concedan ya: los 42 usuarios con rol ADMIN
+están en tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ## Pendientes reales
 

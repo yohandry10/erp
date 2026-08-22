@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { cuadranImportes, sumarImportes } from '../../../shared/utils/cuadre-contable.util';
 import { OnEvent } from '@nestjs/event-emitter';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { PeriodosService } from './periodos.service';
@@ -64,10 +65,13 @@ export class AsientosGeneratorService {
     await this.periodosService.validarPeriodoAbierto(tenantId, fecha);
 
     // Validar que el asiento cuadre (debe = haber)
-    const totalDebe = detalles.reduce((sum, d) => sum + d.debe, 0);
-    const totalHaber = detalles.reduce((sum, d) => sum + d.haber, 0);
+    const totalDebe = sumarImportes(detalles.map((d) => d.debe));
+    const totalHaber = sumarImportes(detalles.map((d) => d.haber));
 
-    if (Math.abs(totalDebe - totalHaber) > 0.01) {
+    // Exacto: `> 0.01` dejaba pasar un descuadre de justo un céntimo, y el writer
+    // que recibe esto lo rechaza con `v_total_debe <> v_total_haber`. La compuerta
+    // de aquí tiene que exigir lo mismo que la de allí.
+    if (!cuadranImportes(totalDebe, totalHaber)) {
       throw new Error(
         `El asiento no cuadra: Debe=${totalDebe}, Haber=${totalHaber}`
       );
@@ -958,7 +962,7 @@ export class AsientosGeneratorService {
         const totalHaberFinanciero = this.round2(
           saldoClientes + saldoFavorCliente + ajustes.retencion + ajustes.detraccion + ajustes.anticipo,
         );
-        if (Math.abs(totalDebeFinanciero - totalHaberFinanciero) > 0.01) {
+        if (!cuadranImportes(totalDebeFinanciero, totalHaberFinanciero)) {
           throw new Error(
             `La distribución de la nota de crédito no cuadra: reversión=${totalDebeFinanciero}, CxC+saldo a favor=${totalHaberFinanciero}`,
           );

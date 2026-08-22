@@ -241,6 +241,16 @@ export class CPEIntegrationService {
       });
     }
 
+    // La moneda va impresa en el comprobante: suponer soles cuando falta la
+    // configuración emitiría un documento argentino o colombiano en PEN. Es la
+    // misma decisión que ya se tomó en TaxCalculatorService y en fiscal-adapter.
+    const monedaEmision = String(empresaConfig.moneda_defecto || '').trim().toUpperCase();
+    if (!monedaEmision) {
+      throw new BadRequestException(
+        'La empresa no tiene moneda configurada; no se emite el comprobante con una supuesta.',
+      );
+    }
+
     // Construir DTO de factura
     const facturaDto: CreateFacturaDto = {
       serie: serie,
@@ -251,8 +261,11 @@ export class CPEIntegrationService {
       tipo_documento_receptor: tipoDocumentoSunat,
       documento_receptor: numeroDocumentoCliente,
       razon_social_receptor: razonSocialCliente,
-      direccion_receptor: cliente.direccion || 'DIRECCIÓN NO REGISTRADA',
-      moneda: empresaConfig.moneda_defecto || 'PEN',
+      // Sin dirección se envía vacío, no un texto inventado: el campo es opcional
+      // en el contrato y «DIRECCIÓN NO REGISTRADA» viajaba dentro del comprobante
+      // como si fuese el domicilio del cliente.
+      direccion_receptor: String(cliente.direccion || '').trim(),
+      moneda: monedaEmision,
       items: items,
       // Bases separadas por afectación; el IGV se recalcula sobre lo gravado en
       // lugar de arrastrar el total del pedido, que asumía todo gravado.

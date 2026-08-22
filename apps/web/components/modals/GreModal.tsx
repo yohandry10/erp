@@ -46,7 +46,6 @@ interface PedidoContext {
   numero: string
   clienteNombre: string
   clienteDireccion?: string | null
-  tenantId: string
 }
 
 interface GreModalProps {
@@ -134,7 +133,10 @@ export default function GreModal({
         pesoTotal: parseFloat(formData.pesoTotal) || 0,
         pedidoId: pedidoContext?.id,
         pedidoNumero: pedidoContext?.numero,
-        tenantId: pedidoContext?.tenantId,
+        // Sin `tenantId`: el servidor lo toma del JWT y `CreateGuiaRemisionDto` no
+        // lo declara, así que el ValidationPipe global —con `forbidNonWhitelisted`—
+        // rechazaba la petición entera con un 400. Crear una GRE desde un pedido no
+        // funcionaba, y el usuario sólo veía «Error al crear la guía de remisión».
         idempotencyKey: requestKeyRef.current,
         ...(!pedidoContext && !cpeData ? {
           items: manualItems.map((item) => ({
@@ -398,7 +400,9 @@ export default function GreModal({
                 value={formData.pesoTotal}
                 onChange={handleChange}
                 step="0.01"
-                min="0"
+                // El DTO exige @Min(0.001): con min="0" el navegador dejaba pasar
+                // un peso cero que el servidor rechazaba despues.
+                min="0.001"
                 required className="w-[100%] p-3 border rounded-[6px] text-sm"
               />
             </div>
