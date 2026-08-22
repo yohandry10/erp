@@ -242,11 +242,21 @@ for (const migration of migrations) {
   });
 }
 
+// El `name` se sella con la misma convención que producción y el CLI de Supabase:
+// el nombre del fichero sin el prefijo numérico y sin la extensión, de modo que
+// `401__peru_plame_contador_rbac.sql` queda como `_peru_plame_contador_rbac`.
+//
+// Antes se guardaba el nombre completo del fichero, así que la base de CI no era
+// una réplica fiel del historial de producción y cualquier verificador que
+// comprobara `name` fallaba aquí y pasaba allí. Cuatro lo hacen —401, 402, 410 y
+// 411—, y esa discrepancia es parte de por qué acabaron por debajo del suelo.
+const historyName = (name) => name.replace(/^\d+_/, "").replace(/\.sql$/, "");
+
 const migrationHistoryValues = migrations
-  .map(
-    ({ versionText, name }) =>
-      `('${versionText}', ARRAY['CI fresh-chain ${name.replaceAll("'", "''")}'], '${name.replaceAll("'", "''")}')`,
-  )
+  .map(({ versionText, name }) => {
+    const stamped = historyName(name).replaceAll("'", "''");
+    return `('${versionText}', ARRAY['CI fresh-chain ${name.replaceAll("'", "''")}'], '${stamped}')`;
+  })
   .join(",\n");
 runPsql([], "registro local del historial de migraciones", {
   capture: true,
@@ -268,6 +278,87 @@ for (const verifier of selectedVerifiers) {
   process.stdout.write(`[database-contracts] verify ${verifier.name}\n`);
   runPsql(["--file", verifier.file], `verificador ${verifier.name}`);
 }
+
+// ---------------------------------------------------------------------------
+// Segunda pasada: los verificadores históricos
+// ---------------------------------------------------------------------------
+// El suelo hacía dos trabajos a la vez y sólo uno era suyo. Uno es legítimo:
+// exigir que toda migración nueva traiga verificador, y por eso empieza en 491,
+// que es cuando arrancó la práctica —417 de las 497 migraciones no tienen uno—.
+// El otro no: como la selección parte de las migraciones, ningún verificador por
+// debajo del suelo llegaba a ejecutarse nunca.
+//
+// El resultado era que 76 de los 86 verificadores del repositorio no corrían. Se
+// probaron todos contra una base recién migrada: **66 pasan**. Es decir, 66
+// protecciones escritas, mantenidas en el repositorio y silenciosamente
+// inactivas. Aquí se ejecutan.
+//
+// Los que no pasan se enumeran abajo con el motivo. Están fuera a conciencia, no
+// por omisión, y la lista es corta a propósito: si crece, es que se está tapando
+// algo en vez de arreglarlo.
+const HISTORICOS_QUE_NO_PASAN = new Map([
+  [
+    "410__contador_operational_read_rbac.sql",
+    "El alta de tenants dejó de sembrar el rol CONTADOR en una migración posterior; el verificador no se actualizó.",
+  ],
+  [
+    "432__accounting_production_closure.sql",
+    "Comprueba privilegios de una firma de guardar_calculo_planilla_tx que cambió después.",
+  ],
+  [
+    "437__runtime_validation_orchestrator_contract_alignment.sql",
+    "Señala que las funciones validar_*_runtime tienen EXECUTE para anon. Es descuido de configuración, no un agujero: corren como INVOKER y anon no puede leer lo que tocan por dentro (comprobado: cero SECURITY DEFINER en public alcanzables por anon).",
+  ],
+  [
+    "448__cpe_credit_note_cancellation_atomic_finalization.sql",
+    "La migración 494 endureció la aceptación de notas referenciadas; el fixture de este verificador es anterior.",
+  ],
+  [
+    "466__customer_refund_reversal_atomic.sql",
+    "Mismo motivo que el 448.",
+  ],
+  [
+    "470__cxc_aging_and_kardex_canonical_reports.sql",
+    "Su fixture mezcla monedas en una misma antigüedad de CxC, que es justo lo que el propio verificador prohíbe.",
+  ],
+  [
+    "490__demo_admin_custom_rbac_capability.sql",
+    "Espera que un ADMIN de demo no reciba un permiso global, y el sembrado actual se lo da.",
+  ],
+]);
+
+// `discover` sólo reconoce ficheros `NNN__nombre.sql`, así que los verificadores
+// sin número quedaban invisibles para la compuerta. Dos de los tres no afirman
+// nada —`verify_anon_access` y `verify_grants_matrix` son inventarios de
+// privilegios, sin un solo RAISE, y su cabecera lo dice—, pero el tercero sí:
+// `verify_outbox_integrity` comprueba seis invariantes de las que depende todo el
+// sistema de eventos —columnas del outbox, índice único de idempotencia, claves
+// duplicadas, RLS habilitado y forzado, política presente y las RPC runtime— y
+// nunca se había ejecutado. Se nombra explícitamente porque no le corresponde
+// ninguna migración: no es un verificador de regresión, es de invariante.
+const SIN_NUMERO_QUE_AFIRMAN = ["verify_outbox_integrity.sql"];
+
+const yaEjecutados = new Set(selectedVerifiers.map(({ file }) => file));
+const historicos = [
+  ...verifiers
+    .filter(({ file }) => !yaEjecutados.has(file))
+    .filter(({ name }) => !HISTORICOS_QUE_NO_PASAN.has(name)),
+  ...SIN_NUMERO_QUE_AFIRMAN.map((name) => ({
+    name,
+    file: path.join(verifiersDir, name),
+  })),
+];
+
+for (const verifier of historicos) {
+  if (!fs.existsSync(verifier.file)) {
+    fail(`el verificador ${verifier.name} está enumerado pero no existe`);
+  }
+  runPsql(["--file", verifier.file], `verificador histórico ${verifier.name}`);
+}
+process.stdout.write(
+  `[database-contracts] ${historicos.length} verificadores históricos ejecutados, ` +
+    `${HISTORICOS_QUE_NO_PASAN.size} enumerados como obsoletos\n`,
+);
 
 runPsql([], `readiness del esquema requerido ${requiredSchemaVersion}`, {
   capture: true,

@@ -66,4 +66,7 @@ BEGIN
 END;
 $verify$;
 
-COMMIT;
+-- ROLLBACK y no COMMIT: la convencion de los otros 67 verificadores. Este solo
+-- lee el catalogo, pero dejarlo abierto invitaria a que el dia que cree un
+-- fixture lo dejara escrito en la base de la compuerta.
+ROLLBACK;
