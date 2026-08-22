@@ -539,9 +539,14 @@ export default function LiquidacionesPage() {
                       </td>
                       <td className="p-3">{deposit.periodo}</td>
                       <td className="p-3">
-                        {new Intl.NumberFormat("es-PE", {
-                          style: "currency",
-                          currency: "PEN",
+                        {/* La moneda es la del contribuyente. Estaba fijada en PEN,
+                            y una liquidación argentina o colombiana se mostraba en
+                            soles. Sin moneda resuelta se imprime el número solo,
+                            que es mejor que etiquetarlo con una divisa ajena. */}
+                        {new Intl.NumberFormat(country.locale || "es-PE", {
+                          style: country.moneda ? "currency" : "decimal",
+                          currency: country.moneda || undefined,
+                          minimumFractionDigits: 2,
                         }).format(Number(deposit.monto || 0))}
                       </td>
                       <td className="p-3">

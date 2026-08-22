@@ -71,8 +71,10 @@ const emptyLine = (): PriceLine => ({
 const unwrap = <T,>(value: any, fallback: T): T =>
   (value && typeof value === 'object' && 'data' in value ? value.data : value) ?? fallback
 
-const money = (value: number, currency = 'PEN') => new Intl.NumberFormat('es-PE', {
-  style: 'currency', currency, minimumFractionDigits: 2,
+// Sin moneda conocida se imprime el número solo. El respaldo era 'PEN', así que
+// un importe argentino sin moneda en la fila salía etiquetado en soles.
+const money = (value: number, currency?: string | null) => new Intl.NumberFormat('es-PE', {
+  style: currency ? 'currency' : 'decimal', currency: currency || undefined, minimumFractionDigits: 2,
 }).format(Number(value || 0))
 
 const operationKey = (kind: string) => {
@@ -403,7 +405,7 @@ export default function ComercialVentasPage() {
           </Panel>
           <div className="space-y-6">
             <Panel title="Cerrar bloque" subtitle="El reporte congela cabeceras y líneas; no vuelve a generar asientos.">
-              <div className="rounded-xl bg-muted/50 p-4"><div className="text-sm text-muted-foreground">Seleccionadas</div><div className="text-3xl font-black">{selectedRows.length}</div><div className="mt-2 text-sm text-muted-foreground">Total del bloque</div><div className="text-2xl font-bold">{money(selectedTotal, selectedRows[0]?.moneda || 'PEN')}</div></div>
+              <div className="rounded-xl bg-muted/50 p-4"><div className="text-sm text-muted-foreground">Seleccionadas</div><div className="text-3xl font-black">{selectedRows.length}</div><div className="mt-2 text-sm text-muted-foreground">Total del bloque</div><div className="text-2xl font-bold">{money(selectedTotal, selectedRows[0]?.moneda)}</div></div>
               <Field label="Notas"><Input aria-label="Turno mañana, ruta norte…" value={batchNotes} onChange={(e) => setBatchNotes(e.target.value)} placeholder="Turno mañana, ruta norte…" /></Field>
               <Button className="mt-3 w-full gap-2" onClick={() => void consolidate()} disabled={saving || selectedRows.length === 0}><Boxes className="h-4 w-4" /> Generar consolidado</Button>
             </Panel>
