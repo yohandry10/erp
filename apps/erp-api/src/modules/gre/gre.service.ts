@@ -759,6 +759,9 @@ export class GreService {
     const modalidadCode = this.getModalidadCode(greData.modalidad);
     const isPublicTransport = modalidadCode === '01';
     const isPrivateTransport = modalidadCode === '02';
+    // `escapeXmlText` no escapa la comilla doble, asi que este valor no vale para un
+    // atributo: un `"` se saldria de `schemeID="..."`. Se conserva para el texto y el
+    // atributo usa `escapeXmlAttribute`, como ya hacen el conductor y la unidad.
     const receptorDocTipo = this.escapeXmlText(payload.receptor.docTipo || '1');
     const receptorDocNumero = this.escapeXmlText(payload.receptor.docNumero || '00000000');
     const receptorNombre = payload.receptor.razonSocial || 'DESTINATARIO';
@@ -880,7 +883,7 @@ export class GreService {
   <cac:DeliveryCustomerParty>
     <cac:Party>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="${receptorDocTipo}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${receptorDocNumero}</cbc:ID>
+        <cbc:ID schemeID="${this.escapeXmlAttribute(payload.receptor.docTipo || '1')}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${receptorDocNumero}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${this.wrapCdata(receptorNombre)}</cbc:RegistrationName>

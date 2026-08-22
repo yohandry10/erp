@@ -92,10 +92,9 @@ export class ContabilidadLibrosController {
     @Query() filtros: any,
   ) {
     try {
-      console.log(
-        `📊 Generando Libro Mayor para cuenta: ${cuentaCodigo}`,
-        filtros,
-      );
+      // El codigo de cuenta llega del cliente: va como argumento, no dentro de la
+      // plantilla, para que no pueda actuar como cadena de formato.
+      console.log('Generando Libro Mayor para cuenta:', cuentaCodigo, filtros);
 
       const libroMayor = await this.accountingService.getLibroMayorPorCuenta(
         cuentaCodigo,

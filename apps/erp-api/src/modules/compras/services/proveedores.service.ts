@@ -193,8 +193,15 @@ export class ProveedoresService {
   }
 
   private isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    // Los tres `[^\s@]+` seguidos permiten retroceso cuadratico: una cadena larga
+    // sin arroba obliga al motor a probar todas las particiones. Se acota la
+    // longitud antes de mirar la forma, que ademas es lo que exige el DTO.
+    if (email.length > 254) return false;
+    const arroba = email.indexOf('@');
+    if (arroba <= 0 || arroba !== email.lastIndexOf('@')) return false;
+    const dominio = email.slice(arroba + 1);
+    if (!dominio.includes('.') || dominio.startsWith('.') || dominio.endsWith('.')) return false;
+    return !/\s/.test(email);
   }
 
   private throwMasterError(error: any): never {
