@@ -11,7 +11,8 @@ import { EventBusService } from '../../shared/events/event-bus.service';
 import { OseService } from '../ose/ose.service';
 import { ValidationService } from '../validations/validation.service';
 
-import { fechaHoyDelTenant } from '../../shared/utils/fecha-tenant.util';
+import { fechaHoyDelTenant, paisDelTenant } from '../../shared/utils/fecha-tenant.util';
+import { fechaHoyEnPais } from '../../shared/utils/fecha-peru.util';
 @Injectable()
 export class GreService {
   private readonly logger = new Logger(GreService.name);
@@ -1632,13 +1633,23 @@ ${lines}
         acc[guia.estado] = (acc[guia.estado] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
+      // `created_at` es `timestamptz`: recortarlo a diez caracteres da el dia UTC,
+      // que para los tres paises del alcance --Peru y Colombia UTC-5, Argentina
+      // UTC-3-- no es el dia del contribuyente. Una guia emitida a las 19:30 de
+      // Lima ya lleva la fecha de manana en UTC, asi que "emitidas hoy" mostraba
+      // cero durante las ultimas cinco horas de cada jornada.
+      const pais = await paisDelTenant(this.supabaseService.getClient(), tenantId);
       const today = await fechaHoyDelTenant(this.supabaseService.getClient(), tenantId);
+      const diaDelTenant = (valor: unknown): string | null => {
+        const instante = new Date(String(valor ?? ''));
+        return Number.isNaN(instante.getTime()) ? null : fechaHoyEnPais(pais, instante);
+      };
       const stats = {
         total: guias.length,
         estados,
         pesoTotal: guias.reduce((sum, guia) => sum + (guia.peso_total || 0), 0),
-        tendencia: this.calcularTendenciaSemanal(guias),
-        greEmitidas: guias.filter((guia) => String(guia.created_at || '').slice(0, 10) === today).length,
+        tendencia: this.calcularTendenciaSemanal(guias, pais),
+        greEmitidas: guias.filter((guia) => diaDelTenant(guia.created_at) === today).length,
         totalGre: guias.length,
         enTransito: (estados.ENVIADO || 0) + (estados.FIRMADO || 0),
         completados: estados.ACEPTADO || 0,
@@ -1661,8 +1672,10 @@ ${lines}
     }
   }
 
-  private calcularTendenciaSemanal(guias: any[]): any[] {
-    // Agrupar por semanas los últimos 7 días
+  private calcularTendenciaSemanal(guias: any[], pais?: string | null): any[] {
+    // Agrupar por semanas los últimos 7 días, en la zona del contribuyente: los
+    // cubos se etiquetaban con el día UTC y una guía de las 19:30 de Lima caía en
+    // el del día siguiente.
     const ahora = new Date();
     const semanaAtras = new Date(ahora.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -1673,11 +1686,12 @@ ${lines}
     const tendencia = [];
     for (let i = 6; i >= 0; i--) {
       const fecha = new Date(ahora.getTime() - i * 24 * 60 * 60 * 1000);
-      const fechaStr = fecha.toISOString().split('T')[0];
+      const fechaStr = fechaHoyEnPais(pais, fecha);
 
-      const guiasDia = guiasSemana.filter(guia =>
-        guia.created_at.split('T')[0] === fechaStr
-      );
+      const guiasDia = guiasSemana.filter(guia => {
+        const instante = new Date(String(guia.created_at ?? ''));
+        return !Number.isNaN(instante.getTime()) && fechaHoyEnPais(pais, instante) === fechaStr;
+      });
 
       tendencia.push({
         fecha: fechaStr,

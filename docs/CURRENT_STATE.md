@@ -8,28 +8,43 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **PROD está en `500`.** El 2026-08-21 se promovieron la `499` —fijar `pg_temp` en el
+- **PROD está en `501`.** El 2026-08-22 se promovió, cerrando el desbordamiento que
+  entregaba a `ADMIN_DEMO` el catálogo completo de permisos —incluidos
+  `tenants.manage`, `system.debug` y las dos lecturas de auditoría— desde la rama
+  sin filtrar de `app.sembrar_permisos_rrhh_financiero_495`, que corre en un trigger
+  sobre `public.roles`. Se retiraron **264 filas** (66 roles × 4), quedaron cero,
+  el espejo legado quedó también a cero, los 66 conservan `users.manage` y ADMIN
+  sigue con mediana 256. `outbox_runtime_health_492` devuelve `ready: true` con
+  `schema_version 501`. **Con ello el verificador 490 vuelve a pasar** tras estar
+  enumerado como obsoleto: la compuerta corre 67 verificadores históricos y enumera
+  6. Fusionado en `e10dfc4d` (PR #83) con CI 22/22 en verde.
+- **La `502` deja un solo modelo de permisos, y todavía no está en PROD.** El RBAC
+  vivía por duplicado: `permisos`/`rol_permisos` —el canónico, el que consultan los
+  guards y sobre el que están escritas todas las exclusiones— y
+  `permissions`/`role_permissions`, un modelo legado que nadie lee y que **seis
+  triggers** mantenían sincronizado en ambos sentidos. No era cosmético: auditar el
+  desbordamiento de ADMIN_DEMO obligó a instrumentar las dos tablas porque ver una
+  fila en la legada no distinguía el origen del reflejo. Un sistema de permisos con
+  dos tablas espejo es uno en el que cualquier comprobación de seguridad puede estar
+  mirando la mitad equivocada. Se comprobó antes de retirarlo: conteos idénticos
+  (16 896 y 59 809), espejo exacto fila a fila en las cuatro direcciones, cero
+  `.from('permissions')` en todo el TypeScript, y las cuatro funciones que parecían
+  escribirlo eran falsos positivos —`role_permissions_seeded` es un parámetro de
+  salida—. Las tablas se retiran con `DROP TABLE` **sin CASCADE** a propósito, para
+  que una dependencia sin localizar rompa en el clúster efímero en vez de caer en
+  silencio. Medido después: el alta de un tenant demo produce los mismos once roles
+  con los mismos conteos que con el espejo puesto.
+- **PROD estuvo en `500`.** El 2026-08-21 se promovieron la `499` —fijar `pg_temp` en el
   `search_path` de diez writers `SECURITY DEFINER`— y la `500` —quitar el `DEFAULT 'PEN'`
   de las 34 columnas `moneda` del esquema y hacer que `pos_registrar_venta_tx` fije la
   moneda del contribuyente, porque no la declaraba y toda venta de POS tomaba
   soles—. Las dos pasaron el gate completo en un clúster efímero antes de
   aplicarse, con sus verificadores comprobados en rojo. `outbox_runtime_health_492`
-  devuelve `ready: true` con `schema_version 500`, y también con 499, que es lo que
-  exige el API desplegado.
-- **La `501` está en el repositorio y todavía no en PROD.** Cierra el
-  desbordamiento que entregaba a `ADMIN_DEMO` el catálogo completo de permisos
-  —incluidos `tenants.manage`, `system.debug` y las dos lecturas de auditoría— desde
-  la rama sin filtrar de `app.sembrar_permisos_rrhh_financiero_495`, que corre en un
-  trigger sobre `public.roles`. Pasó el gate completo en un clúster efímero, con su
-  verificador comprobado en rojo antes y verde después, y **con ello el verificador**
-  **490 vuelve a pasar** tras estar enumerado como obsoleto. `render.yaml`,
-  `.github/workflows/ci.yml` y el defecto de `env.schema.ts` ya piden `501`, así que
-  **la migración se aplica a PROD antes de fusionar**: al revés, readiness dejaría al
-  contenedor sin tráfico. Requiere autorización explícita.
-- **El API desplegado sigue siendo `main`.** El PR #82 se fusionó el 2026-08-21 en
-  `7ca9c27a` con CI, Security Scan y E2E en verde; no se ha podido confirmar el SHA
-  que Render tiene arriba porque no reporta despliegues a GitHub y la URL pública del
-  servicio no está en el repositorio.
+  devolvía `ready: true` con `schema_version 500`.
+- **El API desplegado.** Los PR #82 y #83 estan fusionados en `main` con CI en
+  verde; no se ha podido confirmar el SHA que Render tiene arriba porque no
+  reporta despliegues a GitHub y la URL publica del servicio no esta en el
+  repositorio.
 
 - **PROD estuvo en `498`.** El 2026-08-20 se promovieron `497` y `498`, ambas de
   sólo funciones —sin DDL de tabla ni migración de datos—, tras pasar el gate
@@ -70,6 +85,14 @@ migraciones verificados, prevalece la implementación actual.
   Argentina quedaría fechada al día siguiente. No afecta hoy —ningún contribuyente
   tiene `arca_activo` y no hay tenants AR— y al homologar habrá que decidir si ese
   campo es el instante o el día fiscal.
+  **Apareció un undécimo el 2026-08-22**, y no por el guardián sino porque la suite
+  se puso roja al cruzar la medianoche UTC: `getStats` del módulo GRE comparaba
+  `created_at.slice(0, 10)` —día UTC— contra `fechaHoyDelTenant` —día del
+  contribuyente—, así que «GRE emitidas hoy» caía a cero durante las últimas cinco
+  horas de cada jornada peruana, y `calcularTendenciaSemanal` etiquetaba los cubos
+  con el día UTC. Las dos pasan ya por `fechaHoyEnPais`. El test que lo cubría sólo
+  fallaba según la hora a la que se ejecutara, así que se añadió uno que fija el
+  reloj en las 00:30 UTC —19:30 de Lima— y se comprobó rojo sin el arreglo.
 - **Barrido de integridad sobre PROD el 2026-08-20**, sólo lectura: 170 asientos
   contables, todos cuadrados y con detalle; el invariante de stock
   (`productos.stock_actual` = suma de `producto_existencias`) se cumple en todos
