@@ -8,7 +8,32 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **PROD está en `501`.** El 2026-08-22 se promovió, cerrando el desbordamiento que
+- **PROD está en `502`: un solo modelo de permisos.** El RBAC vivía por duplicado
+  —`permisos`/`rol_permisos`, el canónico que consultan los guards y sobre el que
+  están escritas todas las exclusiones, y `permissions`/`role_permissions`, un
+  modelo legado que nadie leía— con **seis triggers** sincronizándolos en ambos
+  sentidos. No era cosmético: auditar el desbordamiento de ADMIN_DEMO obligó a
+  instrumentar las dos tablas porque ver una fila en la legada no distinguía el
+  origen del reflejo. Un sistema de permisos con dos tablas espejo es uno en el que
+  cualquier comprobación de seguridad puede estar mirando la mitad equivocada.
+  Comprobado antes de retirarlo: conteos idénticos (16 896 y 59 809), espejo exacto
+  fila a fila en las cuatro direcciones, cero `.from('permissions')` en todo el
+  TypeScript, y las cuatro funciones que parecían escribirlo eran falsos positivos
+  —`role_permissions_seeded` es un parámetro de salida—. Las tablas se retiraron con
+  `DROP TABLE` **sin CASCADE** a propósito, para que una dependencia sin localizar
+  rompiera en el clúster efímero en vez de caer en silencio. Aplicada el 2026-08-23
+  con respaldo previo en `app.respaldo_502_permissions` y
+  `app.respaldo_502_role_permissions` —copias íntegras que pueden retirarse cuando
+  se den por innecesarias—. Después: modelo canónico intacto en 16 896 y 59 809,
+  cero triggers de sincronización, `ready: true` con `schema_version 502`, y el alta
+  de un tenant demo produce los mismos once roles con los mismos conteos que con el
+  espejo puesto. **Lo que impide que vuelva** es el verificador 502, escrito como
+  invariante y no como lista de dos nombres: falla si reaparece una tabla con
+  `role_id`+`permission_id`, una tabla de permisos con `codigo`+`modulo`+`accion`, un
+  trigger de sincronización sobre el modelo canónico o una función que nombre el par
+  legado. Comprobado rojo en los cuatro escenarios. Fusionado en `27ab71d9` (PR #84)
+  con CI 22/22 en verde.
+- **PROD estuvo en `501`.** El 2026-08-22 se promovió, cerrando el desbordamiento que
   entregaba a `ADMIN_DEMO` el catálogo completo de permisos —incluidos
   `tenants.manage`, `system.debug` y las dos lecturas de auditoría— desde la rama
   sin filtrar de `app.sembrar_permisos_rrhh_financiero_495`, que corre en un trigger
@@ -18,22 +43,6 @@ migraciones verificados, prevalece la implementación actual.
   `schema_version 501`. **Con ello el verificador 490 vuelve a pasar** tras estar
   enumerado como obsoleto: la compuerta corre 67 verificadores históricos y enumera
   6. Fusionado en `e10dfc4d` (PR #83) con CI 22/22 en verde.
-- **La `502` deja un solo modelo de permisos, y todavía no está en PROD.** El RBAC
-  vivía por duplicado: `permisos`/`rol_permisos` —el canónico, el que consultan los
-  guards y sobre el que están escritas todas las exclusiones— y
-  `permissions`/`role_permissions`, un modelo legado que nadie lee y que **seis
-  triggers** mantenían sincronizado en ambos sentidos. No era cosmético: auditar el
-  desbordamiento de ADMIN_DEMO obligó a instrumentar las dos tablas porque ver una
-  fila en la legada no distinguía el origen del reflejo. Un sistema de permisos con
-  dos tablas espejo es uno en el que cualquier comprobación de seguridad puede estar
-  mirando la mitad equivocada. Se comprobó antes de retirarlo: conteos idénticos
-  (16 896 y 59 809), espejo exacto fila a fila en las cuatro direcciones, cero
-  `.from('permissions')` en todo el TypeScript, y las cuatro funciones que parecían
-  escribirlo eran falsos positivos —`role_permissions_seeded` es un parámetro de
-  salida—. Las tablas se retiran con `DROP TABLE` **sin CASCADE** a propósito, para
-  que una dependencia sin localizar rompa en el clúster efímero en vez de caer en
-  silencio. Medido después: el alta de un tenant demo produce los mismos once roles
-  con los mismos conteos que con el espejo puesto.
 - **PROD estuvo en `500`.** El 2026-08-21 se promovieron la `499` —fijar `pg_temp` en el
   `search_path` de diez writers `SECURITY DEFINER`— y la `500` —quitar el `DEFAULT 'PEN'`
   de las 34 columnas `moneda` del esquema y hacer que `pos_registrar_venta_tx` fije la
