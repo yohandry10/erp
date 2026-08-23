@@ -35,19 +35,25 @@ BEGIN
   END IF;
 
   ---------------------------------------------------------------------------
-  -- 2. El espejo legado dice lo mismo
+  -- 2. El espejo legado dice lo mismo, mientras exista.
+  --
+  --    La migracion 502 lo retiro: un solo modelo de permisos. La comprobacion
+  --    se conserva protegida para que este verificador siga siendo cierto sobre
+  --    una base anterior a la 502.
   ---------------------------------------------------------------------------
-  SELECT string_agg(DISTINCT lower(COALESCE(p.codigo, p.modulo||'.'||p.recurso||'.'||p.accion)), ', ')
-    INTO v_infractores
-  FROM public.roles r
-  JOIN public.role_permissions rp ON rp.role_id = r.id
-  JOIN public.permissions p ON p.id = rp.permission_id
-  WHERE upper(btrim(COALESCE(r.nombre, ''))) = 'ADMIN_DEMO'
-    AND lower(COALESCE(p.codigo, p.modulo||'.'||p.recurso||'.'||p.accion))
-        IN ('tenants.manage', 'system.debug', 'security.audit.read', 'documentos.audit.read');
+  IF to_regclass('public.role_permissions') IS NOT NULL THEN
+    SELECT string_agg(DISTINCT lower(COALESCE(p.codigo, p.modulo||'.'||p.recurso||'.'||p.accion)), ', ')
+      INTO v_infractores
+    FROM public.roles r
+    JOIN public.role_permissions rp ON rp.role_id = r.id
+    JOIN public.permissions p ON p.id = rp.permission_id
+    WHERE upper(btrim(COALESCE(r.nombre, ''))) = 'ADMIN_DEMO'
+      AND lower(COALESCE(p.codigo, p.modulo||'.'||p.recurso||'.'||p.accion))
+          IN ('tenants.manage', 'system.debug', 'security.audit.read', 'documentos.audit.read');
 
-  IF v_infractores IS NOT NULL THEN
-    RAISE EXCEPTION 'VERIFY_501: el espejo `role_permissions` conserva permisos globales para ADMIN_DEMO: %', v_infractores;
+    IF v_infractores IS NOT NULL THEN
+      RAISE EXCEPTION 'VERIFY_501: el espejo `role_permissions` conserva permisos globales para ADMIN_DEMO: %', v_infractores;
+    END IF;
   END IF;
 
   ---------------------------------------------------------------------------
