@@ -86,6 +86,46 @@ describe('GreService validaciones de creación', () => {
     }));
   });
 
+  it('cuenta las GRE de las últimas horas del día peruano como emitidas hoy', async () => {
+    // 19:30 del 22 de agosto en Lima son las 00:30 del 23 en UTC. El contador
+    // recortaba `created_at` a diez caracteres --el día UTC-- y lo comparaba con
+    // la fecha del contribuyente, así que durante las últimas cinco horas de cada
+    // jornada "emitidas hoy" caía a cero. El test fija ese instante porque a
+    // cualquier otra hora el defecto no se manifiesta.
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-23T00:30:00.000Z'));
+    try {
+      const response = {
+        data: [
+          { estado: 'FIRMADO', peso_total: 2, created_at: '2026-08-23T00:30:00.000Z' },
+          { estado: 'ENVIADO', peso_total: 3, created_at: '2026-08-23T01:00:00.000Z' },
+          { estado: 'ACEPTADO', peso_total: 4, created_at: '2026-01-01T00:00:00.000Z' },
+        ],
+        error: null,
+      };
+      const chain: any = {
+        select: jest.fn(), eq: jest.fn(),
+        then: (resolve: (value: any) => void) => Promise.resolve(response).then(resolve),
+      };
+      chain.select.mockReturnValue(chain);
+      chain.eq.mockReturnValue(chain);
+      const service = new GreService(
+        { getClient: jest.fn(() => ({ from: jest.fn(() => chain) })) } as any,
+        { on: jest.fn(), emit: jest.fn(), eventEmitter: { eventNames: () => [] } } as any,
+        {} as any,
+        {} as any,
+      );
+
+      const stats: any = await service.getStats('tenant-1');
+      expect(stats.greEmitidas).toBe(2);
+      // Y la tendencia las agrupa en el día peruano, no en el UTC del día siguiente.
+      expect(stats.tendencia[stats.tendencia.length - 1]).toEqual({
+        fecha: '2026-08-22', cantidad: 2, peso: 5,
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('rechaza GRE sin datos obligatorios', () => {
     const service = buildService() as any;
 

@@ -179,7 +179,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "501"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "502"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5432
