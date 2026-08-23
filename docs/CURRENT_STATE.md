@@ -16,11 +16,20 @@ migraciones verificados, prevalece la implementación actual.
   aplicarse, con sus verificadores comprobados en rojo. `outbox_runtime_health_492`
   devuelve `ready: true` con `schema_version 500`, y también con 499, que es lo que
   exige el API desplegado.
-- **El API desplegado sigue siendo `main`, que pide el esquema 498.** No está roto
-  —la comprobación verifica que la fila exista, y existe— pero la base va por
-  delante del código: el writer del POS que fija la moneda ya está en producción y
-  el código que calcula en enteros no. **Lo cierra el merge de la rama**
-  `fix/arqueo-saldo-teorico` (PR #82).
+- **La `501` está en el repositorio y todavía no en PROD.** Cierra el
+  desbordamiento que entregaba a `ADMIN_DEMO` el catálogo completo de permisos
+  —incluidos `tenants.manage`, `system.debug` y las dos lecturas de auditoría— desde
+  la rama sin filtrar de `app.sembrar_permisos_rrhh_financiero_495`, que corre en un
+  trigger sobre `public.roles`. Pasó el gate completo en un clúster efímero, con su
+  verificador comprobado en rojo antes y verde después, y **con ello el verificador**
+  **490 vuelve a pasar** tras estar enumerado como obsoleto. `render.yaml`,
+  `.github/workflows/ci.yml` y el defecto de `env.schema.ts` ya piden `501`, así que
+  **la migración se aplica a PROD antes de fusionar**: al revés, readiness dejaría al
+  contenedor sin tráfico. Requiere autorización explícita.
+- **El API desplegado sigue siendo `main`.** El PR #82 se fusionó el 2026-08-21 en
+  `7ca9c27a` con CI, Security Scan y E2E en verde; no se ha podido confirmar el SHA
+  que Render tiene arriba porque no reporta despliegues a GitHub y la URL pública del
+  servicio no está en el repositorio.
 
 - **PROD estuvo en `498`.** El 2026-08-20 se promovieron `497` y `498`, ambas de
   sólo funciones —sin DDL de tabla ni migración de datos—, tras pasar el gate
@@ -241,6 +250,8 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   comercial/RBAC del demo. El postcheck remoto confirmó 57 versiones, bucket
   `product-images` con cuatro políticas, RPC RBAC service-only, 40 demos con
   `users.manage` y cero permisos globales restringidos en `ADMIN_DEMO`.
+  Aquello era cierto en esa fecha: el desbordamiento lo introdujo la `495`, posterior,
+  y lo cierra la `501`.
 - La cadena completa `434..490` tiene verificadores transaccionales verdes.
   Una reconstrucción limpia desde cero aplicó el rango íntegro; la API pasó
   193 suites/1.673 pruebas con cobertura y los typechecks API/Web. Las carreras reales
@@ -1160,17 +1171,66 @@ Alcance real, medido y no supuesto:
   traza. Nada de otro contribuyente.
 - `users.manage` es **deliberado**: la migración 493 es posterior al verificador y lo
   concede a propósito —«los ADMIN/ADMIN_DEMO canónicos conservan la capacidad de
-  administrar su tenant»—. En ese punto el 490 está obsoleto por decisión.
+  administrar su tenant»—. El 490 lo exige también, así que en ese punto las dos
+  fuentes coinciden y no había nada que decidir.
 
-Queda una **decisión de producto**, y por eso no se toca: o el sembrado se ajusta a
-los cuatro que el 490 excluye, o el 490 se actualiza para reflejar que hoy se
-conceden a conciencia. Las dos posiciones están escritas en el repositorio y se
-contradicen; elegir una no es una corrección técnica.
+**Cerrado por la migración 501, y la raíz no estaba donde parecía.** No era dato
+heredado: un tenant demo creado en base limpia sale igual, así que era un defecto
+vivo. `ensure_demo_admin_rbac_for_tenant` excluye esos permisos correctamente y aun
+así el rol acababa con los 256. El granter es otro —`app.sembrar_permisos_rrhh_`
+`financiero_495`—, cuyo tercer INSERT reparte paquetes por nombre de rol en tres
+ramas: las de CONTADOR y FINANZAS filtran por código, la de administración no, de
+modo que el JOIN con `permisos` entregaba el catálogo entero del tenant. Y corre
+desde un trigger sobre `public.roles`, es decir en el instante en que
+`ensure_demo_admin_rbac_for_tenant` inserta el rol ADMIN_DEMO, pisando sus
+exclusiones tres líneas antes de que se ejecuten. Por eso volver a llamarla no
+arreglaba nada, y por eso su DELETE defensivo apunta a ADMIN: es el parche que
+alguien puso para el mismo desbordamiento sin advertir que ADMIN_DEMO compartía rama.
+
+Se localizó grabando la pila de llamadas con `GET DIAGNOSTICS PG_CONTEXT` en un
+trigger temporal sobre `rol_permisos` durante un alta de demo, después de descartar
+uno a uno los candidatos leyendo código. La 501 acota esa rama a los once permisos
+que la propia función siembra y retira lo ya concedido. Medido sobre base limpia
+creando un tenant demo con cada versión: ADMIN 251 → **251**, ADMIN_DEMO 256 → **252**
+—pierde exactamente los cuatro—, los otros nueve roles idénticos y `users.manage`
+intacto. El verificador 501 cubre las dos mitades, el dato sembrado y el camino de
+alta, y además el espejo legado `role_permissions`. **El 490 ya pasa** y salió de la
+lista de obsoletos: la compuerta corre 67 verificadores históricos y enumera 6.
 
 **Sobre `verify_anon_access` y el 437**, ya cerrado más arriba: descuido de
 configuración, no vulnerabilidad.
 
 Coste: la compuerta pasa de ~10 verificadores a ~65 y tarda unos diez minutos.
+
+### Las pruebas e2e (auditadas)
+
+Mismo patrón que los verificadores SQL: **de las 29 e2e, CI ejecuta 7.** Las otras
+22 —unas 10 000 líneas— no corren.
+
+Aquí la causa **sí es legítima**: necesitan el API levantado con base y
+credenciales reales, y el job de Playwright sólo levanta la web contra
+`127.0.0.1:3001`. No es un olvido, es que no caben en ese entorno. Pero el efecto
+es el mismo: lo que afirman no lo comprueba nadie, y ya derivó.
+
+`superadmin-tenant-rbac-rls.spec.ts` fija los permisos por rol: ADMIN 195,
+CONTADOR 64, VENDEDOR 51. En producción son **251–256, 99 y 56**.
+
+Fijar un número es un contrato malo: crece solo cada vez que se añade un permiso
+ordinario, y entonces la prueba estorba y se acaba apagando. Lo estable es el
+**techo**, y ése se comprobó contra producción y **aguanta**: de los cinco permisos
+sensibles, los tres que dan poder —`tenants.manage`, `users.manage`, `system.debug`—
+no los alcanza ningún rol operativo. Los otros dos son lecturas de auditoría y las
+llevan AUDITOR, CONTADOR, FINANZAS y GERENCIA, que es para lo que existen.
+
+Ese invariante se saca de la e2e muerta y pasa a `verify_rbac_ceiling.sql`, que sí
+corre en cada compuerta: crea un contribuyente, comprueba que se sembraron roles
+—control de que está midiendo algo— y exige que ninguno operativo alcance los tres.
+Deliberadamente **no dice nada sobre ADMIN_DEMO**, porque ahí hay una decisión de
+producto pendiente y no le toca resolverla a una comprobación.
+
+**Lo que sigue sin cubrirse**: las 22 e2e como tales. Cubrirlas exigiría levantar el
+API con una base sembrada en CI, que es una decisión de infraestructura, no un
+arreglo. Queda dicho para que nadie las cuente como red de seguridad.
 
 ### Sobre los guardianes de esta auditoría
 
