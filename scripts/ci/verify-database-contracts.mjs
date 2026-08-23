@@ -341,10 +341,6 @@ const HISTORICOS_QUE_NO_PASAN = new Map([
     "470__cxc_aging_and_kardex_canonical_reports.sql",
     "Su fixture mezcla monedas en una misma antigüedad de CxC, que es justo lo que el propio verificador prohíbe.",
   ],
-  [
-    "490__demo_admin_custom_rbac_capability.sql",
-    "Espera que un ADMIN de demo no reciba un permiso global, y el sembrado actual se lo da.",
-  ],
 ]);
 
 // `discover` sólo reconoce ficheros `NNN__nombre.sql`, así que los verificadores
@@ -356,7 +352,15 @@ const HISTORICOS_QUE_NO_PASAN = new Map([
 // duplicadas, RLS habilitado y forzado, política presente y las RPC runtime— y
 // nunca se había ejecutado. Se nombra explícitamente porque no le corresponde
 // ninguna migración: no es un verificador de regresión, es de invariante.
-const SIN_NUMERO_QUE_AFIRMAN = ["verify_outbox_integrity.sql"];
+const SIN_NUMERO_QUE_AFIRMAN = [
+  "verify_outbox_integrity.sql",
+  // El techo RBAC vivía sólo dentro de `superadmin-tenant-rbac-rls.spec.ts`, una
+  // de las 22 e2e que CI no ejecuta —necesitan el API levantado con base y
+  // credenciales reales, y el job de Playwright sólo levanta la web—. Aquella
+  // prueba fija además los permisos por rol con números que ya derivaron: espera
+  // ADMIN 195, CONTADOR 64 y VENDEDOR 51, y en producción son 251–256, 99 y 56.
+  "verify_rbac_ceiling.sql",
+];
 
 const yaEjecutados = new Set(selectedVerifiers.map(({ file }) => file));
 const historicos = [
