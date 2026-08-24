@@ -1,4 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  esCompraFiscal,
+  esEstadoFiscal,
+  esVentaFiscal,
+  importeFiscal,
+} from './documento-fiscal.rules';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 export type RegimenTributarioPeru = 'NRUS' | 'RER' | 'MYPE' | 'GENERAL';
@@ -41,8 +47,64 @@ function money(value: unknown): number {
   return Math.round(Math.max(parsed, 0) * 100) / 100;
 }
 
+/**
+ * Suma aplicando el signo fiscal de cada fila: la nota de crédito resta.
+ *
+ * El importe guardado de una nota de crédito es positivo --el DTO de CxP lo
+ * exige con `@Min(0)`-- de modo que sin este signo una nota de crédito de compra
+ * aumentaba el crédito fiscal en vez de reducirlo, y el error era del doble de
+ * su IGV. Es la misma regla que el Registro de Compras ya aplicaba.
+ */
 function sum(rows: any[], field: string): number {
-  return rows.reduce((total, row) => total + Number(row?.[field] ?? 0), 0);
+  return rows.reduce(
+    (total, row) => total + importeFiscal(row?.tipo_documento, row?.[field]),
+    0,
+  );
+}
+
+/**
+ * Consolida las filas crudas en las magnitudes del periodo, aplicando las mismas
+ * reglas fiscales que los libros: solo los tipos que forman cada registro, sin
+ * documentos anulados, y la nota de credito restando.
+ *
+ * Es una funcion pura y exportada a proposito. Esto vivia dentro de un metodo
+ * privado, y es justo donde estaba el defecto: la declaracion no filtraba por
+ * tipo ni aplicaba el signo, de modo que un TICKET de POS contaba como venta y
+ * una nota de credito sumaba en vez de restar. Un calculo de impuestos que no se
+ * puede probar sin base de datos no se prueba.
+ */
+export function consolidarFuentesMensuales(
+  ventasMesRaw: any[],
+  ventasAnioRaw: any[],
+  comprasMesRaw: any[],
+): { fuentes: FuentesTributariasMensuales; ventasMes: any[]; comprasMes: any[] } {
+  const esVenta = (fila: any) =>
+    esVentaFiscal(fila?.tipo_documento) && esEstadoFiscal(fila?.estado);
+  const esCompra = (fila: any) =>
+    esCompraFiscal(fila?.tipo_documento) && esEstadoFiscal(fila?.estado);
+
+  const ventasMes = (ventasMesRaw || []).filter(esVenta);
+  const ventasAnio = (ventasAnioRaw || []).filter(esVenta);
+  const comprasMes = (comprasMesRaw || []).filter(esCompra);
+
+  const ingresosAcumulados = ['total_gravadas', 'total_exoneradas', 'total_inafectas', 'total_exportacion']
+    .reduce((total, field) => total + sum(ventasAnio, field), 0);
+
+  const fuentes: FuentesTributariasMensuales = {
+    ventas_gravadas: sum(ventasMes, 'total_gravadas'),
+    ventas_exoneradas: sum(ventasMes, 'total_exoneradas'),
+    ventas_inafectas: sum(ventasMes, 'total_inafectas'),
+    exportaciones: sum(ventasMes, 'total_exportacion'),
+    igv_ventas: sum(ventasMes, 'total_igv'),
+    compras_gravadas: sum(comprasMes, 'subtotal'),
+    igv_compras: sum(comprasMes, 'igv'),
+    ingresos_netos_acumulados: ingresosAcumulados,
+    compras_totales_mes: sum(comprasMes, 'total'),
+    cantidad_ventas: ventasMes.length,
+    cantidad_compras: comprasMes.length,
+  };
+
+  return { fuentes, ventasMes, comprasMes };
 }
 
 export function normalizarRegimenPeru(value: unknown): RegimenTributarioPeru {
@@ -204,39 +266,26 @@ export class TributosMensualesService {
     const client = this.supabase.getClient();
     const [ventasMesResult, ventasAnioResult, comprasMesResult] = await Promise.all([
       client.from('cpe')
-        .select('id, total_gravadas, total_exoneradas, total_inafectas, total_exportacion, total_igv')
+        .select('id, tipo_documento, estado, total_gravadas, total_exoneradas, total_inafectas, total_exportacion, total_igv')
         .eq('tenant_id', tenantId).gte('fecha_emision', desde).lt('fecha_emision', hasta)
         .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
       client.from('cpe')
-        .select('id, total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
+        .select('id, tipo_documento, estado, total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
         .eq('tenant_id', tenantId).gte('fecha_emision', inicioAnio).lt('fecha_emision', hasta)
         .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
       client.from('cuentas_por_pagar')
-        .select('id, subtotal, igv, total')
+        .select('id, tipo_documento, estado, subtotal, igv, total')
         .eq('tenant_id', tenantId).gte('fecha_emision', desde).lt('fecha_emision', hasta)
         .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
     ]);
     for (const result of [ventasMesResult, ventasAnioResult, comprasMesResult]) {
       if (result.error) throw new Error(`No se pudieron consolidar las fuentes tributarias: ${result.error.message}`);
     }
-    const ventasMes = ventasMesResult.data || [];
-    const ventasAnio = ventasAnioResult.data || [];
-    const comprasMes = comprasMesResult.data || [];
-    const ingresosAcumulados = ['total_gravadas', 'total_exoneradas', 'total_inafectas', 'total_exportacion']
-      .reduce((total, field) => total + sum(ventasAnio, field), 0);
-    const fuentes: FuentesTributariasMensuales = {
-      ventas_gravadas: sum(ventasMes, 'total_gravadas'),
-      ventas_exoneradas: sum(ventasMes, 'total_exoneradas'),
-      ventas_inafectas: sum(ventasMes, 'total_inafectas'),
-      exportaciones: sum(ventasMes, 'total_exportacion'),
-      igv_ventas: sum(ventasMes, 'total_igv'),
-      compras_gravadas: sum(comprasMes, 'subtotal'),
-      igv_compras: sum(comprasMes, 'igv'),
-      ingresos_netos_acumulados: ingresosAcumulados,
-      compras_totales_mes: sum(comprasMes, 'total'),
-      cantidad_ventas: ventasMes.length,
-      cantidad_compras: comprasMes.length,
-    };
+    const { fuentes, ventasMes, comprasMes } = consolidarFuentesMensuales(
+      ventasMesResult.data || [],
+      ventasAnioResult.data || [],
+      comprasMesResult.data || [],
+    );
     const corte = new Date().toISOString();
     return {
       fuentes,

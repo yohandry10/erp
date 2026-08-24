@@ -1,4 +1,9 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  signoFiscal,
+  TIPOS_DOCUMENTO_COMPRA_FISCAL,
+  TIPOS_DOCUMENTO_VENTA_FISCAL,
+} from './documento-fiscal.rules';
 import { SupabaseService } from "../../../shared/supabase/supabase.service";
 import { TenantContextService } from "../../../shared/tenant/tenant-context.service";
 
@@ -503,12 +508,7 @@ export class PleExportService {
       `,
       )
       .eq("tenant_id", tenantId)
-      .in("tipo_documento", [
-        "FACTURA",
-        "BOLETA",
-        "NOTA_CREDITO",
-        "NOTA_DEBITO",
-      ])
+      .in("tipo_documento", [...TIPOS_DOCUMENTO_VENTA_FISCAL])
       .gte("fecha_emision", fechaInicio)
       .lte("fecha_emision", `${fechaFin}T23:59:59`)
       .order("fecha_emision")
@@ -530,8 +530,12 @@ export class PleExportService {
         String(doc.estado || "").toUpperCase(),
       );
       const numeroDocIdentidad = String(doc.receptor_numero_doc || "").trim();
-      const gravadas = Number(doc.total_gravadas ?? doc.subtotal ?? 0);
-      const igv = Number(doc.impuesto_igv || 0);
+      // El Registro de Compras ya restaba las notas de credito y este no: la
+      // misma regla escrita dos veces y sólo una vez bien. Ahora la declara
+      // `documento-fiscal.rules`.
+      const signo = signoFiscal(doc.tipo_documento);
+      const gravadas = signo * Math.abs(Number(doc.total_gravadas ?? doc.subtotal ?? 0));
+      const igv = signo * Math.abs(Number(doc.impuesto_igv || 0));
 
       lineas.push(
         this.toPleLine([
@@ -642,6 +646,9 @@ export class PleExportService {
       `,
       )
       .eq("tenant_id", tenantId)
+      // El Registro de Compras no filtraba por tipo: cualquier documento de
+      // `cuentas_por_pagar` entraba en el libro legal.
+      .in("tipo_documento", [...TIPOS_DOCUMENTO_COMPRA_FISCAL])
       .gte("fecha_emision", fechaInicio)
       .lte("fecha_emision", fechaFin)
       .order("fecha_emision")
@@ -670,8 +677,7 @@ export class PleExportService {
       ).trim();
       const { serie, numero } = this.partirSerieNumero(doc.numero_documento);
       const fiscal = doc.fiscal_metadata || {};
-      const esNotaCredito = String(doc.tipo_documento || "").toUpperCase() === "NOTA_CREDITO";
-      const signo = esNotaCredito ? -1 : 1;
+      const signo = signoFiscal(doc.tipo_documento);
       const igv = signo * Math.abs(Number(doc.igv || 0));
       const base = signo * Math.abs(Number(doc.subtotal || 0));
       const total = signo * Math.abs(Number(doc.total || 0));

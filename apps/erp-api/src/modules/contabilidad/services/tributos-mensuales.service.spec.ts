@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import {
   calcularTributoMensualPeru,
+  consolidarFuentesMensuales,
   FuentesTributariasMensuales,
   normalizarRegimenPeru,
 } from './tributos-mensuales.service';
@@ -98,5 +99,99 @@ describe('calcularTributoMensualPeru', () => {
   it('normaliza el valor legado RUS y rechaza regímenes ajenos', () => {
     expect(normalizarRegimenPeru('RUS')).toBe('NRUS');
     expect(() => normalizarRegimenPeru('MONOTRIBUTO')).toThrow(BadRequestException);
+  });
+});
+
+describe('consolidarFuentesMensuales', () => {
+  // Medido sobre produccion el 2026-08-24: para el mismo mes el Registro de
+  // Ventas daba S/ 1 566,05 de IGV y la declaracion S/ 1 570,55, porque la
+  // declaracion no aplicaba las reglas del libro.
+  const venta = (over: Record<string, any> = {}) => ({
+    tipo_documento: 'FACTURA',
+    estado: 'ACEPTADO',
+    total_gravadas: 1000,
+    total_exoneradas: 0,
+    total_inafectas: 0,
+    total_exportacion: 0,
+    total_igv: 180,
+    ...over,
+  });
+  const compra = (over: Record<string, any> = {}) => ({
+    tipo_documento: 'FACTURA',
+    estado: 'REGISTRADO',
+    subtotal: 500,
+    igv: 90,
+    total: 590,
+    ...over,
+  });
+
+  it('la nota de credito de venta resta en vez de sumar', () => {
+    const { fuentes } = consolidarFuentesMensuales(
+      [venta(), venta({ tipo_documento: 'NOTA_CREDITO', total_gravadas: 200, total_igv: 36 })],
+      [],
+      [],
+    );
+
+    expect(fuentes.igv_ventas).toBe(144);
+    expect(fuentes.ventas_gravadas).toBe(800);
+  });
+
+  it('la nota de credito de compra reduce el credito fiscal', () => {
+    // Es la direccion peligrosa: sumarla rebaja el IGV a pagar.
+    const { fuentes } = consolidarFuentesMensuales(
+      [],
+      [],
+      [compra(), compra({ tipo_documento: 'NOTA_CREDITO', subtotal: 100, igv: 18, total: 118 })],
+    );
+
+    expect(fuentes.igv_compras).toBe(72);
+    expect(fuentes.compras_gravadas).toBe(400);
+  });
+
+  it('deja fuera el ticket interno de POS, que no es comprobante fiscal', () => {
+    const { fuentes } = consolidarFuentesMensuales(
+      [venta(), venta({ tipo_documento: 'TICKET', total_igv: 50, total_gravadas: 278 })],
+      [],
+      [],
+    );
+
+    expect(fuentes.igv_ventas).toBe(180);
+    expect(fuentes.cantidad_ventas).toBe(1);
+  });
+
+  it('deja fuera los documentos anulados', () => {
+    const { fuentes } = consolidarFuentesMensuales(
+      [venta(), venta({ estado: 'ANULADO', total_igv: 999 })],
+      [],
+      [],
+    );
+
+    expect(fuentes.igv_ventas).toBe(180);
+  });
+
+  it('entiende el codigo 01 igual que el nombre FACTURA', () => {
+    // En produccion `cpe.tipo_documento` guarda las dos formas a la vez.
+    const { fuentes } = consolidarFuentesMensuales(
+      [venta({ tipo_documento: '01' }), venta({ tipo_documento: 'FACTURA' })],
+      [],
+      [],
+    );
+
+    expect(fuentes.cantidad_ventas).toBe(2);
+    expect(fuentes.igv_ventas).toBe(360);
+  });
+
+  it('el acumulado del anio usa las mismas reglas', () => {
+    const { fuentes } = consolidarFuentesMensuales(
+      [],
+      [
+        venta({ total_gravadas: 1000 }),
+        venta({ tipo_documento: 'TICKET', total_gravadas: 500 }),
+        venta({ tipo_documento: 'NOTA_CREDITO', total_gravadas: 200 }),
+      ],
+      [],
+    );
+
+    expect(fuentes.ingresos_netos_acumulados).toBe(800);
   });
 });
