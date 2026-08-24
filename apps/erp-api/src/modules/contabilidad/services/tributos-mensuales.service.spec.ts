@@ -15,6 +15,11 @@ const fuentes = (overrides: Partial<FuentesTributariasMensuales> = {}): FuentesT
   igv_ventas: 1800,
   compras_gravadas: 5000,
   igv_compras: 900,
+  igv_compras_gravadas: 900,
+  igv_compras_no_gravadas: 0,
+  igv_compras_comunes: 0,
+  operaciones_gravadas_12m: 100000,
+  operaciones_no_gravadas_12m: 0,
   ingresos_netos_acumulados: 100000,
   compras_totales_mes: 5900,
   cantidad_ventas: 2,
@@ -277,5 +282,103 @@ describe('arrastre del saldo a favor del IGV', () => {
       .map(([, valor]: [string, string]) => valor);
 
     expect(periodosConsultados).toContain('2025-12');
+  });
+});
+
+describe('prorrata del credito fiscal', () => {
+  // Articulo 23 de la Ley del IGV. Antes no existia: todo el IGV de compras
+  // entraba integro al credito, tuviera el contribuyente operaciones mixtas o no.
+  const base = () => fuentes({
+    igv_ventas: 1800,
+    igv_compras: 900,
+    igv_compras_gravadas: 500,
+    igv_compras_comunes: 400,
+    igv_compras_no_gravadas: 0,
+    operaciones_gravadas_12m: 75000,
+    operaciones_no_gravadas_12m: 25000,
+  });
+
+  it('aplica el coeficiente de doce meses solo a las compras comunes', () => {
+    const result: any = calcularTributoMensualPeru('GENERAL', base(), {});
+
+    // 75 000 / 100 000 = 75 %
+    expect(result.coeficiente_prorrata).toBe(75);
+    // 500 integro + 400 x 75 % = 800
+    expect(result.igv_credito_fiscal).toBe(800);
+    expect(result.igv_resultante).toBe(1000);
+  });
+
+  it('sin operaciones no gravadas el credito entra integro', () => {
+    // Es el comportamiento anterior a la prorrata: quien no tiene operaciones
+    // mixtas no debe notar ningun cambio.
+    const result: any = calcularTributoMensualPeru('GENERAL', fuentes({
+      igv_compras: 900,
+      igv_compras_gravadas: 500,
+      igv_compras_comunes: 400,
+      operaciones_gravadas_12m: 100000,
+      operaciones_no_gravadas_12m: 0,
+    }), {});
+
+    expect(result.coeficiente_prorrata).toBe(100);
+    expect(result.igv_credito_fiscal).toBe(900);
+  });
+
+  it('el IGV de compras destinadas a no gravadas no da credito', () => {
+    const result: any = calcularTributoMensualPeru('GENERAL', fuentes({
+      igv_compras: 900,
+      igv_compras_gravadas: 500,
+      igv_compras_comunes: 0,
+      igv_compras_no_gravadas: 400,
+      operaciones_gravadas_12m: 75000,
+      operaciones_no_gravadas_12m: 25000,
+    }), {});
+
+    expect(result.igv_credito_fiscal).toBe(500);
+  });
+
+  it('avisa cuando hay no gravadas y ninguna compra clasificada', () => {
+    const result: any = calcularTributoMensualPeru('GENERAL', fuentes({
+      igv_compras: 900,
+      igv_compras_gravadas: 900,
+      igv_compras_comunes: 0,
+      igv_compras_no_gravadas: 0,
+      operaciones_gravadas_12m: 75000,
+      operaciones_no_gravadas_12m: 25000,
+    }), {});
+
+    expect(result.warnings.map((w: any) => w.codigo)).toContain('PRORRATA_SIN_CLASIFICAR');
+  });
+});
+
+describe('consolidarFuentesMensuales reparte el IGV de compras por destino', () => {
+  const compra = (destino: string, igv: number) => ({
+    tipo_documento: 'FACTURA',
+    estado: 'REGISTRADO',
+    subtotal: igv / 0.18,
+    igv,
+    total: igv / 0.18 + igv,
+    destino_credito_fiscal: destino,
+  });
+
+  it('separa gravadas, comunes y no gravadas', () => {
+    const { fuentes: f } = consolidarFuentesMensuales(
+      [], [],
+      [compra('GRAVADAS', 100), compra('COMUN', 50), compra('NO_GRAVADAS', 30)],
+      [],
+    );
+
+    expect(f.igv_compras_gravadas).toBe(100);
+    expect(f.igv_compras_comunes).toBe(50);
+    expect(f.igv_compras_no_gravadas).toBe(30);
+    expect(f.igv_compras).toBe(180);
+  });
+
+  it('una compra sin clasificar cuenta como destinada a gravadas', () => {
+    const sinDestino: any = compra('GRAVADAS', 100);
+    delete sinDestino.destino_credito_fiscal;
+
+    const { fuentes: f } = consolidarFuentesMensuales([], [], [sinDestino], []);
+
+    expect(f.igv_compras_gravadas).toBe(100);
   });
 });
