@@ -6,8 +6,9 @@ import {
   Logger,
   ForbiddenException,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
+import { from, Observable, switchMap } from 'rxjs';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
+import { SucursalScopeService } from '../../shared/tenant/sucursal-scope.service';
 
 /**
  * Interceptor que establece el contexto de tenant DESPUÉS de la autenticación
@@ -17,7 +18,10 @@ import { TenantContextService } from '../../shared/tenant/tenant-context.service
 export class TenantContextInterceptor implements NestInterceptor {
   private readonly logger = new Logger(TenantContextInterceptor.name);
 
-  constructor(private readonly tenantContext: TenantContextService) {}
+  constructor(
+    private readonly tenantContext: TenantContextService,
+    private readonly sucursalScope: SucursalScopeService,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
@@ -79,6 +83,13 @@ export class TenantContextInterceptor implements NestInterceptor {
       );
     }
 
+    // El alcance por sucursal del usuario se resuelve una vez aquí y viaja en el
+    // contexto; `SupabaseService.getClient()` lo aplica a toda consulta sobre
+    // una tabla con `sucursal_id`. Un superadministrador no se restringe, y una
+    // petición sin usuario tampoco: son los caminos de sistema.
+    const resolverAlcance = (): Promise<string[] | null> =>
+      isSuperAdmin ? Promise.resolve(null) : this.sucursalScope.resolver(tenantId, userId);
+
     // Establecer contexto de tenant para AsyncLocalStorage
     const store = this.tenantContext.getContext();
     if (store) {
@@ -89,7 +100,12 @@ export class TenantContextInterceptor implements NestInterceptor {
         supabaseAccessToken,
         isSuperAdmin,
       });
-      return next.handle();
+      return from(resolverAlcance()).pipe(
+        switchMap((sucursalIds) => {
+          this.tenantContext.setContext({ sucursalIds });
+          return next.handle();
+        }),
+      );
     } else {
       // Si no hay store, crear uno nuevo
       return new Observable((subscriber) => {
@@ -101,7 +117,14 @@ export class TenantContextInterceptor implements NestInterceptor {
             isSuperAdmin,
           },
           () => {
-            next.handle().subscribe(subscriber);
+            from(resolverAlcance())
+              .pipe(
+                switchMap((sucursalIds) => {
+                  this.tenantContext.setContext({ sucursalIds });
+                  return next.handle();
+                }),
+              )
+              .subscribe(subscriber);
           },
         );
       });

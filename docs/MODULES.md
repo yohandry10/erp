@@ -552,6 +552,17 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   central--; asignarle una o varias lo restringe a esas. Dar de alta o asignar
   establecimientos es cosa de administracion; el resto de roles operativos solo
   los lee.
+- **La operacion no declara su establecimiento: lo hereda.** Una venta de POS lo
+  toma de la caja de su sesion, una sesion de su caja, un movimiento de
+  inventario de su almacen y un comprobante de su serie. El valor se guarda para
+  poder consultarlo sin saltos, pero un trigger lo deriva en cada escritura y
+  **rechaza** cualquiera que contradiga a su ancla, de modo que no puede
+  divergir. El stock por local se consulta en `stock_por_sucursal`.
+- **El alcance del usuario se aplica en un solo sitio**: el cliente que devuelve
+  `SupabaseService.getClient()` filtra por `sucursal_id` toda lectura,
+  modificacion y borrado sobre las tablas que llevan la columna. No se filtra el
+  alta, porque la sucursal de una fila nueva la decide la base. Un usuario sin
+  asignaciones no paga ningun filtro.
 - ADMIN normal y ADMIN demo tienen contratos de permisos distintos.
 - Las pruebas gratuitas viven en PROD con política explícita y datos aislados;
   no habilitan transmisiones fiscales reales. DEV está retirado y bloqueado.

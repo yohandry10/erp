@@ -8,6 +8,38 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
+- **La `504` hace que la operación herede su establecimiento, y añade el alcance
+  por usuario. Escrita y verificada; PROD sigue en `502` hasta promover.** La 503
+  dejó modelada la estructura --series, almacenes, cajas-- pero las tablas donde
+  ocurre la operación seguían sin saber dónde pasaron las cosas, así que no había
+  stock por local ni informe de ventas por sucursal: sólo un modelo sobre el que
+  no se podía preguntar nada. La decisión de fondo es **derivar, no duplicar**: la
+  venta de POS toma su sucursal de la caja de su sesión, la sesión de su caja, el
+  movimiento de inventario de su almacén y el comprobante de su serie. Se guarda
+  el valor --para no pagar dos saltos en cada informe-- y un trigger lo deriva en
+  cada escritura y **rechaza** el que contradiga a su ancla, que es el mismo
+  patrón con el que `trg_enforce_product_stock_is_derived_350` protege el stock:
+  un valor derivado que se puede escribir a mano deja de ser derivado el día que
+  alguien lo escribe. `producto_existencias` se queda sin columna a propósito --el
+  stock ya está por almacén-- y el stock por local se consulta en la vista
+  `stock_por_sucursal`, declarada `security_invoker` para que no cruce la frontera
+  entre contribuyentes.
+  **El alcance del usuario se aplica en un solo sitio.** Hay más de ochenta puntos
+  de consulta sobre tablas con `sucursal_id`, y un filtro repetido ochenta veces
+  es un filtro que alguien olvidará --sin que se note, porque la consulta sigue
+  devolviendo datos, sólo que de más locales de los que tocan--. Se resuelve una
+  vez por petición en `TenantContextInterceptor` y lo aplica el cliente que
+  devuelve `SupabaseService.getClient()`, sobre `select`, `update` y `delete`;
+  el alta no se filtra porque la sucursal de una fila nueva la decide la base. Un
+  usuario sin asignaciones --hoy, todos-- no paga ningún filtro. Si la resolución
+  del alcance falla, la petición continúa sin restringir y se registra el error:
+  fallar cerrado dejaría el ERP entero sin datos por una tabla que la mayoría de
+  contribuyentes no usa, y la frontera que importa --el contribuyente-- no se toca
+  aquí. La lista de tablas que el API filtra vive en `sucursal-scope.ts` y **la
+  mantiene honesta el verificador 504**, que la compara con las relaciones que de
+  verdad llevan la columna y falla nombrando el fichero que hay que actualizar;
+  comprobado en rojo creando una tabla con `sucursal_id` fuera de la lista.
+
 - **La `503` convierte la sucursal en un establecimiento anexo del RUC. Escrita
   y verificada; PROD sigue en `502` hasta promoverla.** `public.sucursales`
   existía desde el esqueleto 002 y nunca se alteró: cero endpoints, cero

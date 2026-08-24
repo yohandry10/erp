@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { PostgrestQueryBuilder } from '@supabase/postgrest-js';
 import { TenantContextService } from '../tenant/tenant-context.service';
+import { alcanceRestringido, TABLAS_CON_SUCURSAL } from '../tenant/sucursal-scope';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -251,7 +252,80 @@ export class SupabaseService {
    */
   getClient(options?: { silent?: boolean }): SupabaseClient {
     this.ensureContext(options?.silent);
-    return this.supabase;
+    return this.wrapSucursalScope(this.supabase);
+  }
+
+  /**
+   * Aplica el alcance por sucursal del usuario a las lecturas y a las
+   * modificaciones, en un solo sitio.
+   *
+   * El motivo de que viva aquí y no en cada servicio: hay más de ochenta puntos
+   * de consulta sobre las tablas que llevan `sucursal_id`, y un filtro repetido
+   * ochenta veces es un filtro que alguien olvidará la vez ochenta y uno --y el
+   * olvido no se nota, porque la consulta sigue devolviendo datos, sólo que de
+   * más sucursales de las que tocan--. Aquí no se puede olvidar.
+   *
+   * Alcance de lo que toca y de lo que no:
+   *
+   *  - `select`, `update` y `delete` se filtran. `insert` no: qué sucursal le
+   *    corresponde a una fila nueva lo decide la base derivándolo de su ancla
+   *    (migración 504), no el cliente.
+   *  - Sólo actúa sobre las tablas de `TABLAS_CON_SUCURSAL`, que el verificador
+   *    504 mantiene sincronizada con las que de verdad llevan la columna.
+   *  - Un usuario sin asignaciones tiene alcance total y aquí no se añade nada,
+   *    así que el caso mayoritario no paga ni un filtro de más.
+   *  - Los caminos de sistema --outbox, sembrados, tareas-- corren sin usuario
+   *    en contexto y por tanto sin restricción, que es lo correcto: no son de
+   *    nadie.
+   */
+  private wrapSucursalScope(client: SupabaseClient): SupabaseClient {
+    const alcance = this.tenantContext.getSucursalIds();
+    if (!alcanceRestringido(alcance)) {
+      return client;
+    }
+
+    return new Proxy(client as any, {
+      get: (target: any, prop: PropertyKey, receiver: any) => {
+        if (prop !== 'from') {
+          return Reflect.get(target, prop, receiver);
+        }
+
+        return (table: string) => {
+          const builder = target.from(table);
+          const normalizedTable = (table || '').toString().trim();
+          if (!TABLAS_CON_SUCURSAL.has(normalizedTable)) {
+            return builder;
+          }
+          return this.wrapSucursalBuilder(builder, alcance);
+        };
+      },
+    }) as SupabaseClient;
+  }
+
+  private wrapSucursalBuilder(builder: any, sucursalIds: string[]): any {
+    const filtrables = new Set(['select', 'update', 'delete']);
+
+    return new Proxy(builder, {
+      get: (target: any, prop: PropertyKey, receiver: any) => {
+        const original = Reflect.get(target, prop, receiver);
+        if (typeof prop !== 'string' || !filtrables.has(prop) || typeof original !== 'function') {
+          return original;
+        }
+
+        return (...args: unknown[]) => {
+          const result = original.apply(target, args);
+          // `.in()` existe en el filter builder que devuelven las tres; si
+          // alguna versión futura del cliente dejara de exponerlo, es preferible
+          // fallar aquí que devolver filas de otras sucursales en silencio.
+          if (!result || typeof result.in !== 'function') {
+            throw new Error(
+              `Alcance por sucursal: ${prop}() sobre una tabla con sucursal_id no admite filtro`,
+            );
+          }
+          return result.in('sucursal_id', sucursalIds);
+        };
+      },
+    });
   }
 
   /**
