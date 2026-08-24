@@ -160,6 +160,32 @@ EXECUTE FUNCTION app.normalize_sucursal_row();
 -- ----------------------------------------------------------------------------
 -- 2. Casa matriz para todo contribuyente: la que existe y la que venga
 -- ----------------------------------------------------------------------------
+-- Primero se PROMUEVE la sede que el contribuyente ya tenga, en vez de crearle
+-- una casa matriz nueva al lado.
+--
+-- Esto no se ve en una cadena limpia --ahi la tabla esta vacia-- y si en
+-- produccion: hay 58 filas 'Sede Lima', una por contribuyente, sembradas por el
+-- alta de demo (`WHERE NOT EXISTS` sobre sucursales, migraciones 412/497/498).
+-- Esa sede *es* su local principal. Insertar un 'Casa matriz' junto a ella
+-- dejaria a cada contribuyente con dos locales donde tenia uno, y el relleno
+-- posterior engancharia sus almacenes y cajas a la casa matriz recien creada
+-- mientras la sede de verdad se queda vacia. Se promueve la mas antigua.
+WITH candidatas AS (
+  SELECT DISTINCT ON (s.tenant_id) s.id
+  FROM public.sucursales s
+  WHERE s.tenant_id IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM public.sucursales x
+      WHERE x.tenant_id = s.tenant_id AND x.codigo_establecimiento = '0000'
+    )
+  ORDER BY s.tenant_id, s.created_at, s.id
+)
+UPDATE public.sucursales s
+SET codigo_establecimiento = '0000'
+FROM candidatas c
+WHERE s.id = c.id;
+
+-- Y solo despues se crea una para quien no tenia ninguna.
 INSERT INTO public.sucursales (tenant_id, nombre, codigo, codigo_establecimiento, es_principal, activo, estado, metadata)
 SELECT
   t.id,

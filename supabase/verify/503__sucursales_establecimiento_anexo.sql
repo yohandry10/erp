@@ -249,6 +249,34 @@ BEGIN
   END IF;
 
   ---------------------------------------------------------------------------
+  -- 8b. La migracion no duplico sedes
+  --
+  --    Este fallo no se ve en una cadena limpia: alli `sucursales` esta vacia y
+  --    la casa matriz se crea sin conflicto. En produccion habia 58 filas
+  --    'Sede Lima', una por contribuyente, y la primera version de la 503 les
+  --    creaba una casa matriz al lado y degradaba la sede real a anexo. La regla
+  --    correcta es promover la que ya estaba; aqui se comprueba que se respeto:
+  --    ninguna casa matriz creada por la migracion puede convivir con otra
+  --    sucursal anterior en el mismo contribuyente.
+  ---------------------------------------------------------------------------
+  SELECT string_agg(DISTINCT s.tenant_id::text, ', ')
+    INTO v_infractores
+  FROM public.sucursales s
+  WHERE s.metadata->>'source' = 'migration_503'
+    AND EXISTS (
+      SELECT 1 FROM public.sucursales o
+      WHERE o.tenant_id = s.tenant_id
+        AND o.id <> s.id
+        AND o.created_at < s.created_at
+    );
+
+  IF v_infractores IS NOT NULL THEN
+    RAISE EXCEPTION
+      'VERIFY_503: la migracion creo una casa matriz junto a una sede que ya existia en %; '
+      'la sede que el contribuyente ya tenia se promueve, no se duplica', v_infractores;
+  END IF;
+
+  ---------------------------------------------------------------------------
   -- 9. La contabilidad no esta partida por sucursal, y es a proposito
   ---------------------------------------------------------------------------
   PERFORM 1
