@@ -48,7 +48,10 @@ describe('SupabaseService', () => {
       },
     }) as unknown as ConfigService;
 
-  const tenantContext = { getContext: jest.fn() } as unknown as TenantContextService;
+  const tenantContext = {
+    getContext: jest.fn(),
+    getSucursalIds: jest.fn(() => null),
+  } as unknown as TenantContextService;
 
   const buildService = (overrides?: Record<string, string | undefined>) => {
     const mockClient = createMockClient();
@@ -103,5 +106,75 @@ describe('SupabaseService', () => {
     expect(() => publicClient.rpc('drop_all_tables')).toThrow(
       /Public Supabase client blocked for RPC "drop_all_tables"/,
     );
+  });
+
+  describe('alcance por sucursal', () => {
+    // El filtro vive en el cliente y no en cada servicio porque hay mas de
+    // ochenta puntos de consulta sobre tablas con `sucursal_id`. Estas pruebas
+    // fijan las tres reglas que lo hacen seguro: filtra lo que debe, no toca lo
+    // que no lleva la columna, y nunca filtra un INSERT.
+    const buildScopedService = (sucursalIds: string[] | null) => {
+      const filterBuilder: any = { in: jest.fn(() => filterBuilder) };
+      const queryBuilder: any = {
+        select: jest.fn(() => filterBuilder),
+        update: jest.fn(() => filterBuilder),
+        delete: jest.fn(() => filterBuilder),
+        insert: jest.fn(() => filterBuilder),
+      };
+      const mockClient = {
+        from: jest.fn(() => queryBuilder),
+        rpc: jest.fn(),
+      } as unknown as SupabaseClient;
+
+      createClientMock.mockReturnValue(mockClient);
+      const context = {
+        getContext: jest.fn(() => ({ tenantId: 'tenant-1', userId: 'user-1' })),
+        getSucursalIds: jest.fn(() => sucursalIds),
+      } as unknown as TenantContextService;
+
+      const service = new SupabaseService(context, createConfig());
+      return { service, queryBuilder, filterBuilder };
+    };
+
+    it('filtra las lecturas de una tabla que lleva sucursal_id', () => {
+      const { service, filterBuilder } = buildScopedService(['suc-1']);
+
+      service.getClient().from('ventas_pos').select('*');
+
+      expect(filterBuilder.in).toHaveBeenCalledWith('sucursal_id', ['suc-1']);
+    });
+
+    it('filtra tambien update y delete, no solo la lectura', () => {
+      const { service, filterBuilder } = buildScopedService(['suc-1']);
+
+      service.getClient().from('sesiones_caja').update({ estado: 'CERRADA' });
+      service.getClient().from('documentos').delete();
+
+      expect(filterBuilder.in).toHaveBeenCalledTimes(2);
+    });
+
+    it('no filtra un INSERT: la sucursal de una fila nueva la deriva la base', () => {
+      const { service, filterBuilder } = buildScopedService(['suc-1']);
+
+      service.getClient().from('ventas_pos').insert({ total: 10 });
+
+      expect(filterBuilder.in).not.toHaveBeenCalled();
+    });
+
+    it('no toca las tablas que no llevan la columna', () => {
+      const { service, filterBuilder } = buildScopedService(['suc-1']);
+
+      service.getClient().from('productos').select('*');
+
+      expect(filterBuilder.in).not.toHaveBeenCalled();
+    });
+
+    it('un usuario sin asignaciones no paga ningun filtro', () => {
+      const { service, filterBuilder } = buildScopedService(null);
+
+      service.getClient().from('ventas_pos').select('*');
+
+      expect(filterBuilder.in).not.toHaveBeenCalled();
+    });
   });
 });

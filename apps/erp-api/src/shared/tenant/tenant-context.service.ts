@@ -6,6 +6,12 @@ export interface TenantContextSnapshot {
   userId?: string | null;
   supabaseAccessToken?: string | null;
   isSuperAdmin?: boolean | null;
+  /**
+   * Sucursales que el usuario alcanza. `null` o ausente = todas, que es el
+   * estado de quien no tiene asignaciones. Lo resuelve una vez por petición
+   * `TenantContextInterceptor`; nunca se acepta desde HTTP.
+   */
+  sucursalIds?: string[] | null;
   /** Propiedad efímera del claim outbox; nunca se acepta desde HTTP. */
   outboxEventRowId?: string | null;
   outboxEventId?: string | null;
@@ -39,6 +45,11 @@ export class TenantContextService {
 
   getIsSuperAdmin(): boolean {
     return this.storage.getStore()?.isSuperAdmin ?? false;
+  }
+
+  /** `null` = alcance total. Ver `sucursal-scope.ts`. */
+  getSucursalIds(): string[] | null {
+    return this.storage.getStore()?.sucursalIds ?? null;
   }
 
   getOutboxClaim(): {

@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/hooks/use-api'
+import { GuiaEstablecimientos } from './GuiaEstablecimientos'
+import { AsignacionUsuarios } from './AsignacionUsuarios'
 
 type Sucursal = {
   id: string
@@ -139,6 +141,8 @@ export default function SucursalesPage() {
             </Button>
           </ProtectedComponent>
         </div>
+
+        <GuiaEstablecimientos />
 
         {error && (
           <div className="rounded-lg border border-red-400/40 bg-red-500/10 p-4 text-sm font-medium text-red-600">
@@ -317,6 +321,9 @@ export default function SucursalesPage() {
             ))}
           </ul>
         )}
+        <ProtectedComponent modulo="configuracion" recurso="sucursales" accion="assign">
+          <AsignacionUsuarios sucursales={sucursales} />
+        </ProtectedComponent>
       </ProtectedComponent>
     </div>
   )

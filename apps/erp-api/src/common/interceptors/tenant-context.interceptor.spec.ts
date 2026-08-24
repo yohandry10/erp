@@ -14,6 +14,10 @@ describe('TenantContextInterceptor', () => {
     handle: jest.fn(() => of('ok')),
   });
 
+  // Sin asignaciones el alcance es total, que es el estado de todo usuario hoy.
+  const makeSucursalScope = (ids: string[] | null = null) =>
+    ({ resolver: jest.fn(async () => ids) }) as any;
+
   const makeTenantContext = () => {
     const store = { tenantId: null, userId: null, supabaseAccessToken: null, isSuperAdmin: false };
     return {
@@ -25,7 +29,7 @@ describe('TenantContextInterceptor', () => {
 
   it('throws when header tenant mismatches token tenant (non-superadmin)', () => {
     const tenantContext = makeTenantContext();
-    const interceptor = new TenantContextInterceptor(tenantContext);
+    const interceptor = new TenantContextInterceptor(tenantContext, makeSucursalScope());
     const next = makeNext();
 
     const request: any = {
@@ -40,7 +44,7 @@ describe('TenantContextInterceptor', () => {
 
   it('allows override when superadmin provides X-Tenant-Id', (done) => {
     const tenantContext = makeTenantContext();
-    const interceptor = new TenantContextInterceptor(tenantContext);
+    const interceptor = new TenantContextInterceptor(tenantContext, makeSucursalScope());
     const next = makeNext();
 
     const request: any = {
@@ -62,7 +66,7 @@ describe('TenantContextInterceptor', () => {
 
   it('accepts desktop x-erp-tenant-id alias for tenant context', (done) => {
     const tenantContext = makeTenantContext();
-    const interceptor = new TenantContextInterceptor(tenantContext);
+    const interceptor = new TenantContextInterceptor(tenantContext, makeSucursalScope());
     const next = makeNext();
 
     const request: any = {
