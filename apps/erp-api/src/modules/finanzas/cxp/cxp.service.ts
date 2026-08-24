@@ -481,6 +481,8 @@ export class CxpService {
       anticipo_total: ajustesTributarios.anticipo,
       moneda,
       tipo_documento: tipoDocumento,
+      // Sin clasificar, el destino es GRAVADAS: el comportamiento de siempre.
+      destino_credito_fiscal: dto.destino_credito_fiscal ?? 'GRAVADAS',
       referencia_tipo: dto.referencia_tipo ?? (dto.recepcion_id ? 'RECEPCION' : null),
       referencia_id: dto.referencia_id ?? dto.recepcion_id ?? null,
       fiscal_metadata: {
