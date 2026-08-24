@@ -301,12 +301,54 @@ export class TributosMensualesService {
     };
   }
 
+  /**
+   * Periodo anterior en formato `YYYY-MM`.
+   */
+  private periodoAnterior(periodo: string): string {
+    const [anio, mes] = periodo.split('-').map(Number);
+    return mes === 1
+      ? `${anio - 1}-12`
+      : `${anio}-${String(mes - 1).padStart(2, '0')}`;
+  }
+
+  /**
+   * El saldo a favor con el que arranca el mes es el que dejó el mes anterior.
+   *
+   * Estaba solo como campo del cuerpo de la peticion: nadie lo leia de la
+   * declaracion previa, asi que habia que reteclearlo cada mes. Un numero mal
+   * copiado ahi no rompe nada visible --sale un IGV a pagar perfectamente
+   * plausible-- y es de las cosas que no se descubren hasta una fiscalizacion.
+   *
+   * Se sigue admitiendo el valor explicito: tras una rectificacion el arrastre
+   * legitimo puede no ser el que quedo guardado. Lo que cambia es el defecto.
+   */
+  private async saldoFavorDelMesAnterior(tenantId: string, periodo: string): Promise<number> {
+    const { data } = await this.supabase.getClient()
+      .from('tributos_declaraciones_mensuales')
+      .select('saldo_favor_siguiente')
+      .eq('tenant_id', tenantId)
+      .eq('periodo', this.periodoAnterior(periodo))
+      .eq('vigente', true)
+      .maybeSingle();
+
+    return Math.max(Number((data as any)?.saldo_favor_siguiente ?? 0), 0);
+  }
+
   async calcular(tenantId: string, periodo: string, ajustes: AjustesTributariosMensuales = {}) {
     const [{ regimen }, { fuentes, snapshot }] = await Promise.all([
       this.obtenerConfiguracion(tenantId),
       this.obtenerFuentes(tenantId, periodo),
     ]);
-    const calculo = calcularTributoMensualPeru(regimen, fuentes, ajustes);
+
+    const arrastrado = await this.saldoFavorDelMesAnterior(tenantId, periodo);
+    const ajustesConArrastre: AjustesTributariosMensuales = {
+      ...ajustes,
+      saldo_favor_anterior: ajustes.saldo_favor_anterior ?? arrastrado,
+    };
+    const calculo = calcularTributoMensualPeru(regimen, fuentes, ajustesConArrastre);
+    (snapshot as any).saldo_favor_arrastrado = arrastrado;
+    (snapshot as any).saldo_favor_origen =
+      ajustes.saldo_favor_anterior === undefined ? 'periodo_anterior' : 'declarado';
     const { data: declaracion } = await this.supabase.getClient()
       .from('tributos_declaraciones_mensuales')
       .select('*').eq('tenant_id', tenantId).eq('periodo', periodo).eq('vigente', true)

@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { TributosMensualesService } from './tributos-mensuales.service';
 import {
   calcularTributoMensualPeru,
   consolidarFuentesMensuales,
@@ -193,5 +194,88 @@ describe('consolidarFuentesMensuales', () => {
     );
 
     expect(fuentes.ingresos_netos_acumulados).toBe(800);
+  });
+});
+
+describe('arrastre del saldo a favor del IGV', () => {
+  // El saldo con el que arranca el mes es el que dejo el mes anterior. Vivia
+  // solo como campo del cuerpo de la peticion: habia que reteclearlo, y un
+  // numero mal copiado ahi produce un IGV a pagar plausible y falso.
+  const construir = (saldoPrevio: number | null) => {
+    const declaracionesPorPeriodo: Record<string, any> = {};
+    if (saldoPrevio !== null) {
+      declaracionesPorPeriodo['2026-07'] = { saldo_favor_siguiente: saldoPrevio };
+    }
+
+    const cadena = (tabla: string) => {
+      const filtros: Record<string, any> = {};
+      const chain: any = {
+        select: jest.fn(() => chain),
+        eq: jest.fn((campo: string, valor: any) => {
+          filtros[campo] = valor;
+          return chain;
+        }),
+        gte: jest.fn(() => chain),
+        lt: jest.fn(() => chain),
+        not: jest.fn(() => chain),
+        maybeSingle: jest.fn(async () => {
+          if (tabla === 'empresa_config') {
+            return { data: { pais: 'PE', regimen_tributario: 'GENERAL' }, error: null };
+          }
+          return { data: declaracionesPorPeriodo[filtros.periodo] ?? null, error: null };
+        }),
+      };
+      chain.then = (resolve: any) => resolve({ data: [], error: null });
+      return chain;
+    };
+
+    const supabase: any = {
+      getClient: jest.fn(() => ({ from: jest.fn((tabla: string) => cadena(tabla)) })),
+    };
+    return new TributosMensualesService(supabase);
+  };
+
+  it('toma el saldo a favor que dejo el mes anterior', async () => {
+    const service = construir(450);
+
+    const resultado: any = await service.calcular('tenant-1', '2026-08');
+
+    expect(resultado.saldo_favor_anterior).toBe(450);
+    expect(resultado.source_snapshot.saldo_favor_arrastrado).toBe(450);
+    expect(resultado.source_snapshot.saldo_favor_origen).toBe('periodo_anterior');
+  });
+
+  it('respeta el valor declarado a mano, que tras una rectificacion puede diferir', async () => {
+    const service = construir(450);
+
+    const resultado: any = await service.calcular('tenant-1', '2026-08', {
+      saldo_favor_anterior: 100,
+    });
+
+    expect(resultado.saldo_favor_anterior).toBe(100);
+    expect(resultado.source_snapshot.saldo_favor_origen).toBe('declarado');
+  });
+
+  it('arranca en cero cuando no hay declaracion previa', async () => {
+    const service = construir(null);
+
+    const resultado: any = await service.calcular('tenant-1', '2026-08');
+
+    expect(resultado.saldo_favor_anterior).toBe(0);
+  });
+
+  it('cruza el anio: enero toma el saldo de diciembre', async () => {
+    const service = construir(0);
+    const supabaseSpy = (service as any).supabase.getClient;
+
+    await service.calcular('tenant-1', '2026-01');
+
+    const periodosConsultados = supabaseSpy.mock.results
+      .flatMap((r: any) => (r.value.from as jest.Mock).mock.results)
+      .flatMap((r: any) => (r.value.eq as jest.Mock).mock.calls)
+      .filter(([campo]: [string]) => campo === 'periodo')
+      .map(([, valor]: [string, string]) => valor);
+
+    expect(periodosConsultados).toContain('2025-12');
   });
 });
