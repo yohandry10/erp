@@ -193,6 +193,10 @@ async function main() {
     {} as any,
     {} as any,
     {} as any,
+    // SucursalesService: el smoke no tiene base, y el establecimiento anexo de
+    // una serie se resuelve contra ella. Devuelve la casa matriz, que es lo que
+    // el XML llevaba fijo antes de la migracion 503.
+    { codigoEstablecimientoDeSerie: async () => '0000' } as any,
   ) as any;
   const bajaService = new ComunicacionBajaService(supabase as any, oseService, config) as any;
   const greEventBus = {
