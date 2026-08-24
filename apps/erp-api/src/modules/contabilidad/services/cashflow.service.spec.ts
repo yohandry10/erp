@@ -110,4 +110,92 @@ describe('CashflowService', () => {
     expect(result.neto).toBe(150.6);
     expect(result.detalle.variacionCxc).toBe(94.4);
   });
+
+  describe('correccion por gastos que no movieron caja', () => {
+    // El metodo indirecto corrige la utilidad con lo que no salio de caja. Esa
+    // correccion faltaba: el operativo salia subestimado exactamente en la
+    // depreciacion del mes y, como la depreciacion no toca la 33 sino la 39,
+    // tampoco aparecia en inversion. Se perdia.
+    const conBalances = (actual: any[], previo: any[], utilidadNeta: number) => {
+      estadosFinancieros.getBalanceComprobacion
+        .mockResolvedValueOnce(actual as any)
+        .mockResolvedValueOnce(previo as any);
+      estadosFinancieros.getEstadoResultados.mockResolvedValue({
+        ingresos: { total_ingresos: 0 },
+        costos: { costo_ventas: 0 },
+        gastos: { total_gastos: 0 },
+        utilidad_neta: utilidadNeta,
+      } as any);
+    };
+
+    it('devuelve la depreciacion del mes al flujo operativo', async () => {
+      // Utilidad 1000 con 300 de depreciacion: la caja subio 1300, no 1000.
+      conBalances(
+        [
+          { cuenta: '10', saldo_final: 1300 },
+          { cuenta: '68', saldo_final: 300, debe: 300, haber: 0 },
+        ],
+        [{ cuenta: '10', saldo_final: 0 }],
+        1000,
+      );
+
+      const result = await service.getCashFlow('tenant', 2026, 8);
+
+      expect(result.detalle.gastosNoDesembolsables).toBe(300);
+      expect(result.operativo).toBe(1300);
+    });
+
+    it('el estado cuadra con la variacion real de caja', async () => {
+      conBalances(
+        [
+          { cuenta: '10', saldo_final: 1300 },
+          { cuenta: '68', saldo_final: 300, debe: 300, haber: 0 },
+        ],
+        [{ cuenta: '10', saldo_final: 0 }],
+        1000,
+      );
+
+      const result = await service.getCashFlow('tenant', 2026, 8);
+
+      expect(result.detalle.variacionCaja).toBe(1300);
+      expect(result.detalle.descuadre).toBe(0);
+    });
+
+    it('delata el descuadre en vez de callarlo', async () => {
+      // La caja subio 2000 y el estado solo explica 1300: faltan 700 por
+      // clasificar. Antes no se veia porque nada comparaba contra la caja.
+      conBalances(
+        [
+          { cuenta: '10', saldo_final: 2000 },
+          { cuenta: '68', saldo_final: 300, debe: 300, haber: 0 },
+        ],
+        [{ cuenta: '10', saldo_final: 0 }],
+        1000,
+      );
+
+      const result = await service.getCashFlow('tenant', 2026, 8);
+
+      expect(result.detalle.descuadre).toBe(-700);
+    });
+
+    it('la compra de un activo fijo sale por inversion, no por operacion', async () => {
+      conBalances(
+        [
+          { cuenta: '10', saldo_final: 500 },
+          { cuenta: '33', saldo_final: 500, debe: 500, haber: 0 },
+        ],
+        [
+          { cuenta: '10', saldo_final: 1000 },
+          { cuenta: '33', saldo_final: 0 },
+        ],
+        0,
+      );
+
+      const result = await service.getCashFlow('tenant', 2026, 8);
+
+      expect(result.inversion).toBe(-500);
+      expect(result.operativo).toBe(0);
+      expect(result.detalle.descuadre).toBe(0);
+    });
+  });
 });

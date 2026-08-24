@@ -8,11 +8,22 @@ export interface CashFlowSection {
   neto: number;
   detalle: {
     utilidadNeta: number;
+    /** Depreciacion, amortizacion y deterioro del mes (PCGE 68). */
+    gastosNoDesembolsables: number;
     variacionCxc: number;
     variacionInventario: number;
     variacionCxp: number;
     variacionInversiones: number;
     variacionFinanciamiento: number;
+    /** Variacion real de caja y bancos (PCGE 10) en el mes. */
+    variacionCaja: number;
+    /**
+     * `neto` menos la variacion real de caja. Un flujo de efectivo correcto
+     * cierra en cero; cualquier otro numero dice que falta un concepto por
+     * clasificar. Se expone en vez de callarse porque antes el estado no
+     * cuadraba con la caja y nadie podia notarlo.
+     */
+    descuadre: number;
   };
 }
 
@@ -71,10 +82,26 @@ export class CashflowService {
     const financPrev = this.sumCreditBalanceByPrefix(balancePrevio, ['45', '46', '47', '48', '50']);
     const deltaFinanc = financ - financPrev;
 
-    const operativo = netIncome - deltaCxc - deltaInv + deltaCxp;
+    // Metodo indirecto: la utilidad se corrige con lo que no movio caja.
+    //
+    // La cuenta 68 del PCGE --valuacion y deterioro de activos y provisiones--
+    // recoge depreciacion, amortizacion y deterioro, que son gasto sin salida de
+    // dinero. Sin devolverlos, el flujo operativo salia subestimado exactamente
+    // en la depreciacion del mes, y como la depreciacion no toca la 33 sino la
+    // 39, tampoco aparecia en inversion: simplemente se perdia.
+    const noDesembolsables = this.sumMovimientoDebe(balanceActual, ['68']);
+
+    const operativo = netIncome + noDesembolsables - deltaCxc - deltaInv + deltaCxp;
     const inversion = -deltaInversiones;
     const financiamiento = deltaFinanc;
     const neto = operativo + inversion + financiamiento;
+
+    // La prueba acida del estado: lo que dice que se movio tiene que ser lo que
+    // de verdad se movio en caja y bancos.
+    const caja = this.sumByPrefix(balanceActual, ['10']);
+    const cajaPrev = this.sumByPrefix(balancePrevio, ['10']);
+    const variacionCaja = caja - cajaPrev;
+    const descuadre = neto - variacionCaja;
 
     return {
       operativo: this.roundCurrency(operativo),
@@ -83,11 +110,14 @@ export class CashflowService {
       neto: this.roundCurrency(neto),
       detalle: {
         utilidadNeta: this.roundCurrency(netIncome),
+        gastosNoDesembolsables: this.roundCurrency(noDesembolsables),
         variacionCxc: this.roundCurrency(deltaCxc),
         variacionInventario: this.roundCurrency(deltaInv),
         variacionCxp: this.roundCurrency(deltaCxp),
         variacionInversiones: this.roundCurrency(deltaInversiones),
         variacionFinanciamiento: this.roundCurrency(deltaFinanc),
+        variacionCaja: this.roundCurrency(variacionCaja),
+        descuadre: this.roundCurrency(descuadre),
       },
     };
   }
@@ -160,6 +190,17 @@ export class CashflowService {
     return balance
       .filter((item) => Array.from(set).some((pref) => item.cuenta.startsWith(pref)))
       .reduce((sum, item) => sum + (item.saldo_final || 0), 0);
+  }
+
+  /**
+   * Movimiento deudor del mes. `debe` que devuelve `balance_comprobacion_live`
+   * es el del periodo, no el acumulado, que es justo lo que hace falta para el
+   * gasto no desembolsable del mes.
+   */
+  private sumMovimientoDebe(balance: BalanceComprobacionItem[], prefixes: string[]): number {
+    return balance
+      .filter((item) => prefixes.some((pref) => item.cuenta.startsWith(pref)))
+      .reduce((sum, item) => sum + (item.debe || 0), 0);
   }
 
   private sumCreditBalanceByPrefix(balance: BalanceComprobacionItem[], prefixes: string[]): number {
