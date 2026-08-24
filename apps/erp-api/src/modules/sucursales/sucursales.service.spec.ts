@@ -225,4 +225,92 @@ describe('SucursalesService', () => {
       expect(sucursalesChain.in).toHaveBeenCalledWith('id', ['suc-1']);
     });
   });
+
+  describe('resumen', () => {
+    it('agrupa la actividad por establecimiento y deja en cero los que no vendieron', async () => {
+      const rpc = jest.fn(async () => ({
+        data: [{ sucursal_id: 'suc-matriz' }, { sucursal_id: 'suc-anexo' }],
+        error: null,
+      }));
+
+      const sucursalesChain: any = {
+        select: jest.fn(() => sucursalesChain),
+        eq: jest.fn(() => sucursalesChain),
+        in: jest.fn(() => sucursalesChain),
+        order: jest.fn(() => sucursalesChain),
+      };
+      sucursalesChain.then = (resolve: any) =>
+        resolve({
+          data: [
+            {
+              id: 'suc-matriz',
+              nombre: 'Casa matriz',
+              codigo_establecimiento: '0000',
+              es_principal: true,
+            },
+            {
+              id: 'suc-anexo',
+              nombre: 'Arequipa',
+              codigo_establecimiento: '0001',
+              es_principal: false,
+            },
+          ],
+          error: null,
+        });
+
+      // Sólo el anexo vendió; la matriz tiene una caja abierta y nada más.
+      const tablas: Record<string, any[]> = {
+        ventas_pos: [
+          { sucursal_id: 'suc-anexo', total: 100.5 },
+          { sucursal_id: 'suc-anexo', total: 49.5 },
+        ],
+        documentos: [{ sucursal_id: 'suc-anexo' }],
+        sesiones_caja: [
+          { sucursal_id: 'suc-matriz', estado: 'ABIERTA' },
+          { sucursal_id: 'suc-anexo', estado: 'CERRADA' },
+        ],
+      };
+
+      const construir = (tabla: string) => {
+        const chain: any = {
+          select: jest.fn(() => chain),
+          eq: jest.fn(() => chain),
+          in: jest.fn(() => chain),
+          gte: jest.fn(() => chain),
+          lte: jest.fn(() => chain),
+        };
+        chain.then = (resolve: any) => resolve({ data: tablas[tabla] ?? [], error: null });
+        return chain;
+      };
+
+      const supabase: any = {
+        getClient: jest.fn(() => ({
+          from: jest.fn((tabla: string) =>
+            tabla === 'sucursales' ? sucursalesChain : construir(tabla),
+          ),
+          rpc,
+        })),
+      };
+
+      const service = new SucursalesService(supabase);
+      const resumen = await service.resumen('tenant-1', 'user-1');
+
+      expect(resumen).toEqual([
+        expect.objectContaining({
+          codigo_establecimiento: '0000',
+          ventas_pos_total: 0,
+          ventas_pos_cantidad: 0,
+          comprobantes_cantidad: 0,
+          cajas_abiertas: 1,
+        }),
+        expect.objectContaining({
+          codigo_establecimiento: '0001',
+          ventas_pos_total: 150,
+          ventas_pos_cantidad: 2,
+          comprobantes_cantidad: 1,
+          cajas_abiertas: 0,
+        }),
+      ]);
+    });
+  });
 });

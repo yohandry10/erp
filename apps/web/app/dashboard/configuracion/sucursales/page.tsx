@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { useApi } from '@/hooks/use-api'
 import { GuiaEstablecimientos } from './GuiaEstablecimientos'
 import { AsignacionUsuarios } from './AsignacionUsuarios'
+import { ResumenSucursales } from './ResumenSucursales'
 
 type Sucursal = {
   id: string
@@ -321,6 +322,8 @@ export default function SucursalesPage() {
             ))}
           </ul>
         )}
+        <ResumenSucursales />
+
         <ProtectedComponent modulo="configuracion" recurso="sucursales" accion="assign">
           <AsignacionUsuarios sucursales={sucursales} />
         </ProtectedComponent>

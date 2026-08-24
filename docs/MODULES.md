@@ -558,6 +558,18 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   poder consultarlo sin saltos, pero un trigger lo deriva en cada escritura y
   **rechaza** cualquiera que contradiga a su ancla, de modo que no puede
   divergir. El stock por local se consulta en `stock_por_sucursal`.
+- **Mover mercaderia entre establecimientos es un traslado, no un apunte
+  interno.** Cuando el almacen de origen y el de destino son de sucursales
+  distintas, la transferencia queda marcada con el motivo 04 de SUNAT y los
+  codigos de los dos establecimientos, en el resultado y en la metadata de los
+  dos movimientos. Si el contribuyente marco GRE obligatorio, el traslado se
+  rechaza mientras no se referencie una guia. Dentro de un mismo establecimiento
+  no se marca nada.
+- **La planilla declara el establecimiento donde trabaja cada empleado.** El
+  empleado pertenece a una sucursal y la ficha del T-Registro **hereda** su
+  codigo en cada escritura; no se escribe a mano. Antes toda la planilla de todos
+  los locales se declaraba en la casa matriz, porque la columna tenia
+  `DEFAULT '0000'` y nada la cambiaba.
 - **El alcance del usuario se aplica en un solo sitio**: el cliente que devuelve
   `SupabaseService.getClient()` filtra por `sucursal_id` toda lectura,
   modificacion y borrado sobre las tablas que llevan la columna. No se filtra el
