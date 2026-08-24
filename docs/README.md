@@ -72,7 +72,8 @@ pnpm check-docs
 
 - PROD: `wypnbcptofqdmoynlonq`, único proyecto remoto autorizado y sólo para
   datos reales.
-- DEV está retirado y bloqueado. Las pruebas usan dobles o infraestructura local
+- No hay ningún otro proyecto remoto: el runtime rechaza cualquier project ref
+  que no sea el de PROD. Las pruebas usan dobles o infraestructura local
   efímera y nunca se redirigen a PROD.
 
 Antes de operar una base, leer `OPERATIONS.md` y ejecutar

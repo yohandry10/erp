@@ -36,10 +36,13 @@ transacción explícita.
 - El backend con service role siempre aplica el tenant de la sesión; nunca acepta
   un tenant arbitrario del body.
 
-El único proyecto remoto operativo es PROD: `wypnbcptofqdmoynlonq`. El antiguo
-DEV `hbueraexcbowpfnjlppi` está retirado: el esquema de entorno, las herramientas
-operativas y CI lo rechazan. Las pruebas con escritura sólo pueden usar dobles o
-una infraestructura local efímera sin datos de clientes.
+El único proyecto remoto operativo es PROD: `wypnbcptofqdmoynlonq`. El esquema
+de entorno y el build del frontend rechazan cualquier otro project ref —también
+bajo `NODE_ENV=test`, que es el único modo en el que el resto de reglas se
+relajan—. Es una lista blanca de un solo proyecto, no una lista de prohibidos:
+protege igual de un entorno que ya no existe que de uno que aparezca mañana. Las
+pruebas con escritura sólo pueden usar dobles o una infraestructura local efímera
+sin datos de clientes.
 
 ## Autenticación y autorización
 

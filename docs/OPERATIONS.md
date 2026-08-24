@@ -62,10 +62,10 @@ Reglas:
 
 ## Contrato PROD-only
 
-| Entorno | Project ref            | Estado                                      |
-| ------- | ---------------------- | ------------------------------------------- |
-| PROD    | `wypnbcptofqdmoynlonq` | Único destino remoto; sólo datos reales     |
-| DEV     | `hbueraexcbowpfnjlppi` | Retirado y rechazado por runtime/scripts/CI |
+| Entorno   | Project ref            | Estado                                        |
+| --------- | ---------------------- | --------------------------------------------- |
+| PROD      | `wypnbcptofqdmoynlonq` | Único destino remoto; sólo datos reales       |
+| Cualquier otro | —                 | Rechazado por runtime, build de web y scripts |
 
 Antes de cualquier operación DB:
 
