@@ -31,6 +31,22 @@ export class SucursalesController {
     return { success: true, data };
   }
 
+  /**
+   * Se declara antes que `:id` porque en Nest gana la primera ruta que casa, y
+   * `:id` con ParseUUIDPipe rechazaria «resumen» con un 400 en vez de llegar aqui.
+   */
+  @Get('resumen')
+  @RequirePermission('configuracion.sucursales.read')
+  async resumen(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    const data = await this.service.resumen(tenantId, user?.id, desde, hasta);
+    return { success: true, data };
+  }
+
   @Get(':id')
   @RequirePermission('configuracion.sucursales.read')
   async obtener(

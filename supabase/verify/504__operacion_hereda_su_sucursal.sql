@@ -200,6 +200,7 @@ BEGIN
     SELECT unnest(ARRAY[
       'documento_series', 'almacenes', 'cajas', 'ventas',
       'ventas_pos', 'sesiones_caja', 'movimientos_inventario', 'cpe', 'documentos',
+      'empleados',
       'cpe_documentos', 'stock_por_sucursal',
       -- Estas dos llevan la columna desde la migracion 025 y su NULL significa
       -- "global, sin establecimiento": es la clave de los upsert de inventario.

@@ -83,6 +83,16 @@ export class TransferirInventarioDto {
   @IsDateString()
   fecha_expiracion?: string;
 
+  /**
+   * Guía de remisión que ampara el traslado. Sólo tiene sentido cuando origen y
+   * destino son establecimientos distintos: es un traslado entre anexos del RUC
+   * y SUNAT lo exige con motivo 04. Si el contribuyente marcó GRE obligatorio,
+   * la base rechaza el traslado sin ella.
+   */
+  @IsOptional()
+  @IsUUID()
+  guia_remision_id?: string;
+
   @IsString()
   @MinLength(8)
   @MaxLength(180)

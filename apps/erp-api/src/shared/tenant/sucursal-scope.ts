@@ -21,6 +21,8 @@ export const TABLAS_CON_SUCURSAL: ReadonlySet<string> = new Set([
   'movimientos_inventario',
   'cpe',
   'documentos',
+  // 505: el trabajador declara su establecimiento en el T-Registro
+  'empleados',
   // vistas que exponen la columna
   'cpe_documentos',
   'stock_por_sucursal',

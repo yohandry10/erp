@@ -8,6 +8,37 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
+- **La `505` cierra las dos obligaciones peruanas que quedaban abiertas. Escrita
+  y verificada; PROD sigue en `502` hasta promover.** Con varias sucursales,
+  mover mercaderia de un local a otro deja de ser un apunte interno: para SUNAT
+  es un **traslado entre establecimientos** y exige guia de remision con motivo
+  04. El motivo estaba mapeado en `gre.service.ts` desde antes y nadie lo
+  disparaba, porque hasta la 503 no habia establecimientos entre los que
+  trasladar. `transferir_inventario_tx` no puede emitir la guia --necesita
+  transportista, fechas y pesos que no viajan en su payload-- asi que hace lo que
+  si le toca: detecta que los dos almacenes son de sucursales distintas, deja
+  constancia con los dos codigos y el motivo 04 en el resultado y en la metadata
+  de ambos movimientos, y **bloquea** el traslado si el contribuyente marco GRE
+  obligatorio y no se referencia guia. Se reutiliza ese interruptor en vez de
+  inventar otro porque ya significa exactamente eso.
+  La segunda es la **planilla**: `rrhh_peru_fichas_laborales.establecimiento_codigo`
+  existia desde la 398 con `DEFAULT '0000'` y, sin sucursales, nadie lo cambiaba
+  nunca — toda la planilla de todos los locales se declaraba en la casa matriz.
+  Se arregla en la raiz y no en el generador del PLAME: el empleado pertenece a
+  una sucursal y el codigo de la ficha **se deriva** de ella en cada escritura,
+  igual que en la 504. Quien necesite cambiarlo cambia la sucursal del empleado,
+  que es la afirmacion que de verdad se quiere hacer.
+  El verificador 505 comprueba las cuatro: el traslado entre anexos se marca, el
+  traslado dentro de un local **no** se marca --sin esa mitad, una funcion que
+  marcara siempre pasaria--, GRE obligatorio lo bloquea sin guia, y la ficha sale
+  con el codigo del anexo aunque se le escriba `0000` a mano. Comprobado en rojo
+  en tres escenarios. Cadena limpia de 502 migraciones hasta la 505 con 15
+  verificadores de regresion.
+  Ademas hay **informe por establecimiento** (`GET /sucursales/resumen`): ventas
+  de POS, tickets, comprobantes y cajas abiertas por local, agrupando por
+  `sucursal_id` sin cruzar cajas con almacenes, y filtrado por el alcance del
+  usuario como todo lo demas.
+
 - **La `504` hace que la operación herede su establecimiento, y añade el alcance
   por usuario. Escrita y verificada; PROD sigue en `502` hasta promover.** La 503
   dejó modelada la estructura --series, almacenes, cajas-- pero las tablas donde

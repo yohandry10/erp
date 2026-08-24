@@ -258,6 +258,107 @@ export class SucursalesService {
   }
 
   /**
+   * Informe por establecimiento: qué vendió y qué tiene cada local.
+   *
+   * Se apoya en que la operación ya sabe dónde ocurrió (migración 504), así que
+   * no hay que cruzar cajas con almacenes ni adivinar nada: se agrupa por
+   * `sucursal_id`. Lo que el usuario alcanza ya viene filtrado por el cliente,
+   * de modo que un jefe de local ve su fila y no las de los demás.
+   */
+  async resumen(
+    tenantId: string,
+    usuarioSistemaId: string,
+    desde?: string,
+    hasta?: string,
+  ): Promise<Array<{
+    sucursal_id: string;
+    nombre: string;
+    codigo_establecimiento: string;
+    es_principal: boolean;
+    ventas_pos_total: number;
+    ventas_pos_cantidad: number;
+    comprobantes_cantidad: number;
+    cajas_abiertas: number;
+  }>> {
+    const client = this.supabase.getClient();
+    const sucursales = await this.listar(tenantId, usuarioSistemaId);
+    if (sucursales.length === 0) return [];
+
+    const ids = sucursales.map((sucursal) => sucursal.id);
+
+    let ventasQuery = client
+      .from('ventas_pos')
+      .select('sucursal_id, total, fecha')
+      .eq('tenant_id', tenantId)
+      .in('sucursal_id', ids);
+    if (desde) ventasQuery = ventasQuery.gte('fecha', desde);
+    if (hasta) ventasQuery = ventasQuery.lte('fecha', hasta);
+
+    let documentosQuery = client
+      .from('documentos')
+      .select('sucursal_id, fecha_emision')
+      .eq('tenant_id', tenantId)
+      .in('sucursal_id', ids);
+    if (desde) documentosQuery = documentosQuery.gte('fecha_emision', desde);
+    if (hasta) documentosQuery = documentosQuery.lte('fecha_emision', hasta);
+
+    const [ventas, documentos, sesiones] = await Promise.all([
+      ventasQuery,
+      documentosQuery,
+      client
+        .from('sesiones_caja')
+        .select('sucursal_id, estado')
+        .eq('tenant_id', tenantId)
+        .in('sucursal_id', ids),
+    ]);
+
+    const acumular = <T extends { sucursal_id?: string | null }>(
+      filas: T[] | null,
+      predicado: (fila: T) => boolean,
+      valor: (fila: T) => number,
+    ) => {
+      const mapa = new Map<string, number>();
+      for (const fila of filas ?? []) {
+        if (!fila.sucursal_id || !predicado(fila)) continue;
+        mapa.set(fila.sucursal_id, (mapa.get(fila.sucursal_id) ?? 0) + valor(fila));
+      }
+      return mapa;
+    };
+
+    const totalVentas = acumular(
+      ventas.data as Array<{ sucursal_id: string; total: number }> | null,
+      () => true,
+      (fila) => Number(fila.total ?? 0),
+    );
+    const cantidadVentas = acumular(
+      ventas.data as Array<{ sucursal_id: string }> | null,
+      () => true,
+      () => 1,
+    );
+    const cantidadDocumentos = acumular(
+      documentos.data as Array<{ sucursal_id: string }> | null,
+      () => true,
+      () => 1,
+    );
+    const cajasAbiertas = acumular(
+      sesiones.data as Array<{ sucursal_id: string; estado: string }> | null,
+      (fila) => String(fila.estado ?? '').toUpperCase() === 'ABIERTA',
+      () => 1,
+    );
+
+    return sucursales.map((sucursal) => ({
+      sucursal_id: sucursal.id,
+      nombre: sucursal.nombre,
+      codigo_establecimiento: sucursal.codigo_establecimiento,
+      es_principal: sucursal.es_principal,
+      ventas_pos_total: Number((totalVentas.get(sucursal.id) ?? 0).toFixed(2)),
+      ventas_pos_cantidad: cantidadVentas.get(sucursal.id) ?? 0,
+      comprobantes_cantidad: cantidadDocumentos.get(sucursal.id) ?? 0,
+      cajas_abiertas: cajasAbiertas.get(sucursal.id) ?? 0,
+    }));
+  }
+
+  /**
    * El establecimiento que le corresponde a un comprobante. Lo decide la serie,
    * que es como lo decide SUNAT. Sin serie o sin sucursal enganchada devuelve la
    * casa matriz, que es lo que el XML venia emitiendo fijo.
