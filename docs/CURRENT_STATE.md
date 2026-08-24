@@ -8,7 +8,24 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **PROD está en `505`.** Promovidas el 2026-08-24 las tres migraciones de
+- **PROD está en `506`.** Una auditoría contra el trabajo real de un contador
+  peruano encontró que la regla de qué documentos forman cada registro fiscal
+  estaba escrita **tres veces y ninguna completa**: el Registro de Ventas
+  filtraba por tipo pero no restaba las notas de crédito, el de Compras restaba
+  pero no filtraba, y la determinación mensual de IGV no hacía ninguna de las
+  dos. Medido sobre producción: para el mes en curso el libro daba S/ 1 566,05 y
+  la declaración S/ 1 570,55. La regla vive ahora una sola vez en
+  `documento-fiscal.rules.ts`. Además el **flujo de efectivo no devolvía la
+  depreciación** —el operativo salía subestimado en la depreciación del mes y no
+  aparecía en ninguna otra sección— y ahora, además de devolverla, compara contra
+  la variación real de caja y expone el descuadre en vez de callarlo. Y el
+  **saldo a favor del IGV** ya no se reteclea: se arrastra del mes anterior. La
+  `506` retira `detalle_retenciones_categoria`, una tabla del esqueleto 002 sin un
+  solo uso en código ni en migraciones y sin filas en producción; su verificador
+  comprueba también que las dos tablas de retenciones que **sí** están vivas
+  siguen ahí, porque se parecen mucho en el nombre.
+
+- **PROD estuvo en `505`.** Promovidas el 2026-08-24 las tres migraciones de
   sucursales (`503`, `504` y `505`) tras un ensayo con la forma real de los datos
   de producción; `outbox_runtime_health_492` devuelve `ready: true` con
   `schema_version 505` y los tres verificadores pasan **contra PROD** sin dejar
