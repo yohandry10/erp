@@ -40,6 +40,24 @@ describe('CpeXmlBuilder — afectación del IGV en el XML', () => {
       ...overrides,
     }) as unknown as CreateFacturaDto;
 
+  // El establecimiento anexo del emisor. Hasta la migracion 503 este valor
+  // estaba fijado a '0000' porque no habia sucursales de las que sacarlo, asi
+  // que toda factura de toda sucursal declaraba la casa matriz.
+  it('declara el establecimiento anexo que le pasa el emisor', () => {
+    const xml = builder.generateXmlContent(
+      facturaBase({ codigo_establecimiento: '0003' }),
+    );
+
+    expect(xml).toContain('<cbc:AddressTypeCode>0003</cbc:AddressTypeCode>');
+    expect(xml).not.toContain('<cbc:AddressTypeCode>0000</cbc:AddressTypeCode>');
+  });
+
+  it('cae a la casa matriz cuando no le pasan establecimiento', () => {
+    const xml = builder.generateXmlContent(facturaBase());
+
+    expect(xml).toContain('<cbc:AddressTypeCode>0000</cbc:AddressTypeCode>');
+  });
+
   it('emite el subtotal gravado con el esquema 1000 (IGV)', () => {
     const xml = builder.generateXmlContent(facturaBase());
 

@@ -1,12 +1,44 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-22.
+Actualizado: 2026-08-24.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
 migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
+
+- **La `503` convierte la sucursal en un establecimiento anexo del RUC. Escrita
+  y verificada; PROD sigue en `502` hasta promoverla.** `public.sucursales`
+  existía desde el esqueleto 002 y nunca se alteró: cero endpoints, cero
+  pantallas, cero políticas RLS que la nombraran, y las columnas `sucursal_id`
+  de `ventas`, `cajas` y los precios/stock por sucursal sólo las rellenaba el
+  importador masivo pegando un UUID en una columna de CSV. Era una etiqueta de
+  migración de datos, no una entidad. El diseño lo fija SUNAT y no la
+  imaginación: el establecimiento tiene un código de cuatro dígitos de la ficha
+  RUC, `0000` es la casa matriz, y **las series de comprobante se asignan por
+  establecimiento** —esa es la pieza que hace encajar el resto, porque el CPE ya
+  emitía `cbc:AddressTypeCode` y lo tenía fijado a `'0000'` por no tener de
+  dónde sacarlo—. **La contabilidad no se parte por sucursal a propósito**: los
+  libros electrónicos son por RUC; el resultado por local sale de
+  `centros_costo`, que ya llega a `detalle_asientos`, y quien necesite
+  contabilidad realmente separada necesita otro RUC, que aquí es otro tenant con
+  su grupo de consolidación. Dos decisiones que conviene no deshacer sin leer la
+  cabecera de la migración: **sin asignación explícita un usuario ve todas las
+  sucursales** —así aplicar la 503 no le quita el acceso a nadie— y **todo lo
+  histórico se atribuye a la casa matriz**, que es el único establecimiento que
+  existía. La frontera entre contribuyentes es una **clave foránea compuesta**
+  `(tenant_id, sucursal_id)` y no un trigger de validación como los de 156 y 162:
+  un trigger se desactiva con un ALTER TABLE, la compuesta la sostiene el motor.
+  El relleno histórico no bastaba —los caminos de alta seguían insertando filas
+  sin establecimiento, y el verificador lo cazó— así que un trigger declara la
+  regla una vez: lo que no dice su establecimiento pertenece a la casa matriz.
+  El **verificador 503** comprueba en rojo los cinco escenarios: sin el trigger
+  de casa matriz, sin la clave foránea compuesta, con el alcance de usuario
+  invertido, con `sucursal_id` apareciendo en la contabilidad y con un rol
+  operativo recibiendo el alta de establecimientos. Cadena limpia de 500
+  migraciones hasta la 503 en PostgreSQL 16, 13 verificadores de regresión y 67
+  históricos en verde.
 
 - **PROD está en `502`: un solo modelo de permisos.** El RBAC vivía por duplicado
   —`permisos`/`rol_permisos`, el canónico que consultan los guards y sobre el que

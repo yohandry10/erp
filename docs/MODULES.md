@@ -535,13 +535,31 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   secretos y afiliaciones sintéticos antes de marcarla como real. El envío de
   documentos permanece fail-closed hasta disponer de SOAP WS-Security/XAdES
   homologado; nunca se interpreta una respuesta JSON ficticia como aceptación.
+- Un contribuyente tiene uno o varios **establecimientos anexos** del RUC. La
+  casa matriz es el codigo `0000`, existe siempre, la crea un trigger al dar de
+  alta el tenant y no se puede desactivar; los anexos llevan el codigo de cuatro
+  digitos de la ficha RUC y ese codigo no se reescribe una vez creado, porque ya
+  viaja dentro de comprobantes emitidos. Las series de comprobante pertenecen a
+  un establecimiento y son las que deciden el `cbc:AddressTypeCode` del CPE.
+  Almacenes, cajas y ventas cuelgan tambien del establecimiento; lo que no lo
+  declara se atribuye a la casa matriz.
+- **La contabilidad no se parte por establecimiento**: los libros electronicos
+  son por RUC. El resultado por local se obtiene con centros de costo, que
+  llegan hasta la linea del asiento y a los que la sucursal puede apuntar. Una
+  contabilidad realmente separada exige otro RUC, es decir otro tenant, y para
+  eso existe el grupo de consolidacion.
+- Un usuario sin asignacion de sucursales las alcanza todas --es la oficina
+  central--; asignarle una o varias lo restringe a esas. Dar de alta o asignar
+  establecimientos es cosa de administracion; el resto de roles operativos solo
+  los lee.
 - ADMIN normal y ADMIN demo tienen contratos de permisos distintos.
 - Las pruebas gratuitas viven en PROD con política explícita y datos aislados;
   no habilitan transmisiones fiscales reales. DEV está retirado y bloqueado.
 
 Código principal: `apps/erp-api/src/modules/auth`,
 `apps/erp-api/src/modules/usuarios`, `apps/erp-api/src/modules/permissions`,
-`apps/erp-api/src/modules/tenants`, `apps/erp-api/src/modules/configuracion`.
+`apps/erp-api/src/modules/tenants`, `apps/erp-api/src/modules/configuracion`,
+`apps/erp-api/src/modules/sucursales`.
 
 ## Analytics, reportes y auditoría
 

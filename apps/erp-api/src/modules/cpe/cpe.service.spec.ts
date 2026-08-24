@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CpeService } from './cpe.service';
+import { SucursalesService } from './../sucursales/sucursales.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
 import { EventBusService } from '../../shared/events/event-bus.service';
@@ -84,6 +85,10 @@ describe('CpeService', () => {
         module = await Test.createTestingModule({
             providers: [
                 CpeService,
+                {
+                    provide: SucursalesService,
+                    useValue: { codigoEstablecimientoDeSerie: jest.fn().mockResolvedValue('0000') },
+                },
                 {
                     provide: SupabaseService,
                     useValue: {
