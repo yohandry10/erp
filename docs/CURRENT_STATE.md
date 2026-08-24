@@ -8,8 +8,14 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **La `505` cierra las dos obligaciones peruanas que quedaban abiertas. Escrita
-  y verificada; PROD sigue en `502` hasta promover.** Con varias sucursales,
+- **PROD está en `505`.** Promovidas el 2026-08-24 las tres migraciones de
+  sucursales (`503`, `504` y `505`) tras un ensayo con la forma real de los datos
+  de producción; `outbox_runtime_health_492` devuelve `ready: true` con
+  `schema_version 505` y los tres verificadores pasan **contra PROD** sin dejar
+  residuo. Barrido posterior: outbox sin pendientes ni cola muerta, cero
+  productos descuadrados y cero asientos descuadrados.
+
+- **La `505` cierra las dos obligaciones peruanas que quedaban abiertas.** Con varias sucursales,
   mover mercaderia de un local a otro deja de ser un apunte interno: para SUNAT
   es un **traslado entre establecimientos** y exige guia de remision con motivo
   04. El motivo estaba mapeado en `gre.service.ts` desde antes y nadie lo
@@ -28,6 +34,16 @@ migraciones verificados, prevalece la implementación actual.
   una sucursal y el codigo de la ficha **se deriva** de ella en cada escritura,
   igual que en la 504. Quien necesite cambiarlo cambia la sucursal del empleado,
   que es la afirmacion que de verdad se quiere hacer.
+  **El ensayo contra la forma real de producción encontró un defecto que la cadena
+  limpia no podía ver.** PROD tenía ya 58 filas `Sede Lima`, una por
+  contribuyente, sembradas por el alta de demo; sobre una base vacía ese caso no
+  existe. La primera versión de la 503 les creaba una casa matriz **al lado** y
+  degradaba la sede real a anexo, con lo que cada contribuyente habría acabado con
+  dos locales donde tenía uno y sus almacenes y cajas colgando del recién creado.
+  Ahora se promueve la sede más antigua a `0000` y sólo se crea una nueva para
+  quien no tenía ninguna; el verificador 503 lo comprueba explícitamente. Aplicado:
+  58 promovidas más 10 creadas = 68 sucursales para 68 contribuyentes, ni una
+  duplicada.
   El verificador 505 comprueba las cuatro: el traslado entre anexos se marca, el
   traslado dentro de un local **no** se marca --sin esa mitad, una funcion que
   marcara siempre pasaria--, GRE obligatorio lo bloquea sin guia, y la ficha sale
@@ -40,7 +56,7 @@ migraciones verificados, prevalece la implementación actual.
   usuario como todo lo demas.
 
 - **La `504` hace que la operación herede su establecimiento, y añade el alcance
-  por usuario. Escrita y verificada; PROD sigue en `502` hasta promover.** La 503
+  por usuario.** La 503
   dejó modelada la estructura --series, almacenes, cajas-- pero las tablas donde
   ocurre la operación seguían sin saber dónde pasaron las cosas, así que no había
   stock por local ni informe de ventas por sucursal: sólo un modelo sobre el que
@@ -71,8 +87,7 @@ migraciones verificados, prevalece la implementación actual.
   verdad llevan la columna y falla nombrando el fichero que hay que actualizar;
   comprobado en rojo creando una tabla con `sucursal_id` fuera de la lista.
 
-- **La `503` convierte la sucursal en un establecimiento anexo del RUC. Escrita
-  y verificada; PROD sigue en `502` hasta promoverla.** `public.sucursales`
+- **La `503` convierte la sucursal en un establecimiento anexo del RUC.** `public.sucursales`
   existía desde el esqueleto 002 y nunca se alteró: cero endpoints, cero
   pantallas, cero políticas RLS que la nombraran, y las columnas `sucursal_id`
   de `ventas`, `cajas` y los precios/stock por sucursal sólo las rellenaba el
