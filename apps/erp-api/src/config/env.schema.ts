@@ -75,7 +75,6 @@ export interface AppEnvironment {
 
 const secretPattern = /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+=[\]{}|\\:;"'<>,.?/~`-])/;
 export const PROD_SUPABASE_PROJECT_REF = 'wypnbcptofqdmoynlonq';
-export const DISABLED_DEV_SUPABASE_PROJECT_REF = 'hbueraexcbowpfnjlppi';
 
 /**
  * Un secreto de servidor no lo teclea nadie: lo genera una maquina y se guarda
@@ -196,12 +195,27 @@ export const envSchema = Joi.object({
     ? new URL(value.SUPABASE_URL).hostname.split('.')[0]
     : undefined;
 
+  // Este repositorio opera un solo proyecto de Supabase. La comprobación va antes
+  // que cualquier otra y **también bajo NODE_ENV=test**, que es el único modo en
+  // el que el resto de reglas se relajan.
+  //
+  // Antes esto era una lista negra con el identificador del proyecto DEV
+  // retirado. Una lista negra protege de lo que ya conoces: si mañana aparece un
+  // cuarto proyecto, no lo cubre. Y obligaba a conservar el nombre de DEV en el
+  // código, la configuración del frontend, dos pruebas y tres documentos. Una
+  // lista blanca protege de todo lo que no sea PROD y no necesita nombrar nada.
+  if (actualProjectRef && actualProjectRef !== PROD_SUPABASE_PROJECT_REF) {
+    return helpers.message({
+      custom: `SUPABASE_URL apunta al proyecto ${actualProjectRef}; este repositorio sólo opera ${PROD_SUPABASE_PROJECT_REF}.`,
+    });
+  }
+
   if (
-    actualProjectRef === DISABLED_DEV_SUPABASE_PROJECT_REF ||
-    value.EXPECTED_SUPABASE_PROJECT_REF === DISABLED_DEV_SUPABASE_PROJECT_REF
+    value.EXPECTED_SUPABASE_PROJECT_REF &&
+    value.EXPECTED_SUPABASE_PROJECT_REF !== PROD_SUPABASE_PROJECT_REF
   ) {
     return helpers.message({
-      custom: 'DEV está deshabilitado. El proyecto hbueraexcbowpfnjlppi no puede usarse desde este repositorio.',
+      custom: `EXPECTED_SUPABASE_PROJECT_REF declara ${value.EXPECTED_SUPABASE_PROJECT_REF}; este repositorio sólo opera ${PROD_SUPABASE_PROJECT_REF}.`,
     });
   }
 

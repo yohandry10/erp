@@ -31,9 +31,10 @@ Código y migraciones verificados prevalecen sobre documentación.
 
 ## Contrato PROD-only
 
-- PROD: `wypnbcptofqdmoynlonq`. Es el único proyecto remoto autorizado.
-- DEV `hbueraexcbowpfnjlppi` está retirado y debe ser rechazado por runtime,
-  scripts y CI; no se usa para desarrollo, QA ni demos.
+- PROD: `wypnbcptofqdmoynlonq`. Es el único proyecto remoto autorizado, y el
+  runtime, el build del frontend, los scripts y CI rechazan **cualquier otro**:
+  no es una lista de proyectos prohibidos sino una lista blanca de uno. No hay
+  entorno remoto de desarrollo, QA ni demos.
 - Antes de operar PROD, leer `docs/OPERATIONS.md` y ejecutar
   `scripts/db-environment-preflight.ps1 -Environment PROD`.
 - El runtime usa `.env.production` o secretos inyectados; `.env.local` y `.env`
