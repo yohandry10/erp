@@ -342,7 +342,9 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
   inventa 1.000 para USD u otra divisa.
 - El asiento manual nace en `BORRADOR` o `CONFIRMADO`; un confirmado es
   inmutable y se corrige mediante un contra-asiento enlazado, nunca reescribiendo
-  silenciosamente el original.
+  silenciosamente el original. La captura sólo comunica un asiento balanceado
+  cuando debe y haber tienen importes positivos y su diferencia es menor a un
+  céntimo; un formulario 0/0 permanece pendiente.
 - Cabecera y detalle de asientos, confirmación, reversión, conciliación,
   distribución analítica, devengos, depreciaciones y bajas usan operaciones
   atómicas; sus barreras de idempotencia también viven en la base.
