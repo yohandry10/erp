@@ -7,6 +7,7 @@ import {
   UseGuards,
   BadRequestException,
   Headers,
+  Query,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { SupabaseService } from "../../../shared/supabase/supabase.service";
@@ -269,6 +270,35 @@ export class ContabilidadPeriodosController {
       console.error("❌ [Contabilidad] Error cerrando período:", error);
       throw error;
     }
+  }
+
+  @Post("periodos/:periodo/provision-cobranza-dudosa")
+  @RequirePermission("contabilidad.asientos.crear")
+  @ApiOperation({
+    summary: "Estimacion de cuentas de cobranza dudosa del periodo",
+    description:
+      "Genera el asiento Dr 68 / Cr 19 por la deuda vencida sin cobrar y deja el " +
+      "detalle documento a documento que exige el Libro de Inventarios y Balances. " +
+      "Ejecutarlo dos veces no duplica: lo ya provisionado no vuelve a entrar.",
+  })
+  async provisionarCobranzaDudosa(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser("id") usuarioId: string,
+    @Param("periodo") periodo: string,
+    @Query("dias_vencido") diasVencido?: string,
+  ) {
+    const dias = Number(diasVencido ?? 360);
+    if (!Number.isFinite(dias) || dias < 1) {
+      throw new BadRequestException("dias_vencido debe ser un entero positivo");
+    }
+
+    const data = await this.periodosService.provisionarCobranzaDudosa(
+      tenantId,
+      periodo,
+      usuarioId,
+      Math.trunc(dias),
+    );
+    return { success: true, data };
   }
 
   @Post("periodos/:id/reabrir")

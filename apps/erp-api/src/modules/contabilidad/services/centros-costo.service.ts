@@ -86,48 +86,6 @@ export class CentrosCostoService {
     });
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el centro de costo');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData; return result.record as CentroCosto;
-
-    /* istanbul ignore next -- writer legacy inalcanzable */
-    try {
-      console.log(`📊 [CentrosCosto] Creando centro de costo ${codigo} para tenant ${tenantId}`);
-
-      // Verificar que el código no exista
-      const { data: existente } = await this.supabaseService
-        .getClient()
-        .from('centros_costo')
-        .select('id')
-        .eq('tenant_id', tenantId)
-        .eq('codigo', codigo)
-        .single();
-
-      if (existente) {
-        throw new BadRequestException(`Ya existe un centro de costo con el código ${codigo}`);
-      }
-
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('centros_costo')
-        .insert({
-          tenant_id: tenantId,
-          codigo,
-          nombre,
-          descripcion,
-          activo: true
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ [CentrosCosto] Error creando centro de costo:', error);
-        throw new BadRequestException(`Error al crear centro de costo: ${error.message}`);
-      }
-
-      console.log(`✅ [CentrosCosto] Centro de costo creado: ${data.nombre}`);
-      return data;
-    } catch (error) {
-      console.error('❌ [CentrosCosto] Error en crearCentroCosto:', error);
-      throw error;
-    }
   }
 
   async actualizarCentroCosto(
@@ -149,53 +107,6 @@ export class CentrosCostoService {
     });
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo actualizar el centro de costo');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData; return result.record as CentroCosto;
-
-    /* istanbul ignore next -- writer legacy inalcanzable */
-    try {
-      console.log(`📊 [CentrosCosto] Actualizando centro de costo ${id} para tenant ${tenantId}`);
-
-      // Verificar que existe
-      await this.obtenerCentroCosto(tenantId, id);
-
-      // Si se actualiza el código, verificar que no exista otro con ese código
-      if (updates.codigo) {
-        const { data: existente } = await this.supabaseService
-          .getClient()
-          .from('centros_costo')
-          .select('id')
-          .eq('tenant_id', tenantId)
-          .eq('codigo', updates.codigo)
-          .neq('id', id)
-          .single();
-
-        if (existente) {
-          throw new BadRequestException(`Ya existe otro centro de costo con el código ${updates.codigo}`);
-        }
-      }
-
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('centros_costo')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('tenant_id', tenantId)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ [CentrosCosto] Error actualizando centro de costo:', error);
-        throw new BadRequestException(`Error al actualizar centro de costo: ${error.message}`);
-      }
-
-      console.log(`✅ [CentrosCosto] Centro de costo actualizado: ${data.nombre}`);
-      return data;
-    } catch (error) {
-      console.error('❌ [CentrosCosto] Error en actualizarCentroCosto:', error);
-      throw error;
-    }
   }
 
   async obtenerAsientosPorCentro(

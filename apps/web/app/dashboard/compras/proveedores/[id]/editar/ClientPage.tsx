@@ -20,6 +20,7 @@ interface Proveedor {
   condiciones_pago: string
   limite_credito: number
   dias_credito: number
+  suspension_retencion_cuarta_hasta?: string | null
 }
 
 export default function EditProveedorPage() {
@@ -154,7 +155,11 @@ export default function EditProveedorPage() {
           contacto: proveedor.contacto || '',
           condiciones_pago: proveedor.condiciones_pago as any,
           limite_credito: proveedor.limite_credito,
-          dias_credito: proveedor.dias_credito
+          dias_credito: proveedor.dias_credito,
+          // Sin esto el campo saldría vacío y al guardar cualquier otro cambio
+          // se retiraría la suspensión sin que nadie lo pidiera.
+          suspension_retencion_cuarta_hasta:
+            proveedor.suspension_retencion_cuarta_hasta || ''
         }}
         onSubmit={handleSubmit}
         onCancel={handleCancel}

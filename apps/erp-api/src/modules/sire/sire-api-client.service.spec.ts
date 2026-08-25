@@ -39,7 +39,7 @@ describe('SireApiClientService', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it('bloquea cualquier aceptación real cuando el backend no apunta a PROD', async () => {
-    const service = createService('hbueraexcbowpfnjlppi');
+    const service = createService('qwertyuiopasdfghjklz');
     const fetchSpy = jest.spyOn(global, 'fetch');
 
     await expect(service.aceptarPropuesta(tenantId, 'REG_VEN', '202608'))

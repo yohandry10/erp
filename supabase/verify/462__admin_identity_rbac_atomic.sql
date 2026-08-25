@@ -58,12 +58,38 @@ BEGIN
   v_other_tenant := (v_other_demo->>'tenant_id')::uuid;
   v_other_actor := (v_other_demo->>'user_id')::uuid;
 
+  -- El permiso de la prueba se elige **excluyendo los restringidos**. Antes se
+  -- tomaba el primero por `id`, y como el id es un uuid aleatorio, de cada doce
+  -- ejecuciones una caia sobre `users.manage`, `tenants.manage`, `system.debug`,
+  -- `security.audit.*` o `documentos.audit.read` --que un tenant de demo no puede
+  -- copiar a un rol propio-- y el verificador fallaba con
+  -- `ADMIN_PERMISSION_INVALID_CROSS_TENANT_OR_RESTRICTED` sin que nada estuviera
+  -- roto. Medido sobre los 70 contribuyentes de produccion: fallaba en 6.
+  --
+  -- No se pierde cobertura: que un demo no pueda concederse un permiso
+  -- restringido lo comprueban el verificador 493 --que busca `users.manage` por
+  -- su codigo, no al azar--, el 501 y el techo RBAC.
+  --
+  -- Un guardian que se pone rojo por sorteo acaba ensenando a repetirlo hasta que
+  -- salga verde, y ahi ya no guarda nada.
   SELECT id INTO v_permission FROM public.permisos
-  WHERE tenant_id = v_tenant AND activo ORDER BY id LIMIT 1;
+  WHERE tenant_id = v_tenant AND activo
+    AND lower(COALESCE(codigo, modulo || '.' || recurso || '.' || accion)) NOT IN
+        ('users.manage', 'tenants.manage', 'system.debug', 'documentos.audit.read')
+    AND lower(COALESCE(codigo, modulo || '.' || recurso || '.' || accion)) !~ '^security\.audit\.'
+  ORDER BY id LIMIT 1;
   SELECT id INTO v_permission_2 FROM public.permisos
-  WHERE tenant_id = v_tenant AND activo AND id <> v_permission ORDER BY id LIMIT 1;
+  WHERE tenant_id = v_tenant AND activo AND id <> v_permission
+    AND lower(COALESCE(codigo, modulo || '.' || recurso || '.' || accion)) NOT IN
+        ('users.manage', 'tenants.manage', 'system.debug', 'documentos.audit.read')
+    AND lower(COALESCE(codigo, modulo || '.' || recurso || '.' || accion)) !~ '^security\.audit\.'
+  ORDER BY id LIMIT 1;
   SELECT id INTO v_other_permission FROM public.permisos
-  WHERE tenant_id = v_other_tenant AND activo ORDER BY id LIMIT 1;
+  WHERE tenant_id = v_other_tenant AND activo
+    AND lower(COALESCE(codigo, modulo || '.' || recurso || '.' || accion)) NOT IN
+        ('users.manage', 'tenants.manage', 'system.debug', 'documentos.audit.read')
+    AND lower(COALESCE(codigo, modulo || '.' || recurso || '.' || accion)) !~ '^security\.audit\.'
+  ORDER BY id LIMIT 1;
   IF v_permission IS NULL OR v_permission_2 IS NULL OR v_other_permission IS NULL THEN
     RAISE EXCEPTION 'VERIFY_462_PERMISSION_FIXTURE_MISSING';
   END IF;

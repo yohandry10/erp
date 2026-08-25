@@ -727,7 +727,7 @@ export class ConsolidacionReportesService {
           debe,
           haber,
           plan_cuentas!fk_detalle_asientos_cuenta_id (codigo, nombre),
-          asientos_contables!fk_detalle_asientos_asiento_id_v2 (tenant_id, fecha, estado)
+          asientos_contables!fk_detalle_asientos_asiento_id (tenant_id, fecha, estado)
         `)
         .eq('asientos_contables.tenant_id', tenantId)
         // `fecha` puede llegar como timestamptz. Comparar contra YYYY-MM-DD

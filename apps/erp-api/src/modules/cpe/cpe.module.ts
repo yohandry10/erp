@@ -18,6 +18,7 @@ import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { FiscalModule } from '../fiscal/fiscal.module';
 import { ReferencedNotesService } from './referenced-notes.service';
+import { SucursalesModule } from '../sucursales/sucursales.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ReferencedNotesService } from './referenced-notes.service';
     AuthModule,
     PermissionsModule,
     FiscalModule,
+    SucursalesModule,
   ],
   controllers: [CpeController, ComunicacionBajaController],
   providers: [

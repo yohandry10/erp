@@ -535,13 +535,54 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   secretos y afiliaciones sintéticos antes de marcarla como real. El envío de
   documentos permanece fail-closed hasta disponer de SOAP WS-Security/XAdES
   homologado; nunca se interpreta una respuesta JSON ficticia como aceptación.
+- Un contribuyente tiene uno o varios **establecimientos anexos** del RUC. La
+  casa matriz es el codigo `0000`, existe siempre, la crea un trigger al dar de
+  alta el tenant y no se puede desactivar; los anexos llevan el codigo de cuatro
+  digitos de la ficha RUC y ese codigo no se reescribe una vez creado, porque ya
+  viaja dentro de comprobantes emitidos. Las series de comprobante pertenecen a
+  un establecimiento y son las que deciden el `cbc:AddressTypeCode` del CPE.
+  Almacenes, cajas y ventas cuelgan tambien del establecimiento; lo que no lo
+  declara se atribuye a la casa matriz.
+- **La contabilidad no se parte por establecimiento**: los libros electronicos
+  son por RUC. El resultado por local se obtiene con centros de costo, que
+  llegan hasta la linea del asiento y a los que la sucursal puede apuntar. Una
+  contabilidad realmente separada exige otro RUC, es decir otro tenant, y para
+  eso existe el grupo de consolidacion.
+- Un usuario sin asignacion de sucursales las alcanza todas --es la oficina
+  central--; asignarle una o varias lo restringe a esas. Dar de alta o asignar
+  establecimientos es cosa de administracion; el resto de roles operativos solo
+  los lee.
+- **La operacion no declara su establecimiento: lo hereda.** Una venta de POS lo
+  toma de la caja de su sesion, una sesion de su caja, un movimiento de
+  inventario de su almacen y un comprobante de su serie. El valor se guarda para
+  poder consultarlo sin saltos, pero un trigger lo deriva en cada escritura y
+  **rechaza** cualquiera que contradiga a su ancla, de modo que no puede
+  divergir. El stock por local se consulta en `stock_por_sucursal`.
+- **Mover mercaderia entre establecimientos es un traslado, no un apunte
+  interno.** Cuando el almacen de origen y el de destino son de sucursales
+  distintas, la transferencia queda marcada con el motivo 04 de SUNAT y los
+  codigos de los dos establecimientos, en el resultado y en la metadata de los
+  dos movimientos. Si el contribuyente marco GRE obligatorio, el traslado se
+  rechaza mientras no se referencie una guia. Dentro de un mismo establecimiento
+  no se marca nada.
+- **La planilla declara el establecimiento donde trabaja cada empleado.** El
+  empleado pertenece a una sucursal y la ficha del T-Registro **hereda** su
+  codigo en cada escritura; no se escribe a mano. Antes toda la planilla de todos
+  los locales se declaraba en la casa matriz, porque la columna tenia
+  `DEFAULT '0000'` y nada la cambiaba.
+- **El alcance del usuario se aplica en un solo sitio**: el cliente que devuelve
+  `SupabaseService.getClient()` filtra por `sucursal_id` toda lectura,
+  modificacion y borrado sobre las tablas que llevan la columna. No se filtra el
+  alta, porque la sucursal de una fila nueva la decide la base. Un usuario sin
+  asignaciones no paga ningun filtro.
 - ADMIN normal y ADMIN demo tienen contratos de permisos distintos.
 - Las pruebas gratuitas viven en PROD con política explícita y datos aislados;
   no habilitan transmisiones fiscales reales. DEV está retirado y bloqueado.
 
 Código principal: `apps/erp-api/src/modules/auth`,
 `apps/erp-api/src/modules/usuarios`, `apps/erp-api/src/modules/permissions`,
-`apps/erp-api/src/modules/tenants`, `apps/erp-api/src/modules/configuracion`.
+`apps/erp-api/src/modules/tenants`, `apps/erp-api/src/modules/configuracion`,
+`apps/erp-api/src/modules/sucursales`.
 
 ## Analytics, reportes y auditoría
 

@@ -13,6 +13,8 @@ export interface Proveedor {
   condiciones_pago?: 'CONTADO' | 'CREDITO_15' | 'CREDITO_30' | 'CREDITO_45' | 'CREDITO_60' | 'CREDITO_90'
   dias_credito?: number
   limite_credito?: number
+  /** Sólo Perú: hasta cuándo rige su constancia de suspensión de cuarta categoría. */
+  suspension_retencion_cuarta_hasta?: string | null
   activo: boolean
   created_at: string
   updated_at: string
@@ -29,6 +31,8 @@ export interface CreateProveedorDto {
   condiciones_pago?: 'CONTADO' | 'CREDITO_15' | 'CREDITO_30' | 'CREDITO_45' | 'CREDITO_60' | 'CREDITO_90'
   dias_credito?: number
   limite_credito?: number
+  /** Sólo Perú. Cadena vacía para retirarla: la suspensión caduca cada año. */
+  suspension_retencion_cuarta_hasta?: string
 }
 
 export interface UpdateProveedorDto extends Partial<CreateProveedorDto> {}

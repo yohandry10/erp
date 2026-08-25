@@ -1,4 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  esCompraFiscal,
+  esEstadoFiscal,
+  esVentaFiscal,
+  importeFiscal,
+} from './documento-fiscal.rules';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 export type RegimenTributarioPeru = 'NRUS' | 'RER' | 'MYPE' | 'GENERAL';
@@ -20,6 +26,16 @@ export interface FuentesTributariasMensuales {
   igv_ventas: number;
   compras_gravadas: number;
   igv_compras: number;
+  /** IGV de compras destinadas solo a operaciones gravadas: credito integro. */
+  igv_compras_gravadas: number;
+  /** IGV de compras destinadas solo a no gravadas: sin credito. */
+  igv_compras_no_gravadas: number;
+  /** IGV de compras de destino comun: credito por el coeficiente de prorrata. */
+  igv_compras_comunes: number;
+  /** Operaciones gravadas y exportaciones de los ultimos doce meses. */
+  operaciones_gravadas_12m: number;
+  /** Operaciones no gravadas de los ultimos doce meses. */
+  operaciones_no_gravadas_12m: number;
   ingresos_netos_acumulados: number;
   compras_totales_mes: number;
   cantidad_ventas: number;
@@ -41,8 +57,82 @@ function money(value: unknown): number {
   return Math.round(Math.max(parsed, 0) * 100) / 100;
 }
 
+/**
+ * Suma aplicando el signo fiscal de cada fila: la nota de crédito resta.
+ *
+ * El importe guardado de una nota de crédito es positivo --el DTO de CxP lo
+ * exige con `@Min(0)`-- de modo que sin este signo una nota de crédito de compra
+ * aumentaba el crédito fiscal en vez de reducirlo, y el error era del doble de
+ * su IGV. Es la misma regla que el Registro de Compras ya aplicaba.
+ */
 function sum(rows: any[], field: string): number {
-  return rows.reduce((total, row) => total + Number(row?.[field] ?? 0), 0);
+  return rows.reduce(
+    (total, row) => total + importeFiscal(row?.tipo_documento, row?.[field]),
+    0,
+  );
+}
+
+/**
+ * Consolida las filas crudas en las magnitudes del periodo, aplicando las mismas
+ * reglas fiscales que los libros: solo los tipos que forman cada registro, sin
+ * documentos anulados, y la nota de credito restando.
+ *
+ * Es una funcion pura y exportada a proposito. Esto vivia dentro de un metodo
+ * privado, y es justo donde estaba el defecto: la declaracion no filtraba por
+ * tipo ni aplicaba el signo, de modo que un TICKET de POS contaba como venta y
+ * una nota de credito sumaba en vez de restar. Un calculo de impuestos que no se
+ * puede probar sin base de datos no se prueba.
+ */
+export function consolidarFuentesMensuales(
+  ventasMesRaw: any[],
+  ventasAnioRaw: any[],
+  comprasMesRaw: any[],
+  ventasDoceMesesRaw: any[] = [],
+): { fuentes: FuentesTributariasMensuales; ventasMes: any[]; comprasMes: any[] } {
+  const esVenta = (fila: any) =>
+    esVentaFiscal(fila?.tipo_documento) && esEstadoFiscal(fila?.estado);
+  const esCompra = (fila: any) =>
+    esCompraFiscal(fila?.tipo_documento) && esEstadoFiscal(fila?.estado);
+
+  const ventasMes = (ventasMesRaw || []).filter(esVenta);
+  const ventasAnio = (ventasAnioRaw || []).filter(esVenta);
+  const comprasMes = (comprasMesRaw || []).filter(esCompra);
+
+  const ingresosAcumulados = ['total_gravadas', 'total_exoneradas', 'total_inafectas', 'total_exportacion']
+    .reduce((total, field) => total + sum(ventasAnio, field), 0);
+
+  // Reparto del IGV de compras por destino (articulo 23 de la Ley del IGV).
+  // Sin clasificar, el destino es GRAVADAS y el resultado es identico al de
+  // antes de existir la prorrata.
+  const porDestino = (destino: string) =>
+    comprasMes.filter(
+      (fila: any) => String(fila?.destino_credito_fiscal ?? 'GRAVADAS').toUpperCase() === destino,
+    );
+
+  const ventas12m = (ventasDoceMesesRaw || []).filter(esVenta);
+  const gravadas12m = sum(ventas12m, 'total_gravadas') + sum(ventas12m, 'total_exportacion');
+  const noGravadas12m = sum(ventas12m, 'total_exoneradas') + sum(ventas12m, 'total_inafectas');
+
+  const fuentes: FuentesTributariasMensuales = {
+    igv_compras_gravadas: sum(porDestino('GRAVADAS'), 'igv'),
+    igv_compras_no_gravadas: sum(porDestino('NO_GRAVADAS'), 'igv'),
+    igv_compras_comunes: sum(porDestino('COMUN'), 'igv'),
+    operaciones_gravadas_12m: gravadas12m,
+    operaciones_no_gravadas_12m: noGravadas12m,
+    ventas_gravadas: sum(ventasMes, 'total_gravadas'),
+    ventas_exoneradas: sum(ventasMes, 'total_exoneradas'),
+    ventas_inafectas: sum(ventasMes, 'total_inafectas'),
+    exportaciones: sum(ventasMes, 'total_exportacion'),
+    igv_ventas: sum(ventasMes, 'total_igv'),
+    compras_gravadas: sum(comprasMes, 'subtotal'),
+    igv_compras: sum(comprasMes, 'igv'),
+    ingresos_netos_acumulados: ingresosAcumulados,
+    compras_totales_mes: sum(comprasMes, 'total'),
+    cantidad_ventas: ventasMes.length,
+    cantidad_compras: comprasMes.length,
+  };
+
+  return { fuentes, ventasMes, comprasMes };
 }
 
 export function normalizarRegimenPeru(value: unknown): RegimenTributarioPeru {
@@ -73,7 +163,44 @@ export function calcularTributoMensualPeru(
   const retencionesIgv = money(ajustes.retenciones_igv);
   const percepcionesIgv = money(ajustes.percepciones_igv);
   const otrosCreditosIgv = money(ajustes.otros_creditos_igv);
-  const creditoTotal = money(igvCompras + saldoFavorAnterior + retencionesIgv + percepcionesIgv + otrosCreditosIgv);
+  // Prorrata del credito fiscal (articulo 23 de la Ley del IGV).
+  //
+  // El coeficiente sale de los ultimos doce meses, no del mes: es lo que exige
+  // la norma y ademas evita que un mes atipico mueva el credito de golpe.
+  //
+  //     coeficiente = gravadas + exportaciones (12m) / total operaciones (12m)
+  //
+  // Solo se aplica sobre las compras de destino COMUN. Las destinadas a
+  // gravadas dan credito integro y las destinadas a no gravadas no dan ninguno,
+  // sin coeficiente de por medio.
+  const igvComprasGravadas = money(fuentes.igv_compras_gravadas);
+  const igvComprasComunes = money(fuentes.igv_compras_comunes);
+  const gravadas12m = money(fuentes.operaciones_gravadas_12m);
+  const noGravadas12m = money(fuentes.operaciones_no_gravadas_12m);
+  const totalOperaciones12m = money(gravadas12m + noGravadas12m);
+
+  // Sin operaciones no gravadas no hay nada que prorratear: el coeficiente es
+  // 100 y el credito de las comunes entra entero, que es como se comportaba el
+  // sistema antes de existir la prorrata.
+  const hayOperacionesNoGravadas = noGravadas12m > 0;
+  const coeficienteProrrata = hayOperacionesNoGravadas && totalOperaciones12m > 0
+    ? Math.round((gravadas12m / totalOperaciones12m) * 10000) / 100
+    : 100;
+
+  const creditoComunes = money(igvComprasComunes * (coeficienteProrrata / 100));
+  const creditoFiscal = money(igvComprasGravadas + creditoComunes);
+
+  if (hayOperacionesNoGravadas && money(fuentes.igv_compras_no_gravadas) === 0 && igvComprasComunes === 0) {
+    warnings.push({
+      codigo: 'PRORRATA_SIN_CLASIFICAR',
+      mensaje:
+        'Hay operaciones no gravadas en los ultimos doce meses y ninguna compra clasificada como comun ' +
+        'ni como destinada a no gravadas. Si alguna compra sirve a ambas operaciones, clasificala: de lo ' +
+        'contrario se esta tomando credito fiscal integro sobre ella.',
+    });
+  }
+
+  const creditoTotal = money(creditoFiscal + saldoFavorAnterior + retencionesIgv + percepcionesIgv + otrosCreditosIgv);
   const diferenciaIgv = Math.round((igvVentas - creditoTotal) * 100) / 100;
 
   let igvResultante = money(diferenciaIgv);
@@ -153,6 +280,10 @@ export function calcularTributoMensualPeru(
     igv_ventas: igvVentas,
     compras_gravadas: comprasGravadas,
     igv_compras: igvCompras,
+    igv_credito_fiscal: creditoFiscal,
+    coeficiente_prorrata: coeficienteProrrata,
+    igv_compras_comunes: igvComprasComunes,
+    igv_compras_no_gravadas: money(fuentes.igv_compras_no_gravadas),
     saldo_favor_anterior: saldoFavorAnterior,
     retenciones_igv: retencionesIgv,
     percepciones_igv: percepcionesIgv,
@@ -173,13 +304,23 @@ export function calcularTributoMensualPeru(
 export class TributosMensualesService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  private validarPeriodo(periodo: string): { desde: string; hasta: string; inicioAnio: string } {
+  private validarPeriodo(periodo: string): { desde: string; hasta: string; inicioAnio: string; inicioDoceMeses: string } {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(periodo || '')) {
       throw new BadRequestException('El período debe tener formato YYYY-MM.');
     }
     const [year, month] = periodo.split('-').map(Number);
     const siguiente = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`;
-    return { desde: `${periodo}-01`, hasta: siguiente, inicioAnio: `${year}-01-01` };
+    // El coeficiente de prorrata es de los ultimos doce meses contados hacia
+    // atras desde el periodo, no del ano en curso.
+    const inicioDoceMeses = month === 12
+      ? `${year}-01-01`
+      : `${year - 1}-${String(month + 1).padStart(2, '0')}-01`;
+    return {
+      desde: `${periodo}-01`,
+      hasta: siguiente,
+      inicioAnio: `${year}-01-01`,
+      inicioDoceMeses,
+    };
   }
 
   private async obtenerConfiguracion(tenantId: string) {
@@ -200,43 +341,35 @@ export class TributosMensualesService {
     fuentes: FuentesTributariasMensuales;
     snapshot: Record<string, unknown>;
   }> {
-    const { desde, hasta, inicioAnio } = this.validarPeriodo(periodo);
+    const { desde, hasta, inicioAnio, inicioDoceMeses } = this.validarPeriodo(periodo);
     const client = this.supabase.getClient();
-    const [ventasMesResult, ventasAnioResult, comprasMesResult] = await Promise.all([
+    const [ventasMesResult, ventasAnioResult, ventasDoceMesesResult, comprasMesResult] = await Promise.all([
       client.from('cpe')
-        .select('id, total_gravadas, total_exoneradas, total_inafectas, total_exportacion, total_igv')
+        .select('id, tipo_documento, estado, total_gravadas, total_exoneradas, total_inafectas, total_exportacion, total_igv')
         .eq('tenant_id', tenantId).gte('fecha_emision', desde).lt('fecha_emision', hasta)
         .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
       client.from('cpe')
-        .select('id, total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
+        .select('id, tipo_documento, estado, total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
         .eq('tenant_id', tenantId).gte('fecha_emision', inicioAnio).lt('fecha_emision', hasta)
         .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
+      client.from('cpe')
+        .select('id, tipo_documento, estado, total_gravadas, total_exoneradas, total_inafectas, total_exportacion')
+        .eq('tenant_id', tenantId).gte('fecha_emision', inicioDoceMeses).lt('fecha_emision', hasta)
+        .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
       client.from('cuentas_por_pagar')
-        .select('id, subtotal, igv, total')
+        .select('id, tipo_documento, estado, subtotal, igv, total, destino_credito_fiscal')
         .eq('tenant_id', tenantId).gte('fecha_emision', desde).lt('fecha_emision', hasta)
         .not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA","RECHAZADO")'),
     ]);
-    for (const result of [ventasMesResult, ventasAnioResult, comprasMesResult]) {
+    for (const result of [ventasMesResult, ventasAnioResult, ventasDoceMesesResult, comprasMesResult]) {
       if (result.error) throw new Error(`No se pudieron consolidar las fuentes tributarias: ${result.error.message}`);
     }
-    const ventasMes = ventasMesResult.data || [];
-    const ventasAnio = ventasAnioResult.data || [];
-    const comprasMes = comprasMesResult.data || [];
-    const ingresosAcumulados = ['total_gravadas', 'total_exoneradas', 'total_inafectas', 'total_exportacion']
-      .reduce((total, field) => total + sum(ventasAnio, field), 0);
-    const fuentes: FuentesTributariasMensuales = {
-      ventas_gravadas: sum(ventasMes, 'total_gravadas'),
-      ventas_exoneradas: sum(ventasMes, 'total_exoneradas'),
-      ventas_inafectas: sum(ventasMes, 'total_inafectas'),
-      exportaciones: sum(ventasMes, 'total_exportacion'),
-      igv_ventas: sum(ventasMes, 'total_igv'),
-      compras_gravadas: sum(comprasMes, 'subtotal'),
-      igv_compras: sum(comprasMes, 'igv'),
-      ingresos_netos_acumulados: ingresosAcumulados,
-      compras_totales_mes: sum(comprasMes, 'total'),
-      cantidad_ventas: ventasMes.length,
-      cantidad_compras: comprasMes.length,
-    };
+    const { fuentes, ventasMes, comprasMes } = consolidarFuentesMensuales(
+      ventasMesResult.data || [],
+      ventasAnioResult.data || [],
+      comprasMesResult.data || [],
+      ventasDoceMesesResult.data || [],
+    );
     const corte = new Date().toISOString();
     return {
       fuentes,
@@ -252,12 +385,54 @@ export class TributosMensualesService {
     };
   }
 
+  /**
+   * Periodo anterior en formato `YYYY-MM`.
+   */
+  private periodoAnterior(periodo: string): string {
+    const [anio, mes] = periodo.split('-').map(Number);
+    return mes === 1
+      ? `${anio - 1}-12`
+      : `${anio}-${String(mes - 1).padStart(2, '0')}`;
+  }
+
+  /**
+   * El saldo a favor con el que arranca el mes es el que dejó el mes anterior.
+   *
+   * Estaba solo como campo del cuerpo de la peticion: nadie lo leia de la
+   * declaracion previa, asi que habia que reteclearlo cada mes. Un numero mal
+   * copiado ahi no rompe nada visible --sale un IGV a pagar perfectamente
+   * plausible-- y es de las cosas que no se descubren hasta una fiscalizacion.
+   *
+   * Se sigue admitiendo el valor explicito: tras una rectificacion el arrastre
+   * legitimo puede no ser el que quedo guardado. Lo que cambia es el defecto.
+   */
+  private async saldoFavorDelMesAnterior(tenantId: string, periodo: string): Promise<number> {
+    const { data } = await this.supabase.getClient()
+      .from('tributos_declaraciones_mensuales')
+      .select('saldo_favor_siguiente')
+      .eq('tenant_id', tenantId)
+      .eq('periodo', this.periodoAnterior(periodo))
+      .eq('vigente', true)
+      .maybeSingle();
+
+    return Math.max(Number((data as any)?.saldo_favor_siguiente ?? 0), 0);
+  }
+
   async calcular(tenantId: string, periodo: string, ajustes: AjustesTributariosMensuales = {}) {
     const [{ regimen }, { fuentes, snapshot }] = await Promise.all([
       this.obtenerConfiguracion(tenantId),
       this.obtenerFuentes(tenantId, periodo),
     ]);
-    const calculo = calcularTributoMensualPeru(regimen, fuentes, ajustes);
+
+    const arrastrado = await this.saldoFavorDelMesAnterior(tenantId, periodo);
+    const ajustesConArrastre: AjustesTributariosMensuales = {
+      ...ajustes,
+      saldo_favor_anterior: ajustes.saldo_favor_anterior ?? arrastrado,
+    };
+    const calculo = calcularTributoMensualPeru(regimen, fuentes, ajustesConArrastre);
+    (snapshot as any).saldo_favor_arrastrado = arrastrado;
+    (snapshot as any).saldo_favor_origen =
+      ajustes.saldo_favor_anterior === undefined ? 'periodo_anterior' : 'declarado';
     const { data: declaracion } = await this.supabase.getClient()
       .from('tributos_declaraciones_mensuales')
       .select('*').eq('tenant_id', tenantId).eq('periodo', periodo).eq('vigente', true)

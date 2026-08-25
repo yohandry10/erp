@@ -28,11 +28,19 @@ import {
 } from "../../shared/utils/secure-config.utils";
 import { CacheInvalidationService } from "../../shared/cache/cache-invalidation.service";
 import {
+
   ActiveCountryCode,
   ACTIVE_COUNTRY_PROFILES,
   ActiveCountryProfile,
   validateCountryTaxId,
 } from "../paises/initial-country";
+
+/**
+ * Rol del segundo usuario de la demo. `COMPRAS` tiene 34 permisos e incluye
+ * `compras.ordenes.aprobar`, que es lo unico que necesita para el flujo de
+ * aprobacion; `ADMIN` tiene 256 y no aporta nada al caso.
+ */
+export const ROL_DEL_APROBADOR_DEMO = 'COMPRAS';
 
 type DemoCountryProfile = ActiveCountryProfile & {
   razonSocial: string;
@@ -450,23 +458,29 @@ export class DemoService {
     });
     if (usersError) throw new Error(`aprobador users: ${usersError.message}`);
 
-    // 3. Linkar al rol ADMIN existente (RPC ya lo creó)
-    const { data: adminRole, error: roleError } = await this.adminClient
+    // 3. Linkar al rol COMPRAS, que es el que necesita: puede aprobar ordenes y
+    //    nada mas. Antes se le daba ADMIN, y eso hacia que la demo naciera con
+    //    **dos administradores completos**: quien la probaba entraba con el
+    //    segundo usuario, veia exactamente lo mismo que con el primero y
+    //    concluia --con razon-- que los roles no separan nada. La segregacion de
+    //    funciones de una OC la da que el aprobador sea otra persona, no que
+    //    tenga mas poderes.
+    const { data: aprobadorRole, error: roleError } = await this.adminClient
       .from("roles")
       .select("id")
       .eq("tenant_id", tenantId)
-      .eq("nombre", "ADMIN")
+      .eq("nombre", ROL_DEL_APROBADOR_DEMO)
       .maybeSingle();
-    if (roleError || !adminRole?.id) {
+    if (roleError || !aprobadorRole?.id) {
       throw new Error(
-        `aprobador rol ADMIN no encontrado: ${roleError?.message || "sin data"}`,
+        `aprobador rol ${ROL_DEL_APROBADOR_DEMO} no encontrado: ${roleError?.message || "sin data"}`,
       );
     }
     const { error: linkError } = await this.adminClient
       .from("user_roles")
       .insert({
         usuario_sistema_id: aprobadorId,
-        role_id: adminRole.id,
+        role_id: aprobadorRole.id,
         tenant_id: tenantId,
       });
     if (linkError)

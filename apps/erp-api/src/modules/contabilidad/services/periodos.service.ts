@@ -170,40 +170,6 @@ export class PeriodosService {
     });
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el período contable');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData; return result.record as PeriodoContable;
-
-    /* istanbul ignore next -- writer legacy inalcanzable */
-    // Validar que el mes esté en rango válido
-    if (mes < 1 || mes > 12) {
-      throw new BadRequestException('El mes debe estar entre 1 y 12');
-    }
-
-    // Verificar que no exista ya
-    const periodoExistente = await this.obtenerPeriodo(tenantId, anio, mes);
-    if (periodoExistente) {
-      throw new BadRequestException(
-        `El período ${anio}-${String(mes).padStart(2, '0')} ya existe`
-      );
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('periodos_contables')
-      .insert({
-        tenant_id: tenantId,
-        anio,
-        mes,
-        estado: EstadoPeriodo.ABIERTO
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('❌ [Periodos] Error creando período:', error);
-      throw new Error(`Error creando período contable: ${error.message}`);
-    }
-
-    console.log(`✅ [Periodos] Período ${anio}-${mes} creado para tenant ${tenantId}`);
-    return data as PeriodoContable;
   }
 
   /**
@@ -323,6 +289,39 @@ export class PeriodosService {
    * @param usuarioId - ID del usuario que cierra el período
    * @returns Período contable cerrado
    */
+  /**
+   * Estimación de cuentas de cobranza dudosa del periodo.
+   *
+   * El criterio de antigüedad es un parámetro y no una constante: el reglamento
+   * del Impuesto a la Renta admite provisionar antes de los doce meses cuando
+   * hay protesto o gestiones de cobro documentadas, y eso el sistema no puede
+   * saberlo. 360 días es el umbral que no necesita otra prueba.
+   */
+  async provisionarCobranzaDudosa(
+    tenantId: string,
+    periodo: string,
+    usuarioId: string,
+    diasVencido = 360,
+  ): Promise<Record<string, unknown>> {
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'provisionar_cobranza_dudosa_tx',
+      {
+        p_tenant_id: tenantId,
+        p_periodo: periodo,
+        p_actor_id: usuarioId,
+        p_dias_vencido: diasVencido,
+      },
+    );
+
+    if (error) {
+      throw new BadRequestException(
+        error.message || `No se pudo provisionar la cobranza dudosa de ${periodo}`,
+      );
+    }
+
+    return data as Record<string, unknown>;
+  }
+
   async cerrarPeriodo(
     tenantId: string,
     anio: number,

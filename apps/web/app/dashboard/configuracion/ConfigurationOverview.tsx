@@ -395,7 +395,12 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             </Link>
           )
         })}
-        <Link className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent" href="/dashboard/wizard">Editar en asistente</Link>
+        {/* El asistente rebota al panel cuando el tenant es de demo, asi que
+            ofrecerlo aqui era mandar a una puerta cerrada: se pulsa, no pasa
+            nada visible y de ahi sale la impresion de «no se puede». */}
+        {status?.isDemo !== true && (
+          <Link className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent" href="/dashboard/wizard">Editar en asistente</Link>
+        )}
       </nav>
 
       <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] items-stretch gap-5 mb-5">
@@ -445,6 +450,21 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
               value={isArgentina ? (empresa as any)?.provinciaFiscal : empresa?.ubigeo}
             />
             <FieldRow label="Correo" value={empresa?.email} />
+            {/* En una demo estos datos son los de la empresa de ejemplo y no se
+                pueden cambiar: el asistente pide certificado y credenciales
+                fiscales reales, que sólo corresponden al convertir la cuenta.
+                Sin decirlo aquí, quien prueba el sistema no encuentra dónde
+                poner su propio documento y acaba preguntándolo por fuera. */}
+            {status?.isDemo === true && (
+              <p className="mt-3 rounded-lg border border-amber-400/30 bg-amber-400/5 p-3 text-xs leading-snug text-amber-300">
+                Son los datos de la empresa de ejemplo. Su {documentoFiscal} y su razón social
+                se introducen al convertir la demo en una cuenta real, junto con el certificado
+                del {documentoFiscal}: hasta entonces no se pueden cambiar.
+              </p>
+            )}
+            <Link className="mt-4 inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" href="/dashboard/configuracion/sucursales">
+              Establecimientos anexos
+            </Link>
           </SectionCard>
         )}
 

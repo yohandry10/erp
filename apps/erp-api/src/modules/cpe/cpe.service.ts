@@ -13,6 +13,7 @@ import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.
 import { PdfGeneratorService } from './pdf-generator.service';
 import { FiscalAdapterService } from './fiscal-adapter.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
+import { SucursalesService } from '../sucursales/sucursales.service';
 import { CpeCertificateService } from './cpe-certificate.service';
 import { CpeReportingService } from './cpe-reporting.service';
 import { CpeCancellationService } from './cpe-cancellation.service';
@@ -48,6 +49,7 @@ export class CpeService {
     private readonly cacheInvalidation: CacheInvalidationService,
     private readonly pdfGenerator: PdfGeneratorService,
     private readonly fiscalAdapter: FiscalAdapterService, // 🌍 Adaptador multi-país
+    private readonly sucursalesService: SucursalesService,
   ) {
     this.certificateService = new CpeCertificateService(supabaseService, configService);
     this.reportingService = new CpeReportingService(supabaseService);
@@ -679,8 +681,20 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       // Obtener XmlSigner del tenant
       const xmlSigner = await this.getXmlSigner(tenantId);
       
+      // El establecimiento anexo del emisor lo decide la serie, que es como lo
+      // decide SUNAT: cada sucursal tiene sus propias series y el codigo viaja
+      // en cbc:AddressTypeCode. Hasta la 503 estaba fijado a '0000' en el
+      // constructor del XML porque no habia de donde sacarlo.
+      const codigoEstablecimiento = await this.sucursalesService.codigoEstablecimientoDeSerie(
+        tenantId,
+        createFacturaDto.serie,
+      );
+
       // Generate XML content
-      const xmlContent = this.generateXmlContent(createFacturaDto);
+      const xmlContent = this.generateXmlContent({
+        ...createFacturaDto,
+        codigo_establecimiento: codigoEstablecimiento,
+      } as CreateFacturaDto);
       
       // Sign XML with tenant's certificate
       const signedXml = xmlSigner.signXml(xmlContent);

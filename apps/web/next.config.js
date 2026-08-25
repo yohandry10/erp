@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const path = require('path')
-const disabledDevProjectRef = 'hbueraexcbowpfnjlppi'
 const prodProjectRef = 'wypnbcptofqdmoynlonq'
 
 for (const [name, value] of Object.entries({
@@ -8,8 +7,11 @@ for (const [name, value] of Object.entries({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
 })) {
-  if (String(value || '').includes(disabledDevProjectRef)) {
-    throw new Error(`${name} apunta al proyecto DEV retirado; el build fue bloqueado.`)
+  // Lista blanca, no lista negra: se bloquea todo host de Supabase que no sea
+  // PROD, en vez de un unico proyecto conocido.
+  const host = String(value || '').match(/https?:\/\/([a-z0-9-]+)\.supabase\.co/i)
+  if (host && host[1] !== prodProjectRef) {
+    throw new Error(`${name} apunta al proyecto ${host[1]}; este repositorio solo opera ${prodProjectRef}. El build fue bloqueado.`)
   }
 }
 if (process.env.DEPLOYMENT_ENV && process.env.DEPLOYMENT_ENV !== 'PROD') {

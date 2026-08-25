@@ -1,12 +1,236 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-22.
+Actualizado: 2026-08-25.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
 migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
+
+- **Un recorrido por pantalla, haciendo lo que hace un contador, encontró tres
+  cosas que ninguna prueba veía** porque todas estaban del lado del uso, no del
+  cálculo. Las tres van corregidas en `512`, `513` y `514`, y las tres nacieron
+  del mismo descuido: dar por bueno un mecanismo sin comprobar que se pueda
+  usar.
+
+  La más grave: **ninguna de las 67 cuentas bancarias de producción podía
+  registrar un movimiento**. La semilla las creaba sin cuenta contable asociada
+  y `assert_postable_account_457` la exige, así que el flujo más cotidiano de
+  tesorería fallaba con `BANK_LEDGER_ACCOUNT_NOT_POSTABLE_IN_TENANT`. Detrás
+  había otra causa: la cuenta corriente operativa (`1041`) no estaba en el
+  catálogo de cuentas autocreables. La `514` corrige el catálogo, la semilla y
+  las filas escritas, y su verificador **registra un movimiento de verdad** en
+  vez de conformarse con que la columna no sea nula.
+
+  La segunda: **132 de los 134 proveedores no se podían editar**. La semilla
+  escribía `condiciones_pago = 'CREDITO'`, que no es ninguno de los valores
+  admitidos, y el formulario se negaba a guardar con un error en inglés sobre un
+  enum. Alcanzaba a 66 contribuyentes, los que ve quien está probando el
+  sistema. Lo corrige la `513`, derivando la condición de los días de crédito
+  que la propia semilla ya traía.
+
+  La tercera: **la suspensión de retenciones de cuarta no se podía anotar**. La
+  `508` había puesto la columna y el disparador, pero la función de
+  actualización de proveedores lleva lista explícita de columnas y el campo se
+  ignoraba en silencio. Lo corrige la `512`.
+
+  Y de la misma revisión salió lo que faltaba en las pantallas: el destino del
+  crédito fiscal y la detracción ahora se informan al registrar la factura del
+  proveedor —antes la prorrata usaba siempre `GRAVADAS` porque no había forma de
+  decir otra cosa—, y la estimación de cobranza dudosa tiene botón en los
+  periodos abiertos.
+
+- **Las claves ajenas duplicadas rompían PostgREST, y arreglarlas rompió
+  producción.** Había 45 pares de tablas con la misma clave ajena declarada dos
+  veces. PostgREST no resuelve un embed cuando hay más de una relación entre dos
+  tablas: respondía `PGRST201`, y por eso **no se podía crear una devolución**
+  —`/ventas/rma/candidatos` no listaba pedidos—. La `515` retira 23, sólo las
+  que se comportan igual; las de `tenant_id` se dejan intactas a propósito,
+  porque ahí una dice `CASCADE` y otra `NO ACTION` y quitar una cambiaría qué
+  ocurre al borrar un contribuyente.
+
+  Al retirarlas se rompió el listado de recepciones en caliente. La causa vale
+  más que el arreglo: **hay consultas que nombran la restricción** para
+  desambiguar el embed (`ordenes_compra!recepciones_orden_id_fkey_runtime`), y
+  siete nombraban justo la retirada. Ese nombre es una dependencia contra el
+  esquema escondida dentro de una cadena de texto: no la ve el compilador. Se
+  buscaron las consultas que fallaban *por* ambigüedad y no las que dependían
+  *del nombre*. La `516` renombra la superviviente al nombre que el código pide
+  y deja dos guardianes: el verificador `516` comprueba contra la base que
+  existan los 35 nombres que el código nombra —con control positivo—, y
+  `nombres-clave-ajena.spec.ts` regenera esa lista desde el código para que no se
+  quede vieja.
+
+- **El verificador `462` fallaba por sorteo.** Tomaba «el primer permiso por
+  `id`», que es un uuid aleatorio, y si caía sobre uno restringido para tenants
+  de demo se ponía rojo sin que nada estuviera roto: medido sobre los 70
+  contribuyentes de producción, fallaba en 6. Ahora elige excluyendo los
+  restringidos (0 de 70). No se pierde cobertura: el `493`, el `501` y el techo
+  RBAC comprueban la restricción por código, no al azar.
+
+- **PROD está en `516`.** La `510` puso el mecanismo de tasas de detracción
+  —catálogo de códigos SPOT con tasa y vigencia, `codigo_detraccion` en la cuenta
+  por pagar, y un contraste que **compara sin imponer**, porque hay operaciones
+  con reglas especiales y el contador tiene que poder apartarse a sabiendas, pero
+  no sin enterarse— y la `511` **carga el catálogo**: 35 códigos leídos de los
+  apéndices publicados en `orientacion.sunat.gob.pe`, con anexo, tasa e importe
+  mínimo. El `044` queda fuera porque figura como no vigente y ponerle cualquier
+  tasa sería inventarla. Ya no hay nada pendiente para el contador aquí; lo que
+  sigue siendo suyo es revisar la carga cuando SUNAT publique una resolución
+  nueva.
+
+  Cargar el catálogo destapó dos defectos que con la tabla vacía no se veían: el
+  contraste no miraba el **importe mínimo**, así que una compra de 590 soles
+  —que no lleva detracción— habría salido señalada por no declarar una que no le
+  toca; y los códigos no se normalizaban a tres dígitos, de modo que un `37`
+  tecleado sin el cero no lo encontraba nadie. Los dos van corregidos en la
+  `511`.
+
+- **PROD estuvo en `509`.** Continuación de la auditoría contable, por puntos y con
+  verificador comprobado en rojo en cada uno. La `507` añade la **prorrata del
+  crédito fiscal** con los tres destinos del artículo 23 y coeficiente de doce
+  meses; su defecto es `GRAVADAS`, o sea el comportamiento previo, y el
+  verificador vigila que nadie lo cambie —hacerlo subiría el IGV a pagar de todo
+  el que no usa prorrata sin que nadie toque una declaración—. La `508` calcula
+  la **retención de cuarta categoría** sobre recibos por honorarios y la anota en
+  `libro_retenciones`, que es de donde la planilla electrónica lee el T-Registro
+  de cuarta y donde **nadie escribía nunca**: esa sección salía siempre vacía. La
+  `509` añade la **estimación de cobranza dudosa** (Dr 68 / Cr 19) con el detalle
+  documento a documento que exige el Libro de Inventarios y Balances, criterio de
+  antigüedad como parámetro y sin duplicar en una segunda pasada.
+  Fuera de migración se corrigió el **catálogo de cuentas autocreables**: a 36 de
+  68 contribuyentes les faltaba la `4699` que exige el asiento de recepción de
+  mercadería, y a 32 la `629`; lo que impide que vuelva a quedarse corto es una
+  prueba que lee del propio generador los códigos que pide, y que encontró además
+  la `421` y la `422`.
+
+- **PROD estuvo en `506`.** Una auditoría contra el trabajo real de un contador
+  peruano encontró que la regla de qué documentos forman cada registro fiscal
+  estaba escrita **tres veces y ninguna completa**: el Registro de Ventas
+  filtraba por tipo pero no restaba las notas de crédito, el de Compras restaba
+  pero no filtraba, y la determinación mensual de IGV no hacía ninguna de las
+  dos. Medido sobre producción: para el mes en curso el libro daba S/ 1 566,05 y
+  la declaración S/ 1 570,55. La regla vive ahora una sola vez en
+  `documento-fiscal.rules.ts`. Además el **flujo de efectivo no devolvía la
+  depreciación** —el operativo salía subestimado en la depreciación del mes y no
+  aparecía en ninguna otra sección— y ahora, además de devolverla, compara contra
+  la variación real de caja y expone el descuadre en vez de callarlo. Y el
+  **saldo a favor del IGV** ya no se reteclea: se arrastra del mes anterior. La
+  `506` retira `detalle_retenciones_categoria`, una tabla del esqueleto 002 sin un
+  solo uso en código ni en migraciones y sin filas en producción; su verificador
+  comprueba también que las dos tablas de retenciones que **sí** están vivas
+  siguen ahí, porque se parecen mucho en el nombre.
+
+- **PROD estuvo en `505`.** Promovidas el 2026-08-24 las tres migraciones de
+  sucursales (`503`, `504` y `505`) tras un ensayo con la forma real de los datos
+  de producción; `outbox_runtime_health_492` devuelve `ready: true` con
+  `schema_version 505` y los tres verificadores pasan **contra PROD** sin dejar
+  residuo. Barrido posterior: outbox sin pendientes ni cola muerta, cero
+  productos descuadrados y cero asientos descuadrados.
+
+- **La `505` cierra las dos obligaciones peruanas que quedaban abiertas.** Con varias sucursales,
+  mover mercaderia de un local a otro deja de ser un apunte interno: para SUNAT
+  es un **traslado entre establecimientos** y exige guia de remision con motivo
+  04. El motivo estaba mapeado en `gre.service.ts` desde antes y nadie lo
+  disparaba, porque hasta la 503 no habia establecimientos entre los que
+  trasladar. `transferir_inventario_tx` no puede emitir la guia --necesita
+  transportista, fechas y pesos que no viajan en su payload-- asi que hace lo que
+  si le toca: detecta que los dos almacenes son de sucursales distintas, deja
+  constancia con los dos codigos y el motivo 04 en el resultado y en la metadata
+  de ambos movimientos, y **bloquea** el traslado si el contribuyente marco GRE
+  obligatorio y no se referencia guia. Se reutiliza ese interruptor en vez de
+  inventar otro porque ya significa exactamente eso.
+  La segunda es la **planilla**: `rrhh_peru_fichas_laborales.establecimiento_codigo`
+  existia desde la 398 con `DEFAULT '0000'` y, sin sucursales, nadie lo cambiaba
+  nunca — toda la planilla de todos los locales se declaraba en la casa matriz.
+  Se arregla en la raiz y no en el generador del PLAME: el empleado pertenece a
+  una sucursal y el codigo de la ficha **se deriva** de ella en cada escritura,
+  igual que en la 504. Quien necesite cambiarlo cambia la sucursal del empleado,
+  que es la afirmacion que de verdad se quiere hacer.
+  **El ensayo contra la forma real de producción encontró un defecto que la cadena
+  limpia no podía ver.** PROD tenía ya 58 filas `Sede Lima`, una por
+  contribuyente, sembradas por el alta de demo; sobre una base vacía ese caso no
+  existe. La primera versión de la 503 les creaba una casa matriz **al lado** y
+  degradaba la sede real a anexo, con lo que cada contribuyente habría acabado con
+  dos locales donde tenía uno y sus almacenes y cajas colgando del recién creado.
+  Ahora se promueve la sede más antigua a `0000` y sólo se crea una nueva para
+  quien no tenía ninguna; el verificador 503 lo comprueba explícitamente. Aplicado:
+  58 promovidas más 10 creadas = 68 sucursales para 68 contribuyentes, ni una
+  duplicada.
+  El verificador 505 comprueba las cuatro: el traslado entre anexos se marca, el
+  traslado dentro de un local **no** se marca --sin esa mitad, una funcion que
+  marcara siempre pasaria--, GRE obligatorio lo bloquea sin guia, y la ficha sale
+  con el codigo del anexo aunque se le escriba `0000` a mano. Comprobado en rojo
+  en tres escenarios. Cadena limpia de 502 migraciones hasta la 505 con 15
+  verificadores de regresion.
+  Ademas hay **informe por establecimiento** (`GET /sucursales/resumen`): ventas
+  de POS, tickets, comprobantes y cajas abiertas por local, agrupando por
+  `sucursal_id` sin cruzar cajas con almacenes, y filtrado por el alcance del
+  usuario como todo lo demas.
+
+- **La `504` hace que la operación herede su establecimiento, y añade el alcance
+  por usuario.** La 503
+  dejó modelada la estructura --series, almacenes, cajas-- pero las tablas donde
+  ocurre la operación seguían sin saber dónde pasaron las cosas, así que no había
+  stock por local ni informe de ventas por sucursal: sólo un modelo sobre el que
+  no se podía preguntar nada. La decisión de fondo es **derivar, no duplicar**: la
+  venta de POS toma su sucursal de la caja de su sesión, la sesión de su caja, el
+  movimiento de inventario de su almacén y el comprobante de su serie. Se guarda
+  el valor --para no pagar dos saltos en cada informe-- y un trigger lo deriva en
+  cada escritura y **rechaza** el que contradiga a su ancla, que es el mismo
+  patrón con el que `trg_enforce_product_stock_is_derived_350` protege el stock:
+  un valor derivado que se puede escribir a mano deja de ser derivado el día que
+  alguien lo escribe. `producto_existencias` se queda sin columna a propósito --el
+  stock ya está por almacén-- y el stock por local se consulta en la vista
+  `stock_por_sucursal`, declarada `security_invoker` para que no cruce la frontera
+  entre contribuyentes.
+  **El alcance del usuario se aplica en un solo sitio.** Hay más de ochenta puntos
+  de consulta sobre tablas con `sucursal_id`, y un filtro repetido ochenta veces
+  es un filtro que alguien olvidará --sin que se note, porque la consulta sigue
+  devolviendo datos, sólo que de más locales de los que tocan--. Se resuelve una
+  vez por petición en `TenantContextInterceptor` y lo aplica el cliente que
+  devuelve `SupabaseService.getClient()`, sobre `select`, `update` y `delete`;
+  el alta no se filtra porque la sucursal de una fila nueva la decide la base. Un
+  usuario sin asignaciones --hoy, todos-- no paga ningún filtro. Si la resolución
+  del alcance falla, la petición continúa sin restringir y se registra el error:
+  fallar cerrado dejaría el ERP entero sin datos por una tabla que la mayoría de
+  contribuyentes no usa, y la frontera que importa --el contribuyente-- no se toca
+  aquí. La lista de tablas que el API filtra vive en `sucursal-scope.ts` y **la
+  mantiene honesta el verificador 504**, que la compara con las relaciones que de
+  verdad llevan la columna y falla nombrando el fichero que hay que actualizar;
+  comprobado en rojo creando una tabla con `sucursal_id` fuera de la lista.
+
+- **La `503` convierte la sucursal en un establecimiento anexo del RUC.** `public.sucursales`
+  existía desde el esqueleto 002 y nunca se alteró: cero endpoints, cero
+  pantallas, cero políticas RLS que la nombraran, y las columnas `sucursal_id`
+  de `ventas`, `cajas` y los precios/stock por sucursal sólo las rellenaba el
+  importador masivo pegando un UUID en una columna de CSV. Era una etiqueta de
+  migración de datos, no una entidad. El diseño lo fija SUNAT y no la
+  imaginación: el establecimiento tiene un código de cuatro dígitos de la ficha
+  RUC, `0000` es la casa matriz, y **las series de comprobante se asignan por
+  establecimiento** —esa es la pieza que hace encajar el resto, porque el CPE ya
+  emitía `cbc:AddressTypeCode` y lo tenía fijado a `'0000'` por no tener de
+  dónde sacarlo—. **La contabilidad no se parte por sucursal a propósito**: los
+  libros electrónicos son por RUC; el resultado por local sale de
+  `centros_costo`, que ya llega a `detalle_asientos`, y quien necesite
+  contabilidad realmente separada necesita otro RUC, que aquí es otro tenant con
+  su grupo de consolidación. Dos decisiones que conviene no deshacer sin leer la
+  cabecera de la migración: **sin asignación explícita un usuario ve todas las
+  sucursales** —así aplicar la 503 no le quita el acceso a nadie— y **todo lo
+  histórico se atribuye a la casa matriz**, que es el único establecimiento que
+  existía. La frontera entre contribuyentes es una **clave foránea compuesta**
+  `(tenant_id, sucursal_id)` y no un trigger de validación como los de 156 y 162:
+  un trigger se desactiva con un ALTER TABLE, la compuesta la sostiene el motor.
+  El relleno histórico no bastaba —los caminos de alta seguían insertando filas
+  sin establecimiento, y el verificador lo cazó— así que un trigger declara la
+  regla una vez: lo que no dice su establecimiento pertenece a la casa matriz.
+  El **verificador 503** comprueba en rojo los cinco escenarios: sin el trigger
+  de casa matriz, sin la clave foránea compuesta, con el alcance de usuario
+  invertido, con `sucursal_id` apareciendo en la contabilidad y con un rol
+  operativo recibiendo el alta de establecimientos. Cadena limpia de 500
+  migraciones hasta la 503 en PostgreSQL 16, 13 verificadores de regresión y 67
+  históricos en verde.
 
 - **PROD está en `502`: un solo modelo de permisos.** El RBAC vivía por duplicado
   —`permisos`/`rol_permisos`, el canónico que consultan los guards y sobre el que
@@ -613,6 +837,14 @@ Cambios recientes principales:
   detenerse si el preflight del backfill `490→492` encuentra un evento laboral
   sin snapshot contable inequívoco; el runtime nuevo exige esquema `496` y no
   debe desplegarse antes que la base.
+- `497..516`: aplicadas y registradas en PROD. Cubren el respaldo peruano del
+  esquema (`500`), las sucursales como establecimiento anexo y su herencia en
+  las operaciones (`503..505`), y la auditoría contable por puntos —prorrata del
+  crédito fiscal (`507`), retención de cuarta categoría (`508`), estimación de
+  cobranza dudosa (`509`) y tasas de detracción con su carga (`510`, `511`)—.
+  Cada una con su verificador comprobado en rojo antes de aplicarse.
+  `REQUIRED_DATABASE_SCHEMA_VERSION` vale `511` en `render.yaml` y en
+  `.github/workflows/ci.yml`; los dos tienen que moverse a la vez.
 
 ## Flujos cerrados técnicamente
 
@@ -656,6 +888,31 @@ productivo autorizado.
 
 ## Decisiones e invariantes vigentes
 
+- **Hay tablas que el rol del API no puede escribir directamente, y es
+  deliberado.** `centros_costo`, `periodos_contables`, `tipos_cambio`,
+  `financial_master_operations`, `outbox_events` y las de operaciones atómicas
+  tienen el `INSERT/UPDATE/DELETE` revocado a `service_role` (migraciones `477`,
+  `482` y siguientes): la única entrada es la función `SECURITY DEFINER`, que
+  registra la operación, la hace idempotente y comprueba el autor. Un
+  `permission denied` sobre una de ellas **no es un privilegio olvidado**: es el
+  contrato funcionando. La respuesta correcta es llamar a la RPC, nunca ampliar
+  el `GRANT`.
+- **El autor de un maestro contable tiene que ser un usuario activo del propio
+  contribuyente.** Lo exige `assert_financial_master_actor_477`, que rechaza
+  nulos y centinelas. Un proceso desatendido no puede inventarse un autor: tiene
+  que resolver una persona real —el contador, y si no lo hay el administrador— o
+  no escribir.
+- **Nombrar una clave ajena en un `select` de PostgREST es una dependencia contra
+  el esquema.** `tabla!nombre_de_la_restriccion(...)` deja de funcionar si esa
+  restricción se renombra o se retira, y como vive dentro de una cadena de texto
+  no la ve el compilador ni el tipado. Los 35 nombres en uso están vigilados por
+  el verificador `516` y por `nombres-clave-ajena.spec.ts`; al añadir uno nuevo
+  hay que sumarlo a la lista o la prueba falla.
+- **Una cuenta bancaria sin `cuenta_contable_id` no puede registrar movimientos.**
+  Lo exige `assert_postable_account_457`, y la cuenta tiene que ser una corriente
+  operativa (`1041`, o `104` donde exista): la `1042` es la de detracciones y
+  lleva su propio saldo. El alta por API ya lo pide obligatorio; lo que fallaba
+  era la siembra.
 - `producto_existencias` es la fuente física de stock por almacén.
 - `aplicar_movimiento_inventario_tx` es el writer canónico de movimientos.
 - POS deriva `almacen_id` de la caja de la sesión.
