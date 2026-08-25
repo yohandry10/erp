@@ -7,7 +7,8 @@ export class CerrarCajaDto {
    * (CASH_CLOSE_SUPERVISOR_REQUIRED). Antes no existía forma de enviarla desde el
    * POS: el cierre sólo mandaba monto y notas, así que una caja descuadrada no
    * tenía manera de completarse. El PIN se verifica contra su hash antes de
-   * llamar a la RPC; quién decide si hacía falta sigue siendo la transacción.
+   * llamar a la RPC y se vuelve a acreditar dentro de la transacción; quién
+   * decide si hacía falta sigue siendo el writer autoritativo.
    */
   @IsOptional()
   @IsUUID('4')

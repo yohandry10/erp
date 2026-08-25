@@ -99,6 +99,35 @@ Apertura -> Venta -> Pago -> Ticket/CPE -> Movimiento de caja -> Cierre
 - Servicios y productos sin control de stock se venden sin crear kardex; un SKU
   físico repetido en el carrito produce un solo movimiento por cantidad total.
 - El cierre diferencia arqueo real de cierre administrativo.
+- En Perú y PEN, cada venta íntegramente en efectivo puede aplicar el redondeo
+  a favor del consumidor hasta el décimo inferior. Cada ajuste queda limitado
+  a S/ 0,01..0,09 y se confirma dentro de la misma transacción POS en un ledger
+  inmutable que liga tenant, sesión, venta, pago y movimiento. El cierre sólo
+  usa `REDONDEO_EFECTIVO_LEGAL` cuando su diferencia negativa coincide
+  exactamente con la suma de esos ajustes vivos; varias ventas pueden acumular
+  más de S/ 0,09. Una diferencia pequeña sin evidencia sigue siendo faltante y
+  exige supervisor. La excepción no alcanza sobrantes, pagos mixtos/no
+  efectivos, otras monedas ni otros países. Preview y cierre consultan el mismo
+  ledger y la misma configuración activa, con la caja específica antes que el
+  valor global y cero como fallback. Un total efectivo menor a S/ 0,10 también
+  puede redondearse a S/ 0,00: la venta conserva el total contable y el ledger
+  documenta que no hubo entrega física de efectivo.
+- El cierre físico normal requiere `cajas.cierre`; el cierre administrativo
+  forzado permanece separado. Todo supervisor enviado se valida aunque la
+  diferencia no lo exija: debe ser distinto tanto del actor que ejecuta el
+  cierre como del cajero responsable, tener rol autorizado y acreditar su PIN
+  en la misma transacción. La evidencia durable se
+  liga a tenant, sesión, actores, huella del cierre y versión del PIN, sin
+  persistir el código en claro.
+- Registrar o rotar un PIN se hace desde Gestión de Cajas y exige
+  `users.manage` tanto en HTTP como en SQL. El body sólo admite el PIN nuevo de
+  seis dígitos; tenant, actor, supervisor, versión y estado se resuelven del
+  contexto y nunca se devuelve el PIN ni su hash. La mutación exige
+  `Idempotency-Key`; repetir exactamente la misma intención devuelve la primera
+  versión sin rotarla otra vez, y reutilizar la clave con otro PIN falla cerrado.
+  Cinco fallos bloquean la credencial durante quince minutos: un bloqueo vigente
+  oculta al supervisor del selector y uno vencido lo reactiva automáticamente.
+  El selector de cierre también excluye al actor y al cajero responsable.
 - Un ticket interno puro no es un CPE pendiente y no bloquea el cierre; un canje
   fiscal reservado sí debe finalizar. No se cierra con CPE pendiente, venta
   incompleta, outbox/CxC inconsistente ni

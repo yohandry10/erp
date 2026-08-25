@@ -1,5 +1,10 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import Decimal from 'decimal.js';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import {
+    esRedondeoLegalEfectivoPeru,
+    requiereSupervisorParaDiferenciaCaja,
+} from '../cash-rounding.util';
 
 export interface Denominaciones {
     billetes: { [denominacion: number]: number }; // { 200: 5, 100: 10, 50: 2, ... }
@@ -18,9 +23,13 @@ export interface ResultadoCierre {
     saldo_teorico: number;
     saldo_real: number;
     diferencia: number;
-    tipo_diferencia: 'SOBRANTE' | 'FALTANTE' | 'CUADRADO';
+    tipo_diferencia: 'SOBRANTE' | 'FALTANTE' | 'CUADRADO' | 'REDONDEO_EFECTIVO_LEGAL';
     requiere_supervisor: boolean;
     requiere_justificacion: boolean;
+    redondeo_efectivo_legal: boolean;
+    redondeo_efectivo_documentado: number;
+    redondeo_efectivo_cantidad: number;
+    tolerancia: number;
 }
 
 /**
@@ -188,7 +197,7 @@ export class CashReconciliationService {
         const { data: sesion, error: sesionError } = await this.supabase
             .getClient()
             .from('sesiones_caja')
-            .select('monto_inicio, tenant_id, moneda')
+            .select('monto_inicio, tenant_id, moneda, caja_id')
             .eq('id', sesionId)
             .eq('tenant_id', tenantId)
             .single();
@@ -238,22 +247,87 @@ export class CashReconciliationService {
         );
 
         const saldoReal = montoContado;
-        const diferencia = saldoReal - saldoTeorico;
+        // La RPC opera con numeric y redondea a dos decimales antes de decidir.
+        // Normalizar aquí evita que un residuo IEEE-754 cambie la clase o el
+        // umbral del preview frente al commit atómico.
+        const diferencia = new Decimal(saldoReal)
+            .minus(saldoTeorico)
+            .toDecimalPlaces(2)
+            .toNumber();
 
         // Obtener configuración de tolerancia
-        const { data: config } = await this.supabase
-            .getClient()
-            .from('configuracion_caja')
-            .select('tolerancia_diferencia_cierre')
-            .eq('tenant_id', tenantId)
-            .single();
+        const client = this.supabase.getClient();
+        const [configResult, tenantResult, redondeoResult] = await Promise.all([
+            // La misma función SQL es consumida por cerrar_caja_tx_518. Así el
+            // preview no replica precedencia, estado activo ni desempates de la
+            // configuración específica/global.
+            client.rpc('resolver_tolerancia_cierre_caja_518', {
+                p_tenant_id: tenantId,
+                p_caja_id: sesion.caja_id,
+            }),
+            client
+                .from('tenants')
+                .select('pais')
+                .eq('id', tenantId)
+                .maybeSingle(),
+            // El preview no infiere la causa por magnitud. Consume el mismo
+            // ledger inmutable de venta/pago que el writer reconcilia bajo lock.
+            client.rpc('resumen_redondeo_documentado_cierre_caja_518', {
+                p_tenant_id: tenantId,
+                p_sesion_id: sesionId,
+            }),
+        ]);
 
-        const tolerancia = config?.tolerancia_diferencia_cierre || 10.00;
+        // La RPC usa cero cuando no existe configuración. `|| 10` convertía
+        // explícitamente un cero en diez y hacía divergir preview y commit.
+        if (configResult.error) {
+            this.logger.error(
+                `No se pudo resolver la tolerancia de cierre: ${configResult.error.message}`,
+            );
+            throw new BadRequestException(
+                'No se pudo resolver la configuración vigente de cierre de caja',
+            );
+        }
+        const tolerancia = Math.max(Number(configResult.data ?? 0), 0);
+        if (tenantResult.error) {
+            this.logger.error(
+                `No se pudo resolver el país del cierre: ${tenantResult.error.message}`,
+            );
+            throw new BadRequestException(
+                'No se pudo resolver el contexto monetario vigente de la caja',
+            );
+        }
+        const pais = String(tenantResult.data?.pais || '').trim().toUpperCase();
+        if (redondeoResult.error) {
+            this.logger.error(
+                `No se pudo resolver el redondeo documentado: ${redondeoResult.error.message}`,
+            );
+            throw new BadRequestException(
+                'No se pudo reconciliar la evidencia de redondeo del cierre',
+            );
+        }
+        const redondeoResumen = (
+            redondeoResult.data && typeof redondeoResult.data === 'object'
+                ? redondeoResult.data
+                : {}
+        ) as { monto?: number | string; cantidad?: number | string };
+        const redondeoDocumentado = new Decimal(redondeoResumen.monto ?? 0)
+            .toDecimalPlaces(2)
+            .toNumber();
+        const redondeoCantidad = Math.max(Number(redondeoResumen.cantidad ?? 0), 0);
+        const esRedondeoLegal = esRedondeoLegalEfectivoPeru(
+            diferencia,
+            pais,
+            moneda,
+            redondeoDocumentado,
+        );
 
         // Clasificar diferencia
-        let tipoDiferencia: 'SOBRANTE' | 'FALTANTE' | 'CUADRADO';
+        let tipoDiferencia: ResultadoCierre['tipo_diferencia'];
         if (Math.abs(diferencia) < 0.01) {
             tipoDiferencia = 'CUADRADO';
+        } else if (esRedondeoLegal) {
+            tipoDiferencia = 'REDONDEO_EFECTIVO_LEGAL';
         } else if (diferencia > 0) {
             tipoDiferencia = 'SOBRANTE';
         } else {
@@ -261,7 +335,13 @@ export class CashReconciliationService {
         }
 
         // Determinar si requiere supervisor
-        const requiereSupervisor = Math.abs(diferencia) > tolerancia;
+        const requiereSupervisor = requiereSupervisorParaDiferenciaCaja(
+            diferencia,
+            tolerancia,
+            pais,
+            moneda,
+            redondeoDocumentado,
+        );
         const requiereJustificacion = requiereSupervisor;
 
         this.logger.log(
@@ -276,6 +356,10 @@ export class CashReconciliationService {
             tipo_diferencia: tipoDiferencia,
             requiere_supervisor: requiereSupervisor,
             requiere_justificacion: requiereJustificacion,
+            redondeo_efectivo_legal: esRedondeoLegal,
+            redondeo_efectivo_documentado: redondeoDocumentado,
+            redondeo_efectivo_cantidad: redondeoCantidad,
+            tolerancia,
         };
     }
 

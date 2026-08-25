@@ -277,6 +277,47 @@ describe("ContabilidadEventsListener", () => {
     );
   });
 
+  it("propaga la clase de redondeo legal del outbox sin convertirla en faltante", async () => {
+    jest.spyOn(listener as any, "verificarAsientoCreado").mockResolvedValue(true);
+    asientosGenerator.generarAsientoCierreCaja.mockResolvedValue({
+      id: "asiento-redondeo-1",
+    } as any);
+
+    await (listener as any).handleCajaCerrada({
+      id: "outbox-close-rounding",
+      event_id: "evt-close-rounding",
+      correlation_id: "caja:sesion-rounding",
+      aggregate_type: "sesion_caja",
+      aggregate_id: "sesion-rounding",
+      event_type: "caja.cerrada",
+      event_data: {
+        tenantId: "tenant-001",
+        sesionCajaId: "sesion-rounding",
+        cajaId: "caja-1",
+        fecha: "2026-08-25T18:00:00Z",
+        montoEsperado: 203.84,
+        montoContado: 203.8,
+        diferencia: -0.04,
+        tipoDiferencia: "REDONDEO_EFECTIVO_LEGAL",
+        redondeoEfectivoLegal: true,
+      },
+      event_version: 1,
+      created_at: "2026-08-25T18:00:00Z",
+      processed_at: null,
+      retry_count: 0,
+      status: "PENDING",
+      error_message: null,
+    } as OutboxEvent);
+
+    expect(asientosGenerator.generarAsientoCierreCaja).toHaveBeenCalledWith(
+      expect.objectContaining({
+        diferencia: -0.04,
+        tipo_diferencia: "REDONDEO_EFECTIVO_LEGAL",
+        redondeo_efectivo_legal: true,
+      }),
+    );
+  });
+
   it("enruta movimiento y transferencia bancarios con tenant y event_id durables", async () => {
     jest.spyOn(listener as any, "verificarAsientoCreado").mockResolvedValue(true);
     asientosGenerator.generarAsientoMovimientoBancario.mockResolvedValue({
