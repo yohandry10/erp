@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { createHash } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
@@ -53,6 +54,7 @@ export interface ResultadoImportacion {
 
 /** Un salto mayor que este frente al último conocido no se guarda sin revisar. */
 const DESVIACION_MAXIMA_POR_DEFECTO = 0.05;
+
 
 @Injectable()
 export class TipoCambioSunatService {
@@ -168,8 +170,17 @@ export class TipoCambioSunatService {
    * No pisa un tipo de cambio ya registrado: si existe una fila para esa fecha,
    * se respeta. Un tipo de cambio tecleado por el contador es una decisión suya,
    * y puede haberlo puesto porque conocía el correcto.
+   *
+   * `actorId` no tiene valor por defecto a propósito: la base exige que sea un
+   * usuario activo del contribuyente --lo comprueba
+   * `assert_financial_master_actor_477`-- y rechaza cualquier centinela. Quien
+   * llame tiene que decidir a nombre de quién se importa.
    */
-  async importarFecha(tenantId: string, fecha: string): Promise<ResultadoImportacion> {
+  async importarFecha(
+    tenantId: string,
+    fecha: string,
+    actorId: string,
+  ): Promise<ResultadoImportacion> {
     const cliente = this.supabase.getClient();
 
     const { data: existente } = await cliente
@@ -197,20 +208,34 @@ export class TipoCambioSunatService {
       return { fecha, guardado: false, motivo: rechazo, cotizacion };
     }
 
-    const { error } = await cliente.from('tipos_cambio').insert({
-      tenant_id: tenantId,
+    // `tipos_cambio` no admite escritura directa a proposito: la 482 le revoca el
+    // INSERT al rol del API y deja como unica puerta esta funcion, que ademas
+    // registra la operacion y la hace idempotente. Escribir por fuera no es que
+    // este mal visto, es que el motor lo rechaza.
+    const payload = {
       moneda_origen: 'USD',
       moneda_destino: 'PEN',
       fecha,
       compra: cotizacion.compra,
       venta: cotizacion.venta,
       fuente: cotizacion.fuente,
-      activo: true,
-      estado: 'ACTIVO',
-      metadata: {
-        importado_en: new Date().toISOString(),
-        referencia_contraste: referencia,
-      },
+    };
+    // La clave lleva dentro el contenido y el autor. Si se reintenta lo mismo,
+    // la funcion devuelve lo ya hecho; si cambia algo, es otra operacion y no un
+    // conflicto de idempotencia.
+    const clave = `fx-import:${createHash('sha256')
+      .update(JSON.stringify({ tenantId, actorId, payload }))
+      .digest('hex')
+      .slice(0, 40)}`;
+
+    const { error } = await cliente.rpc('gestionar_maestro_contable_tx', {
+      p_tenant_id: tenantId,
+      p_actor_id: actorId,
+      p_entity: 'FX',
+      p_action: 'CREATE',
+      p_record_id: null,
+      p_payload: payload,
+      p_idempotency_key: clave,
     });
 
     if (error) {
@@ -228,6 +253,7 @@ export class TipoCambioSunatService {
     tenantId: string,
     desde: string,
     hasta: string,
+    actorId: string,
     pausaMs = 1200,
   ): Promise<ResultadoImportacion[]> {
     const resultados: ResultadoImportacion[] = [];
@@ -240,7 +266,7 @@ export class TipoCambioSunatService {
 
     for (let dia = new Date(inicio); dia <= fin; dia.setUTCDate(dia.getUTCDate() + 1)) {
       const fecha = dia.toISOString().slice(0, 10);
-      resultados.push(await this.importarFecha(tenantId, fecha));
+      resultados.push(await this.importarFecha(tenantId, fecha, actorId));
       if (pausaMs > 0) {
         await new Promise((resolver) => setTimeout(resolver, pausaMs));
       }

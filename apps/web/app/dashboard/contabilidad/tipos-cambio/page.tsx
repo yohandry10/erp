@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { parseDateLocal } from '@/lib/date-utils'
-import { AlertCircle, Coins, Loader2, PlusCircle, RefreshCw, Trash2 } from 'lucide-react'
+import { AlertCircle, Coins, Loader2, PlusCircle, RefreshCw, Trash2, Download } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +32,8 @@ export default function TiposCambioPage() {
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [importando, setImportando] = useState(false)
+  const [avisoImportacion, setAvisoImportacion] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     moneda_origen: 'USD',
@@ -63,6 +65,50 @@ export default function TiposCambioPage() {
   useEffect(() => {
     cargar()
   }, [cargar])
+
+  /**
+   * Trae la cotización oficial del día. No la impone: lo que no pase el
+   * contraste contra la última conocida no se guarda y se dice por qué, porque
+   * la fuente no es la SBS directamente --publica en una página, no en un
+   * servicio-- y ya se ha visto devolver un dato corrupto.
+   */
+  const importar = async () => {
+    try {
+      setImportando(true)
+      setError(null)
+      setAvisoImportacion(null)
+
+      // La fecha del calendario de quien mira, no la del meridiano de Greenwich:
+      // a las 20:00 en Lima `toISOString()` ya devuelve el día siguiente y se
+      // pediría una cotización que aún no existe.
+      const ahora = new Date()
+      const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(
+        ahora.getDate(),
+      ).padStart(2, '0')}`
+      const response = await post(
+        `/api/contabilidad/tipos-cambio/importar?desde=${form.fecha || hoy}`,
+        {},
+      )
+
+      if (!response?.success) throw new Error(response?.message || 'No se pudo importar')
+
+      const guardados = Number(response.data?.guardados ?? 0)
+      const omitidos: Array<{ fecha: string; motivo?: string }> = response.data?.omitidos ?? []
+
+      if (guardados > 0) {
+        setAvisoImportacion(`Se importó la cotización del ${form.fecha || hoy}.`)
+      } else {
+        const motivo = omitidos[0]?.motivo ?? 'la fuente no devolvió una cotización utilizable'
+        setAvisoImportacion(`No se importó nada: ${motivo}`)
+      }
+
+      await cargar()
+    } catch (err: any) {
+      setError(err.message || 'No se pudo importar el tipo de cambio')
+    } finally {
+      setImportando(false)
+    }
+  }
 
   const registrar = async () => {
     if (!form.compra && !form.venta) {
@@ -129,17 +175,34 @@ export default function TiposCambioPage() {
                 </p>
               </div>
             </div>
-            <Button
-              type="button"
-              onClick={cargar}
-              variant="outline"
-              className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Actualizar
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={importar}
+                disabled={importando}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                {importando ? 'Importando…' : 'Importar oficial'}
+              </Button>
+              <Button
+                type="button"
+                onClick={cargar}
+                variant="outline"
+                className="gap-2 border-cyan-400/20 bg-white/10 text-primary hover:bg-white/15 hover:text-foreground"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+            </div>
           </div>
         </section>
+
+        {avisoImportacion && (
+          <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+            {avisoImportacion}
+          </div>
+        )}
 
         {error && (
           <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3">
