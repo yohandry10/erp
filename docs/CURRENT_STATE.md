@@ -1578,11 +1578,12 @@ usuarios devuelven 403, y el endpoint de `system.debug` está restringido. La v�
 de escalada por crear un rol llamado `ADMIN` no funciona: la RPC exige
 `users.manage` mediante filas reales de permiso.
 
-**Cerrado:** `checkUserPermission` concedía todo a cualquier rol llamado
-exactamente `ADMIN`, con lo que revocar un permiso a ese rol no surtía efecto y
-bastaba con renombrar un rol para saltarse la lista. Retirado. No concedía nada
-que las filas de `rol_permisos` no concedan ya: los 42 usuarios con rol ADMIN
-están en tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
+**Cerrado:** `checkUserPermission` y `PermissionGuard` concedían todo a cualquier
+rol llamado exactamente `ADMIN`, con lo que revocar un permiso a ese rol no
+surtía efecto y bastaba con renombrar un rol para saltarse la lista. Ambos atajos
+fueron retirados y sólo `SUPER_ADMIN` conserva bypass. No concedían nada que las
+filas de `rol_permisos` no concedan ya: los 42 usuarios con rol ADMIN están en
+tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ## Pendientes reales
 

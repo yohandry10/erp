@@ -80,6 +80,79 @@ describe('PermissionGuard', () => {
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 
+  it('no concede permisos por el nombre del rol ADMIN', async () => {
+    const reflector = createMetadataAwareReflector(true);
+    const checkUserPermission = jest.fn().mockResolvedValue(false);
+    const permissionService = {
+      checkUserPermission,
+    } as unknown as PermissionService;
+    const guard = createGuard(permissionService, reflector);
+
+    const context = mockExecutionContext({
+      user: {
+        id: 'user-admin',
+        tenant_id: 'tenant-1',
+        roles: ['ADMIN'],
+        is_super_admin: false,
+      },
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+    expect(checkUserPermission).toHaveBeenCalledWith(
+      'user-admin',
+      'tenant-1',
+      'ventas',
+      'emitir',
+      '__global__',
+    );
+  });
+
+  it('permite a un ADMIN solo cuando rol_permisos concede el permiso', async () => {
+    const reflector = createMetadataAwareReflector(true);
+    const checkUserPermission = jest.fn().mockResolvedValue(true);
+    const permissionService = {
+      checkUserPermission,
+    } as unknown as PermissionService;
+    const guard = createGuard(permissionService, reflector);
+
+    const context = mockExecutionContext({
+      user: {
+        id: 'user-admin',
+        tenant_id: 'tenant-1',
+        roles: ['ADMIN'],
+        is_super_admin: false,
+      },
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(checkUserPermission).toHaveBeenCalledWith(
+      'user-admin',
+      'tenant-1',
+      'ventas',
+      'emitir',
+      '__global__',
+    );
+  });
+
+  it('mantiene el bypass exclusivo de SUPER_ADMIN', async () => {
+    const reflector = createMetadataAwareReflector(true);
+    const checkUserPermission = jest.fn();
+    const permissionService = {
+      checkUserPermission,
+    } as unknown as PermissionService;
+    const guard = createGuard(permissionService, reflector);
+
+    const context = mockExecutionContext({
+      user: {
+        id: 'super-admin',
+        is_super_admin: true,
+      },
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(checkUserPermission).not.toHaveBeenCalled();
+  });
+
   it('lanza UnauthorizedException cuando no hay usuario', async () => {
     const reflector = createMetadataAwareReflector(true);
     const permissionService = {
