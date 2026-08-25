@@ -30,6 +30,7 @@
     "test:fechas": "node tests/fechas/verify-fecha-local.mjs",
     "test:etiquetas": "node tests/formularios/verify-etiquetas.mjs",
     "test:dinero": "node tests/dinero/verify-aritmetica-moneda.mjs",
+    "test:asiento-balance": "node tests/contabilidad/verify-asiento-balance.mjs",
     "test:contrato": "node tests/contrato/verify-payload-servidor.mjs",
     "test:barra-final": "node tests/contrato/verify-barra-final.mjs",
     "playwright:install": "playwright install chromium"
