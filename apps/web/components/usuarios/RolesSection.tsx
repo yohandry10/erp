@@ -22,6 +22,7 @@ import { Plus, ShieldCheck } from 'lucide-react'
 import { unwrapApiArray } from '@/lib/api-contract'
 
 const RESTRICTED_DEMO_PERMISSIONS = /^(security\.audit\.|tenants\.manage$|system\.debug$|documentos\.audit\.read$)/i
+const PERMISSIONS_PREVIEW_LIMIT = 6
 
 export default function RolesSection({ roles, canManage = false, onRoleCreated }: RolesSectionProps) {
   const country = useCountryContext()
@@ -34,6 +35,7 @@ export default function RolesSection({ roles, canManage = false, onRoleCreated }
   const [descripcion, setDescripcion] = useState('')
   const [selected, setSelected] = useState<string[]>([])
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  const [expandedRoles, setExpandedRoles] = useState<Set<string>>(() => new Set())
 
   const permissionCode = (permission: any) => String(
     permission.codigo || [permission.modulo, permission.recurso, permission.accion].filter(Boolean).join('.')
@@ -92,7 +94,11 @@ export default function RolesSection({ roles, canManage = false, onRoleCreated }
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {roles.map((rol: any, index) => {
           const permisos = visiblePermissions(rol.permisos)
-          return <Card key={index} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
+          const roleKey = String(rol.id || `${rol.nombre}-${index}`)
+          const expanded = expandedRoles.has(roleKey)
+          const displayedPermissions = expanded ? permisos : permisos.slice(0, PERMISSIONS_PREVIEW_LIMIT)
+          const remainingPermissions = permisos.length - displayedPermissions.length
+          return <Card key={roleKey} className="border-cyan-400/20 bg-card/65 text-foreground shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-border group-data-[erp-theme=light]/dashboard:bg-card group-data-[erp-theme=light]/dashboard:text-foreground">
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
                 <CardTitle className="mb-2 text-base text-white group-data-[erp-theme=light]/dashboard:text-foreground">{rol.nombre}</CardTitle>
@@ -109,10 +115,10 @@ export default function RolesSection({ roles, canManage = false, onRoleCreated }
               <p className="mb-2 text-xs uppercase tracking-[0.12em] text-primary/80 group-data-[erp-theme=light]/dashboard:text-muted-foreground">
                 Permisos:
               </p>
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div id={`role-permissions-${index}`} className="mb-4 flex flex-wrap gap-2">
                 {permisos.length > 0 ? (
-                  permisos.map((permiso: string, pIndex: number) => (
-                    <Badge key={pIndex} className="border-cyan-300/25 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
+                  displayedPermissions.map((permiso: string, permissionIndex: number) => (
+                    <Badge key={`${permiso}-${permissionIndex}`} className="border-cyan-300/25 bg-cyan-300/10 text-primary group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
                       {permiso}
                     </Badge>
                   ))
@@ -122,6 +128,23 @@ export default function RolesSection({ roles, canManage = false, onRoleCreated }
                   </Badge>
                 )}
               </div>
+              {permisos.length > PERMISSIONS_PREVIEW_LIMIT && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-expanded={expanded}
+                  aria-controls={`role-permissions-${index}`}
+                  onClick={() => setExpandedRoles((current) => {
+                    const next = new Set(current)
+                    if (next.has(roleKey)) next.delete(roleKey)
+                    else next.add(roleKey)
+                    return next
+                  })}
+                >
+                  {expanded ? 'Mostrar menos' : `Ver ${remainingPermissions} permisos más`}
+                </Button>
+              )}
             </CardContent>
           </Card>
         })}
