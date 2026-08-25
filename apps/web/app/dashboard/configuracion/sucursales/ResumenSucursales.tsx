@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { BarChart3 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useApi } from '@/hooks/use-api'
+import { useLocalizedMoney } from '@/hooks/use-localized-money'
 
 type FilaResumen = {
   sucursal_id: string
@@ -16,12 +17,6 @@ type FilaResumen = {
   cajas_abiertas: number
 }
 
-const formatoMoneda = new Intl.NumberFormat('es-PE', {
-  style: 'currency',
-  currency: 'PEN',
-  minimumFractionDigits: 2,
-})
-
 /**
  * Informe por establecimiento.
  *
@@ -31,6 +26,7 @@ const formatoMoneda = new Intl.NumberFormat('es-PE', {
  */
 export function ResumenSucursales() {
   const { get } = useApi()
+  const { formatCurrency } = useLocalizedMoney()
   const [filas, setFilas] = useState<FilaResumen[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -87,7 +83,7 @@ export function ResumenSucursales() {
                       {fila.nombre}
                     </td>
                     <td className="py-2 pr-4 text-right tabular-nums">
-                      {formatoMoneda.format(fila.ventas_pos_total)}
+                      {formatCurrency(fila.ventas_pos_total)}
                     </td>
                     <td className="py-2 pr-4 text-right tabular-nums">{fila.ventas_pos_cantidad}</td>
                     <td className="py-2 pr-4 text-right tabular-nums">
