@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { obtenerEstadoBalanceAsiento } from '@/lib/contabilidad/asiento-balance'
 
 interface DetalleAsiento {
   cuenta_id: string
@@ -78,7 +79,8 @@ export default function AsientoForm({
   const totalDebe = formData.detalles.reduce((sum, d) => sum + (d.debe || 0), 0)
   const totalHaber = formData.detalles.reduce((sum, d) => sum + (d.haber || 0), 0)
   const diferencia = Math.abs(totalDebe - totalHaber)
-  const isBalanced = diferencia < 0.01
+  const estadoBalance = obtenerEstadoBalanceAsiento(totalDebe, totalHaber)
+  const isBalanced = estadoBalance === 'BALANCEADO'
 
   const handleAddDetalle = () => {
     setFormData({
@@ -361,7 +363,11 @@ export default function AsientoForm({
                   <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                 )}
                 <p className="text-sm font-medium text-primary">
-                  {isBalanced ? 'El asiento esta balanceado correctamente.' : 'Debe y haber deben cuadrar antes de guardar.'}
+                  {estadoBalance === 'PENDIENTE'
+                    ? 'Ingrese importes en debe y haber para comprobar el balance.'
+                    : isBalanced
+                      ? 'El asiento esta balanceado correctamente.'
+                      : 'Debe y haber deben cuadrar antes de guardar.'}
                 </p>
               </div>
               {errors.balance && <p className="mt-3 text-sm font-semibold text-primary">{errors.balance}</p>}

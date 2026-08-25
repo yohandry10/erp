@@ -63,6 +63,7 @@ jobs:
           pnpm --filter @erp-suite/web test:fechas
           pnpm --filter @erp-suite/web test:etiquetas
           pnpm --filter @erp-suite/web test:dinero
+          pnpm --filter @erp-suite/web test:asiento-balance
           pnpm --filter @erp-suite/web test:contrato
           pnpm --filter @erp-suite/web test:barra-final
 
