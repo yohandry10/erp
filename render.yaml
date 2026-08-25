@@ -74,7 +74,7 @@ services:
       # Readiness compara este valor con la historia real de migraciones. El
       # contenedor no recibe tráfico si PROD aún no alcanzó este esquema.
       - key: REQUIRED_DATABASE_SCHEMA_VERSION
-        value: 516
+        value: 517
 
       # Base de datos de produccion. EXPECTED_SUPABASE_PROJECT_REF hace que la
       # API se niegue a arrancar si la apuntan a otro proyecto por error.
