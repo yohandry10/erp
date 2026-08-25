@@ -181,7 +181,7 @@ AS $function$
         'descuento_monto', round(app.to_numeric_or_zero(item->>'descuento_monto'), 2),
         'descuento_porcentaje', round(app.to_numeric_or_zero(item->>'descuento_porcentaje'), 6)
       ) ORDER BY ordinality), '[]'::jsonb)
-      FROM jsonb_array_elements(coalesce(p_intencion->'items', '[]'::jsonb))
+      FROM jsonb_array_elements(app.jsonb_array_or_empty_491(p_intencion->'items'))
         WITH ORDINALITY AS lines(item, ordinality)
     ),
     'pagos', app.pos_payments_canonical_451(p_intencion->'pagos')
