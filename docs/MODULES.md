@@ -37,7 +37,10 @@ Cotización -> Pedido -> Reserva -> Despacho -> Documento/CPE -> Cobro -> Asient
   exacto por el mismo actor; no se puede crear ni modificar con el contrato
   vigente.
 - La cotización puede enviarse y ser aprobada o rechazada por un actor distinto
-  de su creador; `BORRADOR`, `ENVIADA` y `APROBADA` son elegibles para convertir
+  de su creador. Un usuario con rol canónico `ADMIN` o `ADMIN_DEMO` y permiso
+  explícito de aprobación puede autoaprobarla; la excepción conserva actor,
+  fecha y observación de auditoría y no se extiende a roles operativos ni al
+  autorrechazo. `BORRADOR`, `ENVIADA` y `APROBADA` son elegibles para convertir
   a pedido, según permisos.
 - Confirmar un pedido distingue una excepción comercial pendiente de aprobación
   de un bloqueo crediticio: el primero continúa por la bandeja de aprobaciones y

@@ -8,7 +8,7 @@ const user = {
   apellido: 'Cotizaciones',
   roles: ['ADMIN'],
   tenant_id: 'cotizacion-dialog-tenant',
-  is_super_admin: true,
+  is_super_admin: false,
 }
 
 test('aprobar cotización usa diálogo integrado y conserva la observación', async ({ context, page }) => {
@@ -35,14 +35,21 @@ test('aprobar cotización usa diálogo integrado y conserva la observación', as
   }])
 
   let estado = 'ENVIADA'
+  let rechazarPrimeraDecision = true
   const mutations: Array<{ path: string; body: any }> = []
   const nativeDialogs: string[] = []
   const browserErrors: string[] = []
+  const httpErrors: Array<{ path: string; status: number }> = []
   page.on('dialog', async (dialog) => {
     nativeDialogs.push(dialog.type())
     await dialog.dismiss()
   })
   page.on('pageerror', (error) => browserErrors.push(error.message))
+  page.on('response', (response) => {
+    if (response.status() >= 400) {
+      httpErrors.push({ path: new URL(response.url()).pathname, status: response.status() })
+    }
+  })
   page.on('console', (message) => {
     if (message.type() === 'error') browserErrors.push(message.text())
   })
@@ -61,10 +68,30 @@ test('aprobar cotización usa diálogo integrado y conserva la observación', as
       return json({ data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN' } })
     }
     if (/\/api\/demo\/status\/?$/.test(pathname)) return json({ is_demo: false, is_expired: false })
-    if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) return json({ data: [] })
+    if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) {
+      return json({
+        data: [
+          { id: 'perm-edit', tenant_id: user.tenant_id, modulo: 'ventas', recurso: 'cotizaciones', accion: 'editar' },
+          { id: 'perm-approve', tenant_id: user.tenant_id, modulo: 'ventas', recurso: 'cotizaciones', accion: 'approve' },
+          { id: 'perm-convert', tenant_id: user.tenant_id, modulo: 'ventas', recurso: 'cotizaciones', accion: 'convertir_pedido' },
+        ],
+      })
+    }
 
     if (/\/api\/ventas\/cotizaciones\/cotizacion-dialog\/aprobar\/?$/.test(pathname)) {
       mutations.push({ path: pathname, body: request.postDataJSON() })
+      if (rechazarPrimeraDecision) {
+        rechazarPrimeraDecision = false
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            statusCode: 400,
+            message: 'La cotización requiere un aprobador distinto del creador',
+            error: 'Bad Request',
+          }),
+        })
+      }
       estado = 'APROBADA'
       return json({ success: true, data: { estado } })
     }
@@ -117,12 +144,24 @@ test('aprobar cotización usa diálogo integrado y conserva la observación', as
   await dialog.getByRole('textbox', { name: 'Motivo u observación' }).fill('Aprobada en revisión QA')
   await dialog.getByRole('button', { name: 'Aprobar cotización' }).click()
 
+  await expect(page.getByText('La cotización requiere un aprobador distinto del creador')).toBeVisible()
+  await expect(page.getByText('ENVIADA', { exact: true })).toBeVisible()
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Aprobar cotización' })).toBeEnabled()
+  await dialog.getByRole('button', { name: 'Aprobar cotización' }).click()
+
   await expect(page.getByText('APROBADA', { exact: true })).toBeVisible()
-  expect(mutations).toHaveLength(1)
+  expect(mutations).toHaveLength(2)
   expect(mutations[0].path).toMatch(/\/api\/ventas\/cotizaciones\/cotizacion-dialog\/aprobar\/?$/)
   expect(mutations[0].body).toEqual({ motivo: 'Aprobada en revisión QA' })
+  expect(mutations[1]).toEqual(mutations[0])
+  expect(httpErrors).toHaveLength(1)
+  expect(httpErrors[0].status).toBe(400)
+  expect(httpErrors[0].path).toMatch(/\/api\/ventas\/cotizaciones\/cotizacion-dialog\/aprobar\/?$/)
   expect(nativeDialogs).toEqual([])
-  expect(browserErrors).toEqual([])
+  expect(browserErrors.filter((message) =>
+    message !== 'Failed to load resource: the server responded with a status of 400 (Bad Request)'
+  )).toEqual([])
 })
 
 test('la bandeja aprueba pedidos sin prompt nativo y envía el sustento', async ({ context, page }) => {
