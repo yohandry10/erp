@@ -8,6 +8,7 @@ import {
   Param,
   Headers,
   UseGuards,
+  BadRequestException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
@@ -24,6 +25,7 @@ import {
 } from "@erp-suite/dtos";
 import { TiposCambioService } from "../services/tipos-cambio.service";
 import { RevaluacionService } from "../services/revaluacion.service";
+import { TipoCambioSunatService } from "../services/tipo-cambio-sunat.service";
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -32,6 +34,7 @@ export class ContabilidadMultimonedaController {
   constructor(
     private readonly tiposCambioService: TiposCambioService,
     private readonly revaluacionService: RevaluacionService,
+    private readonly tipoCambioSunat: TipoCambioSunatService,
   ) {}
 
   @Get("tipos-cambio")
@@ -127,6 +130,40 @@ export class ContabilidadMultimonedaController {
   ) {
     await this.tiposCambioService.eliminar(tenantId,id,userId,idempotencyKey);
     return { success: true, message: "Tipo de cambio eliminado" };
+  }
+
+  @Post("tipos-cambio/importar")
+  @RequirePermission("contabilidad.tipos_cambio.crear")
+  @ApiOperation({
+    summary: "Importa el tipo de cambio oficial de una fecha o un rango",
+    description:
+      "No existe un tipo de cambio propio de SUNAT: publica el que determina la SBS. " +
+      "Se importan compra y venta, porque el activo usa compra y el pasivo y el IGV usan venta. " +
+      "No pisa una cotizacion ya registrada, y descarta la que se aparte demasiado de la ultima " +
+      "conocida en vez de guardarla: un tipo de cambio equivocado no rompe nada visible.",
+  })
+  async importarTiposCambio(
+    @CurrentTenant() tenantId: string,
+    @Query("desde") desde: string,
+    @Query("hasta") hasta?: string,
+  ) {
+    if (!desde || !/^\d{4}-\d{2}-\d{2}$/.test(desde)) {
+      throw new BadRequestException("Indique 'desde' con formato YYYY-MM-DD");
+    }
+    const fin = hasta ?? desde;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fin)) {
+      throw new BadRequestException("'hasta' debe tener formato YYYY-MM-DD");
+    }
+
+    const resultados = await this.tipoCambioSunat.importarRango(tenantId, desde, fin);
+    return {
+      success: true,
+      data: {
+        guardados: resultados.filter((r) => r.guardado).length,
+        omitidos: resultados.filter((r) => !r.guardado),
+        detalle: resultados,
+      },
+    };
   }
 
   @Get("revaluacion/simular")
