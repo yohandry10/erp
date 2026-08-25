@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Calendar, Lock, Loader2, PlusCircle, RefreshCw, Unlock } from 'lucide-react'
+import { AlertCircle, Calendar, Lock, Loader2, PlusCircle, RefreshCw, ShieldAlert, Unlock } from 'lucide-react'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
@@ -30,7 +30,44 @@ export default function PeriodosPage() {
   const [error, setError] = useState<string | null>(null)
   const [showWizard, setShowWizard] = useState(false)
   const [selectedPeriodo, setSelectedPeriodo] = useState<Periodo | null>(null)
+  const [periodoAProvisionar, setPeriodoAProvisionar] = useState<Periodo | null>(null)
+  const [diasVencido, setDiasVencido] = useState('360')
+  const [provisionando, setProvisionando] = useState(false)
+  const [resultadoProvision, setResultadoProvision] = useState<string | null>(null)
   const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
+
+  /**
+   * Estimación de cuentas de cobranza dudosa del periodo (artículo 37 inciso i
+   * de la Ley del Impuesto a la Renta). Genera el asiento Dr 68 / Cr 19 y deja
+   * el detalle documento a documento que pide el Libro de Inventarios y
+   * Balances. Ejecutarlo dos veces no duplica.
+   */
+  const provisionar = async () => {
+    if (!periodoAProvisionar) return
+    const periodo = `${periodoAProvisionar.anio}-${String(periodoAProvisionar.mes).padStart(2, '0')}`
+    try {
+      setProvisionando(true)
+      setResultadoProvision(null)
+      const resultado = await apiCall(
+        `/contabilidad/periodos/${periodo}/provision-cobranza-dudosa?dias_vencido=${Number(diasVencido) || 360}`,
+        { method: 'POST' },
+      )
+      const datos = resultado?.data ?? resultado
+      const documentos = Number(datos?.documentos ?? 0)
+      setResultadoProvision(
+        documentos > 0
+          ? `Provisionados S/ ${Number(datos?.monto_provisionado ?? 0).toFixed(2)} sobre ${documentos} documento(s).`
+          : 'No había deuda vencida sin provisionar con ese criterio: no se generó ningún asiento.',
+      )
+      // No se recarga la lista a propósito: la estimación no cambia ninguna
+      // columna de la tabla, y `loading` desmonta la página entera --hay un
+      // `return` temprano-- llevándose por delante el resultado que hay que leer.
+    } catch (err: any) {
+      setResultadoProvision(err?.message || 'No se pudo generar la estimación')
+    } finally {
+      setProvisionando(false)
+    }
+  }
 
   const fetchPeriodos = useCallback(async () => {
     try {
@@ -256,6 +293,22 @@ export default function PeriodosPage() {
                                 Cerrar
                               </Button>
                             )}
+                            {periodo.estado === 'ABIERTO' && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                title="Estimación de cuentas de cobranza dudosa (Dr 68 / Cr 19)"
+                                onClick={() => {
+                                  setPeriodoAProvisionar(periodo)
+                                  setResultadoProvision(null)
+                                }}
+                                className="gap-2 border-amber-400/30 bg-amber-400/5 text-amber-300 hover:bg-amber-400/10"
+                              >
+                                <ShieldAlert className="h-4 w-4" />
+                                Cobranza dudosa
+                              </Button>
+                            )}
                             <Button
                               type="button"
                               size="sm"
@@ -306,6 +359,71 @@ export default function PeriodosPage() {
               fetchPeriodos()
             }}
           />
+        )}
+
+        {periodoAProvisionar && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <Card className="w-full max-w-lg border-amber-400/25">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-amber-300">
+                  <ShieldAlert className="h-5 w-5" />
+                  Cobranza dudosa · {periodoAProvisionar.anio}-{String(periodoAProvisionar.mes).padStart(2, '0')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Estima como incobrable la deuda vencida y sin gestión de cobro, con el asiento
+                  Dr 68 / Cr 19 y el detalle documento a documento que pide el Libro de Inventarios
+                  y Balances. Lo ya provisionado no vuelve a entrar, así que ejecutarlo dos veces
+                  no duplica nada.
+                </p>
+
+                <label className="block space-y-2 text-sm font-semibold text-foreground">
+                  Antigüedad mínima del vencimiento (días)
+                  <input
+                    type="number"
+                    min={1}
+                    value={diasVencido}
+                    onChange={(e) => setDiasVencido(e.target.value)}
+                    className="w-full rounded-xl border border-cyan-400/20 bg-card/80 px-3 py-3 text-sm text-foreground outline-none focus:border-cyan-300"
+                  />
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    360 días es el criterio habitual del artículo 37 inciso i. Cámbielo si su
+                    política de cobranza sostiene otro.
+                  </span>
+                </label>
+
+                {resultadoProvision && (
+                  <p className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 text-sm text-foreground">
+                    {resultadoProvision}
+                  </p>
+                )}
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setPeriodoAProvisionar(null)
+                      setResultadoProvision(null)
+                    }}
+                    className="border-cyan-400/20 bg-white/5"
+                  >
+                    Cerrar
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={provisionando}
+                    onClick={provisionar}
+                    className="gap-2 bg-amber-500 text-black hover:bg-amber-400"
+                  >
+                    {provisionando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
+                    {provisionando ? 'Calculando…' : 'Generar estimación'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </div>
