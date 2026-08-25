@@ -137,6 +137,8 @@ test('aprobar cotización usa diálogo integrado y conserva la observación', as
 
   await page.goto('/dashboard/ventas/cotizaciones/cotizacion-dialog/', { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { name: 'Cotización COT-QA-DIALOG' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('IGV (18%):', { exact: true })).toBeVisible()
+  await expect(page.getByText('IGV (18%) (18%):', { exact: true })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Aprobar' }).click()
   const dialog = page.getByRole('dialog', { name: 'Aprobar cotización' })

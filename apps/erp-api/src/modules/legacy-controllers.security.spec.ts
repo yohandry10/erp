@@ -23,9 +23,14 @@ describe('Legacy ERP controllers security metadata', () => {
 
   it('declara permisos por defecto en controladores legacy autenticados', () => {
     expect(getClassPermission(ConfiguracionController)?.raw).toBe('configuracion.read');
-    expect(getClassPermission(ConfiguracionFiscalController)?.raw).toBe('configuracion.read');
     expect(getClassPermission(ConfigurationController)?.raw).toBe('configuracion.read');
     expect(getClassPermission(FinanzasController)?.raw).toBe('finanzas.read');
+  });
+
+  it('permite leer tasas fiscales a cualquier usuario autenticado del tenant', () => {
+    // Este endpoint sólo expone nombres, tasas y moneda del propio tenant. POS,
+    // ventas y compras lo necesitan aunque el rol no administre configuración.
+    expect(getClassPermission(ConfiguracionFiscalController)).toBeUndefined();
   });
 
   it('declara permisos de escritura en handlers mutables de configuracion', () => {
