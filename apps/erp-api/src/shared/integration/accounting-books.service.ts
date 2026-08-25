@@ -844,32 +844,6 @@ export class AccountingBooksService {
       if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear la consignación');
       const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
       return result.record;
-
-      /* istanbul ignore next -- writer legacy inalcanzable */
-      const payload = {
-        numero: consignacionData?.numero,
-        fecha_registro: consignacionData?.fecha_registro,
-        fecha_entrega: consignacionData?.fecha_entrega,
-        producto_id: consignacionData?.producto_id || null,
-        consignatario_nombre: String(consignacionData?.consignatario_nombre || '').trim(),
-        cantidad,
-        valor_unitario: valorUnitario,
-        valor_total: Math.round(cantidad * valorUnitario * 100) / 100,
-        moneda: String(consignacionData?.moneda || 'PEN').trim().toUpperCase(),
-        estado: 'PENDIENTE',
-        // Nunca se confía en tenant_id, valor_total ni estado enviados por el
-        // cliente: pertenecen al contexto y a reglas del servidor.
-        tenant_id: tenantId,
-      };
-      const { data: consignacion, error } = await this.supabase
-        .getClient()
-        .from('registro_consignaciones')
-        .insert(payload)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return consignacion;
     } catch (error) {
       console.error('Error creando consignación:', error);
       throw error;
@@ -892,19 +866,6 @@ export class AccountingBooksService {
       if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo actualizar la consignación');
       const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
       return result.record;
-
-      /* istanbul ignore next -- writer legacy inalcanzable */
-      const { data, error } = await this.supabase
-        .getClient()
-        .from('registro_consignaciones')
-        .update({ estado, updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .eq('tenant_id', tenantId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
     } catch (error) {
       console.error('Error actualizando estado de consignación:', error);
       throw error;

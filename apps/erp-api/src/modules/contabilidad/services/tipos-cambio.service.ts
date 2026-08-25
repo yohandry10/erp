@@ -100,73 +100,6 @@ export class TiposCambioService {
     });
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo registrar el tipo de cambio');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData; return result.record as TipoCambioResponseDto;
-
-    /* istanbul ignore next -- writer legacy inalcanzable */
-    const monedaOrigen = dto.moneda_origen.toUpperCase();
-    const monedaDestino = dto.moneda_destino.toUpperCase();
-
-    if (monedaOrigen === monedaDestino) {
-      throw new BadRequestException(
-        'La moneda de origen y la de destino no pueden ser la misma.'
-      );
-    }
-
-    if (dto.compra === undefined && dto.venta === undefined) {
-      throw new BadRequestException('Debe informar al menos una cotización: compra o venta.');
-    }
-
-    const payload = {
-      tenant_id: tenantId,
-      moneda_origen: monedaOrigen,
-      moneda_destino: monedaDestino,
-      fecha: dto.fecha,
-      compra: dto.compra ?? dto.venta,
-      venta: dto.venta ?? dto.compra,
-      fuente: (dto.fuente || 'MANUAL').toUpperCase(),
-      created_by: userId
-    };
-
-    const { data: existente } = await this.supabaseService
-      .getClient()
-      .from('tipos_cambio')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('moneda_origen', monedaOrigen)
-      .eq('moneda_destino', monedaDestino)
-      .eq('fecha', dto.fecha)
-      .maybeSingle();
-
-    if (existente?.id) {
-      const { data, error } = await this.supabaseService
-        .getClient()
-        .from('tipos_cambio')
-        .update({ ...payload, updated_at: new Date().toISOString() })
-        .eq('id', existente.id)
-        .eq('tenant_id', tenantId)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(`Error actualizando tipo de cambio: ${error.message}`);
-      }
-      return data as TipoCambioResponseDto;
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('tipos_cambio')
-      .insert(payload)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Error registrando tipo de cambio: ${error.message}`);
-    }
-
-    this.logger.log(
-      `💱 Tipo de cambio ${monedaOrigen}/${monedaDestino} ${dto.fecha} registrado para ${tenantId}`
-    );
-    return data as TipoCambioResponseDto;
   }
 
   async eliminar(tenantId:string,id:string,userId:string,idempotencyKey?:string):Promise<void> {
@@ -176,18 +109,6 @@ export class TiposCambioService {
       p_tenant_id:tenantId,p_actor_id:userId,p_entity:'FX',p_action:'DEACTIVATE',p_record_id:id,p_payload:{},p_idempotency_key:key,
     });
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo desactivar el tipo de cambio'); return;
-
-    /* istanbul ignore next -- writer legacy inalcanzable */
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('tipos_cambio')
-      .delete()
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
-
-    if (error) {
-      throw new Error(`Error eliminando tipo de cambio: ${error.message}`);
-    }
   }
 
   /**
