@@ -8,7 +8,40 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **PROD está en `511`.** La `510` puso el mecanismo de tasas de detracción
+- **Un recorrido por pantalla, haciendo lo que hace un contador, encontró tres
+  cosas que ninguna prueba veía** porque todas estaban del lado del uso, no del
+  cálculo. Las tres van corregidas en `512`, `513` y `514`, y las tres nacieron
+  del mismo descuido: dar por bueno un mecanismo sin comprobar que se pueda
+  usar.
+
+  La más grave: **ninguna de las 67 cuentas bancarias de producción podía
+  registrar un movimiento**. La semilla las creaba sin cuenta contable asociada
+  y `assert_postable_account_457` la exige, así que el flujo más cotidiano de
+  tesorería fallaba con `BANK_LEDGER_ACCOUNT_NOT_POSTABLE_IN_TENANT`. Detrás
+  había otra causa: la cuenta corriente operativa (`1041`) no estaba en el
+  catálogo de cuentas autocreables. La `514` corrige el catálogo, la semilla y
+  las filas escritas, y su verificador **registra un movimiento de verdad** en
+  vez de conformarse con que la columna no sea nula.
+
+  La segunda: **132 de los 134 proveedores no se podían editar**. La semilla
+  escribía `condiciones_pago = 'CREDITO'`, que no es ninguno de los valores
+  admitidos, y el formulario se negaba a guardar con un error en inglés sobre un
+  enum. Alcanzaba a 66 contribuyentes, los que ve quien está probando el
+  sistema. Lo corrige la `513`, derivando la condición de los días de crédito
+  que la propia semilla ya traía.
+
+  La tercera: **la suspensión de retenciones de cuarta no se podía anotar**. La
+  `508` había puesto la columna y el disparador, pero la función de
+  actualización de proveedores lleva lista explícita de columnas y el campo se
+  ignoraba en silencio. Lo corrige la `512`.
+
+  Y de la misma revisión salió lo que faltaba en las pantallas: el destino del
+  crédito fiscal y la detracción ahora se informan al registrar la factura del
+  proveedor —antes la prorrata usaba siempre `GRAVADAS` porque no había forma de
+  decir otra cosa—, y la estimación de cobranza dudosa tiene botón en los
+  periodos abiertos.
+
+- **PROD está en `514`.** La `510` puso el mecanismo de tasas de detracción
   —catálogo de códigos SPOT con tasa y vigencia, `codigo_detraccion` en la cuenta
   por pagar, y un contraste que **compara sin imponer**, porque hay operaciones
   con reglas especiales y el contador tiene que poder apartarse a sabiendas, pero
@@ -776,7 +809,7 @@ Cambios recientes principales:
   detenerse si el preflight del backfill `490→492` encuentra un evento laboral
   sin snapshot contable inequívoco; el runtime nuevo exige esquema `496` y no
   debe desplegarse antes que la base.
-- `497..511`: aplicadas y registradas en PROD. Cubren el respaldo peruano del
+- `497..514`: aplicadas y registradas en PROD. Cubren el respaldo peruano del
   esquema (`500`), las sucursales como establecimiento anexo y su herencia en
   las operaciones (`503..505`), y la auditoría contable por puntos —prorrata del
   crédito fiscal (`507`), retención de cuarta categoría (`508`), estimación de
@@ -841,6 +874,11 @@ productivo autorizado.
   nulos y centinelas. Un proceso desatendido no puede inventarse un autor: tiene
   que resolver una persona real —el contador, y si no lo hay el administrador— o
   no escribir.
+- **Una cuenta bancaria sin `cuenta_contable_id` no puede registrar movimientos.**
+  Lo exige `assert_postable_account_457`, y la cuenta tiene que ser una corriente
+  operativa (`1041`, o `104` donde exista): la `1042` es la de detracciones y
+  lleva su propio saldo. El alta por API ya lo pide obligatorio; lo que fallaba
+  era la siembra.
 - `producto_existencias` es la fuente física de stock por almacén.
 - `aplicar_movimiento_inventario_tx` es el writer canónico de movimientos.
 - POS deriva `almacen_id` de la caja de la sesión.
