@@ -113,6 +113,27 @@ export function CompanyTypeStep() {
         </div>
       </div>
 
+      {/* Varios locales: aclarar la diferencia antes de que el cliente configure
+          series y almacenes, que es cuando la duda aparece y ya cuesta deshacerla. */}
+      {Boolean(state.configuration.tipo_empresa) && (
+        <div className="mt-8 p-6 bg-card/40 rounded-xl border border-border">
+          <h3 className="text-base font-semibold mb-2 text-foreground">
+            ¿Tu empresa tiene varios locales?
+          </h3>
+          <p className="text-[0.875rem] text-muted-foreground">
+            Si son locales del <strong>mismo RUC</strong>, se registran como establecimientos
+            anexos: cada uno con su código de SUNAT, sus series de facturación, sus almacenes y
+            sus cajas. El stock y las ventas quedan separados por local; los libros contables van
+            juntos, porque SUNAT los recibe por RUC.
+          </p>
+          <p className="text-[0.875rem] text-muted-foreground mt-3">
+            Si cada local es una <strong>razón social distinta</strong>, son empresas separadas —
+            cada una con su RUC, su Clave SOL y su certificado— y el sistema las consolida
+            después. Podrás configurarlo al terminar este asistente.
+          </p>
+        </div>
+      )}
+
       {/* Configuración GRE - Solo para Perú */}
       {state.configuration.tipo_empresa && country.paisCodigo === 'PE' && (
         <div className="mt-8 p-6 bg-card/40 rounded-xl border border-cyan-400/20">

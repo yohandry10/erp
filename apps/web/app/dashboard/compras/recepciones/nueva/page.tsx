@@ -32,8 +32,18 @@ function NuevaRecepcionContent() {
             </button>
             <h1 className="m-0 text-[clamp(1.75rem,4vw,2.5rem)] font-black leading-[1.1] tracking-[-0.03em] text-foreground">Nueva Recepción de Mercancía</h1>
             <p className="mt-2 text-base text-muted-foreground text-primary">
-              No se especificó una orden de compra
+              Una recepción se registra siempre contra una orden de compra: es de ahí
+              de donde salen las cantidades pedidas y los precios.
             </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Abra la orden que le llegó y use «Recepcionar» desde ella.
+            </p>
+            <button
+              onClick={() => router.push('/dashboard/compras/ordenes')}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500"
+            >
+              Ver órdenes de compra
+            </button>
           </div>
         </div>
       </div>

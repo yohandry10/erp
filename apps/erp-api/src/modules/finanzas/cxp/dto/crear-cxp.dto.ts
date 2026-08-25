@@ -7,8 +7,7 @@ import {
   IsString,
   IsUUID,
   Min,
-  ValidateNested,
-} from 'class-validator';
+  ValidateNested, IsIn, MaxLength} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum CondicionesPagoCxp {
@@ -88,6 +87,32 @@ export class CrearCxpDto {
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El IGV debe ser numérico' })
   @Min(0, { message: 'El IGV no puede ser negativo' })
   igv!: number;
+
+  /**
+   * Destino del bien o servicio a efectos del crédito fiscal (artículo 23 de la
+   * Ley del IGV). Lo decide quien registra la compra porque depende de para qué
+   * se usó, y el sistema no puede deducirlo.
+   *
+   *   GRAVADAS      crédito íntegro (es el valor por defecto)
+   *   NO_GRAVADAS   sin crédito
+   *   COMUN         crédito por el coeficiente de prorrata
+   */
+  @IsOptional()
+  @IsIn(['GRAVADAS', 'NO_GRAVADAS', 'COMUN'], {
+    message: 'destino_credito_fiscal debe ser GRAVADAS, NO_GRAVADAS o COMUN',
+  })
+  destino_credito_fiscal?: 'GRAVADAS' | 'NO_GRAVADAS' | 'COMUN';
+
+  /**
+   * Código de bien o servicio del SPOT. Con el catálogo de tasas cargado, el
+   * sistema contrasta el importe declarado contra el que sale del código y deja
+   * constancia de la diferencia; no lo impone, porque hay operaciones con reglas
+   * especiales.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  codigo_detraccion?: string;
 
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El total debe ser numérico' })
   @Min(0.01, { message: 'El total debe ser mayor a cero' })

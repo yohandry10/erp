@@ -222,7 +222,7 @@ describe('env.schema', () => {
       SUPABASE_URL: 'https://zyxwvutsrqponmlkjihg.supabase.co',
     });
 
-    expect(result.error?.message).toContain('exclusivamente a PROD');
+    expect(result.error?.message).toContain('sólo opera wypnbcptofqdmoynlonq');
   });
 
   it('permite habilitar demos en PROD, que es donde vive la prueba gratuita', () => {
@@ -252,16 +252,18 @@ describe('env.schema', () => {
     expect(result.error?.message).toContain('sólo admite NODE_ENV=production');
   });
 
-  it('rechaza explícitamente el proyecto DEV aunque NODE_ENV sea test', () => {
+  it('rechaza cualquier proyecto que no sea PROD aunque NODE_ENV sea test', () => {
+    // `NODE_ENV=test` es el unico modo en el que el resto de reglas se relajan,
+    // asi que es justo donde una base equivocada podria colarse.
     const result = envSchema.validate({
       ...baseConfig,
       NODE_ENV: 'test',
       DEPLOYMENT_ENV: 'PROD',
-      EXPECTED_SUPABASE_PROJECT_REF: 'hbueraexcbowpfnjlppi',
-      SUPABASE_URL: 'https://hbueraexcbowpfnjlppi.supabase.co',
+      EXPECTED_SUPABASE_PROJECT_REF: 'qwertyuiopasdfghjklz',
+      SUPABASE_URL: 'https://qwertyuiopasdfghjklz.supabase.co',
     });
 
-    expect(result.error?.message).toContain('DEV está deshabilitado');
+    expect(result.error?.message).toContain('sólo opera wypnbcptofqdmoynlonq');
   });
 
   it('rechaza cualquier project_ref distinto de PROD en runtime', () => {

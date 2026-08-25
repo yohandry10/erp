@@ -13,11 +13,17 @@ type FlujoEfectivoData = {
   neto: number
   detalle: {
     utilidadNeta: number
+    /** Depreciación, amortización y deterioro del mes (PCGE 68). */
+    gastosNoDesembolsables: number
     variacionCxc: number
     variacionInventario: number
     variacionCxp: number
     variacionInversiones: number
     variacionFinanciamiento: number
+    /** Variación real de caja y bancos (PCGE 10) en el mes. */
+    variacionCaja: number
+    /** `neto` menos la variación real de caja. Un estado correcto cierra en cero. */
+    descuadre: number
   }
 }
 
@@ -74,12 +80,23 @@ export function FlujoEfectivo({ anio, mes }: FlujoEfectivoProps) {
   ]
   const details = [
     ['Utilidad neta', data.detalle.utilidadNeta],
+    // El método indirecto devuelve a la utilidad lo que no movió dinero. Sin
+    // esta línea el estado no cuadra con la caja y no se ve por qué.
+    ['Depreciación y provisiones del mes', data.detalle.gastosNoDesembolsables],
     ['Variación de cuentas por cobrar', data.detalle.variacionCxc],
     ['Variación de inventarios', data.detalle.variacionInventario],
     ['Variación de cuentas por pagar', data.detalle.variacionCxp],
     ['Variación de inversiones', data.detalle.variacionInversiones],
     ['Variación de financiamiento', data.detalle.variacionFinanciamiento],
+    ['Variación real de caja y bancos', data.detalle.variacionCaja],
   ] as const
+
+  // La prueba ácida del estado: lo que dice que se movió tiene que ser lo que de
+  // verdad se movió en caja. Un descuadre no es un aviso genérico, es un importe
+  // concreto que falta por clasificar, y callarlo deja firmar un estado que no
+  // cierra.
+  const descuadre = Number(data.detalle.descuadre ?? 0)
+  const cuadra = Math.abs(descuadre) < 0.005
 
   return (
     <div className="space-y-5">
@@ -115,9 +132,18 @@ export function FlujoEfectivo({ anio, mes }: FlujoEfectivoProps) {
         </CardContent>
       </Card>
 
-      <p className="rounded-lg border border-amber-400/25 bg-amber-400/5 px-4 py-3 text-xs leading-5 text-amber-700 dark:text-amber-200">
-        Flujo indirecto operativo: usa utilidad neta y variaciones mensuales de capital de trabajo. Debe conciliarse con bancos antes de emitir un estado financiero firmado.
-      </p>
+      {cuadra ? (
+        <p className="rounded-lg border border-emerald-400/25 bg-emerald-400/5 px-4 py-3 text-xs leading-5 text-emerald-700 dark:text-emerald-200">
+          El estado cuadra con la variación real de caja y bancos del período.
+        </p>
+      ) : (
+        <p className="rounded-lg border border-rose-400/30 bg-rose-400/5 px-4 py-3 text-xs leading-5 text-rose-700 dark:text-rose-200">
+          <strong>El estado no cuadra con la caja por {formatCurrency(descuadre)}.</strong>{' '}
+          El flujo neto dice {formatCurrency(data.neto)} y caja y bancos se movieron{' '}
+          {formatCurrency(data.detalle.variacionCaja)}. Falta clasificar esa diferencia
+          antes de emitir un estado financiero firmado.
+        </p>
+      )}
     </div>
   )
 }

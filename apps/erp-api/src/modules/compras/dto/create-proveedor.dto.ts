@@ -66,6 +66,19 @@ export class CreateProveedorDto {
   @Min(0, { message: 'El límite de crédito no puede ser negativo' })
   limite_credito?: number;
 
+  @ApiPropertyOptional({
+    description:
+      'Fecha hasta la que rige la constancia de suspensión de retenciones de cuarta categoría. ' +
+      'Mientras esté vigente no se retiene el 8 % de sus recibos por honorarios. ' +
+      'Cadena vacía para retirarla: la suspensión caduca cada año.',
+    example: '2026-12-31',
+  })
+  @IsOptional()
+  @Matches(/^(\d{4}-\d{2}-\d{2})?$/, {
+    message: 'La suspensión debe ser una fecha AAAA-MM-DD, o vacío para retirarla',
+  })
+  suspension_retencion_cuarta_hasta?: string;
+
   @ApiPropertyOptional({ description: 'Días de crédito otorgados', example: 30, default: 0 })
   @IsOptional()
   @IsNumber({}, { message: 'Los días de crédito deben ser un número' })

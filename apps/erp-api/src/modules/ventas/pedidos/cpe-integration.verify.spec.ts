@@ -2,6 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CPEIntegrationService } from './cpe-integration.service';
 import { CpeService } from '../../cpe/cpe.service';
+import { SucursalesService } from '../../cpe/../sucursales/sucursales.service';
 import { FiscalAdapterService } from '../../cpe/fiscal-adapter.service';
 import { SunatFiscalService } from '../../fiscal/sunat-fiscal.service';
 import { DianFiscalService } from '../../fiscal/dian-fiscal.service';
@@ -64,6 +65,10 @@ describe('CPE Integration Verification', () => {
             providers: [
                 CPEIntegrationService,
                 CpeService,
+                {
+                    provide: SucursalesService,
+                    useValue: { codigoEstablecimientoDeSerie: jest.fn().mockResolvedValue('0000') },
+                },
                 {
                     provide: FiscalAdapterService,
                     useValue: mockFiscalAdapter,
