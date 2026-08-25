@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-24.
+Actualizado: 2026-08-25.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
@@ -8,17 +8,23 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **PROD está en `510`.** La `510` pone el mecanismo de tasas de detracción:
-  catálogo de códigos SPOT con tasa y vigencia, `codigo_detraccion` en la cuenta
-  por pagar, y un contraste que **compara sin imponer** —hay operaciones con
-  reglas especiales y el contador tiene que poder apartarse a sabiendas, pero no
-  sin enterarse—. **El catálogo se entrega vacío y es deliberado**: las tasas las
-  fija SUNAT por resolución y cargarlas de memoria sería escribir números que
-  nadie verificó contra la fuente; una detracción mal depositada es multa más
-  pérdida del crédito fiscal. Con el catálogo vacío el sistema se comporta
-  exactamente como antes, y el verificador comprueba justamente eso primero.
-  **Pendiente para el contador**: cargar `public.tasas_detraccion` contra el
-  anexo vigente.
+- **PROD está en `511`.** La `510` puso el mecanismo de tasas de detracción
+  —catálogo de códigos SPOT con tasa y vigencia, `codigo_detraccion` en la cuenta
+  por pagar, y un contraste que **compara sin imponer**, porque hay operaciones
+  con reglas especiales y el contador tiene que poder apartarse a sabiendas, pero
+  no sin enterarse— y la `511` **carga el catálogo**: 35 códigos leídos de los
+  apéndices publicados en `orientacion.sunat.gob.pe`, con anexo, tasa e importe
+  mínimo. El `044` queda fuera porque figura como no vigente y ponerle cualquier
+  tasa sería inventarla. Ya no hay nada pendiente para el contador aquí; lo que
+  sigue siendo suyo es revisar la carga cuando SUNAT publique una resolución
+  nueva.
+
+  Cargar el catálogo destapó dos defectos que con la tabla vacía no se veían: el
+  contraste no miraba el **importe mínimo**, así que una compra de 590 soles
+  —que no lleva detracción— habría salido señalada por no declarar una que no le
+  toca; y los códigos no se normalizaban a tres dígitos, de modo que un `37`
+  tecleado sin el cero no lo encontraba nadie. Los dos van corregidos en la
+  `511`.
 
 - **PROD estuvo en `509`.** Continuación de la auditoría contable, por puntos y con
   verificador comprobado en rojo en cada uno. La `507` añade la **prorrata del
@@ -770,6 +776,14 @@ Cambios recientes principales:
   detenerse si el preflight del backfill `490→492` encuentra un evento laboral
   sin snapshot contable inequívoco; el runtime nuevo exige esquema `496` y no
   debe desplegarse antes que la base.
+- `497..511`: aplicadas y registradas en PROD. Cubren el respaldo peruano del
+  esquema (`500`), las sucursales como establecimiento anexo y su herencia en
+  las operaciones (`503..505`), y la auditoría contable por puntos —prorrata del
+  crédito fiscal (`507`), retención de cuarta categoría (`508`), estimación de
+  cobranza dudosa (`509`) y tasas de detracción con su carga (`510`, `511`)—.
+  Cada una con su verificador comprobado en rojo antes de aplicarse.
+  `REQUIRED_DATABASE_SCHEMA_VERSION` vale `511` en `render.yaml` y en
+  `.github/workflows/ci.yml`; los dos tienen que moverse a la vez.
 
 ## Flujos cerrados técnicamente
 
@@ -813,6 +827,20 @@ productivo autorizado.
 
 ## Decisiones e invariantes vigentes
 
+- **Hay tablas que el rol del API no puede escribir directamente, y es
+  deliberado.** `centros_costo`, `periodos_contables`, `tipos_cambio`,
+  `financial_master_operations`, `outbox_events` y las de operaciones atómicas
+  tienen el `INSERT/UPDATE/DELETE` revocado a `service_role` (migraciones `477`,
+  `482` y siguientes): la única entrada es la función `SECURITY DEFINER`, que
+  registra la operación, la hace idempotente y comprueba el autor. Un
+  `permission denied` sobre una de ellas **no es un privilegio olvidado**: es el
+  contrato funcionando. La respuesta correcta es llamar a la RPC, nunca ampliar
+  el `GRANT`.
+- **El autor de un maestro contable tiene que ser un usuario activo del propio
+  contribuyente.** Lo exige `assert_financial_master_actor_477`, que rechaza
+  nulos y centinelas. Un proceso desatendido no puede inventarse un autor: tiene
+  que resolver una persona real —el contador, y si no lo hay el administrador— o
+  no escribir.
 - `producto_existencias` es la fuente física de stock por almacén.
 - `aplicar_movimiento_inventario_tx` es el writer canónico de movimientos.
 - POS deriva `almacen_id` de la caja de la sesión.
