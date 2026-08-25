@@ -86,6 +86,14 @@ try {
     assert.equal(huellaIntencionVenta(a), huellaIntencionVenta(b))
   })
 
+  check('false conserva la huella pre-518 y true sí la cambia', () => {
+    const ausente = intencionBase()
+    const desactivado = { ...intencionBase(), redondeoEfectivoLegal: false }
+    const activado = { ...intencionBase(), redondeoEfectivoLegal: true }
+    assert.equal(huellaIntencionVenta(ausente), huellaIntencionVenta(desactivado))
+    assert.notEqual(huellaIntencionVenta(ausente), huellaIntencionVenta(activado))
+  })
+
   check('cambiar la cantidad genera clave nueva y evita el mismatch del servidor', () => {
     contador = 0
     const primera = resolverIntencionVenta(null, intencionBase(), generarClave)
@@ -106,6 +114,7 @@ try {
     ['un producto', (i) => { i.items[1].productoId = 'p-9' }],
     ['el precio', (i) => { i.items[0].precioUnitario = 30 }],
     ['los pagos mixtos', (i) => { i.pagos = [{ metodoPagoId: 'mp-1', monto: 56.5, referencia: '' }] }],
+    ['el redondeo legal de efectivo', (i) => { i.redondeoEfectivoLegal = true }],
   ]) {
     check(`cambiar ${campo} cambia la huella`, () => {
       const modificada = intencionBase()

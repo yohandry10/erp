@@ -1,18 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Info, Unlock, WalletCards } from 'lucide-react';
+import { Info, KeyRound, Unlock, WalletCards } from 'lucide-react';
 import { CashSessionSelector } from './components/CashSessionSelector';
 import { ActiveCashSession } from './components/ActiveCashSession';
 import { CashOpenDialog } from './components/CashOpenDialog';
 import { CortesList } from './components/CortesList';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermission } from '@/hooks/use-permission';
+import { SupervisorPinDialog } from './components/SupervisorPinDialog';
 
 export default function CashManagementPage() {
     const { toast } = useToast();
     const [sesionActiva, setSesionActiva] = useState<any | null>(null);
     const [showOpenDialog, setShowOpenDialog] = useState(false);
+    const [showSupervisorPinDialog, setShowSupervisorPinDialog] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const { hasPermission: canManageSupervisorPins } = usePermission('users', 'manage', '');
 
     const handleSessionSelect = (sesion: any) => {
         setSesionActiva(sesion);
@@ -49,9 +53,19 @@ export default function CashManagementPage() {
                         Administración de turnos, movimientos y cierres
                     </p>
                 </div>
-                {!sesionActiva && (
-                    <button
-                        onClick={() => setShowOpenDialog(true)} className="flex cursor-pointer items-center gap-2 rounded-xl border border-primary bg-primary px-6 py-3 text-base font-semibold text-primary-foreground shadow transition hover:bg-primary/90 sm:px-8 sm:py-4"
+                <div className="flex flex-wrap items-center gap-3">
+                    {canManageSupervisorPins && (
+                        <button
+                            type="button"
+                            onClick={() => setShowSupervisorPinDialog(true)}
+                            className="flex cursor-pointer items-center gap-2 rounded-xl border bg-background px-5 py-3 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent"
+                        >
+                            <KeyRound className="size-5" aria-hidden="true" /> Gestionar PIN supervisor
+                        </button>
+                    )}
+                    {!sesionActiva && (
+                        <button
+                            onClick={() => setShowOpenDialog(true)} className="flex cursor-pointer items-center gap-2 rounded-xl border border-primary bg-primary px-6 py-3 text-base font-semibold text-primary-foreground shadow transition hover:bg-primary/90 sm:px-8 sm:py-4"
                         onMouseEnter={(e) => {
                             e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
                             e.currentTarget.style.boxShadow = '0 25px 50px -12px rgb(0 0 0 / 0.25)';
@@ -60,10 +74,11 @@ export default function CashManagementPage() {
                             e.currentTarget.style.transform = 'translateY(0) scale(1)';
                             e.currentTarget.style.boxShadow = '0 10px 15px -3px rgb(0 0 0 / 0.1)';
                         }}
-                    >
-                        <Unlock className="size-5" aria-hidden="true" /> Abrir Nueva Caja
-                    </button>
-                )}
+                        >
+                            <Unlock className="size-5" aria-hidden="true" /> Abrir Nueva Caja
+                        </button>
+                    )}
+                </div>
             </div>
 
             {!sesionActiva ? (
@@ -107,6 +122,10 @@ export default function CashManagementPage() {
                 isOpen={showOpenDialog}
                 onClose={() => setShowOpenDialog(false)}
                 onSuccess={handleOpenSuccess}
+            />
+            <SupervisorPinDialog
+                open={showSupervisorPinDialog}
+                onOpenChange={setShowSupervisorPinDialog}
             />
         </div>
     );

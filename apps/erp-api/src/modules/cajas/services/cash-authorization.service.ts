@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { requiereSupervisorParaDiferenciaCaja } from '../cash-rounding.util';
 
 export interface ConfiguracionCaja {
     monto_apertura_min: number;
@@ -44,7 +45,10 @@ export class CashAuthorizationService {
                 monto_apertura_max: 2000,
                 retiro_max_sin_autorizacion: 500,
                 saldo_minimo_operativo: 50,
-                tolerancia_diferencia_cierre: 10,
+                // `cerrar_caja_tx` cae a cero cuando no hay configuración. El
+                // precheck Node debe ser igual de estricto; usar 10 aquí hacía
+                // que la UI prometiera cierres que la RPC luego rechazaba.
+                tolerancia_diferencia_cierre: 0,
             };
         }
 
@@ -140,10 +144,18 @@ export class CashAuthorizationService {
         supervisorId?: string,
         codigoAutorizacion?: string,
     ): Promise<{ requiere_autorizacion: boolean; mensaje?: string }> {
-        const config = await this.obtenerConfiguracion(tenantId);
-        const moneda = await this.obtenerMonedaTenant(tenantId);
+        const [config, contexto] = await Promise.all([
+            this.obtenerConfiguracion(tenantId),
+            this.obtenerContextoMonetarioTenant(tenantId),
+        ]);
+        const { moneda, pais } = contexto;
 
-        if (Math.abs(diferencia) <= config.tolerancia_diferencia_cierre) {
+        if (!requiereSupervisorParaDiferenciaCaja(
+            diferencia,
+            config.tolerancia_diferencia_cierre,
+            pais,
+            moneda,
+        )) {
             return { requiere_autorizacion: false };
         }
 
@@ -167,13 +179,26 @@ export class CashAuthorizationService {
     }
 
     async obtenerMonedaTenant(tenantId: string): Promise<string> {
-        const { data } = await this.supabase
+        return (await this.obtenerContextoMonetarioTenant(tenantId)).moneda;
+    }
+
+    private async obtenerContextoMonetarioTenant(
+        tenantId: string,
+    ): Promise<{ pais: string; moneda: string }> {
+        const { data, error } = await this.supabase
             .getClient()
             .from('empresa_config')
-            .select('moneda_defecto')
+            .select('pais, moneda_defecto')
             .eq('tenant_id', tenantId)
             .maybeSingle();
-        return String(data?.moneda_defecto || 'PEN').toUpperCase();
+
+        // La moneda conserva el fallback histórico sólo para formatear mensajes.
+        // El país, en cambio, queda vacío si no pudo resolverse: la excepción
+        // peruana nunca debe habilitarse por defecto ni alcanzar otro país.
+        return {
+            pais: error ? '' : String(data?.pais || '').trim().toUpperCase(),
+            moneda: String(data?.moneda_defecto || 'PEN').trim().toUpperCase(),
+        };
     }
 
     private formatearMonto(monto: number, moneda: string): string {
@@ -217,22 +242,50 @@ export class CashAuthorizationService {
         codigo: string,
         tenantId: string,
     ): Promise<void> {
-        // Verificar que el usuario tenga rol de supervisor o admin
-        const { data: supervisorRoles } = await this.supabase.getClient()
+        const client = this.supabase.getClient();
+        const { data: supervisor, error: supervisorError } = await client
+            .from('usuarios_sistema')
+            .select('id, activo, estado, is_super_admin')
+            .eq('id', supervisorId)
+            .eq('tenant_id', tenantId)
+            .maybeSingle();
+
+        if (
+            supervisorError
+            || !supervisor
+            || supervisor.activo !== true
+            || String(supervisor.estado || 'ACTIVO').trim().toUpperCase() !== 'ACTIVO'
+        ) {
+            throw new UnauthorizedException('El supervisor no está activo para este tenant');
+        }
+
+        // Debe coincidir con `app.cash_actor_is_supervisor_474`, que es la
+        // autoridad final dentro de la transacción de cierre.
+        const { data: supervisorRoles, error: rolesError } = await client
             .from('user_roles')
-            .select('roles(nombre)')
+            .select('roles(nombre, activo, tenant_id)')
             .eq('usuario_sistema_id', supervisorId)
             .eq('tenant_id', tenantId);
 
+        if (rolesError) {
+            throw new UnauthorizedException('No se pudieron verificar los permisos del supervisor');
+        }
+
         const roleNames = (supervisorRoles || [])
-            .map((ur: any) => (ur.roles as any)?.nombre?.toUpperCase())
+            .map((ur: any) => ur.roles as any)
+            .filter((rol: any) => (
+                rol?.activo === true
+                && rol?.tenant_id === tenantId
+            ))
+            .map((rol: any) => rol?.nombre?.toUpperCase())
             .filter(Boolean);
 
-        if (!roleNames.some((r: string) => ['SUPERVISOR', 'ADMIN'].includes(r))) {
+        const rolesAutorizados = ['ADMIN', 'ADMINISTRADOR', 'SUPERADMIN', 'SUPERVISOR'];
+        if (!supervisor.is_super_admin && !roleNames.some((r: string) => rolesAutorizados.includes(r))) {
             throw new UnauthorizedException('El usuario no tiene permisos de supervisor');
         }
 
-        const { data, error } = await this.supabase.getClient().rpc('verificar_pin_supervisor_tx', {
+        const { data, error } = await client.rpc('verificar_pin_supervisor_tx', {
             p_tenant_id: tenantId,
             p_usuario_id: supervisorId,
             p_pin: String(codigo ?? ''),

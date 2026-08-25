@@ -705,6 +705,99 @@ describe('AsientosGeneratorService', () => {
         expect.objectContaining({ cuenta_id: 'cuenta-10111', debe: 0, haber: 5.25 }),
       ]));
     });
+
+    it('contabiliza el redondeo legal PE sin etiquetarlo como faltante del cajero', async () => {
+      periodosService.validarPeriodoAbierto.mockResolvedValue();
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['10', createMockPlanCuenta('10', 'Caja y bancos', 'ACTIVO')],
+        ['65', createMockPlanCuenta('65', 'Otros gastos', 'GASTO')],
+        ['75', createMockPlanCuenta('75', 'Otros ingresos', 'INGRESO')],
+      ]));
+      planCuentasService.buscarCuentaPorCodigoONombre.mockResolvedValue(
+        createMockPlanCuenta('10111', 'Caja principal', 'ACTIVO'),
+      );
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { id: 'asiento-redondeo-1', total_debe: 0.04, total_haber: 0.04 },
+        error: null,
+      });
+
+      await service.generarAsientoCierreCaja({
+        tenant_id: 'test-tenant-id',
+        fecha: '2026-08-25T18:00:00Z',
+        diferencia: -0.04,
+        tipo_diferencia: 'REDONDEO_EFECTIVO_LEGAL',
+        redondeo_efectivo_legal: true,
+        referencia: 'CIERRE-CAJA-redondeo',
+        cuenta_caja_codigo: '10111',
+      });
+
+      const rpc = mockSupabaseClient.rpc.mock.calls.find(
+        ([fn]: [string]) => fn === 'crear_asiento_con_detalles_tx',
+      );
+      expect(rpc?.[1].p_asiento?.concepto).toBe('Redondeo legal de efectivo');
+      expect(rpc?.[1].p_detalles).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          cuenta_id: 'cuenta-65',
+          debe: 0.04,
+          concepto: 'Redondeo legal de pago en efectivo',
+        }),
+        expect.objectContaining({
+          cuenta_id: 'cuenta-10111',
+          haber: 0.04,
+          concepto: 'Menor efectivo por redondeo legal',
+        }),
+      ]));
+      expect(JSON.stringify(rpc?.[1].p_detalles)).not.toContain('faltante');
+    });
+
+    it('no duplica el asiento del cierre cuando se reentrega el mismo event_id', async () => {
+      const eventId = '51800000-0000-4000-8000-000000000001';
+      const asientoCreado = {
+        id: 'asiento-redondeo-idempotente-518',
+        tenant_id: 'test-tenant-id',
+        total_debe: 0.04,
+        total_haber: 0.04,
+        source_event_id: eventId,
+      };
+      periodosService.validarPeriodoAbierto.mockResolvedValue();
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(new Map([
+        ['10', createMockPlanCuenta('10', 'Caja y bancos', 'ACTIVO')],
+        ['65', createMockPlanCuenta('65', 'Otros gastos', 'GASTO')],
+        ['75', createMockPlanCuenta('75', 'Otros ingresos', 'INGRESO')],
+      ]));
+      planCuentasService.buscarCuentaPorCodigoONombre.mockResolvedValue(
+        createMockPlanCuenta('10111', 'Caja principal', 'ACTIVO'),
+      );
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } })
+        .mockResolvedValueOnce({ data: asientoCreado, error: null })
+        .mockResolvedValueOnce({ data: asientoCreado, error: null })
+        .mockResolvedValueOnce({ data: asientoCreado, error: null });
+
+      const evento = {
+        tenant_id: 'test-tenant-id',
+        fecha: '2026-08-25T18:00:00Z',
+        diferencia: -0.04,
+        tipo_diferencia: 'REDONDEO_EFECTIVO_LEGAL',
+        redondeo_efectivo_legal: true,
+        referencia: 'CIERRE-CAJA-idempotente-518',
+        cuenta_caja_codigo: '10111',
+        event_id: eventId,
+      };
+
+      await expect(service.generarAsientoCierreCaja(evento)).resolves.toEqual(asientoCreado);
+      await expect(service.generarAsientoCierreCaja(evento)).resolves.toEqual(asientoCreado);
+
+      expect(mockSupabaseClient.rpc.mock.calls.filter(
+        ([fn]: [string]) => fn === 'crear_asiento_con_detalles_tx',
+      )).toHaveLength(1);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_asiento_con_detalles_tx',
+        expect.objectContaining({
+          p_asiento: expect.objectContaining({ source_event_id: eventId }),
+        }),
+      );
+    });
   });
 
   describe('generarAsientoCobro', () => {

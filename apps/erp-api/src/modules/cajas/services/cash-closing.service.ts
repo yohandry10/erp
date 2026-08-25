@@ -1,10 +1,15 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import {
+    Injectable,
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+    Logger,
+} from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CashMovementsService } from './cash-movements.service';
 import {
     CashReconciliationService,
     Denominaciones,
-    ResultadoCierre,
 } from './cash-reconciliation.service';
 import { CashAuthorizationService } from './cash-authorization.service';
 import { CashAuditService, CashAuditEvent } from './cash-audit.service';
@@ -58,6 +63,54 @@ export class CashClosingService {
         private readonly authService: CashAuthorizationService,
         private readonly auditService: CashAuditService,
     ) { }
+
+    private async ejecutarCierreAtomico(
+        sesionId: string,
+        datos: DatosCierre,
+        userId: string,
+        tenantId: string,
+        supervisorId?: string,
+        codigoAutorizacion?: string,
+    ): Promise<SesionCajaCerrada> {
+        const { data: sesionCerrada, error: cierreError } = await this.supabase
+            .getClient()
+            .rpc('cerrar_caja_tx', {
+                p_tenant_id: tenantId,
+                p_sesion_id: sesionId,
+                p_actor_id: userId,
+                p_payload: {
+                    monto_contado: datos.monto_contado,
+                    denominaciones: datos.denominaciones || {},
+                    notas: datos.notas || null,
+                    supervisor_id: supervisorId || null,
+                    codigo_autorizacion: supervisorId ? codigoAutorizacion || null : null,
+                    cierre_administrativo: false,
+                },
+            });
+
+        if (cierreError || !sesionCerrada) {
+            this.logger.error(`Error cerrando sesión: ${cierreError?.message}`, cierreError);
+            throw new BadRequestException(
+                `Error al cerrar caja: ${cierreError?.message || 'respuesta vacía'}`,
+            );
+        }
+
+        const rechazo = sesionCerrada as {
+            success?: boolean;
+            error_code?: string;
+            message?: string;
+        };
+        if (rechazo.success === false || rechazo.error_code) {
+            this.logger.warn(
+                `Writer rechazó autorización de cierre: ${rechazo.error_code || 'SIN_CODIGO'}`,
+            );
+            throw new BadRequestException(
+                rechazo.message || 'No se pudo acreditar al supervisor para este cierre',
+            );
+        }
+
+        return sesionCerrada as SesionCajaCerrada;
+    }
 
     /**
      * Valida que una sesión esté lista para cerrar
@@ -213,6 +266,28 @@ export class CashClosingService {
         const moneda = await this.authService.obtenerMonedaTenant?.(tenantId) || 'PEN';
         this.logger.log(`Cerrando caja: sesión=${sesionId}, monto contado=${moneda} ${datos.monto_contado}`);
 
+        // Un timeout puede ocultar que el primer request sí confirmó el cierre.
+        // En ese caso no repetimos precierre, preview ni PIN (podrían haber
+        // cambiado después): delegamos inmediatamente al replay autenticado del
+        // writer, que compara actor + fingerprint y no duplica efectos.
+        const { data: estadoSesion } = await this.supabase
+            .getClient()
+            .from('sesiones_caja')
+            .select('id, estado')
+            .eq('id', sesionId)
+            .eq('tenant_id', tenantId)
+            .single();
+        if (String(estadoSesion?.estado || '').trim().toUpperCase() === 'CERRADA') {
+            return this.ejecutarCierreAtomico(
+                sesionId,
+                datos,
+                userId,
+                tenantId,
+                supervisorId,
+                codigoAutorizacion,
+            );
+        }
+
         // Validación 1: Pre-cierre
         const validacionPrecierre = await this.validarPrecierre(sesionId, tenantId);
         if (!validacionPrecierre.valido) {
@@ -243,41 +318,74 @@ export class CashClosingService {
             tenantId,
         );
 
-        // Validación 3: Si diferencia > tolerancia, requiere supervisor
-        if (resultadoCierre.requiere_supervisor) {
-            const validacionAuth = await this.authService.validarDiferenciaCierre(
-                resultadoCierre.diferencia,
-                tenantId,
+        // Validación 3: la conciliación ya tomó la decisión con el mismo
+        // contrato que el writer. No se vuelve a calcular la tolerancia aquí:
+        // una segunda decisión podía divergir por configuración específica de
+        // caja y terminar enviando un supervisor cuyo PIN nunca se verificó.
+        const suministroAutorizacion = Boolean(supervisorId || codigoAutorizacion);
+        if (resultadoCierre.requiere_supervisor && !suministroAutorizacion) {
+            throw new BadRequestException(
+                `La diferencia de cierre (${moneda} ${resultadoCierre.diferencia.toFixed(2)}) requiere autorización de supervisor.`,
+            );
+        }
+
+        // Un supervisor suministrado nunca es metadata opcional. Se acredita
+        // siempre en Node y se vuelve a acreditar dentro del writer SQL, aun si
+        // el preview indicó que la diferencia estaba dentro de tolerancia. La
+        // segunda comprobación elimina la carrera con rotación de PIN/rol.
+        if (suministroAutorizacion) {
+            if (!supervisorId || !codigoAutorizacion) {
+                throw new BadRequestException(
+                    'La autorización de cierre requiere supervisor y PIN completos.',
+                );
+            }
+
+            if (supervisorId === userId) {
+                throw new ForbiddenException(
+                    'El supervisor que autoriza no puede ser el mismo cajero que cierra',
+                );
+            }
+
+            // El actor puede ser un administrador cerrando la sesión de otro
+            // cajero. En ese caso comparar sólo contra userId permite que el
+            // propio responsable de la caja se "supervise" a sí mismo. SQL lo
+            // vuelve a exigir bajo el lock; este chequeo anticipa el error.
+            const { data: sesionResponsable, error: sesionResponsableError } =
+                await this.supabase
+                    .getClient()
+                    .from('sesiones_caja')
+                    .select('cajero_id, usuario_id')
+                    .eq('id', sesionId)
+                    .eq('tenant_id', tenantId)
+                    .maybeSingle();
+            if (sesionResponsableError || !sesionResponsable) {
+                throw new BadRequestException(
+                    'No se pudo acreditar al responsable vigente de la sesión',
+                );
+            }
+            const cajeroResponsable = sesionResponsable.cajero_id
+                || sesionResponsable.usuario_id;
+            if (cajeroResponsable && supervisorId === cajeroResponsable) {
+                throw new ForbiddenException(
+                    'El supervisor que autoriza debe ser distinto del cajero responsable',
+                );
+            }
+
+            await this.authService.validarAutorizacionSupervisor(
                 supervisorId,
                 codigoAutorizacion,
-            );
-
-            if (validacionAuth.requiere_autorizacion) {
-                throw new BadRequestException(validacionAuth.mensaje);
-            }
-        }
-
-        const { data: sesionCerrada, error: cierreError } = await this.supabase
-            .getClient()
-            .rpc('cerrar_caja_tx', {
-                p_tenant_id: tenantId,
-                p_sesion_id: sesionId,
-                p_actor_id: userId,
-                p_payload: {
-                    monto_contado: datos.monto_contado,
-                    denominaciones: datos.denominaciones || {},
-                    notas: datos.notas || null,
-                    supervisor_id: supervisorId || null,
-                    cierre_administrativo: false,
-                },
-            });
-
-        if (cierreError || !sesionCerrada) {
-            this.logger.error(`Error cerrando sesión: ${cierreError?.message}`, cierreError);
-            throw new BadRequestException(
-                `Error al cerrar caja: ${cierreError?.message || 'respuesta vacía'}`,
+                tenantId,
             );
         }
+
+        const sesionCerrada = await this.ejecutarCierreAtomico(
+            sesionId,
+            datos,
+            userId,
+            tenantId,
+            supervisorId,
+            codigoAutorizacion,
+        );
 
         if (Math.abs(Number(sesionCerrada.diferencia ?? 0)) > 0.009) {
             try {
