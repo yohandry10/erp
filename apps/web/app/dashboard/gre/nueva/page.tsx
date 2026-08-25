@@ -58,7 +58,11 @@ function NuevaGreContent() {
 
   const loadPedido = useCallback(async () => {
     if (!pedidoId) {
-      setError('Seleccione un pedido origen para generar la GRE.')
+      setError(
+        'Una guía de remisión se emite contra un pedido: es de ahí de donde salen ' +
+          'el destinatario, los bultos y el punto de partida. Abra el pedido que va a ' +
+          'despachar y genere la guía desde él.',
+      )
       setLoading(false)
       return
     }
@@ -147,8 +151,15 @@ function NuevaGreContent() {
           {error || 'No se pudo preparar la GRE.'}
         </div>
         <Button
+          onClick={() => router.push('/dashboard/ventas/pedidos')}
+          className="w-fit gap-2 bg-blue-600 text-white hover:bg-blue-500"
+        >
+          Ver pedidos
+        </Button>
+        <Button
+          variant="outline"
           onClick={() => router.push('/dashboard/gre')}
-          className="w-fit gap-2 bg-cyan-400 text-foreground hover:bg-cyan-300"
+          className="w-fit gap-2 border-cyan-400/20 bg-white/5 text-primary hover:bg-white/10"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver a GRE

@@ -239,7 +239,7 @@ export default function PresupuestoForm({
           <select id="presupuesto-form-centro-costo-id"
             value={formData.centro_costo_id}
             onChange={(e) => setFormData({ ...formData, centro_costo_id: e.target.value })}
-            disabled={!!presupuestoId}
+            disabled={!!presupuestoId || centrosCosto.length === 0}
             required className="w-[100%] p-3 border rounded-lg text-[0.875rem]"
           >
             <option value="">Seleccione un centro de costo</option>
@@ -249,6 +249,22 @@ export default function PresupuestoForm({
               </option>
             ))}
           </select>
+          {/* Sin centros de costo el formulario es un callejon sin salida: el campo
+              es obligatorio y no hay nada que elegir. Antes no lo decia. */}
+          {centrosCosto.length === 0 && !presupuestoId && (
+            <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/5 p-3 text-sm">
+              <p className="text-amber-300">
+                Todavía no hay centros de costo, y un presupuesto se hace siempre contra uno.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/contabilidad/centros-costo/nuevo')}
+                className="mt-2 inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+              >
+                Crear un centro de costo
+              </button>
+            </div>
+          )}
           {presupuestoId && (
             <p className="mt-2 text-xs text-[var(--primary-500)]">
               No se puede cambiar el centro de costo al editar
