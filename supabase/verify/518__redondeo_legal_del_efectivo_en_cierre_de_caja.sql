@@ -737,6 +737,23 @@ BEGIN
      OR has_table_privilege('service_role', 'public.supervisor_pin_rotaciones_518', 'DELETE') THEN
     RAISE EXCEPTION 'VERIFY_518: operaciones PIN no son privadas/RLS forzado';
   END IF;
+  IF (
+    SELECT count(*)
+    FROM pg_policy p
+    JOIN pg_class c ON c.oid = p.polrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname IN (
+        'ajustes_redondeo_efectivo_pos',
+        'supervisor_pin_rotaciones_518'
+      )
+      AND p.polname = 'service_only_no_direct_access_518'
+      AND p.polcmd = '*'
+      AND pg_get_expr(p.polqual, p.polrelid) = 'false'
+      AND pg_get_expr(p.polwithcheck, p.polrelid) = 'false'
+  ) <> 2 THEN
+    RAISE EXCEPTION 'VERIFY_518: tablas privadas sin política deny-all explícita';
+  END IF;
   IF has_function_privilege('anon', 'public.cerrar_caja_tx(uuid,uuid,uuid,jsonb)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.cerrar_caja_tx(uuid,uuid,uuid,jsonb)', 'EXECUTE')
      OR NOT has_function_privilege('service_role', 'public.cerrar_caja_tx(uuid,uuid,uuid,jsonb)', 'EXECUTE')

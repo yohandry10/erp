@@ -100,6 +100,13 @@ CREATE TABLE IF NOT EXISTS public.supervisor_pin_rotaciones_518 (
 
 ALTER TABLE public.supervisor_pin_rotaciones_518 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.supervisor_pin_rotaciones_518 FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS service_only_no_direct_access_518
+  ON public.supervisor_pin_rotaciones_518;
+CREATE POLICY service_only_no_direct_access_518
+  ON public.supervisor_pin_rotaciones_518
+  FOR ALL TO PUBLIC
+  USING (false)
+  WITH CHECK (false);
 REVOKE ALL ON TABLE public.supervisor_pin_rotaciones_518
   FROM PUBLIC, anon, authenticated, service_role;
 
@@ -108,6 +115,13 @@ CREATE INDEX IF NOT EXISTS ix_ajuste_redondeo_efectivo_pos_sesion
 
 ALTER TABLE public.ajustes_redondeo_efectivo_pos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ajustes_redondeo_efectivo_pos FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS service_only_no_direct_access_518
+  ON public.ajustes_redondeo_efectivo_pos;
+CREATE POLICY service_only_no_direct_access_518
+  ON public.ajustes_redondeo_efectivo_pos
+  FOR ALL TO PUBLIC
+  USING (false)
+  WITH CHECK (false);
 REVOKE ALL ON TABLE public.ajustes_redondeo_efectivo_pos
   FROM PUBLIC, anon, authenticated, service_role;
 
