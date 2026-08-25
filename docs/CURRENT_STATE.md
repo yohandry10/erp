@@ -41,7 +41,35 @@ migraciones verificados, prevalece la implementación actual.
   decir otra cosa—, y la estimación de cobranza dudosa tiene botón en los
   periodos abiertos.
 
-- **PROD está en `514`.** La `510` puso el mecanismo de tasas de detracción
+- **Las claves ajenas duplicadas rompían PostgREST, y arreglarlas rompió
+  producción.** Había 45 pares de tablas con la misma clave ajena declarada dos
+  veces. PostgREST no resuelve un embed cuando hay más de una relación entre dos
+  tablas: respondía `PGRST201`, y por eso **no se podía crear una devolución**
+  —`/ventas/rma/candidatos` no listaba pedidos—. La `515` retira 23, sólo las
+  que se comportan igual; las de `tenant_id` se dejan intactas a propósito,
+  porque ahí una dice `CASCADE` y otra `NO ACTION` y quitar una cambiaría qué
+  ocurre al borrar un contribuyente.
+
+  Al retirarlas se rompió el listado de recepciones en caliente. La causa vale
+  más que el arreglo: **hay consultas que nombran la restricción** para
+  desambiguar el embed (`ordenes_compra!recepciones_orden_id_fkey_runtime`), y
+  siete nombraban justo la retirada. Ese nombre es una dependencia contra el
+  esquema escondida dentro de una cadena de texto: no la ve el compilador. Se
+  buscaron las consultas que fallaban *por* ambigüedad y no las que dependían
+  *del nombre*. La `516` renombra la superviviente al nombre que el código pide
+  y deja dos guardianes: el verificador `516` comprueba contra la base que
+  existan los 35 nombres que el código nombra —con control positivo—, y
+  `nombres-clave-ajena.spec.ts` regenera esa lista desde el código para que no se
+  quede vieja.
+
+- **El verificador `462` fallaba por sorteo.** Tomaba «el primer permiso por
+  `id`», que es un uuid aleatorio, y si caía sobre uno restringido para tenants
+  de demo se ponía rojo sin que nada estuviera roto: medido sobre los 70
+  contribuyentes de producción, fallaba en 6. Ahora elige excluyendo los
+  restringidos (0 de 70). No se pierde cobertura: el `493`, el `501` y el techo
+  RBAC comprueban la restricción por código, no al azar.
+
+- **PROD está en `516`.** La `510` puso el mecanismo de tasas de detracción
   —catálogo de códigos SPOT con tasa y vigencia, `codigo_detraccion` en la cuenta
   por pagar, y un contraste que **compara sin imponer**, porque hay operaciones
   con reglas especiales y el contador tiene que poder apartarse a sabiendas, pero
@@ -809,7 +837,7 @@ Cambios recientes principales:
   detenerse si el preflight del backfill `490→492` encuentra un evento laboral
   sin snapshot contable inequívoco; el runtime nuevo exige esquema `496` y no
   debe desplegarse antes que la base.
-- `497..514`: aplicadas y registradas en PROD. Cubren el respaldo peruano del
+- `497..516`: aplicadas y registradas en PROD. Cubren el respaldo peruano del
   esquema (`500`), las sucursales como establecimiento anexo y su herencia en
   las operaciones (`503..505`), y la auditoría contable por puntos —prorrata del
   crédito fiscal (`507`), retención de cuarta categoría (`508`), estimación de
@@ -874,6 +902,12 @@ productivo autorizado.
   nulos y centinelas. Un proceso desatendido no puede inventarse un autor: tiene
   que resolver una persona real —el contador, y si no lo hay el administrador— o
   no escribir.
+- **Nombrar una clave ajena en un `select` de PostgREST es una dependencia contra
+  el esquema.** `tabla!nombre_de_la_restriccion(...)` deja de funcionar si esa
+  restricción se renombra o se retira, y como vive dentro de una cadena de texto
+  no la ve el compilador ni el tipado. Los 35 nombres en uso están vigilados por
+  el verificador `516` y por `nombres-clave-ajena.spec.ts`; al añadir uno nuevo
+  hay que sumarlo a la lista o la prueba falla.
 - **Una cuenta bancaria sin `cuenta_contable_id` no puede registrar movimientos.**
   Lo exige `assert_postable_account_457`, y la cuenta tiene que ser una corriente
   operativa (`1041`, o `104` donde exista): la `1042` es la de detracciones y
