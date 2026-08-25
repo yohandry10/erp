@@ -253,6 +253,9 @@ Código principal: `apps/erp-api/src/modules/inventario`,
 ## Finanzas y tesorería
 
 - CxC y CxP gestionan saldo, vencimiento, pagos y estados.
+- Registrar cobros, aplicar notas y reprogramar una CxC exige
+  `finanzas.cxc.cobros.write`; emitir CPE es una capacidad fiscal separada y no
+  autoriza por sí sola acciones de cobranza.
 - El aging CxC es un snapshot a una fecha de corte local del tenant. Incluye
   toda deuda emitida hasta el corte aunque sea antigua, reconstruye pagos y
   reversas desde `cxc_pagos` y aplicaciones desde `saldos_favor_movimientos`,
