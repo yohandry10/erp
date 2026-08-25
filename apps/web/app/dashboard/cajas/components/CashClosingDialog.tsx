@@ -17,10 +17,26 @@ interface PreCloseValidation {
     warnings: string[];
 }
 
+interface ClosePreview {
+    saldo_teorico: number;
+    saldo_real: number;
+    diferencia: number;
+    tipo_diferencia: 'SOBRANTE' | 'FALTANTE' | 'CUADRADO' | 'REDONDEO_EFECTIVO_LEGAL';
+    requiere_supervisor: boolean;
+    requiere_justificacion: boolean;
+    redondeo_efectivo_legal: boolean;
+    redondeo_efectivo_documentado: number;
+    redondeo_efectivo_cantidad: number;
+    tolerancia: number;
+}
+
 export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: CashClosingDialogProps) {
     const country = useCountryContext();
     const currencySymbol = country.simboloMoneda || (country.paisCodigo === 'PE' ? 'S/' : '$');
-    const { get, post } = useApi();
+    // Este flujo necesita el mensaje autoritativo del backend (PIN, permiso,
+    // sesión o configuración). El modo por defecto del hook convierte errores
+    // en `null`, lo que antes reemplazaba todo por "Error al cerrar caja".
+    const { get, post } = useApi({ throwOnError: true });
     const [step, setStep] = useState<'VALIDATING' | 'COUNT' | 'REVIEW' | 'JUSTIFICATION' | 'CONFIRM'>('VALIDATING');
     const [validation, setValidation] = useState<PreCloseValidation | null>(null);
     const [denominaciones, setDenominaciones] = useState<Denominaciones>({ billetes: {}, monedas: {} });
@@ -30,14 +46,25 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
     const [notas, setNotas] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Configuración (idealmente vendría del backend)
-    const TOLERANCIA = 10;
+    const [preview, setPreview] = useState<ClosePreview | null>(null);
+    const [supervisores, setSupervisores] = useState<Array<{ id: string; nombre: string }>>([]);
+    const [supervisoresError, setSupervisoresError] = useState<string | null>(null);
+    const [supervisorId, setSupervisorId] = useState('');
+    const [codigoSupervisor, setCodigoSupervisor] = useState('');
 
     const iniciarCierre = useCallback(async () => {
         setStep('VALIDATING');
         setError(null);
         setValidation(null);
+        setPreview(null);
+        setSupervisores([]);
+        setSupervisoresError(null);
+        setSupervisorId('');
+        setCodigoSupervisor('');
+        setDenominaciones({ billetes: {}, monedas: {} });
+        setMontoContado(0);
+        setDiferencia(0);
+        setNotas('');
 
         try {
             setLoading(true);
@@ -71,16 +98,53 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
         }
     }, [iniciarCierre, isOpen, sesionId]);
 
-    const handleCountSubmit = (denom: Denominaciones, total: number) => {
+    const handleCountSubmit = async (denom: Denominaciones, total: number) => {
         setDenominaciones(denom);
         setMontoContado(total);
-        const diff = total - montoEsperado;
-        setDiferencia(diff);
+        setSupervisorId('');
+        setCodigoSupervisor('');
+        setSupervisoresError(null);
+        setError(null);
 
-        if (Math.abs(diff) > TOLERANCIA) {
-            setStep('JUSTIFICATION');
-        } else {
-            setStep('REVIEW');
+        try {
+            setLoading(true);
+            const response = await post(`/cajas/validar-cierre/${sesionId}`, {
+                monto_contado: total,
+                denominaciones: denom,
+            });
+            if (!response?.success || !response.data) {
+                throw new Error(response?.message || 'No se pudo validar el arqueo');
+            }
+
+            const result = response.data as ClosePreview;
+            setPreview(result);
+            setMontoEsperado(Number(result.saldo_teorico));
+            setDiferencia(Number(result.diferencia));
+
+            if (result.requiere_supervisor) {
+                try {
+                    const supervisoresResponse = await get(
+                        `/cajas/supervisores-autorizados/${encodeURIComponent(sesionId)}`,
+                    );
+                    const lista = supervisoresResponse?.data ?? supervisoresResponse;
+                    setSupervisoresError(null);
+                    setSupervisores(Array.isArray(lista) ? lista : []);
+                } catch {
+                    setSupervisores([]);
+                    setSupervisoresError(
+                        'No se pudo consultar a los supervisores habilitados. Reintente antes de cerrar.',
+                    );
+                }
+            } else {
+                setSupervisores([]);
+            }
+
+            setStep(result.requiere_justificacion ? 'JUSTIFICATION' : 'REVIEW');
+        } catch (err: any) {
+            setError(err?.message || 'No se pudo validar el arqueo');
+            setStep('COUNT');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -102,7 +166,12 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
                 monto_contado: montoContado,
                 denominaciones: denominaciones,
                 notas: notas,
-                // supervisor_id y codigo se agregarían aquí si fuera necesario
+                ...(preview?.requiere_supervisor && supervisorId
+                    ? { supervisor_id: supervisorId }
+                    : {}),
+                ...(preview?.requiere_supervisor && codigoSupervisor
+                    ? { codigo_autorizacion: codigoSupervisor }
+                    : {}),
             };
 
             const response = await post(`/cajas/cerrar/${sesionId}`, payload);
@@ -193,7 +262,11 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
                                         <div className="mb-4 bg-primary/10 p-3 rounded-md text-sm text-primary">
                                             Por favor realice el conteo físico del dinero en caja e ingrese las cantidades.
                                         </div>
-                                        <DenominationForm onSubmit={handleCountSubmit} />
+                                        <DenominationForm
+                                            initialValues={denominaciones}
+                                            onSubmit={handleCountSubmit}
+                                            readOnly={loading}
+                                        />
                                     </div>
                                 )}
 
@@ -207,6 +280,11 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
                                             <p className={`text-xl font-bold ${diferencia > 0 ? 'text-emerald-400' : 'text-destructive'}`}>
                                                 Diferencia: {diferencia > 0 ? '+' : ''}{currencySymbol} {diferencia.toFixed(2)}
                                             </p>
+                                            {preview?.requiere_supervisor ? (
+                                                <p className="mt-2 text-sm text-amber-300">
+                                                    Supera la tolerancia configurada de {currencySymbol} {preview.tolerancia.toFixed(2)}. El backend exige autorización de supervisor.
+                                                </p>
+                                            ) : null}
                                         </div>
 
                                         <div>
@@ -276,6 +354,61 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
                                             </dl>
                                         </div>
 
+                                        {preview?.redondeo_efectivo_legal ? (
+                                            <div className="rounded-md border border-sky-400/30 bg-sky-400/10 p-4 text-sm text-sky-200">
+                                                La diferencia corresponde al redondeo legal del pago en efectivo en Perú y coincide con {preview.redondeo_efectivo_cantidad} ajuste(s) documentado(s) por un total de S/ {Number(preview.redondeo_efectivo_documentado || 0).toFixed(2)}. Se conservará como redondeo, no como faltante, y no requiere supervisor.
+                                            </div>
+                                        ) : null}
+
+                                        {preview?.requiere_supervisor ? (
+                                            <div className="space-y-4 rounded-md border border-amber-400/30 bg-amber-400/10 p-4">
+                                                <p className="text-sm text-amber-200">
+                                                    Este arqueo no puede cerrarse sin un supervisor con PIN vigente.
+                                                </p>
+                                                <div>
+                                                    <label htmlFor="cashclosingdialog-supervisor" className="mb-1 block text-sm font-medium text-foreground/85">
+                                                        Supervisor que autoriza
+                                                    </label>
+                                                    <select
+                                                        id="cashclosingdialog-supervisor"
+                                                        value={supervisorId}
+                                                        onChange={(event) => setSupervisorId(event.target.value)}
+                                                        className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                                    >
+                                                        <option value="">Seleccione un supervisor…</option>
+                                                        {supervisores.map((supervisor) => (
+                                                            <option key={supervisor.id} value={supervisor.id}>{supervisor.nombre}</option>
+                                                        ))}
+                                                    </select>
+                                                    {supervisoresError ? (
+                                                        <p className="mt-1 text-xs text-destructive">
+                                                            {supervisoresError}
+                                                        </p>
+                                                    ) : supervisores.length === 0 ? (
+                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                            No hay supervisores con PIN vigente; este cierre debe quedar pendiente hasta registrarlo.
+                                                        </p>
+                                                    ) : null}
+                                                </div>
+                                                <div>
+                                                    <label htmlFor="cashclosingdialog-pin" className="mb-1 block text-sm font-medium text-foreground/85">
+                                                        PIN del supervisor
+                                                    </label>
+                                                    <input
+                                                        id="cashclosingdialog-pin"
+                                                        type="password"
+                                                        inputMode="numeric"
+                                                        autoComplete="off"
+                                                        maxLength={6}
+                                                        value={codigoSupervisor}
+                                                        onChange={(event) => setCodigoSupervisor(event.target.value.replace(/[^0-9]/g, ''))}
+                                                        className="h-11 w-full rounded-md border border-border bg-background px-3 tracking-[0.4em]"
+                                                        placeholder="6 dígitos"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : null}
+
                                         <div className="flex justify-end space-x-3">
                                             <button
                                                 type="button"
@@ -288,7 +421,7 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
                                             <button
                                                 type="button"
                                                 onClick={handleCloseSession}
-                                                disabled={loading}
+                                                disabled={loading || !preview || (preview.requiere_supervisor && (!supervisorId || codigoSupervisor.length !== 6))}
                                                 className="px-6 py-2 bg-red-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
                                             >
                                                 {loading ? 'Cerrando...' : 'Confirmar Cierre'}

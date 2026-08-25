@@ -518,11 +518,16 @@ export class CajasService {
       throw new ForbiddenException('El cierre requiere un usuario autenticado');
     }
 
-    // Autorización de supervisor. `cerrar_caja_tx` es quien decide si hacía falta
-    // (compara la diferencia contra la tolerancia del tenant); aquí sólo se
-    // comprueba que, si viene, sea auténtica. Verificar antes de llamar a la RPC
-    // evita registrar el cierre y descubrir después que la credencial era falsa.
-    if (dto.supervisor_id) {
+    // Autorización de supervisor. El endpoint POS histórico y el diálogo nuevo
+    // convergen en el mismo writer: cualquier credencial suministrada debe llegar
+    // completa, acreditarse aquí y volver a acreditarse dentro de la transacción.
+    const suministroAutorizacion = Boolean(dto.supervisor_id || dto.codigo_supervisor);
+    if (suministroAutorizacion) {
+      if (!dto.supervisor_id || !dto.codigo_supervisor) {
+        throw new BadRequestException(
+          'La autorización de cierre requiere supervisor y PIN completos.',
+        );
+      }
       if (dto.supervisor_id === actorId) {
         throw new ForbiddenException(
           'El supervisor que autoriza no puede ser el mismo cajero que cierra',
@@ -546,10 +551,17 @@ export class CajasService {
         denominaciones: {},
         cierre_administrativo: false,
         supervisor_id: dto.supervisor_id ?? null,
+        codigo_autorizacion: dto.supervisor_id ? dto.codigo_supervisor : null,
       },
     });
     if (error || !data) {
       throw new BadRequestException(error?.message || 'No se pudo confirmar el cierre de caja');
+    }
+
+    if (data.success === false || data.error_code) {
+      throw new BadRequestException(
+        data.message || 'No se pudo acreditar al supervisor para este cierre',
+      );
     }
 
     return data;
@@ -654,72 +666,92 @@ export class CajasService {
     return { saldo };
   }
 
+  async obtenerMovimientos(tenantId: string, sesionId: string) {
+    return this.movementsService.obtenerMovimientos(sesionId, tenantId);
+  }
+
+  async validarCierre(
+    tenantId: string,
+    sesionId: string,
+    montoContado: number,
+    denominaciones: Denominaciones,
+  ) {
+    return this.reconciliationService.validarCierre(
+      sesionId,
+      montoContado,
+      denominaciones,
+      tenantId,
+    );
+  }
+
   /**
    * Supervisores del tenant que pueden autorizar una diferencia de cierre: rol
-   * SUPERVISOR o ADMIN y un PIN activo registrado. Se filtra por PIN porque un
+   * canónico de supervisión (o superadmin) y un PIN activo registrado. Se
+   * filtra por PIN porque un
    * supervisor sin PIN no puede autorizar nada, y ofrecerlo en el selector sólo
    * llevaría al cajero a un rechazo sin explicación.
    *
    * Nunca se devuelve `hash_pin` ni `codigo`.
    */
-  async listarSupervisoresAutorizados(tenantId: string) {
-    const client = this.supabase.getClient();
-
-    const { data: pines, error: pinesError } = await client
-      .from('supervisor_pins')
-      .select('usuario_id')
-      .eq('tenant_id', tenantId)
-      .eq('activo', true);
-
-    if (pinesError) {
+  async listarSupervisoresAutorizados(
+    tenantId: string,
+    actorId: string,
+    sesionId: string,
+  ) {
+    const { data, error } = await this.supabase.getClient()
+      .rpc('listar_supervisores_autorizados_caja_518', {
+        p_tenant_id: tenantId,
+        p_actor_id: actorId,
+        p_sesion_id: sesionId,
+      });
+    if (error) {
       throw new BadRequestException('No se pudieron consultar los supervisores habilitados');
     }
+    return Array.isArray(data) ? data : [];
+  }
 
-    const conPin = [...new Set((pines || []).map((p: any) => p.usuario_id).filter(Boolean))];
-    if (conPin.length === 0) {
-      return [];
+  /** Directorio administrativo sin hashes ni secretos. */
+  async listarSupervisoresGestionPin(tenantId: string, actorId: string) {
+    const { data, error } = await this.supabase.getClient()
+      .rpc('listar_supervisores_gestion_pin_caja_518', {
+        p_tenant_id: tenantId,
+        p_actor_id: actorId,
+      });
+    if (error) {
+      this.logger.warn('Falló el directorio administrativo de PIN de supervisores');
+      throw new BadRequestException(
+        'No se pudo consultar la gestión de PIN de supervisores',
+      );
     }
+    return Array.isArray(data) ? data : [];
+  }
 
-    const { data: roles, error: rolesError } = await client
-      .from('user_roles')
-      .select('usuario_sistema_id, roles(nombre)')
-      .eq('tenant_id', tenantId)
-      .in('usuario_sistema_id', conPin);
-
-    if (rolesError) {
-      throw new BadRequestException('No se pudieron resolver los roles de supervisor');
+  async rotarPinSupervisor(
+    tenantId: string,
+    actorId: string,
+    supervisorId: string,
+    pin: string,
+    idempotencyKey: string,
+  ) {
+    const { data, error } = await this.supabase.getClient()
+      .rpc('registrar_pin_supervisor_caja_tx_518', {
+        p_tenant_id: tenantId,
+        p_actor_id: actorId,
+        p_supervisor_id: supervisorId,
+        p_pin: pin,
+        p_idempotency_key: idempotencyKey,
+      });
+    if (error || !data) {
+      const codigo = String(error?.message || 'SUPERVISOR_PIN_ROTATION_FAILED');
+      const mensaje = codigo.includes('SUPERVISOR_PIN_WEAK')
+        ? 'El PIN es demasiado predecible; use seis dígitos no consecutivos ni repetidos'
+        : codigo.includes('SUPERVISOR_ROLE_REQUIRED')
+          ? 'El usuario ya no tiene un rol autorizado de supervisor'
+          : 'No se pudo registrar el PIN del supervisor';
+      throw new BadRequestException(mensaje);
     }
-
-    const habilitados = [...new Set(
-      (roles || [])
-        .filter((fila: any) => {
-          const nombre = String((fila.roles as any)?.nombre ?? '').toUpperCase();
-          return nombre === 'SUPERVISOR' || nombre === 'ADMIN';
-        })
-        .map((fila: any) => fila.usuario_sistema_id),
-    )];
-
-    if (habilitados.length === 0) {
-      return [];
-    }
-
-    const { data: usuarios, error: usuariosError } = await client
-      .from('usuarios_sistema')
-      .select('id, nombre, apellido')
-      .eq('tenant_id', tenantId)
-      .eq('activo', true)
-      .in('id', habilitados);
-
-    if (usuariosError) {
-      throw new BadRequestException('No se pudieron obtener los datos de los supervisores');
-    }
-
-    return (usuarios || [])
-      .map((u: any) => ({
-        id: u.id,
-        nombre: [u.nombre, u.apellido].filter(Boolean).join(' ').trim() || 'Supervisor',
-      }))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    // El RPC devuelve únicamente identidad, versión y fecha; nunca PIN/hash.
+    return data;
   }
 
   async cerrarCajaAvanzado(

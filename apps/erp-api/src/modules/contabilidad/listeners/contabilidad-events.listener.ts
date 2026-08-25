@@ -1142,6 +1142,8 @@ export class ContabilidadEventsListener implements OnModuleInit, OnApplicationBo
       cuenta_caja_codigo: eventData.cuentaCajaCodigo || '10111',
       sesion_caja_id: eventData.sesionCajaId,
       caja_id: eventData.cajaId,
+      tipo_diferencia: eventData.tipoDiferencia,
+      redondeo_efectivo_legal: eventData.redondeoEfectivoLegal === true,
     };
 
     const asientoCreado = await this.asientosGenerator.generarAsientoCierreCaja(cierreData);

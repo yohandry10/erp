@@ -265,6 +265,11 @@ export class CreateVentaPosDto {
   @IsBoolean()
   emitir_cpe?: boolean;
 
+  /** Solicita el cobro físico redondeado; SQL vuelve a derivarlo y validarlo. */
+  @IsOptional()
+  @IsBoolean()
+  redondeo_efectivo_legal?: boolean;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

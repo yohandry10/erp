@@ -172,6 +172,10 @@ export default function POSPage() {
   const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED !== 'false'
 
   const api = useApi()
+  // El cierre no puede convertir un 4xx/5xx en `null`: si el writer exige
+  // supervisor o rechaza el PIN, el modal debe permanecer abierto y mostrar la
+  // causa exacta. El resto del POS conserva su política histórica de errores.
+  const cashCloseApi = useApi({ throwOnError: true })
   const posSaleApi = useApi({ retries: 1, timeoutMs: 30000 })
   const { user } = useAuth()
   const router = useRouter()
@@ -1090,6 +1094,17 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     }
 
     const totalVenta = calcularTotal()
+    const totalEfectivoLegal = Number(
+      (isPeru && esPagoEfectivo
+        ? Math.floor((totalVenta + 0.000001) * 10) / 10
+        : totalVenta).toFixed(2),
+    )
+    const ajusteRedondeoEfectivo = Number((totalVenta - totalEfectivoLegal).toFixed(2))
+    const aplicaRedondeoEfectivoLegal = !pagosMixtos
+      && isPeru
+      && esPagoEfectivo
+      && ajusteRedondeoEfectivo >= 0.01
+      && ajusteRedondeoEfectivo <= 0.09
     if (pagosMixtos) {
       if (pagos.length === 0) {
         toast({
@@ -1137,11 +1152,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         })
         return
       }
-    } else if (esPagoEfectivo && montoRecibidoNumero + 0.001 < totalVenta) {
+    } else if (esPagoEfectivo && montoRecibidoNumero + 0.001 < totalEfectivoLegal) {
       toast({
         variant: 'destructive',
         title: '❌ Efectivo insuficiente',
-        description: `Falta recibir ${formatCurrency(totalVenta - montoRecibidoNumero)}.`,
+        description: `Falta recibir ${formatCurrency(totalEfectivoLegal - montoRecibidoNumero)}.`,
       })
       return
     } else if (metodoPagoActual?.requiere_referencia && !(referenciaPago || '').trim()) {
@@ -1212,7 +1227,14 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                 monto: parseFloat(p.monto) || 0,
                 referencia: p.referencia,
               }))
-            : null,
+            : aplicaRedondeoEfectivoLegal
+              ? [{
+                  metodoPagoId: metodoPagoSeleccionado,
+                  monto: totalEfectivoLegal,
+                  referencia: referenciaPago,
+                }]
+              : null,
+          redondeoEfectivoLegal: aplicaRedondeoEfectivoLegal,
         },
         () => crearClaveIdempotenciaPos('pos-venta'),
       )
@@ -1264,6 +1286,13 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           monto: parseFloat(p.monto),
           referencia: (p.referencia || '').trim() || null,
         }))
+      } else if (aplicaRedondeoEfectivoLegal) {
+        ventaData.pagos = [{
+          metodo_pago_id: metodoPagoSeleccionado,
+          monto: totalEfectivoLegal,
+          referencia: (referenciaPago || '').trim() || null,
+        }]
+        ventaData.redondeo_efectivo_legal = true
       }
 
       // 5. Procesar venta en backend con 1 reintento en caso de error de red
@@ -1623,7 +1652,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         return
       }
 
-      const saldoResponse = await api.get(`/cajas/saldo-esperado/${sesionCajaId}`)
+      const saldoResponse = await cashCloseApi.get(`/cajas/saldo-esperado/${sesionCajaId}`)
       const saldoEsperado = Number(saldoResponse?.data?.saldo ?? saldoResponse?.saldo)
 
       if (Number.isFinite(saldoEsperado)) {
@@ -1638,7 +1667,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       // La lista de supervisores se pide aqui y no al montar la pantalla: solo
       // hace falta si el cajero llega a cerrar, y evita una consulta por sesion.
       try {
-        const supervisoresResp = await api.get('/cajas/supervisores-autorizados')
+        const supervisoresResp = await cashCloseApi.get('/cajas/supervisores-autorizados')
         const lista = (supervisoresResp?.data ?? supervisoresResp) as unknown
         setSupervisoresCierre(Array.isArray(lista) ? lista as Array<{ id: string; nombre: string }> : [])
       } catch {
@@ -1667,15 +1696,20 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       // La diferencia real la calcula el backend (esperado = inicial + ventas
       // en efectivo − retiros); calcularla aquí como contado − inicial ignoraba
       // las ventas y mostraba diferencias falsas al cajero.
-      const resultado = await api.post(`/cajas/${cajaId}/cierre`, {
+      const autorizacionCompleta = supervisorCierreId && codigoSupervisorCierre.length === 6
+      const resultado = await cashCloseApi.post(`/cajas/${cajaId}/cierre`, {
         sesion_id: sesionCajaId,
         monto_cierre: montoFinal,
         monto_contado: montoFinal,
         notas: 'Cierre manual desde POS',
         // Solo viajan si el cajero las completo. Quien decide si eran obligatorias
         // es la transaccion de cierre, que compara la diferencia con la tolerancia.
-        ...(supervisorCierreId ? { supervisor_id: supervisorCierreId } : {}),
-        ...(codigoSupervisorCierre ? { codigo_supervisor: codigoSupervisorCierre } : {}),
+        ...(autorizacionCompleta
+          ? {
+              supervisor_id: supervisorCierreId,
+              codigo_supervisor: codigoSupervisorCierre,
+            }
+          : {}),
       })
 
       if (resultado) {
@@ -1771,16 +1805,29 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   const totalVentaActual = Number(calcularTotal().toFixed(2))
   const esPagoEfectivo = Boolean(
     metodoPagoActual &&
-    `${metodoPagoActual.codigo || ''} ${metodoPagoActual.nombre || ''}`.toUpperCase().includes('EFECT'),
+    String(metodoPagoActual.tipo || '').trim().toUpperCase() === 'EFECTIVO',
   )
   const montoRecibidoNumero = Number(montoRecibido.replace(',', '.')) || 0
-  const pagoEfectivoInsuficiente = !pagosMixtos && esPagoEfectivo && montoRecibidoNumero + 0.001 < totalVentaActual
+  const totalEfectivoLegalActual = Number(
+    (isPeru && esPagoEfectivo
+      ? Math.floor((totalVentaActual + 0.000001) * 10) / 10
+      : totalVentaActual).toFixed(2),
+  )
+  const ajusteRedondeoEfectivoActual = Number(
+    (totalVentaActual - totalEfectivoLegalActual).toFixed(2),
+  )
+  const pagoEfectivoInsuficiente = !pagosMixtos
+    && esPagoEfectivo
+    && montoRecibidoNumero + 0.001 < totalEfectivoLegalActual
 
   const seleccionarMetodoPago = (metodo: MetodoPago) => {
     setMetodoPagoSeleccionado(metodo.id)
     setReferenciaPago('')
-    const esEfectivo = `${metodo.codigo || ''} ${metodo.nombre || ''}`.toUpperCase().includes('EFECT')
-    setMontoRecibido(esEfectivo ? formatMoney(totalVentaActual) : '')
+    const esEfectivo = String(metodo.tipo || '').trim().toUpperCase() === 'EFECTIVO'
+    const totalCobro = isPeru && esEfectivo
+      ? Number((Math.floor((totalVentaActual + 0.000001) * 10) / 10).toFixed(2))
+      : totalVentaActual
+    setMontoRecibido(esEfectivo ? formatMoney(totalCobro) : '')
   }
 
   const mensajeAccionRapida = () => {
@@ -2585,7 +2632,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                           className={`flex min-h-16 items-center gap-3 rounded-xl border p-3 text-left text-sm font-medium transition ${metodoPagoSeleccionado === metodo.id ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'bg-background hover:bg-accent'}`}
                         >
                           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${metodoPagoSeleccionado === metodo.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                            {metodo.codigo?.toUpperCase().includes('EFECT') ? <Banknote className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                            {String(metodo.tipo || '').trim().toUpperCase() === 'EFECTIVO' ? <Banknote className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
                           </span>
                           <span className="line-clamp-2">{metodo.nombre}</span>
                         </button>
@@ -2603,12 +2650,19 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                       </div>
                     )}
                     {esPagoEfectivo && (
-                      <CashTenderPanel
-                        currencySymbol={currencySymbol}
-                        total={totalVentaActual}
-                        value={montoRecibido}
-                        onChange={setMontoRecibido}
-                      />
+                      <div className="space-y-2">
+                        {isPeru && ajusteRedondeoEfectivoActual >= 0.01 && (
+                          <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+                            Total del comprobante: {formatCurrency(totalVentaActual)}. Cobro físico legal: {formatCurrency(totalEfectivoLegalActual)} (ajuste a favor del consumidor: {formatCurrency(ajusteRedondeoEfectivoActual)}).
+                          </p>
+                        )}
+                        <CashTenderPanel
+                          currencySymbol={currencySymbol}
+                          total={totalEfectivoLegalActual}
+                          value={montoRecibido}
+                          onChange={setMontoRecibido}
+                        />
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -3002,8 +3056,9 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                   <div className="flex gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
                     <p className="text-sm text-muted-foreground">
-                      El monto contado no coincide con el esperado. Un cierre con diferencia
-                      requiere que un supervisor lo autorice con su PIN.
+                      El backend verificará la tolerancia y el redondeo legal del efectivo.
+                      Si esta diferencia requiere supervisor, selecciónelo y complete su PIN;
+                      un rechazo mantendrá la sesión abierta.
                     </p>
                   </div>
 
@@ -3023,7 +3078,8 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                     </select>
                     {supervisoresCierre.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        No hay supervisores con PIN registrado. Regístrelo antes de cerrar con diferencia.
+                        No hay supervisores con PIN registrado. Aún puede confirmar si la diferencia
+                        está dentro de tolerancia o corresponde a redondeo legal.
                       </p>
                     ) : null}
                   </div>
@@ -3068,11 +3124,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                   type="button"
                   variant="destructive"
                   onClick={confirmarCerrarCaja}
-                  disabled={
-                    !montoContadoInput.trim()
-                    || (Math.abs((parseFloat(montoContadoInput) || 0) - (estadoCaja?.montoFinal || 0)) > 0.001
-                      && (!supervisorCierreId || codigoSupervisorCierre.length !== 6))
-                  }
+                  disabled={!montoContadoInput.trim()}
                 >
                   <Check className="mr-2 h-4 w-4" aria-hidden="true" />
                   Confirmar cierre

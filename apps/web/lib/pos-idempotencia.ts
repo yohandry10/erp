@@ -25,6 +25,7 @@ export interface IntencionVentaPos {
   referenciaPago?: string | null;
   descuentoGlobalTipo?: string | null;
   descuentoGlobalValor?: number | null;
+  redondeoEfectivoLegal?: boolean;
   items: Array<{
     productoId: string;
     cantidad: number;
@@ -79,6 +80,12 @@ export function huellaIntencionVenta(intencion: IntencionVentaPos): string {
     metodo: texto(intencion.metodoPagoId) || null,
     referencia: texto(intencion.referenciaPago) || null,
     descuento: [texto(intencion.descuentoGlobalTipo) || null, numero(intencion.descuentoGlobalValor)],
+    // Ausente y false son equivalentes. No serializar false conserva la huella
+    // local de ventas iniciadas antes de 518 y evita regenerar la clave durante
+    // un retry incierto; true sí cambia la intención económica.
+    ...(intencion.redondeoEfectivoLegal === true
+      ? { redondeoEfectivoLegal: true }
+      : {}),
     items,
     pagos,
   });

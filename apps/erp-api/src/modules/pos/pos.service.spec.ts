@@ -41,7 +41,17 @@ const createSupabaseMock = (fixtures: {
   const responseFor = (table: string) => {
     switch (table) {
       case 'empresa_config':
-        return { data: { ruc: '12345678901', razon_social: 'ACME S.A.C.', dias_vencimiento_factura: 30 }, error: null };
+        return {
+          data: {
+            ruc: '12345678901',
+            razon_social: 'ACME S.A.C.',
+            dias_vencimiento_factura: 30,
+            pais: 'PE',
+            moneda_defecto: 'PEN',
+            igv_porcentaje: 18,
+          },
+          error: null,
+        };
       case 'sesiones_caja':
         return {
           data: {
@@ -301,6 +311,9 @@ describe('PosService atomic transaction contract', () => {
             total: 82.6,
             impactos_aplicados: true,
             idempotent: true,
+            redondeo_efectivo_legal: true,
+            monto_efectivo_cobrado: 82.6,
+            monto_ajuste_redondeo: 0.04,
           },
           error: null,
         };
@@ -315,6 +328,9 @@ describe('PosService atomic transaction contract', () => {
       venta_id: 'venta-idempotente',
       total: 82.6,
       idempotent: true,
+      redondeo_efectivo_legal: true,
+      monto_efectivo_cobrado: 82.6,
+      monto_ajuste_redondeo: 0.04,
     }));
     expect(ctx.rpcMock).not.toHaveBeenCalledWith('resolver_precios_venta_tx', expect.any(Object));
     expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_comercial_tx', expect.any(Object));
@@ -725,6 +741,94 @@ describe('PosService atomic transaction contract', () => {
       user,
     );
     expect(result.success).toBe(true);
+  });
+
+  it('documenta el redondeo sólo para pago PE/PEN íntegramente en efectivo', async () => {
+    const producto = { ...productoBase, precio_venta: 100.03 };
+    const ctx = createService({ productos: [producto] });
+    const result = await ctx.service.procesarVenta(
+      {
+        ...ventaBase,
+        moneda: 'PEN',
+        redondeo_efectivo_legal: true,
+        items: [{
+          producto_id: 'prod-1',
+          cantidad: 1,
+          precio_unitario: 100.03,
+          producto: { codigo: 'P1', nombre: 'Prod 1' },
+        }],
+        pagos: [{ metodo_pago_id: 'mp-efectivo', monto: 118 }],
+      },
+      user,
+    );
+
+    expect(result.success).toBe(true);
+    expect(ctx.rpcMock).toHaveBeenCalledWith(
+      'pos_registrar_venta_comercial_tx',
+      expect.objectContaining({
+        p_payload: expect.objectContaining({
+          redondeo_efectivo_legal: true,
+          pagos: [expect.objectContaining({ monto: 118, codigo: 'efectivo' })],
+        }),
+      }),
+    );
+  });
+
+  it('rechaza el mismo subpago sin la evidencia solicitada', async () => {
+    const producto = { ...productoBase, precio_venta: 100.03 };
+    const ctx = createService({ productos: [producto] });
+    const result = await ctx.service.procesarVenta(
+      {
+        ...ventaBase,
+        moneda: 'PEN',
+        items: [{
+          producto_id: 'prod-1',
+          cantidad: 1,
+          precio_unitario: 100.03,
+          producto: { codigo: 'P1', nombre: 'Prod 1' },
+        }],
+        pagos: [{ metodo_pago_id: 'mp-efectivo', monto: 118 }],
+      },
+      user,
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Pagos no cuadran');
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith(
+      'pos_registrar_venta_comercial_tx',
+      expect.anything(),
+    );
+  });
+
+  it('documenta cobro físico cero cuando una venta PE/PEN completa vale menos de S/ 0.10', async () => {
+    const producto = { ...productoBase, precio_venta: 0.03 };
+    const ctx = createService({ productos: [producto] });
+    const result = await ctx.service.procesarVenta(
+      {
+        ...ventaBase,
+        moneda: 'PEN',
+        redondeo_efectivo_legal: true,
+        items: [{
+          producto_id: 'prod-1',
+          cantidad: 1,
+          precio_unitario: 0.03,
+          producto: { codigo: 'P1', nombre: 'Prod 1' },
+        }],
+        pagos: [{ metodo_pago_id: 'mp-efectivo', monto: 0 }],
+      },
+      user,
+    );
+
+    expect(result.success).toBe(true);
+    expect(ctx.rpcMock).toHaveBeenCalledWith(
+      'pos_registrar_venta_comercial_tx',
+      expect.objectContaining({
+        p_payload: expect.objectContaining({
+          redondeo_efectivo_legal: true,
+          pagos: [expect.objectContaining({ monto: 0, codigo: 'efectivo' })],
+        }),
+      }),
+    );
   });
 
   it('rechaza pago con monto cero o negativo', async () => {

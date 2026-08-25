@@ -76,6 +76,13 @@ BEGIN
     'MOSTRADOR', v_actor
   ) RETURNING id INTO v_caja;
 
+  -- El contrato final 518 decide supervisor con la configuración activa de la
+  -- caja. Este verificador histórico prueba el cierre/idempotencia con S/ 1 de
+  -- diferencia, por lo que congela explícitamente esa tolerancia en su fixture.
+  INSERT INTO public.configuracion_caja (
+    tenant_id, caja_id, tolerancia_diferencia_cierre, estado, activo, updated_by
+  ) VALUES (v_tenant, v_caja, 1, 'ACTIVO', true, v_actor);
+
   SELECT (public.crear_producto_inventario_tx(v_tenant, jsonb_build_object(
     'codigo', 'PROD-451', 'nombre', 'Producto físico POS 451',
     'categoria', 'VERIFY', 'precio_venta', 10, 'precio_compra', 4,
@@ -310,7 +317,7 @@ BEGIN
 
   BEGIN
     PERFORM public.cerrar_caja_tx(v_tenant, v_sesion, v_actor,
-      jsonb_build_object('monto_contado',121,'denominaciones','{}'::jsonb,'supervisor_id',v_actor));
+      jsonb_build_object('monto_contado',121,'denominaciones','{}'::jsonb));
     RAISE EXCEPTION 'VERIFY_451_EXPECTED_PENDING_CPE_CLOSE_BLOCK';
   EXCEPTION WHEN check_violation THEN NULL;
   END;
@@ -318,7 +325,7 @@ BEGIN
     PERFORM public.cerrar_caja_tx(v_tenant, v_sesion, v_actor,
       jsonb_build_object(
         'monto_contado', 121, 'denominaciones', '{}'::jsonb,
-        'supervisor_id', v_actor, 'cierre_administrativo', true,
+        'cierre_administrativo', true,
         'razon_cierre_administrativo', 'Sesión abandonada verificada 451'
       ));
     RAISE EXCEPTION 'VERIFY_451_EXPECTED_ADMIN_PENDING_CPE_CLOSE_BLOCK';
@@ -345,7 +352,7 @@ BEGIN
   WHERE id=v_venta AND tenant_id=v_tenant;
 
   SELECT public.cerrar_caja_tx(v_tenant, v_sesion, v_actor,
-    jsonb_build_object('monto_contado',121,'denominaciones','{}'::jsonb,'supervisor_id',v_actor))
+    jsonb_build_object('monto_contado',121,'denominaciones','{}'::jsonb))
     INTO v_close;
   v_hash := v_close->>'hash_integridad';
   IF v_close->>'estado' <> 'CERRADA' OR (v_close->>'monto_esperado')::numeric <> 120
@@ -361,7 +368,7 @@ BEGIN
     RAISE EXCEPTION 'VERIFY_451_CLOSE_INTEGRITY_RECALCULATION_FAILED';
   END IF;
   SELECT public.cerrar_caja_tx(v_tenant, v_sesion, v_actor,
-    jsonb_build_object('monto_contado',121,'denominaciones','{}'::jsonb,'supervisor_id',v_actor))
+    jsonb_build_object('monto_contado',121,'denominaciones','{}'::jsonb))
     INTO v_close_retry;
   IF (v_close_retry->>'idempotent')::boolean IS NOT TRUE
      OR v_close_retry->>'hash_integridad' <> v_hash
@@ -370,7 +377,7 @@ BEGIN
   END IF;
   BEGIN
     PERFORM public.cerrar_caja_tx(v_tenant, v_sesion, v_actor,
-      jsonb_build_object('monto_contado',122,'denominaciones','{}'::jsonb,'supervisor_id',v_actor));
+      jsonb_build_object('monto_contado',122,'denominaciones','{}'::jsonb));
     RAISE EXCEPTION 'VERIFY_451_EXPECTED_CLOSE_PAYLOAD_MISMATCH';
   EXCEPTION WHEN unique_violation THEN NULL;
   END;
