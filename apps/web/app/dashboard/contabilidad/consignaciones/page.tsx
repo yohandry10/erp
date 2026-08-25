@@ -56,7 +56,7 @@ export default function ConsignacionesPage() {
       const query = estado ? `?estado=${encodeURIComponent(estado)}` : ''
       const [consignacionesResponse, productosResponse] = await Promise.all([
         get(`/api/contabilidad/registro-consignaciones${query}`),
-        get('/api/productos'),
+        get('/api/inventario/productos'),
       ])
       if (!consignacionesResponse?.success) throw new Error(consignacionesResponse?.message || 'No se pudo cargar el registro')
       setItems(Array.isArray(consignacionesResponse.data) ? consignacionesResponse.data : [])

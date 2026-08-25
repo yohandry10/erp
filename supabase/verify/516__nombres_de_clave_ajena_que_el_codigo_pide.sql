@@ -52,6 +52,7 @@ BEGIN
     ('fk_recepcion_items_ubicacion_id_v2'),
     ('liquidaciones_id_empleado_fkey'),
     ('movimientos_bancarios_cuenta_bancaria_id_fkey'),
+    ('movimientos_consignacion_registro_id_fkey_runtime'),
     ('movimientos_bancarios_cxp_id_fkey'),
     ('movimientos_bancarios_proveedor_id_fkey'),
     ('orden_compra_detalles_producto_id_fkey_runtime'),
