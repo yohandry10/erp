@@ -71,6 +71,18 @@ export const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
+  // La cuenta corriente operativa de un banco. Sin ella, `assert_postable_account_457`
+  // rechaza cualquier movimiento bancario: la cuenta del banco tiene que apuntar
+  // a una cuenta del plan que admita movimiento, y la 1042 no vale porque es la
+  // de detracciones.
+  '1041': {
+    codigo: '1041',
+    nombre: 'Cuentas corrientes operativas',
+    tipo: 'ACTIVO',
+    nivel: 4,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
   '1042': {
     codigo: '1042',
     nombre: 'Cuentas corrientes para fines específicos - detracciones',
