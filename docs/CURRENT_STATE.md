@@ -8,7 +8,19 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **PROD está en `509`.** Continuación de la auditoría contable, por puntos y con
+- **PROD está en `510`.** La `510` pone el mecanismo de tasas de detracción:
+  catálogo de códigos SPOT con tasa y vigencia, `codigo_detraccion` en la cuenta
+  por pagar, y un contraste que **compara sin imponer** —hay operaciones con
+  reglas especiales y el contador tiene que poder apartarse a sabiendas, pero no
+  sin enterarse—. **El catálogo se entrega vacío y es deliberado**: las tasas las
+  fija SUNAT por resolución y cargarlas de memoria sería escribir números que
+  nadie verificó contra la fuente; una detracción mal depositada es multa más
+  pérdida del crédito fiscal. Con el catálogo vacío el sistema se comporta
+  exactamente como antes, y el verificador comprueba justamente eso primero.
+  **Pendiente para el contador**: cargar `public.tasas_detraccion` contra el
+  anexo vigente.
+
+- **PROD estuvo en `509`.** Continuación de la auditoría contable, por puntos y con
   verificador comprobado en rojo en cada uno. La `507` añade la **prorrata del
   crédito fiscal** con los tres destinos del artículo 23 y coeficiente de doce
   meses; su defecto es `GRAVADAS`, o sea el comportamiento previo, y el

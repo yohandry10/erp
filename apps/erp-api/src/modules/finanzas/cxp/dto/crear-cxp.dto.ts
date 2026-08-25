@@ -7,7 +7,7 @@ import {
   IsString,
   IsUUID,
   Min,
-  ValidateNested, IsIn,} from 'class-validator';
+  ValidateNested, IsIn, MaxLength} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum CondicionesPagoCxp {
@@ -102,6 +102,17 @@ export class CrearCxpDto {
     message: 'destino_credito_fiscal debe ser GRAVADAS, NO_GRAVADAS o COMUN',
   })
   destino_credito_fiscal?: 'GRAVADAS' | 'NO_GRAVADAS' | 'COMUN';
+
+  /**
+   * Código de bien o servicio del SPOT. Con el catálogo de tasas cargado, el
+   * sistema contrasta el importe declarado contra el que sale del código y deja
+   * constancia de la diferencia; no lo impone, porque hay operaciones con reglas
+   * especiales.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  codigo_detraccion?: string;
 
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El total debe ser numérico' })
   @Min(0.01, { message: 'El total debe ser mayor a cero' })
