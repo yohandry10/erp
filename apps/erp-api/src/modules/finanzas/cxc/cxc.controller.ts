@@ -71,7 +71,7 @@ export class CxcController {
   }
 
   @Post(':id/pagos')
-  @RequirePermission('cpe.comprobantes.emitir')
+  @RequirePermission('finanzas.cxc.cobros.write')
   @ApiOperation({
     summary: 'Registrar pago/anticipo',
     description:
