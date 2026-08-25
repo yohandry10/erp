@@ -163,42 +163,6 @@ export class DiferidosService {
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el diferido');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
     return this.aRespuesta(result.record);
-
-    /* istanbul ignore next -- writer legacy inalcanzable */
-    if (dto.cuenta_diferido_id === dto.cuenta_resultado_id) {
-      throw new BadRequestException(
-        'La cuenta de balance y la de resultados no pueden ser la misma: el devengo no movería nada.'
-      );
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('diferidos')
-      .insert({
-        tenant_id: tenantId,
-        codigo: dto.codigo ?? null,
-        nombre: dto.nombre,
-        descripcion: dto.descripcion ?? null,
-        tipo: dto.tipo,
-        cuenta_diferido_id: dto.cuenta_diferido_id,
-        cuenta_resultado_id: dto.cuenta_resultado_id,
-        monto_total: this.round2(dto.monto_total),
-        monto_devengado: 0,
-        periodos: dto.periodos,
-        fecha_inicio: dto.fecha_inicio,
-        centro_costo_id: dto.centro_costo_id ?? null,
-        estado: EstadoDiferido.VIGENTE,
-        created_by: userId
-      })
-      .select()
-      .single();
-
-    if (error || !data) {
-      throw new Error(`Error creando el diferido: ${error?.message}`);
-    }
-
-    this.logger.log(`📆 Diferido "${dto.nombre}" creado para ${tenantId}`);
-    return this.aRespuesta(data);
   }
 
   async cancelar(tenantId: string,diferidoId: string,userId: string,idempotencyKey?: string): Promise<DiferidoResponseDto> {
@@ -210,30 +174,6 @@ export class DiferidosService {
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo cancelar el diferido');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
     return this.aRespuesta(result.record);
-
-    /* istanbul ignore next -- writer legacy inalcanzable */
-    const diferido = await this.obtener(tenantId, diferidoId);
-
-    if (diferido.estado !== EstadoDiferido.VIGENTE) {
-      throw new BadRequestException(
-        `El diferido "${diferido.nombre}" está ${diferido.estado} y ya no admite cambios.`
-      );
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('diferidos')
-      .update({ estado: EstadoDiferido.CANCELADO, updated_at: new Date().toISOString() })
-      .eq('id', diferidoId)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-
-    if (error || !data) {
-      throw new Error(`Error cancelando el diferido: ${error?.message}`);
-    }
-
-    return this.aRespuesta(data);
   }
 
   // --------------------------------------------------------------------------

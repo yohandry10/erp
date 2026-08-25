@@ -202,48 +202,6 @@ export class ActivosFijosService {
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo crear el activo fijo');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
     return this.aRespuesta(result.record);
-
-    /* istanbul ignore next -- writer legacy inalcanzable */
-    const valorResidual = dto.valor_residual ?? 0;
-
-    if (valorResidual > dto.valor_adquisicion) {
-      throw new BadRequestException(
-        'El valor residual no puede superar al de adquisición: la base depreciable sería negativa.'
-      );
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('activos_fijos')
-      .insert({
-        tenant_id: tenantId,
-        codigo: dto.codigo,
-        nombre: dto.nombre,
-        descripcion: dto.descripcion,
-        fecha_adquisicion: dto.fecha_adquisicion,
-        valor_adquisicion: this.round2(dto.valor_adquisicion),
-        valor_residual: this.round2(valorResidual),
-        vida_util_meses: dto.vida_util_meses,
-        metodo_depreciacion: 'LINEAL',
-        fecha_inicio_depreciacion: dto.fecha_inicio_depreciacion ?? dto.fecha_adquisicion,
-        depreciacion_acumulada: 0,
-        situacion: SituacionActivo.ACTIVO,
-        centro_costo_id: dto.centro_costo_id ?? null,
-        estado: 'ACTIVO',
-        created_by: userId
-      })
-      .select()
-      .single();
-
-    if (error || !data) {
-      if (error?.code === '23505') {
-        throw new BadRequestException(`Ya existe un activo con el código ${dto.codigo}.`);
-      }
-      throw new Error(`Error creando activo fijo: ${error?.message}`);
-    }
-
-    this.logger.log(`🏗️ Activo fijo ${dto.codigo} registrado para ${tenantId}`);
-    return this.aRespuesta(data);
   }
 
   /**
@@ -266,44 +224,6 @@ export class ActivosFijosService {
     if(rpcError) throw new BadRequestException(rpcError.message||'No se pudo actualizar el activo fijo');
     const result:any=Array.isArray(rpcData)?rpcData[0]:rpcData;
     return this.aRespuesta(result.record);
-
-    /* istanbul ignore next -- writer legacy inalcanzable */
-    const activo = await this.obtener(tenantId, activoId);
-
-    if (activo.situacion !== SituacionActivo.ACTIVO) {
-      throw new BadRequestException(
-        `El activo ${activo.codigo} está en situación ${activo.situacion} y ya no admite cambios.`
-      );
-    }
-
-    const valorResidual = dto.valor_residual ?? activo.valor_residual;
-    if (valorResidual > activo.valor_adquisicion) {
-      throw new BadRequestException(
-        'El valor residual no puede superar al de adquisición.'
-      );
-    }
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('activos_fijos')
-      .update({
-        nombre: dto.nombre ?? activo.nombre,
-        descripcion: dto.descripcion ?? activo.descripcion,
-        vida_util_meses: dto.vida_util_meses ?? activo.vida_util_meses,
-        valor_residual: this.round2(valorResidual),
-        centro_costo_id: dto.centro_costo_id ?? activo.centro_costo_id ?? null,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', activoId)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-
-    if (error || !data) {
-      throw new Error(`Error actualizando activo fijo: ${error?.message}`);
-    }
-
-    return this.aRespuesta(data);
   }
 
   // --------------------------------------------------------------------------
