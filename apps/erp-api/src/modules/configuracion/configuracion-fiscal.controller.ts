@@ -1,10 +1,7 @@
 import { Controller, Get, ServiceUnavailableException, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
-import { PermissionGuard } from '../../common/guards/permission.guard';
-import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
-import { CurrentUser } from '../auth/current-user.decorator';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
 
@@ -13,8 +10,7 @@ import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
  * Expone la tasa de IGV/IVA y otras configuraciones fiscales
  */
 @Controller('configuracion-fiscal')
-@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard)
-@RequirePermission('configuracion.read')
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class ConfiguracionFiscalController {
   constructor(
     private readonly supabase: SupabaseService,
@@ -24,9 +20,9 @@ export class ConfiguracionFiscalController {
   /**
    * Obtiene la configuración fiscal del tenant actual
    * Incluye tasa de IGV/IVA, moneda principal, país, etc.
-   */
+  */
   @Get()
-  async obtenerConfiguracionFiscal(@CurrentUser() user: any) {
+  async obtenerConfiguracionFiscal(@CurrentTenant() tenantId: string) {
     const client = this.supabase.getClient();
 
     // Obtener configuración fiscal del tenant
@@ -45,7 +41,7 @@ export class ConfiguracionFiscalController {
         created_at,
         updated_at
       `)
-      .eq('tenant_id', user.tenant_id)
+      .eq('tenant_id', tenantId)
       .maybeSingle();
 
     if (error) {
@@ -56,7 +52,7 @@ export class ConfiguracionFiscalController {
     // que a su vez los obtiene de la tabla configuracion_fiscal global
     if (!config) {
       try {
-        const taxConfig = await this.taxCalculator.getTaxConfig(user.tenant_id);
+        const taxConfig = await this.taxCalculator.getTaxConfig(tenantId);
         
         return {
           success: true,
