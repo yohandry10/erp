@@ -229,3 +229,31 @@ dice que el módulo funcione.
 
 `artifacts/` no es documentación canónica. No debe entrar en la lectura inicial
 de agentes y no se enlaza desde `docs/README.md` salvo una investigación forense.
+
+## Tipo de cambio oficial
+
+No existe un tipo de cambio propio de SUNAT: SUNAT publica el que determina la
+SBS. El sistema importa **compra y venta**, porque no son intercambiables: las
+partidas de activo se contabilizan al promedio ponderado compra y las de pasivo
+--y el IGV-- al de venta.
+
+La SBS publica en una página ASPX y no en un servicio JSON, así que la
+importación pasa por un tercero. Eso obliga a desconfiar por diseño, y no es
+teórico: contrastando dos proveedores para el 2026-08-20 uno devolvía 3.647 y el
+otro 3.355, con el día anterior en 3.356 y el siguiente en 3.355. El primero
+servía un dato corrupto.
+
+Por eso la importación **descarta lo que no cuadra en vez de guardarlo**: una
+cotización que se aparte más de `TIPO_CAMBIO_DESVIACION_MAXIMA` (5% por defecto)
+de la última conocida no entra, se registra en el log y queda para que el
+contador la teclee si sabe que es correcta. Tampoco pisa nunca una cotización ya
+registrada.
+
+```powershell
+# Rellenar un rango a mano (requiere token para no chocar con el limite de la fuente)
+POST /api/contabilidad/tipos-cambio/importar?desde=2026-01-01&hasta=2026-08-24
+```
+
+El job diario corre a las 03:00 UTC y pide **la fecha de Lima**, no la del reloj:
+a esa hora en UTC ya es el día siguiente en el servidor pero aún no en Perú, y
+pedir una fecha que la SBS no ha publicado devuelve el arrastre del día previo.

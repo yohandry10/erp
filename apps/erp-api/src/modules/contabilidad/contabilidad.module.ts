@@ -27,6 +27,8 @@ import { CashflowService } from "./services/cashflow.service";
 import { PleExportService } from "./services/ple-export.service";
 import { TiposCambioService } from "./services/tipos-cambio.service";
 import { RevaluacionService } from "./services/revaluacion.service";
+import { TipoCambioSunatService } from "./services/tipo-cambio-sunat.service";
+import { TipoCambioSchedulerService } from "./services/tipo-cambio-scheduler.service";
 import { ContabilidadMultimonedaController } from "./controllers/contabilidad-multimoneda.controller";
 import { PlantillasAsientosService } from "./services/plantillas-asientos.service";
 import { PlantillasSchedulerService } from "./services/plantillas-scheduler.service";
@@ -83,6 +85,8 @@ import { TributosAnualesService } from "./services/tributos-anuales.service";
     ContabilidadEventsListener,
     TiposCambioService,
     RevaluacionService,
+    TipoCambioSunatService,
+    TipoCambioSchedulerService,
     PlantillasAsientosService,
     PlantillasSchedulerService,
     ActivosFijosService,
@@ -110,6 +114,8 @@ import { TributosAnualesService } from "./services/tributos-anuales.service";
     PleExportService,
     TiposCambioService,
     RevaluacionService,
+    TipoCambioSunatService,
+    TipoCambioSchedulerService,
     PlantillasAsientosService,
     ActivosFijosService,
     ConciliacionPartidasService,
