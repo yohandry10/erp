@@ -738,6 +738,8 @@ export class AsientosGeneratorService {
       if (Math.abs(diferencia) <= 0.009) {
         return null;
       }
+      const esRedondeoLegal = evento.redondeo_efectivo_legal === true
+        || evento.tipo_diferencia === 'REDONDEO_EFECTIVO_LEGAL';
 
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
         tenantId,
@@ -772,20 +774,28 @@ export class AsientosGeneratorService {
               cuenta_id: cuentas.get('65')!.id,
               debe: monto,
               haber: 0,
-              concepto: 'Otros gastos - faltante de caja',
+              concepto: esRedondeoLegal
+                ? 'Redondeo legal de pago en efectivo'
+                : 'Otros gastos - faltante de caja',
             },
             {
               cuenta_id: cuentaCaja.id,
               debe: 0,
               haber: monto,
-              concepto: 'Faltante en arqueo de caja',
+              concepto: esRedondeoLegal
+                ? 'Menor efectivo por redondeo legal'
+                : 'Faltante en arqueo de caja',
             },
           ];
 
       return await this.generarAsiento(
         tenantId,
         new Date(evento.fecha),
-        diferencia > 0 ? 'Sobrante de caja' : 'Faltante de caja',
+        diferencia > 0
+          ? 'Sobrante de caja'
+          : esRedondeoLegal
+            ? 'Redondeo legal de efectivo'
+            : 'Faltante de caja',
         detalles,
         evento.referencia,
         evento.event_id,

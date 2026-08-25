@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Put, Query, Req, UseGuards, BadRequestException, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Put, Query, Req, UseGuards, BadRequestException, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { CajasService } from './cajas.service';
 import { CreateCajaDto } from './dto/create-caja.dto';
@@ -10,7 +10,6 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
-import { Denominaciones } from './services/cash-reconciliation.service';
 import { CerrarCajaAvanzadoDto } from './dto/cerrar-caja-avanzado.dto';
 import {
   CancelarCambioTurnoCajaDto,
@@ -20,6 +19,7 @@ import {
   MovimientoManualCajaDto,
   SolicitarRetiroCajaDto,
 } from './dto/cash-operations.dto';
+import { RotarPinSupervisorDto } from './dto/supervisor-pin.dto';
 
 
 @Controller('cajas')
@@ -57,6 +57,30 @@ export class CajasController {
       dto,
       user?.id,
       this.requireIdempotencyKey(idempotencyKey, 'crear caja'),
+    );
+    return { success: true, data };
+  }
+
+  /**
+   * Alta/rotación tenant-scoped. `users.manage` es la capacidad administrativa
+   * indelegable y SQL la vuelve a comprobar; el body no acepta tenant, actor,
+   * hash, versión ni estado.
+   */
+  @Put('supervisores/:supervisorId/pin')
+  @RequirePermission('users.manage')
+  async rotarPinSupervisor(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+    @Param('supervisorId', new ParseUUIDPipe()) supervisorId: string,
+    @Body() dto: RotarPinSupervisorDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    const data = await this.service.rotarPinSupervisor(
+      tenantId,
+      user?.id,
+      supervisorId,
+      dto.pin,
+      this.requireIdempotencyKey(idempotencyKey, 'rotar PIN de supervisor'),
     );
     return { success: true, data };
   }
@@ -203,21 +227,80 @@ export class CajasController {
   }
 
   /**
+   * Ledger visible de la sesión seleccionada en Gestión de Cajas.
+   *
+   * Comparte `cajas.sesiones.ver` con el selector que conduce a esta tabla: no
+   * se concede una lectura nueva y el tenant siempre procede del contexto
+   * autenticado, nunca del path o query string.
+   */
+  @Get('movimientos/:sesionId')
+  @RequirePermission('cajas.sesiones.ver')
+  async obtenerMovimientos(
+    @CurrentTenant() tenantId: string,
+    @Param('sesionId') sesionId: string,
+  ) {
+    const data = await this.service.obtenerMovimientos(tenantId, sesionId);
+    return { success: true, data };
+  }
+
+  /**
+   * Preview autoritativo del arqueo. Reutiliza exactamente el servicio que el
+   * cierre avanzado ejecutará antes de la RPC, por lo que la UI no inventa una
+   * tolerancia ni promete un cierre que luego requiere supervisor.
+   */
+  @Post('validar-cierre/:sesionId')
+  @RequirePermission('cajas.precierre.ver')
+  async validarCierre(
+    @CurrentTenant() tenantId: string,
+    @Param('sesionId') sesionId: string,
+    @Body() dto: CerrarCajaAvanzadoDto,
+  ) {
+    const data = await this.service.validarCierre(
+      tenantId,
+      sesionId,
+      dto.monto_contado,
+      dto.denominaciones,
+    );
+    return { success: true, data };
+  }
+
+  /**
    * Supervisores habilitados para autorizar una diferencia de cierre.
    *
    * Va con el permiso de cierre, no con `users.manage`: quien cierra la caja
    * necesita elegir a quién pedirle la autorización, y un cajero no administra
    * usuarios. Sólo se exponen nombre e identificador, nunca el PIN ni su hash.
    */
-  @Get('supervisores-autorizados')
+  @Get('supervisores-autorizados/:sesionId')
   @RequirePermission('cajas.cierre')
-  async listarSupervisoresAutorizados(@CurrentTenant() tenantId: string) {
-    const data = await this.service.listarSupervisoresAutorizados(tenantId);
+  async listarSupervisoresAutorizados(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+    @Param('sesionId', new ParseUUIDPipe()) sesionId: string,
+  ) {
+    const data = await this.service.listarSupervisoresAutorizados(
+      tenantId,
+      user?.id,
+      sesionId,
+    );
+    return { success: true, data };
+  }
+
+  @Get('supervisores-gestion-pin')
+  @RequirePermission('users.manage')
+  async listarSupervisoresGestionPin(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.service.listarSupervisoresGestionPin(
+      tenantId,
+      user?.id,
+    );
     return { success: true, data };
   }
 
   @Post('cerrar/:sesionId')
-  @RequirePermission('cajas.cierre_administrativo')
+  @RequirePermission('cajas.cierre')
   async cerrarCajaAvanzado(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,

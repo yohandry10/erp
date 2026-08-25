@@ -4,13 +4,15 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
+  Matches,
   MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 
 /**
- * Body del cierre administrativo de caja.
+ * Body del cierre físico avanzado de caja.
  *
  * El arqueo se declara como dos mapas de denominación a cantidad, igual que la
  * interfaz `Denominaciones` que consume el servicio de conciliación. Las claves
@@ -35,6 +37,9 @@ export class CerrarCajaAvanzadoDto {
   denominaciones!: DenominacionesArqueoDto;
 
   @IsOptional() @IsString() @MaxLength(2000) notas?: string;
-  @IsOptional() @IsString() @MaxLength(80) supervisor_id?: string;
-  @IsOptional() @IsString() @MaxLength(120) codigo_autorizacion?: string;
+  @IsOptional() @IsUUID('4') supervisor_id?: string;
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9]{6}$/, { message: 'El código de supervisor debe tener 6 dígitos' })
+  codigo_autorizacion?: string;
 }

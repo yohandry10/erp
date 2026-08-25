@@ -148,6 +148,13 @@ const createSupabaseMock = () => {
                 };
             }
 
+            if (fn === 'resolver_tolerancia_cierre_caja_518') {
+                return {
+                    data: Number(mockData.configuracion_caja?.tolerancia_diferencia_cierre ?? 10),
+                    error: null,
+                };
+            }
+
             return { data: null, error: null };
         }),
     };
@@ -189,6 +196,7 @@ describe('Cash Operations Flow Integration', () => {
                 requiere_autorizacion: false,
                 mensaje: 'OK',
             }),
+            validarAutorizacionSupervisor: jest.fn().mockResolvedValue(undefined),
         } as any;
 
         auditService = {
@@ -226,6 +234,20 @@ describe('Cash Operations Flow Integration', () => {
             'registrar_movimiento_caja',
             expect.anything(),
         );
+    });
+
+    it('consulta el ledger por sesión y tenant, sin aceptar alcance del cliente', async () => {
+        const client = supabaseService.getClient();
+        const chain = client.from('movimientos_caja');
+        chain.eq.mockClear();
+        supabaseService._mockData.movimientos_caja = [{ id: 'mov-tenant-123' }];
+
+        await expect(
+            movementsService.obtenerMovimientos(mockSesionId, mockTenantId),
+        ).resolves.toEqual([{ id: 'mov-tenant-123' }]);
+
+        expect(chain.eq).toHaveBeenCalledWith('sesion_caja_id', mockSesionId);
+        expect(chain.eq).toHaveBeenCalledWith('tenant_id', mockTenantId);
     });
 
     it('should validate closing with correct amount', async () => {
@@ -373,12 +395,6 @@ describe('Cash Operations Flow Integration', () => {
             monedas: {},
         };
 
-        // En este escenario SÍ queremos que la diferencia requiera autorización
-        authService.validarDiferenciaCierre = jest.fn().mockResolvedValue({
-            requiere_autorizacion: true,
-            mensaje: 'Requiere supervisor',
-        });
-
         await expect(
             closingService.cerrarCaja(
                 mockSesionId,
@@ -391,5 +407,148 @@ describe('Cash Operations Flow Integration', () => {
                 mockTenantId,
             ),
         ).rejects.toThrow(BadRequestException);
+
+        expect(authService.validarAutorizacionSupervisor).not.toHaveBeenCalled();
+
+        await closingService.cerrarCaja(
+            mockSesionId,
+            {
+                monto_contado: 80,
+                denominaciones,
+                notas: 'Falta dinero',
+            },
+            mockUserId,
+            mockTenantId,
+            'supervisor-123',
+            '123456',
+        );
+
+        expect(authService.validarAutorizacionSupervisor).toHaveBeenCalledWith(
+            'supervisor-123',
+            '123456',
+            mockTenantId,
+        );
+        expect(authService.validarDiferenciaCierre).not.toHaveBeenCalled();
+
+        expect(client.rpc).toHaveBeenCalledWith('cerrar_caja_tx', expect.objectContaining({
+            p_payload: expect.objectContaining({
+                supervisor_id: 'supervisor-123',
+                codigo_autorizacion: '123456',
+            }),
+        }));
+    });
+
+    it('acredita todo supervisor suministrado aunque el preview no lo exija', async () => {
+        jest.spyOn(closingService, 'validarPrecierre').mockResolvedValue({
+            valido: true,
+            errores: [],
+            warnings: [],
+        });
+        jest.spyOn(reconciliationService, 'validarCierre').mockResolvedValue({
+            valido: true,
+            saldo_teorico: 100,
+            saldo_real: 100,
+            diferencia: 0,
+            tipo_diferencia: 'CUADRADO',
+            requiere_supervisor: false,
+            requiere_justificacion: false,
+            redondeo_efectivo_legal: false,
+            redondeo_efectivo_documentado: 0,
+            redondeo_efectivo_cantidad: 0,
+            tolerancia: 0,
+        });
+
+        await closingService.cerrarCaja(
+            mockSesionId,
+            { monto_contado: 100, denominaciones: { billetes: { 100: 1 }, monedas: {} } },
+            mockUserId,
+            mockTenantId,
+            'supervisor-123',
+            '123456',
+        );
+
+        expect(authService.validarAutorizacionSupervisor).toHaveBeenCalledWith(
+            'supervisor-123',
+            '123456',
+            mockTenantId,
+        );
+    });
+
+    it('reintenta una sesión ya cerrada directamente contra el replay atómico', async () => {
+        supabaseService._mockData.sesiones_caja = {
+            id: mockSesionId,
+            estado: 'CERRADA',
+        };
+        const precierre = jest.spyOn(closingService, 'validarPrecierre');
+        const preview = jest.spyOn(reconciliationService, 'validarCierre');
+        supabaseService.getClient().rpc.mockResolvedValueOnce({
+            data: {
+                id: mockSesionId,
+                estado: 'CERRADA',
+                diferencia: 0,
+                idempotent: true,
+            },
+            error: null,
+        });
+
+        await expect(closingService.cerrarCaja(
+            mockSesionId,
+            {
+                monto_contado: 100,
+                denominaciones: { billetes: { 100: 1 }, monedas: {} },
+                notas: 'Cierre OK',
+            },
+            mockUserId,
+            mockTenantId,
+        )).resolves.toEqual(expect.objectContaining({ idempotent: true }));
+
+        expect(precierre).not.toHaveBeenCalled();
+        expect(preview).not.toHaveBeenCalled();
+        expect(authService.validarAutorizacionSupervisor).not.toHaveBeenCalled();
+        expect(supabaseService.getClient().rpc).toHaveBeenCalledWith(
+            'cerrar_caja_tx',
+            expect.objectContaining({ p_actor_id: mockUserId }),
+        );
+    });
+
+    it('impide que el cajero responsable autorice a un actor administrativo distinto', async () => {
+        jest.spyOn(closingService, 'validarPrecierre').mockResolvedValue({
+            valido: true,
+            errores: [],
+            warnings: [],
+        });
+        jest.spyOn(reconciliationService, 'validarCierre').mockResolvedValue({
+            valido: false,
+            saldo_teorico: 100,
+            saldo_real: 90,
+            diferencia: -10,
+            tipo_diferencia: 'FALTANTE',
+            requiere_supervisor: true,
+            requiere_justificacion: true,
+            redondeo_efectivo_legal: false,
+            redondeo_efectivo_documentado: 0,
+            redondeo_efectivo_cantidad: 0,
+            tolerancia: 0,
+        });
+        supabaseService._mockData.sesiones_caja = {
+            id: mockSesionId,
+            cajero_id: 'cajero-responsable',
+            usuario_id: 'cajero-responsable',
+        };
+
+        await expect(closingService.cerrarCaja(
+            mockSesionId,
+            { monto_contado: 90, denominaciones: { billetes: {}, monedas: {} } },
+            'admin-que-cierra',
+            mockTenantId,
+            'cajero-responsable',
+            '123456',
+        )).rejects.toThrow('distinto del cajero responsable');
+
+        expect(authService.validarAutorizacionSupervisor).not.toHaveBeenCalled();
+        expect(supabaseService.getClient().rpc).not.toHaveBeenCalledWith(
+            'cerrar_caja_tx',
+            expect.anything(),
+        );
     });
 });

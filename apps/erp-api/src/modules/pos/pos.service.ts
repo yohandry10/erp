@@ -779,6 +779,7 @@ export class PosService {
         referencia_pago: ventaData.referencia_pago || null,
         descuento_global: ventaData.descuento_global || 0,
         pagos: ventaData.pagos || null,
+        redondeo_efectivo_legal: ventaData.redondeo_efectivo_legal === true,
         items,
       };
       const { data: retryData, error: retryError } = await this.supabase.getClient()
@@ -818,6 +819,9 @@ export class PosService {
           caja_movimiento_id: retry.caja_movimiento_id ?? null,
           items_actualizados: retry.items_actualizados ?? [],
           idempotent: true,
+          redondeo_efectivo_legal: retry.redondeo_efectivo_legal === true,
+          monto_efectivo_cobrado: retry.monto_efectivo_cobrado ?? null,
+          monto_ajuste_redondeo: retry.monto_ajuste_redondeo ?? null,
           message: tipoEmisionRetry === 'TICKET'
             ? 'Ticket interno ya confirmado; reintento validado sin recalcular la lista'
             : 'Venta fiscal ya confirmada; reintento validado sin recalcular la lista',
@@ -942,6 +946,7 @@ export class PosService {
       }
 
       const pagosRaw = Array.isArray(ventaData?.pagos) ? ventaData.pagos : null;
+      const solicitaRedondeoEfectivo = ventaData?.redondeo_efectivo_legal === true;
       let pagosNormalizados: Array<{
         codigo: string;
         tipo: string;
@@ -962,7 +967,7 @@ export class PosService {
           }
           const metodoInfo = await this.getMetodoPagoInfo(String(metodoValor), user.tenant_id);
           const montoPago = Number(pago?.monto ?? 0);
-          if (!Number.isFinite(montoPago) || montoPago <= 0) {
+          if (!Number.isFinite(montoPago) || montoPago < 0) {
             throw new Error('Monto de pago inválido');
           }
           sumaPagos = sumaPagos.plus(montoPago);
@@ -976,11 +981,43 @@ export class PosService {
           });
         }
 
-        if (sumaPagos.minus(totalCalculadoDecimal).abs().greaterThan(0.01)) {
+        const diferenciaPago = totalCalculadoDecimal.minus(sumaPagos).toDecimalPlaces(2);
+        const efectivoLegalEsperado = totalCalculadoDecimal
+          .times(10)
+          .floor()
+          .dividedBy(10)
+          .toDecimalPlaces(2);
+        const redondeoValido = solicitaRedondeoEfectivo
+          && String(empresaCfg?.pais || '').trim().toUpperCase() === 'PE'
+          && monedaVenta === 'PEN'
+          && pagosNormalizados.every((pago) => pago.tipo === 'EFECTIVO')
+          && diferenciaPago.greaterThanOrEqualTo(0.01)
+          && diferenciaPago.lessThanOrEqualTo(0.09)
+          && sumaPagos.equals(efectivoLegalEsperado);
+        const pagosConCeroValidos = pagosNormalizados.every((pago) => pago.monto > 0)
+          || (
+            redondeoValido
+            && pagosNormalizados.length === 1
+            && pagosNormalizados[0].monto === 0
+          );
+
+        if (solicitaRedondeoEfectivo && (!redondeoValido || !pagosConCeroValidos)) {
+          throw new Error(
+            'Redondeo de efectivo inválido: sólo aplica a una venta PE/PEN íntegramente en efectivo y al décimo inferior',
+          );
+        }
+        if (!pagosConCeroValidos) {
+          throw new Error('Monto de pago inválido');
+        }
+        if (!solicitaRedondeoEfectivo && !diferenciaPago.isZero()) {
           throw new Error(
             `Pagos no cuadran con total. Pagos=${sumaPagos.toFixed(2)} Total=${totalCalculadoDecimal.toFixed(2)}`,
           );
         }
+      } else if (solicitaRedondeoEfectivo) {
+        throw new Error(
+          'Redondeo de efectivo inválido: se requiere el pago efectivo explícito',
+        );
       }
 
       // Si los totales del cliente no coinciden, forzar los calculados
@@ -1135,6 +1172,7 @@ export class PosService {
               metodo_pago_id: pago.metodo_pago_id,
             }))
           : null,
+        redondeo_efectivo_legal: solicitaRedondeoEfectivo,
         referencia_pago: ventaData.referencia_pago || null,
         cpe_data: emitirCpe ? {
           tipo_documento: tipoComprobante,
@@ -1234,6 +1272,9 @@ export class PosService {
         caja_movimiento_id: ventaTx.caja_movimiento_id ?? null,
         items_actualizados: ventaTx.items_actualizados ?? [],
         idempotent: Boolean(ventaTx.idempotent),
+        redondeo_efectivo_legal: ventaTx.redondeo_efectivo_legal === true,
+        monto_efectivo_cobrado: ventaTx.monto_efectivo_cobrado ?? null,
+        monto_ajuste_redondeo: ventaTx.monto_ajuste_redondeo ?? null,
         message: tipoEmision === 'TICKET'
           ? 'Venta confirmada como ticket interno canjeable; sin correlativo fiscal reservado'
           : 'Venta confirmada atómicamente; CPE en cola durable',
