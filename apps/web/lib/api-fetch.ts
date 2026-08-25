@@ -1,4 +1,4 @@
-import { buildApiUrl, normalizeApiEndpoint } from './api-url'
+import { buildApiUrl, normalizeApiEndpoint, withTrailingSlash } from './api-url'
 import { customAuth } from './auth-service'
 import { fetchWithOfflineSupport } from './offline-store'
 
@@ -24,7 +24,11 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   // El tenant autoritativo viene del JWT/cookie. No copiar el tenant de un
   // snapshot local potencialmente obsoleto al header de autorización.
 
-  return fetchWithOfflineSupport(buildApiUrl(normalizedEndpoint), {
+  // El API redirige con 308 toda ruta sin barra final. `useApi` ya la anade;
+  // `fetchApi` no lo hacia, y como `TenantContext` y el banner de demo pasan por
+  // aqui, cada carga de pagina pagaba dos redirecciones de ida y vuelta antes de
+  // recibir un solo dato.
+  return fetchWithOfflineSupport(buildApiUrl(withTrailingSlash(normalizedEndpoint)), {
     credentials: 'include',
     mode: 'cors',
     cache: 'no-store',
