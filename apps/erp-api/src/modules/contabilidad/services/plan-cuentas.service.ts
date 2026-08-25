@@ -16,7 +16,53 @@ export interface PlanCuenta {
   updated_at?: string;
 }
 
-const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>> = {
+export const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>> = {
+  // Anadidas tras cruzar el catalogo contra los codigos que exigen los
+  // generadores de asientos. `obtenerCuentasPorCodigos` es todo-o-nada: si una
+  // sola falta y no esta aqui, el asiento no se genera y la operacion se queda
+  // sin contabilizar. Medido sobre produccion: a 36 de 68 contribuyentes les
+  // faltaba la 4699, que exige el asiento de recepcion de mercaderia, y a 32 la
+  // 629, que exige el de beneficios sociales.
+  '421': {
+    codigo: '421',
+    nombre: 'Facturas, boletas y otros comprobantes por pagar',
+    tipo: 'PASIVO',
+    nivel: 3,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '422': {
+    codigo: '422',
+    nombre: 'Anticipos a proveedores',
+    tipo: 'PASIVO',
+    nivel: 3,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '4699': {
+    codigo: '4699',
+    nombre: 'Otras cuentas por pagar diversas - terceros',
+    tipo: 'PASIVO',
+    nivel: 4,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '629': {
+    codigo: '629',
+    nombre: 'Beneficios sociales de los trabajadores',
+    tipo: 'GASTO',
+    nivel: 3,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '19': {
+    codigo: '19',
+    nombre: 'Estimacion de cuentas de cobranza dudosa',
+    tipo: 'ACTIVO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
   '10': {
     codigo: '10',
     nombre: 'Efectivo y equivalentes de efectivo',
