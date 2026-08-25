@@ -803,7 +803,7 @@ export class AccountingBooksService {
         .from('registro_consignaciones')
         .select(`
           *,
-          movimientos_consignacion(
+          movimientos_consignacion!movimientos_consignacion_registro_id_fkey_runtime(
             *,
             productos(codigo, nombre, categoria)
           )

@@ -69,7 +69,26 @@ migraciones verificados, prevalece la implementación actual.
   restringidos (0 de 70). No se pierde cobertura: el `493`, el `501` y el techo
   RBAC comprueban la restricción por código, no al azar.
 
-- **PROD está en `516`.** La `510` puso el mecanismo de tasas de detracción
+- **Catorce funciones de escritura llevaban meses inalcanzables desde el API, y
+  todos sus verificadores pasaban en verde.** El envoltorio público se declaró
+  con los tipos y sin los nombres de parámetro. PostgREST sólo sabe llamar por
+  nombre —es como lo hace supabase-js— así que respondía `PGRST202: Could not
+  find the function ... in the schema cache`. Los verificadores no lo veían
+  porque llaman desde SQL con argumentos posicionales, donde funciona
+  perfectamente: **el contrato que se comprobaba no era el que usa el producto**.
+
+  Estaba caído registrar o desactivar un tipo de cambio, crear un centro de
+  costo, abrir un periodo, crear/editar/anular un documento manual, crear una
+  serie, el resumen diario y la comunicación de baja de SUNAT con sus tres
+  funciones de envío, consignaciones, consolidación, presupuestos y el borrado
+  de una distribución analítica. Lo corrige la `517`, recreándolas con los
+  nombres que el código ya enviaba.
+
+  El verificador `517` no las llama: mira el catálogo, y exige que ninguna
+  función pública `SECURITY DEFINER` se quede sin nombres. Con control positivo,
+  porque una comprobación de este tipo pasa en verde con demasiada facilidad.
+
+- **PROD está en `517`.** La `510` puso el mecanismo de tasas de detracción
   —catálogo de códigos SPOT con tasa y vigencia, `codigo_detraccion` en la cuenta
   por pagar, y un contraste que **compara sin imponer**, porque hay operaciones
   con reglas especiales y el contador tiene que poder apartarse a sabiendas, pero
@@ -837,7 +856,7 @@ Cambios recientes principales:
   detenerse si el preflight del backfill `490→492` encuentra un evento laboral
   sin snapshot contable inequívoco; el runtime nuevo exige esquema `496` y no
   debe desplegarse antes que la base.
-- `497..516`: aplicadas y registradas en PROD. Cubren el respaldo peruano del
+- `497..517`: aplicadas y registradas en PROD. Cubren el respaldo peruano del
   esquema (`500`), las sucursales como establecimiento anexo y su herencia en
   las operaciones (`503..505`), y la auditoría contable por puntos —prorrata del
   crédito fiscal (`507`), retención de cuarta categoría (`508`), estimación de
@@ -902,6 +921,9 @@ productivo autorizado.
   nulos y centinelas. Un proceso desatendido no puede inventarse un autor: tiene
   que resolver una persona real —el contador, y si no lo hay el administrador— o
   no escribir.
+- **Una función pública que el API llame tiene que declarar sus parámetros con
+  nombre.** PostgREST no sabe llamar posicionalmente. Un verificador que la
+  pruebe desde SQL no detecta el fallo, porque desde SQL sí funciona.
 - **Nombrar una clave ajena en un `select` de PostgREST es una dependencia contra
   el esquema.** `tabla!nombre_de_la_restriccion(...)` deja de funcionar si esa
   restricción se renombra o se retira, y como vive dentro de una cadena de texto
