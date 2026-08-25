@@ -46,6 +46,11 @@ const proveedorSchema = z.object({
     .optional(),
   dias_credito: z.number()
     .min(0, 'Los días de crédito no pueden ser negativos')
+    .optional(),
+  // Sólo Perú: la retención de cuarta categoría es de la Ley del Impuesto a la
+  // Renta peruana. Vacío significa que no hay constancia vigente.
+  suspension_retencion_cuarta_hasta: z.string()
+    .regex(/^(\d{4}-\d{2}-\d{2})?$/, 'Indique una fecha o déjelo vacío')
     .optional()
 })
 
@@ -86,7 +91,9 @@ export function ProveedorForm({
       contacto: initialData?.contacto || '',
       condiciones_pago: initialData?.condiciones_pago || 'CONTADO',
       limite_credito: initialData?.limite_credito || 0,
-      dias_credito: initialData?.dias_credito || 0
+      dias_credito: initialData?.dias_credito || 0,
+      suspension_retencion_cuarta_hasta:
+        initialData?.suspension_retencion_cuarta_hasta || ''
     }
   })
 
@@ -307,6 +314,37 @@ export function ProveedorForm({
           </div>
         </div>
       </div>
+
+      {country.paisCodigo === 'PE' && (
+        <div className="relative rounded-2xl border border-border bg-card/95 p-4 text-card-foreground shadow-md backdrop-blur-xl">
+          <h3 className="text-[1.125rem] font-semibold mb-2 flex items-center gap-2">
+            <Building2 size={20} />
+            Retención de cuarta categoría
+          </h3>
+          <p className="text-xs text-muted-foreground mb-6">
+            Si el proveedor le entregó su constancia de suspensión, anote hasta cuándo rige.
+            Mientras esté vigente no se le retendrá el 8 % de sus recibos por honorarios.
+            Déjelo vacío cuando caduque.
+          </p>
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
+            <div>
+              <label htmlFor="proveedorform-suspension-cuarta" className="block text-[0.875rem] font-medium mb-2 text-foreground/85">
+                Suspensión vigente hasta
+              </label>
+              <input id="proveedorform-suspension-cuarta"
+                type="date"
+                {...register('suspension_retencion_cuarta_hasta')}
+                className="w-[100%] p-3 rounded-lg text-[0.875rem]"
+              />
+              {errors.suspension_retencion_cuarta_hasta && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors.suspension_retencion_cuarta_hasta.message}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex justify-end gap-4 pt-4 border-t">
