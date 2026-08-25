@@ -144,6 +144,7 @@ export class ContabilidadMultimonedaController {
   })
   async importarTiposCambio(
     @CurrentTenant() tenantId: string,
+    @CurrentUser("id") userId: string,
     @Query("desde") desde: string,
     @Query("hasta") hasta?: string,
   ) {
@@ -155,7 +156,7 @@ export class ContabilidadMultimonedaController {
       throw new BadRequestException("'hasta' debe tener formato YYYY-MM-DD");
     }
 
-    const resultados = await this.tipoCambioSunat.importarRango(tenantId, desde, fin);
+    const resultados = await this.tipoCambioSunat.importarRango(tenantId, desde, fin, userId);
     return {
       success: true,
       data: {

@@ -21,9 +21,13 @@ describe('TipoCambioSunatService', () => {
   const construirSupabase = (opciones: {
     existente?: any;
     ultimo?: any;
-    onInsert?: jest.Mock;
+    onRpc?: jest.Mock;
   }) => {
-    const insert = opciones.onInsert ?? jest.fn(async () => ({ error: null }));
+    // Se escribe por `gestionar_maestro_contable_tx` y no con un insert porque la
+    // migracion 482 le revoca el INSERT sobre `tipos_cambio` al rol del API. El
+    // doble lo imita: si alguien vuelve a insertar directo, aqui no se ve, pero
+    // en la base falla con «permission denied».
+    const rpc = opciones.onRpc ?? jest.fn(async () => ({ data: { success: true }, error: null }));
 
     const cadena = (): any => {
       const chain: any = {
@@ -32,7 +36,6 @@ describe('TipoCambioSunatService', () => {
         lt: jest.fn(() => chain),
         order: jest.fn(() => chain),
         limit: jest.fn(() => chain),
-        insert,
       };
       // `maybeSingle` sirve dos consultas distintas: la de la fecha exacta y la
       // del último conocido. Se distinguen por si se uso `lt`.
@@ -45,8 +48,8 @@ describe('TipoCambioSunatService', () => {
     };
 
     return {
-      getClient: jest.fn(() => ({ from: jest.fn(() => cadena()) })),
-      _insert: insert,
+      getClient: jest.fn(() => ({ from: jest.fn(() => cadena()), rpc })),
+      _rpc: rpc,
     };
   };
 
@@ -62,11 +65,16 @@ describe('TipoCambioSunatService', () => {
     const supabase = construirSupabase({ ultimo: { fecha: '2026-08-19', compra: 3.356, venta: 3.362 } });
 
     const service = new TipoCambioSunatService(supabase as any);
-    const resultado = await service.importarFecha('tenant-1', '2026-08-20');
+    const resultado = await service.importarFecha('tenant-1', '2026-08-20', 'usuario-1');
 
     expect(resultado.guardado).toBe(true);
-    expect(supabase._insert).toHaveBeenCalledWith(
-      expect.objectContaining({ compra: 3.355, venta: 3.361, fuente: 'apis.net.pe' }),
+    expect(supabase._rpc).toHaveBeenCalledWith(
+      'gestionar_maestro_contable_tx',
+      expect.objectContaining({
+        p_entity: 'FX',
+        p_action: 'CREATE',
+        p_payload: expect.objectContaining({ compra: 3.355, venta: 3.361, fuente: 'apis.net.pe' }),
+      }),
     );
   });
 
@@ -77,11 +85,11 @@ describe('TipoCambioSunatService', () => {
     const supabase = construirSupabase({ ultimo: { fecha: '2026-08-19', compra: 3.356, venta: 3.362 } });
 
     const service = new TipoCambioSunatService(supabase as any);
-    const resultado = await service.importarFecha('tenant-1', '2026-08-20');
+    const resultado = await service.importarFecha('tenant-1', '2026-08-20', 'usuario-1');
 
     expect(resultado.guardado).toBe(false);
     expect(resultado.motivo).toContain('se aparta');
-    expect(supabase._insert).not.toHaveBeenCalled();
+    expect(supabase._rpc).not.toHaveBeenCalled();
   });
 
   it('sin cotización previa acepta la primera, porque si no el sistema se queda sin ninguna', async () => {
@@ -89,7 +97,7 @@ describe('TipoCambioSunatService', () => {
     const supabase = construirSupabase({ ultimo: null });
 
     const service = new TipoCambioSunatService(supabase as any);
-    const resultado = await service.importarFecha('tenant-1', '2026-08-20');
+    const resultado = await service.importarFecha('tenant-1', '2026-08-20', 'usuario-1');
 
     expect(resultado.guardado).toBe(true);
   });
@@ -99,11 +107,11 @@ describe('TipoCambioSunatService', () => {
     const supabase = construirSupabase({ existente: { id: 'tc-1', fuente: 'manual' } });
 
     const service = new TipoCambioSunatService(supabase as any);
-    const resultado = await service.importarFecha('tenant-1', '2026-08-20');
+    const resultado = await service.importarFecha('tenant-1', '2026-08-20', 'usuario-1');
 
     expect(resultado.guardado).toBe(false);
     expect(resultado.motivo).toContain('ya existe');
-    expect(supabase._insert).not.toHaveBeenCalled();
+    expect(supabase._rpc).not.toHaveBeenCalled();
   });
 
   it('la fuente caída no rompe nada: se informa y se sigue', async () => {
@@ -112,11 +120,11 @@ describe('TipoCambioSunatService', () => {
     const supabase = construirSupabase({});
 
     const service = new TipoCambioSunatService(supabase as any);
-    const resultado = await service.importarFecha('tenant-1', '2026-08-20');
+    const resultado = await service.importarFecha('tenant-1', '2026-08-20', 'usuario-1');
 
     expect(resultado.guardado).toBe(false);
     expect(resultado.motivo).toContain('no devolvió');
-    expect(supabase._insert).not.toHaveBeenCalled();
+    expect(supabase._rpc).not.toHaveBeenCalled();
   });
 
   it('rechaza una respuesta con importes no utilizables', async () => {
@@ -124,10 +132,29 @@ describe('TipoCambioSunatService', () => {
     const supabase = construirSupabase({});
 
     const service = new TipoCambioSunatService(supabase as any);
-    const resultado = await service.importarFecha('tenant-1', '2026-08-20');
+    const resultado = await service.importarFecha('tenant-1', '2026-08-20', 'usuario-1');
 
     expect(resultado.guardado).toBe(false);
-    expect(supabase._insert).not.toHaveBeenCalled();
+    expect(supabase._rpc).not.toHaveBeenCalled();
+  });
+
+  it('la importación queda a nombre de quien la pidió', async () => {
+    // La base rechaza cualquier autor que no sea un usuario activo del
+    // contribuyente (`FINANCIAL_MASTER_ACTOR_INVALID`), asi que el autor viaja
+    // hasta la funcion sin sustituirse por ningun centinela.
+    axiosGet.mockResolvedValue({ data: { compra: 3.355, venta: 3.361 } });
+    const supabase = construirSupabase({});
+
+    await new TipoCambioSunatService(supabase as any).importarFecha(
+      'tenant-1',
+      '2026-08-20',
+      'usuario-7',
+    );
+
+    expect(supabase._rpc).toHaveBeenCalledWith(
+      'gestionar_maestro_contable_tx',
+      expect.objectContaining({ p_actor_id: 'usuario-7' }),
+    );
   });
 
   it('la tolerancia del contraste es configurable', async () => {
@@ -136,7 +163,7 @@ describe('TipoCambioSunatService', () => {
     const supabase = construirSupabase({ ultimo: { fecha: '2026-08-19', compra: 3.356, venta: 3.362 } });
 
     const service = new TipoCambioSunatService(supabase as any);
-    const resultado = await service.importarFecha('tenant-1', '2026-08-20');
+    const resultado = await service.importarFecha('tenant-1', '2026-08-20', 'usuario-1');
 
     // Con la tolerancia al 50 % el mismo valor pasa: la regla no está grabada a fuego.
     expect(resultado.guardado).toBe(true);
