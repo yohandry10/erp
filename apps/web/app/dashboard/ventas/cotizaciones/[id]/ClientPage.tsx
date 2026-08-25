@@ -9,6 +9,15 @@ import { Cotizacion, EstadoCotizacion } from '@/types/ventas'
 import CotizacionForm, { CotizacionFormData } from '@/components/ventas/CotizacionForm'
 import ConvertirPedidoButton from '@/components/ventas/ConvertirPedidoButton'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from '@/components/ui/use-toast'
 import { ArrowLeft, CheckCircle2, Edit, FileText, Loader2, Send, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
@@ -56,6 +65,8 @@ export default function CotizacionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [transitioning, setTransitioning] = useState<'enviar' | 'aprobar' | 'rechazar' | null>(null)
+  const [pendingTransition, setPendingTransition] = useState<'enviar' | 'aprobar' | 'rechazar' | null>(null)
+  const [transitionReason, setTransitionReason] = useState('')
 
   const cotizacionId = params.id as string
 
@@ -135,24 +146,16 @@ export default function CotizacionDetailPage() {
     return formatLocalizedCurrency(toNumber(amount))
   }
 
-  const handleEstadoTransition = async (accion: 'enviar' | 'aprobar' | 'rechazar') => {
-    let motivo: string | undefined
+  const openEstadoTransition = (accion: 'enviar' | 'aprobar' | 'rechazar') => {
+    setTransitionReason('')
+    setPendingTransition(accion)
+  }
 
-    if (accion === 'enviar') {
-      if (!window.confirm(`¿Marcar la cotización ${cotizacion?.numero ?? ''} como enviada?`)) {
-        return
-      }
-    } else {
-      const decision = accion === 'aprobar' ? 'aprobar' : 'rechazar'
-      const motivoIngresado = window.prompt(
-        `Motivo u observación para ${decision} la cotización ${cotizacion?.numero ?? ''} (opcional):`,
-      )
-      if (motivoIngresado === null) {
-        return
-      }
-      motivo = motivoIngresado.trim() || undefined
-    }
+  const handleEstadoTransition = async () => {
+    if (!pendingTransition) return
 
+    const accion = pendingTransition
+    const motivo = accion === 'enviar' ? undefined : transitionReason.trim() || undefined
     try {
       setTransitioning(accion)
       const response = await post(
@@ -173,6 +176,8 @@ export default function CotizacionDetailPage() {
         title: 'Estado actualizado',
         description: `La cotización quedó ${estadoFinal}.`,
       })
+      setPendingTransition(null)
+      setTransitionReason('')
       await loadCotizacion()
     } catch (error: any) {
       toast({
@@ -219,6 +224,23 @@ export default function CotizacionDetailPage() {
                      cotizacion.estado === EstadoCotizacion.APROBADA
   const isConverted = cotizacion.estado === EstadoCotizacion.CONVERTIDA
   const detalle = Array.isArray(cotizacion.detalle) ? cotizacion.detalle : []
+  const transitionCopy = pendingTransition === 'enviar'
+    ? {
+        title: 'Enviar cotización',
+        description: `La cotización ${cotizacion.numero} quedará disponible para decisión del cliente.`,
+        confirm: 'Confirmar envío',
+      }
+    : pendingTransition === 'aprobar'
+      ? {
+          title: 'Aprobar cotización',
+          description: `Confirma la aprobación de la cotización ${cotizacion.numero}.`,
+          confirm: 'Aprobar cotización',
+        }
+      : {
+          title: 'Rechazar cotización',
+          description: `Confirma el rechazo de la cotización ${cotizacion.numero}.`,
+          confirm: 'Rechazar cotización',
+        }
 
   return (
     <div className="p-6 flex flex-col gap-6">
@@ -276,7 +298,7 @@ export default function CotizacionDetailPage() {
               type="button"
               variant="outline"
               disabled={transitioning !== null}
-              onClick={() => handleEstadoTransition('enviar')}
+              onClick={() => openEstadoTransition('enviar')}
             >
               {transitioning === 'enviar' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Enviar
@@ -289,7 +311,7 @@ export default function CotizacionDetailPage() {
                 type="button"
                 variant="success"
                 disabled={transitioning !== null}
-                onClick={() => handleEstadoTransition('aprobar')}
+                onClick={() => openEstadoTransition('aprobar')}
               >
                 {transitioning === 'aprobar' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Aprobar
@@ -298,7 +320,7 @@ export default function CotizacionDetailPage() {
                 type="button"
                 variant="destructive"
                 disabled={transitioning !== null}
-                onClick={() => handleEstadoTransition('rechazar')}
+                onClick={() => openEstadoTransition('rechazar')}
               >
                 {transitioning === 'rechazar' ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
                 Rechazar
@@ -315,6 +337,63 @@ export default function CotizacionDetailPage() {
           )}
         </div>
       </div>
+
+      <Dialog
+        open={pendingTransition !== null}
+        onOpenChange={(open) => {
+          if (!open && transitioning === null) {
+            setPendingTransition(null)
+            setTransitionReason('')
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{transitionCopy.title}</DialogTitle>
+            <DialogDescription>{transitionCopy.description}</DialogDescription>
+          </DialogHeader>
+
+          {pendingTransition !== 'enviar' && (
+            <div className="space-y-2 py-2">
+              <label htmlFor="cotizacion-transition-reason" className="text-sm font-medium text-foreground">
+                Motivo u observación (opcional)
+              </label>
+              <Textarea
+                id="cotizacion-transition-reason"
+                aria-label="Motivo u observación"
+                value={transitionReason}
+                onChange={(event) => setTransitionReason(event.target.value)}
+                placeholder="Añade el sustento de la decisión..."
+                rows={4}
+                disabled={transitioning !== null}
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={transitioning !== null}
+              onClick={() => {
+                setPendingTransition(null)
+                setTransitionReason('')
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant={pendingTransition === 'rechazar' ? 'destructive' : 'success'}
+              disabled={transitioning !== null}
+              onClick={handleEstadoTransition}
+            >
+              {transitioning !== null && <Loader2 className="h-4 w-4 animate-spin" />}
+              {transitionCopy.confirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Converted Message */}
       {isConverted && (

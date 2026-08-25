@@ -4,6 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { CheckCircle2, AlertCircle, RefreshCw, XCircle, DollarSign, Clock, FileText } from 'lucide-react'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { toast } from '@/components/ui/use-toast'
 
 interface ClienteResumen {
   razon_social?: string
@@ -74,6 +85,11 @@ export default function AprobacionesPage() {
   const [decidingId, setDecidingId] = useState<string | null>(null)
   const [data, setData] = useState<PedidoPendiente[]>([])
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null)
+  const [pendingDecision, setPendingDecision] = useState<{
+    pedido: PedidoPendiente
+    decision: 'APROBADO' | 'RECHAZADO'
+  } | null>(null)
+  const [observaciones, setObservaciones] = useState('')
 
   const totalPendiente = useMemo(
     () => data.reduce((sum, pedido) => sum + (pedido.total || 0), 0),
@@ -94,7 +110,11 @@ export default function AprobacionesPage() {
       }
     } catch (error) {
       console.error('Error al cargar aprobaciones pendientes:', error)
-      alert('Error: No se pudieron cargar los pedidos pendientes de aprobación')
+      toast({
+        title: 'No se pudieron cargar las aprobaciones',
+        description: 'Actualiza la bandeja o inténtalo nuevamente.',
+        variant: 'destructive',
+      })
     } finally {
       setUltimaActualizacion(new Date())
       setLoading(false)
@@ -105,35 +125,50 @@ export default function AprobacionesPage() {
     loadPendientes()
   }, [loadPendientes])
 
-  const handleDecision = async (pedido: PedidoPendiente, decision: 'APROBADO' | 'RECHAZADO') => {
+  const openDecision = (pedido: PedidoPendiente, decision: 'APROBADO' | 'RECHAZADO') => {
     if (estaBloqueadoPorCredito(pedido)) {
-      alert(
-        `El pedido ${pedido.numero} está bloqueado por crédito. Regulariza la cuenta del cliente antes de continuar; este bloqueo no admite aprobación comercial.`,
-      )
+      toast({
+        title: 'Pedido bloqueado por crédito',
+        description: `Regulariza la cuenta del cliente de ${pedido.numero}; este bloqueo no admite aprobación comercial.`,
+        variant: 'destructive',
+      })
       return
     }
 
-    const observaciones = window.prompt(
-      `Ingresa una observación para ${decision === 'APROBADO' ? 'aprobar' : 'rechazar'} el pedido ${pedido.numero} (opcional):`,
-    )
+    setObservaciones('')
+    setPendingDecision({ pedido, decision })
+  }
+
+  const handleDecision = async () => {
+    if (!pendingDecision) return
+    const { pedido, decision } = pendingDecision
 
     try {
       setDecidingId(pedido.id)
       const response = await post(`/ventas/pedidos/${pedido.id}/aprobaciones/decision`, {
         decision,
         motivos: pedido.motivos,
-        observaciones: observaciones || undefined,
+        observaciones: observaciones.trim() || undefined,
       })
 
       if (response?.success) {
-        alert(`El pedido ${pedido.numero} fue ${decision === 'APROBADO' ? 'aprobado' : 'rechazado'} correctamente`)
-        loadPendientes()
+        toast({
+          title: decision === 'APROBADO' ? 'Pedido aprobado' : 'Pedido rechazado',
+          description: `${pedido.numero} fue procesado correctamente.`,
+        })
+        setPendingDecision(null)
+        setObservaciones('')
+        await loadPendientes()
       } else {
         throw new Error(response?.message || 'Operación no completada')
       }
     } catch (error) {
       console.error('Error registrando decisión:', error)
-      alert('Error: No pudimos registrar la decisión de aprobación')
+      toast({
+        title: 'No se pudo registrar la decisión',
+        description: 'Verifica el estado del pedido e inténtalo nuevamente.',
+        variant: 'destructive',
+      })
     } finally {
       setDecidingId(null)
     }
@@ -304,7 +339,7 @@ export default function AprobacionesPage() {
                       ) : (
                       <div className="flex gap-3 flex-wrap">
                         <button
-                          onClick={() => handleDecision(pedido, 'APROBADO')}
+                          onClick={() => openDecision(pedido, 'APROBADO')}
                           disabled={decidingId === pedido.id} className="py-3 px-6 rounded-lg border-0 text-white text-[0.875rem] font-semibold flex items-center gap-2 transition"
                           onMouseEnter={(e) => {
                             if (decidingId !== pedido.id) {
@@ -325,7 +360,7 @@ export default function AprobacionesPage() {
                           Aprobar
                         </button>
                         <button
-                          onClick={() => handleDecision(pedido, 'RECHAZADO')}
+                          onClick={() => openDecision(pedido, 'RECHAZADO')}
                           disabled={decidingId === pedido.id} className="py-3 px-6 rounded-lg border text-[0.875rem] font-semibold flex items-center gap-2 transition"
                           onMouseEnter={(e) => {
                             if (decidingId !== pedido.id) {
@@ -391,6 +426,70 @@ export default function AprobacionesPage() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={pendingDecision !== null}
+        onOpenChange={(open) => {
+          if (!open && decidingId === null) {
+            setPendingDecision(null)
+            setObservaciones('')
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pendingDecision?.decision === 'APROBADO' ? 'Aprobar pedido' : 'Rechazar pedido'}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingDecision
+                ? `Registra la decisión sobre el pedido ${pendingDecision.pedido.numero}.`
+                : 'Registra la decisión comercial.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <label htmlFor="pedido-decision-observaciones" className="text-sm font-medium text-foreground">
+              Observación (opcional)
+            </label>
+            <Textarea
+              id="pedido-decision-observaciones"
+              aria-label="Observación de la decisión"
+              value={observaciones}
+              onChange={(event) => setObservaciones(event.target.value)}
+              placeholder="Añade el sustento de la decisión..."
+              rows={4}
+              disabled={decidingId !== null}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={decidingId !== null}
+              onClick={() => {
+                setPendingDecision(null)
+                setObservaciones('')
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant={pendingDecision?.decision === 'RECHAZADO' ? 'destructive' : 'success'}
+              disabled={decidingId !== null}
+              onClick={handleDecision}
+            >
+              {decidingId !== null
+                ? 'Procesando...'
+                : pendingDecision?.decision === 'APROBADO'
+                  ? 'Aprobar pedido'
+                  : 'Rechazar pedido'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

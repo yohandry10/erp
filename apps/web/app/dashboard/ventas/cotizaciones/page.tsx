@@ -17,6 +17,8 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { parseDateLocal } from '@/lib/date-utils'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import { toast } from '@/components/ui/use-toast'
 
 const ESTADO_COLORS: Record<EstadoCotizacion, { bg: string, text: string }> = {
   [EstadoCotizacion.BORRADOR]: { bg: 'rgba(156, 163, 175, 0.1)', text: '#6b7280' },
@@ -39,6 +41,7 @@ export default function CotizacionesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCotizaciones, setTotalCotizaciones] = useState(0)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; numero: string } | null>(null)
   const itemsPerPage = 10
 
   const loadCotizaciones = useCallback(async () => {
@@ -59,7 +62,11 @@ export default function CotizacionesPage() {
       }
     } catch (error) {
       console.error('Error loading cotizaciones:', error)
-      alert('❌ Error: No se pudieron cargar las cotizaciones')
+      toast({
+        title: 'No se pudieron cargar las cotizaciones',
+        description: 'Actualiza la bandeja o inténtalo nuevamente.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -79,17 +86,23 @@ export default function CotizacionesPage() {
     setCurrentPage(1)
   }
 
-  const handleDelete = async (id: string, numero: string) => {
-    if (!confirm(`¿Está seguro de eliminar la cotización "${numero}"?`)) {
-      return
-    }
+  const handleDelete = async () => {
+    if (!pendingDelete) return
 
     try {
-      await del(`/api/ventas/cotizaciones/${id}`)
-      alert('✅ Cotización eliminada correctamente')
-      loadCotizaciones()
+      await del(`/api/ventas/cotizaciones/${pendingDelete.id}`)
+      toast({
+        title: 'Cotización eliminada',
+        description: `${pendingDelete.numero} fue eliminada correctamente.`,
+      })
+      setPendingDelete(null)
+      await loadCotizaciones()
     } catch (error: any) {
-      alert(`❌ Error: ${error.message || 'No se pudo eliminar la cotización'}`)
+      toast({
+        title: 'No se pudo eliminar la cotización',
+        description: error.message || 'Inténtalo nuevamente.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -266,7 +279,7 @@ export default function CotizacionesPage() {
                                   <Edit size={16} />
                                 </button>
                                 <button
-                                  onClick={() => handleDelete(cotizacion.id, cotizacion.numero)} className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors cursor-pointer hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                                  onClick={() => setPendingDelete({ id: cotizacion.id, numero: cotizacion.numero })} className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors cursor-pointer hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
                                   title="Eliminar"
                                 >
                                   <Trash2 size={16} />
@@ -309,6 +322,16 @@ export default function CotizacionesPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={handleDelete}
+        title="Eliminar cotización"
+        message={`La cotización ${pendingDelete?.numero ?? ''} se eliminará definitivamente. Esta acción sólo está disponible mientras permanece en borrador.`}
+        confirmText="Eliminar cotización"
+        variant="danger"
+      />
     </div>
   )
 }
