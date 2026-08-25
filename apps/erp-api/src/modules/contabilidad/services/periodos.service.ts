@@ -323,6 +323,39 @@ export class PeriodosService {
    * @param usuarioId - ID del usuario que cierra el período
    * @returns Período contable cerrado
    */
+  /**
+   * Estimación de cuentas de cobranza dudosa del periodo.
+   *
+   * El criterio de antigüedad es un parámetro y no una constante: el reglamento
+   * del Impuesto a la Renta admite provisionar antes de los doce meses cuando
+   * hay protesto o gestiones de cobro documentadas, y eso el sistema no puede
+   * saberlo. 360 días es el umbral que no necesita otra prueba.
+   */
+  async provisionarCobranzaDudosa(
+    tenantId: string,
+    periodo: string,
+    usuarioId: string,
+    diasVencido = 360,
+  ): Promise<Record<string, unknown>> {
+    const { data, error } = await this.supabaseService.getClient().rpc(
+      'provisionar_cobranza_dudosa_tx',
+      {
+        p_tenant_id: tenantId,
+        p_periodo: periodo,
+        p_actor_id: usuarioId,
+        p_dias_vencido: diasVencido,
+      },
+    );
+
+    if (error) {
+      throw new BadRequestException(
+        error.message || `No se pudo provisionar la cobranza dudosa de ${periodo}`,
+      );
+    }
+
+    return data as Record<string, unknown>;
+  }
+
   async cerrarPeriodo(
     tenantId: string,
     anio: number,

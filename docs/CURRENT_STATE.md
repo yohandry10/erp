@@ -8,7 +8,25 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **PROD está en `506`.** Una auditoría contra el trabajo real de un contador
+- **PROD está en `509`.** Continuación de la auditoría contable, por puntos y con
+  verificador comprobado en rojo en cada uno. La `507` añade la **prorrata del
+  crédito fiscal** con los tres destinos del artículo 23 y coeficiente de doce
+  meses; su defecto es `GRAVADAS`, o sea el comportamiento previo, y el
+  verificador vigila que nadie lo cambie —hacerlo subiría el IGV a pagar de todo
+  el que no usa prorrata sin que nadie toque una declaración—. La `508` calcula
+  la **retención de cuarta categoría** sobre recibos por honorarios y la anota en
+  `libro_retenciones`, que es de donde la planilla electrónica lee el T-Registro
+  de cuarta y donde **nadie escribía nunca**: esa sección salía siempre vacía. La
+  `509` añade la **estimación de cobranza dudosa** (Dr 68 / Cr 19) con el detalle
+  documento a documento que exige el Libro de Inventarios y Balances, criterio de
+  antigüedad como parámetro y sin duplicar en una segunda pasada.
+  Fuera de migración se corrigió el **catálogo de cuentas autocreables**: a 36 de
+  68 contribuyentes les faltaba la `4699` que exige el asiento de recepción de
+  mercadería, y a 32 la `629`; lo que impide que vuelva a quedarse corto es una
+  prueba que lee del propio generador los códigos que pide, y que encontró además
+  la `421` y la `422`.
+
+- **PROD estuvo en `506`.** Una auditoría contra el trabajo real de un contador
   peruano encontró que la regla de qué documentos forman cada registro fiscal
   estaba escrita **tres veces y ninguna completa**: el Registro de Ventas
   filtraba por tipo pero no restaba las notas de crédito, el de Compras restaba
