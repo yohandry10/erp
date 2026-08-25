@@ -9,6 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type Proveedor = { id: string; razon_social: string; ruc?: string }
+type TasaDetraccion = {
+  codigo: string
+  descripcion: string
+  anexo: string
+  tasa: number
+  importe_minimo: number | null
+}
 
 const hoyLocal = () => {
   const fecha = new Date()
@@ -42,13 +49,42 @@ export default function NuevaCuentaPorPagarPage() {
     documento_referencia_numero: '',
     documento_referencia_fecha: '',
     observaciones: '',
+    destino_credito_fiscal: 'GRAVADAS',
+    codigo_detraccion: '',
+    detraccion: '',
+    retencion: '',
+    percepcion: '',
   })
+  const [tasasDetraccion, setTasasDetraccion] = useState<TasaDetraccion[]>([])
 
   const total = useMemo(
     () => Math.round((Number(form.subtotal || 0) + Number(form.igv || 0)) * 100) / 100,
     [form.subtotal, form.igv],
   )
   const esNotaCredito = form.tipo_documento === 'NOTA_CREDITO'
+
+  const tasaElegida = useMemo(
+    () => tasasDetraccion.find((t) => t.codigo === form.codigo_detraccion) ?? null,
+    [tasasDetraccion, form.codigo_detraccion],
+  )
+
+  /**
+   * Lo que saldría de aplicar la tasa del catálogo. Por debajo del importe
+   * mínimo la operación no lleva detracción, y ahí lo que corresponde es cero.
+   */
+  const detraccionSugerida = useMemo(() => {
+    if (!tasaElegida || total <= 0) return null
+    const minimo = Number(tasaElegida.importe_minimo ?? 0)
+    if (minimo > 0 && total < minimo) return 0
+    return Math.round(total * Number(tasaElegida.tasa) * 100) / 100
+  }, [tasaElegida, total])
+
+  // Se avisa, no se impone: hay operaciones con reglas especiales y el contador
+  // tiene que poder apartarse del catálogo a sabiendas.
+  const detraccionDiscrepa =
+    detraccionSugerida !== null &&
+    form.detraccion !== '' &&
+    Math.abs(Number(form.detraccion) - detraccionSugerida) > 0.01
 
   const cargarProveedores = useCallback(async () => {
     try {
@@ -62,9 +98,38 @@ export default function NuevaCuentaPorPagarPage() {
     }
   }, [get])
 
+  const cargarTasasDetraccion = useCallback(async () => {
+    try {
+      const response = await get('/api/finanzas/cxp/detracciones/tasas')
+      setTasasDetraccion(response?.data || [])
+    } catch {
+      // Que el catálogo no cargue no puede impedir registrar la factura: el
+      // código se puede teclear igual y el contraste lo hace la base.
+      setTasasDetraccion([])
+    }
+  }, [get])
+
   useEffect(() => { void cargarProveedores() }, [cargarProveedores])
+  useEffect(() => { void cargarTasasDetraccion() }, [cargarTasasDetraccion])
 
   const update = (field: string, value: string) => setForm((current) => ({ ...current, [field]: value }))
+
+  /**
+   * Al elegir el código se rellena el importe con lo que sale de la tasa, y al
+   * quitarlo se vacía: dejar un importe de detracción sin código sería declarar
+   * un depósito que no se puede identificar.
+   */
+  const elegirCodigoDetraccion = (codigo: string) => {
+    const tasa = tasasDetraccion.find((t) => t.codigo === codigo)
+    let sugerido = ''
+    if (tasa && total > 0) {
+      const minimo = Number(tasa.importe_minimo ?? 0)
+      sugerido = minimo > 0 && total < minimo
+        ? '0'
+        : String(Math.round(total * Number(tasa.tasa) * 100) / 100)
+    }
+    setForm((current) => ({ ...current, codigo_detraccion: codigo, detraccion: codigo ? sugerido : '' }))
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -88,6 +153,11 @@ export default function NuevaCuentaPorPagarPage() {
         moneda: form.moneda,
         tipo_cambio: form.moneda === 'PEN' ? 1 : Number(form.tipo_cambio),
         observaciones: form.observaciones.trim() || undefined,
+        destino_credito_fiscal: form.destino_credito_fiscal,
+        ...(form.codigo_detraccion ? { codigo_detraccion: form.codigo_detraccion } : {}),
+        ...(Number(form.detraccion) > 0 ? { detraccion: Number(form.detraccion) } : {}),
+        ...(Number(form.retencion) > 0 ? { retencion: Number(form.retencion) } : {}),
+        ...(Number(form.percepcion) > 0 ? { percepcion: Number(form.percepcion) } : {}),
         ...(esNotaCredito ? {
           documento_referencia_tipo: form.documento_referencia_tipo,
           documento_referencia_serie: form.documento_referencia_serie.trim(),
@@ -166,6 +236,63 @@ export default function NuevaCuentaPorPagarPage() {
                 <input required type="number" min="0" step="0.01" className={inputClass} value={form.igv} onChange={(e) => update('igv', e.target.value)} />
               </label>
               <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-4 md:col-span-2"><span className="text-xs font-bold uppercase tracking-wider text-primary">Total</span><div className="mt-1 text-2xl font-black">{form.moneda} {total.toFixed(2)}</div></div>
+
+              <div className="grid gap-4 rounded-2xl border border-cyan-400/20 bg-card/40 p-4 md:col-span-2 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <h2 className="font-bold text-primary">Tratamiento tributario</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Decide cuánto crédito fiscal da esta compra y qué se deposita o retiene.
+                    Lo que se ponga aquí es lo que sale después en la determinación mensual.
+                  </p>
+                </div>
+
+                <label className={`${labelClass} md:col-span-2`}>Destino del crédito fiscal
+                  <select className={inputClass} value={form.destino_credito_fiscal} onChange={(e) => update('destino_credito_fiscal', e.target.value)}>
+                    <option value="GRAVADAS">Operaciones gravadas · crédito íntegro</option>
+                    <option value="NO_GRAVADAS">Operaciones no gravadas · sin crédito</option>
+                    <option value="COMUN">Uso común · crédito por prorrata</option>
+                  </select>
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    Depende de para qué se usó lo comprado, así que sólo lo sabe quien la registra.
+                    «Uso común» aplica el coeficiente de los últimos doce meses (artículo 23 de la Ley del IGV).
+                  </span>
+                </label>
+
+                <label className={labelClass}>Detracción · código del SPOT
+                  <select className={inputClass} value={form.codigo_detraccion} onChange={(e) => elegirCodigoDetraccion(e.target.value)}>
+                    <option value="">Sin detracción</option>
+                    {tasasDetraccion.map((t) => (
+                      <option key={t.codigo} value={t.codigo}>
+                        {t.codigo} · {t.descripcion} ({(Number(t.tasa) * 100).toFixed(1)}%)
+                      </option>
+                    ))}
+                  </select>
+                  {tasaElegida && <span className="block text-xs font-normal text-muted-foreground">
+                    Anexo {tasaElegida.anexo}, tasa {(Number(tasaElegida.tasa) * 100).toFixed(1)}%
+                    {Number(tasaElegida.importe_minimo ?? 0) > 0
+                      ? ` · sólo desde S/ ${Number(tasaElegida.importe_minimo).toFixed(2)}`
+                      : ' · sin importe mínimo'}
+                  </span>}
+                </label>
+
+                <label className={labelClass}>Detracción · importe a depositar
+                  <input type="number" min="0" step="0.01" disabled={!form.codigo_detraccion} className={inputClass} value={form.detraccion} onChange={(e) => update('detraccion', e.target.value)} />
+                  {detraccionDiscrepa && <span className="block text-xs font-normal text-amber-300">
+                    Del código {form.codigo_detraccion} salen S/ {detraccionSugerida?.toFixed(2)}. Se guarda lo que usted ponga,
+                    pero quedará anotada la diferencia.
+                  </span>}
+                </label>
+
+                <label className={labelClass}>Retención de IGV
+                  <input type="number" min="0" step="0.01" className={inputClass} value={form.retencion} onChange={(e) => update('retencion', e.target.value)} />
+                  <span className="block text-xs font-normal text-muted-foreground">Sólo si su empresa es agente de retención.</span>
+                </label>
+
+                <label className={labelClass}>Percepción
+                  <input type="number" min="0" step="0.01" className={inputClass} value={form.percepcion} onChange={(e) => update('percepcion', e.target.value)} />
+                  <span className="block text-xs font-normal text-muted-foreground">La que le haya cobrado el proveedor.</span>
+                </label>
+              </div>
 
               {esNotaCredito && <div className="grid gap-4 rounded-2xl border border-amber-400/25 bg-amber-400/5 p-4 md:col-span-2 md:grid-cols-2">
                 <h2 className="font-bold text-amber-300 md:col-span-2">Comprobante modificado obligatorio</h2>

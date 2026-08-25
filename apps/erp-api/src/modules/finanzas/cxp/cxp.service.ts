@@ -1299,6 +1299,36 @@ export class CxpService {
    * @param value Valor a redondear
    * @returns Valor redondeado con precisión decimal
    */
+  /**
+   * Catalogo de tasas del SPOT vigentes a una fecha.
+   *
+   * Lo necesita quien registra la compra: el codigo de detraccion no se sabe de
+   * memoria y equivocarlo cuesta la multa por no depositar mas la perdida del
+   * credito fiscal. La tabla es comun a todos los contribuyentes --las tasas las
+   * fija SUNAT-- asi que no lleva `tenant_id`.
+   */
+  async listarTasasDetraccion(tenantId: string, fecha?: string): Promise<any> {
+    const cliente = this.supabase.getClient();
+    // La fecha decide que tasas salen, asi que sale del calendario del
+    // contribuyente y no del reloj del servidor.
+    const alDia = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha)
+      ? fecha
+      : await fechaHoyDelTenant(cliente, tenantId);
+
+    const { data, error } = await cliente
+      .from('tasas_detraccion')
+      .select('codigo, descripcion, anexo, tasa, importe_minimo')
+      .lte('vigente_desde', alDia)
+      .or(`vigente_hasta.is.null,vigente_hasta.gte.${alDia}`)
+      .order('codigo');
+
+    if (error) {
+      throw new BadRequestException(`No se pudo leer el catalogo de detracciones: ${error.message}`);
+    }
+
+    return { success: true, data: data ?? [] };
+  }
+
   private round2(value: number): number {
     return new Decimal(value).toDecimalPlaces(2).toNumber();
   }
