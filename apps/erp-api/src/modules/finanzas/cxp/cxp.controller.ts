@@ -85,6 +85,24 @@ export class CxpController {
     return this.cxpService.obtenerProveedoresMayorDeuda(tenantId, limite);
   }
 
+  @Get('detracciones/tasas')
+  @RequirePermission('finanzas.cxp.ver')
+  @ApiOperation({
+    summary: 'Catálogo de tasas de detracción vigentes',
+    description:
+      'Códigos del SPOT con su anexo, tasa e importe mínimo, vigentes a la fecha indicada ' +
+      '(por defecto, la de hoy en el calendario del contribuyente). Lo consume el registro ' +
+      'de la factura del proveedor: el código no se sabe de memoria y equivocarlo cuesta la ' +
+      'multa por no depositar más la pérdida del crédito fiscal.',
+  })
+  @ApiResponse({ status: 200, description: 'Catálogo obtenido' })
+  async listarTasasDetraccion(
+    @CurrentTenant() tenantId: string,
+    @Query('fecha') fecha?: string,
+  ) {
+    return this.cxpService.listarTasasDetraccion(tenantId, fecha);
+  }
+
   @Get(':id')
   @RequirePermission('finanzas.cxp.ver')
   @ApiOperation({
