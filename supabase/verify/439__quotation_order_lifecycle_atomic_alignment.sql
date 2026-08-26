@@ -209,14 +209,26 @@ BEGIN
     RAISE EXCEPTION 'La actualización atómica no dejó un documento coherente';
   END IF;
 
+  -- La política vigente permite autoaprobar únicamente a ADMIN/ADMIN_DEMO con
+  -- permiso explícito. Para conservar la prueba de segregación original, el
+  -- autocreador de este caso es el actor operativo sin rol administrativo.
+  UPDATE public.cotizaciones
+  SET created_by = v_approver_id
+  WHERE id = v_cotizacion_id AND tenant_id = v_tenant_id;
   BEGIN
     PERFORM public.cambiar_estado_cotizacion_tx(
-      v_cotizacion_id, v_tenant_id, 'APROBADA', v_user_id, 'Autoaprobación'
+      v_cotizacion_id, v_tenant_id, 'APROBADA', v_approver_id, 'Autoaprobación'
     );
     RAISE EXCEPTION 'El creador no debe autoaprobar su cotización';
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM = 'El creador no debe autoaprobar su cotización' THEN RAISE; END IF;
+    IF SQLERRM <> 'La cotización requiere un aprobador distinto del creador' THEN
+      RAISE EXCEPTION 'La segregación falló por una causa inesperada: %', SQLERRM;
+    END IF;
   END;
+  UPDATE public.cotizaciones
+  SET created_by = v_user_id
+  WHERE id = v_cotizacion_id AND tenant_id = v_tenant_id;
   PERFORM public.cambiar_estado_cotizacion_tx(
     v_cotizacion_id, v_tenant_id, 'ENVIADA', v_user_id, NULL
   );

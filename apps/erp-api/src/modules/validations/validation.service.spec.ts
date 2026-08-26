@@ -3,6 +3,28 @@ import { ColombiaValidationService } from './colombia-validation.service';
 import { ApiPeruService } from './apiperu.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
+import * as forge from 'node-forge';
+
+const pfxValido = (taxId: string, password: string): Buffer => {
+  const pair = forge.pki.rsa.generateKeyPair(1024);
+  const certificate = forge.pki.createCertificate();
+  certificate.publicKey = pair.publicKey;
+  certificate.serialNumber = '01';
+  certificate.validity.notBefore = new Date();
+  certificate.validity.notAfter = new Date();
+  certificate.validity.notAfter.setFullYear(certificate.validity.notBefore.getFullYear() + 5);
+  const attributes = [
+    { name: 'commonName', value: `EMPRESA ${taxId}` },
+    { type: '2.5.4.5', value: taxId },
+  ];
+  certificate.setSubject(attributes);
+  certificate.setIssuer(attributes);
+  certificate.sign(pair.privateKey, forge.md.sha256.create());
+  const p12 = forge.pkcs12.toPkcs12Asn1(pair.privateKey, [certificate], password, {
+    algorithm: '3des',
+  });
+  return Buffer.from(forge.asn1.toDer(p12).getBytes(), 'binary');
+};
 
 describe('ValidationService', () => {
   let service: ValidationService;
@@ -32,7 +54,11 @@ describe('ValidationService', () => {
     } as any;
 
     configService = {
-      get: jest.fn(),
+      get: jest.fn((key: string) =>
+        key === 'CERT_ENCRYPTION_KEY'
+          ? 'clave-de-cifrado-validacion-32-chars'
+          : undefined,
+      ),
     } as any;
 
     service = new ValidationService(supabaseService, colombiaService, apiPeruService, configService);
@@ -40,6 +66,110 @@ describe('ValidationService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('validateCertificate', () => {
+    const baseEmpresa = {
+      ruc: '20123456786',
+      pais: 'PE',
+      certificado_pfx: null,
+      certificado_password: null,
+      certificado_expira_en: null,
+      sunat_environment: 'homologacion',
+      sunat_cert_expected_ruc: null,
+      arca_cuit_representada: null,
+      arca_environment: null,
+    };
+
+    it('valida el certificado sintético para una demo PE en homologación', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { ...baseEmpresa, is_demo: true },
+        error: null,
+      });
+
+      const result = await service.validateCertificate('tenant-demo');
+
+      expect(result.isValid).toBe(true);
+      expect(result.expiresAt).toBeInstanceOf(Date);
+      expect(result.warnings).toEqual(
+        expect.arrayContaining([expect.stringMatching(/certificado simulado/i)]),
+      );
+    });
+
+    it('no habilita el certificado sintético para una demo en producción', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          ...baseEmpresa,
+          is_demo: true,
+          sunat_environment: 'produccion',
+        },
+        error: null,
+      });
+
+      const result = await service.validateCertificate('tenant-demo-produccion');
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('No se ha cargado un certificado digital válido');
+    });
+
+    it('mantiene bloqueada una cuenta real sin certificado', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { ...baseEmpresa, is_demo: false },
+        error: null,
+      });
+
+      const result = await service.validateCertificate('tenant-real');
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('No se ha cargado un certificado digital válido');
+    });
+
+    it('valida titularidad argentina con CUIT y ambiente ARCA', async () => {
+      const cuit = '30710158229';
+      const password = 'clave-ar';
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          ...baseEmpresa,
+          pais: 'AR',
+          ruc: cuit,
+          arca_cuit_representada: cuit,
+          arca_environment: 'produccion',
+          sunat_environment: null,
+          certificado_pfx: pfxValido(cuit, password),
+          certificado_password: password,
+        },
+        error: null,
+      });
+
+      const result = await service.validateCertificate('tenant-ar');
+
+      expect(result.isValid).toBe(true);
+      expect(result.rucMatches).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('valida titularidad colombiana con NIT y ambiente DIAN', async () => {
+      const nit = '900123456-8';
+      const password = 'clave-co';
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          ...baseEmpresa,
+          pais: 'CO',
+          ruc: nit,
+          dian_environment: 'PRODUCCION',
+          sunat_environment: null,
+          certificado_pfx: pfxValido(nit, password),
+          certificado_password: password,
+        },
+        error: null,
+      });
+
+      const result = await service.validateCertificate('tenant-co');
+
+      expect(result.isValid).toBe(true);
+      expect(result.rucMatches).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
   });
 
   describe('validateTaxIdFormat (via validateRucConfiguration)', () => {

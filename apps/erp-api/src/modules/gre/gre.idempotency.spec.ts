@@ -17,10 +17,24 @@ function configChain(ruc = '20100066603') {
   return chain;
 }
 
-function buildService(rpc: jest.Mock, ose: Record<string, jest.Mock>, chain = configChain()) {
+function buildService(
+  rpc: jest.Mock,
+  ose: Record<string, jest.Mock>,
+  chain = configChain(),
+  isDemo = false,
+) {
   const client = { rpc, from: jest.fn(() => chain) };
+  const guardChain: any = {
+    select: jest.fn(), eq: jest.fn(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: { is_demo: isDemo }, error: null }),
+  };
+  guardChain.select.mockReturnValue(guardChain);
+  guardChain.eq.mockReturnValue(guardChain);
   const service = new GreService(
-    { getClient: jest.fn(() => client) } as any,
+    {
+      getClient: jest.fn(() => client),
+      getPublicClient: jest.fn(() => ({ from: jest.fn(() => guardChain) })),
+    } as any,
     { on: jest.fn(), emit: jest.fn(), eventEmitter: { eventNames: () => [] } } as any,
     ose as any,
     {} as any,
@@ -165,5 +179,23 @@ describe('GreService claim/finalizer 463', () => {
       p_technical_error: false,
       p_codigo: '98',
     }));
+  });
+
+  it('una demo no reserva ni envía o consulta una GRE', async () => {
+    const rpc = jest.fn();
+    const enviarGre = jest.fn();
+    const consultarTicketGre = jest.fn();
+    const { service } = buildService(rpc, { enviarGre, consultarTicketGre }, configChain(), true);
+
+    await expect(service.enviarManualmenteSunat(
+      greId, tenantId, actorId, { idempotencyKey: 'gre:send:demo' },
+    )).rejects.toThrow('demo');
+    await expect(service.consultarEstadoGre(
+      greId, tenantId, actorId, 'gre:query:demo',
+    )).rejects.toThrow('demo');
+
+    expect(rpc).not.toHaveBeenCalled();
+    expect(enviarGre).not.toHaveBeenCalled();
+    expect(consultarTicketGre).not.toHaveBeenCalled();
   });
 });

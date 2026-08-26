@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import CpeModal from '@/components/modals/CpeModal'
-import CpeViewModal from '@/components/modals/CpeViewModal'
+import CpeA4PreviewModal from '@/components/cpe/CpeA4PreviewModal'
 import GreModal from '@/components/modals/GreModal'
 import { ComprobantesFilters } from '@/components/cpe/ComprobantesFilters'
 import { ComprobantesTable } from '@/components/cpe/ComprobantesTable'
@@ -65,8 +65,11 @@ export default function CPEPage() {
   const [isGreModalOpen, setIsGreModalOpen] = useState(false)
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>('')
   const [selectedDocumentType, setSelectedDocumentType] = useState<string>('')
+  const [selectedDocumentSeries, setSelectedDocumentSeries] = useState<string>('')
+  const [selectedDocumentNumber, setSelectedDocumentNumber] = useState<string | number>('')
   const [selectedCpeForGre, setSelectedCpeForGre] = useState<CpeDocument | null>(null)
   const [selectedCpeForCancellation, setSelectedCpeForCancellation] = useState<CpeDocument | null>(null)
+  const directPreviewHandled = useRef<string | null>(null)
 
   const [filters, setFilters] = useState({
     tipoComprobante: '',
@@ -136,10 +139,28 @@ export default function CPEPage() {
     loadData()
   }, [loadData])
 
+  useEffect(() => {
+    const requestedCpeId = new URLSearchParams(window.location.search).get('cpe_id')?.trim()
+    if (!requestedCpeId || directPreviewHandled.current === requestedCpeId) return
+
+    directPreviewHandled.current = requestedCpeId
+    setSelectedDocumentId(requestedCpeId)
+    setSelectedDocumentType('')
+    setSelectedDocumentSeries('')
+    setSelectedDocumentNumber('')
+    setIsViewModalOpen(true)
+
+    const cleanUrl = `${window.location.pathname}${window.location.hash}`
+    window.history.replaceState(window.history.state, '', cleanUrl)
+  }, [])
+
   const viewDocument = (documentId: string, documentType: string) => {
     console.log(`📄 Abriendo vista del documento: ${documentId} tipo: ${documentType}`);
+    const selected = documents.find((document) => document.id === documentId)
     setSelectedDocumentId(documentId);
     setSelectedDocumentType(documentType);
+    setSelectedDocumentSeries(selected?.serie || '')
+    setSelectedDocumentNumber(selected?.numero || '')
     setIsViewModalOpen(true);
   }
 
@@ -268,6 +289,9 @@ export default function CPEPage() {
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 {isArgentina ? 'Facturas A/B/C' : isColombia ? 'Facturas de venta' : 'Facturas, boletas'} y notas conectadas a {fiscalLabel}.
               </p>
+              <p className="mt-1 max-w-3xl text-sm font-medium text-primary/90">
+                Usa “Vista A4” para revisar exactamente el formato y los datos que recibirá tu cliente.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               {paisCodigo === 'PE' && (
@@ -357,11 +381,13 @@ export default function CPEPage() {
       />
 
       {/* CPE View Modal */}
-      <CpeViewModal
+      <CpeA4PreviewModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         documentId={selectedDocumentId}
         documentType={selectedDocumentType}
+        serie={selectedDocumentSeries}
+        numero={selectedDocumentNumber}
       />
 
       {/* GRE Modal */}

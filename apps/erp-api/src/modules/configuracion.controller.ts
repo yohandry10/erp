@@ -13,6 +13,7 @@ import { ConfigurationService } from './configuracion/configuration.service';
 
 import { ActualizarDatosEmpresaDto, ActualizarParametrosFacturacionDto, ActualizarSerieDto } from './configuracion/dto/configuracion-request.dto';
 import { ProbarFirmaXmlDto } from './shared-dto/acciones-simples.dto';
+import { assertExternalFiscalTransportAllowed } from '../shared/utils/fiscal-transport-guard';
 
 /**
  * @deprecated Este controlador está DEPRECADO. 
@@ -64,18 +65,19 @@ export class ConfiguracionController {
 
   @Get('ose')
   @ApiOperation({ summary: 'Obtener configuración OSE/SUNAT' })
-  async getConfiguracionOse() {
+  async getConfiguracionOse(@CurrentTenant() tenantId: string) {
     try {
-      const config = this.oseService.getConfiguracion();
-      const verification = await this.oseService.verificarConfiguracion();
+      const status = await this.oseService.getTenantConfigurationStatus(tenantId);
 
       return {
         success: true,
         data: {
-          configuracion: config,
-          verificacion: verification,
-          message: verification.valid ? 
-            'Configuración OSE válida y lista para uso' : 
+          ...status,
+          message: status.configuracion.isDemoTenant
+            ? 'Configuración local de demo lista; transporte SUNAT bloqueado'
+            : status.verificacion.valid
+              ? 'Configuración OSE completa; conectividad externa no probada'
+              :
             'Configuración OSE incompleta - requiere ajustes'
         }
       };
@@ -90,63 +92,52 @@ export class ConfiguracionController {
 
   @Post('ose/verificar')
   @RequirePermission('configuracion.write')
-  @ApiOperation({ summary: 'Verificar conectividad con SUNAT' })
-  async verificarConectividadSunat() {
-    try {
-      console.log('🔍 Verificando conectividad con SUNAT...');
+  @ApiOperation({ summary: 'Validar configuración OSE sin simular conectividad' })
+  async verificarConectividadSunat(@CurrentTenant() tenantId: string) {
+    // La demo nunca debe aparentar una conexión fiscal. El preflight ocurre
+    // antes de leer o invocar cualquier adaptador OSE.
+    await assertExternalFiscalTransportAllowed(this.supabaseService, tenantId);
 
-      const verification = await this.oseService.verificarConfiguracion();
-      
-      if (!verification.valid) {
-        return {
-          success: false,
-          message: 'Configuración OSE no válida',
-          data: {
-            errors: verification.errors,
-            recomendaciones: [
-              'Verificar variables de entorno OSE_URL, OSE_USUARIO, OSE_PASSWORD',
-              'Validar que el certificado digital esté presente',
-              'Confirmar RUC de empresa configurado',
-              'Revisar permisos de acceso a SUNAT'
-            ]
-          }
-        };
-      }
+    const status = await this.oseService.getTenantConfigurationStatus(tenantId);
+    const verification = status.verificacion;
+    const configuracion = status.configuracion;
 
-      // Simular prueba de conectividad (en producción sería una llamada real)
-      const conectividadTest = {
-        url: this.oseService.getConfiguracion().url,
-        status: 'CONECTADO',
-        responseTime: '150ms',
-        certificateValid: true,
-        timestamp: new Date()
-      };
-
-      return {
-        success: true,
-        message: 'Conectividad con SUNAT verificada exitosamente',
-        data: {
-          conectividad: conectividadTest,
-          configuracion: this.oseService.getConfiguracion()
-        }
-      };
-
-    } catch (error) {
-      console.error('❌ Error verificando conectividad SUNAT:', error);
+    if (!verification.valid) {
       return {
         success: false,
-        message: `Error verificando conectividad: ${error.message}`,
+        message: 'Configuración OSE no válida; conectividad no probada',
         data: {
-          error: error.message,
+          conectividad: {
+            url: configuracion.url,
+            status: 'NO_PROBADO',
+            connectivityTested: false,
+            certificateValid: null,
+          },
+          errors: verification.errors,
           recomendaciones: [
-            'Verificar conexión a internet',
-            'Validar credenciales OSE',
-            'Revisar configuración de proxy si aplica',
-            'Contactar soporte técnico si el problema persiste'
+            'Verificar variables de entorno OSE_URL, OSE_USUARIO, OSE_PASSWORD',
+            'Validar que el certificado digital esté presente',
+            'Confirmar RUC de empresa configurado',
           ]
         }
       };
     }
+
+    return {
+      success: true,
+      message: 'Configuración OSE válida; conectividad externa no probada',
+      data: {
+        conectividad: {
+          url: configuracion.url,
+          status: 'NO_PROBADO',
+          connectivityTested: false,
+          certificateValid: configuracion.certificateExists,
+          timestamp: new Date(),
+        },
+        configuracion,
+        verificacion: verification,
+      }
+    };
   }
 
   @Get('empresa')

@@ -1222,11 +1222,14 @@ Lo que está bien, medido para no volver a medirlo:
   profundidad de defensa, no un agujero vivo.
 - **`libs/dtos`**: 224 clases llegan por `@Body()` y **ninguna** propiedad sin
   validador.
-- **`libs/crypto`**: los tres caminos de firma fallan cerrados. El respaldo a
-  certificado autofirmado se pide con `allowDemoFallback`, nunca se hereda;
-  `CertificateOwnershipError` no se traga; y `resolveDemoSignerConfig` lanza si no hay
-  `PFX_PATH`/`PFX_PASS`, así que la rama «sin PFX → modo demo» del constructor no es
-  alcanzable desde el servicio.
+- **`libs/crypto`**: los caminos de firma fallan cerrados. Una cuenta real usa
+  exclusivamente el certificado y la clave de su tenant; nunca hereda
+  `PFX_PATH`/`PFX_PASS` del proceso ni sustituye material corrupto.
+  `CertificateOwnershipError` no se traga. Sólo una demo PE con
+  `sunat_environment=homologacion` y sin configuración parcial carga de forma
+  explícita el PFX sintético del runtime, validado y con
+  `allowDemoFallback=false`, únicamente para generar y firmar: envío, consulta,
+  ticket, aceptación y CDR permanecen bloqueados y no se inventan.
 - **Worker**: acuña un JWT de cinco minutos por tenant con su propio secreto; las
   rutas worker son `@Public()` y las cubre `WorkerAuthGuard`, que compara el tenant
   del token contra el solicitado. La ruta de emisión exige además un `actor_id` UUID.

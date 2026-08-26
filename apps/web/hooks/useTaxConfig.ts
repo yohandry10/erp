@@ -75,7 +75,14 @@ export function useTaxConfig() {
    * Obtiene el nombre del impuesto (IGV, IVA, etc.)
    */
   const getNombreImpuesto = () => {
-    return data?.impuesto_principal_nombre ?? (country.paisCodigo === 'PE' ? 'IGV' : 'IVA')
+    const rawName = data?.impuesto_principal_nombre
+      ?? country.impuesto
+      ?? (country.paisCodigo === 'PE' ? 'IGV' : 'IVA')
+    // El contexto de país usa etiquetas completas como `IGV (18%)`, mientras
+    // las pantallas que consumen este hook añaden la tasa por separado. Se
+    // normaliza aquí para no terminar mostrando `IGV (18%) (18%)` cuando el
+    // endpoint fiscal todavía no respondió o usa el fallback de país.
+    return rawName.replace(/\s*\(\s*\d+(?:[.,]\d+)?\s*%\s*\)\s*$/u, '').trim()
   }
 
   return {

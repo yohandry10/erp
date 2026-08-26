@@ -34,6 +34,18 @@ describe('OseService certificate path resolution', () => {
     jest.clearAllMocks();
   });
 
+  const createTenantSupabase = (response: { data: any; error: any }) => ({
+    getClient: () => ({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => response,
+          }),
+        }),
+      }),
+    }),
+  });
+
   const buildSunatCdrZipBase64 = (xml: string, fileName = 'R-20100066603-01-F001-1.xml') => {
     const name = Buffer.from(fileName, 'utf8');
     const compressed = zlib.deflateRawSync(Buffer.from(xml, 'utf8'));
@@ -69,6 +81,308 @@ describe('OseService certificate path resolution', () => {
     expect((service as any).xmlSigner.getCertificateInfo()).toMatchObject({
       demoMode: false,
     });
+  });
+
+  it('resuelve el PFX sintético sólo para el runtime de una demo PE en homologación', async () => {
+    const supabase = createTenantSupabase({
+      data: {
+        ruc: '20123456786',
+        pais: 'PE',
+        is_demo: true,
+        certificado_pfx: null,
+        certificado_password: null,
+        sunat_environment: 'homologacion',
+      },
+      error: null,
+    });
+    const service = new OseService(
+      createConfigService() as any,
+      circuitBreaker as any,
+      supabase as any,
+    );
+
+    const runtime = await (service as any).resolveRuntime({ tenantId: 'tenant-demo' });
+
+    expect(runtime.signer.getCertificateInfo()).toMatchObject({ demoMode: false });
+  });
+
+  it('falla cerrado sin tenant en todas las operaciones que podrían abrir red fiscal', async () => {
+    const service = new OseService(
+      createConfigService() as any,
+      circuitBreaker as any,
+    );
+
+    const responses = await Promise.all([
+      service.enviarCpe('<Invoice/>', '20123456786-01-F001-1'),
+      service.enviarGre('<DespatchAdvice/>', '20123456786-09-T001-1'),
+      service.enviarResumen('<VoidedDocuments/>', '20123456786-RA-20260825-1'),
+      service.consultarEstadoCpe('20123456786', '01', 'F001', '1'),
+      service.consultarTicket('ticket-ra-1'),
+      service.consultarTicketGre('ticket-gre-1'),
+    ]);
+
+    for (const response of responses) {
+      expect(response).toEqual(
+        expect.objectContaining({
+          success: false,
+          descripcionRespuesta: expect.stringMatching(/tenantId es obligatorio/i),
+        }),
+      );
+    }
+    expect(circuitBreaker.execute).not.toHaveBeenCalled();
+  });
+
+  it('no sustituye empresa_config por credenciales globales si falta acceso tenant-scoped', async () => {
+    const service = new OseService(
+      createConfigService({
+        SUNAT_USERNAME: '20123456786GLOBAL',
+        SUNAT_PASSWORD: 'global-no-usar',
+      }) as any,
+      circuitBreaker as any,
+    );
+
+    const response = await service.enviarCpe(
+      '<Invoice/>',
+      '20123456786-01-F001-1',
+      { tenantId: 'tenant-sin-db' },
+    );
+
+    expect(response).toEqual(
+      expect.objectContaining({
+        success: false,
+        descripcionRespuesta: expect.stringMatching(/empresa_config no está disponible/i),
+      }),
+    );
+    expect(circuitBreaker.execute).not.toHaveBeenCalled();
+  });
+
+  it('acota la lectura del runtime exactamente al tenant solicitado', async () => {
+    const eq = jest.fn((_column: string, _tenantId: string) => ({
+      maybeSingle: async () => ({
+        data: {
+          ruc: '20123456786',
+          pais: 'PE',
+          is_demo: true,
+          certificado_pfx: null,
+          certificado_password: null,
+          sunat_environment: 'homologacion',
+        },
+        error: null,
+      }),
+    }));
+    const supabase = {
+      getClient: () => ({
+        from: () => ({
+          select: () => ({ eq }),
+        }),
+      }),
+    };
+    const service = new OseService(
+      createConfigService() as any,
+      circuitBreaker as any,
+      supabase as any,
+    );
+
+    await (service as any).resolveTransportRuntime({ tenantId: 'tenant-a' });
+
+    expect(eq).toHaveBeenCalledTimes(1);
+    expect(eq).toHaveBeenCalledWith('tenant_id', 'tenant-a');
+  });
+
+  it('expone readiness OSE por tenant y declara la conectividad como no probada', async () => {
+    const supabase = createTenantSupabase({
+      data: {
+        ruc: '20123456786',
+        pais: 'PE',
+        is_demo: true,
+        certificado_pfx: null,
+        certificado_password: null,
+        sunat_environment: 'homologacion',
+        sunat_username: '20123456786MODDATOS',
+        sunat_password: 'MODDATOS',
+        sunat_cpe_url: null,
+      },
+      error: null,
+    });
+    const service = new OseService(
+      createConfigService({ OSE_URL: 'https://global-no-usar.example' }) as any,
+      circuitBreaker as any,
+      supabase as any,
+    );
+
+    const status = await service.getTenantConfigurationStatus('tenant-demo');
+
+    expect(status).toEqual({
+      configuracion: expect.objectContaining({
+        applicable: true,
+        ruc: '20123456786',
+        certificateExists: true,
+        isDemoTenant: true,
+        connectivityStatus: 'NO_PROBADO',
+        transportStatus: 'BLOQUEADO_DEMO',
+      }),
+      verificacion: {
+        valid: true,
+        errors: [],
+        connectivityStatus: 'NO_PROBADO',
+      },
+    });
+    expect(status.configuracion.url).not.toBe('https://global-no-usar.example');
+  });
+
+  it('permite firmar en demo, pero bloquea CPE, GRE y RA/RC sin fabricar CDR o ticket', async () => {
+    const supabase = createTenantSupabase({
+      data: {
+        ruc: '20123456786',
+        pais: 'PE',
+        is_demo: true,
+        certificado_pfx: null,
+        certificado_password: null,
+        sunat_environment: 'homologacion',
+      },
+      error: null,
+    });
+    const service = new OseService(
+      createConfigService() as any,
+      circuitBreaker as any,
+      supabase as any,
+    );
+    jest.spyOn(service as any, 'prepareXmlForSend').mockReturnValue({
+      xmlSigned: '<Invoice>signed</Invoice>',
+      hash: 'a'.repeat(64),
+    });
+
+    const cpe = await service.enviarCpe('<Invoice/>', '20123456786-01-F001-1', {
+      tenantId: 'tenant-demo',
+    });
+    const gre = await service.enviarGre('<DespatchAdvice/>', '20123456786-09-T001-1', {
+      tenantId: 'tenant-demo',
+    });
+    const summary = await service.enviarResumen(
+      '<VoidedDocuments/>',
+      '20123456786-RA-20260825-1',
+      { tenantId: 'tenant-demo' },
+    );
+    const estado = await service.consultarEstadoCpe('20123456786', '01', 'F001', '1', {
+      tenantId: 'tenant-demo',
+    });
+
+    for (const response of [cpe, gre, summary, estado]) {
+      expect(response).toEqual(expect.objectContaining({
+        success: false,
+        codigoRespuesta: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+      }));
+      expect(response.cdr).toBeUndefined();
+      expect(response.ticket).toBeUndefined();
+    }
+    expect(circuitBreaker.execute).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ pais: 'CO', sunat_environment: 'homologacion' }, /pais PE/i],
+    [{ pais: 'PE', sunat_environment: null }, /Ambiente SUNAT inválido/i],
+    [{ pais: 'PE', sunat_environment: 'sandbox' }, /Ambiente SUNAT inválido/i],
+    [{ pais: 'PE', sunat_environment: 'produccion' }, /sólo puede simular SUNAT/i],
+  ])('una demo con contexto fiscal inválido falla cerrado: %j', async (override, message) => {
+    const supabase = createTenantSupabase({
+      data: {
+        ruc: '20123456786',
+        pais: 'PE',
+        is_demo: true,
+        certificado_pfx: null,
+        certificado_password: null,
+        sunat_environment: 'homologacion',
+        ...override,
+      },
+      error: null,
+    });
+    const service = new OseService(
+      createConfigService() as any,
+      circuitBreaker as any,
+      supabase as any,
+    );
+
+    await expect(
+      (service as any).resolveRuntime({ tenantId: 'tenant-demo-invalido' }),
+    ).rejects.toThrow(message as RegExp);
+    expect(circuitBreaker.execute).not.toHaveBeenCalled();
+  });
+
+  it('un tenant real con PFX propio y sin credenciales SOL no hereda las globales ni abre circuito', async () => {
+    const workspaceRoot = path.resolve(process.cwd(), '..', '..');
+    const pfx = fs.readFileSync(path.join(workspaceRoot, 'certs', 'demo.pfx'));
+    const supabase = createTenantSupabase({
+      data: {
+        ruc: '20123456789',
+        pais: 'PE',
+        is_demo: false,
+        certificado_pfx: pfx,
+        certificado_password: '12345678910',
+        sunat_environment: 'homologacion',
+        sunat_username: null,
+        sunat_password: null,
+      },
+      error: null,
+    });
+    const service = new OseService(
+      createConfigService({ CERT_ENCRYPTION_KEY: 'x'.repeat(32) }) as any,
+      circuitBreaker as any,
+      supabase as any,
+    );
+    jest.spyOn(service as any, 'prepareXmlForSend').mockReturnValue({
+      xmlSigned: '<Invoice>signed</Invoice>',
+      hash: 'a'.repeat(64),
+    });
+
+    const response = await service.enviarCpe('<Invoice/>', '20123456789-01-F001-1', {
+      tenantId: 'tenant-real-sin-sol',
+    });
+
+    expect(response).toEqual(expect.objectContaining({
+      success: false,
+      codigoRespuesta: '99',
+      descripcionRespuesta: expect.stringMatching(/Usuario SUNAT\/OSE no configurado/i),
+    }));
+    expect(circuitBreaker.execute).not.toHaveBeenCalled();
+  });
+
+  it('no hereda el PFX global en una cuenta real sin certificado', async () => {
+    const supabase = createTenantSupabase({
+      data: {
+        ruc: '20123456789',
+        pais: 'PE',
+        is_demo: false,
+        certificado_pfx: null,
+        certificado_password: null,
+        sunat_environment: 'homologacion',
+      },
+      error: null,
+    });
+    const service = new OseService(
+      createConfigService() as any,
+      circuitBreaker as any,
+      supabase as any,
+    );
+
+    await expect(
+      (service as any).resolveRuntime({ tenantId: 'tenant-real' }),
+    ).rejects.toThrow(/Certificado digital no configurado/);
+  });
+
+  it('un error al leer empresa_config nunca activa el fixture demo', async () => {
+    const supabase = createTenantSupabase({
+      data: null,
+      error: { message: 'database unavailable' },
+    });
+    const service = new OseService(
+      createConfigService() as any,
+      circuitBreaker as any,
+      supabase as any,
+    );
+
+    await expect(
+      (service as any).resolveRuntime({ tenantId: 'tenant-error' }),
+    ).rejects.toThrow(/database unavailable/);
   });
 
   it('resuelve endpoints SUNAT beta por operacion sin reutilizar otros CPE para GRE', () => {

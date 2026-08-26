@@ -2,7 +2,12 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { ConfigService } from '@nestjs/config';
 import { SigningOptions, XmlSigner } from '@erp-suite/crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { assertExternalFiscalTransportAllowed } from '../../shared/utils/fiscal-transport-guard';
 import { decryptBuffer, decryptText } from '../../shared/utils/secure-config.utils';
+import {
+  canUseRuntimeDemoCertificate,
+  loadRuntimeDemoCertificate,
+} from '../../shared/utils/demo-certificate.utils';
 import { OseService, SunatResponse } from '../ose/ose.service';
 import {
   CrearComunicacionBajaDto,
@@ -280,6 +285,7 @@ export class ComunicacionBajaService {
     actorId: string,
     idempotencyKey: string,
   ): Promise<any> {
+    await assertExternalFiscalTransportAllowed(this.supabaseService, tenantId);
     const prepared = await this.rpc('preparar_envio_resumen_fiscal_tx', {
       p_tipo: tipo,
       p_lote_id: loteId,
@@ -364,11 +370,12 @@ export class ComunicacionBajaService {
     tenantId: string,
     actorId: string,
   ): Promise<any> {
+    await assertExternalFiscalTransportAllowed(this.supabaseService, tenantId);
     const lote = await this.getLote(tipo, loteId, tenantId);
+    if (String(lote.estado).toUpperCase() === 'ACEPTADO') {
+      return { success: true, data: lote, estado: lote.estado };
+    }
     if (!lote.ticket_sunat) {
-      if (String(lote.estado).toUpperCase() === 'ACEPTADO') {
-        return { success: true, data: lote, estado: lote.estado };
-      }
       throw new BadRequestException('El lote todavía no tiene ticket fiscal');
     }
     if (!lote.envio_token) {
@@ -642,27 +649,57 @@ ${billingPayments}
     const { data: empresa, error } = await this.supabaseService
       .getClient()
       .from('empresa_config')
-      .select('ruc, certificado_pfx, certificado_password, sunat_environment, sunat_cert_expected_ruc, sunat_cert_ruc_mismatch_confirmed')
+      .select('ruc, pais, is_demo, certificado_pfx, certificado_password, sunat_environment, sunat_cert_expected_ruc, sunat_cert_ruc_mismatch_confirmed')
       .eq('tenant_id', tenantId)
       .maybeSingle();
     if (error) throw new BadRequestException(`No se pudo leer el certificado del tenant: ${error.message}`);
-    if (!empresa?.certificado_pfx) {
+    if (!empresa) {
+      throw new BadRequestException('No existe configuración fiscal para el tenant');
+    }
+    let pfxBuffer = empresa?.certificado_pfx
+      ? decryptBuffer(this.configService, empresa.certificado_pfx) || empresa.certificado_pfx
+      : null;
+    let pfxPassword = empresa?.certificado_password
+      ? decryptText(this.configService, empresa.certificado_password) || ''
+      : '';
+
+    if (!pfxBuffer && canUseRuntimeDemoCertificate(empresa)) {
+      const demoCertificate = loadRuntimeDemoCertificate(this.configService);
+      pfxBuffer = demoCertificate.pfxBuffer;
+      pfxPassword = demoCertificate.pfxPassword;
+      this.logger.warn(
+        `Usando certificado fiscal simulado para firmar RA/RC del tenant demo ${tenantId}`,
+      );
+    }
+
+    if (!pfxBuffer) {
       throw new BadRequestException(
         'No hay certificado fiscal del cliente configurado para firmar RA/RC',
       );
     }
     return new XmlSigner({
-      pfxBuffer: decryptBuffer(this.configService, empresa.certificado_pfx) || empresa.certificado_pfx,
-      pfxPassword: decryptText(this.configService, empresa.certificado_password) || '',
+      pfxBuffer,
+      pfxPassword,
       ...this.getCertificateRucGuardOptions(empresa),
     });
   }
 
   private getCertificateRucGuardOptions(empresa: any): Partial<SigningOptions> {
-    const environment = empresa.sunat_environment || 'homologacion';
+    const environment = String(empresa?.sunat_environment ?? '').trim().toLowerCase();
+    if (environment !== 'homologacion' && environment !== 'produccion') {
+      throw new BadRequestException(
+        'El ambiente SUNAT del tenant debe ser homologacion o produccion.',
+      );
+    }
+    const ruc = String(empresa?.ruc ?? '').trim();
+    if (!/^\d{11}$/.test(ruc)) {
+      throw new BadRequestException(
+        'El tenant debe configurar su propio RUC antes de firmar RA/RC.',
+      );
+    }
     const mismatchConfirmed = empresa.sunat_cert_ruc_mismatch_confirmed === true;
     return {
-      expectedRuc: empresa.sunat_cert_expected_ruc || empresa.ruc,
+      expectedRuc: empresa.sunat_cert_expected_ruc || ruc,
       enforceRucInCertificate: environment === 'produccion',
       allowRucMismatchWithConfirmation: mismatchConfirmed,
       // RA/RC nunca sustituye silenciosamente el PFX cargado por el cliente.

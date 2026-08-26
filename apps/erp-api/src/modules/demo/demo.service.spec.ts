@@ -38,6 +38,38 @@ describe('DemoService operational seed', () => {
     ]));
   });
 
+  it('valida el certificado demo PE sin persistir PFX ni contraseña en empresa_config', async () => {
+    const update = jest.fn((_payload: Record<string, unknown>) => ({
+      eq: jest.fn().mockResolvedValue({ data: null, error: null }),
+    }));
+    const service = new DemoService(
+      {
+        getClient: () => ({
+          from: jest.fn(() => ({ update })),
+        }),
+      } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      { get: jest.fn(() => undefined) } as any,
+      {} as any,
+    );
+
+    await (service as any).seedFiscalDemo('tenant-demo-pe', { codigo: 'PE' });
+
+    expect(update).toHaveBeenCalledTimes(1);
+    const persistedPatch = update.mock.calls[0][0];
+    expect(persistedPatch).not.toHaveProperty('certificado_pfx');
+    expect(persistedPatch).not.toHaveProperty('certificado_password');
+    expect(persistedPatch).not.toHaveProperty('certificado_expira_en');
+    expect(persistedPatch).toEqual(
+      expect.objectContaining({
+        ruc: '20123456786',
+        sunat_environment: 'homologacion',
+      }),
+    );
+  });
+
   function buildSeedService(readiness: any = { ready: true }) {
     const rpc = jest.fn().mockResolvedValue({ data: readiness, error: null });
     const service = new DemoService(
@@ -149,19 +181,6 @@ describe('DemoService operational seed', () => {
     }));
   });
 
-  it('resuelve certs/demo.pfx desde el workspace sin depender de src o dist', () => {
-    const service = new DemoService(
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      { get: () => 'demo-encryption-key-that-is-long-enough' } as any,
-      {} as any,
-    );
-
-    expect((service as any).resolveDemoPfxPath('certs/demo.pfx')).toMatch(/[\\/]certs[\\/]demo\.pfx$/);
-  });
-
   it('siembra el catálogo demo colombiano en escala COP', async () => {
     let productos: any[] = [];
     const from = jest.fn((table: string) => {
@@ -268,7 +287,7 @@ describe('DemoService atomic creation', () => {
       { login } as any,
       {} as any,
       {} as any,
-      {} as any,
+      { get: jest.fn(() => undefined) } as any,
       { invalidateAllTenantCache } as any,
     );
     return { service, rpc, login, invalidateAllTenantCache };
@@ -307,6 +326,35 @@ describe('DemoService atomic creation', () => {
       aprobador_user_id: 'approver-464',
       idempotent: false,
     }));
+  });
+
+  it('verifica el PFX sintético antes de crear una demo peruana', async () => {
+    const { service, rpc } = buildAtomicService();
+
+    await expect(
+      service.createDemoTenant(
+        { nombre: 'Demo Perú', pais: 'PE', dias_duracion: 14 },
+        'demo-create-pe-fiscal-ready',
+      ),
+    ).resolves.toEqual(expect.objectContaining({ success: true, pais: 'PE' }));
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('no crea una demo PE si el artefacto fiscal simulado no está disponible', async () => {
+    const { service, rpc } = buildAtomicService();
+    (service as any).configService = {
+      get: jest.fn((key: string) =>
+        key === 'DEMO_PFX_PATH' ? 'certs/no-existe-demo.pfx' : undefined,
+      ),
+    };
+
+    await expect(
+      service.createDemoTenant(
+        { nombre: 'Demo Perú incompleta', pais: 'PE', dias_duracion: 14 },
+        'demo-create-pe-fiscal-missing',
+      ),
+    ).rejects.toThrow(/certificado fiscal simulado/i);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it('falla antes de escribir si falta una clave idempotente estable', async () => {

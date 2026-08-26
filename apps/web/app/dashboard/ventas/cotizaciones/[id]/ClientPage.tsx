@@ -44,7 +44,10 @@ export default function CotizacionDetailPage() {
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const router = useRouter()
   const params = useParams()
-  const { get, put, post } = useApi()
+  const { get, put, post } = useApi({
+    showErrorToast: false,
+    throwOnError: true,
+  })
   const { hasPermission: canEditCotizacion, loading: editPermissionLoading } = usePermission(
     'ventas',
     'editar',

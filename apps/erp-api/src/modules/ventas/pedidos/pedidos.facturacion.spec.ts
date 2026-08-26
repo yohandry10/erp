@@ -190,6 +190,35 @@ describe('PedidosService (facturación)', () => {
     await expect(service.generarFactura('pedido-1', 'tenant-1')).rejects.toBeInstanceOf(Error);
   });
 
+  it('mantiene bloqueada una cuenta real que no cargó certificado', async () => {
+    mockSupabaseClient = createMockSupabaseClient({
+      empresa_config: {
+        single: [
+          {
+            data: {
+              ruc: '20123456786',
+              razon_social: 'Empresa Test SAC',
+              direccion_fiscal: 'Av. Test 123',
+              pais: 'PE',
+              is_demo: false,
+              sunat_environment: 'homologacion',
+              certificado_pfx: null,
+              certificado_password: null,
+            },
+            error: null,
+          },
+        ],
+      },
+    });
+    (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
+    const findOne = jest.spyOn(service as any, 'findOne');
+
+    await expect(service.generarFactura('pedido-real', 'tenant-real')).rejects.toThrow(
+      /Certificado Digital/,
+    );
+    expect(findOne).not.toHaveBeenCalled();
+  });
+
   it('no debe descontar stock (flujo simplificado) si falla la generación de CPE', async () => {
     mockSupabaseClient = createMockSupabaseClient({
       empresa_config: {
@@ -270,11 +299,14 @@ describe('PedidosService (facturación)', () => {
         single: [
           {
             data: {
-              ruc: '20123456789',
+              ruc: '20123456786',
               razon_social: 'Empresa Test SAC',
               direccion_fiscal: 'Av. Test 123',
-              certificado_pfx: 'base64-pfx',
-              certificado_password: 'secret',
+              pais: 'PE',
+              is_demo: true,
+              sunat_environment: 'homologacion',
+              certificado_pfx: null,
+              certificado_password: null,
             },
             error: null,
           },

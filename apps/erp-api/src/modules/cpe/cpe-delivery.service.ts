@@ -10,6 +10,7 @@ import { FiscalAdapterService } from './fiscal-adapter.service';
 import { PdfGeneratorService } from './pdf-generator.service';
 import { CpeCertificateService } from './cpe-certificate.service';
 import { buildSunatQrContent, buildSunatQrDataUrl } from './sunat-qr.util';
+import { assertExternalFiscalTransportAllowed } from '../../shared/utils/fiscal-transport-guard';
 
 /** Firma, consulta, representa y entrega CPE al proveedor fiscal. */
 export class CpeDeliveryService {
@@ -192,6 +193,7 @@ async checkOseStatus(
     tenantId: string,
     options?: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
   ) {
+    await assertExternalFiscalTransportAllowed(this.supabaseService, tenantId);
     const origin = options?.origin ?? this.defaultDeliveryOptions.origin;
     const idempotencyKey = String(options?.idempotencyKey ?? '').trim()
       || `cpe.query:${tenantId}:${id}:${Math.floor(Date.now() / 300_000)}`;
@@ -252,6 +254,7 @@ async retrySendToOse(
     tenantId: string,
     options?: { idempotencyKey?: string; actorId?: string; origin?: 'USER' | 'WORKER' | 'SYSTEM' },
   ) {
+    await assertExternalFiscalTransportAllowed(this.supabaseService, tenantId);
     const origin = options?.origin ?? this.defaultDeliveryOptions.origin;
     const idempotencyKey = String(options?.idempotencyKey ?? '').trim()
       || `cpe.send:${tenantId}:${cpeId}`;
