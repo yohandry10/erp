@@ -10,6 +10,7 @@ describe('ComunicacionBajaService — RA/RC durable 461', () => {
   let ose: any;
   let tableResults: Record<string, any[]>;
   let directWrites: Array<{ table: string; operation: string }>;
+  let transportIsDemo: boolean;
 
   function chainFor(table: string) {
     const result = tableResults[table]?.shift() ?? { data: null, error: null };
@@ -32,13 +33,27 @@ describe('ComunicacionBajaService — RA/RC durable 461', () => {
   beforeEach(() => {
     tableResults = {};
     directWrites = [];
+    transportIsDemo = false;
     client = {
       rpc: jest.fn(),
       from: jest.fn((table: string) => chainFor(table)),
     };
     ose = { enviarResumen: jest.fn(), consultarTicket: jest.fn() };
     service = new ComunicacionBajaService(
-      { getClient: () => client } as any,
+      {
+        getClient: () => client,
+        getPublicClient: () => {
+          const chain: any = {
+            select: jest.fn(), eq: jest.fn(),
+            maybeSingle: jest.fn().mockResolvedValue({
+              data: { is_demo: transportIsDemo }, error: null,
+            }),
+          };
+          chain.select.mockReturnValue(chain);
+          chain.eq.mockReturnValue(chain);
+          return { from: jest.fn(() => chain) };
+        },
+      } as any,
       ose,
       { get: jest.fn() } as any,
     );
@@ -77,6 +92,42 @@ describe('ComunicacionBajaService — RA/RC durable 461', () => {
       pfxBuffer: Buffer.from('pfx-invalido'),
       pfxPassword: 'incorrecta',
     })).toThrow();
+  });
+
+  it('firma RA/RC demo PE con el PFX sintético del runtime', async () => {
+    tableResults.empresa_config = [{
+      data: {
+        ruc: '20123456786',
+        pais: 'PE',
+        is_demo: true,
+        certificado_pfx: null,
+        certificado_password: null,
+        sunat_environment: 'homologacion',
+      },
+      error: null,
+    }];
+
+    const signer = await (service as any).getXmlSigner(tenantId);
+
+    expect(signer.getCertificateInfo()).toMatchObject({ demoMode: false });
+  });
+
+  it('mantiene RA/RC bloqueado para una cuenta real sin certificado', async () => {
+    tableResults.empresa_config = [{
+      data: {
+        ruc: '20123456789',
+        pais: 'PE',
+        is_demo: false,
+        certificado_pfx: null,
+        certificado_password: null,
+        sunat_environment: 'homologacion',
+      },
+      error: null,
+    }];
+
+    await expect((service as any).getXmlSigner(tenantId)).rejects.toThrow(
+      /No hay certificado fiscal del cliente/,
+    );
   });
 
   it('no congela un lote si la firma XML generada no se puede validar', async () => {
@@ -324,6 +375,46 @@ describe('ComunicacionBajaService — RA/RC durable 461', () => {
       expect.objectContaining({ p_resultado: 'PENDIENTE' }),
     );
     expect(result).toMatchObject({ success: false, estado: 'ENVIADO', retryable: true });
+    expect(directWrites).toEqual([]);
+  });
+
+  it('un lote ya ACEPTADO con ticket es terminal y no se consulta ni finaliza otra vez', async () => {
+    tableResults.comunicaciones_baja = [{
+      data: {
+        id: 'ra-aceptada',
+        estado: 'ACEPTADO',
+        ticket_sunat: 'DEMO-TICKET-1',
+        envio_token: '44444444-4444-4444-8444-444444444444',
+        cdr_respuesta: 'cdr-terminal',
+      },
+      error: null,
+    }];
+
+    const result = await service.consultarEstadoComunicacion(
+      'ra-aceptada',
+      tenantId,
+      actorId,
+    );
+
+    expect(result).toMatchObject({ success: true, estado: 'ACEPTADO' });
+    expect(ose.consultarTicket).not.toHaveBeenCalled();
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it('una demo no prepara, envía, consulta ni finaliza RA/RC', async () => {
+    transportIsDemo = true;
+
+    await expect(service.enviarComunicacionBaja(
+      'ra-demo', tenantId, actorId, 'ra-send:demo',
+    )).rejects.toThrow('demo');
+    await expect(service.consultarEstadoComunicacion(
+      'ra-demo', tenantId, actorId,
+    )).rejects.toThrow('demo');
+
+    expect(client.rpc).not.toHaveBeenCalled();
+    expect(client.from).not.toHaveBeenCalled();
+    expect(ose.enviarResumen).not.toHaveBeenCalled();
+    expect(ose.consultarTicket).not.toHaveBeenCalled();
     expect(directWrites).toEqual([]);
   });
 

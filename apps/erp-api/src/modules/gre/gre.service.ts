@@ -13,6 +13,7 @@ import { ValidationService } from '../validations/validation.service';
 
 import { fechaHoyDelTenant, paisDelTenant } from '../../shared/utils/fecha-tenant.util';
 import { fechaHoyEnPais } from '../../shared/utils/fecha-peru.util';
+import { assertExternalFiscalTransportAllowed } from '../../shared/utils/fiscal-transport-guard';
 @Injectable()
 export class GreService {
   private readonly logger = new Logger(GreService.name);
@@ -1180,6 +1181,7 @@ ${lines}
     idempotencyKey: string,
     origin: 'USUARIO' | 'WORKER' | 'SISTEMA',
   ): Promise<any> {
+    await assertExternalFiscalTransportAllowed(this.supabaseService, tenantId);
     const client = this.supabaseService.getClient();
     const { data: claim, error: claimError } = await client.rpc('reservar_envio_gre_tx', {
       p_tenant_id: tenantId,
@@ -1324,6 +1326,7 @@ ${lines}
     idempotencyKey: string,
     origin: 'USUARIO' | 'WORKER' | 'SISTEMA' = actorId ? 'USUARIO' : 'WORKER',
   ): Promise<any> {
+    await assertExternalFiscalTransportAllowed(this.supabaseService, tenantId);
     const client = this.supabaseService.getClient();
     const { data: claim, error: claimError } = await client.rpc('reservar_consulta_gre_tx', {
       p_tenant_id: tenantId,

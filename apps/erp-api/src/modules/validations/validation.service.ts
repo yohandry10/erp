@@ -19,6 +19,10 @@ import * as crypto from 'crypto';
 import { ApiPeruService } from './apiperu.service';
 import { ConfigService } from '@nestjs/config';
 import { validateArgentinaCuit } from '../paises/initial-country';
+import {
+  canUseRuntimeDemoCertificate,
+  loadRuntimeDemoCertificate,
+} from '../../shared/utils/demo-certificate.utils';
 
 @Injectable()
 export class ValidationService {
@@ -48,7 +52,7 @@ export class ValidationService {
       const { data: empresa, error } = await this.supabaseService
         .getClient()
         .from('empresa_config')
-        .select('certificado_pfx, certificado_password, certificado_expira_en, ruc, pais, sunat_cert_expected_ruc, sunat_environment, arca_cuit_representada, arca_environment')
+        .select('certificado_pfx, certificado_password, certificado_expira_en, ruc, pais, is_demo, sunat_cert_expected_ruc, sunat_environment, arca_cuit_representada, arca_environment, dian_environment')
         .eq('tenant_id', tenantId)
         .single();
 
@@ -59,7 +63,26 @@ export class ValidationService {
         return { isValid, errors, warnings };
       }
 
-      const certificadoBuffer = this.decryptCertificate(empresa.certificado_pfx);
+      let certificadoBuffer = this.decryptCertificate(empresa.certificado_pfx);
+      let password = this.decryptText(empresa.certificado_password);
+
+      if (!certificadoBuffer && canUseRuntimeDemoCertificate(empresa)) {
+        try {
+          const demoCertificate = loadRuntimeDemoCertificate(this.configService);
+          certificadoBuffer = demoCertificate.pfxBuffer;
+          password = demoCertificate.pfxPassword;
+          warnings.push(
+            'Se usa un certificado simulado de la demo; no habilita emisión fiscal real.',
+          );
+        } catch (demoCertificateError) {
+          this.logger.error(
+            `No se pudo cargar el certificado simulado para el tenant demo ${tenantId}`,
+            demoCertificateError,
+          );
+          errors.push('El certificado fiscal simulado de la demo no está disponible');
+          return { isValid: false, errors, warnings };
+        }
+      }
 
       this.logger.log(
         `[ValidationService] certificado_pfx type=${typeof empresa.certificado_pfx} bufferLength=${
@@ -73,8 +96,6 @@ export class ValidationService {
         return { isValid, errors, warnings };
       }
 
-      const password = this.decryptText(empresa.certificado_password);
-
       try {
         const metadata = parseCertificateBuffer(certificadoBuffer, password || '');
         expiresAt = metadata.validTo;
@@ -82,26 +103,34 @@ export class ValidationService {
         // Que cargue y no este vencido no basta: SUNAT solo acepta el
         // certificado del contribuyente que emite. Sin esta comprobacion el
         // estado daba "valido" a un certificado de otro titular.
-        const esArgentina = String(empresa.pais || '').toUpperCase() === 'AR';
-        const rucEmisor = esArgentina
+        const country = String(empresa.pais || 'PE').trim().toUpperCase();
+        const taxIdEmisor = country === 'AR'
           ? empresa.arca_cuit_representada || empresa.ruc || null
-          : empresa.sunat_cert_expected_ruc || empresa.ruc || null;
-        const titularidad = esArgentina
-          ? (() => {
-              const candidates = metadata.subject.match(/(?<!\d)\d{11}(?!\d)/g) ?? [];
-              const ids = [...new Set(candidates.filter(validateArgentinaCuit))];
-              const coincide = Boolean(
-                rucEmisor && ids.includes(String(rucEmisor).replace(/\D/g, '')),
-              );
+          : country === 'PE'
+            ? empresa.sunat_cert_expected_ruc || empresa.ruc || null
+            : empresa.ruc || null;
+        const titularidad = country === 'PE'
+          ? verificarTitularidadCertificado(metadata.subject, taxIdEmisor)
+          : (() => {
+              const expected = String(taxIdEmisor || '').replace(/\D/g, '');
+              const candidates = metadata.subject
+                .split(',')
+                .map((attribute) => attribute.slice(attribute.indexOf('=') + 1).replace(/\D/g, ''))
+                .filter((candidate) => country === 'AR'
+                  ? validateArgentinaCuit(candidate)
+                  : /^\d{9,11}$/.test(candidate));
+              const ids = [...new Set(candidates)];
+              const coincide = Boolean(expected && ids.includes(expected));
+              const authority = country === 'AR' ? 'ARCA' : 'DIAN';
+              const label = country === 'AR' ? 'CUIT' : 'NIT';
               return {
                 coincide,
                 rucsEnCertificado: ids,
                 error: coincide
                   ? undefined
-                  : 'El certificado no declara el CUIT representado ante ARCA.',
+                  : `El certificado no declara el ${label} representado ante ${authority}.`,
               };
-            })()
-          : verificarTitularidadCertificado(metadata.subject, rucEmisor);
+            })();
         rucMatches = titularidad.coincide;
         rucsEnCertificado = titularidad.rucsEnCertificado;
 
@@ -110,7 +139,11 @@ export class ValidationService {
           // avisa y se deja seguir probando, porque no se emite nada real;
           // en produccion es requisito duro y bloquea.
           const enProduccion = String(
-            esArgentina ? empresa.arca_environment : empresa.sunat_environment,
+            country === 'AR'
+              ? empresa.arca_environment
+              : country === 'CO'
+                ? empresa.dian_environment
+                : empresa.sunat_environment,
           ).trim().toLowerCase() === 'produccion';
 
           if (enProduccion) {

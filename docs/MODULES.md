@@ -37,7 +37,10 @@ Cotización -> Pedido -> Reserva -> Despacho -> Documento/CPE -> Cobro -> Asient
   exacto por el mismo actor; no se puede crear ni modificar con el contrato
   vigente.
 - La cotización puede enviarse y ser aprobada o rechazada por un actor distinto
-  de su creador; `BORRADOR`, `ENVIADA` y `APROBADA` son elegibles para convertir
+  de su creador. Un usuario con rol canónico `ADMIN` o `ADMIN_DEMO` y permiso
+  explícito de aprobación puede autoaprobarla; la excepción conserva actor,
+  fecha y observación de auditoría y no se extiende a roles operativos ni al
+  autorrechazo. `BORRADOR`, `ENVIADA` y `APROBADA` son elegibles para convertir
   a pedido, según permisos.
 - Confirmar un pedido distingue una excepción comercial pendiente de aprobación
   de un bloqueo crediticio: el primero continúa por la bandeja de aprobaciones y
@@ -171,10 +174,13 @@ Código principal: `apps/erp-api/src/modules/pos`,
   modifica CxC, saldo a favor ni contabilidad. El efecto se aplica una sola vez
   después de que nota y documento origen estén aceptados y exista CDR; rechazo
   o retry técnico quedan sin efecto financiero.
-- El XML canónico siempre es UBL firmado con el certificado configurado por el
-  tenant. La demo y QA usan transporte local simulado, sin habilitación legal
-  ni transmisión real; al aportar sus credenciales, el cliente reutiliza el
-  mismo flujo.
+- El XML canónico siempre es UBL firmado. Una cuenta real usa exclusivamente el
+  certificado configurado por su tenant. La demo PE, sólo con
+  `sunat_environment=homologacion` y mientras no tenga credenciales propias,
+  usa el PFX sintético del runtime para generar y firmar. Toda transmisión,
+  consulta, ticket, aceptación y CDR sigue bloqueada: la demo no fabrica
+  evidencia fiscal ni transmite a SUNAT. Al convertirse, el cliente debe cargar
+  sus propias credenciales y certificado para habilitar el flujo real.
 - RA (facturas) y RC operación 3 (boletas) sólo aceptan CPE que 448 ya dejó
   `ANULADO` con reversa comercial durable confirmada; no son un atajo para
   anular deuda, ingreso, stock o pedido. El Centro de Documentos expone la
@@ -548,7 +554,8 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   SIRE comparte las credenciales API SUNAT cifradas con GRE REST, pero su
   activación y su frontera de ejecución son independientes.
 - La demo Perú se crea en PEN, con IGV, RUC/DNI, series F001/B001/T001,
-  SUNAT/OSE simulado, GRE/SIRE y flujo logístico habilitado. El PCGE inicial se
+  generación y firma fiscal de prueba, GRE/SIRE y flujo logístico habilitado;
+  ningún envío ni aceptación SUNAT/OSE se simula. El PCGE inicial se
   inserta por código sin duplicar cuentas ya existentes.
 - La conversión de demo a cuenta real exige que el cliente defina y confirme
   un correo de acceso y una contraseña permanente antes de elegir si conserva

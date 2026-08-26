@@ -183,7 +183,7 @@ export class CotizacionesController {
 
   @Post(':id/aprobar')
   @RequirePermission('ventas.cotizaciones.approve')
-  @ApiOperation({ summary: 'Aprobar cotización con actor segregado' })
+  @ApiOperation({ summary: 'Aprobar cotización con segregación o excepción administrativa trazable' })
   async aprobar(
     @Param('id') id: string,
     @Body() body: MotivoOpcionalDto,

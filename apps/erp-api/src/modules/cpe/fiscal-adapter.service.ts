@@ -52,7 +52,15 @@ export class FiscalAdapterService {
       const paisId = await this.obtenerPaisTenant(tenantId);
       const emisionConfig = await this.obtenerEmisionConfig(tenantId);
 
-      if (emisionConfig?.modo === 'OSE_API') {
+      if (emisionConfig.isDemo) {
+        return {
+          success: false,
+          codigoRespuesta: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+          descripcionRespuesta: 'La demo puede generar y firmar documentos, pero no transmite ni fabrica aceptación fiscal.',
+        };
+      }
+
+      if (emisionConfig.modo === 'OSE_API') {
         this.logger.log(`🌍 Enviando documento via OSE API para tenant ${tenantId}`);
 
         if (!emisionConfig.activo) {
@@ -138,8 +146,16 @@ export class FiscalAdapterService {
     hash?: string
   ): Promise<EnvioDocumentoResult> {
     try {
+      const paisId = await this.obtenerPaisTenant(tenantId);
       const emisionConfig = await this.obtenerEmisionConfig(tenantId);
-      if (emisionConfig?.modo === 'OSE_API') {
+      if (emisionConfig.isDemo) {
+        return {
+          success: false,
+          codigoRespuesta: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+          descripcionRespuesta: 'La demo no consulta ni fabrica estados de aceptación fiscal.',
+        };
+      }
+      if (emisionConfig.modo === 'OSE_API') {
         if (!emisionConfig.activo) {
           return {
             success: false,
@@ -167,7 +183,6 @@ export class FiscalAdapterService {
         return this.mapFiscalResponse(oseResponse);
       }
 
-      const paisId = await this.obtenerPaisTenant(tenantId);
       if (paisId === 1) {
         const ruc = await this.obtenerRucTenant(tenantId);
         const sunatResponse = await this.oseService.consultarEstadoCpe(
@@ -216,7 +231,7 @@ export class FiscalAdapterService {
    */
   async obtenerNombreServicioFiscal(tenantId: string): Promise<string> {
     const emisionConfig = await this.obtenerEmisionConfig(tenantId);
-    if (emisionConfig?.modo === 'OSE_API') {
+    if (emisionConfig.modo === 'OSE_API' && !emisionConfig.isDemo) {
       return 'OSE API';
     }
 
@@ -343,55 +358,63 @@ export class FiscalAdapterService {
   private async obtenerEmisionConfig(tenantId: string): Promise<{
     modo: string;
     activo: boolean;
+    isDemo: boolean;
+    sunatEnvironment: string;
     config?: OseApiConfig;
-  } | null> {
-    try {
-      const { data, error } = await this.supabaseService.getClient()
-        .from('empresa_config')
-        .select([
-          'emision_cpe_modo',
-          'ose_activo',
-          'ose_url',
-          'ose_status_url',
-          'ose_username',
-          'ose_password',
-          'ose_auth_tipo',
-          'ose_api_key',
-          'ose_api_header',
-          'ose_bearer_token'
-        ].join(','))
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
+  }> {
+    const { data, error } = await this.supabaseService.getClient()
+      .from('empresa_config')
+      .select([
+        'emision_cpe_modo',
+        'is_demo',
+        'sunat_environment',
+        'ose_activo',
+        'ose_url',
+        'ose_status_url',
+        'ose_username',
+        'ose_password',
+        'ose_auth_tipo',
+        'ose_api_key',
+        'ose_api_header',
+        'ose_bearer_token'
+      ].join(','))
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
-        this.logger.warn(`Error leyendo configuracion de emision: ${error.message}`);
-      }
-
-      const typedData = data as any;
-      const modo = (typedData?.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
-      const activo = typedData?.ose_activo === true;
-
-      if (modo !== 'OSE_API') {
-        return { modo, activo };
-      }
-
-      const authTipo = (typedData?.ose_auth_tipo || 'BASIC').toString().toUpperCase() as OseAuthTipo;
-      const config: OseApiConfig = {
-        url: typedData?.ose_url || '',
-        statusUrl: typedData?.ose_status_url || null,
-        authTipo,
-        username: typedData?.ose_username || null,
-        password: typedData?.ose_password || null,
-        apiKey: typedData?.ose_api_key || null,
-        apiHeader: typedData?.ose_api_header || null,
-        bearerToken: typedData?.ose_bearer_token || null,
-      };
-
-      return { modo, activo, config };
-    } catch (error) {
-      this.logger.warn(`No se pudo resolver modo de emision: ${error.message}`);
-      return null;
+    if (error) {
+      throw new ServiceUnavailableException(
+        `No se pudo leer la configuración de emisión del tenant ${tenantId}: ${error.message}`,
+      );
     }
+    if (!data) {
+      throw new ServiceUnavailableException(
+        `No existe configuración de emisión para el tenant ${tenantId}`,
+      );
+    }
+
+    const typedData = data as any;
+    const modo = (typedData.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
+    const activo = typedData.ose_activo === true;
+    const isDemo = typedData.is_demo === true;
+    const sunatEnvironment = String(typedData.sunat_environment || '').trim().toLowerCase();
+
+    if (modo !== 'OSE_API') {
+      return { modo, activo, isDemo, sunatEnvironment };
+    }
+
+    const authTipo = (typedData.ose_auth_tipo || 'BASIC').toString().toUpperCase() as OseAuthTipo;
+    const config: OseApiConfig = {
+      url: typedData.ose_url || '',
+      statusUrl: typedData.ose_status_url || null,
+      authTipo,
+      username: typedData.ose_username || null,
+      password: typedData.ose_password || null,
+      apiKey: typedData.ose_api_key || null,
+      apiHeader: typedData.ose_api_header || null,
+      bearerToken: typedData.ose_bearer_token || null,
+    };
+
+    return { modo, activo, isDemo, sunatEnvironment, config };
   }
 
   // ========== MÉTODOS PRIVADOS ==========

@@ -102,6 +102,7 @@ interface OseStatus {
     usernameConfigured?: boolean
     passwordConfigured?: boolean
     requireRealCertificate?: boolean
+    connectivityStatus?: 'NO_PROBADO' | 'CONECTADO' | 'ERROR' | 'BLOQUEADO_DEMO'
   }
   verificacion?: {
     valid: boolean
@@ -525,9 +526,10 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
               </>
             ) : (
               <>
-                <FieldRow label="OSE/SUNAT válido" value={ose?.verificacion?.valid} ok={ose?.verificacion?.valid === true} />
+                <FieldRow label="Configuración OSE/SUNAT completa" value={ose?.verificacion?.valid} ok={ose?.verificacion?.valid === true} />
                 <FieldRow label="Certificado OSE resuelto" value={ose?.configuracion?.certificateExists} ok={ose?.configuracion?.certificateExists === true} />
                 <FieldRow label="Ambiente" value={ose?.configuracion?.environment} />
+                <FieldRow label="Conectividad externa" value={ose?.configuracion?.connectivityStatus || 'NO_PROBADO'} />
               </>
             )}
           </SectionCard>

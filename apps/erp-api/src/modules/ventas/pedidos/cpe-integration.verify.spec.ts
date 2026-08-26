@@ -95,6 +95,16 @@ describe('CPE Integration Verification', () => {
                     provide: SupabaseService,
                     useValue: {
                         getClient: jest.fn().mockReturnValue(mockSupabaseClient),
+                        getPublicClient: jest.fn().mockReturnValue({
+                            from: jest.fn().mockReturnValue({
+                                select: jest.fn().mockReturnThis(),
+                                eq: jest.fn().mockReturnThis(),
+                                maybeSingle: jest.fn().mockResolvedValue({
+                                    data: { is_demo: false },
+                                    error: null,
+                                }),
+                            }),
+                        }),
                         update: mockSupabaseUpdate,
                     },
                 },

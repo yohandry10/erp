@@ -3,12 +3,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import { parseDateLocal } from '@/lib/date-utils'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useApi } from '@/hooks/use-api'
 import { useEmpresaConfig } from '@/hooks/use-empresa-config'
+import { usePermission } from '@/hooks/use-permission'
 import { PedidoVenta } from '@/types/ventas'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Package, RefreshCw } from 'lucide-react'
+import { Package, RefreshCw, ShieldAlert } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -19,6 +21,10 @@ export default function OrdenesPendientesPage() {
   const router = useRouter()
   const { get } = useApi()
   const { loading: configLoading, isFlujologistica } = useEmpresaConfig()
+  const {
+    hasPermission: canViewLogistics,
+    loading: permissionLoading,
+  } = usePermission('inventario', 'ver', 'logistica')
 
   const [ordenes, setOrdenes] = useState<PedidoVenta[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,7 +32,7 @@ export default function OrdenesPendientesPage() {
   const [showPreparacionModal, setShowPreparacionModal] = useState(false)
 
   const loadOrdenes = useCallback(async () => {
-    if (!isFlujologistica) return
+    if (!isFlujologistica || permissionLoading || !canViewLogistics) return
 
     try {
       setLoading(true)
@@ -46,7 +52,7 @@ export default function OrdenesPendientesPage() {
     } finally {
       setLoading(false)
     }
-  }, [get, isFlujologistica])
+  }, [canViewLogistics, get, isFlujologistica, permissionLoading])
 
   useEffect(() => {
     loadOrdenes()
@@ -65,12 +71,29 @@ export default function OrdenesPendientesPage() {
     }
   }
 
-  if (configLoading) {
+  if (configLoading || permissionLoading) {
     return (
       <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6 [&_table]:w-full [&_table]:border-collapse [&_table]:rounded-xl [&_table]:bg-card [&_table]:text-card-foreground [&_th]:border-b [&_th]:border-border [&_th]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:border-b [&_td]:border-border [&_td]:px-4 [&_td]:py-3 [&_td]:text-left [&_tr:hover]:bg-accent/40">
         <div className="flex min-h-48 items-center justify-center">
           <div className="inline-block size-8 animate-spin rounded-full border-[3px] border-muted border-t-primary"></div>
-          <p>Cargando configuración...</p>
+          <p>Validando acceso a Logística...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!canViewLogistics) {
+    return (
+      <div className="mx-auto w-full max-w-[1600px] p-4 text-foreground md:p-6">
+        <div className="rounded-2xl border border-border bg-card/95 p-12 text-center text-card-foreground shadow-md">
+          <ShieldAlert className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-60" />
+          <h1 className="mb-2 text-2xl font-bold">Acceso denegado</h1>
+          <p className="text-muted-foreground">
+            El rol actual no puede preparar ni despachar pedidos. El equipo de Logística continuará este flujo.
+          </p>
+          <Button asChild variant="outline" className="mt-5">
+            <Link href="/dashboard/ventas/pedidos/">Volver a Pedidos</Link>
+          </Button>
         </div>
       </div>
     )

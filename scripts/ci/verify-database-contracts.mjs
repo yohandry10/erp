@@ -218,6 +218,14 @@ function runPsql(args, description, { capture = false, input } = {}) {
   return capture ? String(result.stdout ?? "").trim() : "";
 }
 
+function readSqlForPsql(file) {
+  // Algunos archivos históricos conservan BOM UTF-8. PostgreSQL 16 en Windows
+  // lo interpreta como parte del primer token cuando psql recibe --file. La
+  // cadena fresca normaliza únicamente la entrada; no reescribe migraciones ya
+  // aplicadas ni altera el SQL que recibe el servidor.
+  return fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
+}
+
 const preflight = runPsql(
   [
     "--no-align",
@@ -257,8 +265,9 @@ runPsql(
 
 for (const migration of migrations) {
   process.stdout.write(`[database-contracts] apply ${migration.name}\n`);
-  runPsql(["--file", migration.file], `migración ${migration.name}`, {
+  runPsql([], `migración ${migration.name}`, {
     capture: true,
+    input: readSqlForPsql(migration.file),
   });
 }
 
@@ -296,7 +305,9 @@ runPsql([], "registro local del historial de migraciones", {
 
 for (const verifier of selectedVerifiers) {
   process.stdout.write(`[database-contracts] verify ${verifier.name}\n`);
-  runPsql(["--file", verifier.file], `verificador ${verifier.name}`);
+  runPsql([], `verificador ${verifier.name}`, {
+    input: readSqlForPsql(verifier.file),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +388,9 @@ for (const verifier of historicos) {
   if (!fs.existsSync(verifier.file)) {
     fail(`el verificador ${verifier.name} está enumerado pero no existe`);
   }
-  runPsql(["--file", verifier.file], `verificador histórico ${verifier.name}`);
+  runPsql([], `verificador histórico ${verifier.name}`, {
+    input: readSqlForPsql(verifier.file),
+  });
 }
 process.stdout.write(
   `[database-contracts] ${historicos.length} verificadores históricos ejecutados, ` +

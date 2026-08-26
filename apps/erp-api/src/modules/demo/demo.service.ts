@@ -10,22 +10,14 @@ import { obtenerDatosDePago } from "./datos-de-pago";
 import { TenantContextService } from "../../shared/tenant/tenant-context.service";
 import { AuthService } from "../auth/auth.service";
 import * as bcrypt from "bcrypt";
-import * as fs from "node:fs";
-import * as path from "node:path";
 import { randomInt, randomUUID } from "node:crypto";
 import {
   CreateDemoTenantDto,
   ConvertDemoToRealDto,
 } from "./dto/create-demo-tenant.dto";
 import { StripeService } from "./stripe.service";
-import {
-  parseCertificateBuffer,
-  toPostgresBytea,
-} from "../../shared/utils/certificate.utils";
-import {
-  encryptBuffer,
-  encryptText,
-} from "../../shared/utils/secure-config.utils";
+import { encryptText } from "../../shared/utils/secure-config.utils";
+import { loadRuntimeDemoCertificate } from "../../shared/utils/demo-certificate.utils";
 import { CacheInvalidationService } from "../../shared/cache/cache-invalidation.service";
 import {
 
@@ -216,6 +208,10 @@ export class DemoService {
     }
 
     try {
+      if (countryCode === "PE") {
+        loadRuntimeDemoCertificate(this.configService);
+      }
+
       const { data, error } = await this.client.rpc("create_demo_tenant_ready_tx", {
         p_nombre: nombre,
         p_dias_duracion: diasDuracion,
@@ -733,11 +729,9 @@ export class DemoService {
   }
 
   /**
-   * Carga certs/demo.pfx + DEMO_PFX_PASS en empresa_config.certificado_pfx para que
-   * CPE/GRE puedan firmar comprobantes en modo demo. Sin esto, todo flujo
-   * fiscal falla con "Certificado digital inválido".
-   * No usa PFX_PATH/PFX_PASS porque esos pueden apuntar al certificado fiscal
-   * real de un contribuyente.
+   * Configura la identidad fiscal demo. El PFX sintético se valida aquí, pero
+   * permanece como artefacto efímero del runtime: nunca se cifra ni persiste en
+   * empresa_config como si perteneciera al contribuyente.
    */
   private async seedFiscalDemo(
     tenantId: string,
@@ -858,57 +852,9 @@ export class DemoService {
     // simulada y no debe presentar un PFX SUNAT como si fuera una credencial ARCA.
     if (country.codigo !== "PE") return;
 
-    // 2) Certificado demo para firmar CPE/GRE en modo demo de Perú.
-    const pfxPath = process.env.DEMO_PFX_PATH || "certs/demo.pfx";
-    const pfxPass = process.env.DEMO_PFX_PASS || "12345678910";
-    const absPath = this.resolveDemoPfxPath(pfxPath);
-    if (!absPath) {
-      throw new Error(`PFX demo no encontrado: ${pfxPath} (cwd=${process.cwd()})`);
-    }
-    const buffer = fs.readFileSync(absPath);
-    // Validamos el cert para obtener expiry; si está roto, abortamos el seed.
-    const metadata = parseCertificateBuffer(buffer, pfxPass);
-    const encryptedCertificate = encryptBuffer(this.configService, buffer);
-    const encryptedPassword = encryptText(this.configService, pfxPass);
-    const { error } = await this.adminClient
-      .from("empresa_config")
-      .update({
-        certificado_pfx: toPostgresBytea(encryptedCertificate),
-        certificado_password: encryptedPassword,
-        certificado_expira_en: metadata.validTo.toISOString(),
-      })
-      .eq("tenant_id", tenantId);
-    if (error)
-      throw new Error(`empresa_config update (certificado): ${error.message}`);
-  }
-
-  /**
-   * Resuelve el fixture tanto en ts-jest/dev (`src/...`) como en el artefacto
-   * compilado (`dist/src/...`). Basarse en una cantidad fija de `..` rompía el
-   * seed al ejecutar `node dist/src/main.js`.
-   */
-  private resolveDemoPfxPath(configuredPath: string): string | null {
-    if (path.isAbsolute(configuredPath)) {
-      return fs.existsSync(configuredPath) ? configuredPath : null;
-    }
-
-    const candidates = [
-      path.resolve(process.cwd(), configuredPath),
-      path.resolve(process.cwd(), "..", "..", configuredPath),
-      path.resolve(__dirname, "..", "..", "..", "..", "..", configuredPath),
-      path.resolve(
-        __dirname,
-        "..",
-        "..",
-        "..",
-        "..",
-        "..",
-        "..",
-        configuredPath,
-      ),
-    ];
-
-    return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
+    // 2) Preflight del artefacto demo. OseService lo cargará bajo demanda sólo
+    //    para demo PE en homologación y con las columnas de certificado vacías.
+    loadRuntimeDemoCertificate(this.configService);
   }
 
   /**

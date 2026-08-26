@@ -63,7 +63,8 @@ export class CpeService {
   }
   /**
    * Obtiene el XmlSigner configurado para el tenant
-   * Si el tenant tiene certificado propio, lo usa. Si no, usa la configuración global válida.
+   * Una cuenta real usa su certificado propio; sólo una demo PE en homologación
+   * puede resolver el fixture sintético explícito del runtime.
    */
 private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
     return this.certificateService.getXmlSigner(tenantId);

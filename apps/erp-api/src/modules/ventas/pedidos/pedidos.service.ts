@@ -9,6 +9,7 @@ import { CreatePedidoDto, UpdatePedidoDto, DecisionAprobacion } from './dto';
 import { PedidoVenta, EstadoPedido, PedidoDetalle } from './entities';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { calcularDesgloseIgv } from '../../../shared/utils/igv-afectacion.util';
+import { canUseRuntimeDemoCertificate } from '../../../shared/utils/demo-certificate.utils';
 import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 
 interface ConfiguracionEmpresa {
@@ -1279,10 +1280,13 @@ export class PedidosService {
     if (!empresaConfig.ruc) camposFaltantes.push('RUC');
     if (!empresaConfig.razon_social) camposFaltantes.push('Razón Social');
     if (!empresaConfig.direccion_fiscal) camposFaltantes.push('Dirección Fiscal');
-    // NOTA: El certificado digital es opcional para testing/desarrollo
-    // En producción, la empresa debe subirlo a través del wizard
-    if (!empresaConfig.certificado_pfx) camposFaltantes.push('Certificado Digital');
-    if (!empresaConfig.certificado_password) camposFaltantes.push('Contraseña del Certificado');
+    const usaCertificadoDemoRuntime = canUseRuntimeDemoCertificate(empresaConfig);
+    if (!empresaConfig.certificado_pfx && !usaCertificadoDemoRuntime) {
+      camposFaltantes.push('Certificado Digital');
+    }
+    if (!empresaConfig.certificado_password && !usaCertificadoDemoRuntime) {
+      camposFaltantes.push('Contraseña del Certificado');
+    }
 
     if (camposFaltantes.length > 0) {
       throw new BadRequestException(

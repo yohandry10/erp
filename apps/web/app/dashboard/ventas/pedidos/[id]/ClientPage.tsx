@@ -13,6 +13,10 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
+import { usePermission } from '@/hooks/use-permission'
+import CpeA4PreviewModal from '@/components/cpe/CpeA4PreviewModal'
+import { Button } from '@/components/ui/button'
+import { Eye } from 'lucide-react'
 
 const ESTADO_COLORS: Record<EstadoPedido, { bg: string; text: string }> = {
   [EstadoPedido.PENDIENTE]: { bg: '#fef3c7', text: '#92400e' },
@@ -31,6 +35,10 @@ const ESTADO_COLORS: Record<EstadoPedido, { bg: string; text: string }> = {
 export default function PedidoDetailPage() {
   const { formatCurrency } = useLocalizedMoney()
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
+  const {
+    hasPermission: canViewLogistics,
+    loading: logisticsPermissionLoading,
+  } = usePermission('inventario', 'ver', 'logistica')
   const router = useRouter()
   const params = useParams()
   const { get, post } = useApi()
@@ -38,6 +46,7 @@ export default function PedidoDetailPage() {
 
   const [pedido, setPedido] = useState<PedidoVenta | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showCpePreview, setShowCpePreview] = useState(false)
 
   const pedidoId = params.id as string
 
@@ -132,6 +141,7 @@ export default function PedidoDetailPage() {
     ['RUC', '6'].includes(clienteTipoDocumento) &&
     /^\d{11}$/.test(String(clienteDocumento ?? ''))
   const documentType = clienteEsRuc ? 'FACTURA' : 'BOLETA'
+  const documentTypeCode = clienteEsRuc ? '01' : '03'
 
   const facturaButtonConfig = {
     usar_flujo_logistica: empresaConfig?.usar_flujo_logistica ?? false,
@@ -283,7 +293,11 @@ export default function PedidoDetailPage() {
             </span>
           </div>
           <span className="text-sm">
-            Usa el botón “Ir a Logística” para preparar y despachar. Luego regresa aquí para facturar cuando el pedido esté listo.
+            {logisticsPermissionLoading
+              ? 'Verificando acceso al flujo logístico...'
+              : canViewLogistics
+                ? 'Usa el botón “Ir a Logística” para preparar y despachar. Luego regresa aquí para facturar cuando el pedido esté listo.'
+                : 'Después de confirmar, el pedido queda pendiente de atención por el equipo de Logística. No necesitas salir del módulo de Ventas.'}
           </span>
         </div>
       )}
@@ -306,21 +320,42 @@ export default function PedidoDetailPage() {
           <div>
             <strong>Flujo logístico activo</strong>
             <p className="mt-1 mr-0 mb-0 ml-0 text-[var(--primary-600)]">
-              Completa la preparación y despacho en Inventario → Logística para avanzar el pedido a
-              LISTO_FACTURAR y habilitar la emisión de la factura.
+              {logisticsPermissionLoading
+                ? 'Verificando quién continuará la preparación y el despacho...'
+                : canViewLogistics
+                  ? 'Completa la preparación y despacho en Inventario → Logística para avanzar el pedido a LISTO_FACTURAR y habilitar la emisión de la factura.'
+                  : 'El pedido ya quedó transferido al equipo de Logística. Cuando termine la preparación y el despacho, volverá a Ventas como LISTO_FACTURAR.'}
             </p>
           </div>
-          <button
-            onClick={() => {
-              const target =
-                pedido.estado === EstadoPedido.EN_PREPARACION
-                  ? '/dashboard/inventario/logistica/listo-despacho'
-                  : '/dashboard/inventario/logistica/ordenes-pendientes'
-              router.push(target)
-            }} className="py-2 px-4 border-0 bg-[var(--primary-600)] text-white font-semibold cursor-pointer"
-          >
-            {pedido.estado === EstadoPedido.EN_PREPARACION ? 'Ir a Despachos' : 'Ir a Logística'}
-          </button>
+          {!logisticsPermissionLoading && canViewLogistics ? (
+            <button
+              onClick={() => {
+                const target =
+                  pedido.estado === EstadoPedido.EN_PREPARACION
+                    ? '/dashboard/inventario/logistica/listo-despacho'
+                    : '/dashboard/inventario/logistica/ordenes-pendientes'
+                router.push(target)
+              }} className="py-2 px-4 border-0 bg-[var(--primary-600)] text-white font-semibold cursor-pointer"
+            >
+              {pedido.estado === EstadoPedido.EN_PREPARACION ? 'Ir a Despachos' : 'Ir a Logística'}
+            </button>
+          ) : !logisticsPermissionLoading ? (
+            <span className="rounded-full border bg-card px-3 py-2 text-sm font-semibold text-[var(--primary-700)]">
+              Pendiente de atención por el equipo de Logística
+            </span>
+          ) : null}
+        </div>
+      )}
+
+      {pedido.factura_id && (
+        <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-4">
+          <p className="mb-3 text-sm text-muted-foreground">
+            El comprobante ya está disponible. Revísalo en el mismo formato A4 que verá el cliente.
+          </p>
+          <Button type="button" variant="outline" onClick={() => setShowCpePreview(true)}>
+            <Eye className="mr-2 h-4 w-4" />
+            Ver {documentType === 'BOLETA' ? 'boleta' : 'factura'} A4
+          </Button>
         </div>
       )}
 
@@ -426,6 +461,13 @@ export default function PedidoDetailPage() {
           </p>
         </div>
       )}
+
+      <CpeA4PreviewModal
+        isOpen={showCpePreview}
+        onClose={() => setShowCpePreview(false)}
+        documentId={pedido.factura_id || ''}
+        documentType={documentTypeCode}
+      />
     </div>
   )
 }

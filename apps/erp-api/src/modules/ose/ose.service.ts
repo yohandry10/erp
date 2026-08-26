@@ -9,6 +9,10 @@ import * as zlib from 'zlib';
 import { CircuitBreakerService, CircuitBreakerOpenError, CircuitStats } from '../../shared/resilience/circuit-breaker.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { decryptBuffer, decryptText } from '../../shared/utils/secure-config.utils';
+import {
+  canUseRuntimeDemoCertificate,
+  loadRuntimeDemoCertificate,
+} from '../../shared/utils/demo-certificate.utils';
 
 export interface OseConfig {
   url: string;
@@ -27,6 +31,7 @@ export interface OseConfig {
   certificatePath: string;
   certificatePassword: string;
   environment: 'homologacion' | 'produccion';
+  isDemoTenant?: boolean;
 }
 
 export interface SunatResponse {
@@ -47,7 +52,27 @@ interface ParsedCdrMetadata {
 }
 
 export interface SunatRuntimeOptions {
-  tenantId?: string;
+  tenantId: string;
+}
+
+export interface OseTenantConfigurationStatus {
+  configuracion: {
+    applicable: boolean;
+    environment: string;
+    url: string;
+    ruc: string;
+    certificateExists: boolean;
+    usuario: string;
+    password: string;
+    isDemoTenant: boolean;
+    connectivityStatus: 'NO_PROBADO';
+    transportStatus: 'BLOQUEADO_DEMO' | 'CONFIGURADO_NO_PROBADO';
+  };
+  verificacion: {
+    valid: boolean;
+    errors: string[];
+    connectivityStatus: 'NO_PROBADO';
+  };
 }
 
 interface OseRuntime {
@@ -246,8 +271,14 @@ export class OseService implements OnModuleInit {
   }
 
   private async resolveRuntime(options?: SunatRuntimeOptions): Promise<OseRuntime> {
-    if (!options?.tenantId || !this.supabaseService) {
+    if (!options?.tenantId) {
       return { config: this.oseConfig, signer: this.xmlSigner };
+    }
+
+    if (!this.supabaseService) {
+      throw new Error(
+        `No se puede resolver SUNAT para el tenant ${options.tenantId}: empresa_config no está disponible`,
+      );
     }
 
     try {
@@ -256,6 +287,8 @@ export class OseService implements OnModuleInit {
         .from('empresa_config')
         .select([
           'ruc',
+          'pais',
+          'is_demo',
           'certificado_pfx',
           'certificado_password',
           'sunat_environment',
@@ -285,42 +318,83 @@ export class OseService implements OnModuleInit {
         throw new Error(`No existe empresa_config SUNAT para tenant ${options.tenantId}`);
       }
 
-      const environment =
-        String(typedData.sunat_environment || this.oseConfig.environment).toLowerCase() === 'produccion'
-          ? 'produccion'
-          : 'homologacion';
-      const ruc = String(typedData.ruc || this.oseConfig.ruc || '').trim();
-      const usuario = this.normalizeSunatUsername(typedData.sunat_username || this.oseConfig.usuario, ruc);
+      const country = String(typedData.pais ?? '').trim().toUpperCase();
+      if (country !== 'PE') {
+        throw new Error(
+          `El runtime SUNAT del tenant ${options.tenantId} requiere pais PE explícito`,
+        );
+      }
+
+      const rawEnvironment = String(typedData.sunat_environment ?? '').trim().toLowerCase();
+      if (rawEnvironment !== 'homologacion' && rawEnvironment !== 'produccion') {
+        throw new Error(
+          `Ambiente SUNAT inválido para tenant ${options.tenantId}: configure homologacion o produccion`,
+        );
+      }
+      const environment = rawEnvironment as 'homologacion' | 'produccion';
+      const isDemoTenant =
+        typedData.is_demo === true && country === 'PE' && environment === 'homologacion';
+      if (typedData.is_demo === true && !isDemoTenant) {
+        throw new Error(
+          `El tenant demo ${options.tenantId} sólo puede simular SUNAT como demo PE en homologación`,
+        );
+      }
+      const ruc = String(typedData.ruc ?? '').trim();
+      if (!/^\d{11}$/.test(ruc)) {
+        throw new Error(`RUC SUNAT inválido o ausente para tenant ${options.tenantId}`);
+      }
+      const usuario = this.normalizeSunatUsername(typedData.sunat_username, ruc);
       const password = typedData.sunat_password
         ? decryptText(this.configService, typedData.sunat_password)
-        : this.oseConfig.password;
+        : '';
+
+      const tenantCpeUrl = String(typedData.sunat_cpe_url ?? '').trim() || undefined;
+      const tenantSummaryUrl = String(typedData.sunat_summary_url ?? '').trim() || undefined;
+      const tenantQueryUrl = String(typedData.sunat_query_url ?? '').trim() || undefined;
+      const tenantGreUrl = String(typedData.sunat_gre_url ?? '').trim() || undefined;
+      const tenantGreRestBaseUrl =
+        String(typedData.sunat_gre_rest_base_url ?? '').trim() ||
+        'https://api-cpe.sunat.gob.pe/v1';
+      const tenantGreRestAuthUrl =
+        String(typedData.sunat_gre_auth_url ?? '').trim() || undefined;
 
       const config: OseConfig = {
-        ...this.oseConfig,
+        isDemoTenant,
         environment,
         ruc,
         usuario,
         password,
-        url: typedData.sunat_cpe_url || SUNAT_ENDPOINTS[environment].cpe,
-        cpeUrl: typedData.sunat_cpe_url || undefined,
-        summaryUrl: typedData.sunat_summary_url || typedData.sunat_cpe_url || undefined,
-        queryUrl: typedData.sunat_query_url || undefined,
-        greUrl: typedData.sunat_gre_url || undefined,
+        url: tenantCpeUrl || SUNAT_ENDPOINTS[environment].cpe,
+        cpeUrl: tenantCpeUrl,
+        summaryUrl: tenantSummaryUrl || tenantCpeUrl,
+        queryUrl: tenantQueryUrl,
+        greUrl: tenantGreUrl,
         greTransport: String(typedData.sunat_gre_transport || 'soap').toLowerCase() === 'rest' ? 'rest' : 'soap',
-        greRestBaseUrl: typedData.sunat_gre_rest_base_url || this.oseConfig.greRestBaseUrl || 'https://api-cpe.sunat.gob.pe/v1',
-        greRestAuthUrl: typedData.sunat_gre_auth_url || undefined,
-        greRestClientId: typedData.sunat_gre_client_id || this.oseConfig.greRestClientId,
+        greRestBaseUrl: tenantGreRestBaseUrl,
+        greRestAuthUrl: tenantGreRestAuthUrl,
+        greRestClientId: String(typedData.sunat_gre_client_id ?? '').trim() || undefined,
         greRestClientSecret: typedData.sunat_gre_client_secret
           ? decryptText(this.configService, typedData.sunat_gre_client_secret)
-          : this.oseConfig.greRestClientSecret,
+          : undefined,
+        certificatePath: '',
         certificatePassword: typedData.certificado_password
           ? decryptText(this.configService, typedData.certificado_password)
-          : this.oseConfig.certificatePassword,
+          : '',
       };
 
-      const certificateBuffer = typedData.certificado_pfx
+      let certificateBuffer = typedData.certificado_pfx
         ? decryptBuffer(this.configService, typedData.certificado_pfx)
         : null;
+      let certificatePassword = config.certificatePassword;
+
+      if (!certificateBuffer && canUseRuntimeDemoCertificate(typedData)) {
+        const demoCertificate = loadRuntimeDemoCertificate(this.configService);
+        certificateBuffer = demoCertificate.pfxBuffer;
+        certificatePassword = demoCertificate.pfxPassword;
+        this.logger.warn(
+          `Usando certificado fiscal simulado en runtime SUNAT para el tenant demo ${options.tenantId}`,
+        );
+      }
 
       if (!certificateBuffer) {
         throw new Error(`Certificado digital no configurado para tenant ${options.tenantId}`);
@@ -328,7 +402,7 @@ export class OseService implements OnModuleInit {
 
       const signer = new XmlSigner({
         pfxBuffer: certificateBuffer,
-        pfxPassword: config.certificatePassword,
+        pfxPassword: certificatePassword,
         allowDemoFallback: false,
         expectedRuc: typedData.sunat_cert_expected_ruc || ruc,
         enforceRucInCertificate: environment === 'produccion',
@@ -342,6 +416,29 @@ export class OseService implements OnModuleInit {
       );
       throw error;
     }
+  }
+
+  /**
+   * Toda operación con tráfico externo debe resolver configuración y secretos
+   * desde el tenant autenticado. El runtime global sólo se conserva para firma
+   * local/offline en herramientas que no transportan documentos.
+   */
+  private async resolveTransportRuntime(
+    options?: SunatRuntimeOptions,
+  ): Promise<OseRuntime> {
+    const tenantId = String(options?.tenantId ?? '').trim();
+    if (!tenantId) {
+      throw new Error(
+        'tenantId es obligatorio para toda transmisión o consulta externa SUNAT/OSE',
+      );
+    }
+    if (!this.supabaseService) {
+      throw new Error(
+        `No se puede transportar para el tenant ${tenantId}: empresa_config no está disponible`,
+      );
+    }
+
+    return this.resolveRuntime({ tenantId });
   }
 
   private normalizeSunatUsername(username: string | undefined, ruc: string): string {
@@ -360,8 +457,21 @@ export class OseService implements OnModuleInit {
     try {
       this.logger.log(`📤 Enviando CPE a SUNAT: ${fileName}`);
 
-      const runtime = await this.resolveRuntime(options);
+      const runtime = await this.resolveTransportRuntime(options);
       const { xmlSigned, hash } = this.prepareXmlForSend(xmlUnsigned, runtime.signer);
+
+      if (runtime.config.isDemoTenant) {
+        return {
+          success: false,
+          codigoRespuesta: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+          descripcionRespuesta: 'El CPE demo puede generarse y firmarse, pero no se transmite ni se marca como aceptado por SUNAT.',
+          observaciones: ['No se realizó ninguna transmisión ni se fabricó un CDR.'],
+          numeroComprobante: fileName,
+          hashCPE: hash,
+        };
+      }
+
+      this.assertSunatConfigured(runtime.config);
 
       // 2. Comprimir el XML
       const zipBuffer = await this.compressXml(xmlSigned, fileName);
@@ -423,8 +533,29 @@ export class OseService implements OnModuleInit {
     try {
       this.logger.log(`🚚 Enviando GRE a SUNAT: ${fileName}`);
 
-      const runtime = await this.resolveRuntime(options);
+      const runtime = await this.resolveTransportRuntime(options);
       const { xmlSigned, hash } = this.prepareXmlForSend(xmlUnsigned, runtime.signer);
+
+      if (runtime.config.isDemoTenant) {
+        return {
+          success: false,
+          codigoRespuesta: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+          descripcionRespuesta: 'La GRE demo puede generarse y firmarse, pero no se transmite ni se marca como aceptada por SUNAT.',
+          observaciones: ['No se realizó ninguna transmisión ni se fabricó un CDR.'],
+          numeroComprobante: fileName,
+          hashCPE: hash,
+        };
+      }
+
+      this.assertSunatConfigured(runtime.config);
+      if (
+        runtime.config.greTransport === 'rest' &&
+        (!runtime.config.greRestClientId || !runtime.config.greRestClientSecret)
+      ) {
+        throw new Error(
+          'Credenciales API GRE no configuradas para el tenant: client_id y client_secret son obligatorios',
+        );
+      }
 
       // 2. Comprimir el XML
       const zipBuffer = await this.compressXml(xmlSigned, fileName);
@@ -486,8 +617,20 @@ export class OseService implements OnModuleInit {
     try {
       this.logger.log(`📤 Enviando resumen SUNAT: ${fileName}`);
 
-      const runtime = await this.resolveRuntime(options);
+      const runtime = await this.resolveTransportRuntime(options);
       const { xmlSigned, hash } = this.prepareXmlForSend(xmlUnsigned, runtime.signer);
+
+      if (runtime.config.isDemoTenant) {
+        return {
+          success: false,
+          codigoRespuesta: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+          descripcionRespuesta: 'El resumen demo puede generarse y firmarse, pero no se transmite ni recibe ticket SUNAT.',
+          observaciones: ['No se realizó ninguna transmisión ni se fabricó un ticket.'],
+          numeroComprobante: fileName,
+          hashCPE: hash,
+        };
+      }
+      this.assertSunatConfigured(runtime.config);
       const zipBuffer = await this.compressXml(xmlSigned, fileName);
 
       const response = await this.circuitBreaker.execute<SunatResponse>(
@@ -540,7 +683,20 @@ export class OseService implements OnModuleInit {
   ): Promise<SunatResponse> {
     try {
       this.logger.log(`🔍 Consultando estado CPE: ${ruc}-${tipoDocumento}-${serie}-${numero}`);
-      const runtime = await this.resolveRuntime(options);
+      const runtime = await this.resolveTransportRuntime(options);
+
+      if (runtime.config.isDemoTenant) {
+        const reference = `${ruc}-${tipoDocumento}-${serie}-${numero}`;
+        return {
+          success: false,
+          codigoRespuesta: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+          descripcionRespuesta: 'Una demo no consulta ni fabrica estados de aceptación SUNAT.',
+          observaciones: ['No se consultó ningún servicio de SUNAT.'],
+          numeroComprobante: reference,
+        };
+      }
+
+      this.assertSunatConfigured(runtime.config);
 
       // Q33: Consultar con Circuit Breaker
       const response = await this.circuitBreaker.execute(
@@ -581,7 +737,19 @@ export class OseService implements OnModuleInit {
 
       const cleanTicket = ticket.trim();
       this.logger.log(`🔍 Consultando ticket SUNAT: ${cleanTicket}`);
-      const runtime = await this.resolveRuntime(options);
+      const runtime = await this.resolveTransportRuntime(options);
+
+      if (runtime.config.isDemoTenant) {
+        return {
+          success: false,
+          codigoRespuesta: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+          descripcionRespuesta: 'Una demo no consulta ni fabrica tickets SUNAT.',
+          observaciones: ['No se consultó ningún servicio de SUNAT.'],
+          ticket: cleanTicket,
+        };
+      }
+
+      this.assertSunatConfigured(runtime.config);
 
       return this.circuitBreaker.execute<SunatResponse>(
         CIRCUIT_SUNAT_QUERY,
@@ -652,13 +820,17 @@ export class OseService implements OnModuleInit {
     zipBuffer: Buffer,
     fileName: string,
     endpointKind: 'cpe' | 'gre',
-    config: OseConfig = this.oseConfig,
+    config: OseConfig,
   ): Promise<SunatResponse> {
     const postData = this.buildZipSoapRequest(zipBuffer, fileName, 'sendBill', config);
     return this.postSoap(endpointKind, 'urn:sendBill', postData, config);
   }
 
-  private async sendGreToSunatRest(zipBuffer: Buffer, fileName: string, config: OseConfig = this.oseConfig): Promise<SunatResponse> {
+  private async sendGreToSunatRest(
+    zipBuffer: Buffer,
+    fileName: string,
+    config: OseConfig,
+  ): Promise<SunatResponse> {
     const token = await this.getGreRestAccessToken(config);
     const { ruc, tipo, serie, numero } = this.parseGreFileName(fileName);
     const baseUrl = (config.greRestBaseUrl || '').replace(/\/+$/, '');
@@ -679,7 +851,16 @@ export class OseService implements OnModuleInit {
 
   async consultarTicketGre(ticket: string, options?: SunatRuntimeOptions): Promise<SunatResponse> {
     try {
-      const runtime = await this.resolveRuntime(options);
+      const runtime = await this.resolveTransportRuntime(options);
+      if (runtime.config.isDemoTenant) {
+        return {
+          success: false,
+          codigoRespuesta: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+          descripcionRespuesta: 'Una demo no consulta ni fabrica tickets GRE SUNAT.',
+          observaciones: ['No se consultó ningún servicio de SUNAT.'],
+          ticket,
+        };
+      }
       const token = await this.getGreRestAccessToken(runtime.config);
       const baseUrl = (runtime.config.greRestBaseUrl || '').replace(/\/+$/, '');
       const response = await this.getJson(`${baseUrl}/contribuyente/gem/comprobantes/envios/${encodeURIComponent(ticket)}`, {
@@ -696,12 +877,16 @@ export class OseService implements OnModuleInit {
     }
   }
 
-  private async sendSummaryToSunat(zipBuffer: Buffer, fileName: string, config: OseConfig = this.oseConfig): Promise<SunatResponse> {
+  private async sendSummaryToSunat(
+    zipBuffer: Buffer,
+    fileName: string,
+    config: OseConfig,
+  ): Promise<SunatResponse> {
     const postData = this.buildZipSoapRequest(zipBuffer, fileName, 'sendSummary', config);
     return this.postSoap('summary', 'urn:sendSummary', postData, config);
   }
 
-  private async getGreRestAccessToken(config: OseConfig = this.oseConfig): Promise<string> {
+  private async getGreRestAccessToken(config: OseConfig): Promise<string> {
     if (!config.greRestClientId || !config.greRestClientSecret) {
       throw new Error('Credenciales API GRE no configuradas: SUNAT_GRE_CLIENT_ID y SUNAT_GRE_CLIENT_SECRET son obligatorias para SUNAT_GRE_TRANSPORT=rest');
     }
@@ -876,7 +1061,7 @@ export class OseService implements OnModuleInit {
     endpointKind: SunatEndpointKind,
     soapAction: string,
     postData: string,
-    config: OseConfig = this.oseConfig,
+    config: OseConfig,
   ): Promise<SunatResponse> {
     return new Promise((resolve, reject) => {
       try {
@@ -1087,13 +1272,16 @@ export class OseService implements OnModuleInit {
     tipoDocumento: string,
     serie: string,
     numero: string,
-    config: OseConfig = this.oseConfig,
+    config: OseConfig,
   ): Promise<SunatResponse> {
     const postData = this.buildStatusCdrRequest(ruc, tipoDocumento, serie, numero, config);
     return this.postSoap('query', 'urn:getStatusCdr', postData, config);
   }
 
-  private async queryTicketInSunat(ticket: string, config: OseConfig = this.oseConfig): Promise<SunatResponse> {
+  private async queryTicketInSunat(
+    ticket: string,
+    config: OseConfig,
+  ): Promise<SunatResponse> {
     const postData = this.buildTicketStatusRequest(ticket, config);
     return this.postSoap('summary', 'urn:getStatus', postData, config);
   }
@@ -1290,6 +1478,83 @@ export class OseService implements OnModuleInit {
   /**
    * Verificar configuración OSE
    */
+  async getTenantConfigurationStatus(
+    tenantId: string,
+  ): Promise<OseTenantConfigurationStatus> {
+    if (!tenantId || !this.supabaseService) {
+      throw new Error('Tenant y acceso a empresa_config son obligatorios para consultar OSE');
+    }
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select([
+        'ruc',
+        'pais',
+        'is_demo',
+        'certificado_pfx',
+        'certificado_password',
+        'sunat_environment',
+        'sunat_username',
+        'sunat_password',
+        'sunat_cpe_url',
+      ].join(','))
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`No se pudo leer la configuración OSE del tenant: ${error.message}`);
+    }
+    if (!data) {
+      throw new Error('No existe configuración OSE para este tenant');
+    }
+
+    const row = data as any;
+    const country = String(row.pais || '').trim().toUpperCase();
+    const environment = String(row.sunat_environment || '').trim().toLowerCase();
+    const isDemoTenant = row.is_demo === true;
+    const ruc = String(row.ruc || '').trim();
+    const usuarioConfigured = Boolean(String(row.sunat_username || '').trim());
+    const passwordConfigured = Boolean(row.sunat_password);
+    const certificateExists = Boolean(row.certificado_pfx) || canUseRuntimeDemoCertificate(row);
+    const configuredUrl = String(row.sunat_cpe_url || '').trim();
+    const url = configuredUrl || (
+      environment === 'produccion'
+        ? SUNAT_ENDPOINTS.produccion.cpe
+        : SUNAT_ENDPOINTS.homologacion.cpe
+    );
+    const errors: string[] = [];
+
+    if (country !== 'PE') errors.push('OSE/SUNAT sólo aplica a empresas de Perú');
+    if (!/^\d{11}$/.test(ruc)) errors.push('RUC peruano no configurado o inválido');
+    if (!['homologacion', 'produccion'].includes(environment)) {
+      errors.push('Ambiente SUNAT no configurado');
+    }
+    if (!usuarioConfigured) errors.push('Usuario SOL no configurado');
+    if (!passwordConfigured) errors.push('Clave SOL no configurada');
+    if (!certificateExists) errors.push('Certificado digital no configurado');
+
+    return {
+      configuracion: {
+        applicable: country === 'PE',
+        environment,
+        url,
+        ruc,
+        certificateExists,
+        usuario: usuarioConfigured ? '***configurado***' : 'no configurado',
+        password: passwordConfigured ? '***configurado***' : 'no configurado',
+        isDemoTenant,
+        connectivityStatus: 'NO_PROBADO',
+        transportStatus: isDemoTenant ? 'BLOQUEADO_DEMO' : 'CONFIGURADO_NO_PROBADO',
+      },
+      verificacion: {
+        valid: errors.length === 0,
+        errors,
+        connectivityStatus: 'NO_PROBADO',
+      },
+    };
+  }
+
   async verificarConfiguracion(): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = [];
 
