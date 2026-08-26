@@ -1,6 +1,28 @@
 import { expect, test } from '@playwright/test'
 import { SignJWT } from 'jose'
 
+const onePageA4Pdf = () => {
+  const stream = 'BT /F1 12 Tf 72 760 Td (Factura demo visible) Tj ET\n'
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
+    `4 0 obj\n<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}endstream\nendobj\n`,
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+  ]
+  let body = '%PDF-1.4\n'
+  const offsets = [0]
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(body))
+    body += object
+  }
+  const xrefOffset = Buffer.byteLength(body)
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  body += offsets.slice(1).map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+  return Buffer.from(body)
+}
+
 const user = {
   id: 'cotizacion-dialog-user',
   email: 'cotizacion-dialog@erp.local',
@@ -85,7 +107,7 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
       return route.fulfill({
         status: 200,
         contentType: 'application/pdf',
-        body: '%PDF-1.4\n% ERP A4 DEMO\n%%EOF',
+        body: onePageA4Pdf(),
       })
     }
     if (/\/api\/cpe\/comprobantes\/cpe-a4-demo\/?$/.test(pathname)) {
@@ -96,6 +118,28 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
           tipo_documento: '01',
           serie: 'F001',
           numero: 42,
+          fecha_emision: '2026-08-25',
+          moneda: 'PEN',
+          estado: 'BORRADOR',
+          razon_social_receptor: 'Cliente Vista Previa S.A.C.',
+          documento_receptor: '20600000013',
+          direccion_receptor: 'Av. Demo 123, Lima',
+          total_gravadas: 100,
+          total_igv: 18,
+          total_venta: 118,
+          emisor: {
+            ruc: '20600000021',
+            razon_social: 'Comercial Andina Demo S.A.C.',
+            direccion_fiscal: 'Av. Emisor 456, Lima',
+            telefono: '01 555 0101',
+            email: 'ventas@demo.invalid',
+          },
+          items: [{
+            cantidad: 2,
+            descripcion: 'Audífonos Bluetooth',
+            precio_unitario: 50,
+            total_item: 118,
+          }],
         },
       })
     }
@@ -137,7 +181,12 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
   await expect(dialog.getByText('210 × 297 mm', { exact: true })).toBeVisible()
   await expect(dialog.getByText(/Muestra demo · sin validez SUNAT/i)).toBeVisible()
   await expect(dialog.getByTestId('cpe-a4-sheet')).toBeVisible()
-  await expect(dialog.locator('iframe[title^="Vista previa A4"]')).toHaveAttribute('src', /^blob:/)
+  await expect(dialog.getByTestId('cpe-a4-html-preview')).toBeVisible()
+  await expect(dialog.getByText('Comercial Andina Demo S.A.C.', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('Cliente Vista Previa S.A.C.', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('Audífonos Bluetooth', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('S/ 118.00', { exact: true }).last()).toBeVisible()
+  await expect(dialog.locator('iframe')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: 'Descargar A4' })).toBeEnabled()
   await expect(dialog.getByRole('button', { name: 'Abrir / imprimir' })).toBeEnabled()
   expect(browserErrors).toEqual([])

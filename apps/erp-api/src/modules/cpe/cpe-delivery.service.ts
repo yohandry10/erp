@@ -105,10 +105,11 @@ async getCpeById(id: string, tenantId: string): Promise<any> {
         throw new Error('CPE no encontrado');
       }
 
-      // Obtener logo_url de empresa_config
+      // La vista previa HTML necesita los mismos datos visibles que el PDF.
+      // Se resuelven siempre por tenant para no mezclar emisores.
       const { data: empresaConfig } = await this.supabaseService.getClient()
         .from('empresa_config')
-        .select('logo_url')
+        .select('logo_url,ruc,razon_social,direccion_fiscal,telefono,email')
         .eq('tenant_id', tenantId)
         .maybeSingle();
 
@@ -127,6 +128,14 @@ async getCpeById(id: string, tenantId: string): Promise<any> {
       return {
         ...cpeData,
         logo_url: typedEmpresaConfig?.logo_url || null,
+        emisor: {
+          ruc: typedEmpresaConfig?.ruc || typedCpeData.ruc_emisor || null,
+          razon_social: typedEmpresaConfig?.razon_social || typedCpeData.razon_social_emisor || null,
+          direccion_fiscal: typedEmpresaConfig?.direccion_fiscal || null,
+          telefono: typedEmpresaConfig?.telefono || null,
+          email: typedEmpresaConfig?.email || null,
+          logo_url: typedEmpresaConfig?.logo_url || null,
+        },
         sunat_qr_content: sunatQrContent,
         sunat_qr_data_url: sunatQrDataUrl,
         valor_resumen: typedCpeData.valor_resumen || typedCpeData.hash_firma || typedCpeData.hash || null,
