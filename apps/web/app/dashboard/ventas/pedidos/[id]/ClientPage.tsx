@@ -14,6 +14,9 @@ import { es } from 'date-fns/locale'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { usePermission } from '@/hooks/use-permission'
+import CpeA4PreviewModal from '@/components/cpe/CpeA4PreviewModal'
+import { Button } from '@/components/ui/button'
+import { Eye } from 'lucide-react'
 
 const ESTADO_COLORS: Record<EstadoPedido, { bg: string; text: string }> = {
   [EstadoPedido.PENDIENTE]: { bg: '#fef3c7', text: '#92400e' },
@@ -43,6 +46,7 @@ export default function PedidoDetailPage() {
 
   const [pedido, setPedido] = useState<PedidoVenta | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showCpePreview, setShowCpePreview] = useState(false)
 
   const pedidoId = params.id as string
 
@@ -137,6 +141,7 @@ export default function PedidoDetailPage() {
     ['RUC', '6'].includes(clienteTipoDocumento) &&
     /^\d{11}$/.test(String(clienteDocumento ?? ''))
   const documentType = clienteEsRuc ? 'FACTURA' : 'BOLETA'
+  const documentTypeCode = clienteEsRuc ? '01' : '03'
 
   const facturaButtonConfig = {
     usar_flujo_logistica: empresaConfig?.usar_flujo_logistica ?? false,
@@ -342,6 +347,18 @@ export default function PedidoDetailPage() {
         </div>
       )}
 
+      {pedido.factura_id && (
+        <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-4">
+          <p className="mb-3 text-sm text-muted-foreground">
+            El comprobante ya está disponible. Revísalo en el mismo formato A4 que verá el cliente.
+          </p>
+          <Button type="button" variant="outline" onClick={() => setShowCpePreview(true)}>
+            <Eye className="mr-2 h-4 w-4" />
+            Ver {documentType === 'BOLETA' ? 'boleta' : 'factura'} A4
+          </Button>
+        </div>
+      )}
+
       {/* Cliente Info */}
       <div className="p-6 shadow border">
         <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] mb-4">
@@ -444,6 +461,13 @@ export default function PedidoDetailPage() {
           </p>
         </div>
       )}
+
+      <CpeA4PreviewModal
+        isOpen={showCpePreview}
+        onClose={() => setShowCpePreview(false)}
+        documentId={pedido.factura_id || ''}
+        documentType={documentTypeCode}
+      />
     </div>
   )
 }

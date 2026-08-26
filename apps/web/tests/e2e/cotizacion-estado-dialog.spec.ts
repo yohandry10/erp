@@ -31,7 +31,119 @@ const logisticsUser = {
   is_super_admin: false,
 }
 
-test('aprobar cotización usa diálogo integrado y conserva la observación', async ({ context, page }) => {
+test('el cliente encuentra y abre la representación A4 de una factura demo', async ({ context, page }) => {
+  const secret = process.env.JWT_SECRET
+  if (!secret) throw new Error('JWT_SECRET no está disponible para el E2E aislado de CPE A4')
+
+  const token = await new SignJWT({
+    tenant_id: user.tenant_id,
+    email: user.email,
+    roles: user.roles,
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(user.id)
+    .setIssuedAt()
+    .setExpirationTime('10m')
+    .sign(new TextEncoder().encode(secret))
+
+  await context.addCookies([{
+    name: 'access_token',
+    value: token,
+    url: process.env.BASE_URL || 'http://localhost:3001',
+    httpOnly: true,
+    sameSite: 'Lax',
+  }])
+
+  const browserErrors: string[] = []
+  page.on('pageerror', (error) => browserErrors.push(error.message))
+  page.on('console', (message) => {
+    if (message.type() === 'error') browserErrors.push(message.text())
+  })
+
+  await page.route('**/api/**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname
+    const json = (body: unknown) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    })
+
+    if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
+    if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
+      return json({ data: { pais_id: 1, pais: 'PE', paisCodigo: 'PE', monedaDefecto: 'PEN', locale: 'es-PE' } })
+    }
+    if (/\/api\/demo\/status\/?$/.test(pathname)) {
+      return json({ is_demo: true, is_expired: false, dias_restantes: 14 })
+    }
+    if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) {
+      return json({ data: [{ id: 'cpe-pdf', modulo: 'cpe', recurso: 'comprobantes', accion: 'descargar_pdf' }] })
+    }
+    if (/\/api\/cpe\/stats\/?$/.test(pathname)) {
+      return json({ success: true, data: { cpeEmitidosHoy: 1, cpeDelMes: 1, montoFacturado: 118, rechazados: 0 } })
+    }
+    if (/\/api\/cpe\/comprobantes\/cpe-a4-demo\/pdf\/?$/.test(pathname)) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        body: '%PDF-1.4\n% ERP A4 DEMO\n%%EOF',
+      })
+    }
+    if (/\/api\/cpe\/comprobantes\/cpe-a4-demo\/?$/.test(pathname)) {
+      return json({
+        success: true,
+        data: {
+          id: 'cpe-a4-demo',
+          tipo_documento: '01',
+          serie: 'F001',
+          numero: 42,
+        },
+      })
+    }
+    if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
+      return json({
+        success: true,
+        data: [{
+          id: 'cpe-a4-demo',
+          tipoDocumento: '01',
+          tipoComprobante: 'Factura',
+          serie: 'F001',
+          numero: 42,
+          fechaEmision: '25/08/2026',
+          cliente: 'Cliente Vista Previa S.A.C.',
+          clienteRuc: '20600000013',
+          total: 118,
+          moneda: 'PEN',
+          estado: 'FIRMADO',
+          fechaCreacion: '2026-08-25T12:00:00Z',
+        }],
+      })
+    }
+    return json({ success: true, data: [] })
+  })
+
+  await page.addInitScript((sessionUser) => {
+    const session = JSON.stringify({ user: sessionUser })
+    window.localStorage.setItem('erp.auth.session.snapshot', session)
+    window.sessionStorage.setItem('erp.auth.session.snapshot', session)
+    window.localStorage.setItem('erp_onboarding_completed', JSON.stringify(['admin']))
+    window.localStorage.setItem('selectedCountry', '1')
+  }, user)
+
+  await page.goto('/dashboard/cpe/?cpe_id=cpe-a4-demo', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText(/Usa “Vista A4” para revisar exactamente/i)).toBeVisible({ timeout: 30_000 })
+
+  const dialog = page.getByRole('dialog', { name: /Factura F001-00000042/i })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText('210 × 297 mm', { exact: true })).toBeVisible()
+  await expect(dialog.getByText(/Muestra demo · sin validez SUNAT/i)).toBeVisible()
+  await expect(dialog.getByTestId('cpe-a4-sheet')).toBeVisible()
+  await expect(dialog.locator('iframe[title^="Vista previa A4"]')).toHaveAttribute('src', /^blob:/)
+  await expect(dialog.getByRole('button', { name: 'Descargar A4' })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: 'Abrir / imprimir' })).toBeEnabled()
+  expect(browserErrors).toEqual([])
+})
+
+test('ADMIN autoaprueba su cotización en un solo flujo y conserva la observación', async ({ context, page }) => {
   const secret = process.env.JWT_SECRET
   if (!secret) throw new Error('JWT_SECRET no está disponible para el E2E aislado de cotizaciones')
 
@@ -55,7 +167,6 @@ test('aprobar cotización usa diálogo integrado y conserva la observación', as
   }])
 
   let estado = 'ENVIADA'
-  let rechazarPrimeraDecision = true
   const mutations: Array<{ path: string; body: any }> = []
   const nativeDialogs: string[] = []
   const browserErrors: string[] = []
@@ -100,18 +211,6 @@ test('aprobar cotización usa diálogo integrado y conserva la observación', as
 
     if (/\/api\/ventas\/cotizaciones\/cotizacion-dialog\/aprobar\/?$/.test(pathname)) {
       mutations.push({ path: pathname, body: request.postDataJSON() })
-      if (rechazarPrimeraDecision) {
-        rechazarPrimeraDecision = false
-        return route.fulfill({
-          status: 400,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            statusCode: 400,
-            message: 'La cotización requiere un aprobador distinto del creador',
-            error: 'Bad Request',
-          }),
-        })
-      }
       estado = 'APROBADA'
       return json({ success: true, data: { estado } })
     }
@@ -166,24 +265,13 @@ test('aprobar cotización usa diálogo integrado y conserva la observación', as
   await dialog.getByRole('textbox', { name: 'Motivo u observación' }).fill('Aprobada en revisión QA')
   await dialog.getByRole('button', { name: 'Aprobar cotización' }).click()
 
-  await expect(page.getByText('La cotización requiere un aprobador distinto del creador')).toBeVisible()
-  await expect(page.getByText('ENVIADA', { exact: true })).toBeVisible()
-  await expect(dialog).toBeVisible()
-  await expect(dialog.getByRole('button', { name: 'Aprobar cotización' })).toBeEnabled()
-  await dialog.getByRole('button', { name: 'Aprobar cotización' }).click()
-
   await expect(page.getByText('APROBADA', { exact: true })).toBeVisible()
-  expect(mutations).toHaveLength(2)
+  expect(mutations).toHaveLength(1)
   expect(mutations[0].path).toMatch(/\/api\/ventas\/cotizaciones\/cotizacion-dialog\/aprobar\/?$/)
   expect(mutations[0].body).toEqual({ motivo: 'Aprobada en revisión QA' })
-  expect(mutations[1]).toEqual(mutations[0])
-  expect(httpErrors).toHaveLength(1)
-  expect(httpErrors[0].status).toBe(400)
-  expect(httpErrors[0].path).toMatch(/\/api\/ventas\/cotizaciones\/cotizacion-dialog\/aprobar\/?$/)
+  expect(httpErrors).toEqual([])
   expect(nativeDialogs).toEqual([])
-  expect(browserErrors.filter((message) =>
-    message !== 'Failed to load resource: the server responded with a status of 400 (Bad Request)'
-  )).toEqual([])
+  expect(browserErrors).toEqual([])
 })
 
 test('la bandeja aprueba pedidos sin prompt nativo y envía el sustento', async ({ context, page }) => {
@@ -278,8 +366,10 @@ test('la bandeja aprueba pedidos sin prompt nativo y envía el sustento', async 
   await dialog.getByRole('textbox', { name: 'Observación de la decisión' }).fill('Autorizado por QA comercial')
   await dialog.getByRole('button', { name: 'Aprobar pedido' }).click()
 
-  await expect(page.getByText('Pedido aprobado')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'PV-QA-DIALOG' })).toHaveCount(0)
+  await expect(
+    page.getByRole('heading', { name: 'No hay pedidos pendientes de aprobación' }),
+  ).toBeVisible()
   expect(decisions).toEqual([{
     decision: 'APROBADO',
     motivos: ['Descuento comercial fuera de política'],

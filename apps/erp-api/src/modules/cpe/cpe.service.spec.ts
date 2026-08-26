@@ -275,10 +275,13 @@ describe('CpeService', () => {
             // 2. Idempotencia check
             mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null } as any); // No existing CPE
 
-            // 3. Get certificate (1st call in create) -> Fallback to demo
-            mockSupabaseClient.single.mockResolvedValueOnce({
-                data: null, // No tenant cert -> fallback to demo
-                error: { message: 'Not found' }
+            // 3. El contrato de creación se prueba con un firmador tenant ya resuelto.
+            // La política real/demo del certificado tiene su suite específica.
+            jest.spyOn(service as any, 'getXmlSigner').mockResolvedValue({
+                signXml: jest.fn().mockReturnValue('<xml>signed-success</xml>'),
+                generateHash: jest.fn().mockReturnValue('success-hash'),
+                validateSignature: jest.fn().mockReturnValue(true),
+                validateSignatureStrict: jest.fn().mockReturnValue(true),
             });
 
             const mockCreatedCpe = {
@@ -428,7 +431,12 @@ describe('CpeService', () => {
             validationService.validateCertificate.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
             validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, missingFields: [], errors: [] });
             validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
-            mockSupabaseClient.single.mockResolvedValueOnce({ data: null, error: { message: 'Not found' } });
+            jest.spyOn(service as any, 'getXmlSigner').mockResolvedValue({
+                signXml: jest.fn().mockReturnValue('<xml>signed-reconciled</xml>'),
+                generateHash: jest.fn().mockReturnValue('reconciled-hash'),
+                validateSignature: jest.fn().mockReturnValue(true),
+                validateSignatureStrict: jest.fn().mockReturnValue(true),
+            });
             mockSupabaseClient.rpc.mockResolvedValueOnce({
                 data: {
                     cpe: { ...existingCpe, estado: 'FIRMADO', sunat_status: 'READY' },

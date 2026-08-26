@@ -8,6 +8,15 @@ describe('CpeDeliveryService - frontera de firma 476', () => {
     });
     const supabase = {
       getClient: jest.fn(() => ({ rpc })),
+      getPublicClient: jest.fn(() => {
+        const chain: any = {
+          select: jest.fn(), eq: jest.fn(),
+          maybeSingle: jest.fn().mockResolvedValue({ data: { is_demo: false }, error: null }),
+        };
+        chain.select.mockReturnValue(chain);
+        chain.eq.mockReturnValue(chain);
+        return { from: jest.fn(() => chain) };
+      }),
       update: jest.fn(),
     };
     const fiscal = {

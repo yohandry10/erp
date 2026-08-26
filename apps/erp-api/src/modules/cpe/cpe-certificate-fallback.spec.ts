@@ -11,11 +11,18 @@ describe('XmlSigner · certificado del cliente', () => {
   const CLAVE = 'clave-correcta';
   const RUC_EMPRESA = '20601234565';
 
-  const fabricarPfx = (ruc: string, clave: string): Buffer => {
+  const fabricarPfx = (
+    ruc: string,
+    clave: string,
+    identityOverrides: {
+      issuerRuc?: string;
+      serialNumber?: string;
+    } = {},
+  ): Buffer => {
     const par = forge.pki.rsa.generateKeyPair(1024);
     const cert = forge.pki.createCertificate();
     cert.publicKey = par.publicKey;
-    cert.serialNumber = '01';
+    cert.serialNumber = identityOverrides.serialNumber ?? '01';
     cert.validity.notBefore = new Date();
     cert.validity.notAfter = new Date();
     cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 5);
@@ -23,8 +30,12 @@ describe('XmlSigner · certificado del cliente', () => {
       { name: 'commonName', value: `EMPRESA ${ruc}` },
       { type: '2.5.4.5', value: ruc },
     ];
+    const issuerRuc = identityOverrides.issuerRuc ?? ruc;
     cert.setSubject(attrs);
-    cert.setIssuer(attrs);
+    cert.setIssuer([
+      { name: 'commonName', value: `EMISOR ${issuerRuc}` },
+      { type: '2.5.4.5', value: issuerRuc },
+    ]);
     cert.sign(par.privateKey, forge.md.sha256.create());
     const p12 = forge.pkcs12.toPkcs12Asn1(par.privateKey, [cert], clave, {
       algorithm: '3des',
@@ -84,6 +95,38 @@ describe('XmlSigner · certificado del cliente', () => {
       () =>
         new XmlSigner({
           pfxBuffer: ajeno,
+          pfxPassword: CLAVE,
+          expectedRuc: RUC_EMPRESA,
+          enforceRucInCertificate: true,
+        }),
+    ).toThrow(/no contiene el RUC esperado/i);
+  });
+
+  it('rechaza un certificado cuando el RUC esperado aparece solo en el issuer', () => {
+    const ajenoConIssuerDelTenant = fabricarPfx('20600900006', CLAVE, {
+      issuerRuc: RUC_EMPRESA,
+    });
+
+    expect(
+      () =>
+        new XmlSigner({
+          pfxBuffer: ajenoConIssuerDelTenant,
+          pfxPassword: CLAVE,
+          expectedRuc: RUC_EMPRESA,
+          enforceRucInCertificate: true,
+        }),
+    ).toThrow(/no contiene el RUC esperado/i);
+  });
+
+  it('rechaza un certificado cuando el RUC esperado aparece solo en el serial del certificado', () => {
+    const ajenoConSerialDelTenant = fabricarPfx('20600900006', CLAVE, {
+      serialNumber: RUC_EMPRESA,
+    });
+
+    expect(
+      () =>
+        new XmlSigner({
+          pfxBuffer: ajenoConSerialDelTenant,
           pfxPassword: CLAVE,
           expectedRuc: RUC_EMPRESA,
           enforceRucInCertificate: true,

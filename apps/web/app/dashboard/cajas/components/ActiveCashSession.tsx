@@ -59,15 +59,9 @@ export function ActiveCashSession({ sesion, onCloseSession, className = '' }: Ac
                     </div>
                 </div>
                 <button
-                    onClick={onCloseSession} className="bg-muted text-foreground/80 border py-2 px-4 rounded-lg text-[0.875rem] font-medium cursor-pointer transition"
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#e2e8f0';
-                        e.currentTarget.style.borderColor = '#94a3b8';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#f1f5f9';
-                        e.currentTarget.style.borderColor = '#cbd5e1';
-                    }}
+                    type="button"
+                    onClick={onCloseSession}
+                    className="cursor-pointer rounded-lg border border-border bg-background px-4 py-2 text-[0.875rem] font-semibold text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                     ← Cambiar sesión
                 </button>
