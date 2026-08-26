@@ -184,6 +184,26 @@ async function openCashClosing(
     timeout: 30_000,
   });
   await page.getByText('Caja QA 518', { exact: true }).click();
+  const switchSession = page.getByRole('button', { name: 'Cambiar sesión' });
+  await expect(switchSession).toBeVisible();
+  await switchSession.hover();
+  await page.getByRole('heading', { name: /Caja QA 518/i }).hover();
+  const switchContrast = await switchSession.evaluate((button) => {
+    const parse = (value: string) => (value.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    const luminance = (rgb: number[]) => rgb.reduce((sum, channel, index) => {
+      const normalized = channel / 255;
+      const linear = normalized <= 0.03928
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+      return sum + linear * [0.2126, 0.7152, 0.0722][index];
+    }, 0);
+    const style = getComputedStyle(button);
+    const foreground = luminance(parse(style.color));
+    const background = luminance(parse(style.backgroundColor));
+    return (Math.max(foreground, background) + 0.05)
+      / (Math.min(foreground, background) + 0.05);
+  });
+  expect(switchContrast).toBeGreaterThanOrEqual(4.5);
   await page.getByRole('button', { name: 'Cerrar Caja' }).click();
   const dialog = page.getByRole('dialog', { name: 'Cierre de caja' });
   await expect(dialog).toBeVisible();
@@ -258,7 +278,7 @@ test('administrador registra el PIN sin exponerlo de vuelta', async ({ context, 
   await pinDialog.getByLabel('Confirmar PIN').fill('481590');
   await pinDialog.getByRole('button', { name: 'Registrar PIN' }).click();
 
-  await expect(page.getByText('PIN registrado')).toBeVisible();
+  await expect(page.getByText('PIN registrado', { exact: true })).toBeVisible();
   expect(pinBodies).toEqual([{ pin: '481590' }]);
   expect(pinIdempotencyKeys).toHaveLength(1);
   expect(pinIdempotencyKeys[0]).not.toBe('');
