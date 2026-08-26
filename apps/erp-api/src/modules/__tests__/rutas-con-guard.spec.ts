@@ -66,6 +66,9 @@ function rutasSinAutorizacion(): string[] {
 describe('autorización de rutas HTTP', () => {
   it('sólo estas rutas se conforman con estar autenticadas', () => {
     expect(rutasSinAutorizacion()).toEqual([
+      // Tasas y moneda del propio tenant: datos operativos de sólo lectura que
+      // Ventas/POS necesitan para calcular; TenantGuard mantiene el aislamiento.
+      'modules/configuracion/configuracion-fiscal.controller.ts:24',
       // Contexto de configuración del propio tenant de quien pregunta.
       'modules/configuracion/configuration-context.controller.ts:29',
       'modules/configuracion/configuration-context.controller.ts:66',

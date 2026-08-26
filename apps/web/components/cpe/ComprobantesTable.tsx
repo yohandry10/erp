@@ -82,8 +82,8 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
               </td>
               <td className="p-3">
                 <div className="flex flex-wrap justify-end gap-2">
-                <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onView(doc.id, doc.tipoDocumento || doc.tipoComprobante)}>Ver</button>
-                <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onPdf?.(doc.id)}>PDF</button>
+                <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onView(doc.id, doc.tipoDocumento || doc.tipoComprobante)}>Vista A4</button>
+                <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onPdf?.(doc.id)}>Descargar A4</button>
                 {isNote && doc.estado === 'BORRADOR' && onSign && (
                   <button
                     className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-400/15 dark:text-amber-200"

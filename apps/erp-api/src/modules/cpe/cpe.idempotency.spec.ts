@@ -11,9 +11,17 @@ describe('CpeDeliveryService - owner durable 476', () => {
     total_gravadas: 100, total_igv: 18, total_venta: 118, items: [],
   };
 
-  function createService(rpc: jest.Mock) {
+  function createService(rpc: jest.Mock, isDemo = false) {
+    const guardChain: any = {
+      select: jest.fn(),
+      eq: jest.fn(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: { is_demo: isDemo }, error: null }),
+    };
+    guardChain.select.mockReturnValue(guardChain);
+    guardChain.eq.mockReturnValue(guardChain);
     const supabase = {
       getClient: jest.fn(() => ({ rpc })),
+      getPublicClient: jest.fn(() => ({ from: jest.fn(() => guardChain) })),
       update: jest.fn(),
     };
     const fiscal = {
@@ -89,5 +97,21 @@ describe('CpeDeliveryService - owner durable 476', () => {
     expect(fiscal.enviarDocumento).not.toHaveBeenCalled();
     expect(fiscal.obtenerNombreServicioFiscal).not.toHaveBeenCalled();
     expect(supabase.update).not.toHaveBeenCalled();
+  });
+
+  it('una demo no reserva envío ni consulta y tampoco alcanza el adaptador', async () => {
+    const rpc = jest.fn();
+    const { service, fiscal } = createService(rpc, true);
+
+    await expect(service.retrySendToOse(cpe.id, cpe.tenant_id, {
+      idempotencyKey: 'cpe.send:demo', origin: 'SYSTEM',
+    })).rejects.toThrow('demo');
+    await expect(service.checkOseStatus(cpe.id, cpe.tenant_id, {
+      idempotencyKey: 'cpe.query:demo', origin: 'SYSTEM',
+    })).rejects.toThrow('demo');
+
+    expect(rpc).not.toHaveBeenCalled();
+    expect(fiscal.enviarDocumento).not.toHaveBeenCalled();
+    expect(fiscal.obtenerNombreServicioFiscal).not.toHaveBeenCalled();
   });
 });

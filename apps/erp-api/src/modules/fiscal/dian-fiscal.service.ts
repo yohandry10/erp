@@ -291,20 +291,13 @@ export class DianFiscalService extends FiscalServiceAbstract {
       return { ready: false, mode: 'WRONG_COUNTRY', missing: ['tenant_colombia'] };
     }
     if (row.is_demo === true) {
-      const connectivity = await this.apiClient.probarConectividad(this.dianConfig);
-      await this.persistirPrueba('SIMULADA', {
-        ...connectivity,
-        syntheticDemo: true,
-        transmitted: false,
-      }, tenantId);
       return {
-        ready: true,
-        mode: 'SIMULATED_DEMO',
-        transportReachable: connectivity.reachable,
+        ready: false,
+        mode: 'DEMO_EXTERNAL_TRANSPORT_BLOCKED',
+        transportReachable: false,
         credentialsValidated: false,
-        message: connectivity.reachable
-          ? 'Fixture completo y WSDL oficial DIAN accesible; no se transmitieron datos.'
-          : `Fixture completo; no se transmitieron datos. ${connectivity.message}`,
+        message:
+          'La demo Colombia no abre conexiones a DIAN ni valida endpoints externos. Convierte la cuenta a real para probar el transporte.',
       };
     }
 

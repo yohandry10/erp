@@ -12,6 +12,9 @@ export interface SigningOptions {
   useDemoMode?: boolean; // Para testing sin certificado real
   allowDemoFallback?: boolean;
   expectedRuc?: string;
+  expectedTaxId?: string;
+  taxIdLabel?: string;
+  fiscalAuthority?: string;
   enforceRucInCertificate?: boolean;
   allowRucMismatchWithConfirmation?: boolean;
 }
@@ -104,40 +107,48 @@ export class XmlSigner {
       return;
     }
 
-    const expectedRuc = this.options.expectedRuc?.replace(/\D/g, '');
-    if (!expectedRuc) {
+    const expectedTaxId = (
+      this.options.expectedTaxId || this.options.expectedRuc
+    )?.replace(/\D/g, '');
+    const authority = this.options.fiscalAuthority || 'SUNAT';
+    const taxIdLabel = this.options.taxIdLabel || 'RUC';
+    if (!expectedTaxId) {
       throw new CertificateOwnershipError(
-        'SUNAT producción requiere configurar el RUC esperado del certificado.',
+        `${authority} producción requiere configurar el ${taxIdLabel} esperado del certificado.`,
       );
     }
 
-    const certificateText = this.getCertificateIdentityText().replace(/\D/g, '');
-    if (certificateText.includes(expectedRuc)) {
+    if (this.certificateSubjectContainsTaxId(expectedTaxId)) {
       return;
     }
 
     if (this.options.allowRucMismatchWithConfirmation) {
       console.warn(
-        `⚠️ El certificado no contiene el RUC esperado ${expectedRuc}; se permite solo por confirmación explícita configurada.`,
+        `⚠️ El certificado no contiene el ${taxIdLabel} esperado ${expectedTaxId}; se permite solo por confirmación explícita configurada.`,
       );
       return;
     }
 
     throw new CertificateOwnershipError(
-      `El certificado fiscal no contiene el RUC esperado ${expectedRuc}. ` +
-        'SUNAT producción para persona jurídica requiere un certificado asociado al contribuyente; ' +
-        'use un PFX con el RUC de la empresa o configure una confirmación explícita documentada.',
+      `El certificado fiscal no contiene el ${taxIdLabel} esperado ${expectedTaxId}. ` +
+        `${authority} producción requiere un certificado asociado al contribuyente; ` +
+        `use un PFX con el ${taxIdLabel} de la empresa o configure una confirmación explícita documentada.`,
     );
   }
 
-  private getCertificateIdentityText(): string {
-    const subject = this.certificate.subject?.attributes ?? [];
-    const issuer = this.certificate.issuer?.attributes ?? [];
-    const attrs = [...subject, ...issuer]
-      .map((attr) => `${attr.name || attr.type || ''}=${attr.value || ''}`)
-      .join(', ');
+  private certificateSubjectContainsTaxId(expectedTaxId: string): boolean {
+    const normalizedExpectedTaxId = expectedTaxId.replace(/\D/g, '');
+    if (!normalizedExpectedTaxId) {
+      return false;
+    }
 
-    return `${attrs}, serialNumber=${this.certificate.serialNumber || ''}`;
+    // El issuer identifica a la autoridad certificadora y el serial identifica
+    // al certificado, no a su titular. La propiedad fiscal se acredita sólo con
+    // los valores del SUBJECT mientras no exista un parser explícito de SAN.
+    const subject = this.certificate.subject?.attributes ?? [];
+    return subject.some((attr) =>
+      String(attr.value ?? '').replace(/\D/g, '').includes(normalizedExpectedTaxId),
+    );
   }
 
   private resolveCertificatePath(configuredPath: string): string | null {
@@ -163,9 +174,13 @@ export class XmlSigner {
     const cert = forge.pki.createCertificate();
     cert.publicKey = keys.publicKey;
     cert.serialNumber = '01';
-    cert.validity.notBefore = new Date();
-    cert.validity.notAfter = new Date();
-    cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1);
+    const now = new Date();
+    // Un contenedor y un firmador pueden diferir algunos minutos. Retroceder
+    // 24 h evita que un certificado recién generado parezca "aún no vigente"
+    // sin ampliar su uso fuera del modo de pruebas local.
+    cert.validity.notBefore = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    cert.validity.notAfter = new Date(now);
+    cert.validity.notAfter.setUTCFullYear(cert.validity.notAfter.getUTCFullYear() + 1);
     
     const attrs = [{
       name: 'organizationName',
@@ -410,7 +425,7 @@ export class XmlSigner {
         demoMode: this.demoMode,
         expectedRuc: this.options.expectedRuc || undefined,
         rucMatches: this.options.expectedRuc
-          ? this.getCertificateIdentityText().replace(/\D/g, '').includes(this.options.expectedRuc.replace(/\D/g, ''))
+          ? this.certificateSubjectContainsTaxId(this.options.expectedRuc.replace(/\D/g, ''))
           : undefined,
       };
     } catch (error) {

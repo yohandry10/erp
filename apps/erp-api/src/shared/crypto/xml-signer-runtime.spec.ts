@@ -3,6 +3,16 @@ import * as path from 'path';
 import { XmlSigner } from '@erp-suite/crypto';
 
 describe('XmlSigner runtime package resolution', () => {
+  it('genera el certificado efímero con tolerancia de reloj de 24 horas', () => {
+    const before = Date.now();
+    const signer = new XmlSigner({ useDemoMode: true });
+    const validFrom = signer.getCertificateInfo().validFrom as Date;
+    const skew = before - validFrom.getTime();
+
+    expect(skew).toBeGreaterThanOrEqual(23 * 60 * 60 * 1000);
+    expect(skew).toBeLessThanOrEqual(25 * 60 * 60 * 1000);
+  });
+
   it('carga el certificado relativo al workspace cuando la API corre desde apps/erp-api', () => {
     const workspaceRoot = path.resolve(process.cwd(), '..', '..');
     const certificatePath = path.join(workspaceRoot, 'certs', 'demo.pfx');
@@ -65,7 +75,7 @@ describe('XmlSigner runtime package resolution', () => {
       pfxPath: 'certs/demo.pfx',
       pfxPassword: '12345678910',
       allowDemoFallback: false,
-      expectedRuc: '12345678910',
+      expectedRuc: '20123456786',
       enforceRucInCertificate: true,
     });
 
