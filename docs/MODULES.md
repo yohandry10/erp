@@ -156,6 +156,10 @@ Código principal: `apps/erp-api/src/modules/pos`,
 
 - CPE construye UBL, firma, envía, consulta, almacena CDR y produce
   representación impresa.
+- La vista A4 muestra en HTML los datos fiscales, emisor, receptor, líneas y
+  totales con proporción 210 × 297 mm; no depende del visor PDF nativo del
+  navegador. Descargar o abrir/imprimir conserva el PDF A4 generado por el
+  backend. En demo ambas representaciones declaran que no tienen validez SUNAT.
 - Envío y consulta usan reserva, llamada externa y finalización durable. Un
   retry reutiliza la operación y no puede repetir una transmisión ya reclamada;
   el worker POS adopta el documento reservado sin crear otra factura o CxC.
