@@ -775,7 +775,11 @@ export class PdfGeneratorService {
    */
   private addFooter(doc: any, cpeData: any, countryCode: string): void {
     const pageHeight = doc.page.height;
-    const footerY = pageHeight - 50;
+    const bottomMargin = Number(doc.page.margins?.bottom || 50);
+    // Escribir exactamente en `pageHeight - 50` deja la línea fuera del área
+    // útil de una hoja con margen inferior de 50 pt. PDFKit autoagregaba una
+    // segunda página casi vacía sólo para terminar el pie.
+    const footerY = pageHeight - bottomMargin - 12;
 
     const authority = getActiveCountryByCode(countryCode)?.autoridadFiscal ?? 'SUNAT';
     const locale = countryCode === 'AR' ? 'es-AR' : countryCode === 'CO' ? 'es-CO' : 'es-PE';
@@ -790,7 +794,7 @@ export class PdfGeneratorService {
         `Estado ${authority}: ${status} | ` +
         `Generado: ${new Date().toLocaleString(locale)}`,
         50, footerY,
-        { width: 495, align: 'center' }
+        { width: 495, align: 'center', lineBreak: false }
       );
   }
 

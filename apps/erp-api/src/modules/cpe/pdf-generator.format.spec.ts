@@ -63,6 +63,7 @@ describe('representación impresa CPE', () => {
     const pointsToMillimeters = (points: string) => Number(points) * 25.4 / 72;
     expect(pointsToMillimeters(mediaBox![1])).toBeCloseTo(210, 0);
     expect(pointsToMillimeters(mediaBox![2])).toBeCloseTo(297, 0);
+    expect(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).toHaveLength(1);
   });
 
   it('imprime el importe persistido de la línea y conserva descuentos y redondeos', () => {
