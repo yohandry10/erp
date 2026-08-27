@@ -86,6 +86,17 @@ export default function VentaExitosaModal({
 }: VentaExitosaModalProps) {
   const country = useCountryContext()
   const { get, post } = useApi({ showErrorToast: false, retries: 1, timeoutMs: 15000 })
+  // Cliente aparte sólo para emitir el comprobante. `useApi` convierte un
+  // `success: false` del API en excepción y, sin `throwOnError`, la traga y
+  // devuelve null: el motivo se pierde por el camino y el cajero se queda con
+  // «no se pudo emitir», que no le dice si es el certificado, la conexión o el
+  // correlativo. Con esto llega el motivo real.
+  const { post: postEmision } = useApi({
+    showErrorToast: false,
+    retries: 1,
+    timeoutMs: 15000,
+    throwOnError: true,
+  })
   const [currentCpeId, setCurrentCpeId] = useState<string | null>(null)
   const [facturacionPendiente, setFacturacionPendiente] = useState(false)
   const [facturando, setFacturando] = useState(false)
@@ -224,16 +235,25 @@ export default function VentaExitosaModal({
     setFacturando(true)
     setFacturacionError(null)
     const ventaId = encodeURIComponent(String(ventaData.venta_id))
-    const result = await post(`/api/pos/reintentar-facturacion/${ventaId}`)
-    const data = result?.data || result
+    try {
+      const result = await postEmision(`/api/pos/reintentar-facturacion/${ventaId}`)
+      const data = result?.data || result
 
-    if (data?.success && data?.cpe_id) {
-      setCurrentCpeId(data.cpe_id)
-      setFacturacionPendiente(false)
-      await loadCpePrintData(data.cpe_id).catch(() => null)
-    } else {
+      if (data?.success && data?.cpe_id) {
+        setCurrentCpeId(data.cpe_id)
+        setFacturacionPendiente(false)
+        await loadCpePrintData(data.cpe_id).catch(() => null)
+      } else {
+        setFacturacionPendiente(true)
+        setFacturacionError(data?.message || 'No se pudo emitir el CPE en este intento.')
+      }
+    } catch (error) {
       setFacturacionPendiente(true)
-      setFacturacionError(data?.message || 'No se pudo emitir el CPE en este intento.')
+      setFacturacionError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'No se pudo emitir el CPE en este intento.',
+      )
     }
     setFacturando(false)
   }
