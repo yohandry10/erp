@@ -1395,6 +1395,15 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           cliente_documento: getClienteDocumento(clienteActual),
           cliente_nombre: clienteActual?.razon_social || clienteActual?.nombres || 'Cliente General',
           fecha: new Date().toISOString(),
+          // Las lineas de la venta, que hasta ahora no se pasaban: el ticket
+          // impreso salia sin detalle, con una sola linea que decia «Productos».
+          items: carrito.map((item) => ({
+            nombre: item.producto.nombre,
+            codigo: item.producto.codigo,
+            cantidad: item.cantidad,
+            precio: item.precio_unitario,
+            subtotal: item.subtotal,
+          })),
         })
         setMostrarCheckout(false)
         setMostrarVentaExitosa(true)
