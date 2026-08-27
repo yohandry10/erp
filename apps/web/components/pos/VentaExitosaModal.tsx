@@ -1,8 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock3, Eye, FileText, Printer, RefreshCw } from 'lucide-react'
-import { printTicket } from './TicketPrint'
+import {
+  PosDocumentPreview,
+  PosDocumentData,
+  printPosDocument,
+} from './PosDocumentPreview'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
@@ -28,6 +32,7 @@ interface VentaExitosaData {
   fecha?: string
   items?: Array<{
     nombre: string
+    codigo?: string
     cantidad: number
     precio: number
     subtotal: number
@@ -103,6 +108,8 @@ export default function VentaExitosaModal({
   const [checkingStatus, setCheckingStatus] = useState(false)
   const [facturacionError, setFacturacionError] = useState<string | null>(null)
   const [cpePrintData, setCpePrintData] = useState<CpePrintData | null>(null)
+  const [vistaPreviaAbierta, setVistaPreviaAbierta] = useState(false)
+  const documentoRef = useRef<HTMLDivElement | null>(null)
   const currencySymbol = country.simboloMoneda || 'S/'
   const taxLabel = country.impuesto || 'IGV (18%)'
   const documentoFiscal = country.documentoFiscal || 'RUC'
@@ -193,36 +200,74 @@ export default function VentaExitosaModal({
     }
   }, [currentCpeId, isOpen, loadCpePrintData])
 
+  /**
+   * El comprobante que se va a imprimir, ya sea el CPE emitido o el ticket
+   * interno de la venta.
+   */
+  const documentoImprimible: PosDocumentData | null = useMemo(() => {
+    if (!ventaData) return null
+    const cpe = cpePrintData
+
+    if (cpe) {
+      return {
+        numero: [cpe.serie, cpe.numero].filter(Boolean).join('-') || ventaData.numero_ticket,
+        tipo: getDocumentoLabelFromCpe(cpe.tipo_documento),
+        fecha: cpe.fecha_emision || cpe.created_at || ventaData.fecha,
+        clienteNombre: cpe.razon_social_receptor || ventaData.cliente_nombre,
+        clienteDocumento: cpe.documento_receptor || ventaData.cliente_documento,
+        subtotal: Number(cpe.total_gravadas ?? ventaData.subtotal) || 0,
+        descuentos: 0,
+        impuestos: Number(cpe.total_igv ?? ventaData.impuestos) || 0,
+        total: Number(cpe.total_venta ?? ventaData.total) || 0,
+        items: (cpe.items || []).map((item, indice) => ({
+          id: indice,
+          descripcion: item.nombre_producto || item.descripcion || 'Producto',
+          cantidad: Number(item.cantidad) || 0,
+          precioUnitario: Number(item.precio_unitario) || 0,
+          total: Number(item.subtotal ?? item.valor_venta) || 0,
+        })),
+      }
+    }
+
+    return {
+      numero: ventaData.numero_ticket,
+      tipo: documentoLabel,
+      fecha: ventaData.fecha,
+      clienteNombre: ventaData.cliente_nombre,
+      clienteDocumento: ventaData.cliente_documento,
+      subtotal: Number(ventaData.subtotal) || 0,
+      descuentos: 0,
+      impuestos: Number(ventaData.impuestos) || 0,
+      total: Number(ventaData.total) || 0,
+      items: (ventaData.items || []).map((item, indice) => ({
+        id: indice,
+        codigo: item.codigo,
+        descripcion: item.nombre,
+        cantidad: Number(item.cantidad) || 0,
+        precioUnitario: Number(item.precio) || 0,
+        total: Number(item.subtotal) || 0,
+      })),
+    }
+  }, [ventaData, cpePrintData, documentoLabel])
+
   if (!isOpen || !ventaData) return null
 
+  /**
+   * Antes esto abria una ventana emergente y lanzaba `print()` encima. Si el
+   * navegador bloqueaba la emergente --lo hace en modo quiosco y en muchas
+   * politicas de empresa--, el unico aviso era un `alert()`, que en pantalla
+   * completa a menudo ni aparece: el cajero pulsaba y no pasaba nada.
+   *
+   * Ahora se muestra el mismo comprobante que ya se ve antes de cobrar, dentro
+   * de la aplicacion, y se imprime con `printPosDocument`, que usa un iframe
+   * oculto. Sin emergentes que bloquear y con el ticket a la vista antes de
+   * gastar papel.
+   */
   const handleImprimirTicket = async () => {
-    let fiscalData = cpePrintData
-    if (currentCpeId && !fiscalData) {
-      fiscalData = await loadCpePrintData(currentCpeId)
+    if (currentCpeId && !cpePrintData) {
+      await loadCpePrintData(currentCpeId).catch(() => null)
     }
-
-    const printableData = fiscalData
-      ? mapCpeToTicketData(fiscalData, ventaData)
-      : {
-      numero_ticket: ventaData.numero_ticket,
-      total: ventaData.total,
-      subtotal: ventaData.subtotal,
-      impuestos: ventaData.impuestos,
-      tipo_comprobante: ventaData.tipo_comprobante,
-      cliente_nombre: ventaData.cliente_nombre,
-      fecha: ventaData.fecha,
-      items: ventaData.items,
-      representacion_fiscal: false,
-    }
-
-    printTicket(printableData, empresaData, {
-      currencySymbol,
-      taxLabel,
-      documentoFiscal,
-      documentoLabel: fiscalData ? getDocumentoLabelFromCpe(fiscalData.tipo_documento) : documentoLabel,
-      locale: country.locale,
-      fiscalAuthority: country.servicioFiscal,
-    })
+    setVistaPreviaAbierta(true)
   }
 
   const handleVerComprobante = () => {
@@ -397,53 +442,69 @@ export default function VentaExitosaModal({
           </Button>
         </div>
       </div>
+
+      {vistaPreviaAbierta && documentoImprimible && (
+        <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[94vh] w-[560px] max-w-[96vw] flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-2xl">
+            <div className="flex items-center justify-between gap-4 border-b px-5 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Vista previa de impresión</h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">Ticket térmico · papel de 80 mm</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVistaPreviaAbierta(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border bg-background text-xl leading-none text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                aria-label="Cerrar vista previa"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="overflow-y-auto bg-slate-200 p-5 dark:bg-slate-950/80">
+              <div ref={documentoRef}>
+                <PosDocumentPreview
+                  data={documentoImprimible}
+                  company={{
+                    nombre: empresaData?.nombre || '',
+                    ruc: empresaData?.ruc || '',
+                    direccion: empresaData?.direccion,
+                    logoUrl: empresaData?.logo_url,
+                  }}
+                  format="thermal"
+                  currencySymbol={currencySymbol}
+                  taxLabel={taxLabel}
+                  taxIdLabel={documentoFiscal}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t bg-card px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setVistaPreviaAbierta(false)}
+                className="rounded-lg border bg-background px-4 py-2 text-sm font-semibold transition hover:bg-accent"
+              >
+                Cerrar
+              </button>
+              <Button
+                type="button"
+                className="gap-2"
+                onClick={() => printPosDocument(
+                  documentoRef.current?.querySelector('[data-pos-print-document]') as HTMLElement | null,
+                  `${documentoImprimible.tipo} ${documentoImprimible.numero}`,
+                  'thermal',
+                )}
+              >
+                <Printer className="h-4 w-4" aria-hidden="true" />
+                Imprimir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
-}
-
-function mapCpeToTicketData(cpeData: CpePrintData, ventaData: NonNullable<VentaExitosaModalProps['ventaData']>) {
-  return {
-    numero_ticket: formatCpeNumber(cpeData, ventaData.numero_ticket),
-    total: Number(cpeData.total_venta ?? ventaData.total ?? 0),
-    subtotal: Number(cpeData.total_gravadas ?? ventaData.subtotal ?? 0),
-    impuestos: Number(cpeData.total_igv ?? ventaData.impuestos ?? 0),
-    tipo_comprobante: cpeData.tipo_documento ?? ventaData.tipo_comprobante,
-    cliente_nombre: cpeData.razon_social_receptor || ventaData.cliente_nombre,
-    cliente_documento: cpeData.documento_receptor,
-    cliente_tipo_documento: cpeData.tipo_documento_receptor,
-    fecha: cpeData.fecha_emision || cpeData.created_at || ventaData.fecha,
-    hash: cpeData.valor_resumen || cpeData.hash_firma || cpeData.hash,
-    hash_firma: cpeData.hash_firma,
-    sunat_qr_content: cpeData.sunat_qr_content,
-    sunat_qr_data_url: cpeData.sunat_qr_data_url,
-    representacion_fiscal: Boolean(cpeData.sunat_qr_data_url),
-    cpe_emitido: true,
-    estado_sunat: cpeData.sunat_status || cpeData.estado,
-    items: Array.isArray(cpeData.items) && cpeData.items.length > 0
-      ? cpeData.items.map((item) => {
-          const cantidad = Number(item.cantidad ?? 1)
-          const precio = Number(item.precio_unitario ?? 0)
-          return {
-            nombre: item.nombre_producto || item.descripcion || 'Producto',
-            cantidad,
-            precio,
-            subtotal: Number(item.valor_venta ?? item.subtotal ?? multiplicarMoneda(cantidad, precio)),
-          }
-        })
-      : ventaData.items,
-  }
-}
-
-function formatCpeNumber(cpeData: CpePrintData, fallback: string): string {
-  if (!cpeData.serie || cpeData.numero === undefined || cpeData.numero === null) return fallback
-
-  const rawNumber = String(cpeData.numero)
-  const parsed = Number.parseInt(rawNumber, 10)
-  const formattedNumber = Number.isFinite(parsed)
-    ? String(parsed).padStart(8, '0')
-    : rawNumber
-
-  return `${cpeData.serie}-${formattedNumber}`
 }
 
 function getDocumentoLabelFromCpe(tipoDocumento?: string): string {
