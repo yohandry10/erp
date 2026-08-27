@@ -11,6 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@xmldom/xmldom": "^0.8.13",
     "node-forge": "^1.4.0",
     "xml-crypto": "6.1.2"
   },

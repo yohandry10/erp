@@ -3,6 +3,10 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SignedXml } from 'xml-crypto';
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
+
+/** Espacio de nombres de XMLDSig. Es lo que distingue una firma de verdad. */
+const XMLDSIG_NS = 'http://www.w3.org/2000/09/xmldsig#';
 
 export interface SigningOptions {
   pfxPath?: string;
@@ -384,17 +388,21 @@ export class XmlSigner {
    */
   validateSignatureStrict(signedXml: string): boolean {
     try {
-      const signatures = signedXml.match(
-        /<(?:[\w.-]+:)?Signature\b[\s\S]*?<\/(?:[\w.-]+:)?Signature>/g,
-      );
-      if (!signatures || signatures.length !== 1) {
+      // Se busca por espacio de nombres, no por el nombre del elemento. Un
+      // comprobante UBL de SUNAT lleva **siempre** un bloque `<cac:Signature>`,
+      // que es un metadato obligatorio y no una firma: contar cualquier
+      // elemento llamado `Signature` daba dos donde solo hay una, esta
+      // comprobacion devolvia false y **ningun CPE llegaba a persistirse**.
+      const documento = new DOMParser().parseFromString(signedXml, 'text/xml');
+      const firmas = documento.getElementsByTagNameNS(XMLDSIG_NS, 'Signature');
+      if (firmas.length !== 1) {
         return false;
       }
 
       const verifier = new SignedXml({
         publicCert: forge.pki.certificateToPem(this.certificate),
       });
-      verifier.loadSignature(signatures[0]);
+      verifier.loadSignature(new XMLSerializer().serializeToString(firmas[0]));
       const references = verifier.getReferences();
       if (references.length !== 1) {
         return false;
