@@ -942,15 +942,20 @@ productivo autorizado.
   `fechaDeDocumentoEnPais` devuelve tal cual lo que ya es `YYYY-MM-DD` y sólo
   convierte lo que lleva hora. El XML y la vista A4 nunca estuvieron afectados:
   la A4 formatea por texto, sin `new Date`.
-- **Una nota sobre una venta del POS clasifica mal lo inafecto y lo exportado.**
-  `crear_nota_referenciada_legacy_494` lee la afectación de
-  `documento_detalles.metadata`, y el camino del POS (migración 476) **no la
-  escribe ahí** —sólo `source` y el fingerprint; la afectación vive en
-  `cpe.items`—. Así que siempre dispara su respaldo, `igv > 0 ? '10' : '20'`:
-  lo gravado y lo exonerado quedan bien por casualidad, pero **inafecto (30) y
-  exportación (40) se declaran como exonerado (9997/E)**. Pendiente: la
-  migración 461 sí escribe la afectación en ese metadata, así que el arreglo es
-  que 476 haga lo mismo (recrear `finalizar_cpe_pos_tx`, 282 líneas).
+- **El detalle del documento guarda su afectación (migración 521).**
+  `crear_nota_referenciada_legacy_494` clasifica cada línea de una nota leyendo
+  `documento_detalles.metadata->>'afectacion_igv'`, y el camino del POS
+  (migración 476) **no la escribía ahí** —sólo `source` y el fingerprint; la
+  afectación vivía en `cpe.items`—, así que siempre disparaba su respaldo
+  `igv > 0 ? '10' : '20'`. Lo gravado y lo exonerado salían bien por
+  casualidad; **inafecto (30) y exportación (40) también tienen IGV cero**, de
+  modo que una nota sobre una venta con esos ítems los declaraba exonerados
+  (9997/E en vez de 9998/O o 9995). La 521 recrea `finalizar_cpe_pos_tx`
+  literal con un único cambio —el `jsonb_build_object` del metadata— y rellena
+  lo ya emitido desde `cpe.items`. El emparejamiento del relleno tiene que
+  mirar las dos claves de código: la 476 escribe `codigo_producto` y la RPC de
+  venta del POS (451) escribe `codigo`; con una sola se quedaban sin rellenar
+  justamente las boletas del POS.
 
 - **El resumen del comprobante declara todas las bases, y se construye desde
   `ESQUEMA_TRIBUTARIO`.** Los códigos de SUNAT (1000 IGV, 9997 EXO, 9998 INA,
