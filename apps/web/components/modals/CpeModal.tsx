@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { ConsultaRuc, type ContribuyenteConsultado } from '@/components/shared/ConsultaRuc'
 
 interface CpeModalProps {
   isOpen: boolean
@@ -134,6 +135,13 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       }
       setFormData(prev => ({ ...prev, serie: newSerie }))
     }
+  }
+
+  // Un comprobante a un RUC que no existe lo rechaza SUNAT. Se avisa antes de
+  // emitir, y de paso se trae la razon social que debe ir en el documento.
+  const rellenarConElPadron = (dato: ContribuyenteConsultado) => {
+    if (!dato.razonSocial) return
+    setFormData(prev => (prev.clienteRazonSocial?.trim() ? prev : { ...prev, clienteRazonSocial: dato.razonSocial! }))
   }
 
   const handleItemChange = (index: number, field: string, value: any) => {
@@ -322,6 +330,11 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   value={formData.clienteRuc}
                   onChange={handleChange}
                   required className="w-[100%] p-3 border rounded-[6px] text-sm"
+                />
+                <ConsultaRuc
+                  ruc={formData.clienteRuc}
+                  activo={!isArgentina && !isColombia}
+                  onEncontrado={rellenarConElPadron}
                 />
               </div>
 

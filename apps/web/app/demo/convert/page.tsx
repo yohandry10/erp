@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/lib/api-fetch';
+import { ConsultaRuc, type ContribuyenteConsultado } from '@/components/shared/ConsultaRuc';
 
 interface InstruccionesDePago {
   solicitud_id: string;
@@ -257,6 +258,14 @@ export default function ConvertDemoPage() {
     });
   };
 
+  // Al teclear el RUC real de la empresa, trae la razon social que SUNAT tiene
+  // registrada. Es el momento en el que mas ayuda: aqui se equivoca uno y el
+  // tenant queda creado con un nombre que luego sale en las facturas.
+  const rellenarConElPadron = (dato: ContribuyenteConsultado) => {
+    if (!dato.razonSocial) return;
+    setFormData(prev => (prev.razon_social.trim() ? prev : { ...prev, razon_social: dato.razonSocial! }));
+  };
+
   if (checkingEligibility) {
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-8">
@@ -475,6 +484,12 @@ export default function ConvertDemoPage() {
               <p className="text-xs text-muted-foreground mt-1">
                 Ingresa el {taxDocument} real de tu empresa. Se validará según {countryName}.
               </p>
+              <ConsultaRuc
+                ruc={formData.ruc}
+                documentoLabel={taxDocument}
+                activo={countryCode === 'PE'}
+                onEncontrado={rellenarConElPadron}
+              />
             </div>
 
             <div className="mb-5">
