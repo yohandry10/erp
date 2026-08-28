@@ -52,6 +52,10 @@ export interface ResultadoImportacion {
   cotizacion?: CotizacionImportada;
 }
 
+/** Series del BCRP: tipo de cambio del sistema bancario SBS, que es el que rige. */
+const SERIE_BCRP_COMPRA = 'PD04639PD';
+const SERIE_BCRP_VENTA = 'PD04640PD';
+
 /** Un salto mayor que este frente al último conocido no se guarda sin revisar. */
 const DESVIACION_MAXIMA_POR_DEFECTO = 0.05;
 
@@ -67,6 +71,55 @@ export class TipoCambioSunatService {
     return Number.isFinite(configurada) && configurada > 0
       ? configurada
       : DESVIACION_MAXIMA_POR_DEFECTO;
+  }
+
+  /**
+   * Fuente primaria: el BCRP.
+   *
+   * Publica una API abierta y documentada, sin autenticacion ni captcha, con la
+   * serie **del sistema bancario SBS**, que es exactamente la que SUNAT
+   * republica y la que manda para el IGV y la renta. Es la fuente mas cercana al
+   * original a la que se puede llegar por un canal oficial: SUNAT no tiene API
+   * de tipo de cambio, y lo unico que hay es el endpoint interno de su pagina de
+   * consulta, que exige simular un navegador y mandar un token de captcha
+   * falso. Eso no entra en un ERP.
+   *
+   * Se comprobo que importa: para el 20 de agosto de 2026 el BCRP da compra
+   * 3.351, y el proveedor que usabamos daba 3.355, que es el **interbancario**,
+   * no el del sistema bancario. Estaba mezclando series en el lado de la compra.
+   */
+  private async consultarBcrp(fecha: string): Promise<CotizacionImportada | null> {
+    const base =
+      process.env.TIPO_CAMBIO_BCRP_URL ||
+      'https://estadisticas.bcrp.gob.pe/estadisticas/series/api';
+
+    const leerSerie = async (serie: string): Promise<number | null> => {
+      const respuesta = await axios.get(`${base}/${serie}/json/${fecha}/${fecha}`, {
+        timeout: 10000,
+        headers: { Accept: 'application/json' },
+        validateStatus: (status) => status === 200,
+      });
+      const bruto = respuesta.data?.periods?.[0]?.values?.[0];
+      const valor = Number(bruto);
+      // Un dia sin publicacion --fin de semana o feriado-- devuelve 'n.d.'.
+      return Number.isFinite(valor) && valor > 0 ? valor : null;
+    };
+
+    try {
+      const [compra, venta] = await Promise.all([
+        leerSerie(SERIE_BCRP_COMPRA),
+        leerSerie(SERIE_BCRP_VENTA),
+      ]);
+      if (compra === null || venta === null) return null;
+
+      return { fecha, compra, venta, fuente: 'bcrp' };
+    } catch (error: any) {
+      const estado = error?.response?.status;
+      this.logger.warn(
+        `Tipo de cambio ${fecha}: el BCRP no respondio${estado ? ` (HTTP ${estado})` : ''}: ${error?.message}`,
+      );
+      return null;
+    }
   }
 
   /**
@@ -196,7 +249,9 @@ export class TipoCambioSunatService {
       return { fecha, guardado: false, motivo: 'ya existe una cotización para esa fecha' };
     }
 
-    const cotizacion = await this.consultarApisNetPe(fecha);
+    // El BCRP primero, y el proveedor de siempre solo si aquel no responde.
+    const cotizacion =
+      (await this.consultarBcrp(fecha)) ?? (await this.consultarApisNetPe(fecha));
     if (!cotizacion) {
       return { fecha, guardado: false, motivo: 'la fuente no devolvió una cotización utilizable' };
     }
