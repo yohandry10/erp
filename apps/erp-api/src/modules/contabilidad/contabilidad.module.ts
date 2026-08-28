@@ -28,6 +28,7 @@ import { PleExportService } from "./services/ple-export.service";
 import { TiposCambioService } from "./services/tipos-cambio.service";
 import { RevaluacionService } from "./services/revaluacion.service";
 import { TipoCambioSunatService } from "./services/tipo-cambio-sunat.service";
+import { PadronRucService } from "./services/padron-ruc.service";
 import { TipoCambioSchedulerService } from "./services/tipo-cambio-scheduler.service";
 import { ContabilidadMultimonedaController } from "./controllers/contabilidad-multimoneda.controller";
 import { PlantillasAsientosService } from "./services/plantillas-asientos.service";
@@ -86,6 +87,7 @@ import { TributosAnualesService } from "./services/tributos-anuales.service";
     TiposCambioService,
     RevaluacionService,
     TipoCambioSunatService,
+    PadronRucService,
     TipoCambioSchedulerService,
     PlantillasAsientosService,
     PlantillasSchedulerService,
@@ -115,6 +117,7 @@ import { TributosAnualesService } from "./services/tributos-anuales.service";
     TiposCambioService,
     RevaluacionService,
     TipoCambioSunatService,
+    PadronRucService,
     TipoCambioSchedulerService,
     PlantillasAsientosService,
     ActivosFijosService,

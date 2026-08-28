@@ -26,6 +26,7 @@ import {
 import { TiposCambioService } from "../services/tipos-cambio.service";
 import { RevaluacionService } from "../services/revaluacion.service";
 import { TipoCambioSunatService } from "../services/tipo-cambio-sunat.service";
+import { PadronRucService } from "../services/padron-ruc.service";
 
 @ApiTags("contabilidad")
 @Controller("contabilidad")
@@ -35,6 +36,7 @@ export class ContabilidadMultimonedaController {
     private readonly tiposCambioService: TiposCambioService,
     private readonly revaluacionService: RevaluacionService,
     private readonly tipoCambioSunat: TipoCambioSunatService,
+    private readonly padronRuc: PadronRucService,
   ) {}
 
   @Get("tipos-cambio")
@@ -165,6 +167,22 @@ export class ContabilidadMultimonedaController {
         detalle: resultados,
       },
     };
+  }
+
+  @Get("padron-ruc/:ruc")
+  @RequirePermission("contabilidad.tipos_cambio.crear")
+  @ApiOperation({
+    summary: "Consultar un RUC en el padron de SUNAT",
+    description:
+      "Devuelve razon social, estado (activo o de baja) y condicion (habido o no habido). " +
+      "Lo ultimo es lo que decide si una compra da derecho a credito fiscal. " +
+      "Es informacion, no una barrera: si la fuente no responde devuelve el ultimo dato " +
+      "conocido, y si no hay ninguno devuelve vacio, que significa «no se pudo comprobar» " +
+      "y nunca «no existe».",
+  })
+  async consultarPadronRuc(@Param("ruc") ruc: string, @Query("forzar") forzar?: string) {
+    const dato = await this.padronRuc.consultar(ruc, forzar === "true");
+    return { success: true, data: dato };
   }
 
   @Get("revaluacion/simular")
