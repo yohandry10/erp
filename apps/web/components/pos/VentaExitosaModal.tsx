@@ -307,6 +307,14 @@ export default function VentaExitosaModal({
   const formatCurrency = (value: number) => `${currencySymbol} ${formatMoney(value)}`
 
   const cpeListo = Boolean(currentCpeId)
+  // `cpePrintData` llega despues de `currentCpeId`, asi que hasta que cargue se
+  // sigue mostrando el correlativo interno en vez de un hueco.
+  const numeroFiscal = cpePrintData?.serie
+    ? [cpePrintData.serie, cpePrintData.numero].filter(Boolean).join('-')
+    : null
+  const etiquetaFiscal = getDocumentoLabelFromCpe(cpePrintData?.tipo_documento) === 'FACTURA'
+    ? 'Factura'
+    : 'Boleta'
   const puedeEmitirCpe = !ticketCanjeable && !cpeListo && Boolean(ventaData.venta_id)
 
   return (
@@ -325,8 +333,21 @@ export default function VentaExitosaModal({
                 <CheckCircle2 className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200/80">Venta registrada</p>
-                <h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">{ventaData.numero_ticket}</h2>
+                {/* Emitido el comprobante, lo que el cliente necesita ver es su
+                    numero fiscal --B001-00000001--, no el correlativo interno
+                    del ticket. Antes solo salia el interno y habia que ir a
+                    buscar la boleta al listado para saber su numero. */}
+                <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200/80">
+                  {numeroFiscal ? `${etiquetaFiscal} emitida` : 'Venta registrada'}
+                </p>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                  {numeroFiscal ?? ventaData.numero_ticket}
+                </h2>
+                {numeroFiscal && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ticket interno {ventaData.numero_ticket}
+                  </p>
+                )}
               </div>
             </div>
             <Badge className="border border-cyan-300/20 bg-cyan-400/10 text-primary">
