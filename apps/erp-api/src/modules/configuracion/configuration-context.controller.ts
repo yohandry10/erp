@@ -92,6 +92,7 @@ export class ConfigurationContextController {
           'razon_social',
           'nombre_comercial',
           'moneda_defecto',
+          'igv_porcentaje',
           'configuracion_completa',
           'tipo_empresa',
           'usar_flujo_logistica',
@@ -144,6 +145,14 @@ export class ConfigurationContextController {
           razonSocial: empresaConfig.razon_social,
           nombreComercial: empresaConfig.nombre_comercial,
           monedaDefecto: empresaConfig.moneda_defecto,
+          // La tasa del tenant, que es la que aplica la RPC de venta. Sin ella
+          // el navegador usaba una constante por pais y podia exhibir un total
+          // distinto del que se registraba: con la empresa al 10 % el POS cobraba
+          // 118 y la venta quedaba en 110.
+          igvPorcentaje:
+            empresaConfig.igv_porcentaje === null || empresaConfig.igv_porcentaje === undefined
+              ? null
+              : Number(empresaConfig.igv_porcentaje),
           configuracionCompleta: empresaConfig.configuracion_completa === true,
           tipo_empresa: empresaConfig.tipo_empresa,
           usar_flujo_logistica: empresaConfig.usar_flujo_logistica,

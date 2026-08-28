@@ -405,6 +405,12 @@ export class ConfigurationController {
         idempotencyKey,
       );
 
+      // Aqui es donde se fija `igv_porcentaje`, y de ahi el asistente lleva
+      // directo al panel. Sin invalidar, el contexto cacheado --60 s-- servia la
+      // tasa anterior y el POS exhibia un porcentaje distinto del que aplica la
+      // RPC de venta durante ese minuto.
+      await this.cacheInvalidation.invalidateAllTenantCache(tenantId);
+
       return {
         success: true,
         message: 'Configuración completada exitosamente',
