@@ -932,6 +932,28 @@ productivo autorizado.
 
 ## Decisiones e invariantes vigentes
 
+- **La tasa de impuesto tiene una sola fuente: `empresa_config.igv_porcentaje`.**
+  La RPC de venta del POS siempre calculó con ella; el navegador usaba una
+  constante por país en `lib/initial-country`. Mientras coincidieran no se
+  notaba, y por defecto coinciden (PE 18, AR 21, CO 19). En cuanto no —el
+  asistente inicial deja escribir el porcentaje y `PUT /configuration/empresa`
+  deja cambiarlo— **el POS exhibía y cobraba un total y registraba otro**:
+  comprobado en un tenant puesto al 10 %, el botón decía «Cobrar S/ 118,00», el
+  cajero cobraba 118 y la venta quedaba grabada como «Subtotal 100,00 · IGV
+  (18%) S/ 10,00 · TOTAL 110,00». La venta **no fallaba**: el guard
+  `POS_ITEM_TAX_INVALID` de la RPC no protege de esto, porque el backend
+  recalcula los ítems con la tasa del tenant antes de llamarla y entonces las
+  dos cifras que compara ya coinciden. Ahora
+  `/configuration/context/country` devuelve `igvPorcentaje` y
+  `lib/tasa-impuesto` la impone sobre la constante, que queda sólo como
+  respaldo. El rótulo se deriva de la misma tasa: antes un ticket podía decir
+  «IGV (18%)» junto a un importe del 10 %.
+- **`null` no es `0` al resolver la tasa.** `Number(null)` y `Number('')` valen
+  `0`, así que un tenant sin tasa guardada habría exhibido 0 % mientras el
+  servidor aplicaba el 18 % de su `coalesce`. `resolverTasaImpuesto` distingue
+  «no hay dato» de un 0 escrito a propósito, que es legítimo (Ley de Amazonía).
+  Lo cazó el verificador, no la revisión.
+
 - **La tasa de IGV no se elige por producto; la afectación sí.** El porcentaje
   sale siempre de `empresas.igv_porcentaje` (el del asistente inicial), y qué
   productos lo pagan lo decide `productos.afectacion_igv` (Catálogo 07 de SUNAT).

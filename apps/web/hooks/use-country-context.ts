@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/lib/api-fetch';
+import { etiquetaImpuesto, resolverTasaImpuesto } from '@/lib/tasa-impuesto';
 import {
   ACTIVE_COUNTRIES,
   INITIAL_ACTIVE_COUNTRY_CODE,
@@ -98,10 +99,20 @@ function buildCountryContext(empresaConfig: any): CountryContext {
   }
 
   const resolvedMoneda = monedaDefecto || countryData.moneda;
+
+  // La tasa manda la del tenant, no la constante del país: es la que aplica la
+  // RPC de venta, y usar otra hacía que el POS exhibiera un total y registrara
+  // otro. Ver `lib/tasa-impuesto`.
+  const impuestoRate = resolverTasaImpuesto(empresaConfig.igvPorcentaje, countryData.impuestoRate);
+
   return {
     paisId,
     paisCodigo,
     ...countryData,
+    impuestoRate,
+    // El rótulo se deriva de la misma tasa que el cálculo: si no, un ticket
+    // podía decir «IGV (18%)» sobre un importe calculado al 10 %.
+    impuesto: etiquetaImpuesto(countryData.impuesto, impuestoRate),
     moneda: resolvedMoneda,
     simboloMoneda: resolveCurrencySymbol(resolvedMoneda, countryData.simboloMoneda),
     requiresSetup: false,
