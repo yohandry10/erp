@@ -157,6 +157,70 @@ describe('TipoCambioSunatService', () => {
     );
   });
 
+  describe('de donde sale la cotizacion', () => {
+    // El BCRP publica la serie del sistema bancario SBS, que es la que SUNAT
+    // republica y la que rige para el IGV y la renta. Se prefiere a cualquier
+    // intermediario: para el 20-08-2026 el BCRP da compra 3.351 y el proveedor
+    // anterior daba 3.355, que es el interbancario, otra serie.
+    const respuestaBcrp = (valor: number) => ({
+      data: { periods: [{ name: '20.Ago.26', values: [String(valor)] }] },
+    });
+
+    it('toma el BCRP cuando responde, y no consulta al proveedor anterior', async () => {
+      axiosGet.mockImplementation((url: string) => {
+        if (url.includes('PD04639PD')) return Promise.resolve(respuestaBcrp(3.351));
+        if (url.includes('PD04640PD')) return Promise.resolve(respuestaBcrp(3.361));
+        return Promise.reject(new Error('no deberia consultarse el proveedor anterior'));
+      });
+      const supabase = construirSupabase({});
+
+      const resultado = await new TipoCambioSunatService(supabase as any).importarFecha(
+        'tenant-1',
+        '2026-08-20',
+        'usuario-1',
+      );
+
+      expect(resultado.guardado).toBe(true);
+      expect(resultado.cotizacion).toMatchObject({ compra: 3.351, venta: 3.361, fuente: 'bcrp' });
+    });
+
+    it('un dia sin publicacion en el BCRP no se inventa: se recurre al proveedor anterior', async () => {
+      // Fin de semana o feriado: el BCRP devuelve 'n.d.' en vez de un numero.
+      axiosGet.mockImplementation((url: string) => {
+        if (url.includes('bcrp.gob.pe')) {
+          return Promise.resolve({ data: { periods: [{ values: ['n.d.'] }] } });
+        }
+        return Promise.resolve({ data: { compra: 3.355, venta: 3.361 } });
+      });
+      const supabase = construirSupabase({});
+
+      const resultado = await new TipoCambioSunatService(supabase as any).importarFecha(
+        'tenant-1',
+        '2026-08-20',
+        'usuario-1',
+      );
+
+      expect(resultado.cotizacion?.fuente).toBe('apis.net.pe');
+    });
+
+    it('si el BCRP esta caido tampoco se detiene la importacion', async () => {
+      axiosGet.mockImplementation((url: string) => {
+        if (url.includes('bcrp.gob.pe')) return Promise.reject(new Error('502'));
+        return Promise.resolve({ data: { compra: 3.355, venta: 3.361 } });
+      });
+      const supabase = construirSupabase({});
+
+      const resultado = await new TipoCambioSunatService(supabase as any).importarFecha(
+        'tenant-1',
+        '2026-08-20',
+        'usuario-1',
+      );
+
+      expect(resultado.guardado).toBe(true);
+      expect(resultado.cotizacion?.fuente).toBe('apis.net.pe');
+    });
+  });
+
   it('la tolerancia del contraste es configurable', async () => {
     process.env.TIPO_CAMBIO_DESVIACION_MAXIMA = '0.5';
     axiosGet.mockResolvedValue({ data: { compra: 3.647, venta: 3.651 } });
