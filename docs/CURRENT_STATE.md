@@ -932,6 +932,25 @@ productivo autorizado.
 
 ## Decisiones e invariantes vigentes
 
+- **El resumen del comprobante declara todas las bases, y se construye desde
+  `ESQUEMA_TRIBUTARIO`.** Los códigos de SUNAT (1000 IGV, 9997 EXO, 9998 INA,
+  9995 EXP) estaban escritos a mano en tres sitios del generador de XML, y eso
+  produjo dos huecos del mismo tipo: (a) la rama de **notas de crédito y débito**
+  emitía un único `TaxSubtotal` fijo en categoría `S` y ponía en
+  `LineExtensionAmount` sólo `total_gravadas`, de modo que una nota sobre un
+  comprobante con operaciones exoneradas declaraba 100,00 donde sus líneas
+  sumaban 200,00 —descuadre que SUNAT rechaza— y hacía desaparecer la base
+  exonerada; (b) la **exportación** entraba en `totalBaseImponible` y se
+  clasificaba bien en cada línea, pero ningún `TaxSubtotal` la declaraba. En los
+  dos casos las líneas estaban bien, que es lo que los hacía difíciles de ver.
+  Ahora las dos ramas usan `buildTaxSubtotalsXml` y `totalBaseImponible`, y esos
+  recorren el catálogo en vez de repetir los códigos.
+- **Los importes del XML son siempre positivos.** Una nota de crédito llega con
+  los totales en negativo; SUNAT no admite importes negativos, el signo lo lleva
+  el tipo de documento. Las líneas ya lo normalizaban con `Math.abs` y la
+  cabecera lo hacía con `formatAbsAmount`; al unificar las dos ramas hubo que
+  llevar esa normalización a los ayudantes comunes (`baseAbsoluta`).
+
 - **La tasa de impuesto tiene una sola fuente: `empresa_config.igv_porcentaje`.**
   La RPC de venta del POS siempre calculó con ella; el navegador usaba una
   constante por país en `lib/initial-country`. Mientras coincidieran no se
