@@ -8,6 +8,7 @@ import { Building2, Mail, Phone, MapPin, Settings, FileText, X, AlertCircle, Eye
 import { cn } from '@/lib/utils'
 import { INITIAL_ACTIVE_COUNTRY } from '@/lib/initial-country'
 import { validateCountryTaxId } from '@/lib/country-tax-id'
+import { ConsultaRuc, type ContribuyenteConsultado } from '@/components/shared/ConsultaRuc'
 
 const sectionClass = 'mb-8'
 const sectionHeaderClass = 'mb-5 flex items-center gap-3 border-b-2 border-border pb-3'
@@ -267,6 +268,13 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
     }
   }
 
+  // El tenant se crea con la razon social que se teclee aqui y esa es la que
+  // sale luego en cada comprobante, asi que conviene traerla del padron.
+  const rellenarConElPadron = (dato: ContribuyenteConsultado) => {
+    if (!dato.razonSocial) return
+    setFormData(prev => (prev.razon_social.trim() ? prev : { ...prev, razon_social: dato.razonSocial! }))
+  }
+
   const handleCloseCredentials = () => {
     setCredentials(null)
     onClose()
@@ -387,6 +395,12 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                     <p className={helperClass}>
                       {documentoConfig.helper}
                     </p>
+                    <ConsultaRuc
+                      ruc={formData.ruc}
+                      documentoLabel={documentoConfig.label}
+                      activo={formData.pais === 'PE'}
+                      onEncontrado={rellenarConElPadron}
+                    />
                   </div>
 
                   <div>
