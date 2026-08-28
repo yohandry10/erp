@@ -1,11 +1,13 @@
 'use client'
 
+import { useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { CreateProveedorDto } from '@/types/compras'
 import { Building2, Mail, Phone, MapPin, User, CreditCard, Calendar } from 'lucide-react'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { ConsultaRuc, type ContribuyenteConsultado } from '@/components/shared/ConsultaRuc'
 
 // Validation schema matching backend DTO
 const proveedorSchema = z.object({
@@ -78,7 +80,9 @@ export function ProveedorForm({
     register,
     handleSubmit,
     formState: { errors },
-    watch
+    watch,
+    setValue,
+    getValues
   } = useForm<ProveedorFormData>({
     resolver: zodResolver(proveedorSchema),
     defaultValues: {
@@ -98,6 +102,21 @@ export function ProveedorForm({
   })
 
   const condicionesPago = watch('condiciones_pago')
+  const rucTecleado = watch('ruc')
+
+  // Rellena lo que SUNAT ya sabe, pero nunca pisa lo que el usuario escribio:
+  // si corrigio la razon social a mano es porque tenia un motivo.
+  const rellenarConElPadron = useCallback(
+    (dato: ContribuyenteConsultado) => {
+      if (dato.razonSocial && !getValues('razon_social')?.trim()) {
+        setValue('razon_social', dato.razonSocial, { shouldValidate: true })
+      }
+      if (dato.direccion && !getValues('direccion')?.trim()) {
+        setValue('direccion', dato.direccion, { shouldValidate: true })
+      }
+    },
+    [getValues, setValue],
+  )
 
   const onFormSubmit = async (data: ProveedorFormData) => {
     await onSubmit(data as CreateProveedorDto)
@@ -128,6 +147,12 @@ export function ProveedorForm({
                 {errors.ruc.message}
               </p>
             )}
+            <ConsultaRuc
+              ruc={rucTecleado}
+              documentoLabel={taxIdLabel}
+              activo={country.paisCodigo === 'PE'}
+              onEncontrado={rellenarConElPadron}
+            />
           </div>
 
           {/* Razón Social */}

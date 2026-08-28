@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ClientesService } from './clientes.service';
+import { PadronRucService } from '../../contabilidad/services/padron-ruc.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreateClienteDto, UpdateClienteDto } from './dto';
 
 describe('ClientesService', () => {
   let service: ClientesService;
+  let consultarPadron: jest.Mock;
   let mockSupabaseClient: any;
 
   const createChainMock = () => {
@@ -30,6 +32,7 @@ describe('ClientesService', () => {
 
   beforeEach(async () => {
     mockSupabaseClient = createChainMock();
+    consultarPadron = jest.fn(async () => null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -40,6 +43,7 @@ describe('ClientesService', () => {
             getClient: jest.fn().mockReturnValue(mockSupabaseClient),
           },
         },
+        { provide: PadronRucService, useValue: { consultar: consultarPadron } },
       ],
     }).compile();
 
@@ -242,7 +246,38 @@ describe('ClientesService', () => {
       expect(mockSupabaseClient.delete).not.toHaveBeenCalled();
     });
 
-    it('validarRUC solo confirma el dígito verificador y no inventa datos SUNAT', async () => {
+    it('validarRUC devuelve lo que dice el padrón, incluida la condición', async () => {
+      // La condición --habido o no habido-- es la razón de ser de la consulta:
+      // el dígito verificador solo descarta un número mal tecleado.
+      consultarPadron.mockResolvedValue({
+        ruc: '20100066603',
+        razonSocial: 'SUNAT OPERACIONES EN LINEA',
+        estado: 'ACTIVO',
+        condicion: 'NO HABIDO',
+        direccion: 'AV. GARCILASO DE LA VEGA 1472',
+        ubigeo: '150101',
+        consultadoEn: '2026-08-28T00:00:00.000Z',
+        fuente: 'apis.net.pe',
+        desdeCache: false,
+      });
+
+      const result = await service.validarRUC({ ruc: '20100066603' });
+
+      expect(result).toEqual(expect.objectContaining({
+        ruc: '20100066603',
+        validado_formato: true,
+        consulta_sunat: true,
+        razon_social: 'SUNAT OPERACIONES EN LINEA',
+        estado: 'ACTIVO',
+        condicion: 'NO HABIDO',
+      }));
+    });
+
+    it('si el padrón no responde no inventa datos registrales', async () => {
+      // `null` del padrón es «no se pudo comprobar», nunca «no existe». Dar por
+      // buena la razón social en ese caso sería afirmar algo que no se sabe.
+      consultarPadron.mockResolvedValue(null);
+
       const result = await service.validarRUC({ ruc: '20100066603' });
 
       expect(result).toEqual(expect.objectContaining({
