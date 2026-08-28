@@ -77,3 +77,32 @@ export function rangoDelDiaEnPais(
     hasta: new Date(inicioLocal + 24 * 60 * 60 * 1000).toISOString(),
   };
 }
+
+/**
+ * Presenta la fecha de un documento en la zona del contribuyente.
+ *
+ * La conversion de zona solo tiene sentido sobre un **instante**. Aplicarla a
+ * una fecha pura la retrasa un dia: `new Date('2026-08-28')` es medianoche UTC,
+ * y en Lima --UTC-5-- eso son las 19:00 del 27. Como `cpe.fecha_emision` se
+ * guarda justamente como fecha pura (`YYYY-MM-DD`, ver `resolveEmissionDate`),
+ * el listado de comprobantes mostraba el dia anterior al que declara el XML:
+ * comprobado el 2026-08-28 con una boleta cuyo `IssueDate` era 2026-08-28 y
+ * cuya fila decia 2026-08-27.
+ *
+ * Una fecha pura ya esta en la zona del contribuyente --la escribio el propio
+ * emisor-- asi que se devuelve tal cual. Solo se convierte lo que lleva hora.
+ */
+export function fechaDeDocumentoEnPais(valor: unknown, zonaHoraria: string): string {
+  const texto = String(valor ?? '').trim();
+  if (!texto) return '';
+
+  // `2026-08-28` o `2026-08-28 00:00:00` sin zona: es una fecha, no un instante.
+  const fechaPura = /^(\d{4}-\d{2}-\d{2})(?:[ T]00:00(?::00(?:\.0+)?)?)?$/.exec(texto);
+  if (fechaPura) return fechaPura[1];
+
+  const instante = new Date(texto);
+  return Number.isNaN(instante.getTime())
+    ? ''
+    : instante.toLocaleDateString('en-CA', { timeZone: zonaHoraria });
+}
+
