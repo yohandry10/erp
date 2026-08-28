@@ -373,8 +373,8 @@ export default function ClienteForm({
               className={`rounded-lg border p-3 text-xs ${
                 (datosDelPadron.condicion ?? '').toUpperCase() === 'HABIDO' &&
                 (datosDelPadron.estado ?? '').toUpperCase() === 'ACTIVO'
-                  ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700'
-                  : 'border-amber-400/40 bg-amber-400/5 text-amber-700'
+                  ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300'
+                  : 'border-amber-400/40 bg-amber-400/5 text-amber-700 dark:text-amber-300'
               }`}
             >
               <p className="m-0 font-semibold">{datosDelPadron.razonSocial || 'Contribuyente encontrado'}</p>
