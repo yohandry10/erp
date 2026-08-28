@@ -62,12 +62,17 @@ export default function NuevoProductoPage() {
     stock: "",
     stockMinimo: "",
     codigoBarras: "",
-    impuesto: "18",
     afectacionIgv: "10",
     almacenId: "",
   });
 
   const impuestoNombre = country.paisCodigo === "PE" ? "IGV" : "IVA";
+  // La tasa del producto no se elige: la fija la empresa y la afectacion decide
+  // si se aplica. Se calcula aqui para exhibirla y para guardarla coherente.
+  const tasaEfectiva =
+    formData.afectacionIgv === "10"
+      ? Math.round(country.impuestoRate * 10000) / 100
+      : 0;
 
   useEffect(() => {
     let vigente = true;
@@ -111,14 +116,6 @@ export default function NuevoProductoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (country.loading) return;
-    setFormData((prev) => ({
-      ...prev,
-      impuesto: String(Math.round(country.impuestoRate * 10000) / 100),
-    }));
-  }, [country.loading, country.impuestoRate]);
-
   const validateForm = () => {
     const nextErrors: Record<string, string> = {};
     const precioVenta = Number(formData.precioVenta);
@@ -127,7 +124,6 @@ export default function NuevoProductoPage() {
     const stock = formData.stock === "" ? 0 : Number(formData.stock);
     const stockMinimo =
       formData.stockMinimo === "" ? 0 : Number(formData.stockMinimo);
-    const impuesto = formData.impuesto === "" ? 0 : Number(formData.impuesto);
 
     if (!formData.codigo.trim()) nextErrors.codigo = "El código es requerido";
     if (!formData.nombre.trim()) nextErrors.nombre = "El nombre es requerido";
@@ -147,9 +143,6 @@ export default function NuevoProductoPage() {
     }
     if (Number.isNaN(stockMinimo) || stockMinimo < 0) {
       nextErrors.stockMinimo = "El stock mínimo no puede ser negativo";
-    }
-    if (Number.isNaN(impuesto) || impuesto < 0 || impuesto > 100) {
-      nextErrors.impuesto = "El impuesto debe estar entre 0 y 100";
     }
     if (stock > 0 && !formData.almacenId) {
       nextErrors.almacenId =
@@ -184,7 +177,7 @@ export default function NuevoProductoPage() {
         stock_reservado: 0,
         almacen_id: formData.almacenId || null,
         codigo_barras: formData.codigoBarras.trim() || undefined,
-        impuesto: formData.impuesto === "" ? 0 : Number(formData.impuesto),
+        impuesto: tasaEfectiva,
         afectacion_igv: formData.afectacionIgv,
         atributos_extra: Object.keys(atributosExtra).length > 0 ? atributosExtra : undefined,
       };
@@ -578,29 +571,24 @@ export default function NuevoProductoPage() {
               )}
             </div>
             <div>
-              <label htmlFor="nuevo-impuesto">{country.paisCodigo === 'PE' ? 'IGV' : 'IVA'} (%)</label>
-              <input id="nuevo-impuesto"
-                type="number"
-                name="impuesto"
-                value={formData.impuesto}
-                onChange={handleChange}
-                step="0.01"
-                min="0"
-                max="100"
-                aria-invalid={Boolean(errors.impuesto)}
-                aria-describedby={
-                  errors.impuesto ? "producto-impuesto-error" : undefined
-                }
-                placeholder={String(Math.round(country.impuestoRate * 10000) / 100)}
-              />
-              {errors.impuesto && (
-                <p
-                  id="producto-impuesto-error"
-                  className="text-red-500 text-xs mt-1"
-                >
-                  {errors.impuesto}
-                </p>
-              )}
+              {/* Era un campo editable que no lo leia nadie: la venta, el ticket y
+                  el precio exhibido toman siempre la tasa del tenant
+                  (`empresas.igv_porcentaje`, la del asistente inicial) y deciden
+                  si se cobra por la afectacion. Escribir 0 aqui no eximia al
+                  producto de nada, asi que se muestra el resultado en vez de
+                  ofrecer una palanca que no mueve nada. */}
+              <label htmlFor="nuevo-impuesto">{impuestoNombre} que se cobrara</label>
+              <output
+                id="nuevo-impuesto"
+                className="block w-[100%] rounded-md border border-border bg-muted/40 p-2 text-sm text-muted-foreground"
+              >
+                {tasaEfectiva === 0
+                  ? `No se cobra ${impuestoNombre}`
+                  : `${tasaEfectiva}% sobre el precio de venta`}
+              </output>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sale de la afectación y de la tasa configurada para la empresa.
+              </p>
             </div>
             <div>
               {/* Sin este campo todo producto nacia gravado y no habia forma de

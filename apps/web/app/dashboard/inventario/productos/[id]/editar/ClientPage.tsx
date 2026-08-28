@@ -44,11 +44,16 @@ export default function EditarProductoPage() {
     precioCompra: "",
     stockMinimo: "",
     codigoBarras: "",
-    impuesto: "18",
     afectacionIgv: "10",
   });
 
   const impuestoNombre = country.paisCodigo === "PE" ? "IGV" : "IVA";
+  // Derivada, no elegida: la tasa la fija la empresa y la afectacion decide si
+  // se aplica.
+  const tasaEfectiva =
+    formData.afectacionIgv === "10"
+      ? Math.round(country.impuestoRate * 10000) / 100
+      : 0;
 
   const loadProducto = useCallback(async () => {
     if (!productoId) return;
@@ -85,7 +90,6 @@ export default function EditarProductoPage() {
           precioCompra: p.precio_compra?.toString() || "",
           stockMinimo: p.stock_minimo?.toString() || "",
           codigoBarras: p.codigo_barras || "",
-          impuesto: p.impuesto?.toString() || String(Math.round(country.impuestoRate * 10000) / 100),
           afectacionIgv: String(p.afectacion_igv || "10"),
         });
       }
@@ -133,7 +137,7 @@ export default function EditarProductoPage() {
         precio_compra: formData.precioCompra === "" ? 0 : Number(formData.precioCompra),
         stock_minimo: formData.stockMinimo === "" ? 0 : Number(formData.stockMinimo),
         codigo_barras: formData.codigoBarras.trim() || undefined,
-        impuesto: formData.impuesto === "" ? 0 : Number(formData.impuesto),
+        impuesto: tasaEfectiva,
         afectacion_igv: formData.afectacionIgv,
       };
       const fingerprint = JSON.stringify(payload);
@@ -398,17 +402,22 @@ export default function EditarProductoPage() {
               />
             </div>
             <div>
-              <label htmlFor="editar-impuesto">{country.paisCodigo === 'PE' ? 'IGV' : 'IVA'} (%)</label>
-              <input id="editar-impuesto"
-                type="number"
-                name="impuesto"
-                value={formData.impuesto}
-                onChange={handleChange}
-                step="0.01"
-                min="0"
-                max="100"
-                placeholder={String(Math.round(country.impuestoRate * 10000) / 100)}
-              />
+              {/* No lo leia nadie: la venta y el ticket toman la tasa del tenant
+                  y la afectacion decide si se cobra. Poner 0 aqui no eximia al
+                  producto, asi que se muestra el resultado en vez de una palanca
+                  que no mueve nada. */}
+              <label htmlFor="editar-impuesto">{impuestoNombre} que se cobrara</label>
+              <output
+                id="editar-impuesto"
+                className="block w-[100%] rounded-md border border-border bg-muted/40 p-2 text-sm text-muted-foreground"
+              >
+                {tasaEfectiva === 0
+                  ? `No se cobra ${impuestoNombre}`
+                  : `${tasaEfectiva}% sobre el precio de venta`}
+              </output>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sale de la afectación y de la tasa configurada para la empresa.
+              </p>
             </div>
             <div>
               {/* Sin este campo no habia forma de corregir la afectacion de un
