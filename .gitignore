@@ -57,6 +57,8 @@ apps/web/.offline-test-tmp/
 apps/web/.dinero-test-tmp/
 test-results/
 apps/web/tests/e2e/artifacts/
+# Utileria de verificacion local (proxy contra el API desplegado, volcados)
+scratchpad/
 
 # Respaldos PostgreSQL locales: pueden contener datos reales de PROD.
 artifacts/db-backups/*.dump

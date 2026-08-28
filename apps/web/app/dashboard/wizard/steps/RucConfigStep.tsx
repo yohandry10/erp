@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Building2 } from 'lucide-react'
 import { LogoUploader } from '@/components/configuracion/LogoUploader'
+import { ConsultaRuc, type ContribuyenteConsultado } from '@/components/shared/ConsultaRuc'
 
 export function RucConfigStep() {
   const { state, updateConfiguration } = useWizard()
@@ -15,6 +16,23 @@ export function RucConfigStep() {
   const handleInputChange = (field: string, value: string) => {
     updateConfiguration({ [field]: value })
   }
+
+  // Rellena razon social y domicilio con lo que SUNAT tiene registrado, que es
+  // justo lo que pide el paso: "tal como aparecen en SUNAT". No pisa lo ya
+  // escrito, por si el usuario corrigio algo a proposito.
+  const rellenarConElPadron = React.useCallback(
+    (dato: ContribuyenteConsultado) => {
+      const cambios: Record<string, string> = {}
+      if (dato.razonSocial && !state.configuration.razonSocial?.trim()) {
+        cambios.razonSocial = dato.razonSocial
+      }
+      if (dato.direccion && !state.configuration.direccion?.trim()) {
+        cambios.direccion = dato.direccion
+      }
+      if (Object.keys(cambios).length > 0) updateConfiguration(cambios)
+    },
+    [state.configuration.razonSocial, state.configuration.direccion, updateConfiguration],
+  )
 
   const handleLogoChange = (file: File | null, previewUrl: string | null) => {
     updateConfiguration({
@@ -48,13 +66,19 @@ export function RucConfigStep() {
                 : 'Ej: 20123456789'}
             value={state.configuration.ruc}
             onChange={(e) => handleInputChange('ruc', e.target.value)}
-            maxLength={11} className="text-base"
+            maxLength={country.paisCodigo === 'CO' ? 12 : 11} className="text-base"
           />
           <p className="text-xs text-[var(--primary-500)] mt-1">
             {country.paisCodigo === 'CO'
               ? 'Ingresa el NIT con su dígito de verificación.'
               : 'Debe tener 11 dígitos.'}
           </p>
+          <ConsultaRuc
+            ruc={state.configuration.ruc}
+            documentoLabel={country.documentoFiscal}
+            activo={country.paisCodigo === 'PE'}
+            onEncontrado={rellenarConElPadron}
+          />
         </div>
 
         <div>

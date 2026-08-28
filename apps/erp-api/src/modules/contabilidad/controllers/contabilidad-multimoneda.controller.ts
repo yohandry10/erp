@@ -169,8 +169,13 @@ export class ContabilidadMultimonedaController {
     };
   }
 
+  // Sin permiso especifico a proposito: lo consultan el alta de proveedor, la de
+  // cliente y el asistente inicial, y no hay un permiso que tengan los tres --
+  // `contabilidad.tipos_cambio.crear` no lo tiene compras, y `validations.run`
+  // solo lo tiene ADMIN--. El dato es publico y se devuelve **solo el RUC que el
+  // usuario teclea**, nunca un listado, asi que basta con la sesion que ya exige
+  // el guard global.
   @Get("padron-ruc/:ruc")
-  @RequirePermission("contabilidad.tipos_cambio.crear")
   @ApiOperation({
     summary: "Consultar un RUC en el padron de SUNAT",
     description:

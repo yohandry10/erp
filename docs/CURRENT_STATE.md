@@ -923,12 +923,31 @@ Cambios recientes principales:
   oficiales externos.
 - Tema dark/light, shell responsive, Analytics y navegación por roles.
 - Offline desktop: SQLite local, outbox durable y caché por tenant.
+- Padrón de RUC de SUNAT consultable desde el alta de proveedor, la de cliente y
+  el asistente inicial: razón social, estado y **condición** (habido o no habido).
 
 “Cerrado técnicamente” significa que el código y las pruebas controladas pasan; no
 reemplaza homologación legal, credenciales finales, hardware físico ni smoke
 productivo autorizado.
 
 ## Decisiones e invariantes vigentes
+
+- **El padrón de RUC avisa, no impide, y `null` significa «no se pudo
+  comprobar».** `PadronRucService` (migración 520, tabla global `padron_ruc`)
+  devuelve `null` tanto si la fuente no responde como si el RUC no aparece, y
+  ninguno de los dos casos puede bloquear el alta de un proveedor: si la fuente
+  se cae, el registro sigue. Cuando la fuente falla se devuelve el último dato
+  conocido aunque haya envejecido, porque para avisar de una baja un dato de hace
+  dos meses vale más que ninguno. La condición **NO HABIDO** se muestra en ámbar
+  y deja continuar: un contador puede tener motivos para registrar a ese
+  proveedor; lo que no puede es enterarse tres meses después, cuando el crédito
+  fiscal ya se objetó.
+- **El endpoint del padrón no lleva `@RequirePermission` a propósito.** Lo
+  consultan compras, ventas y el asistente inicial, y no existe un permiso que
+  tengan los tres: `contabilidad.tipos_cambio.crear` no lo tiene COMPRAS y
+  `validations.run` sólo lo tienen ADMIN y ADMIN_DEMO. El dato es público y sólo
+  se devuelve **el RUC que el usuario teclea**, nunca un listado, así que la
+  sesión que ya exige el guard global es frontera suficiente.
 
 - **Hay tablas que el rol del API no puede escribir directamente, y es
   deliberado.** `centros_costo`, `periodos_contables`, `tipos_cambio`,

@@ -5,6 +5,7 @@ import { Cliente } from './entities/cliente.entity';
 import { validarDocumentoIdentidad, validarRucPeru } from '../../../shared/utils/documento-identidad-peru.util';
 import { validateArgentinaTaxId } from '../../fiscal/arca-fiscal.service';
 import { validateColombiaNit } from '../../paises/initial-country';
+import { PadronRucService } from '../../contabilidad/services/padron-ruc.service';
 
 function validarDocumentoCliente(tipo: string, numero: string) {
   if (tipo === 'CUIT') {
@@ -40,6 +41,7 @@ function validarDocumentoCliente(tipo: string, numero: string) {
 export class ClientesService {
   constructor(
     private readonly supabase: SupabaseService,
+    private readonly padronRuc: PadronRucService,
   ) {}
 
   /**
@@ -281,15 +283,33 @@ export class ClientesService {
         throw new BadRequestException(validacion.error);
       }
 
-      // Este endpoint no tiene una fuente registral configurada. Devuelve únicamente
-      // la validación matemática local y nunca inventa razón social, domicilio,
-      // estado ni condición del contribuyente.
+      // El dígito verificador solo descarta un número mal tecleado. Lo que decide
+      // si conviene facturar a alguien es el padrón: si está de baja o no habido.
+      const enElPadron = await this.padronRuc.consultar(ruc);
+
+      if (!enElPadron) {
+        // `null` es «no se pudo comprobar», nunca «no existe»: la fuente puede
+        // estar caída. Se dice tal cual en vez de dar por bueno el contribuyente.
+        return {
+          ruc,
+          validado_formato: true,
+          consulta_sunat: false,
+          fuente: 'VALIDACION_LOCAL',
+          mensaje: 'RUC válido por formato y dígito verificador; no se pudo consultar el padrón SUNAT',
+        };
+      }
+
       return {
         ruc,
         validado_formato: true,
-        consulta_sunat: false,
-        fuente: 'VALIDACION_LOCAL',
-        mensaje: 'RUC válido por formato y dígito verificador; no se consultó el padrón SUNAT',
+        consulta_sunat: true,
+        fuente: enElPadron.fuente,
+        razon_social: enElPadron.razonSocial,
+        direccion: enElPadron.direccion,
+        estado: enElPadron.estado,
+        condicion: enElPadron.condicion,
+        consultado_en: enElPadron.consultadoEn,
+        mensaje: `${enElPadron.razonSocial ?? 'Contribuyente'} — ${enElPadron.estado ?? 'estado desconocido'}, ${enElPadron.condicion ?? 'condición desconocida'}`,
       };
     } catch (error) {
       console.error('Error validating RUC:', error);

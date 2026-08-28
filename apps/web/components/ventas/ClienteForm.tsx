@@ -82,6 +82,14 @@ export default function ClienteForm({
   const { post, unwrap } = useApi()
   const [validatingRuc, setValidatingRuc] = useState(false)
   const [rucValidated, setRucValidated] = useState(false)
+  // Lo que respondio el padron de SUNAT, si respondio. Se guarda aparte de
+  // `rucValidated` porque validar el digito verificador y encontrar al
+  // contribuyente son dos cosas distintas y solo la segunda dice si esta habido.
+  const [datosDelPadron, setDatosDelPadron] = useState<{
+    razonSocial: string | null
+    estado: string | null
+    condicion: string | null
+  } | null>(null)
 
   const {
     register,
@@ -184,12 +192,22 @@ export default function ClienteForm({
           setValue('nombre_comercial', responseData.nombre_comercial)
         }
 
+        setDatosDelPadron(
+          responseData.consulta_sunat
+            ? {
+                razonSocial: responseData.razon_social ?? null,
+                estado: responseData.estado ?? null,
+                condicion: responseData.condicion ?? null,
+              }
+            : null,
+        )
+
         setRucValidated(true)
         toast({
           title: 'RUC Validado',
           description: responseData.consulta_sunat
-            ? 'Datos obtenidos de SUNAT correctamente'
-            : 'Formato y dígito verificador válidos. Complete los datos registrales manualmente.'
+            ? String(responseData.mensaje || 'Datos obtenidos de SUNAT correctamente')
+            : 'Formato y dígito verificador válidos. No se pudo consultar el padrón; complete los datos registrales manualmente.'
         })
       }
     } catch (error: any) {
@@ -311,6 +329,7 @@ export default function ClienteForm({
                 onChange={(event) => {
                   documentoNumeroField.onChange(event)
                   setRucValidated(false)
+                  setDatosDelPadron(null)
                 }}
               />
             </div>
@@ -342,10 +361,33 @@ export default function ClienteForm({
               {errors.documento_numero.message}
             </p>
           )}
-          {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.NIT].includes(documentoTipo) && (
+          {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.NIT].includes(documentoTipo) && !datosDelPadron && (
             <p className="text-xs text-[var(--primary-500)] m-0">
-              Valida formato y dígito verificador. No consulta el padrón de {isArgentina ? 'ARCA' : isColombia ? 'DIAN/RUT' : 'SUNAT'}.
+              {documentoTipo === TipoDocumento.RUC
+                ? 'Comprueba el dígito verificador y consulta el padrón de SUNAT: razón social, estado y condición.'
+                : `Valida formato y dígito verificador. No consulta el padrón de ${isArgentina ? 'ARCA' : 'DIAN/RUT'}.`}
             </p>
+          )}
+          {datosDelPadron && (
+            <div
+              className={`rounded-lg border p-3 text-xs ${
+                (datosDelPadron.condicion ?? '').toUpperCase() === 'HABIDO' &&
+                (datosDelPadron.estado ?? '').toUpperCase() === 'ACTIVO'
+                  ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700'
+                  : 'border-amber-400/40 bg-amber-400/5 text-amber-700'
+              }`}
+            >
+              <p className="m-0 font-semibold">{datosDelPadron.razonSocial || 'Contribuyente encontrado'}</p>
+              <p className="m-0 mt-1">
+                {datosDelPadron.estado ?? 'estado desconocido'} ·{' '}
+                {datosDelPadron.condicion ?? 'condición desconocida'} · según SUNAT
+              </p>
+              {(datosDelPadron.condicion ?? '').toUpperCase() === 'NO HABIDO' && (
+                <p className="m-0 mt-2">
+                  Está <strong>no habido</strong>. Puede facturarle igual, pero conviene saberlo.
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>

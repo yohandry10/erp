@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { useToast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { validateArgentinaCuit, validateColombiaNit } from '@/lib/country-tax-id'
+import { ConsultaRuc, type ContribuyenteConsultado } from '@/components/shared/ConsultaRuc'
 
 interface Proveedor {
   id?: number | string
@@ -174,6 +175,15 @@ export default function ProveedorModal({
     }
   }
 
+  // Rellena lo que SUNAT ya sabe sin pisar lo que el usuario haya escrito.
+  const rellenarConElPadron = useCallback((dato: ContribuyenteConsultado) => {
+    setFormData(prev => ({
+      ...prev,
+      razon_social: prev.razon_social?.trim() ? prev.razon_social : (dato.razonSocial ?? prev.razon_social),
+      direccion: prev.direccion?.trim() ? prev.direccion : (dato.direccion ?? prev.direccion),
+    } as FormData))
+  }, [])
+
   if (!isOpen) return null
 
   return (
@@ -217,6 +227,12 @@ export default function ProveedorModal({
                 {errors.ruc && (
                   <p className="text-red-500 text-xs mt-1">{errors.ruc}</p>
                 )}
+                <ConsultaRuc
+                  ruc={formData.ruc}
+                  documentoLabel={taxIdLabel}
+                  activo={country.paisCodigo === 'PE'}
+                  onEncontrado={rellenarConElPadron}
+                />
               </div>
 
               <div>
