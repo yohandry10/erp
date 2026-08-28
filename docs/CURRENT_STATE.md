@@ -932,6 +932,18 @@ productivo autorizado.
 
 ## Decisiones e invariantes vigentes
 
+- **La tasa de IGV no se elige por producto; la afectación sí.** El porcentaje
+  sale siempre de `empresas.igv_porcentaje` (el del asistente inicial), y qué
+  productos lo pagan lo decide `productos.afectacion_igv` (Catálogo 07 de SUNAT).
+  La columna `productos.impuesto` existe y se guarda, pero **ningún cálculo la
+  lee**: ni la RPC de venta del POS, ni el ticket, ni el precio exhibido en el
+  catálogo, ni la construcción del XML. Era un campo editable en el alta y la
+  edición de producto, de modo que escribir `0` ahí parecía eximir al producto y
+  no eximía de nada; ahora se muestra derivado y de sólo lectura. Los productos
+  creados antes conservan el valor incoherente (un exonerado con `impuesto = 18`)
+  y no se ha migrado a propósito: nadie lo lee, y tocar datos de producción por
+  una columna inerte no compensa.
+
 - **El padrón de RUC avisa, no impide, y `null` significa «no se pudo
   comprobar».** `PadronRucService` (migración 520, tabla global `padron_ruc`)
   devuelve `null` tanto si la fuente no responde como si el RUC no aparece, y
