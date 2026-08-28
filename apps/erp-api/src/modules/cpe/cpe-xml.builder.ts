@@ -1,7 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { CreateFacturaDto } from '@erp-suite/dtos';
 import { DocumentoFiscal } from '../documentos/interfaces/documento-fiscal.interface';
-import { ESQUEMA_TRIBUTARIO, categoriaDeAfectacion } from '../../shared/utils/igv-afectacion.util';
+import {
+  AFECTACION_IGV,
+  CategoriaAfectacion,
+  ESQUEMA_TRIBUTARIO,
+  categoriaDeAfectacion,
+} from '../../shared/utils/igv-afectacion.util';
 
 /**
  * Construye y normaliza XML UBL 2.1 para SUNAT.
@@ -307,7 +312,14 @@ private generateDebitNoteXmlContent(factura: CreateFacturaDto): string {
     });
   }
 
-private buildNoteXml(
+// El resumen usa los mismos ayudantes que la factura a proposito. Antes esta
+  // rama declaraba **un solo** TaxSubtotal fijo en categoria `S` y ponia en
+  // LineExtensionAmount unicamente `total_gravadas`: una nota sobre un
+  // comprobante con operaciones exoneradas declaraba 100,00 donde sus lineas
+  // sumaban 200,00 --que SUNAT rechaza-- y hacia desaparecer la base exonerada
+  // del resumen. Las lineas si clasificaban bien, lo que lo hacia dificil de
+  // ver: mirando una linea suelta todo parecia correcto.
+  private buildNoteXml(
     factura: CreateFacturaDto,
     config: {
       root: 'CreditNote' | 'DebitNote';
@@ -401,17 +413,10 @@ private buildNoteXml(
   </cac:AccountingCustomerParty>
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="${moneda}">${this.formatAbsAmount(factura.total_igv)}</cbc:TaxAmount>
-    <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${moneda}">${this.formatAbsAmount(factura.total_gravadas)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${moneda}">${this.formatAbsAmount(factura.total_igv)}</cbc:TaxAmount>
-      <cac:TaxCategory>
-        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">S</cbc:ID>
-        ${this.buildIgvTaxSchemeXml()}
-      </cac:TaxCategory>
-    </cac:TaxSubtotal>
+${this.buildTaxSubtotalsXml(factura, moneda)}
   </cac:TaxTotal>
   <cac:${config.totalTag}>
-    <cbc:LineExtensionAmount currencyID="${moneda}">${this.formatAbsAmount(factura.total_gravadas)}</cbc:LineExtensionAmount>
+    <cbc:LineExtensionAmount currencyID="${moneda}">${this.formatAbsAmount(this.totalBaseImponible(factura))}</cbc:LineExtensionAmount>
     <cbc:TaxInclusiveAmount currencyID="${moneda}">${this.formatAbsAmount(factura.total_venta)}</cbc:TaxInclusiveAmount>
     <cbc:AllowanceTotalAmount currencyID="${moneda}">${this.formatAbsAmount((factura as any).total_descuentos ?? 0)}</cbc:AllowanceTotalAmount>
     <cbc:ChargeTotalAmount currencyID="${moneda}">${this.formatAbsAmount((factura as any).total_cargos ?? 0)}</cbc:ChargeTotalAmount>
@@ -559,70 +564,74 @@ private buildTaxSchemePorAfectacionXml(afectacionIgv?: string | null): string {
   }
 
 /**
- * Construye los TaxSubtotal del comprobante separando las bases por tipo de
- * afectación. SUNAT exige un bloque por categoría: 1000 (IGV gravado),
- * 9997 (exonerado) y 9998 (inafecto). Declarar una base exonerada dentro del
- * subtotal gravado implica reportar IGV que no se cobró.
+ * Construye los TaxSubtotal del resumen separando las bases por afectación.
+ * SUNAT exige un bloque por categoría: 1000 (IGV gravado), 9997 (exonerado),
+ * 9998 (inafecto) y 9995 (exportación). Declarar una base exonerada dentro del
+ * subtotal gravado implica reportar IGV que no se cobró; omitirla del todo deja
+ * el `LineExtensionAmount` sin respaldo y el comprobante se rechaza.
+ *
+ * Se recorre `ESQUEMA_TRIBUTARIO` en vez de escribir los códigos aquí. Antes
+ * estaban a mano en este método, y por eso la exportación --que sí entraba en
+ * `totalBaseImponible` y sí se clasificaba bien en cada línea-- no llegó nunca
+ * al resumen: se añadió la categoría en un sitio y se olvidó en el otro.
  */
 private buildTaxSubtotalsXml(factura: CreateFacturaDto, moneda: string): string {
-    const gravadas = Number((factura as any).total_gravadas ?? 0);
-    const exoneradas = Number((factura as any).total_exoneradas ?? 0);
-    const inafectas = Number((factura as any).total_inafectas ?? 0);
     const igv = Number((factura as any).total_igv ?? 0);
+    const anyFactura = factura as any;
 
-    const subtotales: string[] = [];
 
-    // El bloque gravado se emite siempre: un comprobante sin operaciones
-    // gravadas igual debe declarar la base en cero.
-    subtotales.push(`    <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(gravadas)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(igv)}</cbc:TaxAmount>
+    const bases: Array<{ categoria: CategoriaAfectacion; base: number; impuesto: number }> = [
+      // El bloque gravado se emite siempre: un comprobante sin operaciones
+      // gravadas igual debe declarar la base en cero.
+      { categoria: 'GRAVADO', base: this.baseAbsoluta(anyFactura.total_gravadas), impuesto: Math.abs(igv) },
+      { categoria: 'EXONERADO', base: this.baseAbsoluta(anyFactura.total_exoneradas), impuesto: 0 },
+      { categoria: 'INAFECTO', base: this.baseAbsoluta(anyFactura.total_inafectas), impuesto: 0 },
+      { categoria: 'EXPORTACION', base: this.baseAbsoluta(anyFactura.total_exportacion), impuesto: 0 },
+    ];
+
+    return bases
+      .filter(({ categoria, base }) => categoria === 'GRAVADO' || base > 0)
+      .map(({ categoria, base, impuesto }) => {
+        const esquema = ESQUEMA_TRIBUTARIO[categoria];
+        return `    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(base)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(impuesto)}</cbc:TaxAmount>
       <cac:TaxCategory>
-        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">S</cbc:ID>
-        ${this.buildIgvTaxSchemeXml()}
-      </cac:TaxCategory>
-    </cac:TaxSubtotal>`);
-
-    if (exoneradas > 0) {
-      subtotales.push(`    <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(exoneradas)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(0)}</cbc:TaxAmount>
-      <cac:TaxCategory>
-        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">E</cbc:ID>
+        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">${this.categoriaTributariaUbl(this.codigoDeCategoria(categoria))}</cbc:ID>
         <cac:TaxScheme>
-          <cbc:ID schemeID="UN/ECE 5153" schemeName="Codigo de tributos" schemeAgencyName="PE:SUNAT">9997</cbc:ID>
-          <cbc:Name>EXO</cbc:Name>
-          <cbc:TaxTypeCode>VAT</cbc:TaxTypeCode>
+          <cbc:ID schemeID="UN/ECE 5153" schemeName="Codigo de tributos" schemeAgencyName="PE:SUNAT">${esquema.id}</cbc:ID>
+          <cbc:Name>${esquema.nombre}</cbc:Name>
+          <cbc:TaxTypeCode>${esquema.tipo}</cbc:TaxTypeCode>
         </cac:TaxScheme>
       </cac:TaxCategory>
-    </cac:TaxSubtotal>`);
-    }
+    </cac:TaxSubtotal>`;
+      })
+      .join('\n');
+  }
 
-    if (inafectas > 0) {
-      subtotales.push(`    <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${moneda}">${this.formatAmount(inafectas)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${moneda}">${this.formatAmount(0)}</cbc:TaxAmount>
-      <cac:TaxCategory>
-        <cbc:ID schemeID="UN/ECE 5305" schemeName="Tax Category Identifier" schemeAgencyName="United Nations Economic Commission for Europe">O</cbc:ID>
-        <cac:TaxScheme>
-          <cbc:ID schemeID="UN/ECE 5153" schemeName="Codigo de tributos" schemeAgencyName="PE:SUNAT">9998</cbc:ID>
-          <cbc:Name>INA</cbc:Name>
-          <cbc:TaxTypeCode>FRE</cbc:TaxTypeCode>
-        </cac:TaxScheme>
-      </cac:TaxCategory>
-    </cac:TaxSubtotal>`);
-    }
+/**
+ * Base en positivo. Una nota de crédito llega con los totales en negativo --es
+ * una devolución-- y SUNAT no admite importes negativos: el signo lo lleva el
+ * tipo de documento. Las líneas ya lo normalizaban con `Math.abs`; el resumen
+ * tiene que hacer lo mismo o cabecera y líneas se contradicen.
+ */
+private baseAbsoluta(valor: unknown): number {
+    return Math.abs(this.toNumber(valor, 0));
+  }
 
-    return subtotales.join('\n');
+/** Código del Catálogo 07 representativo de cada categoría, para el 5305. */
+private codigoDeCategoria(categoria: CategoriaAfectacion): string {
+    return AFECTACION_IGV[categoria];
   }
 
 /** Suma de todas las bases del comprobante, sin importar su afectación. */
 private totalBaseImponible(factura: CreateFacturaDto): number {
+    const anyFactura = factura as any;
     return (
-      Number((factura as any).total_gravadas ?? 0) +
-      Number((factura as any).total_exoneradas ?? 0) +
-      Number((factura as any).total_inafectas ?? 0) +
-      Number((factura as any).total_exportacion ?? 0)
+      this.baseAbsoluta(anyFactura.total_gravadas) +
+      this.baseAbsoluta(anyFactura.total_exoneradas) +
+      this.baseAbsoluta(anyFactura.total_inafectas) +
+      this.baseAbsoluta(anyFactura.total_exportacion)
     );
   }
 
