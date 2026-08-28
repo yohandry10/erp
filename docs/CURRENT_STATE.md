@@ -932,6 +932,26 @@ productivo autorizado.
 
 ## Decisiones e invariantes vigentes
 
+- **Convertir la zona horaria de una fecha pura la retrasa un día.** `new
+  Date('2026-08-28')` es medianoche UTC, que en Lima son las 19:00 del 27.
+  `cpe.fecha_emision` se guarda como fecha pura, así que el listado de
+  comprobantes mostraba 2026-08-27 para una boleta cuyo XML declaraba
+  2026-08-28. La conversión no se puede quitar sin más —se introdujo por el
+  problema contrario, un comprobante emitido a las 20:15 de Lima salía fechado
+  al día siguiente—, hay que distinguir la fecha del instante:
+  `fechaDeDocumentoEnPais` devuelve tal cual lo que ya es `YYYY-MM-DD` y sólo
+  convierte lo que lleva hora. El XML y la vista A4 nunca estuvieron afectados:
+  la A4 formatea por texto, sin `new Date`.
+- **Una nota sobre una venta del POS clasifica mal lo inafecto y lo exportado.**
+  `crear_nota_referenciada_legacy_494` lee la afectación de
+  `documento_detalles.metadata`, y el camino del POS (migración 476) **no la
+  escribe ahí** —sólo `source` y el fingerprint; la afectación vive en
+  `cpe.items`—. Así que siempre dispara su respaldo, `igv > 0 ? '10' : '20'`:
+  lo gravado y lo exonerado quedan bien por casualidad, pero **inafecto (30) y
+  exportación (40) se declaran como exonerado (9997/E)**. Pendiente: la
+  migración 461 sí escribe la afectación en ese metadata, así que el arreglo es
+  que 476 haga lo mismo (recrear `finalizar_cpe_pos_tx`, 282 líneas).
+
 - **El resumen del comprobante declara todas las bases, y se construye desde
   `ESQUEMA_TRIBUTARIO`.** Los códigos de SUNAT (1000 IGV, 9997 EXO, 9998 INA,
   9995 EXP) estaban escritos a mano en tres sitios del generador de XML, y eso

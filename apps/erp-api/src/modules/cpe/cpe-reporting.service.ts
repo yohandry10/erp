@@ -1,7 +1,7 @@
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CpeXmlBuilder } from './cpe-xml.builder';
 import { paisDelTenant, rangoDelDiaDelTenant } from '../../shared/utils/fecha-tenant.util';
-import { zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
+import { fechaDeDocumentoEnPais, zonaHorariaDePais } from '../../shared/utils/fecha-peru.util';
 
 /** Consultas y exportaciones CPE; no participa en emisión ni anulación. */
 export class CpeReportingService {
@@ -90,14 +90,14 @@ async getComprobantesFromDatabase(filters: any = {}, tenantId?: string) {
       // emitido en ese momento aparecía fechado al día siguiente, es decir con
       // fecha futura y en el periodo tributario equivocado. Se comprobó en
       // producción el 2026-08-19: la factura demo salía como 2026-08-20.
+      //
+      // Pero convertir la zona de una **fecha pura** la retrasa un día, que es
+      // como se guarda `fecha_emision`: el listado mostraba 2026-08-27 para una
+      // boleta cuyo XML declaraba 2026-08-28. `fechaDeDocumentoEnPais` sólo
+      // convierte lo que lleva hora.
       const zonaTenant = zonaHorariaDePais(await paisDelTenant(client, tenantId));
-      const fechaLocal = (valor: unknown): string => {
-        if (!valor) return '';
-        const fecha = new Date(String(valor));
-        return Number.isNaN(fecha.getTime())
-          ? ''
-          : fecha.toLocaleDateString('en-CA', { timeZone: zonaTenant });
-      };
+      const fechaLocal = (valor: unknown): string =>
+        fechaDeDocumentoEnPais(valor, zonaTenant);
 
       // Transformar datos al formato esperado por el frontend
       const comprobantesFormateados = (cpeData || []).map(cpe => ({

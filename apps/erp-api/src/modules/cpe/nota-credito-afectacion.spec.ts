@@ -36,8 +36,12 @@ describe('CpeXmlBuilder — nota de crédito con operaciones no gravadas', () =>
       documento_receptor: '20600000013',
       razon_social_receptor: 'CLIENTE SAC',
       moneda: 'PEN',
-      documento_referencia_id: 'F001-00000001',
+      // Los mismos nombres que pone `referenced-notes.service` al leer la fila
+      // que escribe `crear_nota_referenciada_tx`: tipo, serie y número por
+      // separado. Si la prueba usara otra forma no estaría guardando esta ruta.
       documento_referencia_tipo: '01',
+      documento_referencia_serie: 'F001',
+      documento_referencia_numero: '00000001',
       motivo_nota: 'Devolución parcial',
       total_gravadas: 100,
       total_exoneradas: 100,
@@ -204,8 +208,9 @@ describe('CpeXmlBuilder — una nota con totales negativos', () => {
       documento_receptor: '20600000013',
       razon_social_receptor: 'CLIENTE SAC',
       moneda: 'PEN',
-      documento_referencia_id: 'F001-00000001',
       documento_referencia_tipo: '01',
+      documento_referencia_serie: 'F001',
+      documento_referencia_numero: '00000001',
       total_gravadas: -100,
       total_exoneradas: -50,
       total_igv: -18,
