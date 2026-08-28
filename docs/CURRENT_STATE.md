@@ -88,6 +88,29 @@ migraciones verificados, prevalece la implementación actual.
   función pública `SECURITY DEFINER` se quede sin nombres. Con control positivo,
   porque una comprobación de este tipo pasa en verde con demasiada facilidad.
 
+- **La emisión electrónica estuvo rota 16 días y nadie lo notó.** El 11 de agosto
+  se añadió `validateSignatureStrict`, que contaba las firmas del XML con una
+  expresión regular sobre «cualquier elemento llamado `Signature`». Un
+  comprobante UBL de SUNAT lleva **siempre** un bloque `<cac:Signature>` —
+  metadato obligatorio que declara quién firma, no una firma—, así que contaba
+  dos donde hay una, exigía exactamente una y devolvía `false`. El servicio
+  aborta ahí, antes de persistir.
+
+  Alcanzaba a **seis caminos**: emisión y registro de CPE, notas referenciadas,
+  comunicación de baja, envío por OSE y guías GRE (que firman vía
+  `oseService.signXmlOnly`). Los 5 comprobantes firmados que hay en producción
+  son del 6 al 9 de agosto, anteriores al fallo; las 30 guías GRE están todas en
+  borrador y la última es del 10. **No llegó a afectar a ningún cliente** porque
+  en esos 16 días nadie intentó emitir: los 61 borradores son la semilla
+  `F001-00000001`, uno por contribuyente demo.
+
+  Corregido buscando por espacio de nombres XMLDSig. Verificado extrayendo un
+  comprobante firmado de producción y validándolo **fuera de nuestro código**,
+  con `xml-crypto` y el certificado que viaja dentro del propio XML.
+
+  Lo que no lo cazó: las pruebas de firma existentes usan un XML mínimo **sin el
+  bloque UBL**. `firma-comprobante-ubl.spec.ts` firma uno con la forma real.
+
 - **PROD está en `517`.** La `510` puso el mecanismo de tasas de detracción
   —catálogo de códigos SPOT con tasa y vigencia, `codigo_detraccion` en la cuenta
   por pagar, y un contraste que **compara sin imponer**, porque hay operaciones
@@ -924,6 +947,18 @@ productivo autorizado.
 - **Una función pública que el API llame tiene que declarar sus parámetros con
   nombre.** PostgREST no sabe llamar posicionalmente. Un verificador que la
   pruebe desde SQL no detecta el fallo, porque desde SQL sí funciona.
+- **Un comprobante UBL lleva un `<cac:Signature>` que NO es una firma.** Es un
+  metadato que el esquema de SUNAT exige. Cualquier comprobación que cuente
+  firmas debe hacerlo por el espacio de nombres XMLDSig
+  (`http://www.w3.org/2000/09/xmldsig#`), nunca por el nombre del elemento. Y
+  una prueba de firma que use un XML mínimo sin ese bloque no prueba el caso
+  real.
+- **El tipo de cambio sale del BCRP** (series `PD04639PD` compra y `PD04640PD`
+  venta, sistema bancario SBS, que es la que SUNAT republica). SUNAT no tiene
+  API de tipo de cambio: lo único disponible es el endpoint interno de su página
+  de consulta, que exige simular un navegador y enviar un token de captcha
+  falso, y por eso se descartó. `apis.net.pe` queda de respaldo — daba la serie
+  interbancaria en el lado de la compra, no la del sistema bancario.
 - **Nombrar una clave ajena en un `select` de PostgREST es una dependencia contra
   el esquema.** `tabla!nombre_de_la_restriccion(...)` deja de funcionar si esa
   restricción se renombra o se retira, y como vive dentro de una cadena de texto
