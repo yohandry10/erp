@@ -172,6 +172,22 @@ export class TaxCalculatorService {
    * 
    * @private
    */
+  /**
+   * La tasa que el contribuyente declara en `empresa_config`, normalizada a
+   * tanto por uno. `null` si no la declara o si es un valor que no se puede
+   * usar; en ese caso se hereda la del país, que es lo que había antes.
+   *
+   * Se distingue «no hay dato» de un 0 escrito a propósito --exonerado por la
+   * Ley de Amazonía--, porque `Number(null)` vale 0 y confundirlos cobraría un
+   * impuesto a quien no debe pagarlo.
+   */
+  private tasaDeclaradaPorElContribuyente(valor: unknown): number | null {
+    if (valor === null || valor === undefined || valor === '') return null;
+    const porcentaje = Number(valor);
+    if (!Number.isFinite(porcentaje) || porcentaje < 0 || porcentaje > 100) return null;
+    return porcentaje > 1 ? porcentaje / 100 : porcentaje;
+  }
+
   async getTaxConfig(tenantId: string, paisId?: string): Promise<TaxConfig> {
     const cacheKey = `${tenantId}:${paisId || 'default'}`;
 
@@ -184,6 +200,23 @@ export class TaxCalculatorService {
     try {
       // Obtener país del tenant si no se proporciona
       let paisIdToUse = paisId;
+      // `null` mientras no se sepa; 0 es una tasa valida y no un hueco.
+      let tasaDelContribuyente: number | null = null;
+
+      if (paisIdToUse) {
+        // Con el pais ya resuelto no hace falta consultar `empresa_config` para
+        // saberlo, pero si para la tasa del contribuyente. Se consulta aparte y
+        // sin propagar el fallo: quien pasa el pais explicitamente puede estar
+        // calculando para un tenant que aun no tiene configuracion, y antes esa
+        // llamada funcionaba. Si no se puede leer, se hereda la del pais.
+        const { data: soloTasa } = await this.supabase.getClient()
+          .from('empresa_config')
+          .select('igv_porcentaje')
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+        tasaDelContribuyente = this.tasaDeclaradaPorElContribuyente(soloTasa?.igv_porcentaje);
+      }
+
       if (!paisIdToUse) {
         // El error de esta consulta se descartaba y `|| 1` resolvía Perú en
         // silencio. Con `empresa_config` sin índice único por tenant, una fila
@@ -191,7 +224,11 @@ export class TaxCalculatorService {
         // la configuración peruana. El país del contribuyente no se adivina.
         const { data: empresaConfig, error: empresaError } = await this.supabase.getClient()
           .from('empresa_config')
-          .select('pais_id')
+          // Se trae tambien la tasa del contribuyente: es la que aplica la RPC
+          // de venta y, desde la 522, toda la cadena SQL. Sin ella aqui,
+          // cotizaciones, pedidos y el CPE que se arma desde un pedido
+          // calculaban con la del pais y discrepaban del resto del servidor.
+          .select('pais_id, igv_porcentaje')
           .eq('tenant_id', tenantId)
           .maybeSingle();
 
@@ -207,6 +244,7 @@ export class TaxCalculatorService {
         }
 
         paisIdToUse = String(empresaConfig.pais_id);
+        tasaDelContribuyente = this.tasaDeclaradaPorElContribuyente(empresaConfig.igv_porcentaje);
       }
 
       // Consultar configuración fiscal con las columnas correctas
@@ -277,7 +315,10 @@ export class TaxCalculatorService {
 
       const config: TaxConfig = {
         // Cero es una tasa válida; `||` la reemplazaba indebidamente por 18 %.
-        tasaIgv: tasaNormalizada,
+        // La del contribuyente manda sobre la del país: `configuracion_fiscal`
+        // aporta el país, la moneda y el nombre, y la tasa sólo cuando el
+        // contribuyente no declara la suya.
+        tasaIgv: tasaDelContribuyente ?? tasaNormalizada,
         pais: paisData.codigo_iso,
         moneda: paisData.moneda_codigo,
         nombreImpuesto: data?.impuesto_principal_nombre || 'IGV',
