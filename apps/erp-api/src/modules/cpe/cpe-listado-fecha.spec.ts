@@ -48,4 +48,24 @@ describe('fecha de un comprobante en el listado', () => {
     expect(fechaDeDocumentoEnPais('', LIMA)).toBe('');
     expect(fechaDeDocumentoEnPais('ayer', LIMA)).toBe('');
   });
+
+  it('una fecha guardada como timestamptz a medianoche UTC tampoco se mueve', () => {
+    // El caso real, y el que se escapó al primer arreglo: `cpe.fecha_emision`
+    // es `timestamp with time zone` y guarda `2026-08-28 00:00:00+00`, que
+    // PostgREST serializa con desfase explícito. La expresión anterior sólo
+    // aceptaba la fecha pelada o con hora sin desfase, así que esto caía a la
+    // conversión y volvía a restar un día. Verificado contra producción: el XML
+    // declaraba 2026-08-28 y el listado seguía diciendo 2026-08-27.
+    expect(fechaDeDocumentoEnPais('2026-08-28T00:00:00+00:00', LIMA)).toBe('2026-08-28');
+    expect(fechaDeDocumentoEnPais('2026-08-28 00:00:00+00', LIMA)).toBe('2026-08-28');
+    expect(fechaDeDocumentoEnPais('2026-08-28T00:00:00.000Z', LIMA)).toBe('2026-08-28');
+  });
+
+  it('pero un instante real de medianoche en otro huso sí se convierte', () => {
+    // Medianoche **de Lima** es un instante, no una fecha: son las 05:00 UTC.
+    // Sólo se considera «fecha» la medianoche en UTC, que es como Postgres
+    // guarda una fecha pura en esta base.
+    expect(fechaDeDocumentoEnPais('2026-08-29T00:00:00-05:00', LIMA)).toBe('2026-08-29');
+    expect(fechaDeDocumentoEnPais('2026-08-29T02:00:00+00:00', LIMA)).toBe('2026-08-28');
+  });
 });

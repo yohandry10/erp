@@ -939,8 +939,13 @@ productivo autorizado.
   2026-08-28. La conversión no se puede quitar sin más —se introdujo por el
   problema contrario, un comprobante emitido a las 20:15 de Lima salía fechado
   al día siguiente—, hay que distinguir la fecha del instante:
-  `fechaDeDocumentoEnPais` devuelve tal cual lo que ya es `YYYY-MM-DD` y sólo
-  convierte lo que lleva hora. El XML y la vista A4 nunca estuvieron afectados:
+  `fechaDeDocumentoEnPais` devuelve tal cual lo que ya es una fecha y sólo
+  convierte lo que es un instante. **La columna es `timestamptz`**, así que
+  PostgREST la serializa como `2026-08-28T00:00:00+00:00`: hay que aceptar
+  también esa forma. El primer intento sólo cubría la fecha pelada y el listado
+  siguió restando un día hasta que se comprobó de punta a punta contra el XML.
+  Medianoche **en UTC** es como Postgres guarda aquí una fecha pura; medianoche
+  en otro huso sí es un instante y se convierte. El XML y la vista A4 nunca estuvieron afectados:
   la A4 formatea por texto, sin `new Date`.
 - **La semilla de demo es el único escritor que no declara la afectación.**
   `demo_business_seed_v1` (migración 519) escribe `documento_detalles` sin
