@@ -976,6 +976,20 @@ productivo autorizado.
   cabecera lo hacía con `formatAbsAmount`; al unificar las dos ramas hubo que
   llevar esa normalización a los ayudantes comunes (`baseAbsoluta`).
 
+- **`TaxCalculatorService` también lee la del contribuyente.** La 522 unificó el
+  lado SQL, pero el calculador de TypeScript seguía leyendo sólo
+  `configuracion_fiscal`, y es el que usan cotizaciones, pedidos y la
+  construcción del CPE desde un pedido. Ahora la tasa del contribuyente manda
+  y `configuracion_fiscal` aporta el país, la moneda, el nombre del impuesto y
+  la tasa por defecto. También cuando el llamante pasa `paisId` explícito, vía
+  por la que se saltaba la consulta (hoy nadie lo pasa, pero era el mismo hueco
+  latente).
+- **`GET /api/configuracion-fiscal` tiene una rama muerta.** Devuelve
+  directamente la fila de `configuracion_fiscal` del tenant si existe, saltándose
+  el calculador. No existe: las 5 filas son globales (`tenant_id IS NULL`) y
+  **nada en el código crea filas por tenant** —los únicos INSERT son las semillas
+  por país—. Si algún día se crearan, esa rama volvería a introducir una segunda
+  fuente para la tasa.
 - **La tasa de impuesto tiene una sola fuente: `empresa_config.igv_porcentaje`
   (migración 522).** Había **tres** ramas leyéndola de sitios distintos: la RPC
   de venta del POS (451) de `empresa_config`; las cotizaciones y pedidos de
