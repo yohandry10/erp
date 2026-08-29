@@ -942,6 +942,14 @@ productivo autorizado.
   `fechaDeDocumentoEnPais` devuelve tal cual lo que ya es `YYYY-MM-DD` y sólo
   convierte lo que lleva hora. El XML y la vista A4 nunca estuvieron afectados:
   la A4 formatea por texto, sin `new Date`.
+- **La semilla de demo es el único escritor que no declara la afectación.**
+  `demo_business_seed_v1` (migración 519) escribe `documento_detalles` sin
+  `afectacion_igv` en el metadata, igual que hacía el POS antes de la 521. Hoy
+  es inofensivo porque **todas sus líneas son gravadas** —67 en producción, 0
+  sin IGV—, así que el respaldo `igv > 0 ? '10' : '20'` acierta. Dejaría de
+  serlo en cuanto la semilla incluya un producto exonerado, inafecto o de
+  exportación: una nota de crédito sobre esa factura demo lo declararía como
+  exonerado. Sólo afecta a contribuyentes de demostración.
 - **El detalle del documento guarda su afectación (migración 521).**
   `crear_nota_referenciada_legacy_494` clasifica cada línea de una nota leyendo
   `documento_detalles.metadata->>'afectacion_igv'`, y el camino del POS
