@@ -96,8 +96,18 @@ export function fechaDeDocumentoEnPais(valor: unknown, zonaHoraria: string): str
   const texto = String(valor ?? '').trim();
   if (!texto) return '';
 
-  // `2026-08-28` o `2026-08-28 00:00:00` sin zona: es una fecha, no un instante.
-  const fechaPura = /^(\d{4}-\d{2}-\d{2})(?:[ T]00:00(?::00(?:\.0+)?)?)?$/.exec(texto);
+  // Una fecha, no un instante. Tres formas de la misma cosa:
+  //   `2026-08-28`                    la fecha pelada
+  //   `2026-08-28 00:00:00`           con hora, sin desfase
+  //   `2026-08-28T00:00:00+00:00`     lo que devuelve PostgREST, porque
+  //                                   `cpe.fecha_emision` es `timestamptz` y
+  //                                   Postgres guarda la fecha como medianoche
+  //
+  // Medianoche **en UTC** es como se guarda aqui una fecha pura; medianoche en
+  // otro huso si es un instante y se convierte. La forma con desfase se escapo
+  // del primer arreglo y el listado seguia restando un dia.
+  const fechaPura =
+    /^(\d{4}-\d{2}-\d{2})(?:[ T]00:00(?::00(?:\.0+)?)?(?:Z|[+-]00(?::?00)?)?)?$/.exec(texto);
   if (fechaPura) return fechaPura[1];
 
   const instante = new Date(texto);
