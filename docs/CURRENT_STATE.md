@@ -976,7 +976,23 @@ productivo autorizado.
   cabecera lo hacía con `formatAbsAmount`; al unificar las dos ramas hubo que
   llevar esa normalización a los ayudantes comunes (`baseAbsoluta`).
 
-- **La tasa de impuesto tiene una sola fuente: `empresa_config.igv_porcentaje`.**
+- **La tasa de impuesto tiene una sola fuente: `empresa_config.igv_porcentaje`
+  (migración 522).** Había **tres** ramas leyéndola de sitios distintos: la RPC
+  de venta del POS (451) de `empresa_config`; las cotizaciones y pedidos de
+  venta (441) y toda la cadena de compras (439/440/444/453) de
+  `app.tasa_impuesto_tenant`, que prefería `configuracion_fiscal` por país; y el
+  navegador de una constante de `lib/initial-country`. Comprobado en producción
+  el 2026-08-28 con un tenant al 10 %: ventas 10,00 y compras 18,00 en el mismo
+  instante. Que discrepen es peor que cualquiera por separado, porque el crédito
+  fiscal de las compras deja de cuadrar con el débito de las ventas y nadie
+  denuncia el descuadre. La 522 invierte la preferencia de
+  `app.tasa_impuesto_tenant`: primero la del contribuyente —con `IS NOT NULL`, no
+  `coalesce`, porque **0 es una tasa** (Ley de Amazonía) y no un hueco— y
+  `configuracion_fiscal` como valor por defecto del país. Los 79 contribuyentes
+  de producción estaban alineados a 18,00, así que no cambió ningún importe: sólo
+  cierra el hueco. El rango imposible no lo guarda ni la tabla
+  (`ck_empresa_config_financial_runtime` acota a 0..100).
+- **La tasa que se exhibe es la misma que se cobra.**
   La RPC de venta del POS siempre calculó con ella; el navegador usaba una
   constante por país en `lib/initial-country`. Mientras coincidieran no se
   notaba, y por defecto coinciden (PE 18, AR 21, CO 19). En cuanto no —el
