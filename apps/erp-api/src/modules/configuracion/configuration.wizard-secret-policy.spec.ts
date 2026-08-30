@@ -57,7 +57,7 @@ describe('ConfigurationService - secretos del progreso del wizard', () => {
     const sameIntentWithOtherKey = (serviceWithOtherKey as any)
       .configurationIntentFingerprint({ tenantId, certificatePassword: 'secreto-a' });
 
-    expect(first).toMatch(/^[0-9a-f]{64}$/u);
+    expect(first).toMatch(/^hmac-v1:[0-9a-f]{64}$/u);
     expect(replay).toBe(first);
     expect(changedSecret).not.toBe(first);
     expect(sameIntentWithOtherKey).not.toBe(first);

@@ -323,53 +323,6 @@ $function$;
 REVOKE ALL ON FUNCTION app.cpe_dian_acceptance_guard_528()
 FROM PUBLIC, anon, authenticated, service_role;
 
--- Una promoción 525 -> 528 no puede grandfatherizar aceptaciones débiles.
--- Si existe una fila real CO ya aceptada sin el contrato estricto completo,
--- se aborta la migración para investigarla/remediarla antes del despliegue.
--- El lock cierra la ventana TOCTOU: ningún writer puede confirmar una
--- aceptación bajo 525 entre el preflight y la instalación del trigger 528.
-LOCK TABLE public.cpe IN SHARE ROW EXCLUSIVE MODE;
-
-DO $preflight$
-DECLARE
-  v_invalid_cpe uuid;
-BEGIN
-  SELECT c.id INTO v_invalid_cpe
-  FROM public.cpe c
-  WHERE c.simulated_origin IS FALSE
-    AND upper(coalesce(c.issuer_snapshot->>'country_code', '')) = 'CO'
-    AND (
-      upper(btrim(coalesce(c.estado::text, ''))) = 'ACEPTADO'
-      OR upper(btrim(coalesce(c.estado_sunat::text, ''))) = 'ACEPTADO'
-      OR upper(btrim(coalesce(c.sunat_status::text, ''))) = 'ACCEPTED'
-      OR upper(coalesce(c.fiscal_authority_evidence->>'status', '')) = 'ACCEPTED'
-    )
-    AND NOT app.cpe_dian_acceptance_contract_valid_528(
-      c.id, c.tenant_id, c.metadata, c.cdr_sunat
-    )
-  LIMIT 1;
-
-  IF v_invalid_cpe IS NOT NULL THEN
-    RAISE EXCEPTION 'MIGRATION_528_EXISTING_DIAN_ACCEPTANCE_UNVERIFIED:%',
-      v_invalid_cpe USING ERRCODE = '23514';
-  END IF;
-END;
-$preflight$;
-
-DROP TRIGGER IF EXISTS trg_cpe_dian_acceptance_guard_528 ON public.cpe;
-DROP TRIGGER IF EXISTS trg_zz_cpe_dian_acceptance_guard_528 ON public.cpe;
--- El prefijo `zz` es deliberado: PostgreSQL ejecuta triggers del mismo tipo
--- por nombre. Debe correr después del normalizador 218 y del guard 525 para
--- validar el estado canónico/materializado y aun así abortar toda la fila si
--- falta la evidencia DIAN estricta.
-CREATE TRIGGER trg_zz_cpe_dian_acceptance_guard_528
-BEFORE UPDATE OF estado, estado_sunat, sunat_status, metadata, cdr_sunat
-ON public.cpe
-FOR EACH ROW EXECUTE FUNCTION app.cpe_dian_acceptance_guard_528();
-
-COMMENT ON FUNCTION app.cpe_dian_acceptance_guard_528() IS
-  'Impide aceptar o degradar evidencia de CPE CO reales sin código DIAN 00, ApplicationResponse único, firma de autoridad confiable y CUFE/CUDE exactamente correlacionado con el XML sellado.';
-
 -- El progreso del wizard es estado visual, no una bóveda. La API aplica la
 -- misma allowlist, pero la frontera SQL también debe sanear tanto entradas
 -- nuevas como JSON histórico antes de mezclarlo, devolverlo o auditarlo.
@@ -556,6 +509,39 @@ BEFORE INSERT OR UPDATE OF configuracion_temporal
 ON public.wizard_progress
 FOR EACH ROW EXECUTE FUNCTION app.wizard_progress_sanitize_guard_528();
 
+CREATE OR REPLACE FUNCTION app.configuration_wizard_intent_result_sanitize_528(
+  p_operation text,
+  p_result jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = pg_catalog, public, app, pg_temp
+AS $function$
+DECLARE
+  v_operation text := upper(btrim(coalesce(p_operation, '')));
+  v_result jsonb := coalesce(p_result, '{}'::jsonb);
+BEGIN
+  IF jsonb_typeof(v_result#>'{progress,configuracion_temporal}') = 'object' THEN
+    v_result := jsonb_set(
+      v_result, '{progress,configuracion_temporal}',
+      app.wizard_temporary_config_sanitize_528(
+        v_result#>'{progress,configuracion_temporal}'
+      ), false
+    );
+  END IF;
+  IF v_operation = 'WIZARD_COMPLETE'
+     AND jsonb_typeof(v_result->'configuracion') = 'object' THEN
+    v_result := jsonb_set(
+      v_result, '{configuracion}',
+      app.safe_empresa_config_464(v_result->'configuracion'), false
+    );
+  END IF;
+  RETURN v_result;
+END;
+$function$;
+
 CREATE OR REPLACE FUNCTION app.sanitize_wizard_storage_528()
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -627,27 +613,29 @@ BEGIN
     AND coalesce(a.metadata->>'accion', '') IN (
       'GUARDAR_PASO_WIZARD', 'COMPLETAR_WIZARD'
     )
-    AND a.metadata ? 'fingerprint';
+    AND coalesce(a.metadata->>'fingerprint', '') ~ '^[0-9a-f]{64}$';
   GET DIAGNOSTICS v_legacy_fingerprint_audit = ROW_COUNT;
 
   UPDATE public.configuration_operation_intents i
-  SET result = jsonb_set(
-        i.result, '{progress,configuracion_temporal}',
-        app.wizard_temporary_config_sanitize_528(
-          i.result#>'{progress,configuracion_temporal}'
-        ), false
+  SET result = app.configuration_wizard_intent_result_sanitize_528(
+        i.operation, i.result
       ),
       updated_at = now()
-  WHERE i.operation = 'WIZARD_STEP'
-    AND jsonb_typeof(i.result#>'{progress,configuracion_temporal}') = 'object'
-    AND i.result#>'{progress,configuracion_temporal}' IS DISTINCT FROM
-      app.wizard_temporary_config_sanitize_528(
-        i.result#>'{progress,configuracion_temporal}'
+  WHERE i.operation IN ('WIZARD_STEP', 'WIZARD_COMPLETE')
+    AND i.result IS DISTINCT FROM
+      app.configuration_wizard_intent_result_sanitize_528(
+        i.operation, i.result
       );
   GET DIAGNOSTICS v_intents = ROW_COUNT;
 
-  DELETE FROM public.configuration_operation_intents i
-  WHERE i.operation IN ('WIZARD_STEP', 'WIZARD_COMPLETE');
+  -- La key y el resultado son parte del contrato de idempotencia y no se
+  -- eliminan: un retry que cruce el despliegue debe recibir el mismo resultado
+  -- sin volver a escribir outbox. Sólo se destruye la huella legacy sensible.
+  UPDATE public.configuration_operation_intents i
+  SET intent_fingerprint = 'legacy-redacted-v1',
+      updated_at = now()
+  WHERE i.operation IN ('WIZARD_STEP', 'WIZARD_COMPLETE')
+    AND i.intent_fingerprint ~ '^[0-9a-f]{64}$';
   GET DIAGNOSTICS v_legacy_fingerprint_intents = ROW_COUNT;
 
   RETURN jsonb_build_object(
@@ -655,12 +643,163 @@ BEGIN
     'audit_log', v_audit,
     'configuration_operation_intents', v_intents,
     'legacy_fingerprint_audit_purged', v_legacy_fingerprint_audit,
-    'legacy_fingerprint_intents_purged', v_legacy_fingerprint_intents
+    'legacy_fingerprint_intents_redacted', v_legacy_fingerprint_intents
   );
 END;
 $function$;
 
+-- Sólo los intents históricos cuyo digest fue destruido usan este sentinel.
+-- En ese caso la idempotency key ya representa una operación consumida y su
+-- resultado se devuelve sin comparar el payload nuevo. Ninguna fila nueva se
+-- puede crear con el sentinel mediante los RPC públicos de este release.
+CREATE OR REPLACE FUNCTION app.configuration_intent_replay_464(
+  p_scope_type text,
+  p_scope_id text,
+  p_operation text,
+  p_idempotency_key text,
+  p_fingerprint text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, app, pg_temp
+AS $function$
+DECLARE
+  v_scope_type text := upper(btrim(COALESCE(p_scope_type, '')));
+  v_scope_id text := lower(btrim(COALESCE(p_scope_id, '')));
+  v_operation text := upper(btrim(COALESCE(p_operation, '')));
+  v_key text := lower(btrim(COALESCE(p_idempotency_key, '')));
+  v_row public.configuration_operation_intents;
+BEGIN
+  IF v_scope_type NOT IN ('TENANT', 'PLATFORM', 'USER', 'DEMO')
+     OR v_scope_id = ''
+     OR v_operation = ''
+     OR length(v_key) NOT BETWEEN 8 AND 255
+     OR p_fingerprint IS NULL THEN
+    RAISE EXCEPTION 'CONFIGURATION_IDEMPOTENCY_REQUEST_INVALID'
+      USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended(
+    'configuration:' || v_scope_type || ':' || v_scope_id || ':'
+      || v_operation || ':' || v_key,
+    464
+  ));
+
+  SELECT * INTO v_row
+  FROM public.configuration_operation_intents i
+  WHERE i.scope_type = v_scope_type
+    AND i.scope_id = v_scope_id
+    AND i.operation = v_operation
+    AND i.idempotency_key = v_key
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+  IF v_row.intent_fingerprint = 'legacy-redacted-v1'
+     AND v_operation IN ('WIZARD_STEP', 'WIZARD_COMPLETE') THEN
+    RETURN v_row.result || jsonb_build_object('idempotent', true);
+  END IF;
+  IF v_row.intent_fingerprint IS DISTINCT FROM p_fingerprint THEN
+    RAISE EXCEPTION 'CONFIGURATION_IDEMPOTENCY_CONFLICT' USING ERRCODE = '23505';
+  END IF;
+  RETURN v_row.result || jsonb_build_object('idempotent', true);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION app.configuration_intent_finish_464(
+  p_tenant_id uuid,
+  p_scope_type text,
+  p_scope_id text,
+  p_operation text,
+  p_idempotency_key text,
+  p_fingerprint text,
+  p_result jsonb
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, app, pg_temp
+AS $function$
+DECLARE
+  v_operation text := upper(btrim(coalesce(p_operation, '')));
+BEGIN
+  IF (v_operation = 'WIZARD_STEP'
+      AND coalesce(p_fingerprint, '') !~ '^step-v1:[0-9a-f]{64}$')
+     OR (v_operation = 'WIZARD_COMPLETE'
+      AND coalesce(p_fingerprint, '')
+            !~ '^(hmac-v1|db-public-v1):[0-9a-f]{64}$') THEN
+    RAISE EXCEPTION 'CONFIGURATION_WIZARD_FINGERPRINT_INVALID'
+      USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.configuration_operation_intents (
+    tenant_id, scope_type, scope_id, operation, idempotency_key,
+    intent_fingerprint, result
+  ) VALUES (
+    p_tenant_id,
+    upper(btrim(p_scope_type)),
+    lower(btrim(p_scope_id)),
+    v_operation,
+    lower(btrim(p_idempotency_key)),
+    p_fingerprint,
+    COALESCE(p_result, '{}'::jsonb)
+  );
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION app.configuration_wizard_intent_guard_528()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, app, pg_temp
+AS $function$
+DECLARE
+  v_operation text := upper(btrim(coalesce(NEW.operation, '')));
+  v_fingerprint text := coalesce(NEW.intent_fingerprint, '');
+BEGIN
+  IF v_operation NOT IN ('WIZARD_STEP', 'WIZARD_COMPLETE') THEN
+    RETURN NEW;
+  END IF;
+
+  IF v_fingerprint = 'legacy-redacted-v1' THEN
+    IF TG_OP = 'INSERT' THEN
+      RAISE EXCEPTION 'CONFIGURATION_WIZARD_SENTINEL_FORBIDDEN'
+        USING ERRCODE = '22023';
+    ELSIF coalesce(OLD.intent_fingerprint, '') <> 'legacy-redacted-v1'
+       AND coalesce(OLD.intent_fingerprint, '') !~ '^[0-9a-f]{64}$' THEN
+      RAISE EXCEPTION 'CONFIGURATION_WIZARD_SENTINEL_FORBIDDEN'
+        USING ERRCODE = '22023';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF (v_operation = 'WIZARD_STEP'
+      AND v_fingerprint !~ '^step-v1:[0-9a-f]{64}$')
+     OR (v_operation = 'WIZARD_COMPLETE'
+      AND v_fingerprint !~ '^(hmac-v1|db-public-v1):[0-9a-f]{64}$') THEN
+    RAISE EXCEPTION 'CONFIGURATION_WIZARD_FINGERPRINT_INVALID'
+      USING ERRCODE = '22023';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+-- Espera cualquier writer legacy ya iniciado, sanea también esas filas y
+-- mantiene el lock hasta COMMIT; al liberarlo, helper y RPCs nuevos ya son
+-- visibles y el trigger impide volver a introducir huellas sin versión.
+LOCK TABLE public.configuration_operation_intents
+IN SHARE ROW EXCLUSIVE MODE;
+
 SELECT app.sanitize_wizard_storage_528();
+
+DROP TRIGGER IF EXISTS trg_configuration_wizard_intent_guard_528
+ON public.configuration_operation_intents;
+CREATE TRIGGER trg_configuration_wizard_intent_guard_528
+BEFORE INSERT OR UPDATE OF operation, intent_fingerprint
+ON public.configuration_operation_intents
+FOR EACH ROW EXECUTE FUNCTION app.configuration_wizard_intent_guard_528();
 
 CREATE OR REPLACE FUNCTION public.guardar_paso_wizard_config_tx(
   p_tenant_id uuid,
@@ -691,9 +830,9 @@ BEGIN
   v_configuration := app.wizard_temporary_config_sanitize_528(
     coalesce(p_configuracion_temporal, '{}'::jsonb)
   );
-  v_fingerprint := app.configuration_fingerprint_464(jsonb_build_object(
-    'step', p_paso_actual, 'configuration', v_configuration
-  ));
+  v_fingerprint := 'step-v1:' || app.configuration_fingerprint_464(
+    jsonb_build_object('step', p_paso_actual, 'configuration', v_configuration)
+  );
   v_replay := app.configuration_intent_replay_464(
     'TENANT', p_tenant_id::text, 'WIZARD_STEP', p_idempotency_key, v_fingerprint
   );
@@ -753,6 +892,150 @@ BEGIN
 END;
 $function$;
 
+-- El runtime nuevo firma los intents del cierre con HMAC y los versiona. La
+-- validación estricta hace que un runtime anterior (SHA-256 desnudo) falle
+-- cerrado durante el despliegue DB-first, en vez de volver a persistir un
+-- fingerprint apto para ataque offline. El único llamador SQL heredado es el
+-- aprovisionamiento demo y sólo puede usar su parche público, exacto y sin
+-- secretos; se conserva con un namespace separado para no fingir que es HMAC.
+CREATE OR REPLACE FUNCTION public.completar_wizard_config_tx(
+  p_tenant_id uuid,
+  p_actor_id uuid,
+  p_idempotency_key text,
+  p_patch jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, app, extensions, pg_temp
+AS $function$
+DECLARE
+  v_fingerprint text;
+  v_patch jsonb;
+  v_replay jsonb;
+  v_old jsonb;
+  v_new jsonb;
+  v_wizard public.wizard_progress;
+  v_result jsonb;
+BEGIN
+  PERFORM app.assert_configuration_actor_464(p_tenant_id, p_actor_id, false);
+  IF jsonb_typeof(COALESCE(p_patch, '{}'::jsonb)) <> 'object' THEN
+    RAISE EXCEPTION 'CONFIGURATION_WIZARD_PATCH_INVALID' USING ERRCODE = '22023';
+  END IF;
+
+  v_patch := COALESCE(p_patch, '{}'::jsonb) - '_intent_fingerprint';
+  IF p_patch ? '_intent_fingerprint' THEN
+    IF COALESCE(p_patch->>'_intent_fingerprint', '')
+         !~ '^hmac-v1:[0-9a-f]{64}$' THEN
+      RAISE EXCEPTION 'CONFIGURATION_WIZARD_FINGERPRINT_INVALID'
+        USING ERRCODE = '22023';
+    END IF;
+    v_fingerprint := p_patch->>'_intent_fingerprint';
+  ELSE
+    IF (SELECT count(*) FROM jsonb_object_keys(v_patch)) <> 3
+       OR NOT (v_patch ?& ARRAY['pais', 'pais_id', 'moneda_defecto'])
+       OR COALESCE(v_patch->>'pais', '') !~ '^[A-Z]{2}$'
+       OR COALESCE(v_patch->>'pais_id', '') !~ '^[0-9]{1,19}$'
+       OR COALESCE(v_patch->>'moneda_defecto', '') !~ '^[A-Z]{3}$' THEN
+      RAISE EXCEPTION 'CONFIGURATION_WIZARD_FINGERPRINT_REQUIRED'
+        USING ERRCODE = '22023';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.paises p
+      JOIN public.empresa_config ec
+        ON ec.tenant_id = p_tenant_id
+       AND coalesce(ec.is_demo, false)
+      WHERE p.id::text = v_patch->>'pais_id'
+        AND upper(p.codigo_iso) = v_patch->>'pais'
+        AND upper(p.moneda_codigo) = v_patch->>'moneda_defecto'
+        AND p.activo
+    ) THEN
+      RAISE EXCEPTION 'CONFIGURATION_WIZARD_DEMO_COUNTRY_INVALID'
+        USING ERRCODE = '22023';
+    END IF;
+    v_fingerprint := 'db-public-v1:' || app.configuration_fingerprint_464(v_patch);
+  END IF;
+
+  v_replay := app.configuration_intent_replay_464(
+    'TENANT', p_tenant_id::text, 'WIZARD_COMPLETE',
+    p_idempotency_key, v_fingerprint
+  );
+  IF v_replay IS NOT NULL THEN RETURN v_replay; END IF;
+
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('configuration:wizard:' || p_tenant_id::text, 464)
+  );
+  SELECT app.safe_empresa_config_464(to_jsonb(ec.*)) INTO v_old
+  FROM public.empresa_config ec
+  WHERE ec.tenant_id = p_tenant_id
+  FOR UPDATE;
+  IF v_old IS NULL THEN
+    RAISE EXCEPTION 'CONFIGURATION_TENANT_NOT_FOUND' USING ERRCODE = 'P0002';
+  END IF;
+
+  v_new := app.apply_empresa_config_patch_464(
+    p_tenant_id,
+    v_patch || jsonb_build_object(
+      'configuracion_completa', true,
+      'ultima_validacion', now()
+    )
+  );
+  INSERT INTO public.wizard_progress (
+    tenant_id, paso_actual, pasos_completados, configuracion_temporal,
+    completado, completado_at, created_at, updated_at
+  ) VALUES (
+    p_tenant_id, 7, ARRAY[1,2,3,4,5,6,7], '{}'::jsonb,
+    true, now(), now(), now()
+  )
+  ON CONFLICT (tenant_id) DO UPDATE
+  SET paso_actual = 7,
+      pasos_completados = ARRAY[1,2,3,4,5,6,7],
+      configuracion_temporal = '{}'::jsonb,
+      completado = true,
+      completado_at = COALESCE(public.wizard_progress.completado_at, now()),
+      updated_at = now()
+  RETURNING * INTO v_wizard;
+
+  UPDATE public.tenants t
+  SET nombre = COALESCE(v_new->>'razon_social', t.nombre),
+      ruc = COALESCE(v_new->>'ruc', t.ruc),
+      pais = COALESCE(v_new->>'pais', t.pais),
+      updated_at = now()
+  WHERE t.id = p_tenant_id;
+
+  PERFORM app.audit_configuration_464(
+    p_tenant_id, p_actor_id, 'empresa_config', 'UPDATE', p_tenant_id::text,
+    v_old, app.safe_empresa_config_464(v_new), 'COMPLETAR_WIZARD',
+    jsonb_build_object(
+      'idempotency_key', lower(btrim(p_idempotency_key)),
+      'fingerprint', v_fingerprint,
+      'contract_version', 528
+    )
+  );
+  INSERT INTO public.outbox_events (
+    tenant_id, aggregate_type, aggregate_id, event_type,
+    payload, status, idempotency_key
+  ) VALUES (
+    p_tenant_id, 'empresa_config', p_tenant_id::text,
+    'configuracion.wizard.completado',
+    jsonb_build_object('tenant_id', p_tenant_id, 'actor_id', p_actor_id),
+    'pending', 'wizard-complete-464:' || lower(btrim(p_idempotency_key))
+  );
+
+  v_result := jsonb_build_object(
+    'configuracion', app.safe_empresa_config_464(v_new),
+    'progress', to_jsonb(v_wizard),
+    'idempotent', false
+  );
+  PERFORM app.configuration_intent_finish_464(
+    p_tenant_id, 'TENANT', p_tenant_id::text, 'WIZARD_COMPLETE',
+    p_idempotency_key, v_fingerprint, v_result
+  );
+  RETURN v_result;
+END;
+$function$;
+
 REVOKE ALL ON FUNCTION app.wizard_scalar_value_valid_528(jsonb)
 FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION app.wizard_certificate_metadata_sanitize_528(jsonb)
@@ -761,13 +1044,30 @@ REVOKE ALL ON FUNCTION app.wizard_temporary_config_sanitize_528(jsonb)
 FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION app.wizard_progress_sanitize_guard_528()
 FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION app.configuration_wizard_intent_result_sanitize_528(
+  text, jsonb
+) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION app.sanitize_wizard_storage_528()
+FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION app.configuration_intent_replay_464(
+  text, text, text, text, text
+) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION app.configuration_intent_finish_464(
+  uuid, text, text, text, text, text, jsonb
+) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION app.configuration_wizard_intent_guard_528()
 FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.guardar_paso_wizard_config_tx(
   uuid, uuid, text, integer, jsonb
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.guardar_paso_wizard_config_tx(
   uuid, uuid, text, integer, jsonb
+) TO service_role;
+REVOKE ALL ON FUNCTION public.completar_wizard_config_tx(
+  uuid, uuid, text, jsonb
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.completar_wizard_config_tx(
+  uuid, uuid, text, jsonb
 ) TO service_role;
 
 -- Registrar la primera constancia del portal no puede depender de una bandera
@@ -939,6 +1239,52 @@ REVOKE ALL ON FUNCTION public.registrar_habilitacion_dian_tx(
 GRANT EXECUTE ON FUNCTION public.registrar_habilitacion_dian_tx(
   uuid, uuid, text, text
 ) TO service_role;
+
+-- Una promoción 525 -> 528 no puede grandfatherizar aceptaciones débiles.
+-- El trabajo ajeno a CPE (saneo/backfill y RPCs) ya terminó: el lock se toma
+-- sólo para el preflight final y la instalación del guard, minimizando el
+-- tiempo durante el cual se bloquean writers fiscales sin abrir la TOCTOU.
+LOCK TABLE public.cpe IN SHARE ROW EXCLUSIVE MODE;
+
+DO $preflight$
+DECLARE
+  v_invalid_cpe uuid;
+BEGIN
+  SELECT c.id INTO v_invalid_cpe
+  FROM public.cpe c
+  WHERE c.simulated_origin IS FALSE
+    AND upper(coalesce(c.issuer_snapshot->>'country_code', '')) = 'CO'
+    AND (
+      upper(btrim(coalesce(c.estado::text, ''))) = 'ACEPTADO'
+      OR upper(btrim(coalesce(c.estado_sunat::text, ''))) = 'ACEPTADO'
+      OR upper(btrim(coalesce(c.sunat_status::text, ''))) = 'ACCEPTED'
+      OR upper(coalesce(c.fiscal_authority_evidence->>'status', '')) = 'ACCEPTED'
+    )
+    AND NOT app.cpe_dian_acceptance_contract_valid_528(
+      c.id, c.tenant_id, c.metadata, c.cdr_sunat
+    )
+  LIMIT 1;
+
+  IF v_invalid_cpe IS NOT NULL THEN
+    RAISE EXCEPTION 'MIGRATION_528_EXISTING_DIAN_ACCEPTANCE_UNVERIFIED:%',
+      v_invalid_cpe USING ERRCODE = '23514';
+  END IF;
+END;
+$preflight$;
+
+DROP TRIGGER IF EXISTS trg_cpe_dian_acceptance_guard_528 ON public.cpe;
+DROP TRIGGER IF EXISTS trg_zz_cpe_dian_acceptance_guard_528 ON public.cpe;
+-- El prefijo `zz` es deliberado: PostgreSQL ejecuta triggers del mismo tipo
+-- por nombre. Debe correr después del normalizador 218 y del guard 525 para
+-- validar el estado canónico/materializado y aun así abortar toda la fila si
+-- falta la evidencia DIAN estricta.
+CREATE TRIGGER trg_zz_cpe_dian_acceptance_guard_528
+BEFORE UPDATE OF estado, estado_sunat, sunat_status, metadata, cdr_sunat
+ON public.cpe
+FOR EACH ROW EXECUTE FUNCTION app.cpe_dian_acceptance_guard_528();
+
+COMMENT ON FUNCTION app.cpe_dian_acceptance_guard_528() IS
+  'Impide aceptar o degradar evidencia de CPE CO reales sin código DIAN 00, ApplicationResponse único, firma de autoridad confiable y CUFE/CUDE exactamente correlacionado con el XML sellado.';
 
 COMMIT;
 

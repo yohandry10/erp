@@ -69,6 +69,16 @@ BEGIN
     RAISE EXCEPTION 'VERIFY_528_WIZARD_SANITIZER_TRIGGER_MISSING';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger
+    WHERE tgrelid = 'public.configuration_operation_intents'::regclass
+      AND tgname = 'trg_configuration_wizard_intent_guard_528'
+      AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'VERIFY_528_WIZARD_INTENT_TRIGGER_MISSING';
+  END IF;
+
   SELECT pg_get_functiondef(
     'app.wizard_temporary_config_sanitize_528(jsonb)'::regprocedure
   ) INTO v_definition;
@@ -125,6 +135,26 @@ BEGIN
      OR has_function_privilege(
        'service_role',
        'app.sanitize_wizard_storage_528()'::regprocedure,
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'service_role',
+       'app.configuration_wizard_intent_result_sanitize_528(text,jsonb)'::regprocedure,
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'service_role',
+       'app.configuration_intent_replay_464(text,text,text,text,text)'::regprocedure,
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'service_role',
+       'app.configuration_intent_finish_464(uuid,text,text,text,text,text,jsonb)'::regprocedure,
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'service_role',
+       'app.configuration_wizard_intent_guard_528()'::regprocedure,
        'EXECUTE'
      ) THEN
     RAISE EXCEPTION 'VERIFY_528_WIZARD_INTERNAL_FUNCTION_EXPOSED';
@@ -494,10 +524,16 @@ DO $wizard_and_first_attestation$
 DECLARE
   v_tenant uuid := gen_random_uuid();
   v_actor uuid := gen_random_uuid();
+  v_demo_tenant uuid := gen_random_uuid();
+  v_demo_actor uuid := gen_random_uuid();
   v_wizard uuid;
   v_unsafe jsonb;
   v_result jsonb;
   v_rejected boolean := false;
+  v_outbox_before integer := 0;
+  v_outbox_after integer := 0;
+  v_range_case jsonb;
+  v_range_case_index integer := 0;
 BEGIN
   INSERT INTO public.tenants (
     id, codigo, nombre, descripcion, pais, plan, activo, estado
@@ -531,12 +567,18 @@ BEGIN
     )
   );
 
+  -- Simula una fila realmente anterior a 528: el trigger permanente se
+  -- desactiva sólo dentro de este BEGIN/ROLLBACK para probar el backfill.
+  ALTER TABLE public.wizard_progress
+    DISABLE TRIGGER trg_wizard_progress_sanitize_528;
   INSERT INTO public.wizard_progress (
     tenant_id, paso_actual, pasos_completados, configuracion_temporal,
     completado, created_at, updated_at
   ) VALUES (
     v_tenant, 2, ARRAY[1, 2], v_unsafe, false, now(), now()
   ) RETURNING id INTO v_wizard;
+  ALTER TABLE public.wizard_progress
+    ENABLE TRIGGER trg_wizard_progress_sanitize_528;
 
   INSERT INTO public.audit_log (
     tenant_id, user_id, table_name, operation, record_id,
@@ -553,6 +595,8 @@ BEGIN
     )
   );
 
+  ALTER TABLE public.configuration_operation_intents
+    DISABLE TRIGGER trg_configuration_wizard_intent_guard_528;
   INSERT INTO public.configuration_operation_intents (
     tenant_id, scope_type, scope_id, operation, idempotency_key,
     intent_fingerprint, result
@@ -562,6 +606,36 @@ BEGIN
     jsonb_build_object(
       'progress', jsonb_build_object('configuracion_temporal', v_unsafe)
     )
+  );
+
+  INSERT INTO public.configuration_operation_intents (
+    tenant_id, scope_type, scope_id, operation, idempotency_key,
+    intent_fingerprint, result
+  ) VALUES (
+    v_tenant, 'TENANT', v_tenant::text, 'WIZARD_COMPLETE',
+    'verify-historical-complete-528', repeat('c', 64),
+    jsonb_build_object(
+      'legacyMarker', 'complete-528',
+      'configuracion', jsonb_build_object(
+        'pais', 'CO',
+        'razon_social', 'Resultado histórico seguro 528',
+        'dian_software_pin', 'HIST_SECRET_528'
+      ),
+      'progress', jsonb_build_object('configuracion_temporal', v_unsafe),
+      'idempotent', false
+    )
+  );
+  ALTER TABLE public.configuration_operation_intents
+    ENABLE TRIGGER trg_configuration_wizard_intent_guard_528;
+
+  INSERT INTO public.outbox_events (
+    tenant_id, aggregate_type, aggregate_id, event_type,
+    payload, status, idempotency_key
+  ) VALUES (
+    v_tenant, 'empresa_config', v_tenant::text,
+    'configuracion.wizard.completado',
+    jsonb_build_object('tenant_id', v_tenant, 'actor_id', v_actor),
+    'pending', 'wizard-complete-464:verify-historical-complete-528'
   );
 
   v_result := app.sanitize_wizard_storage_528();
@@ -581,12 +655,69 @@ BEGIN
                        'HIST_SECRET_528') > 0
           )
       )
-      OR EXISTS (
+      OR NOT EXISTS (
         SELECT 1 FROM public.configuration_operation_intents i
         WHERE i.tenant_id = v_tenant
           AND i.idempotency_key = 'verify-historical-wizard-528'
+          AND i.intent_fingerprint = 'legacy-redacted-v1'
+          AND strpos(i.result::text, 'HIST_SECRET_528') = 0
+      )
+      OR NOT EXISTS (
+        SELECT 1 FROM public.configuration_operation_intents i
+        WHERE i.tenant_id = v_tenant
+          AND i.idempotency_key = 'verify-historical-complete-528'
+          AND i.intent_fingerprint = 'legacy-redacted-v1'
+          AND i.result->>'legacyMarker' = 'complete-528'
+          AND strpos(i.result::text, 'HIST_SECRET_528') = 0
+          AND NOT (i.result->'configuracion' ? 'dian_software_pin')
+      )
+      OR EXISTS (
+        SELECT 1 FROM public.configuration_operation_intents i
+        WHERE i.tenant_id = v_tenant
+          AND i.operation IN ('WIZARD_STEP', 'WIZARD_COMPLETE')
+          AND i.intent_fingerprint ~ '^[0-9a-f]{64}$'
       ) THEN
     RAISE EXCEPTION 'VERIFY_528_HISTORICAL_WIZARD_SECRET_SURVIVED:%', v_result;
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    INSERT INTO public.configuration_operation_intents (
+      tenant_id, scope_type, scope_id, operation, idempotency_key,
+      intent_fingerprint, result
+    ) VALUES (
+      v_tenant, 'TENANT', v_tenant::text, 'WIZARD_STEP',
+      'verify-direct-legacy-insert-528', repeat('9', 64), '{}'::jsonb
+    );
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    IF SQLERRM <> 'CONFIGURATION_WIZARD_FINGERPRINT_INVALID' THEN RAISE; END IF;
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'VERIFY_528_DIRECT_LEGACY_INTENT_ACCEPTED';
+  END IF;
+
+  v_result := public.guardar_paso_wizard_config_tx(
+    v_tenant, v_actor, 'verify-historical-wizard-528', 7,
+    jsonb_build_object('razonSocial', 'Payload diferente no reejecutable')
+  );
+  IF coalesce((v_result->>'idempotent')::boolean, false) IS NOT TRUE
+     OR strpos(v_result::text, 'Payload diferente no reejecutable') > 0 THEN
+    RAISE EXCEPTION 'VERIFY_528_LEGACY_STEP_REPLAY_BROKEN:%', v_result;
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM app.configuration_intent_finish_464(
+      v_tenant, 'TENANT', v_tenant::text, 'WIZARD_STEP',
+      'verify-sentinel-insert-528', 'legacy-redacted-v1', '{}'::jsonb
+    );
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    IF SQLERRM <> 'CONFIGURATION_WIZARD_FINGERPRINT_INVALID' THEN RAISE; END IF;
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'VERIFY_528_SENTINEL_INSERT_ACCEPTED';
   END IF;
 
   v_result := public.guardar_paso_wizard_config_tx(
@@ -617,13 +748,19 @@ BEGIN
        WHERE i.tenant_id = v_tenant
          AND i.idempotency_key = 'verify-wizard-write-528'
          AND strpos(i.result::text, 'WRITE_SECRET_528') > 0
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM public.configuration_operation_intents i
+       WHERE i.tenant_id = v_tenant
+         AND i.idempotency_key = 'verify-wizard-write-528'
+         AND i.intent_fingerprint ~ '^step-v1:[0-9a-f]{64}$'
      ) THEN
     RAISE EXCEPTION 'VERIFY_528_NEW_WIZARD_SECRET_PERSISTED:%', v_result;
   END IF;
 
-  -- Estado inicial: prueba alcanzable y con trust, pero la numeración aún no
-  -- coincide. No existe aprobación previa; credentialsValidated=false prueba
-  -- que la primera atestación ya no depende circularmente de ella.
+  -- Estado inicial: prueba alcanzable y con trust. La bandera de numeración ya
+  -- es true, pero el rango será deliberadamente distinto; así el negativo
+  -- demuestra la comparación completa y no sólo una bandera booleana.
   INSERT INTO public.empresa_config (
     tenant_id, ruc, razon_social, direccion_fiscal, pais, moneda_defecto,
     estado, configuracion_completa, is_demo, dian_activo,
@@ -645,43 +782,234 @@ BEGIN
     decode('01', 'hex'), 'ENC:CERT-VERIFY-528',
     now(), 'INCOMPLETA', jsonb_build_object(
       'reachable', true,
-      'numberingValidated', false,
+      'numberingValidated', true,
       'credentialsValidated', false,
       'externalApprovalValidated', false,
       'authorityTrust', jsonb_build_object('ready', true),
       'environment', 'PRODUCCION',
       'authorizedRanges', jsonb_build_array(jsonb_build_object(
-        'resolution', '1876405289',
-        'prefix', 'FV528',
-        'from', 1,
-        'to', 999999,
-        'validFrom', (current_date - 30)::text,
-        'validTo', (current_date + 365)::text
+        'resolution', 'RANGO-DISCORDANTE-528',
+        'prefix', 'BAD528',
+        'from', 2,
+        'to', 999998,
+        'validFrom', (current_date - 29)::text,
+        'validTo', (current_date + 364)::text
       ))
     )
   );
 
+  SELECT count(*) INTO v_outbox_before
+  FROM public.outbox_events
+  WHERE tenant_id = v_tenant
+    AND idempotency_key = 'wizard-complete-464:verify-historical-complete-528';
+  v_result := public.completar_wizard_config_tx(
+    v_tenant, v_actor, 'verify-historical-complete-528',
+    jsonb_build_object(
+      'razon_social', 'No debe reejecutarse',
+      '_intent_fingerprint', 'hmac-v1:' || repeat('d', 64)
+    )
+  );
+  SELECT count(*) INTO v_outbox_after
+  FROM public.outbox_events
+  WHERE tenant_id = v_tenant
+    AND idempotency_key = 'wizard-complete-464:verify-historical-complete-528';
+  IF coalesce((v_result->>'idempotent')::boolean, false) IS NOT TRUE
+     OR v_result->>'legacyMarker' <> 'complete-528'
+     OR strpos(v_result::text, 'No debe reejecutarse') > 0
+     OR v_outbox_before <> 1 OR v_outbox_after <> v_outbox_before THEN
+    RAISE EXCEPTION 'VERIFY_528_LEGACY_COMPLETE_REPLAY_BROKEN:%:%:%',
+      v_result, v_outbox_before, v_outbox_after;
+  END IF;
+
+  v_rejected := false;
   BEGIN
-    PERFORM public.registrar_habilitacion_dian_tx(
-      v_tenant, v_actor, 'verify-first-attestation-bad-528',
-      'Portal DIAN aún sin rango coincidente verify 528'
+    PERFORM public.completar_wizard_config_tx(
+      v_tenant, v_actor, 'verify-raw-complete-528',
+      jsonb_build_object(
+        'razon_social', 'SHA legacy no permitido',
+        '_intent_fingerprint', repeat('e', 64)
+      )
     );
-  EXCEPTION WHEN check_violation THEN
-    IF SQLERRM <> 'DIAN_TECHNICAL_VALIDATION_REQUIRED_BEFORE_PORTAL_ATTESTATION' THEN
-      RAISE;
-    END IF;
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    IF SQLERRM <> 'CONFIGURATION_WIZARD_FINGERPRINT_INVALID' THEN RAISE; END IF;
     v_rejected := true;
   END;
-  IF NOT v_rejected
-     OR (SELECT dian_habilitacion_estado IS NOT NULL
-         FROM public.empresa_config WHERE tenant_id = v_tenant) THEN
-    RAISE EXCEPTION 'VERIFY_528_FIRST_ATTESTATION_WEAK_EVIDENCE_ACCEPTED';
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'VERIFY_528_RAW_COMPLETE_FINGERPRINT_ACCEPTED';
   END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM public.completar_wizard_config_tx(
+      v_tenant, v_actor, 'verify-missing-complete-528',
+      jsonb_build_object('razon_social', 'Sin HMAC no permitido')
+    );
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    IF SQLERRM <> 'CONFIGURATION_WIZARD_FINGERPRINT_REQUIRED' THEN RAISE; END IF;
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'VERIFY_528_MISSING_COMPLETE_FINGERPRINT_ACCEPTED';
+  END IF;
+
+  -- Compatibilidad estricta con el único llamador SQL heredado del seed demo.
+  INSERT INTO public.tenants (
+    id, codigo, nombre, descripcion, ruc, pais, plan, activo, estado
+  ) VALUES (
+    v_demo_tenant, 'VERIFY-528-DEMO-' || left(v_demo_tenant::text, 8),
+    'Tenant demo configuración verify 528', 'Fixture demo transaccional',
+    '900123456-8', 'CO', 'test', true, 'ACTIVO'
+  );
+  INSERT INTO public.usuarios_sistema (
+    id, tenant_id, nombre, apellido, email, nombre_usuario,
+    password_hash, activo, estado, is_super_admin
+  ) VALUES (
+    v_demo_actor, v_demo_tenant, 'Actor Demo', 'Verify 528',
+    'actor-demo-528-' || left(v_demo_actor::text, 8) || '@local.invalid',
+    'actordemo528-' || left(v_demo_actor::text, 8),
+    'unused-local-hash', true, 'ACTIVO', false
+  );
+  INSERT INTO public.empresa_config (
+    tenant_id, ruc, razon_social, direccion_fiscal, pais, pais_id,
+    moneda_defecto, estado, configuracion_completa, is_demo, dian_environment
+  ) VALUES (
+    v_demo_tenant, '900123456-8', 'Empresa Demo Colombia S.A.S.',
+    'Carrera 7 # 72-41, Bogotá D.C.', 'CO',
+    (SELECT p.id FROM public.paises p
+     WHERE upper(p.codigo_iso) = 'CO' AND p.activo LIMIT 1),
+    'COP', 'ACTIVO', false, true, 'HOMOLOGACION'
+  );
+  v_result := public.completar_wizard_config_tx(
+    v_demo_tenant, v_demo_actor, 'verify-demo-public-complete-528',
+    jsonb_build_object(
+      'pais', 'CO',
+      'pais_id', (SELECT p.id FROM public.paises p
+                  WHERE upper(p.codigo_iso) = 'CO' AND p.activo LIMIT 1),
+      'moneda_defecto', 'COP'
+    )
+  );
+  IF coalesce((v_result->>'idempotent')::boolean, true) IS NOT FALSE
+     OR NOT EXISTS (
+       SELECT 1 FROM public.configuration_operation_intents i
+       WHERE i.tenant_id = v_demo_tenant
+         AND i.idempotency_key = 'verify-demo-public-complete-528'
+         AND i.intent_fingerprint ~ '^db-public-v1:[0-9a-f]{64}$'
+     ) THEN
+    RAISE EXCEPTION 'VERIFY_528_DEMO_PUBLIC_COMPLETION_BROKEN:%', v_result;
+  END IF;
+
+  v_result := public.completar_wizard_config_tx(
+    v_tenant, v_actor, 'verify-hmac-complete-528',
+    jsonb_build_object(
+      'razon_social', 'Emisor HMAC verify 528',
+      '_intent_fingerprint', 'hmac-v1:' || repeat('f', 64)
+    )
+  );
+  IF coalesce((v_result->>'idempotent')::boolean, true) IS NOT FALSE
+     OR NOT EXISTS (
+       SELECT 1 FROM public.configuration_operation_intents i
+       WHERE i.tenant_id = v_tenant
+         AND i.idempotency_key = 'verify-hmac-complete-528'
+         AND i.intent_fingerprint ~ '^hmac-v1:[0-9a-f]{64}$'
+     ) THEN
+    RAISE EXCEPTION 'VERIFY_528_HMAC_COMPLETION_NOT_PERSISTED:%', v_result;
+  END IF;
+  v_result := public.completar_wizard_config_tx(
+    v_tenant, v_actor, 'verify-hmac-complete-528',
+    jsonb_build_object(
+      'razon_social', 'Emisor HMAC verify 528',
+      '_intent_fingerprint', 'hmac-v1:' || repeat('f', 64)
+    )
+  );
+  IF coalesce((v_result->>'idempotent')::boolean, false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'VERIFY_528_HMAC_COMPLETION_NOT_IDEMPOTENT:%', v_result;
+  END IF;
+
+  FOR v_range_case IN
+    SELECT value
+    FROM jsonb_array_elements(jsonb_build_array(
+      jsonb_build_object(
+        'resolution', 'BAD-RESOLUTION-528', 'prefix', 'FV528',
+        'from', 1, 'to', 999999,
+        'validFrom', (current_date - 30)::text,
+        'validTo', (current_date + 365)::text
+      ),
+      jsonb_build_object(
+        'resolution', '1876405289', 'prefix', 'BAD528',
+        'from', 1, 'to', 999999,
+        'validFrom', (current_date - 30)::text,
+        'validTo', (current_date + 365)::text
+      ),
+      jsonb_build_object(
+        'resolution', '1876405289', 'prefix', 'FV528',
+        'from', 2, 'to', 999999,
+        'validFrom', (current_date - 30)::text,
+        'validTo', (current_date + 365)::text
+      ),
+      jsonb_build_object(
+        'resolution', '1876405289', 'prefix', 'FV528',
+        'from', 1, 'to', 999998,
+        'validFrom', (current_date - 30)::text,
+        'validTo', (current_date + 365)::text
+      ),
+      jsonb_build_object(
+        'resolution', '1876405289', 'prefix', 'FV528',
+        'from', 1, 'to', 999999,
+        'validFrom', (current_date - 29)::text,
+        'validTo', (current_date + 365)::text
+      ),
+      jsonb_build_object(
+        'resolution', '1876405289', 'prefix', 'FV528',
+        'from', 1, 'to', 999999,
+        'validFrom', (current_date - 30)::text,
+        'validTo', (current_date + 364)::text
+      )
+    ))
+  LOOP
+    v_range_case_index := v_range_case_index + 1;
+    UPDATE public.empresa_config
+    SET dian_ultima_prueba_at = now(),
+        dian_ultima_prueba_detalle = jsonb_set(
+          dian_ultima_prueba_detalle,
+          '{authorizedRanges}', jsonb_build_array(v_range_case), true
+        )
+    WHERE tenant_id = v_tenant;
+
+    v_rejected := false;
+    BEGIN
+      PERFORM public.registrar_habilitacion_dian_tx(
+        v_tenant, v_actor,
+        'verify-range-mismatch-528-' || v_range_case_index::text,
+        'Portal DIAN con rango discordante verify 528'
+      );
+    EXCEPTION WHEN check_violation THEN
+      IF SQLERRM <> 'DIAN_TECHNICAL_VALIDATION_REQUIRED_BEFORE_PORTAL_ATTESTATION' THEN
+        RAISE;
+      END IF;
+      v_rejected := true;
+    END;
+    IF NOT v_rejected
+       OR (SELECT dian_habilitacion_estado IS NOT NULL
+           FROM public.empresa_config WHERE tenant_id = v_tenant) THEN
+      RAISE EXCEPTION 'VERIFY_528_RANGE_MISMATCH_ACCEPTED:%:%',
+        v_range_case_index, v_range_case;
+    END IF;
+  END LOOP;
 
   UPDATE public.empresa_config
   SET dian_ultima_prueba_at = now(),
-      dian_ultima_prueba_detalle = dian_ultima_prueba_detalle
-        || jsonb_build_object('numberingValidated', true)
+      dian_ultima_prueba_detalle = jsonb_set(
+        dian_ultima_prueba_detalle,
+        '{authorizedRanges}',
+        jsonb_build_array(jsonb_build_object(
+          'resolution', '1876405289',
+          'prefix', 'FV528',
+          'from', 1,
+          'to', 999999,
+          'validFrom', (current_date - 30)::text,
+          'validTo', (current_date + 365)::text
+        )), true
+      )
   WHERE tenant_id = v_tenant;
 
   v_result := public.registrar_habilitacion_dian_tx(
