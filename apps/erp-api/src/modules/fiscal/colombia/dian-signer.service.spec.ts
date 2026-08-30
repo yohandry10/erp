@@ -299,12 +299,18 @@ describe('DianSignerService XAdES-EPES', () => {
     ['documento', (xml: string) => xml.replace('119000.00', '119001.00')],
     ['SignedProperties', (xml: string) => xml.replace('supplier', 'third party')],
     ['política', (xml: string) => xml.replace(DIAN_SIGNATURE_POLICY_SHA256, 'A'.repeat(44))],
-    ['firma RSA', (xml: string) => xml.replace(/(<ds:SignatureValue>)(.)/, '$1A')],
+    ['firma RSA', (xml: string) => xml.replace(
+      /(<ds:SignatureValue>)([A-Za-z0-9+/])/,
+      (_match, prefix: string, firstCharacter: string) =>
+        `${prefix}${firstCharacter === 'A' ? 'B' : 'A'}`,
+    )],
   ])('rechaza alteración posterior de %s', async (_name, mutate) => {
     const signed = await service.firmarXML(invoiceXml(), {
       certificateBuffer: p12, certificatePassword: PASSWORD, signingTime: SIGNING_TIME,
     });
-    expect(await service.verificarFirma(mutate(signed))).toBe(false);
+    const mutated = mutate(signed);
+    expect(mutated).not.toBe(signed);
+    expect(await service.verificarFirma(mutated)).toBe(false);
   });
 
   it('rechaza wrapping por ID duplicado y firmas múltiples', async () => {
