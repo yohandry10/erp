@@ -177,7 +177,7 @@ export class ContabilidadMultimonedaController {
   // el guard global.
   @Get("padron-ruc/:ruc")
   @ApiOperation({
-    summary: "Consultar un RUC en el padron de SUNAT",
+    summary: "Consultar datos públicos auxiliares de un RUC",
     description:
       "Devuelve razon social, estado (activo o de baja) y condicion (habido o no habido). " +
       "Lo ultimo es lo que decide si una compra da derecho a credito fiscal. " +

@@ -47,6 +47,31 @@ Los esquemas de configuración en código son la fuente exacta. Categorías:
 - Redis/worker: host, puerto, credenciales y flags de jobs.
 - Auth: secretos JWT, cookies y expiraciones.
 - SUNAT/OSE: ambiente, SOL, certificado, RUC esperado y GRE REST.
+- ARCA: ambiente, certificado y punto de venta. WSAA/WSFE se derivan del
+  ambiente y sólo admiten las URLs oficiales exactas: homologación usa
+  `https://wsaahomo.afip.gov.ar/ws/services/LoginCms` y
+  `https://wswhomo.afip.gov.ar/wsfev1/service.asmx`; producción usa
+  `https://wsaa.afip.gov.ar/ws/services/LoginCms` y
+  `https://servicios1.afip.gov.ar/wsfev1/service.asmx`. No se aceptan destinos,
+  redirecciones, puertos, queries ni rutas configurables por tenant.
+- DIAN: Software ID/PIN, TestSet, PFX, resolución/prefijo/rango y clave técnica
+  pertenecen al tenant. El runtime implementa UBL/XAdES y SOAP 1.2 con
+  WS-Security/WS-Addressing, pero la transmisión permanece bloqueada hasta que
+  una validación técnica reciente y la evidencia del portal acrediten ese mismo
+  software/TestSet como `HABILITADO`. No existe fallback a credenciales DIAN
+  globales cuando hay tenant. Los endpoints se derivan del ambiente, admiten
+  sólo la URL oficial exacta y rechazan redirecciones: habilitación usa
+  `https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc` y producción usa
+  `https://vpfe.dian.gov.co/WcfDianCustomerServices.svc`.
+- Confianza DIAN: `DIAN_AUTHORITY_CA_BUNDLE_PEM` —o la ruta absoluta local
+  admitida por el runtime— y `DIAN_AUTHORITY_SPKI_SHA256` contienen material
+  público de la autoridad, no el PFX del tenant. Bundle y pins SHA-256 de SPKI
+  son obligatorios; fuente ambigua, archivo/ruta inválidos, pin malformado,
+  cadena no confiable o firmante no fijado bloquean readiness/aceptación. La
+  rotación debe actualizar ambos de forma coordinada y pasar los controles
+  criptográficos antes del deploy. El certificado HTTPS de
+  `vpfe.dian.gov.co` sólo autentica el transporte: no es el certificado que
+  firma el XML y nunca se usa para calcular este pin.
 - Stripe, correo, observabilidad y almacenamiento.
 
 Reglas:
@@ -56,9 +81,80 @@ Reglas:
 - `.env.local`, `.env` y el antiguo proyecto DEV no son fuentes operativas.
 - El frontend sólo recibe variables `NEXT_PUBLIC_*` expresamente públicas.
 - Logs y evidencia deben redactar tokens, passwords y claves.
+- Las mutaciones de autenticación, `/configuration*`, `/configuracion*`,
+  conversión demo y rutas de certificados, credenciales, PFX o secretos exigen
+  conexión viva. No se persisten en outbox Web/Tauri; al leer o sincronizar se
+  purga cualquier entrada legacy sensible.
 - En producción `REQUIRED_DATABASE_SCHEMA_VERSION` es obligatorio. Debe igualar
   la última migración requerida por el release; omitirlo es error de arranque,
   no un fallback a una versión antigua.
+
+### Preflight Colombia DIAN
+
+La verificación técnica y la habilitación legal son gates distintos. Para un
+tenant colombiano real, antes del primer envío:
+
+1. Confirmar país `CO`, cuenta no demo y NIT canónico con dígito de
+   verificación. El certificado X.509 del PFX debe corresponder al mismo NIT.
+2. Cargar por el writer de configuración el PFX/password, Software ID/PIN,
+   TestSet, resolución, prefijo, rango, fechas y clave técnica. Nunca colocar
+   esos valores en Git, logs, capturas o variables `NEXT_PUBLIC_*`.
+3. Obtener por un canal oficial un `ApplicationResponse` 02/04 real y reciente
+   generado por DIAN. Extraer el `X509Certificate` embebido, verificar firma,
+   vigencia al `SigningTime`, revocación, identidad DIAN, issuer y cadena hasta
+   una ECD acreditada por ONAC; confirmar el leaf/serial en el repositorio de la
+   ECD o con DIAN. La caja FEV 1.9 v2026 no publica un leaf ni pin vigente y el
+   certificado del ejemplo del Anexo está vencido: no sirven como trust.
+   Descargar de la ECD exacta la raíz/subordinada y configurar el bundle; el pin
+   es SHA-256 sobre el DER de `SubjectPublicKeyInfo` del leaf XML DIAN, no sobre
+   el certificado completo, una CA, TLS o el PFX tenant. Verificar que runtime
+   los considere listos y que una cadena/pin adulterados fallen cerrado.
+4. Ejecutar `GetNumberingRange` para validar endpoint, certificado y numeración.
+   Este método no recibe ni valida el Software PIN. Después, por el flujo de
+   emisión en habilitación, enviar el TestSet asignado con `SendTestSetAsync` y
+   consultar su `ZipKey` mediante `GetStatusZip` hasta un estado terminal. La
+   firma del documento valida el PFX; recibir el ZIP no significa que el set fue
+   aceptado ni que el PIN quedó homologado.
+5. Comprobar en el portal DIAN que ese Software ID/TestSet pasó a
+   `HABILITADO`. Un ADMIN puede registrar la referencia verificable sólo tras
+   una validación técnica reciente. Cambiar NIT, Software ID, TestSet o la
+   naturaleza demo invalida la evidencia.
+6. Antes de cambiar a producción, consultar otra vez la numeración, confirmar
+   rango/clave técnica y ejecutar una emisión controlada. Cerrar la evidencia
+   con `GetStatus`, `ApplicationResponse` y `AttachedDocument`; después probar
+   `91`, `92` y los eventos FEV 030-034 aplicables.
+7. Si el cliente operará como participante directo RADIAN, tramitar por separado
+   el registro en Eventos RADIAN, documentos/requisitos y verificación DIAN, y
+   superar el Set RADIAN de 15 eventos. Es un gate adicional al TestSet FEV y
+   no se acredita por haber enviado 030-034.
+
+Para rotar confianza, instalar el pin/cadena nuevos antes del corte y admitir
+old+new únicamente durante una ventana comprobada; monitorizar `NotAfter`,
+CRL/OCSP e issuer. Conservar el material anterior para revalidación histórica,
+pero retirarlo de aceptación corriente después de confirmar el cese del
+firmante. Los eventos 030-034 los firma el participante y el
+`AttachedDocument` exterior lo firma el emisor; el pin DIAN sólo se aplica a la
+respuesta de autoridad interna y a respuestas DIAN separadas.
+
+El snapshot de pruebas, PR, CI, migración, despliegue y retest vigente se registra
+en `CURRENT_STATE.md`. Esta guía no autoriza operar por el solo hecho de que un
+gate local pase: se exige siempre CI remoto, promoción DB-first, despliegue y
+retest productivo autorizado sobre el mismo SHA.
+
+Un fallo antes de sellar el XML puede reintentar la misma intención. Después
+del sello, un timeout o respuesta ambigua obliga a consultar primero por la
+clave persistida: CUFE/CUDE usa `GetStatus`, `ZipKey` usa `GetStatusZip` y los
+eventos consultan `GetStatusEvent`; `GetXmlByDocumentKey` recupera la FEV que se
+ancla. El retry server-side usa el `operationId` persistido aunque el navegador
+haya perdido su clave de `sessionStorage`. No se cambia de idempotencia ni se
+regenera nombre ZIP, correlativo, XML o código único para «destrabar» un envío
+incierto.
+
+La fuente normativa operativa para el gate separado es el
+[Abecé RADIAN oficial vigente](https://micrositios.dian.gov.co/sistema-de-facturacion-electronica/abece-radian/),
+consultado el 2026-08-29. La página exige 15 eventos para el Set de pruebas del
+participante directo; no se sustituye por un documento histórico ni por el
+TestSet de facturación electrónica.
 
 ## Contrato PROD-only
 
@@ -172,6 +268,7 @@ pnpm build
 pnpm test:cov
 pnpm test:ui-styles
 pnpm test:quality
+pnpm test:dian-contract
 ```
 
 Según el cambio, añadir:
@@ -214,6 +311,36 @@ corre los verificadores requeridos y prueba el readiness contra la versión
 final; Playwright usa sólo localhost y mocks controlados para los recorridos sin
 base. Las specs que necesiten datos reales continúan bloqueadas salvo que reciban
 una base efímera explícita. Ningún E2E puede apuntar a PROD ni al DEV retirado.
+
+La frontera PostgreSQL crea también un catálogo mínimo efímero de Supabase
+Storage (`storage.buckets`, `storage.objects`, roles y RLS). Así las migraciones
+de Storage no pueden saltarse silenciosamente la creación del bucket o sus
+políticas; la compuerta 523 demuestra en rojo una configuración adulterada y una
+policy ausente antes de ejecutar el verificador normal. Este doble sólo valida
+el contrato SQL: no levanta la API de Storage ni sustituye el smoke posterior al
+despliegue contra el único proyecto Supabase autorizado.
+
+`test:dian-contract` comprueba primero el manifiesto SHA-256 de 22 artefactos y
+genera con el código real nueve XML firmados: factura `01`, notas `91/92`,
+eventos 030-034 y `AttachedDocument`. Los nueve pasan el XSD oficial; factura,
+notas y eventos pasan además el Schematron compilado de la caja DIAN FEV 1.9 de
+2026. El adjunto queda sólo bajo XSD porque el XSL distribuido no cubre su raíz.
+Antes del Schematron, el gate exige los cuatro `ProfileID` descriptivos exactos
+del Anexo FEV 1.9. La propia caja contiene divergencias entre XSL, listas de
+códigos y ejemplos RADIAN. El gate fija URL/hash, página/regla y evidencia de
+cada divergencia, y sólo tolera el conjunto completo de reglas/mensajes exactos enumerados en
+`scripts/ci/fixtures/dian-fev-1.9/README.md`; cualquier otro fatal rompe CI. Es
+una comprobación reproducible de estructura, no un reemplazo del TestSet ni de
+la validación en el portal DIAN. Por sí solo tampoco prueba importación,
+persistencia, secuencia o retry: esas capas están cubiertas separadamente por los
+verificadores 527/528, la suite API y Playwright con APIs interceptadas. Ninguno
+prueba transmisión ni habilitación real.
+
+El verificador 528 debe permanecer en la frontera PostgreSQL 16: prueba que un
+`ApplicationResponse` adulterado, con raíz/namespace incorrectos, firma múltiple,
+referencia indirecta o CUFE/CUDE divergente no pueda promover el CPE a
+`ACEPTADO`. El flag de trust que consume SQL sólo puede originarse en la
+verificación criptográfica fail-closed del API.
 
 Conviene recordar qué **no** cazan las pruebas. La suite estaba verde mientras el
 sistema adelantaba las fechas un día pasadas las 19:00, perdía las bases

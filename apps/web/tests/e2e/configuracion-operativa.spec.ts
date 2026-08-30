@@ -43,6 +43,8 @@ test.describe('Configuración operativa', () => {
     await expect(page).toHaveURL(/\/dashboard\/configuracion\/empresa\/?$/)
     await expect(page.getByRole('heading', { name: 'Empresa' })).toBeVisible({ timeout: 30000 })
     await expect(page.getByRole('heading', { name: 'Fiscal y certificado' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Logo de la empresa' })).toBeVisible()
+    await expect(page.getByLabel('Archivo de logo')).toHaveAttribute('accept', 'image/png,image/jpeg')
 
     await gotoAuthenticated(page, '/dashboard/configuracion/ventas/')
     await expect(page).toHaveURL(/\/dashboard\/configuracion\/ventas\/?$/)

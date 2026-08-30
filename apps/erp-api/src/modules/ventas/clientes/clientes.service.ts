@@ -8,10 +8,10 @@ import { validateColombiaNit } from '../../paises/initial-country';
 import { PadronRucService } from '../../contabilidad/services/padron-ruc.service';
 
 function validarDocumentoCliente(tipo: string, numero: string) {
-  if (tipo === 'CUIT') {
+  if (['CUIT', 'CUIL', 'CDI'].includes(tipo)) {
     return {
       valido: validateArgentinaTaxId(numero),
-      error: 'El CUIT debe tener 11 dígitos y un dígito verificador válido',
+      error: `El ${tipo} debe tener 11 dígitos y un dígito verificador válido`,
     };
   }
   if (tipo === 'NIT') {
@@ -293,15 +293,20 @@ export class ClientesService {
         return {
           ruc,
           validado_formato: true,
+          consulta_padron: false,
+          // Alias histórico: se conserva hasta versionar el contrato, pero no
+          // significa que la fuente sea un servicio oficial de SUNAT.
           consulta_sunat: false,
           fuente: 'VALIDACION_LOCAL',
-          mensaje: 'RUC válido por formato y dígito verificador; no se pudo consultar el padrón SUNAT',
+          mensaje: 'RUC válido por formato y dígito verificador; no se pudo consultar la fuente registral auxiliar',
         };
       }
 
       return {
         ruc,
         validado_formato: true,
+        consulta_padron: true,
+        // Compatibilidad con consumidores anteriores a `consulta_padron`.
         consulta_sunat: true,
         fuente: enElPadron.fuente,
         razon_social: enElPadron.razonSocial,

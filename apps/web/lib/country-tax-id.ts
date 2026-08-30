@@ -13,18 +13,30 @@ export function validateArgentinaCuit(value: unknown): boolean {
 }
 
 export function validateColombiaNit(value: unknown): boolean {
+  return parseColombiaNit(value) !== null
+}
+
+export function parseColombiaNit(value: unknown): {
+  base: string
+  dv: string
+  compact: string
+  formatted: string
+} | null {
   const raw = String(value ?? '').trim().replace(/\s+/g, '')
-  const compactMatch = raw.match(/^(\d{9})(\d)$/)
-  const match = raw.match(/^(\d{9,10})-(\d)$/) ?? compactMatch
-  if (!match) return false
-  const weights = [71, 67, 59, 53, 47, 43, 41, 37, 29, 23, 19, 17, 13, 7, 3]
-  const sum = match[1]
+  const separated = raw.match(/^(\d{9,10})-(\d)$/)
+  const compact = raw.match(/^\d{10,11}$/)
+  const base = separated?.[1] ?? (compact ? raw.slice(0, -1) : '')
+  const dv = separated?.[2] ?? (compact ? raw.slice(-1) : '')
+  if (!base || !dv) return null
+  const weights = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71]
+  const sum = base
     .split('')
     .reverse()
     .reduce((total, digit, index) => total + Number(digit) * weights[index], 0)
   const remainder = sum % 11
   const expected = remainder === 0 || remainder === 1 ? remainder : 11 - remainder
-  return expected === Number(match[2])
+  if (expected !== Number(dv)) return null
+  return { base, dv, compact: `${base}${dv}`, formatted: `${base}-${dv}` }
 }
 
 export function validateCountryTaxId(countryCode: string, value: unknown): boolean {

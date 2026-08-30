@@ -258,9 +258,9 @@ export default function ConvertDemoPage() {
     });
   };
 
-  // Al teclear el RUC real de la empresa, trae la razon social que SUNAT tiene
-  // registrada. Es el momento en el que mas ayuda: aqui se equivoca uno y el
-  // tenant queda creado con un nombre que luego sale en las facturas.
+  // Al teclear el RUC real de la empresa, la fuente registral auxiliar propone
+  // la razón social. Es el momento en el que más ayuda: aquí se equivoca uno y
+  // el tenant queda creado con un nombre que luego sale en las facturas.
   const rellenarConElPadron = (dato: ContribuyenteConsultado) => {
     if (!dato.razonSocial) return;
     setFormData(prev => (prev.razon_social.trim() ? prev : { ...prev, razon_social: dato.razonSocial! }));

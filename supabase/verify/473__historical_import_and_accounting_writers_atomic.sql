@@ -97,6 +97,16 @@ BEGIN
     (v_other_tenant, 'VERIFY-473-' || left(v_other_tenant::text, 8),
      'Tenant ajeno verify 473', 'Fixture aislamiento', 'PE', 'test', true, 'ACTIVO');
 
+  -- Los writers maestros posteriores a 526 leen el país desde la configuración
+  -- tributaria del tenant. La importación histórica sigue siendo PE, pero su
+  -- fixture debe representar un tenant operativo completo.
+  INSERT INTO public.empresa_config (
+    tenant_id, ruc, razon_social, pais, moneda_defecto, estado,
+    configuracion_completa, is_demo
+  ) VALUES
+    (v_tenant, '20604730019', 'Empresa verify 473', 'PE', 'PEN', 'ACTIVO', true, false),
+    (v_other_tenant, '20604730027', 'Empresa ajena verify 473', 'PE', 'PEN', 'ACTIVO', true, false);
+
   PERFORM set_config('app.current_tenant_id', v_tenant::text, true);
 
   INSERT INTO public.usuarios_sistema (

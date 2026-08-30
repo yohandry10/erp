@@ -10,6 +10,7 @@ import {
   getActiveCountryByCode,
   validateCountryTaxId,
 } from '../paises/initial-country';
+import { normalizeDianIdentity } from '../fiscal/colombia/dian-document.util';
 
 /** Registra XML firmado por el escritorio y normaliza su payload de entrada. */
 export class CpeRegistrationService {
@@ -349,19 +350,16 @@ resolveTipoDocumentoReceptor(
   ): string {
     const normalized = String(provided || '').trim().toUpperCase();
     if (pais === 'CO') {
-      const colombiaMap: Record<string, string> = {
-        '13': '13',
-        CC: '13',
-        '31': '31',
-        NIT: '31',
-        '22': '22',
-        CE: '22',
-        '41': '41',
-        PASAPORTE: '41',
-        '12': '12',
-        TI: '12',
-      };
-      return colombiaMap[normalized] || (documentoReceptor.length >= 9 ? '31' : '13');
+      if (!normalized) {
+        throw new BadRequestException(
+          'DIAN requiere indicar NIT (31), CC (13), CE (22), TI (12) o pasaporte (41)',
+        );
+      }
+      try {
+        return normalizeDianIdentity(normalized, documentoReceptor).type;
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : 'Documento DIAN inválido');
+      }
     }
     const map: Record<string, string> = {
       '1': '1',

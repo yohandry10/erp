@@ -74,7 +74,15 @@ services:
       # Readiness compara este valor con la historia real de migraciones. El
       # contenedor no recibe tráfico si PROD aún no alcanzó este esquema.
       - key: REQUIRED_DATABASE_SCHEMA_VERSION
-        value: 522
+        value: 528
+
+      # Las respuestas ApplicationResponse de DIAN sólo se aceptan cuando su
+      # XAdES encadena al bundle público configurado y el firmante coincide con
+      # un SPKI aprobado. No reutilizar aquí el PFX privado de ningún tenant.
+      - key: DIAN_AUTHORITY_CA_BUNDLE_PEM
+        sync: false
+      - key: DIAN_AUTHORITY_SPKI_SHA256
+        sync: false
 
       # Base de datos de produccion. EXPECTED_SUPABASE_PROJECT_REF hace que la
       # API se niegue a arrancar si la apuntan a otro proyecto por error.

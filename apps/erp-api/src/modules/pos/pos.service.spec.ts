@@ -1,4 +1,9 @@
 import { PosService } from './pos.service';
+import { DianXmlBuilderService } from '../fiscal/colombia/dian-xml-builder.service';
+import {
+  normalizePersistedFiscalItems,
+  normalizePersistedFiscalTotals,
+} from '../cpe/cpe-delivery.service';
 
 const productoBase = {
   id: 'prod-1',
@@ -35,6 +40,7 @@ const createSupabaseMock = (fixtures: {
   canjesResponse?: any;
   productos?: any[];
   metodoPago?: any;
+  empresaConfig?: any;
 } = {}) => {
   const inserts: Array<{ table: string; rows: any }> = [];
   const updates: Array<{ table: string; rows: any }> = [];
@@ -42,7 +48,7 @@ const createSupabaseMock = (fixtures: {
     switch (table) {
       case 'empresa_config':
         return {
-          data: {
+          data: fixtures.empresaConfig ?? {
             ruc: '12345678901',
             razon_social: 'ACME S.A.C.',
             dias_vencimiento_factura: 30,
@@ -166,6 +172,7 @@ const createService = (fixtures: {
   canjesResponse?: any;
   productos?: any[];
   metodoPago?: any;
+  empresaConfig?: any;
 } = {}) => {
   const { supabaseClient, rpcMock, inserts, updates } = createSupabaseMock(fixtures);
 
@@ -257,6 +264,356 @@ describe('PosService atomic transaction contract', () => {
     expect(ctx.rpcMock).not.toHaveBeenCalledWith('acquire_pos_lock', expect.any(Object));
     expect(ctx.rpcMock).not.toHaveBeenCalledWith('release_pos_lock', expect.any(Object));
   });
+
+  const empresaColombiaReal = {
+    ruc: '9001234568', razon_social: 'EMPRESA CO S.A.S.', pais: 'CO', is_demo: false,
+    moneda_defecto: 'COP', igv_porcentaje: 19, serie_factura: 'FE',
+    direccion_fiscal: 'Carrera 7 # 72-41', ubigeo: '11001',
+    departamento: 'Bogotá D.C.', provincia: 'Bogotá D.C.',
+    dian_regimen_fiscal: 'O-13', dian_tipo_contribuyente: '1',
+  };
+
+  it('atraviesa POS real -> CPE 01/31 -> XML DIAN con NIT y pago canónicos', async () => {
+    const ctx = createService({ empresaConfig: empresaColombiaReal });
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase,
+      cliente_id: 'cliente-co-b2b',
+      cliente_documento: '900123456-8',
+      cliente_tipo_documento: 'NIT',
+      cliente_nombre: 'CLIENTE CO S.A.S.',
+      cliente_direccion: 'Calle 1 # 2-3',
+      metodo_pago_id: 'mp-efectivo',
+      emitir_cpe: true,
+      comprobante: { tipo: '01', serie: 'FE' },
+      moneda: 'COP',
+    }, user);
+
+    expect(result.success).toBe(true);
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    const payload = rpc?.[1]?.p_payload;
+    expect(payload).toMatchObject({
+      cliente_tipo_documento: '31', cliente_documento: '9001234568',
+      cpe_data: {
+        tipo_documento: '01', serie: 'FE', ruc_emisor: '9001234568',
+        tipo_documento_receptor: '31', documento_receptor: '9001234568',
+        condicion_pago: 'CONTADO', medio_pago: '10',
+      },
+    });
+
+    const cpe = payload.cpe_data;
+    const metadata = cpe.metadata;
+    const xml = await new DianXmlBuilderService().generarFacturaElectronica({
+      id: 'from-pos', tipoDocumento: cpe.tipo_documento, serie: cpe.serie, numero: '1',
+      fechaEmision: '2026-08-29T10:15:00-05:00', moneda: cpe.moneda,
+      emisor: {
+        tipoDocumento: '31', numeroDocumento: cpe.ruc_emisor,
+        razonSocial: cpe.razon_social_emisor, direccion: metadata.dian_direccion_emisor,
+        codigoUbigeo: metadata.dian_codigo_dane_emisor,
+        ciudad: metadata.dian_municipio_emisor, departamento: metadata.dian_departamento_emisor,
+        codigoDepartamento: String(metadata.dian_codigo_dane_emisor).slice(0, 2),
+        regimenFiscal: metadata.dian_regimen_fiscal,
+        tipoContribuyente: metadata.dian_tipo_contribuyente,
+      },
+      receptor: {
+        tipoDocumento: cpe.tipo_documento_receptor,
+        numeroDocumento: cpe.documento_receptor,
+        razonSocial: cpe.razon_social_receptor,
+        direccion: cpe.direccion_receptor,
+        // La 526 fotografía este perfil desde el maestro enlazado antes de
+        // persistir un CPE CO real; aquí reproducimos el shape persistido que
+        // consume Delivery, no el payload previo al trigger.
+        dianTaxProfile: {
+          profile: 'ADQUIRIENTE_NIT_B2B', taxLevelCode: 'O-99',
+          taxLevelListName: '04', taxSchemeId: '01', taxSchemeName: 'IVA',
+        },
+      },
+      subtotal: cpe.total_gravadas, totalImpuestos: cpe.total_igv,
+      importeTotal: cpe.total_venta, tasaImpuesto: 0.19,
+      formaPago: cpe.condicion_pago, medioPago: cpe.medio_pago,
+      dianContext: {
+        environmentId: '2', software: { id: 'software-id', pin: 'software-pin' },
+        authorization: {
+          number: '18760000001', prefix: cpe.serie, rangeFrom: 1, rangeTo: 5000,
+          validFrom: '2026-01-01', validTo: '2027-01-01', technicalKey: 'technical-key',
+        },
+        taxes: { iva: cpe.total_igv, inc: 0, ica: 0 },
+      },
+      items: payload.items.map((item: any) => ({
+        descripcion: 'Prod 1', cantidad: item.cantidad, precioUnitario: item.precio_unitario,
+        valorVenta: item.subtotal, igv: item.igv, tasaIgv: 0.19,
+      })),
+    });
+    expect(xml).toContain('<cbc:InvoiceTypeCode>01</cbc:InvoiceTypeCode>');
+    expect(xml).toContain('schemeID="8" schemeName="31" schemeAgencyID="195">900123456</cbc:ID>');
+  });
+
+  it('preserva 10/20/30 desde catálogo autoritativo hasta el XML DIAN mixto', async () => {
+    const productos = [
+      { ...productoBase, id: 'prod-1', codigo: 'P10', nombre: 'Producto gravado', afectacion_igv: '10' },
+      { ...productoBase, id: 'prod-exo', codigo: 'P20', nombre: 'Producto exento', afectacion_igv: '20' },
+      { ...productoBase, id: 'prod-excl', codigo: 'P30', nombre: 'Producto excluido', afectacion_igv: '30' },
+    ];
+    const ctx = createService({ empresaConfig: empresaColombiaReal, productos });
+
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase,
+      cliente_id: 'cliente-co-consumidor',
+      cliente_documento: '1020304050',
+      cliente_tipo_documento: 'CC',
+      cliente_nombre: 'CLIENTE CO',
+      metodo_pago_id: 'mp-efectivo',
+      emitir_cpe: true,
+      comprobante: { tipo: '01', serie: 'FE' },
+      moneda: 'COP',
+      items: productos.map((producto) => ({
+        producto_id: producto.id,
+        cantidad: 1,
+        precio_unitario: 100,
+        // Simula un navegador manipulado: el backend debe ignorarlo y volver
+        // a copiar el valor vigente del catálogo.
+        afectacion_igv: '10',
+      })),
+    }, user);
+
+    expect(result.success).toBe(true);
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    const payload = rpc?.[1]?.p_payload;
+    expect(payload.items.map((item: any) => item.afectacion_igv)).toEqual(['10', '20', '30']);
+    expect(payload.items.map((item: any) => item.igv)).toEqual([19, 0, 0]);
+    expect(payload.cpe_data).toMatchObject({
+      total_gravadas: 100,
+      total_exoneradas: 100,
+      total_inafectas: 100,
+      total_igv: 19,
+      total_venta: 319,
+    });
+
+    const productosPorId = new Map(productos.map((producto) => [producto.id, producto]));
+    const persistedItems = payload.items.map((item: any) => ({
+      descripcion: productosPorId.get(item.producto_id)?.nombre,
+      cantidad: item.cantidad,
+      precio_unitario: item.precio_unitario,
+      valor_venta: item.subtotal,
+      impuesto_igv: item.igv,
+      tasa_igv: item.subtotal > 0 ? item.igv / item.subtotal : 0,
+      unidad_medida: 'NIU',
+      codigo_producto: productosPorId.get(item.producto_id)?.codigo,
+      afectacion_igv: item.afectacion_igv,
+    }));
+    const normalizedItems = normalizePersistedFiscalItems(persistedItems, 0.19);
+    const totals = normalizePersistedFiscalTotals(payload.cpe_data);
+    expect(normalizedItems.map((item) => item.dianTaxCategory))
+      .toEqual(['GRAVADO', 'EXENTO', 'EXCLUIDO']);
+    expect(totals).toMatchObject({ subtotal: 300, totalImpuestos: 19, importeTotal: 319 });
+
+    const metadata = payload.cpe_data.metadata;
+    const xml = await new DianXmlBuilderService().generarFacturaElectronica({
+      id: 'pos-mixto-co', tipoDocumento: '01', serie: 'FE', numero: '2',
+      fechaEmision: '2026-08-29T10:15:00-05:00', moneda: 'COP',
+      emisor: {
+        tipoDocumento: '31', numeroDocumento: payload.cpe_data.ruc_emisor,
+        razonSocial: payload.cpe_data.razon_social_emisor,
+        direccion: metadata.dian_direccion_emisor,
+        codigoUbigeo: metadata.dian_codigo_dane_emisor,
+        ciudad: metadata.dian_municipio_emisor,
+        departamento: metadata.dian_departamento_emisor,
+        codigoDepartamento: String(metadata.dian_codigo_dane_emisor).slice(0, 2),
+        regimenFiscal: metadata.dian_regimen_fiscal,
+        tipoContribuyente: metadata.dian_tipo_contribuyente,
+      },
+      receptor: {
+        tipoDocumento: payload.cpe_data.tipo_documento_receptor,
+        numeroDocumento: payload.cpe_data.documento_receptor,
+        razonSocial: payload.cpe_data.razon_social_receptor,
+        dianTaxProfile: {
+          profile: 'CONSUMIDOR_FINAL', taxLevelCode: 'R-99-PN',
+          taxLevelListName: '49', taxSchemeId: 'ZY', taxSchemeName: 'No causa',
+        },
+      },
+      subtotal: totals.subtotal,
+      totalGravadas: payload.cpe_data.total_gravadas,
+      totalExoneradas: payload.cpe_data.total_exoneradas,
+      totalInafectas: payload.cpe_data.total_inafectas,
+      totalImpuestos: totals.totalImpuestos,
+      importeTotal: totals.importeTotal,
+      tasaImpuesto: 0.19,
+      formaPago: payload.cpe_data.condicion_pago,
+      medioPago: payload.cpe_data.medio_pago,
+      items: normalizedItems,
+      dianContext: {
+        environmentId: '2', software: { id: 'software-id', pin: 'software-pin' },
+        authorization: {
+          number: '18760000001', prefix: 'FE', rangeFrom: 1, rangeTo: 5000,
+          validFrom: '2026-01-01', validTo: '2027-01-01', technicalKey: 'technical-key',
+        },
+        taxes: { iva: 19, inc: 0, ica: 0 },
+      },
+    });
+
+    const lines = [...xml.matchAll(/<cac:InvoiceLine>([\s\S]*?)<\/cac:InvoiceLine>/g)]
+      .map((match) => match[1]);
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain('<cbc:TaxAmount currencyID="COP">19.00</cbc:TaxAmount>');
+    expect(lines[1]).toContain('<cbc:TaxAmount currencyID="COP">0.00</cbc:TaxAmount>');
+    expect(lines[2]).not.toContain('<cac:TaxTotal>');
+    const headerTax = /<cac:TaxTotal>([\s\S]*?)<\/cac:TaxTotal>/.exec(xml)?.[1] ?? '';
+    expect(headerTax).not.toContain('<cbc:TaxableAmount currencyID="COP">300.00</cbc:TaxableAmount>');
+    expect((headerTax.match(/<cbc:TaxableAmount currencyID="COP">100\.00<\/cbc:TaxableAmount>/g) || []))
+      .toHaveLength(2);
+    expect(xml).toContain('<cbc:LineExtensionAmount currencyID="COP">300.00</cbc:LineExtensionAmount>');
+    expect(xml).toContain('<cbc:PayableAmount currencyID="COP">319.00</cbc:PayableAmount>');
+  });
+
+  it.each([
+    ['03', 'NIT', '9001234568'],
+    ['01', '0', '9001234568'],
+  ])('rechaza en backend la combinación DIAN tipo %s / identidad %s', async (
+    tipoComprobante, tipoIdentidad, numero,
+  ) => {
+    const ctx = createService({ empresaConfig: empresaColombiaReal });
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase, cliente_documento: numero, cliente_tipo_documento: tipoIdentidad,
+      metodo_pago_id: 'mp-efectivo', emitir_cpe: true,
+      comprobante: { tipo: tipoComprobante, serie: 'FE' }, moneda: 'COP',
+    }, user);
+    expect(result.success).toBe(false);
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_comercial_tx', expect.anything());
+  });
+
+  it('rechaza antes de cobrar un tenant real sin geografía ni responsabilidad DIAN', async () => {
+    const ctx = createService({
+      empresaConfig: { ...empresaColombiaReal, ubigeo: null, dian_regimen_fiscal: null },
+    });
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase, cliente_documento: '1020304050', cliente_tipo_documento: 'CC',
+      metodo_pago_id: 'mp-efectivo', emitir_cpe: true,
+      comprobante: { tipo: '01', serie: 'FE' }, moneda: 'COP',
+    }, user);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('código DANE');
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith('pos_registrar_venta_comercial_tx', expect.anything());
+  });
+
+  it.each([
+    ['CUIL', '86'],
+    ['CDI', '87'],
+  ])('preserva punto de venta AR 12 y receptor %s en el CPE atómico', async (
+    clienteTipoDocumento,
+    expectedIdentityCode,
+  ) => {
+    const ctx = createService({
+      empresaConfig: {
+        ruc: '30710158229',
+        razon_social: 'EMPRESA ARGENTINA SA',
+        pais: 'AR',
+        moneda_defecto: 'ARS',
+        igv_porcentaje: 21,
+        arca_punto_venta: 12,
+        arca_condicion_iva: 'RESPONSABLE_INSCRIPTO',
+      },
+    });
+
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase,
+      cliente_documento: '20123456786',
+      cliente_tipo_documento: clienteTipoDocumento,
+      cliente_condicion_iva: 'MONOTRIBUTO',
+      emitir_cpe: true,
+      comprobante: { tipo: '01', serie: 'F001' },
+      moneda: 'ARS',
+    }, user);
+
+    expect(result.success).toBe(true);
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1]?.p_payload).toMatchObject({
+      cliente_tipo_documento: expectedIdentityCode,
+      cpe_data: {
+        serie: '00012',
+        tipo_documento_receptor: expectedIdentityCode,
+        metadata: {
+          arca_punto_venta: 12,
+          arca_condicion_iva_emisor: 'RESPONSABLE_INSCRIPTO',
+          arca_condicion_iva_receptor: 'MONOTRIBUTO',
+        },
+      },
+    });
+  });
+
+  it('respeta IVA cero del emisor monotributista argentino hasta el CPE atómico', async () => {
+    const ctx = createService({
+      empresaConfig: {
+        ruc: '30710158229',
+        razon_social: 'EMISOR MONOTRIBUTO SRL',
+        pais: 'AR',
+        moneda_defecto: 'ARS',
+        igv_porcentaje: 0,
+        arca_punto_venta: 12,
+        arca_condicion_iva: 'MONOTRIBUTO',
+      },
+    });
+
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase,
+      cliente_documento: '30123456',
+      cliente_tipo_documento: 'DNI',
+      cliente_condicion_iva: 'CONSUMIDOR_FINAL',
+      emitir_cpe: true,
+      comprobante: { tipo: '01', serie: 'F001' },
+      moneda: 'ARS',
+    }, user);
+    expect(result).toMatchObject({ success: true, message: 'Venta confirmada atómicamente; CPE en cola durable' });
+
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1]?.p_payload).toMatchObject({
+      items: [{ igv: 0 }],
+      cpe_data: {
+        total_gravadas: 100,
+        total_igv: 0,
+        total_venta: 100,
+        metadata: {
+          arca_condicion_iva_emisor: 'MONOTRIBUTO',
+        },
+      },
+    });
+  });
+
+  it.each(['MONOTRIBUTO', 'EXENTO'])(
+    'bloquea antes de cobrar un emisor argentino %s persistido con IVA 21',
+    async (arcaCondicionIva) => {
+      const ctx = createService({
+        empresaConfig: {
+          ruc: '30710158229',
+          razon_social: 'EMISOR ARGENTINO INCONSISTENTE',
+          pais: 'AR',
+          moneda_defecto: 'ARS',
+          igv_porcentaje: 21,
+          arca_punto_venta: 12,
+          arca_condicion_iva: arcaCondicionIva,
+        },
+      });
+
+      const result = await ctx.service.procesarVenta({
+        ...ventaBase,
+        cliente_documento: '30123456',
+        cliente_tipo_documento: 'DNI',
+        cliente_condicion_iva: 'CONSUMIDOR_FINAL',
+        emitir_cpe: true,
+        comprobante: { tipo: '01', serie: 'F001' },
+        moneda: 'ARS',
+      }, user);
+
+      expect(result).toMatchObject({ success: false });
+      expect(result.message).toContain('no puede cobrar IVA');
+      expect(ctx.rpcMock).not.toHaveBeenCalledWith(
+        'resolver_precios_venta_tx',
+        expect.anything(),
+      );
+      expect(ctx.rpcMock).not.toHaveBeenCalledWith(
+        'pos_registrar_venta_comercial_tx',
+        expect.anything(),
+      );
+    },
+  );
 
   it('procesa venta feliz exclusivamente mediante atomic_tx', async () => {
     const ctx = createService();

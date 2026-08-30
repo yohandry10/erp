@@ -54,6 +54,9 @@ export function SunatConfigStep() {
   const isArgentina = country.paisCodigo === 'AR'
   const oseLabel = 'OSE'
   const dianEnvironment = state.configuration.dian_environment || 'HOMOLOGACION'
+  const dianEndpoint = dianEnvironment === 'PRODUCCION'
+    ? 'https://vpfe.dian.gov.co/WcfDianCustomerServices.svc'
+    : 'https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc'
   const sunatEnvironment = state.configuration.sunat_environment || 'homologacion'
   const greTransport = state.configuration.sunat_gre_transport || 'soap'
   const sireActivo = state.configuration.sire_activo !== false
@@ -76,14 +79,25 @@ export function SunatConfigStep() {
   }, [isOseApi, state.configuration.ose_activo, updateConfiguration])
 
   useEffect(() => {
-    if (isColombia && !state.configuration.dian_activo) {
+    if (isColombia && (
+      !state.configuration.dian_activo
+      || state.configuration.emision_cpe_modo !== 'DIAN_DIRECTO'
+      || state.configuration.dian_url !== dianEndpoint
+    )) {
       updateConfiguration({
         dian_activo: true,
         emision_cpe_modo: 'DIAN_DIRECTO',
-        dian_url: state.configuration.dian_url || 'https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc',
+        dian_url: dianEndpoint,
       })
     }
-  }, [isColombia, state.configuration.dian_activo, state.configuration.dian_url, updateConfiguration])
+  }, [
+    dianEndpoint,
+    isColombia,
+    state.configuration.dian_activo,
+    state.configuration.dian_url,
+    state.configuration.emision_cpe_modo,
+    updateConfiguration,
+  ])
 
   useEffect(() => {
     if (isPeru && !state.configuration.sunat_gre_rest_base_url) {
@@ -148,7 +162,7 @@ export function SunatConfigStep() {
                 {isArgentina ? (
                   <SelectItem value="ARCA_WSFE">ARCA directo (WSAA + WSFEv1)</SelectItem>
                 ) : isColombia ? (
-                  <SelectItem value="DIAN_DIRECTO">DIAN directo (UBL 2.1 + CUFE)</SelectItem>
+                  <SelectItem value="DIAN_DIRECTO">DIAN directo (pendiente de homologación)</SelectItem>
                 ) : (
                   <>
                     <SelectItem value="SUNAT_DIRECTO">{country.servicioFiscal} directo (SOAP)</SelectItem>
@@ -161,8 +175,10 @@ export function SunatConfigStep() {
 
           {!isOseApi ? (
             <InfoPanel
-              title={`${country.servicioFiscal} directo activo`}
-              description={`Se usaran las credenciales propias del contribuyente y los endpoints oficiales configurados para ${country.servicioFiscal}.`}
+              title={isColombia ? 'DIAN directo pendiente de homologación' : `${country.servicioFiscal} directo activo`}
+              description={isColombia
+                ? 'Puedes guardar los datos reales del contribuyente, pero el envío permanece bloqueado hasta validar UBL/CUFE/XAdES, superar el set de pruebas y habilitar el transporte SOAP oficial.'
+                : `Se usaran las credenciales propias del contribuyente y los endpoints oficiales configurados para ${country.servicioFiscal}.`}
             />
           ) : null}
         </CardContent>
@@ -226,7 +242,7 @@ export function SunatConfigStep() {
                   id="arca_punto_venta"
                   type="number"
                   min={1}
-                  max={99999}
+                  max={99998}
                   value={state.configuration.arca_punto_venta || 1}
                   onChange={(event) => updateConfiguration({ arca_punto_venta: Number(event.target.value) })}
                   className={inputClass}
@@ -243,7 +259,6 @@ export function SunatConfigStep() {
                     <SelectItem value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</SelectItem>
                     <SelectItem value="MONOTRIBUTO">Monotributista</SelectItem>
                     <SelectItem value="EXENTO">Exento</SelectItem>
-                    <SelectItem value="CONSUMIDOR_FINAL">Consumidor Final</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -543,26 +558,17 @@ export function SunatConfigStep() {
               <Input
                 id="dian_url"
                 type="url"
-                value={state.configuration.dian_url || ''}
-                onChange={(e) => updateConfiguration({ dian_url: e.target.value })}
-                placeholder="https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc"
+                value={dianEndpoint}
+                readOnly
+                aria-readonly="true"
                 className={inputClass}
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Se asigna automáticamente según el ambiente; no admite destinos personalizados.
+              </p>
             </div>
 
             <div className={fieldGridClass}>
-              <div>
-                <Label htmlFor="dian_usuario" className={labelClass}>
-                  Usuario DIAN <span className={requiredClass}>*</span>
-                </Label>
-                <Input id="dian_usuario" value={state.configuration.dian_usuario || ''} onChange={(e) => updateConfiguration({ dian_usuario: e.target.value })} placeholder="usuario" className={inputClass} />
-              </div>
-              <div>
-                <Label htmlFor="dian_password" className={labelClass}>
-                  Password DIAN <span className={requiredClass}>*</span>
-                </Label>
-                <Input id="dian_password" type="password" value={state.configuration.dian_password || ''} onChange={(e) => updateConfiguration({ dian_password: e.target.value })} placeholder="••••••••" className={inputClass} />
-              </div>
               <div>
                 <Label htmlFor="dian_software_id" className={labelClass}>
                   Software ID <span className={requiredClass}>*</span>

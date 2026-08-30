@@ -1,5 +1,8 @@
 import {
+  BadRequestException,
   Controller,
+  Delete,
+  ForbiddenException,
   Get,
   Post,
   Put,
@@ -8,9 +11,19 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+} from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -27,16 +40,24 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
 import { encryptText } from '../../shared/utils/secure-config.utils';
 import { DianFiscalService } from '../fiscal/dian-fiscal.service';
+import { normalizeArcaEndpointConfiguration } from '../fiscal/arca-fiscal.service';
 import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
 import { ActualizarEmpresaConfigurationDto } from './dto/actualizar-empresa-configuration.dto';
+import { RegistrarHabilitacionDianDto } from './dto/registrar-habilitacion-dian.dto';
 import { CompletarConfiguracionDto } from '../shared-dto/acciones-simples.dto';
 import {
   INITIAL_ACTIVE_COUNTRY_CODE,
   INITIAL_ACTIVE_COUNTRY_ID,
   INITIAL_ACTIVE_COUNTRY_MESSAGE,
+  getActiveCountryById,
   isInitialActiveCountryCode,
   isInitialActiveCountryId,
 } from '../paises/initial-country';
+import {
+  CompanyLogoService,
+  CompanyLogoUpload,
+  MAX_COMPANY_LOGO_BYTES,
+} from './company-logo.service';
 
 @ApiTags('configuration')
 @Controller('configuration')
@@ -46,12 +67,21 @@ import {
 export class ConfigurationController {
   private readonly logger = new Logger(ConfigurationController.name);
 
+  private normalizeArcaEndpoints<T extends Record<string, unknown>>(input: T): T {
+    try {
+      return normalizeArcaEndpointConfiguration(input);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   constructor(
     private readonly configurationService: ConfigurationService,
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
     private readonly dianFiscalService: DianFiscalService,
     private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly companyLogoService: CompanyLogoService,
   ) {}
 
   @Post('colombia/dian/test')
@@ -65,6 +95,53 @@ export class ConfigurationController {
       );
     }
     return { success: true, data: await this.dianFiscalService.probarConfiguracion(tenantId) };
+  }
+
+  @Post('colombia/dian/habilitacion')
+  @RequirePermission('configuracion.write')
+  @ApiOperation({
+    summary: 'Registrar la constancia administrativa de software Habilitado en el portal DIAN',
+  })
+  async registerColombiaDianApproval(
+    @Body() body: RegistrarHabilitacionDianDto,
+    @CurrentTenant() tenantId?: string,
+    @CurrentUser() user?: User,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    if (!tenantId || !user?.id) {
+      throw new HttpException(
+        { success: false, message: 'Tenant y actor requeridos' },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    const isTenantAdmin = user.is_super_admin === true || (user.roles ?? []).some((role) =>
+      ['ADMIN', 'ADMINISTRADOR', 'SUPERADMIN'].includes(String(role).trim().toUpperCase()),
+    );
+    if (!isTenantAdmin) {
+      throw new ForbiddenException(
+        'Sólo un administrador del tenant puede registrar la constancia HABILITADO de DIAN',
+      );
+    }
+    const key = String(idempotencyKey ?? '').trim();
+    if (key.length < 8 || key.length > 255) {
+      throw new BadRequestException(
+        'Idempotency-Key es obligatorio y debe tener entre 8 y 255 caracteres',
+      );
+    }
+    const data = await this.dianFiscalService.registrarHabilitacionPortal(
+      tenantId,
+      user.id,
+      key,
+      body.evidenceReference.trim(),
+    );
+    await this.cacheInvalidation.invalidateAllTenantCache(tenantId);
+    return {
+      success: true,
+      data,
+      message: data.validation?.ready
+        ? 'Habilitación DIAN registrada y configuración productiva revalidada'
+        : 'Habilitación DIAN registrada; la validación técnica aún requiere atención',
+    };
   }
 
   private assertInitialActiveCountry(paisId?: number | null, paisCodigo?: string | null): void {
@@ -285,6 +362,15 @@ export class ConfigurationController {
         );
       }
 
+      if (stepData.configuracionTemporal) {
+        stepData = {
+          ...stepData,
+          configuracionTemporal: this.normalizeArcaEndpoints(
+            stepData.configuracionTemporal as Record<string, unknown>,
+          ),
+        };
+      }
+
       const progress = await this.configurationService.saveWizardStep(
         tenantId,
         stepData,
@@ -397,10 +483,11 @@ export class ConfigurationController {
         );
       }
       this.logger.log(`Completing configuration for tenant: ${tenantId}`);
+      const configuration = this.normalizeArcaEndpoints(body.configuration);
       // Una sola frontera SQL guarda empresa y marca el wizard completo.
       await this.configurationService.completeWizard(
         tenantId,
-        body.configuration,
+        configuration,
         user?.id,
         idempotencyKey,
       );
@@ -688,6 +775,10 @@ export class ConfigurationController {
           dianResolucionHasta: data.dian_resolucion_hasta,
           dianResolucionFechaInicio: data.dian_resolucion_fecha_inicio,
           dianResolucionFechaFin: data.dian_resolucion_fecha_fin,
+          dianHabilitacionEstado: data.dian_habilitacion_estado,
+          dianHabilitacionAt: data.dian_habilitacion_at,
+          dianHabilitacionReferencia:
+            data.dian_habilitacion_evidencia?.reference || null,
         },
       };
     } catch (error) {
@@ -697,6 +788,75 @@ export class ConfigurationController {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  @Post('empresa/logo')
+  @RequirePermission('configuracion.write')
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { files: 1, fileSize: MAX_COMPANY_LOGO_BYTES },
+  }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOperation({ summary: 'Subir o reemplazar el logo empresarial en Supabase Storage' })
+  async uploadEmpresaLogo(
+    @CurrentTenant() tenantId: string | undefined,
+    @CurrentUser() user: User | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @UploadedFile() file?: CompanyLogoUpload,
+  ) {
+    if (!tenantId) {
+      throw new HttpException(
+        { success: false, message: 'Tenant requerido' },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    const data = await this.companyLogoService.upload(
+      tenantId,
+      user?.id || '',
+      idempotencyKey || '',
+      file,
+    );
+    await this.cacheInvalidation.invalidateAllTenantCache(tenantId);
+    return {
+      success: true,
+      data,
+      message: data.cleanup_pending
+        ? 'Logo actualizado; la limpieza del archivo anterior quedó pendiente de reintento'
+        : 'Logo empresarial actualizado exitosamente',
+    };
+  }
+
+  @Delete('empresa/logo')
+  @RequirePermission('configuracion.write')
+  @ApiOperation({ summary: 'Quitar de forma segura el logo empresarial' })
+  async deleteEmpresaLogo(
+    @CurrentTenant() tenantId: string | undefined,
+    @CurrentUser() user: User | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ) {
+    if (!tenantId) {
+      throw new HttpException(
+        { success: false, message: 'Tenant requerido' },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    const data = await this.companyLogoService.remove(
+      tenantId,
+      user?.id || '',
+      idempotencyKey || '',
+    );
+    await this.cacheInvalidation.invalidateAllTenantCache(tenantId);
+    return {
+      success: true,
+      data: { ...data, logo_url: null },
+      message: 'Logo empresarial eliminado exitosamente',
+    };
   }
 
   /**
@@ -722,6 +882,9 @@ export class ConfigurationController {
       }
 
       this.logger.log(`Updating empresa data for tenant: ${tenantId}`);
+      datosEmpresa = this.normalizeArcaEndpoints(
+        datosEmpresa as unknown as Record<string, unknown>,
+      ) as unknown as ActualizarEmpresaConfigurationDto;
       const updateData: any = {};
       let resolvedPaisId: number | null = null;
       let resolvedPaisCodigo: string | null = null;
@@ -784,7 +947,7 @@ export class ConfigurationController {
         const { data: currentEmpresa } = await this.supabaseService
           .getClient()
           .from('empresa_config')
-          .select('pais_id')
+          .select('pais_id, pais')
           .eq('tenant_id', tenantId)
           .maybeSingle();
 
@@ -792,7 +955,33 @@ export class ConfigurationController {
           resolvedPaisId = INITIAL_ACTIVE_COUNTRY_ID;
           resolvedPaisCodigo = INITIAL_ACTIVE_COUNTRY_CODE;
         } else {
-          this.assertInitialActiveCountry(Number(currentEmpresa.pais_id), null);
+          resolvedPaisId = Number(currentEmpresa.pais_id);
+          resolvedPaisCodigo = String(
+            currentEmpresa.pais
+            || getActiveCountryById(resolvedPaisId)?.codigo
+            || '',
+          ).trim().toUpperCase();
+          this.assertInitialActiveCountry(resolvedPaisId, resolvedPaisCodigo);
+        }
+      }
+
+      if (resolvedPaisCodigo === 'CO') {
+        const requestedMode = String(datosEmpresa.emisionCpeModo ?? '').trim().toUpperCase();
+        const hasOseDestination = [
+          datosEmpresa.oseUrl,
+          datosEmpresa.oseStatusUrl,
+          datosEmpresa.oseUsername,
+          datosEmpresa.osePassword,
+          datosEmpresa.oseApiKey,
+          datosEmpresa.oseApiHeader,
+          datosEmpresa.oseBearerToken,
+        ].some((value) => String(value ?? '').trim().length > 0);
+        if ((requestedMode && requestedMode !== 'DIAN_DIRECTO')
+            || datosEmpresa.oseActivo === true
+            || hasOseDestination) {
+          throw new BadRequestException(
+            'Colombia emite exclusivamente por DIAN_DIRECTO; la configuración OSE sólo corresponde a Perú',
+          );
         }
       }
 
@@ -824,6 +1013,20 @@ export class ConfigurationController {
         throw new HttpException(
           { success: false, message: INITIAL_ACTIVE_COUNTRY_MESSAGE },
           HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const logoPayload = datosEmpresa as ActualizarEmpresaConfigurationDto & {
+        logo_url?: unknown;
+        logoBase64?: unknown;
+      };
+      if (
+        logoPayload.logoUrl !== undefined
+        || logoPayload.logo_url !== undefined
+        || logoPayload.logoBase64 !== undefined
+      ) {
+        throw new BadRequestException(
+          'El logo debe cargarse mediante POST /api/configuration/empresa/logo',
         );
       }
 
@@ -874,22 +1077,28 @@ export class ConfigurationController {
       }
       if (datosEmpresa.actividadEconomica) updateData.actividad_economica = datosEmpresa.actividadEconomica;
       if (datosEmpresa.igvPorcentaje !== undefined) updateData.igv_porcentaje = datosEmpresa.igvPorcentaje;
-      if (datosEmpresa.logoUrl) updateData.logo_url = datosEmpresa.logoUrl;
       if (datosEmpresa.tipo_empresa) updateData.tipo_empresa = datosEmpresa.tipo_empresa;
       if (datosEmpresa.usar_flujo_logistica !== undefined) updateData.usar_flujo_logistica = datosEmpresa.usar_flujo_logistica;
       if (datosEmpresa.gre_obligatorio !== undefined) updateData.gre_obligatorio = datosEmpresa.gre_obligatorio;
       if (datosEmpresa.gre_automatico_habilitado !== undefined) updateData.gre_automatico_habilitado = datosEmpresa.gre_automatico_habilitado;
       if (datosEmpresa.umbral_gre_automatico !== undefined) updateData.umbral_gre_automatico = datosEmpresa.umbral_gre_automatico;
-      if (datosEmpresa.emisionCpeModo) updateData.emision_cpe_modo = datosEmpresa.emisionCpeModo;
-      if (datosEmpresa.oseUrl !== undefined) updateData.ose_url = datosEmpresa.oseUrl;
-      if (datosEmpresa.oseStatusUrl !== undefined) updateData.ose_status_url = datosEmpresa.oseStatusUrl;
-      if (datosEmpresa.oseUsername !== undefined) updateData.ose_username = datosEmpresa.oseUsername;
-      if (datosEmpresa.osePassword !== undefined) updateData.ose_password = datosEmpresa.osePassword;
-      if (datosEmpresa.oseApiKey !== undefined) updateData.ose_api_key = datosEmpresa.oseApiKey;
-      if (datosEmpresa.oseApiHeader !== undefined) updateData.ose_api_header = datosEmpresa.oseApiHeader;
-      if (datosEmpresa.oseBearerToken !== undefined) updateData.ose_bearer_token = datosEmpresa.oseBearerToken;
-      if (datosEmpresa.oseAuthTipo !== undefined) updateData.ose_auth_tipo = datosEmpresa.oseAuthTipo;
-      if (datosEmpresa.oseActivo !== undefined) updateData.ose_activo = datosEmpresa.oseActivo;
+      if (resolvedPaisCodigo === 'CO') {
+        // No confiar sólo en la UI: incluso un registro legado mal configurado
+        // vuelve a la ruta fiscal canónica al guardar cualquier cambio.
+        updateData.emision_cpe_modo = 'DIAN_DIRECTO';
+        updateData.ose_activo = false;
+      } else {
+        if (datosEmpresa.emisionCpeModo) updateData.emision_cpe_modo = datosEmpresa.emisionCpeModo;
+        if (datosEmpresa.oseUrl !== undefined) updateData.ose_url = datosEmpresa.oseUrl;
+        if (datosEmpresa.oseStatusUrl !== undefined) updateData.ose_status_url = datosEmpresa.oseStatusUrl;
+        if (datosEmpresa.oseUsername !== undefined) updateData.ose_username = datosEmpresa.oseUsername;
+        if (datosEmpresa.osePassword !== undefined) updateData.ose_password = datosEmpresa.osePassword;
+        if (datosEmpresa.oseApiKey !== undefined) updateData.ose_api_key = datosEmpresa.oseApiKey;
+        if (datosEmpresa.oseApiHeader !== undefined) updateData.ose_api_header = datosEmpresa.oseApiHeader;
+        if (datosEmpresa.oseBearerToken !== undefined) updateData.ose_bearer_token = datosEmpresa.oseBearerToken;
+        if (datosEmpresa.oseAuthTipo !== undefined) updateData.ose_auth_tipo = datosEmpresa.oseAuthTipo;
+        if (datosEmpresa.oseActivo !== undefined) updateData.ose_activo = datosEmpresa.oseActivo;
+      }
       if (datosEmpresa.dianActivo !== undefined) updateData.dian_activo = datosEmpresa.dianActivo;
       if (datosEmpresa.dianUrl !== undefined) updateData.dian_url = datosEmpresa.dianUrl;
       if (datosEmpresa.dianUsuario !== undefined) updateData.dian_usuario = datosEmpresa.dianUsuario;

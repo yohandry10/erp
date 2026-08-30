@@ -5,7 +5,9 @@ import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 
 /**
- * Consulta un RUC en el padrón de SUNAT mientras se teclea.
+ * Consulta datos públicos auxiliares de un RUC mientras se teclea. La fuente
+ * actual no es un servicio oficial de SUNAT y la respuesta no se presenta como
+ * certificación.
  *
  * Dice tres cosas que antes no se sabían: si el contribuyente existe, si está
  * de baja y si está **habido**. Lo último importa de verdad — una compra a un
@@ -98,7 +100,7 @@ export function ConsultaRuc({
     return (
       <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
         <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-        Consultando el {documentoLabel} en SUNAT…
+        Consultando datos públicos del {documentoLabel}…
       </p>
     )
   }
@@ -106,14 +108,14 @@ export function ConsultaRuc({
   if (sinRespuesta || !dato) {
     return (
       <p className="mt-2 text-xs text-muted-foreground">
-        No se pudo comprobar este {documentoLabel} en SUNAT ahora mismo. Puede continuar.
+        No se pudo comprobar este {documentoLabel} en la fuente auxiliar. Puede continuar.
       </p>
     )
   }
 
-  const activoEnSunat = (dato.estado ?? '').toUpperCase() === 'ACTIVO'
+  const activoEnPadron = (dato.estado ?? '').toUpperCase() === 'ACTIVO'
   const habido = (dato.condicion ?? '').toUpperCase() === 'HABIDO'
-  const todoBien = activoEnSunat && habido
+  const todoBien = activoEnPadron && habido
 
   return (
     <div
@@ -136,6 +138,9 @@ export function ConsultaRuc({
         {dato.estado ?? 'estado desconocido'} · {dato.condicion ?? 'condición desconocida'}
         {dato.direccion ? ` · ${dato.direccion}` : ''}
       </p>
+      <p className="mt-1 pl-5 text-[0.68rem] opacity-80">
+        Consulta auxiliar {dato.desdeCache ? 'desde caché' : `vía ${dato.fuente}`}; confirma en SUNAT antes de una decisión fiscal.
+      </p>
 
       {!habido && (
         <p className="mt-2 pl-5 font-normal">
@@ -143,9 +148,9 @@ export function ConsultaRuc({
           Puede registrarlo igual, pero conviene saberlo antes.
         </p>
       )}
-      {!activoEnSunat && (
+      {!activoEnPadron && (
         <p className="mt-1 pl-5 font-normal">
-          Figura de <strong>baja</strong> en SUNAT, así que no debería emitir comprobantes.
+          La fuente consultada lo reporta de <strong>baja</strong>; confirma el estado en SUNAT antes de aceptar comprobantes.
         </p>
       )}
     </div>

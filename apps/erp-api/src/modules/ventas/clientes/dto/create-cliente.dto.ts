@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsEmail, Length, MinLength, Matches } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsEmail, IsIn, Length, MaxLength, MinLength, Matches } from 'class-validator';
 import { TipoCliente, TipoDocumento } from '../entities/cliente.entity';
 
 /**
@@ -38,4 +38,20 @@ export class CreateClienteDto {
   @IsString({ message: 'El teléfono debe ser texto' })
   @Length(6, 20, { message: 'El teléfono debe tener entre 6 y 20 caracteres' })
   telefono?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  @IsIn([
+    'RESPONSABLE_INSCRIPTO', 'MONOTRIBUTO', 'EXENTO', 'CONSUMIDOR_FINAL',
+    'SUJETO_NO_CATEGORIZADO', 'PROVEEDOR_EXTERIOR', 'CLIENTE_EXTERIOR',
+    'IVA_LIBERADO', 'MONOTRIBUTISTA_SOCIAL', 'IVA_NO_ALCANZADO',
+    'MONOTRIBUTO_TRABAJADOR_INDEPENDIENTE_PROMOVIDO',
+  ])
+  arca_condicion_iva?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['CONSUMIDOR_FINAL', 'ADQUIRIENTE_NIT_B2B'])
+  dian_perfil_fiscal?: 'CONSUMIDOR_FINAL' | 'ADQUIRIENTE_NIT_B2B';
 }

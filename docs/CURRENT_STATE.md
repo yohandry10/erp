@@ -1,12 +1,100 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-25.
+Actualizado: 2026-08-29.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
 migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
+
+- **Estado remoto comprobado el 2026-08-29, antes del paquete de logo/A4:**
+  GitHub `main`, Render y Vercel sirven el commit
+  `54e8b1a1124d6d300352d1b7c1e36086ce6dcd1a`; los tres workflows de ese SHA
+  están verdes (248 suites y 2169 pruebas) y PROD registra `schema_version 522`.
+  Readiness devuelve DB, Redis y outbox listos, pero revela un desfase real:
+  el proceso de Render aún informa `required_schema_version 519`, aunque
+  `render.yaml` de `main` exige 522. No se considera cerrado hasta desplegar el
+  siguiente runtime y comprobar que el valor efectivo coincida con el gate.
+
+- **Las migraciones 523-528 y la nueva representación CPE están verificadas
+  localmente como release candidate, no en producción.** La 523 reserva el logo empresarial en Supabase
+  Storage con ruta por tenant, idempotencia, RLS y writer canónico; el PDF usa
+  A4 físico, QR SUNAT Q en la parte inferior, logo, unidades, bases y leyenda.
+  A4 es una elección de salida del ERP, no un tamaño obligatorio impuesto por
+  SUNAT. La 524 añade la condición IVA del receptor y evidencia terminal CAE
+  para el flujo argentino, sin fingir un CDR de SUNAT. La promoción exige
+  PostgreSQL 16 desde cero, verificadores 523-528, CI/PR, DB-first, gate efectivo
+  528 y revalidación visual en PROD. La 525 conserva por CPE la procedencia y el
+  emisor, trata el legado como simulado y separa CUFE/CUDE del hash XML; la 526
+  congela el perfil tributario DIAN del receptor. La 527 importa y ancla la FEV
+  recibida, separa RBAC de lectura/gestión/034 y reserva, sella, finaliza y
+  reintenta idempotentemente los eventos FEV 030-034. Una reconstrucción limpia
+  de PostgreSQL 16 aplicó las 525 migraciones hasta 528 y cerró 38 verificadores
+  vigentes, 67 históricos y 6 obsoletos expresamente enumerados. La suite API
+  completa, repetida tras el último ajuste normativo y el saneo del progreso
+  del wizard, pasa 278 suites y 2516/2516 pruebas; type-check, lint sin errores,
+  build de 132 rutas y el contrato DIAN de nueve documentos también están
+  verdes. La 528
+  impide declarar un CPE colombiano `ACEPTADO` sin correlación estructural exacta
+  del `ApplicationResponse`, firma confiable y mismo CUFE/CUDE; su verificador
+  también está verde. La reconstrucción final comprobó además las ocho rutas
+  concurrentes 525/527: reserva esperó el advisory lock 3,477 s/3,479 s, terminó
+  idempotente y PostgreSQL registró cero deadlocks. Base, API y Web desplegados
+  siguen en 522; `render.yaml` y
+  CI ya exigen 528 para el release, pero PR/CI remoto, DB-first y despliegue aún
+  están pendientes.
+
+- **La emisión Colombia y los eventos FEV 030-034 quedan técnicamente
+  implementados en este release candidate, no homologados legalmente.** La
+  factura electrónica `01` y las notas `91/92` se
+  construyen como UBL 2.1 bajo el Anexo Técnico FEV 1.9, calculan CUFE/CUDE
+  SHA-384, se firman XAdES-EPES y viajan por SOAP 1.2 con WS-Addressing y
+  WS-Security X.509. El adaptador implementa `SendTestSetAsync`,
+  `SendBillSync`/`SendBillAsync`, `GetStatus`, `GetStatusZip`,
+  `GetNumberingRange`, `SendEventUpdateStatus` y `GetStatusEvent`; conserva
+  `ApplicationResponse` y sólo construye `AttachedDocument` cuando existe una
+  respuesta DIAN real. La 527 consulta `GetStatusEvent`, `GetStatus` y
+  `GetXmlByDocumentKey`, importa la FEV recibida desde evidencia oficial y
+  permite 030-033 sobre esa ancla; el 034 parte de la factura emitida. El retry
+  se recupera por `operationId` persistido aun sin la clave de `sessionStorage`.
+  Reintentos y recuperación distinguen CUFE/CUDE de `ZipKey` para no reenviar
+  una intención cuyo resultado sea incierto. El gate de contrato fija por
+  SHA-256 22 artefactos oficiales y genera desde el código real nueve XML
+  firmados: factura, dos notas, cinco eventos y adjunto. Los nueve pasan XSD.
+  Antes del Schematron, el gate exige los `ProfileID` normativos exactos:
+  `DIAN 2.1: Factura Electrónica de Venta`, `DIAN 2.1: Nota Crédito de Factura
+  Electrónica de Venta`, `DIAN 2.1: Nota Débito de Factura Electrónica de Venta`
+  y `DIAN 2.1: ApplicationResponse de Factura Electrónica de Venta`. Factura,
+  notas y eventos pasan además el Schematron compilado con el conjunto completo
+  y exacto de divergencias documentadas de la caja FEV 1.9 de 2026; el XSL aún
+  espera perfiles cortos, pero no se tolera por código ni substring genérico. El
+  `AttachedDocument` queda sólo bajo XSD porque el XSL oficial no declara su
+  espacio de nombres como raíz. La firma de autoridad se exige sobre el
+  `ApplicationResponse` 02/04 interno devuelto por DIAN; el contenedor exterior
+  del `AttachedDocument` y los eventos 030-034 se firman con el PFX del
+  participante/tenant. Una respuesta DIAN a esos eventos se valida por separado
+  contra el trust de autoridad.
+  El trust store público y los pins SHA-256 del SPKI de DIAN son obligatorios;
+  si faltan o no encadenan, la aceptación falla cerrado. El PFX se contrasta con
+  el NIT efectivo antes de persistir o activar DIAN; cambiar el NIT con un PFX
+  almacenado para otro emisor falla cerrado. `GetNumberingRange` acredita
+  numeración, no el Software PIN ni la homologación. Nada de ello acredita el
+  TestSet de facturación ni estado `HABILITADO`: faltan el PFX, Software
+  ID/PIN, TestSet, resolución/numeración, constancia real del portal y smoke
+  autorizado. Además, participar directamente en RADIAN es otra habilitación:
+  el Abecé oficial vigente exige registro/requisitos y un Set de pruebas RADIAN
+  de 15 eventos. Soportar 030-034 no equivale a superar ese set ni deja listo el
+  factoring o los demás eventos de circulación.
+
+- **Alcance fiscal argentino de esta entrega:** sólo WSFEv1 en pesos y las
+  familias A/B/C ordinarias. Exportación E requiere WSFEXv1; moneda extranjera
+  requiere cotización oficial; CAEA tiene un régimen de contingencia propio; y
+  A-CBU/A sujeta a retención requieren una habilitación del emisor otorgada por
+  ARCA. Esos casos quedan bloqueados hasta implementar y verificar sus contratos
+  externos; no se degradan a A normal, CAE común ni cotización 1. Colombia ya
+  tiene transporte técnico, pero continúa sin homologación del contribuyente
+  ni transmisión real verificada.
 
 - **Un recorrido por pantalla, haciendo lo que hace un contador, encontró tres
   cosas que ninguna prueba veía** porque todas estaban del lado del uso, no del
@@ -355,11 +443,11 @@ migraciones verificados, prevalece la implementación actual.
   y el planificador de plantillas, que corre a las 02:00 UTC —21:00 de Lima del día
   anterior— y disparaba las plantillas un día antes con fecha futura. Todos pasan
   ya por la zona del contribuyente; el planificador filtra por el calendario de
-  cada tenant. Queda anotado y sin resolver el caso de ARCA: el QR y el XML leen
-  `fechaEmision` en UTC y coinciden entre sí, pero una emisión nocturna en
-  Argentina quedaría fechada al día siguiente. No afecta hoy —ningún contribuyente
-  tiene `arca_activo` y no hay tenants AR— y al homologar habrá que decidir si ese
-  campo es el instante o el día fiscal.
+  cada tenant. El caso de ARCA que se detectó en esta pasada también quedó
+  cerrado: `CbteFch` es un día fiscal y se resuelve con el calendario argentino,
+  no con los getters UTC del servidor; el QR reutiliza exactamente la misma fecha.
+  La evidencia y el contrato vigente están detallados en «ARCA: la fecha del
+  comprobante (cerrado)» más abajo.
   **Apareció un undécimo el 2026-08-22**, y no por el guardián sino porque la suite
   se puso roja al cruzar la medianoche UTC: `getStats` del módulo GRE comparaba
   `created_at.slice(0, 10)` —día UTC— contra `fechaHoyDelTenant` —día del
@@ -445,7 +533,10 @@ migraciones verificados, prevalece la implementación actual.
   demuestre una aceptación beta de ambas notas; no se afirma esa homologación.
 - Inventario usa un único ledger físico por almacén.
 - Desktop/Tauri está implementado como cliente offline-first con SQLite y outbox
-  por tenant.
+  por tenant. Las mutaciones de autenticación, configuración, conversión demo y
+  rutas con certificado, PFX, credencial o secreto nunca son offline-capable:
+  fallan cerradas ante falta de red y se purgan entradas sensibles heredadas de
+  Web Storage y SQLite antes de listar o sincronizar.
 
 ## Entornos
 
@@ -626,8 +717,8 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   contratos no cambia. Las tasas del motor (10 % + 1,55 % + 1,37 % = 12,92 %) ya
   eran correctas; queda pendiente el catálogo por AFP, que hoy usa las de Integra
   para las cuatro administradoras.
-- `498` está validada sólo localmente y **no** promovida a PROD. La planilla de la
-  demo traía los importes escritos a mano y el del trabajador con contrato AFP
+- La planilla de la demo traía los importes escritos a mano y el del trabajador
+  con contrato AFP
   estaba mal: 416 sobre 3 200 es el 13 % de la ONP, no el 12,92 % de una AFP. Es el
   mismo patrón que cerró la `497` con la venta POS —dato derivado escrito a mano en
   vez de producido por el motor—, y reaparece solo cada vez que cambia una tasa o
@@ -635,7 +726,6 @@ tenants operativos y ninguna dependencia del proyecto DEV retirado.
   demo pasa a nacer en borrador y sin líneas por empleado: el usuario pulsa
   «Calcular» y ve lo que produce el motor real. El readiness sólo exige que la
   planilla exista.
-- El runtime exige ahora esquema `498`.
 - La configuración fiscal dejó de fallar abierta. `TaxCalculatorService` devolvía
   Perú 18 %/PEN ante cualquier fallo —error de consulta, país sin resolver, fila
   ausente o tasa inválida—, de modo que un tenant colombiano facturaba al 18 % en
@@ -885,21 +975,39 @@ Cambios recientes principales:
   crédito fiscal (`507`), retención de cuarta categoría (`508`), estimación de
   cobranza dudosa (`509`) y tasas de detracción con su carga (`510`, `511`)—.
   Cada una con su verificador comprobado en rojo antes de aplicarse.
-  `REQUIRED_DATABASE_SCHEMA_VERSION` vale `511` en `render.yaml` y en
-  `.github/workflows/ci.yml`; los dos tienen que moverse a la vez.
+  PROD registra actualmente `522`; el proceso de Render observado todavía
+  anunciaba requisito `519`, y el release candidate local mueve
+  `REQUIRED_DATABASE_SCHEMA_VERSION` a `528` en `render.yaml` y
+  `.github/workflows/ci.yml`. Los verificadores 523-528 pasan en PostgreSQL 16
+  efímero. Base, runtime y CI deben coincidir en 528 antes de dar el despliegue
+  por cerrado.
 
 ## Flujos cerrados técnicamente
+
+«Cerrado técnicamente» significa que existe implementación y contrato probado;
+no equivale a un recorrido visual E2E contra producción. La matriz de
+`Cobertura visual vigente del release candidate 523-528` distingue ambos
+niveles.
 
 - Auth, sesión HttpOnly, RBAC, RLS y aislamiento tenant.
 - Catálogos, clientes, proveedores y configuración empresarial.
 - Ventas, cotizaciones, pedidos, POS, caja y pagos.
 - CPE `01/03/07/08`, RA y RC en beta.
-- Argentina: CUIT, ARS, IVA `0/10,5/21/27`, Facturas A/B/C/E/M y notas
-  WSFEv1, punto de venta, CAE/QR y autenticación WSAA implementados.
-- Colombia: NIT con dígito de verificación, COP, IVA 19 %, factura electrónica
-  DIAN y documento soporte de pago de nómina configurables. La demo comprueba
-  el WSDL oficial sin transmitir; la emisión real falla cerrado mientras no
-  exista transporte SOAP WS-Security/XAdES homologado con credenciales reales.
+- Argentina: CUIT, ARS, IVA `0/10,5/21/27`, Facturas A/B/C ordinarias en pesos
+  y sus notas por WSFEv1, punto de venta, CAE/QR y autenticación WSAA. Factura E
+  requiere WSFEXv1; moneda extranjera, CAEA y clases especiales conservan sus
+  propias fronteras y no se presentan como soportadas.
+- Colombia: NIT con dígito de verificación, COP, IVA configurable y afectación
+  por producto; factura `01`, notas `91/92`, CUFE/CUDE SHA-384, XAdES-EPES,
+  SOAP 1.2 WS-Security/WS-Addressing, numeración, consulta, recuperación,
+  `ApplicationResponse`, `AttachedDocument`, importación/listado de FEV recibida
+  y eventos FEV 030-034 con consulta y retry durable. La 528 exige evidencia
+  DIAN estructural y criptográficamente correlacionada antes de aceptar. La demo
+  no transmite y una cuenta real falla cerrado si falta perfil receptor,
+  credencial tenant-scoped, validación técnica reciente o constancia del portal
+  `HABILITADO`, trust store o pins oficiales. Este cierre técnico no equivale a
+  TestSet aprobado ni a habilitación legal DIAN; tampoco constituye habilitación
+  como participante directo RADIAN ni soporte integral de factoring.
 - Compras, recepción, inventario, reservas, logística y kardex.
 - Finanzas, CxC, CxP, bancos y conciliación. Contabilidad cubre las siete fases
   auditadas: ciclo de vida, multi-moneda, recurrentes, activos, partidas
@@ -923,8 +1031,9 @@ Cambios recientes principales:
   oficiales externos.
 - Tema dark/light, shell responsive, Analytics y navegación por roles.
 - Offline desktop: SQLite local, outbox durable y caché por tenant.
-- Padrón de RUC de SUNAT consultable desde el alta de proveedor, la de cliente y
-  el asistente inicial: razón social, estado y **condición** (habido o no habido).
+- Datos públicos auxiliares del RUC consultables desde el alta de proveedor, la
+  de cliente y el asistente inicial: razón social, estado y **condición**
+  (habido o no habido). La fuente actual no es un servicio oficial de SUNAT.
 
 “Cerrado técnicamente” significa que el código y las pruebas controladas pasan; no
 reemplaza homologación legal, credenciales finales, hardware físico ni smoke
@@ -1015,9 +1124,11 @@ productivo autorizado.
   denuncia el descuadre. La 522 invierte la preferencia de
   `app.tasa_impuesto_tenant`: primero la del contribuyente —con `IS NOT NULL`, no
   `coalesce`, porque **0 es una tasa** (Ley de Amazonía) y no un hueco— y
-  `configuracion_fiscal` como valor por defecto del país. Los 79 contribuyentes
-  de producción estaban alineados a 18,00, así que no cambió ningún importe: sólo
-  cierra el hueco. El rango imposible no lo guarda ni la tabla
+  `configuracion_fiscal` como valor por defecto del país. La migración y su
+  verificador prueban que las ramas convergen y que 0 sigue siendo una tasa
+  válida; la cifra histórica de «79 contribuyentes alineados» no cuenta como
+  evidencia reproducible por sí sola y no debe usarse como garantía. El rango
+  imposible no lo guarda ni la tabla
   (`ck_empresa_config_financial_runtime` acota a 0..100).
 - **La tasa que se exhibe es la misma que se cobra.**
   La RPC de venta del POS siempre calculó con ella; el navegador usaba una
@@ -1055,6 +1166,10 @@ productivo autorizado.
 
 - **El padrón de RUC avisa, no impide, y `null` significa «no se pudo
   comprobar».** `PadronRucService` (migración 520, tabla global `padron_ruc`)
+  consulta actualmente `api.apis.net.pe/v1/ruc` y conserva una caché local; no
+  descarga ni consulta directamente el padrón reducido oficial de SUNAT. Por
+  tanto, la UI debe presentarlo como una comprobación auxiliar y no como una
+  certificación oficial de SUNAT. El servicio
   devuelve `null` tanto si la fuente no responde como si el RUC no aparece, y
   ninguno de los dos casos puede bloquear el alta de un proveedor: si la fuente
   se cae, el registro sigue. Cuando la fuente falla se devuelve el último dato
@@ -1126,8 +1241,10 @@ productivo autorizado.
 - SUNAT producción exige que el certificado contenga el RUC esperado, salvo una
   excepción explícita y documentada.
 - Web usa cookie HttpOnly; no se guardan JWT ni contraseñas en Web Storage.
-- Tauri protege secretos locales con DPAPI y la outbox no guarda headers
-  sensibles.
+- Tauri protege secretos locales con DPAPI. Las mutaciones de auth,
+  configuración, conversión demo y material fiscal sensible requieren respuesta
+  en vivo, nunca se encolan y purgan cualquier residuo legacy tanto de la outbox
+  web como de SQLite Tauri.
 - El frontend usa Tailwind 3.4, shadcn/Radix y tokens semánticos.
 - `ADMIN_DEMO` puede crear usuarios y roles operativos dentro de su propio
   tenant para probar el sistema. `users.manage` no es delegable a roles custom,
@@ -1140,6 +1257,103 @@ Mapa de qué se ha revisado y con qué profundidad, para no repetir análisis en
 sesiones posteriores. «A fondo» significa leer el código del módulo buscando
 fallos de lógica; «barrido» significa que lo cruzó una comprobación de patrón
 pero nadie lo leyó.
+
+### Cobertura visual vigente del release candidate 523-528
+
+Esta matriz registra la pasada visible más reciente, no todo lo que alguna vez
+se leyó o probó en el repositorio. Se mantienen separados tres niveles:
+
+- **Visual real:** acción reproducida en el navegador integrado contra el
+  frontend desplegado y revisión de la respuesta/consola.
+- **Visual aislado:** Playwright abre la interfaz, pero intercepta las APIs; es
+  una regresión de UI y contrato HTTP, no una prueba del backend ni de PROD.
+- **Código/SQL:** suites o verificadores sin recorrido visible. No se cuentan
+  como auditoría visual.
+
+Sólo se marcará `CERRADO VISUAL` cuando el mismo flujo complete
+`reproducir → consola/logs → corregir → test → PR/CI → desplegar → retest` sobre
+el mismo SHA. **Ningún flujo del paquete local 523-528 cumple todavía esa
+cadena completa**, porque sigue en estado pre-PR: faltan CI remoto, promoción
+DB-first, despliegue y retest contra el mismo SHA.
+
+| Módulo o flujo crítico | Evidencia visual alcanzada | Estado vigente | Qué falta para cierre visual |
+| --- | --- | --- | --- |
+| Demo, autenticación y onboarding PE/AR/CO | Demos y navegación base PE/AR/CO tienen smoke histórico; en esta pasada se usó una sesión administrativa PE y se comprobó login/sesión. | `PARCIAL` | Repetir creación, conversión a real, expiración, cierre de sesión y navegación completa con cada rol en los tres países sobre el SHA final. |
+| Ventas: cotización → aprobación → pedido → logística | Se reprodujo el rechazo de aprobación, se distinguió vendedor de ADMIN y se verificó la aprobación administrativa; Playwright cubre aprobación, sustento, pedido y entrega a Logística. | `PARCIAL + VISUAL AISLADO` | Recorrer en PROD el circuito completo hasta despacho, factura, cobranza, devolución/RMA y nota, con ADMIN, vendedor y aprobador separados. |
+| POS y Caja | Se vieron ventas y movimientos de una caja abierta, el botón ilegible de cambio de sesión y su corrección de contraste. Playwright cubre cierre, redondeo, supervisor/PIN y conservación de errores. | `PARCIAL + VISUAL AISLADO` | Cerrar una caja nueva en PROD sobre 518+, cambiar turno de extremo a extremo, cuadrar medios de pago y probar impresora/Tauri físicos. La sesión histórica sin evidencia de redondeo no se fuerza. |
+| Fiscal/CPE Perú | Se abrió una factura/boleta demo, se corrigió el visor blanco y se comprobó A4 `210 × 297 mm`, datos, totales, descarga/impresión y marca sin validez. | `RC VERIFICADO LOCALMENTE` | Promover 523-528, subir logo real por Storage y repetir en PROD factura, boleta, NC/ND, QR/evidencia, correo/descarga y asiento originado. No se afirma aceptación SUNAT nueva. |
+| Fiscal/CPE Argentina y Colombia | Playwright localiza sus etiquetas y prohíbe QR fiscal falso en demos; API/SQL prueban CAE/evidencia AR. Para CO, Chrome Playwright cubre readiness, demo, historial bloqueado, auditor, retry por `operationId`, importación y 030→032→033 + 034; las 278 suites/2516 pruebas del API y la reconstrucción limpia hasta SQL 528 cubren el backend. Las APIs del recorrido visual están interceptadas. | `VISUAL AISLADO + AUTOMATIZADO LOCAL; NO PR/CI NI PROD` | AR: homologación con certificado/punto real. CO: promover 523-528, configurar trust/pins y contribuyente real, superar TestSet FEV, registrar `HABILITADO` y repetir visualmente emisión, consulta, adjunto, notas y eventos contra DIAN. Participación directa RADIAN requiere además su habilitación y set de 15 eventos. |
+| Contabilidad: consignaciones | El HTTP 500 y el mensaje visible se reprodujeron, se corrigió el contrato RPC y se volvió a cargar la bandeja. | `PARCIAL` | Alta, venta, devolución y cierre de una consignación real; comprobar stock, tercero, asiento, CxC y mayor en una misma cadena. |
+| Analytics | Se revisaron parcialmente mora/comercial y fechas durante la pasada; el usuario pidió detener este frente para priorizar Caja y fiscal. | `PAUSADO` | Recorrer cada tablero, filtro, exportación y reconciliar sus cifras con Ventas, CxC, inventario y contabilidad. |
+| Configuración, empresa y logo | Hay contrato de API/Storage, validaciones y pruebas de wizard. La API y SQL aplican la misma allowlist al estado temporal; la 528 sanea progreso, auditoría e intenciones históricas y un trigger impide que writers directos reintroduzcan secretos. No existe aún retest visual productivo del upload 523. | `CÓDIGO + TEST` | Wizard real completo, logo subir/reemplazar/eliminar, sucursales/series, credenciales fiscales y persistencia tras relogin en PE/AR/CO. |
+| Inventario y maestros | Playwright aislado cubre alta/edición legacy de productos y algunas reglas de Kardex. | `VISUAL AISLADO` | Flujo real producto → compra/recepción → stock/kardex → reserva/transferencia/despacho/devolución, con lotes/series y dos almacenes. |
+| Finanzas y tesorería | Playwright aislado cubre casos puntuales de Kardex financiero/liquidación; la lógica tiene suites y verificadores. | `VISUAL AISLADO + CÓDIGO` | CxC, CxP, bancos, ingreso/gasto, detracción/retención, multi-moneda, conciliación y cierre contra asientos y estados de cuenta reales. |
+| Usuarios, roles y seguridad | Playwright aislado cubre resumen de roles; guards/RLS tienen pruebas y smokes históricos de aislamiento. | `VISUAL AISLADO + CÓDIGO` | Crear, limitar, revocar y reactivar usuarios por cada rol; probar sesiones revocadas y permisos cruzados entre dos tenants en el SHA final. |
+
+El perfil aislado ejecutado sobre el árbol final quedó en **38/38**, más **1/1**
+de login/tema móvil. Incluye `setup`, middleware/auth, inventario maestro, gate
+fiscal de NC/ND, Finanzas/Kardex, monitor contable/outbox, usuarios/roles,
+cotizaciones/pedidos/logística, Caja y los ocho recorridos Colombia de
+readiness, demo, RBAC, retry/importación y eventos. Las APIs están interceptadas
+en esas pruebas. No reemplaza las suites que requieren API y PostgreSQL reales.
+
+#### Módulos y cadenas todavía sin auditoría visual E2E completa
+
+- **Dashboard, Documentos, Ayuda, auditoría y reportes generales:** navegación o
+  código no equivalen a validar cifras, filtros, exportaciones y errores.
+- **Compras procure-to-pay:** proveedor → orden → recepción → factura → crédito
+  fiscal/CxP → pago → asiento → libro de compras.
+- **Inventario/logística/GRE:** reservas, transferencias, picking, despacho,
+  devolución/RMA, consignación, trazabilidad y guía aceptada.
+- **Contabilidad completa:** plan, asiento manual/automático, periodo, centros de
+  costo, activos, diferidos, consolidación, estados financieros, PLE e impuestos.
+- **Finanzas completa:** tesorería, bancos, conciliación, cobranzas, pagos,
+  crédito, retenciones/detracciones y moneda extranjera.
+- **RRHH, PLAME/T-Registro, CTS y liquidaciones:** empleado → contrato →
+  asistencia → nómina → beneficios/cese → declaración; también PILA/nómina CO y
+  salidas AR aplicables.
+- **SIRE y transmisiones fiscales externas:** aceptación real SUNAT/OSE, GRE y
+  SIRE; ARCA real; DIAN real. Requieren credenciales y homologación del cliente.
+- **Offline/Tauri y hardware:** desconexión, cola, reinicio, replay idempotente,
+  caja/impresora y recuperación de conflictos en el ejecutable real.
+- **Responsive y accesibilidad:** sólo login/tema móvil tiene regresión en esta
+  pasada; falta cada módulo en móvil, teclado, lector y contraste.
+
+La existencia de una suite `*.spec.ts`, una revisión de código o la etiqueta
+«cerrado técnicamente» **no autoriza a reportar 100 % visual**. Esta lista es el
+punto de reanudación obligatorio después del release 523-528.
+
+#### Matriz específica Colombia DIAN
+
+Esta tabla evita mezclar tres afirmaciones distintas: que el código existe, que
+un contrato automatizado lo comprueba y que un usuario lo completó visualmente
+contra DIAN. En la fecha de corte **ninguna transmisión colombiana real se ha
+ejecutado** y el release candidate todavía no está desplegado. Los recorridos
+Chrome usan APIs interceptadas: prueban UX y contrato HTTP, no DIAN ni el backend
+productivo.
+
+| Flujo Colombia | Evidencia automatizada vigente | Evidencia visual vigente | Pendiente externo o de cierre |
+| --- | --- | --- | --- |
+| Alta demo CO, sesión y contexto COP/NIT | Suites de demo, país, impuesto y aislamiento tenant. | Chrome Playwright comprueba que una demo permanece sin escrituras externas aunque su bloque fiscal aparente estar completo. | Crear demo temporal y repetir login/navegación tras desplegar. |
+| Configuración y readiness DIAN | API exige tenant CO real y credenciales propias. Una validación técnica de menos de 24 h debe demostrar endpoint accesible, trust listo y coincidencia exacta de resolución, prefijo, rango y vigencia antes de permitir la primera constancia; producción exige después estado `HABILITADO`. La atestación es ADMIN-only, idempotente e invalida al cambiar identidad/Software ID/TestSet. | Chrome Playwright cubre listo, bloqueado, demo y registro de constancia; no se registró evidencia real del portal. | PFX, Software ID/PIN, TestSet, trust/pins, numeración y estado `HABILITADO` reales. |
+| Perfil tributario del receptor | La migración 526, su verificador y suites de clientes/CPE exigen una elección explícita y congelan el snapshot usado al emitir. | Formulario implementado; no revalidado en PROD. | Completar/confirmar los perfiles de clientes reales antes de emitir. |
+| Factura `01` desde POS/CPE | Builder y orquestación prueban afectación gravada, exenta y excluida, totales, CUFE y autorización. El gate genera el XML real y ejecuta XSD/Schematron oficial versionado. | La vista A4 CO tiene regresión Playwright; no hay envío visible real. | Numeración DIAN vigente y TestSet/producción autorizados. |
+| Nota crédito `91` y nota débito `92` | La referencia exige CPE aceptado del mismo tenant y conserva CUFE/CUDE, tipo, motivo y discrepancia; XSD/Schematron cubren ambos XML. | No recorridas visualmente de extremo a extremo. | Emitir/consultar cada tipo en el TestSet real y guardar respuesta oficial. |
+| Firma XAdES-EPES, trust y transporte SOAP | Suites criptográficas verifican firma XMLDSig/XAdES, propiedad del PFX y confianza independiente en respuestas DIAN mediante bundle CA y pins SHA-256 de SPKI. SOAP 1.2 firma WS-Security X.509, fija WS-Addressing y rechaza redirecciones/faults/XXE. TLS y el firmante XML son certificados distintos. | Sin llamada visible a DIAN con certificado de cliente. | Obtener un `ApplicationResponse` 02/04 real y reciente, verificar su leaf/cadena con la ECD y ONAC, y sólo entonces instalar bundle/pins y probar rotación. La caja oficial 2026 no publica un leaf o pin vigente; no usar TLS, PFX tenant ni el ejemplo vencido. |
+| Numeración y envío | Contratos cubren `GetNumberingRange`, `SendTestSetAsync`, `SendBillSync` y `SendBillAsync`; el rango y la clave técnica deben coincidir antes de la firma. `numberingValidated` sólo acredita ese rango; `softwarePinValidated` requiere evidencia separada de TestSet/portal, y `credentialsValidated` exige ambas. | No revalidado contra el servicio oficial. | Resolución/prefijo/rango vigentes asignados al software real; Software ID/PIN y TestSet del contribuyente. |
+| Consulta, reintento y recuperación | Se distinguen `GetStatus` por CUFE/CUDE, `GetStatusZip` por `ZipKey`, `GetStatusEvent` por CUFE de la factura y `GetXmlByDocumentKey` para recuperar la FEV. Una respuesta incierta se consulta antes de reenviar; retry usa `operationId` persistido. | Chrome comprueba retry sin la clave de `sessionStorage`; no se reprodujo latencia/fault real de DIAN. | Smoke autorizado de timeout, pendiente, aceptado y rechazo fiscal. |
+| `ApplicationResponse`, aceptación 528 y `AttachedDocument` | La 528 exige raíz/namespace UBL exactos, una firma `ds:Signature`, un `DocumentResponse/DocumentReference/UUID` directo con el mismo CUFE/CUDE, hash y trust válidos. El pin DIAN valida el `ApplicationResponse` 02/04 interno; el adjunto sólo nace después y su contenedor exterior se firma con el PFX tenant conservando emisor/receptor del snapshot. | No se descargó un adjunto producido por una aceptación real. | Obtener aceptación DIAN real y comprobar correlación, entrega y descarga al cliente. |
+| Eventos FEV 030-034 | 527/528 y sus verificadores PostgreSQL 16 cubren ancla recibida, RBAC/tenant, reserva-sello-finalización, secuencia, idempotencia, correlación estricta y retry; la suite API completa pasa. El gate firma/valida los cinco XML y exige el `ProfileID` descriptivo exacto. | Chrome aislado importa, recorre 030→032→033 y 034, conserva historial read-only y reconcilia por `operationId`; todo con APIs interceptadas. | PR/CI, esquema 528, deploy y prueba real como adquirente/facturador. No afirmar RADIAN integral. |
+| Habilitación directa RADIAN/factoring | No implementada ni demostrada por 030-034. | Sin recorrido ni credenciales reales. | Registro como participante directo, documentos/requisitos, verificación DIAN y Set RADIAN de 15 eventos; luego probar los eventos de circulación/factoring que correspondan. |
+| Impresión A4 y logo | PDF/vista conservan emisor y país del snapshot; el logo usa Storage tenant-scoped. La representación no se presenta como autorización fiscal. | A4 fue comprobado visualmente en el flujo CPE general; logo y documento CO final no se revalidaron juntos en PROD. | Subir logo real y comprobar PDF/impresora física tras desplegar. |
+| PILA y nómina electrónica CO | Cálculo laboral, configuración y bloqueo demo tienen pruebas separadas. | No hay declaración real visual. | Operador PILA, credenciales de nómina, datos patronales y validación legal externa; no forman parte de la homologación FEV. |
+
+El conjunto automatizado demuestra coherencia técnica y regresión local; no
+demuestra disponibilidad de DIAN, titularidad de credenciales, aceptación del
+TestSet ni habilitación jurídica del contribuyente. El requisito separado de 15
+eventos para un participante directo procede del
+[Abecé RADIAN oficial vigente](https://micrositios.dian.gov.co/sistema-de-facturacion-electronica/abece-radian/),
+consultado el 2026-08-29; no se infiere del TestSet FEV.
 
 > **Cuidado con los «hoy no dispara» de este documento.** Varias notas de abajo
 > se apoyan en datos de los tenants de producción —que ningún usuario esté en
@@ -1192,8 +1406,9 @@ crédito), `ventas` (dos DTOs y una fecha), `inventario`, `fiscal`, `migration`,
   pesos de la DIAN se aplicaban en orden inverso, con lo que el dígito de más a la
   derecha pesaba 71 en vez de 3. Comprobado contra cuatro NIT reales y públicos
   (Bancolombia, Ecopetrol, DIAN, Claro): acertaba uno de cuatro por casualidad.
-  Rechazaba NIT válidos. Corregido y fijado con esos mismos cuatro. Sin efecto
-  hoy: no hay ningún contribuyente con país CO.
+  Rechazaba NIT válidos. Corregido y fijado con esos mismos cuatro. Las demos
+  colombianas no transmiten y no se usa su existencia como evidencia de que un
+  contribuyente real esté habilitado.
 
   Había **dos copias** de esa fórmula con el mismo error, y la que de verdad se
   usa —alta de proveedor y configuración del contribuyente— era la de
@@ -1740,11 +1955,13 @@ real**. Además, en este entorno las barras invertidas dentro de una cadena se
 colapsan al escribir un fichero, así que `new RegExp('\\b' + x)` acaba buscando un
 carácter de retroceso; hay que componerlas con `String.fromCharCode(92)` o usar
 literales de expresión regular.
-### Ninguno pendiente
+### Cobertura estática del API completada
 
-La auditoría cubre los 36 módulos del API. Lo que queda son ampliaciones de
-producto y los pendientes operativos que dependen de credenciales o de terceros,
-ambos listados más abajo.
+La revisión estática cubre los 36 módulos del API. Eso no significa que los 36
+módulos hayan sido recorridos visualmente E2E: la matriz anterior y las 22 suites
+con API/DB real que no ejecuta el perfil aislado mantienen explícitos los huecos.
+Lo restante incluye ampliaciones de producto, recorridos visibles y dependencias
+operativas de credenciales o terceros.
 ### Resultado de la frontera de seguridad (cerrado, no repetir)
 
 `permissions`, `auth` y `tenants` están leídos y **no tienen agujero explotable**.
@@ -1791,13 +2008,21 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
   categoría, modalidad registral, obra social, ART y alícuota, sindicato,
   contribución patronal y parámetros de Ganancias/LSD/F.931. La demo usa datos
   sintéticos y no transmite declaraciones.
-- Para una empresa colombiana real, configurar software, PIN, certificado,
-  resolución/prefijo y set de pruebas DIAN, implementar/homologar el transporte
-  SOAP WS-Security/XAdES y superar el set oficial antes de transmitir. En RRHH
-  se deben confirmar EPS, fondo de pensiones, ARL y clase de riesgo, caja de
-  compensación, exoneraciones, retenciones y operador PILA. PILA admite portal
-  de operador o API privada HTTPS del operador; no se presupone una API pública
-  universal. La demo no transmite nómina electrónica ni planillas PILA.
+- Para una empresa colombiana real, cargar **su** PFX, Software ID/PIN, TestSet,
+  resolución/prefijo/rango y clave técnica; configurar el bundle CA y los pins
+  SPKI oficiales, validar numeración, superar el set FEV y confirmar en el portal
+  que el software quedó `HABILITADO`. El transporte SOAP/WS-Security/XAdES ya
+  forma parte del release candidate, pero no existe evidencia de una aceptación
+  real y no se activa por una credencial global del proceso. La primera emisión
+  productiva debe ser controlada y cerrar consulta, `ApplicationResponse`,
+  `AttachedDocument`, nota y evento FEV con evidencia DIAN antes de declarar
+  go-live. Si operará directamente en RADIAN, debe completar además su registro,
+  requisitos, verificación y Set de pruebas independiente de 15 eventos; 030-034
+  no acreditan factoring ni habilitación RADIAN integral. En RRHH se deben confirmar EPS,
+  fondo de pensiones, ARL y clase de riesgo, caja de compensación,
+  exoneraciones, retenciones y operador PILA. PILA admite portal de operador o
+  API privada HTTPS del operador; no se presupone una API pública universal. La
+  demo no transmite nómina electrónica ni planillas PILA.
 - Validar impresora física, `.exe` Tauri y carga final.
 
 ### Producto y riesgo residual
@@ -1836,7 +2061,8 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `498` en PROD.
+1. Código y migraciones actuales; estado remoto verificado hasta `522` en PROD
+   y release candidate local verificado hasta `528`, todavía pre-PR.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.

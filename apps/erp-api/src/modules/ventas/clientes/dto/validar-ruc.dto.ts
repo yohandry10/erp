@@ -2,7 +2,7 @@ import { IsString, Length, Matches } from 'class-validator';
 
 /**
  * ValidarRucDto
- * DTO para validar un RUC con la API de SUNAT
+ * DTO para validar el formato del RUC y consultar una fuente pública auxiliar.
  * Requirements: 1.4, 19.1, 19.3
  */
 export class ValidarRucDto {

@@ -8,6 +8,12 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, "../..");
 const migrationsDir = path.join(rootDir, "supabase", "migrations");
 const verifiersDir = path.join(rootDir, "supabase", "verify");
+const storageBootstrapFile = path.join(
+  rootDir,
+  "scripts",
+  "ci",
+  "bootstrap-supabase-storage.sql",
+);
 const planOnly = process.argv.includes("--plan");
 const migrationPattern = /^(\d{3,})__.+\.sql$/;
 
@@ -153,6 +159,7 @@ const selectedVerifiers = selectedVersions.map((version) => {
 
 const plan = {
   postgres: 16,
+  supabaseStorageCatalog: true,
   latestMigration,
   requiredSchemaVersion,
   migrationCount: migrations.length,
@@ -218,6 +225,34 @@ function runPsql(args, description, { capture = false, input } = {}) {
   return capture ? String(result.stdout ?? "").trim() : "";
 }
 
+function runPsqlExpectFailure(
+  args,
+  description,
+  { input, expectedMessage },
+) {
+  const result = spawnSync(psql, [...baseArgs, ...args], {
+    cwd: rootDir,
+    env: process.env,
+    encoding: "utf8",
+    input,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  if (result.error) fail(`${description}: ${result.error.message}`);
+  if (result.status === 0) {
+    fail(`${description} debía fallar y terminó en verde`);
+  }
+  const diagnostic = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  if (!diagnostic.includes(expectedMessage)) {
+    process.stderr.write(diagnostic);
+    fail(
+      `${description} falló por una causa distinta; se esperaba ${expectedMessage}`,
+    );
+  }
+  process.stdout.write(
+    `[database-contracts] control rojo confirmado: ${description} (${expectedMessage})\n`,
+  );
+}
+
 function readSqlForPsql(file) {
   // Algunos archivos históricos conservan BOM UTF-8. PostgreSQL 16 en Windows
   // lo interpreta como parte del primer token cuando psql recibe --file. La
@@ -263,6 +298,14 @@ runPsql(
   "bootstrap de roles Supabase locales",
 );
 
+if (!fs.existsSync(storageBootstrapFile)) {
+  fail("falta scripts/ci/bootstrap-supabase-storage.sql");
+}
+runPsql([], "bootstrap efímero del catálogo Supabase Storage", {
+  capture: true,
+  input: readSqlForPsql(storageBootstrapFile),
+});
+
 for (const migration of migrations) {
   process.stdout.write(`[database-contracts] apply ${migration.name}\n`);
   runPsql([], `migración ${migration.name}`, {
@@ -302,6 +345,47 @@ runPsql([], "registro local del historial de migraciones", {
     SET statements = EXCLUDED.statements, name = EXCLUDED.name;
   `,
 });
+
+// El verificador 523 antes quedaba verde sin medir el bucket ni sus políticas:
+// los dos bloques eran condicionales y PostgreSQL puro no tenía schema storage.
+// Además de crear el catálogo efímero, demostramos que el guardián se ve rojo
+// ante las dos regresiones que debe impedir. Cada control repara el estado
+// reejecutando la migración idempotente antes de continuar con la cadena normal.
+const logoStorageMigration = migrations.find(({ version }) => version === 523);
+const logoStorageVerifier = verifierByVersion.get(523);
+if (logoStorageMigration && logoStorageVerifier) {
+  runPsql([], "control: adulterar configuración del bucket company-assets", {
+    capture: true,
+    input: `
+      UPDATE storage.buckets
+      SET file_size_limit = 1
+      WHERE id = 'company-assets';
+    `,
+  });
+  runPsqlExpectFailure([], "523 rechaza configuración incorrecta del bucket", {
+    input: readSqlForPsql(logoStorageVerifier.file),
+    expectedMessage: "VERIFY_523_STORAGE_BUCKET_CONFIG_INVALID",
+  });
+  runPsql([], "restaurar 523 tras control de configuración", {
+    capture: true,
+    input: readSqlForPsql(logoStorageMigration.file),
+  });
+
+  runPsql([], "control: eliminar una policy de company-assets", {
+    capture: true,
+    input: `
+      DROP POLICY company_assets_backend_only_delete_523 ON storage.objects;
+    `,
+  });
+  runPsqlExpectFailure([], "523 rechaza una policy ausente", {
+    input: readSqlForPsql(logoStorageVerifier.file),
+    expectedMessage: "VERIFY_523_STORAGE_RESTRICTIVE_POLICIES_MISSING",
+  });
+  runPsql([], "restaurar 523 tras control de policy", {
+    capture: true,
+    input: readSqlForPsql(logoStorageMigration.file),
+  });
+}
 
 for (const verifier of selectedVerifiers) {
   process.stdout.write(`[database-contracts] verify ${verifier.name}\n`);

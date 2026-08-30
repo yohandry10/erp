@@ -7,7 +7,8 @@ import { useCountryContext } from '@/hooks/use-country-context'
 import { fetchApi } from '@/lib/api-fetch'
 import { isOfflineQueuedResponse } from '@/lib/offline-store'
 import { INITIAL_ACTIVE_COUNTRY_CODE, INITIAL_ACTIVE_COUNTRY_ID } from '@/lib/initial-country'
-import { validateCountryTaxId } from '@/lib/country-tax-id'
+import { parseColombiaNit, validateCountryTaxId } from '@/lib/country-tax-id'
+import { configurationWithoutLocalLogo } from './wizard-logo'
 
 function getOrCreateWizardIntent(storageKey: string, prefix: string) {
   let key = window.sessionStorage.getItem(storageKey)
@@ -133,6 +134,9 @@ export function useWizard() {
 
   const saveStepProgress = async (stepId: string, stepData: any, options?: { silent?: boolean }) => {
     const showLoader = !options?.silent
+    const persistableStepData = stepData === state.configuration
+      ? configurationWithoutLocalLogo(state.configuration)
+      : stepData
     try {
       if (showLoader) {
         setLoading(true)
@@ -157,7 +161,7 @@ export function useWizard() {
           pasoActual,
           configuracionTemporal: {
             stepId,
-            ...stepData,
+            ...persistableStepData,
           },
         }),
       })
@@ -312,7 +316,7 @@ export function useWizard() {
   }
 
   const validateRuc = useCallback(async () => {
-    const { ruc, razonSocial, direccion, ubigeo } = state.configuration
+    const { ruc, razonSocial, direccion, ubigeo, departamento, provincia } = state.configuration
     const documentoFiscal = country.documentoFiscal || 'RUC'
 
     try {
@@ -326,12 +330,13 @@ export function useWizard() {
         missingFields.push(documentoFiscal)
         isValid = false
       } else {
-        const normalized = ruc.replace(/\D/g, '')
-        if (!validateCountryTaxId(country.paisCodigo || 'PE', normalized)) {
+        if (!validateCountryTaxId(country.paisCodigo || 'PE', ruc)) {
           errors.push(
             country.paisCodigo === 'AR'
               ? 'El CUIT debe tener 11 dígitos y dígito verificador válido'
-              : `El ${documentoFiscal} debe tener 11 dígitos`,
+              : country.paisCodigo === 'CO'
+                ? 'El NIT debe incluir un dígito de verificación válido'
+                : `El ${documentoFiscal} debe tener 11 dígitos`,
           )
           isValid = false
         }
@@ -350,6 +355,17 @@ export function useWizard() {
       if (country.paisCodigo === 'PE' && !/^\d{6}$/.test(ubigeo || '')) {
         errors.push('El ubigeo del domicilio fiscal debe tener 6 dígitos')
         isValid = false
+      }
+
+      if (country.paisCodigo === 'CO') {
+        if (!/^\d{5}$/.test(ubigeo || '')) {
+          errors.push('El código DANE del municipio fiscal debe tener 5 dígitos')
+          isValid = false
+        }
+        if (!departamento || !provincia) {
+          missingFields.push('Departamento y municipio')
+          isValid = false
+        }
       }
 
       updateValidationResults({
@@ -374,11 +390,15 @@ export function useWizard() {
     }
 
     const showLoader = !options?.silent
+    const logoFile = state.configuration.logoFile
     const configuration = {
-      ...state.configuration,
+      ...configurationWithoutLocalLogo(state.configuration),
+      ruc: country.paisCodigo === 'CO'
+        ? (parseColombiaNit(state.configuration.ruc)?.compact || state.configuration.ruc)
+        : state.configuration.ruc,
       pais: (country.paisCodigo || INITIAL_ACTIVE_COUNTRY_CODE) as 'PE' | 'AR' | 'CO',
       pais_id: country.paisId || Number(INITIAL_ACTIVE_COUNTRY_ID),
-      igv_porcentaje: state.configuration.igv_porcentaje || country.impuestoRate * 100,
+      igv_porcentaje: state.configuration.igv_porcentaje ?? country.impuestoRate * 100,
       emision_cpe_modo: country.paisCodigo === 'AR'
         ? 'ARCA_WSFE'
         : country.paisCodigo === 'CO'
@@ -413,6 +433,42 @@ export function useWizard() {
       }
 
       const data = await response.json()
+
+      if (logoFile) {
+        const logoIntentStorageKey = 'configuration-wizard-logo-upload-intent'
+        const logoSignatureStorageKey = `${logoIntentStorageKey}:signature`
+        const logoSignature = `${logoFile.name}:${logoFile.size}:${logoFile.lastModified}`
+        if (window.sessionStorage.getItem(logoSignatureStorageKey) !== logoSignature) {
+          window.sessionStorage.removeItem(logoIntentStorageKey)
+          window.sessionStorage.setItem(logoSignatureStorageKey, logoSignature)
+        }
+        const logoForm = new FormData()
+        logoForm.append('file', logoFile)
+
+        const logoResponse = await fetchApi('/api/configuration/empresa/logo', {
+          method: 'POST',
+          headers: {
+            'Idempotency-Key': getOrCreateWizardIntent(
+              logoIntentStorageKey,
+              'wizard-logo-upload',
+            ),
+          },
+          credentials: 'include',
+          body: logoForm,
+        })
+
+        const logoResult = await logoResponse.json().catch(() => ({}))
+        if (!logoResponse.ok || logoResult.success !== true) {
+          throw new Error(logoResult.message || 'La empresa se configuró, pero no se pudo guardar el logo')
+        }
+
+        window.sessionStorage.removeItem(logoIntentStorageKey)
+        window.sessionStorage.removeItem(logoSignatureStorageKey)
+      } else {
+        window.sessionStorage.removeItem('configuration-wizard-logo-upload-intent')
+        window.sessionStorage.removeItem('configuration-wizard-logo-upload-intent:signature')
+      }
+
       window.sessionStorage.removeItem('configuration-wizard-complete-intent')
       setPersistedConfiguration(true)
       return data
@@ -489,14 +545,18 @@ export function useWizard() {
     if (currentStepData.id === 'ruc') {
       return !!(
         state.configuration.ruc &&
+        validateCountryTaxId(country.paisCodigo || 'PE', state.configuration.ruc) &&
         state.configuration.razonSocial &&
         state.configuration.direccion &&
         (
-          country.paisCodigo !== 'PE' ||
-          (!state.configuration.ubigeo &&
-            state.configuration.gre_obligatorio !== true &&
-            state.configuration.gre_automatico_habilitado !== true) ||
-          /^\d{6}$/.test(state.configuration.ubigeo || '')
+          country.paisCodigo === 'CO'
+            ? /^\d{5}$/.test(state.configuration.ubigeo || '')
+              && Boolean(state.configuration.departamento && state.configuration.provincia)
+            : country.paisCodigo !== 'PE' ||
+              (!state.configuration.ubigeo &&
+                state.configuration.gre_obligatorio !== true &&
+                state.configuration.gre_automatico_habilitado !== true) ||
+              /^\d{6}$/.test(state.configuration.ubigeo || '')
         )
       )
     }
@@ -518,7 +578,10 @@ export function useWizard() {
         return false
       }
       if (country.paisCodigo === 'CO') {
-        return true
+        return ['1', '2'].includes(String(state.configuration.dian_tipo_contribuyente || ''))
+          && /^O-\d{2}(?:;O-\d{2})*$/.test(
+            String(state.configuration.dian_regimen_fiscal || '').trim().toUpperCase(),
+          )
       }
       if (!state.configuration.regimen_tributario) {
         return false
@@ -535,7 +598,11 @@ export function useWizard() {
         if (state.configuration.arca_activo !== true) return true
         return !!(
           state.configuration.arca_punto_venta &&
-          state.configuration.arca_condicion_iva &&
+          state.configuration.arca_punto_venta >= 1 &&
+          state.configuration.arca_punto_venta <= 99998 &&
+          ['RESPONSABLE_INSCRIPTO', 'MONOTRIBUTO', 'EXENTO'].includes(
+            String(state.configuration.arca_condicion_iva || '').toUpperCase(),
+          ) &&
           state.configuration.ingresos_brutos &&
           state.configuration.fecha_inicio_actividades &&
           state.configuration.provincia_fiscal
@@ -547,8 +614,6 @@ export function useWizard() {
         return !!(
           state.configuration.dian_activo &&
           state.configuration.dian_url &&
-          state.configuration.dian_usuario &&
-          state.configuration.dian_password &&
           state.configuration.dian_software_id &&
           state.configuration.dian_software_pin &&
           (!homologacion || state.configuration.dian_test_set_id) &&

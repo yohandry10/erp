@@ -12,6 +12,8 @@ export function FiscalConfigStep() {
   const isPeru = country.paisCodigo === 'PE'
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
+  const arcaVatCondition = String(state.configuration.arca_condicion_iva || '').toUpperCase()
+  const arcaDoesNotChargeVat = isArgentina && ['MONOTRIBUTO', 'EXENTO'].includes(arcaVatCondition)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   return (
@@ -68,17 +70,24 @@ export function FiscalConfigStep() {
                 <select
                   id="regimen_tributario_ar"
                   value={state.configuration.regimen_tributario || ''}
-                  onChange={(event) => updateConfiguration({
-                    regimen_tributario: event.target.value as any,
-                    arca_condicion_iva: event.target.value as any,
-                  })}
+                  onChange={(event) => {
+                    const condition = event.target.value
+                    updateConfiguration({
+                      regimen_tributario: condition as any,
+                      arca_condicion_iva: condition as any,
+                      igv_porcentaje: condition === 'RESPONSABLE_INSCRIPTO'
+                        ? country.impuestoRate * 100
+                        : ['MONOTRIBUTO', 'EXENTO'].includes(condition)
+                          ? 0
+                          : (state.configuration.igv_porcentaje ?? country.impuestoRate * 100),
+                    })
+                  }}
                   className="h-10 w-full rounded-md border bg-card px-3"
                 >
                   <option value="">Seleccione condición</option>
                   <option value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</option>
                   <option value="MONOTRIBUTO">Monotributo</option>
                   <option value="EXENTO">Exento en IVA</option>
-                  <option value="NO_RESPONSABLE">No Responsable</option>
                 </select>
               </div>
             )}
@@ -142,10 +151,21 @@ export function FiscalConfigStep() {
                 id="igv_porcentaje"
                 type="number"
                 step="0.01"
-                value={state.configuration.igv_porcentaje || country.impuestoRate * 100 || 18}
-                onChange={(e) => updateConfiguration({ igv_porcentaje: parseFloat(e.target.value) })}
-                placeholder={String(country.impuestoRate * 100)} className="text-base"
+                value={state.configuration.igv_porcentaje ?? country.impuestoRate * 100 ?? 18}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+                  if (Number.isFinite(value)) updateConfiguration({ igv_porcentaje: value })
+                }}
+                placeholder={String(country.impuestoRate * 100)}
+                disabled={arcaDoesNotChargeVat}
+                aria-describedby={arcaDoesNotChargeVat ? 'arca-iva-help' : undefined}
+                className="text-base"
               />
+              {arcaDoesNotChargeVat && (
+                <p id="arca-iva-help" className="mt-1 text-xs text-muted-foreground">
+                  Esta condición emite comprobantes clase C sin discriminar ni cobrar IVA.
+                </p>
+              )}
             </div>
 
             {isPeru && (
@@ -184,6 +204,10 @@ export function FiscalConfigStep() {
                   const value = isArgentina
                     ? e.target.value.replace(/\D/g, '').slice(0, 5)
                     : e.target.value.toUpperCase()
+                  if (isArgentina && Number(value || 0) > 99998) {
+                    setErrors({ ...errors, serie_factura: 'El punto de venta ARCA debe estar entre 00001 y 99998' })
+                    return
+                  }
                   updateConfiguration(isArgentina
                     ? {
                         serie_factura: value,

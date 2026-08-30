@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as forge from 'node-forge';
 import { FiscalServiceAbstract } from '../../shared/integration/fiscal-service.abstract';
-import { fechaHoyEnPais } from '../../shared/utils/fecha-peru.util';
+import {
+  fechaDeDocumentoEnPais,
+  zonaHorariaDePais,
+} from '../../shared/utils/fecha-peru.util';
 import {
   ConsultaEstado,
   DocumentoElectronico,
@@ -14,8 +17,12 @@ import {
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 import { decryptBuffer, decryptText } from '../../shared/utils/secure-config.utils';
+import {
+  resolveArgentinaExplicitWsfeCode,
+  resolveArgentinaFiscalDocument,
+} from '../../shared/utils/argentina-fiscal-document.util';
 
-const ARCA_ENDPOINTS = {
+export const ARCA_ENDPOINTS = {
   homologacion: {
     wsaa: 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
     wsfe: 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
@@ -26,7 +33,72 @@ const ARCA_ENDPOINTS = {
   },
 } as const;
 
-type ArcaEnvironment = keyof typeof ARCA_ENDPOINTS;
+export type ArcaEnvironment = keyof typeof ARCA_ENDPOINTS;
+export type ArcaEndpointKind = keyof (typeof ARCA_ENDPOINTS)['homologacion'];
+
+export function resolveArcaEnvironment(value: unknown): ArcaEnvironment {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized || normalized === 'homologacion') return 'homologacion';
+  if (normalized === 'produccion') return 'produccion';
+  throw new Error('Ambiente ARCA inválido: use homologacion o produccion');
+}
+
+/**
+ * ARCA no ofrece endpoints configurables por contribuyente. Aceptar una URL
+ * escrita por el tenant convertiría las llamadas SOAP (que incluyen CMS,
+ * token y sign) en un canal SSRF/exfiltración. Por eso el valor persistido es
+ * sólo una comprobación de integridad: el destino efectivo siempre se deriva
+ * del ambiente y debe coincidir byte a byte con la URL oficial.
+ */
+export function resolveArcaOfficialEndpoint(
+  environment: ArcaEnvironment,
+  kind: ArcaEndpointKind,
+  configuredValue?: unknown,
+): string {
+  const official = ARCA_ENDPOINTS[environment][kind];
+  const configured = String(configuredValue ?? '').trim();
+  if (!configured) return official;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(configured);
+  } catch {
+    throw new Error(`URL ${kind.toUpperCase()} de ARCA inválida`);
+  }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+    throw new Error(`URL ${kind.toUpperCase()} de ARCA debe usar HTTPS y no incluir credenciales`);
+  }
+  const normalized = parsed.toString();
+  if (
+    parsed.port
+    || parsed.search
+    || parsed.hash
+    || configured !== normalized
+    || normalized !== official
+  ) {
+    throw new Error(
+      `URL ${kind.toUpperCase()} no autorizada para ARCA ${environment}; debe usarse el endpoint oficial`,
+    );
+  }
+  return official;
+}
+
+export function normalizeArcaEndpointConfiguration<T extends Record<string, unknown>>(
+  input: T,
+): T {
+  const hasArcaEndpointConfiguration = [
+    'arca_environment', 'arca_wsaa_url', 'arca_wsfe_url',
+  ].some((key) => input[key] !== undefined && input[key] !== null && input[key] !== '');
+  if (!hasArcaEndpointConfiguration) return input;
+
+  const environment = resolveArcaEnvironment(input.arca_environment);
+  return {
+    ...input,
+    arca_environment: environment,
+    arca_wsaa_url: resolveArcaOfficialEndpoint(environment, 'wsaa', input.arca_wsaa_url),
+    arca_wsfe_url: resolveArcaOfficialEndpoint(environment, 'wsfe', input.arca_wsfe_url),
+  };
+}
 
 interface ArcaTenantConfig {
   environment: ArcaEnvironment;
@@ -86,56 +158,62 @@ function soapValue(xml: string, tag: string): string | null {
  * `CbteFch` es una fecha de calendario, no un instante: el día fiscal del
  * contribuyente. Como ARCA sólo emite para Argentina, la zona es fija.
  */
-function formatArcaDate(value: Date | string): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) throw new Error('Fecha inválida para ARCA');
-  return fechaHoyEnPais('AR', date).replace(/-/g, '');
+function resolveArcaDocumentDate(value: Date | string): string {
+  const date = fechaDeDocumentoEnPais(value, zonaHorariaDePais('AR'));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Fecha inválida para ARCA');
+  return date;
 }
 
-function resolveArcaDocumentType(type: string): number {
-  const normalized = String(type ?? '').trim().toUpperCase();
-  // Compatibilidad con el contrato CPE histórico del ERP:
-  // 01=factura, 03=venta a consumidor, 07/08=notas. Los catálogos AR nuevos
-  // usan directamente los códigos numéricos WSFEv1.
-  const legacy: Record<string, number> = {
-    '01': 1,
-    '03': 6,
-    '07': 8,
-    '08': 7,
-  };
-  if (legacy[normalized]) return legacy[normalized];
-  const aliases: Record<string, number> = {
-    FACTURA_A: 1,
-    NOTA_DEBITO_A: 2,
-    NOTA_CREDITO_A: 3,
-    FACTURA_B: 6,
-    NOTA_DEBITO_B: 7,
-    NOTA_CREDITO_B: 8,
-    FACTURA_C: 11,
-    NOTA_DEBITO_C: 12,
-    NOTA_CREDITO_C: 13,
-    FACTURA_E: 19,
-    FACTURA_M: 51,
-    NOTA_DEBITO_M: 52,
-    NOTA_CREDITO_M: 53,
-  };
-  const numeric = Number(normalized);
-  const resolved = Number.isInteger(numeric) ? numeric : aliases[normalized];
-  const supported = [1, 2, 3, 6, 7, 8, 11, 12, 13, 19, 20, 21, 51, 52, 53];
-  if (!supported.includes(resolved)) {
-    throw new Error(`Tipo de comprobante ARCA no soportado: ${type}`);
+function formatArcaDate(value: Date | string): string {
+  return resolveArcaDocumentDate(value).replace(/-/g, '');
+}
+
+function resolveArcaTaxBases(document: DocumentoElectronico): {
+  taxable: number;
+  exempt: number;
+  nonTaxable: number;
+} {
+  const subtotal = Number(document.subtotal);
+  const exempt = Number(document.totalExoneradas ?? 0);
+  const nonTaxable = Number(document.totalInafectas ?? 0);
+  const taxable = document.totalGravadas == null
+    ? subtotal - exempt - nonTaxable
+    : Number(document.totalGravadas);
+  if (![subtotal, taxable, exempt, nonTaxable].every(Number.isFinite)
+      || [taxable, exempt, nonTaxable].some((value) => value < -0.005)) {
+    throw new Error('Las bases ARCA deben ser importes finitos no negativos');
   }
-  return resolved;
+  if (Math.abs(taxable + exempt + nonTaxable - subtotal) > 0.02) {
+    throw new Error('Las bases gravada, exenta y no gravada no coinciden con el subtotal');
+  }
+  return {
+    taxable: Math.abs(taxable) < 0.005 ? 0 : taxable,
+    exempt: Math.abs(exempt) < 0.005 ? 0 : exempt,
+    nonTaxable: Math.abs(nonTaxable) < 0.005 ? 0 : nonTaxable,
+  };
 }
 
 function resolveArcaIdentityType(type: string, number: string): number {
   const normalized = String(type ?? '').trim().toUpperCase();
-  if (normalized === 'CUIT' || normalized === '6' || normalized === '80') return 80;
-  if (normalized === 'CUIL') return 86;
-  if (normalized === 'CDI') return 87;
-  if (normalized === 'DNI' || normalized === '1' || normalized === '96') return 96;
-  if (!number || /^0+$/.test(number)) return 99;
-  return 99;
+  if (normalized === 'CUIT' || normalized === '80') return 80;
+  if (normalized === 'CUIL' || normalized === '86') return 86;
+  if (normalized === 'CDI' || normalized === '87') return 87;
+  if (normalized === 'DNI' || normalized === '96') return 96;
+  if ((normalized === 'CONSUMIDOR_FINAL' || normalized === '99')
+      && (!number || /^0+$/.test(number))) return 99;
+  throw new Error('Tipo de documento ARCA del receptor inválido');
+}
+
+function isValidArcaCompactDate(value: unknown): boolean {
+  const normalized = String(value ?? '').trim();
+  if (!/^\d{8}$/.test(normalized)) return false;
+  const year = Number(normalized.slice(0, 4));
+  const month = Number(normalized.slice(4, 6));
+  const day = Number(normalized.slice(6, 8));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
 }
 
 function resolveArcaVatCode(rate: number): number {
@@ -159,10 +237,13 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     private readonly supabase: SupabaseService,
     private readonly tenantContext: TenantContextService,
   ) {
-    const environment: ArcaEnvironment =
-      configService.get('ARCA_ENVIRONMENT') === 'produccion' ? 'produccion' : 'homologacion';
+    const environment = resolveArcaEnvironment(configService.get('ARCA_ENVIRONMENT'));
     const config: FiscalConfig = {
-      url: configService.get('ARCA_WSFE_URL') || ARCA_ENDPOINTS[environment].wsfe,
+      url: resolveArcaOfficialEndpoint(
+        environment,
+        'wsfe',
+        configService.get('ARCA_WSFE_URL'),
+      ),
       usuario: '',
       password: '',
       empresaId: configService.get('EMPRESA_CUIT') || '',
@@ -180,7 +261,12 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
       const errors: string[] = [];
       if (!config.activo) errors.push('Integración ARCA no activada');
       if (!validateArgentinaTaxId(config.cuit)) errors.push('CUIT representada inválida');
-      if (!config.puntoVenta) errors.push('Punto de venta ARCA no configurado');
+      if (!Number.isSafeInteger(config.puntoVenta) || config.puntoVenta < 1 || config.puntoVenta > 99998) {
+        errors.push('Punto de venta ARCA inválido: debe estar entre 1 y 99998');
+      }
+      if (!['RESPONSABLE_INSCRIPTO', 'MONOTRIBUTO', 'EXENTO'].includes(
+        String(config.condicionIva || '').toUpperCase(),
+      )) errors.push('Condición IVA del emisor inválida o no configurada');
       if (!config.certificate.length) errors.push('Certificado digital ARCA no configurado');
       return { valid: errors.length === 0, errors };
     } catch (error) {
@@ -203,7 +289,22 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
       const config = await this.loadTenantConfig();
       if (!config.activo) throw new Error('La integración ARCA está desactivada');
       const ticket = await this.getAccessTicket(config);
-      const type = resolveArcaDocumentType(documento.tipoDocumento);
+      const fiscalDocument = resolveArgentinaFiscalDocument({
+        documentType: documento.tipoDocumento,
+        issuerVatCondition: documento.emisor.condicionIva,
+        receiverVatCondition: documento.receptor.condicionIva,
+        authorizationVariant: documento.arcaAuthorizationVariant,
+      });
+      const tenantFiscalDocument = resolveArgentinaFiscalDocument({
+        documentType: documento.tipoDocumento,
+        issuerVatCondition: config.condicionIva,
+        receiverVatCondition: documento.receptor.condicionIva,
+        authorizationVariant: documento.arcaAuthorizationVariant,
+      });
+      if (tenantFiscalDocument.wsfeCode !== fiscalDocument.wsfeCode) {
+        throw new Error('La condición IVA del emisor no coincide con la configuración ARCA del tenant');
+      }
+      const type = fiscalDocument.wsfeCode;
       const requestedNumber = Number(documento.numero);
       if (!Number.isSafeInteger(requestedNumber) || requestedNumber < 1) {
         throw new Error('Número de comprobante ARCA inválido');
@@ -216,11 +317,27 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
         );
       }
 
-      const soap = this.buildAuthorizeRequest(config, ticket, documento, type, requestedNumber);
-      const response = await this.postSoap(config.wsfeUrl, soap, 'http://ar.gov.afip.dif.FEV1/FECAESolicitar');
+      const requestedIssueDate = formatArcaDate(documento.fechaEmision);
+      const soap = this.buildAuthorizeRequest(
+        config,
+        ticket,
+        documento,
+        type,
+        requestedNumber,
+        fiscalDocument.receiverVatConditionId,
+        requestedIssueDate,
+      );
+      const response = await this.postSoap(
+        config.wsfeUrl,
+        soap,
+        'http://ar.gov.afip.dif.FEV1/FECAESolicitar',
+        config.environment,
+        'wsfe',
+      );
       const result = soapValue(response, 'Resultado');
       const cae = soapValue(response, 'CAE');
       const caeExpiration = soapValue(response, 'CAEFchVto');
+      const authorizedIssueDate = soapValue(response, 'CbteFch');
       const errors = this.extractMessages(response, 'Err');
       const observations = this.extractMessages(response, 'Obs');
 
@@ -234,8 +351,22 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
           metadata: { resultado: result },
         };
       }
+      if (!/^\d{14}$/.test(cae) || !isValidArcaCompactDate(caeExpiration)
+          || !isValidArcaCompactDate(authorizedIssueDate)) {
+        throw new Error('ARCA autorizó sin evidencia CAE, fecha fiscal o vencimiento válida y completa');
+      }
+      if (authorizedIssueDate !== requestedIssueDate) {
+        throw new Error('ARCA devolvió una fecha fiscal distinta de la fecha solicitada');
+      }
 
-      const qrUrl = this.buildQrUrl(config, documento, type, requestedNumber, cae);
+      const qrUrl = this.buildQrUrl(
+        config,
+        documento,
+        type,
+        requestedNumber,
+        cae,
+        authorizedIssueDate,
+      );
       return {
         success: true,
         codigoRespuesta: 'A',
@@ -250,6 +381,10 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
           caeVencimiento: caeExpiration,
           puntoVenta: config.puntoVenta,
           tipoComprobante: type,
+          condicionIvaEmisor: fiscalDocument.issuerVatCondition,
+          condicionIvaReceptorId: fiscalDocument.receiverVatConditionId,
+          modalidadAutorizacion: fiscalDocument.authorizationVariant,
+          fechaFiscalAutorizada: `${authorizedIssueDate.slice(0, 4)}-${authorizedIssueDate.slice(4, 6)}-${authorizedIssueDate.slice(6, 8)}`,
           qrUrl,
         },
       };
@@ -267,7 +402,7 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     try {
       const config = await this.loadTenantConfig();
       const ticket = await this.getAccessTicket(config);
-      const type = resolveArcaDocumentType(consulta.tipoDocumento);
+      const type = resolveArgentinaExplicitWsfeCode(consulta.tipoDocumento);
       const number = Number(consulta.numero);
       const body = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
@@ -283,21 +418,34 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
         config.wsfeUrl,
         body,
         'http://ar.gov.afip.dif.FEV1/FECompConsultar',
+        config.environment,
+        'wsfe',
       );
       const cae = soapValue(response, 'CodAutorizacion');
       const result = soapValue(response, 'Resultado');
+      const caeExpiration = soapValue(response, 'FchVto');
       const errors = this.extractMessages(response, 'Err');
+      const validAuthorization = result === 'A'
+        && /^\d{14}$/.test(String(cae ?? ''))
+        && isValidArcaCompactDate(caeExpiration);
       return {
-        success: result === 'A' && Boolean(cae),
-        codigoRespuesta: result || soapValue(response, 'Code') || 'ARCA_UNKNOWN',
-        descripcionRespuesta: result === 'A'
+        success: validAuthorization,
+        codigoRespuesta: result === 'A' && !validAuthorization
+          ? 'ARCA_INVALID_EVIDENCE'
+          : result || soapValue(response, 'Code') || 'ARCA_UNKNOWN',
+        descripcionRespuesta: validAuthorization
           ? 'Comprobante autorizado por ARCA'
+          : result === 'A'
+            ? 'ARCA respondió autorizado sin CAE/vencimiento fiscal válido'
           : errors[0] || 'ARCA no devolvió un comprobante autorizado',
         hash: cae ?? undefined,
+        numeroComprobante: `${String(config.puntoVenta).padStart(5, '0')}-${String(number).padStart(8, '0')}`,
         errores: errors,
         metadata: {
           cae,
-          caeVencimiento: soapValue(response, 'FchVto'),
+          caeVencimiento: caeExpiration,
+          puntoVenta: config.puntoVenta,
+          tipoComprobante: type,
           resultado: result,
         },
       };
@@ -316,17 +464,54 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     if (!validateArgentinaTaxId(documento.emisor.numeroDocumento)) {
       errores.push('CUIT del emisor inválida: debe tener 11 dígitos y dígito verificador correcto');
     }
+    let fiscalDocument: ReturnType<typeof resolveArgentinaFiscalDocument> | null = null;
     try {
-      resolveArcaDocumentType(documento.tipoDocumento);
+      fiscalDocument = resolveArgentinaFiscalDocument({
+        documentType: documento.tipoDocumento,
+        issuerVatCondition: documento.emisor.condicionIva,
+        receiverVatCondition: documento.receptor.condicionIva,
+        authorizationVariant: documento.arcaAuthorizationVariant,
+      });
     } catch (error) {
       errores.push(error instanceof Error ? error.message : String(error));
     }
-    if (!['ARS', 'USD'].includes(String(documento.moneda).toUpperCase())) {
-      errores.push('Moneda ARCA soportada: ARS o USD');
+    if (String(documento.moneda).toUpperCase() !== 'ARS') {
+      errores.push(
+        'Moneda ARCA soportada en este release: ARS. USD requiere cotización fiscal persistida y no se admite sin ella',
+      );
+    }
+    let receiverIdentityType: number | null = null;
+    try {
+      receiverIdentityType = resolveArcaIdentityType(
+        documento.receptor.tipoDocumento,
+        normalizeArgentinaTaxId(documento.receptor.numeroDocumento),
+      );
+    } catch (error) {
+      errores.push(error instanceof Error ? error.message : String(error));
+    }
+    if (receiverIdentityType != null && [80, 86, 87].includes(receiverIdentityType)
+        && !validateArgentinaTaxId(documento.receptor.numeroDocumento)) {
+      errores.push('CUIT/CUIL/CDI del receptor inválido: el dígito verificador no coincide');
+    }
+    if (fiscalDocument?.documentClass === 'A' && receiverIdentityType !== 80) {
+      errores.push('Comprobante ARCA clase A exige receptor identificado con CUIT (DocTipo 80)');
+    }
+    if (fiscalDocument?.documentClass === 'C') {
+      const hasVat = Math.abs(Number(documento.totalImpuestos || 0)) > 0.005
+        || (documento.items || []).some((item) => {
+          const rawRate = Number(item.tasaIgv ?? documento.tasaImpuesto ?? 0);
+          return Math.abs(rawRate) > 0.0001 || Math.abs(Number(item.igv || 0)) > 0.005;
+        });
+      if (hasVat) errores.push('Comprobante ARCA clase C debe emitirse sin IVA discriminado');
     }
     if (documento.importeTotal <= 0) errores.push('El importe total debe ser mayor que cero');
     if (Math.abs(documento.subtotal + documento.totalImpuestos - documento.importeTotal) > 0.02) {
       errores.push('Subtotal + IVA no coincide con el total del comprobante');
+    }
+    try {
+      resolveArcaTaxBases(documento);
+    } catch (error) {
+      errores.push(error instanceof Error ? error.message : String(error));
     }
     for (const item of documento.items || []) {
       const rate = Number(item.tasaIgv ?? documento.tasaImpuesto ?? 21);
@@ -349,7 +534,12 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
   }
 
   async generarXML(documento: DocumentoElectronico): Promise<string> {
-    const type = resolveArcaDocumentType(documento.tipoDocumento);
+    const type = resolveArgentinaFiscalDocument({
+      documentType: documento.tipoDocumento,
+      issuerVatCondition: documento.emisor.condicionIva,
+      receiverVatCondition: documento.receptor.condicionIva,
+      authorizationVariant: documento.arcaAuthorizationVariant,
+    }).wsfeCode;
     return `<ArcaComprobante><Tipo>${type}</Tipo><Numero>${escapeXml(documento.numero)}</Numero>` +
       `<Fecha>${formatArcaDate(documento.fechaEmision)}</Fecha><Moneda>${escapeXml(documento.moneda)}</Moneda>` +
       `<Neto>${documento.subtotal.toFixed(2)}</Neto><IVA>${documento.totalImpuestos.toFixed(2)}</IVA>` +
@@ -388,13 +578,12 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     if (!row || String(row.pais).toUpperCase() !== 'AR') {
       throw new Error('El tenant no está configurado para Argentina');
     }
-    const environment: ArcaEnvironment =
-      String(row.arca_environment).toLowerCase() === 'produccion' ? 'produccion' : 'homologacion';
+    const environment = resolveArcaEnvironment(row.arca_environment);
     const certificate = decryptBuffer(this.configService, row.certificado_pfx) ?? Buffer.alloc(0);
     const config: ArcaTenantConfig = {
       environment,
-      wsaaUrl: row.arca_wsaa_url || ARCA_ENDPOINTS[environment].wsaa,
-      wsfeUrl: row.arca_wsfe_url || ARCA_ENDPOINTS[environment].wsfe,
+      wsaaUrl: resolveArcaOfficialEndpoint(environment, 'wsaa', row.arca_wsaa_url),
+      wsfeUrl: resolveArcaOfficialEndpoint(environment, 'wsfe', row.arca_wsfe_url),
       cuit: normalizeArgentinaTaxId(row.arca_cuit_representada || row.ruc),
       puntoVenta: Number(row.arca_punto_venta || 0),
       condicionIva: row.arca_condicion_iva || '',
@@ -402,6 +591,9 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
       certificatePassword: decryptText(this.configService, row.certificado_password),
       activo: row.arca_activo === true,
     };
+    if (!Number.isSafeInteger(config.puntoVenta) || config.puntoVenta < 1 || config.puntoVenta > 99998) {
+      throw new Error('Punto de venta ARCA inválido: debe estar entre 1 y 99998');
+    }
     this.tenantConfig = config;
     return config;
   }
@@ -419,7 +611,13 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsaa="http://wsaa.view.sua.dvadac.desein.afip.gov">
   <soap:Body><wsaa:loginCms><wsaa:in0>${escapeXml(cms)}</wsaa:in0></wsaa:loginCms></soap:Body>
 </soap:Envelope>`;
-    const response = await this.postSoap(config.wsaaUrl, request, '');
+    const response = await this.postSoap(
+      config.wsaaUrl,
+      request,
+      '',
+      config.environment,
+      'wsaa',
+    );
     const loginCmsReturn = soapValue(response, 'loginCmsReturn');
     if (!loginCmsReturn) {
       throw new Error(soapValue(response, 'faultstring') || 'WSAA no devolvió Ticket de Acceso');
@@ -495,6 +693,8 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
       config.wsfeUrl,
       request,
       'http://ar.gov.afip.dif.FEV1/FECompUltimoAutorizado',
+      config.environment,
+      'wsfe',
     );
     const number = Number(soapValue(response, 'CbteNro'));
     if (!Number.isSafeInteger(number) || number < 0) {
@@ -509,8 +709,19 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     document: DocumentoElectronico,
     type: number,
     number: number,
+    receiverVatConditionId: number,
+    fiscalIssueDate?: string,
   ): string {
+    const issueDate = fiscalIssueDate ?? formatArcaDate(document.fechaEmision);
+    if (!isValidArcaCompactDate(issueDate)) {
+      throw new Error('Fecha fiscal inválida para la solicitud ARCA');
+    }
+    const taxBases = resolveArcaTaxBases(document);
     const receptorNumber = normalizeArgentinaTaxId(document.receptor.numeroDocumento);
+    const receiverIdentityType = resolveArcaIdentityType(document.receptor.tipoDocumento, receptorNumber);
+    if ([1, 2, 3, 51, 52, 53].includes(type) && receiverIdentityType !== 80) {
+      throw new Error('Comprobante ARCA clase A exige receptor CUIT con DocTipo 80');
+    }
     const vatRows = new Map<number, { base: number; tax: number }>();
     for (const item of document.items || []) {
       const rawRate = Number(item.tasaIgv ?? document.tasaImpuesto ?? 21);
@@ -524,34 +735,52 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     if (!vatRows.size && document.totalImpuestos > 0) {
       const rate = Number(document.tasaImpuesto ?? 21);
       vatRows.set(resolveArcaVatCode(rate <= 1 ? rate * 100 : rate), {
-        base: document.subtotal,
+        base: taxBases.taxable,
         tax: document.totalImpuestos,
       });
     }
-    const iva = [...vatRows.entries()]
+    const isClassC = [11, 12, 13].includes(type);
+    if (isClassC && (Math.abs(document.totalImpuestos) > 0.005
+        || [...vatRows.keys()].some((code) => code !== 3))) {
+      throw new Error('Comprobante ARCA clase C no puede contener IVA discriminado');
+    }
+    const iva = isClassC ? '' : [...vatRows.entries()]
       .filter(([code]) => code !== 3)
       .map(([code, values]) =>
         `<ar:AlicIva><ar:Id>${code}</ar:Id><ar:BaseImp>${values.base.toFixed(2)}</ar:BaseImp>` +
         `<ar:Importe>${values.tax.toFixed(2)}</ar:Importe></ar:AlicIva>`,
       ).join('');
     const currency = String(document.moneda).toUpperCase() === 'USD' ? 'DOL' : 'PES';
-    const reference = document.documentoReferencia
-      ? `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${type}</ar:Tipo><ar:PtoVta>${config.puntoVenta}</ar:PtoVta>` +
-        `<ar:Nro>${Number(String(document.documentoReferencia.numero).replace(/\D/g, ''))}</ar:Nro>` +
-        `</ar:CbteAsoc></ar:CbtesAsoc>`
-      : '';
+    const isNote = [2, 3, 7, 8, 12, 13, 52, 53].includes(type);
+    if (isNote && !document.documentoReferencia) {
+      throw new Error('Nota ARCA sin comprobante asociado autorizado');
+    }
+    let reference = '';
+    if (document.documentoReferencia) {
+      const referenceType = resolveArgentinaExplicitWsfeCode(document.documentoReferencia.tipo);
+      const referencePoint = Number(String(document.documentoReferencia.serie ?? '').replace(/\D/g, ''));
+      const referenceNumber = Number(String(document.documentoReferencia.numero ?? '').replace(/\D/g, ''));
+      if (!Number.isSafeInteger(referencePoint) || referencePoint < 1 || referencePoint > 99998
+          || !Number.isSafeInteger(referenceNumber) || referenceNumber < 1) {
+        throw new Error('Comprobante asociado ARCA sin tipo, punto o número fiscal válido');
+      }
+      reference = `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${referenceType}</ar:Tipo>` +
+        `<ar:PtoVta>${referencePoint}</ar:PtoVta><ar:Nro>${referenceNumber}</ar:Nro>` +
+        `</ar:CbteAsoc></ar:CbtesAsoc>`;
+    }
     return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
 <soap:Body><ar:FECAESolicitar><ar:Auth>
 <ar:Token>${escapeXml(ticket.token)}</ar:Token><ar:Sign>${escapeXml(ticket.sign)}</ar:Sign><ar:Cuit>${config.cuit}</ar:Cuit>
 </ar:Auth><ar:FeCAEReq><ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${config.puntoVenta}</ar:PtoVta>
 <ar:CbteTipo>${type}</ar:CbteTipo></ar:FeCabReq><ar:FeDetReq><ar:FECAEDetRequest>
-<ar:Concepto>1</ar:Concepto><ar:DocTipo>${resolveArcaIdentityType(document.receptor.tipoDocumento, receptorNumber)}</ar:DocTipo>
-<ar:DocNro>${receptorNumber || 0}</ar:DocNro><ar:CbteDesde>${number}</ar:CbteDesde><ar:CbteHasta>${number}</ar:CbteHasta>
-<ar:CbteFch>${formatArcaDate(document.fechaEmision)}</ar:CbteFch><ar:ImpTotal>${document.importeTotal.toFixed(2)}</ar:ImpTotal>
-<ar:ImpTotConc>${Number(document.totalInafectas || 0).toFixed(2)}</ar:ImpTotConc>
-<ar:ImpNeto>${document.subtotal.toFixed(2)}</ar:ImpNeto><ar:ImpOpEx>${Number(document.totalExoneradas || 0).toFixed(2)}</ar:ImpOpEx>
-<ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>${document.totalImpuestos.toFixed(2)}</ar:ImpIVA>
+<ar:Concepto>1</ar:Concepto><ar:DocTipo>${receiverIdentityType}</ar:DocTipo>
+<ar:DocNro>${receptorNumber || 0}</ar:DocNro><ar:CondicionIVAReceptorId>${receiverVatConditionId}</ar:CondicionIVAReceptorId>
+<ar:CbteDesde>${number}</ar:CbteDesde><ar:CbteHasta>${number}</ar:CbteHasta>
+<ar:CbteFch>${issueDate}</ar:CbteFch><ar:ImpTotal>${document.importeTotal.toFixed(2)}</ar:ImpTotal>
+<ar:ImpTotConc>${taxBases.nonTaxable.toFixed(2)}</ar:ImpTotConc>
+<ar:ImpNeto>${taxBases.taxable.toFixed(2)}</ar:ImpNeto><ar:ImpOpEx>${taxBases.exempt.toFixed(2)}</ar:ImpOpEx>
+<ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>${(isClassC ? 0 : document.totalImpuestos).toFixed(2)}</ar:ImpIVA>
 <ar:MonId>${currency}</ar:MonId><ar:MonCotiz>1.000000</ar:MonCotiz>${reference}
 ${iva ? `<ar:Iva>${iva}</ar:Iva>` : ''}
 </ar:FECAEDetRequest></ar:FeDetReq></ar:FeCAEReq></ar:FECAESolicitar></soap:Body></soap:Envelope>`;
@@ -563,12 +792,17 @@ ${iva ? `<ar:Iva>${iva}</ar:Iva>` : ''}
     type: number,
     number: number,
     cae: string,
+    authorizedIssueDate?: string,
   ): string {
+    const issueDate = authorizedIssueDate ?? formatArcaDate(document.fechaEmision);
+    if (!isValidArcaCompactDate(issueDate)) {
+      throw new Error('Fecha fiscal autorizada inválida para el QR ARCA');
+    }
     const payload = {
       ver: 1,
       // El QR tiene que declarar la misma fecha que el XML, y por el mismo
       // motivo: el día fiscal argentino, no el día UTC.
-      fecha: fechaHoyEnPais('AR', new Date(document.fechaEmision)),
+      fecha: `${issueDate.slice(0, 4)}-${issueDate.slice(4, 6)}-${issueDate.slice(6, 8)}`,
       cuit: Number(config.cuit),
       ptoVta: config.puntoVenta,
       tipoCmp: type,
@@ -584,7 +818,7 @@ ${iva ? `<ar:Iva>${iva}</ar:Iva>` : ''}
       tipoCodAut: 'E',
       codAut: Number(cae),
     };
-    return `https://www.afip.gob.ar/fe/qr/?p=${Buffer.from(JSON.stringify(payload)).toString('base64')}`;
+    return `https://www.arca.gob.ar/fe/qr/?p=${Buffer.from(JSON.stringify(payload)).toString('base64')}`;
   }
 
   private extractMessages(xml: string, container: 'Err' | 'Obs'): string[] {
@@ -595,11 +829,21 @@ ${iva ? `<ar:Iva>${iva}</ar:Iva>` : ''}
     return [...xml.matchAll(regex)].map((match) => match[1].trim());
   }
 
-  private async postSoap(url: string, body: string, soapAction: string): Promise<string> {
+  private async postSoap(
+    url: string,
+    body: string,
+    soapAction: string,
+    environment: ArcaEnvironment,
+    kind: ArcaEndpointKind,
+  ): Promise<string> {
+    // Segunda barrera, inmediatamente antes del I/O: ni una fila legacy
+    // manipulada ni una mutación accidental del objeto config puede cambiar el
+    // host, el ambiente o degradar HTTPS.
+    const officialUrl = resolveArcaOfficialEndpoint(environment, kind, url);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30_000);
     try {
-      const response = await fetch(url, {
+      const response = await fetch(officialUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/xml; charset=utf-8',
@@ -607,7 +851,11 @@ ${iva ? `<ar:Iva>${iva}</ar:Iva>` : ''}
         },
         body,
         signal: controller.signal,
+        redirect: 'manual',
       });
+      if (response.status >= 300 && response.status < 400) {
+        throw new Error(`ARCA HTTP ${response.status}: redirección bloqueada`);
+      }
       const text = await response.text();
       if (!response.ok) {
         throw new Error(
