@@ -220,6 +220,20 @@ export class ConfiguracionController {
   ) {
     try {
       console.log('💼 Actualizando datos de empresa:', datosEmpresa);
+
+      const logoPayload = datosEmpresa as typeof datosEmpresa & {
+        logo_url?: unknown;
+        logoBase64?: unknown;
+      };
+      if (
+        logoPayload.logoUrl !== undefined
+        || logoPayload.logo_url !== undefined
+        || logoPayload.logoBase64 !== undefined
+      ) {
+        throw new BadRequestException(
+          'El logo debe cargarse mediante POST /api/configuration/empresa/logo',
+        );
+      }
       
       const updateData: any = {};
       
@@ -239,7 +253,6 @@ export class ConfiguracionController {
       if (datosEmpresa.regimen) updateData.regimen_tributario = datosEmpresa.regimen;
       if (datosEmpresa.actividadEconomica) updateData.actividad_economica = datosEmpresa.actividadEconomica;
       if (datosEmpresa.igvPorcentaje !== undefined) updateData.igv_porcentaje = datosEmpresa.igvPorcentaje;
-      if (datosEmpresa.logoUrl) updateData.logo_url = datosEmpresa.logoUrl;
       
       // Nuevos campos de configuración de ventas
       if (datosEmpresa.tipo_empresa) updateData.tipo_empresa = datosEmpresa.tipo_empresa;

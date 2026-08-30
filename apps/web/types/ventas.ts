@@ -12,6 +12,8 @@ export enum TipoDocumento {
   DNI = 'DNI',
   RUC = 'RUC',
   CUIT = 'CUIT',
+  CUIL = 'CUIL',
+  CDI = 'CDI',
   NIT = 'NIT',
   CC = 'CC',
   TI = 'TI',
@@ -33,6 +35,7 @@ export interface Cliente {
   direccion?: string
   email?: string
   telefono?: string
+  arca_condicion_iva?: string
   created_at: string
   updated_at: string
   created_by?: string

@@ -14,8 +14,14 @@ import {
 } from './configuration.types';
 import { parseCertificateBuffer, toPostgresBytea } from '../../shared/utils/certificate.utils';
 import { verificarTitularidadCertificado } from '../../shared/utils/certificado-ruc-peru.util';
-import { createHash } from 'crypto';
-import { decryptBuffer, decryptText, encryptBuffer, encryptText } from '../../shared/utils/secure-config.utils';
+import { createHash, createHmac } from 'crypto';
+import {
+  decryptBuffer,
+  decryptText,
+  encryptBuffer,
+  encryptText,
+  getSecretKeys,
+} from '../../shared/utils/secure-config.utils';
 import {
   INITIAL_ACTIVE_COUNTRY_CODE,
   INITIAL_ACTIVE_COUNTRY_MESSAGE,
@@ -24,10 +30,140 @@ import {
   isInitialActiveCountryCode,
   isInitialActiveCountryId,
   validateArgentinaCuit,
-  validateColombiaNit,
+  parseColombiaNit,
 } from '../paises/initial-country';
+import {
+  normalizeDianTransportEnvironment,
+  resolveOfficialDianEndpoint,
+} from '../fiscal/colombia/dian-endpoint.util';
+import { hasCurrentDianPortalApproval } from '../fiscal/colombia/dian-habilitation-evidence.util';
 
 export const TOTAL_WIZARD_STEPS = 7;
+
+const normalizeWizardTemporaryKey = (key: string): string => key
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]/gi, '')
+  .toLowerCase();
+
+const WIZARD_TEMPORARY_ALLOWED_KEYS = [
+  'stepId',
+  'pais',
+  'pais_id',
+  'ruc',
+  'razonSocial',
+  'direccion',
+  'ubigeo',
+  'departamento',
+  'provincia',
+  'distrito',
+  'tipo_empresa',
+  'usar_flujo_logistica',
+  'gre_obligatorio',
+  'gre_automatico_habilitado',
+  'umbral_gre_automatico',
+  'regimen_tributario',
+  'igv_porcentaje',
+  'retencion_renta_porcentaje',
+  'serie_factura',
+  'serie_boleta',
+  'serie_nota_credito',
+  'serie_guia_remision',
+  'emision_cpe_modo',
+  'sunat_environment',
+  'sunat_username',
+  'sunat_cpe_url',
+  'sunat_summary_url',
+  'sunat_query_url',
+  'sunat_gre_url',
+  'sunat_gre_transport',
+  'sunat_gre_rest_base_url',
+  'sunat_gre_auth_url',
+  'sunat_gre_client_id',
+  'sire_activo',
+  'sunat_cert_expected_ruc',
+  'sunat_cert_ruc_mismatch_confirmed',
+  'sunat_cert_ruc_mismatch_reason',
+  'ose_url',
+  'ose_status_url',
+  'ose_username',
+  'ose_auth_tipo',
+  'ose_api_header',
+  'ose_activo',
+  'dian_activo',
+  'dian_url',
+  'dian_usuario',
+  'dian_software_id',
+  'dian_test_set_id',
+  'dian_environment',
+  'dian_regimen_fiscal',
+  'dian_tipo_contribuyente',
+  'dian_resolucion_numero',
+  'dian_resolucion_prefijo',
+  'dian_resolucion_desde',
+  'dian_resolucion_hasta',
+  'dian_resolucion_fecha_inicio',
+  'dian_resolucion_fecha_fin',
+  'arca_activo',
+  'arca_environment',
+  'arca_wsaa_url',
+  'arca_wsfe_url',
+  'arca_cuit_representada',
+  'arca_punto_venta',
+  'arca_condicion_iva',
+  'ingresos_brutos',
+  'fecha_inicio_actividades',
+  'provincia_fiscal',
+  'certificateValid',
+  'certificateConfigured',
+  'rucValid',
+  'validatedAt',
+  'certificateMetadata',
+] as const;
+
+const WIZARD_TEMPORARY_ALLOWED_KEY_BY_NORMALIZED = new Map(
+  WIZARD_TEMPORARY_ALLOWED_KEYS.map((key) => [normalizeWizardTemporaryKey(key), key]),
+);
+
+const WIZARD_TEMPORARY_METADATA_ALLOWED_KEYS = [
+  'isValid',
+  'isConfigured',
+  'subject',
+  'issuer',
+  'serialNumber',
+  'validFrom',
+  'validTo',
+  'expiresAt',
+  'daysUntilExpiration',
+  'rucEmisor',
+  'rucsEnCertificado',
+  'perteneceAlEmisor',
+  'motivoTitularidad',
+  'errors',
+  'warnings',
+] as const;
+
+const WIZARD_TEMPORARY_METADATA_KEY_BY_NORMALIZED = new Map(
+  WIZARD_TEMPORARY_METADATA_ALLOWED_KEYS.map((key) => [normalizeWizardTemporaryKey(key), key]),
+);
+
+const WIZARD_TEMPORARY_SECRET_KEY_MARKERS = [
+  'password',
+  'contrasena',
+  'passwd',
+  'secret',
+  'token',
+  'apikey',
+  'bearer',
+  'privatekey',
+  'certificatebase64',
+  'certificatefile',
+  'certificadopfx',
+  'softwarepin',
+  'logobase64',
+  'logofile',
+  'logourl',
+] as const;
 
 @Injectable()
 export class ConfigurationService {
@@ -38,6 +174,107 @@ export class ConfigurationService {
     private readonly validationService: ValidationService,
     private readonly configService: ConfigService,
   ) {}
+
+  private certificateOwnership(
+    countryCode: string,
+    subject: string,
+    issuerTaxId: unknown,
+  ): { coincide: boolean; rucsEnCertificado: string[]; error?: string } {
+    const country = String(countryCode || 'PE').trim().toUpperCase();
+    const expectedTaxId = String(issuerTaxId ?? '').trim();
+
+    if (country === 'AR') {
+      const candidates = subject.match(/(?<!\d)\d{11}(?!\d)/g) ?? [];
+      const taxIds = [...new Set(candidates.filter(validateArgentinaCuit))];
+      const expected = expectedTaxId.replace(/\D/g, '');
+      const coincide = Boolean(expected && taxIds.includes(expected));
+      return {
+        coincide,
+        rucsEnCertificado: taxIds,
+        error: coincide
+          ? undefined
+          : 'El certificado ARCA debe declarar el CUIT representado en su titular.',
+      };
+    }
+
+    if (country === 'CO') {
+      const expected = parseColombiaNit(expectedTaxId);
+      const candidates = subject.match(/(?<!\d)\d{9,10}(?:-?\d)?(?!\d)/g) ?? [];
+      const taxIds = [...new Set(candidates.map((candidate) => {
+        const parsed = parseColombiaNit(candidate);
+        if (parsed) return parsed.compact;
+        const digits = candidate.replace(/\D/g, '');
+        return expected && digits === expected.base ? expected.base : '';
+      }).filter(Boolean))];
+      const coincide = Boolean(expected && taxIds.some(
+        (candidate) => candidate === expected.compact || candidate === expected.base,
+      ));
+      return {
+        coincide,
+        rucsEnCertificado: taxIds,
+        error: coincide
+          ? undefined
+          : 'El certificado DIAN debe declarar el NIT del emisor que se está configurando.',
+      };
+    }
+
+    return verificarTitularidadCertificado(subject, expectedTaxId || null);
+  }
+
+  private validateCertificateForIssuer(
+    buffer: Buffer,
+    password: string,
+    countryCode: string,
+    issuerTaxId: unknown,
+  ): WizardCertificateValidationResult {
+    const metadata = parseCertificateBuffer(buffer, password);
+    const rucEmisor = String(issuerTaxId ?? '').trim() || null;
+    const ownership = this.certificateOwnership(
+      countryCode,
+      metadata.subject,
+      rucEmisor,
+    );
+    const daysUntilExpiration = Math.ceil(
+      (metadata.validTo.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+    );
+
+    return {
+      subject: metadata.subject,
+      issuer: metadata.issuer,
+      serialNumber: metadata.serialNumber,
+      validFrom: metadata.validFrom,
+      validTo: metadata.validTo,
+      daysUntilExpiration,
+      rucEmisor,
+      rucsEnCertificado: ownership.rucsEnCertificado,
+      perteneceAlEmisor: ownership.coincide,
+      motivoTitularidad: ownership.error,
+    };
+  }
+
+  private async loadStoredCertificateForIssuer(
+    tenantId: string,
+    countryCode: string,
+    issuerTaxId: unknown,
+  ): Promise<WizardCertificateValidationResult | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select('certificado_pfx, certificado_password')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data?.certificado_pfx || !data?.certificado_password) return null;
+
+    const buffer = decryptBuffer(this.configService, data.certificado_pfx);
+    if (!buffer) throw new BadRequestException('El certificado digital almacenado está vacío');
+    return this.validateCertificateForIssuer(
+      buffer,
+      decryptText(this.configService, data.certificado_password),
+      countryCode,
+      issuerTaxId,
+    );
+  }
 
   private requireAtomicContext(actorId?: string, idempotencyKey?: string): {
     actorId: string;
@@ -62,7 +299,9 @@ export class ConfigurationService {
       tenantId: row.tenant_id,
       pasoActual: row.paso_actual,
       pasosCompletados: row.pasos_completados || [],
-      configuracionTemporal: row.configuracion_temporal,
+      // También se sanea al leer para que una fila legacy nunca vuelva a
+      // exponer secretos aunque haya sido persistida antes de esta política.
+      configuracionTemporal: this.sanitizeWizardTemporaryConfig(row.configuracion_temporal),
       completado: row.completado,
       completadoAt: row.completado_at ? new Date(row.completado_at) : undefined,
       createdAt: new Date(row.created_at),
@@ -73,24 +312,50 @@ export class ConfigurationService {
   private sanitizeWizardTemporaryConfig(
     input: Record<string, unknown> | undefined,
   ): Record<string, unknown> {
-    const sanitized = { ...(input || {}) };
-    const secretOrBinaryKeys = [
-      'certificateBase64',
-      'certificatePassword',
-      'certificateFile',
-      'certificado_pfx',
-      'certificado_password',
-      'logoBase64',
-      'logoFile',
-      'sunat_password',
-      'sunat_gre_client_secret',
-      'ose_password',
-      'ose_api_key',
-      'ose_bearer_token',
-      'dian_password',
-      'dian_software_pin',
-    ];
-    for (const key of secretOrBinaryKeys) delete sanitized[key];
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+
+    const sanitized: Record<string, unknown> = {};
+    for (const [rawKey, value] of Object.entries(input)) {
+      const normalizedKey = normalizeWizardTemporaryKey(rawKey);
+      if (WIZARD_TEMPORARY_SECRET_KEY_MARKERS.some(
+        (marker) => normalizedKey.includes(marker),
+      )) continue;
+
+      const allowedKey = WIZARD_TEMPORARY_ALLOWED_KEY_BY_NORMALIZED.get(normalizedKey);
+      if (!allowedKey) continue;
+
+      const sanitizedValue = allowedKey === 'certificateMetadata'
+        ? this.sanitizeWizardTemporaryMetadata(value)
+        : this.sanitizeWizardTemporaryScalar(value);
+      if (sanitizedValue !== undefined) sanitized[allowedKey] = sanitizedValue;
+    }
+    return sanitized;
+  }
+
+  private sanitizeWizardTemporaryScalar(value: unknown): unknown {
+    if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return value;
+    if (Array.isArray(value)) {
+      const sanitized = value
+        .map((item) => this.sanitizeWizardTemporaryScalar(item))
+        .filter((item) => item !== undefined);
+      return sanitized.length === value.length ? sanitized : undefined;
+    }
+    return undefined;
+  }
+
+  private sanitizeWizardTemporaryMetadata(value: unknown): Record<string, unknown> | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const sanitized: Record<string, unknown> = {};
+    for (const [rawKey, nestedValue] of Object.entries(value)) {
+      const normalizedKey = normalizeWizardTemporaryKey(rawKey);
+      if (WIZARD_TEMPORARY_SECRET_KEY_MARKERS.some(
+        (marker) => normalizedKey.includes(marker),
+      )) continue;
+      const allowedKey = WIZARD_TEMPORARY_METADATA_KEY_BY_NORMALIZED.get(normalizedKey);
+      if (!allowedKey) continue;
+      const sanitizedValue = this.sanitizeWizardTemporaryScalar(nestedValue);
+      if (sanitizedValue !== undefined) sanitized[allowedKey] = sanitizedValue;
+    }
     return sanitized;
   }
 
@@ -109,9 +374,259 @@ export class ConfigurationService {
           return result;
         }, {});
     };
-    return createHash('sha256')
-      .update(JSON.stringify(canonicalize(input)))
-      .digest('hex');
+    // Es un identificador de idempotencia, no un hash de contraseña. Derivamos
+    // una subclave con dominio propio para no reutilizar directamente la clave
+    // AES; el HMAC impide ataques offline si se filtra la tabla de replays.
+    const fingerprintKey = createHmac('sha256', getSecretKeys(this.configService)[0])
+      .update('configuration-intent-fingerprint:v1', 'utf8')
+      .digest();
+    const intentHmac = createHmac('sha256', fingerprintKey);
+    // HMAC keyed y separado por dominio para identificar un payload; no almacena
+    // ni verifica contraseñas, por lo que una KDF de password sería incorrecta.
+    // codeql[js/insufficient-password-hash]
+    intentHmac.update(JSON.stringify(canonicalize(input)));
+    const intentMac = intentHmac.digest('hex');
+    return `hmac-v1:${intentMac}`;
+  }
+
+  private assertArgentinaIssuerVatInvariant(
+    countryCode: unknown,
+    vatCondition: unknown,
+    vatPercentage: unknown,
+  ): void {
+    if (String(countryCode ?? '').trim().toUpperCase() !== 'AR') return;
+
+    const condition = String(vatCondition ?? '').trim().toUpperCase();
+    if (!['MONOTRIBUTO', 'EXENTO'].includes(condition)) return;
+
+    const percentage = Number(vatPercentage);
+    if (
+      vatPercentage === null
+      || vatPercentage === undefined
+      || vatPercentage === ''
+      || !Number.isFinite(percentage)
+      || percentage !== 0
+    ) {
+      throw new BadRequestException(
+        `ARCA: un emisor ${condition} no puede cobrar IVA; igv_porcentaje debe ser 0`,
+      );
+    }
+  }
+
+  private async assertArgentinaIssuerVatPatch(
+    tenantId: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    const invariantKeys = ['pais', 'pais_id', 'arca_condicion_iva', 'igv_porcentaje'];
+    if (!invariantKeys.some((key) => Object.prototype.hasOwnProperty.call(patch, key))) {
+      return;
+    }
+
+    const { data: currentConfig, error } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select('pais, pais_id, arca_condicion_iva, igv_porcentaje')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) throw error;
+
+    const current = (currentConfig ?? {}) as Record<string, unknown>;
+    const countryCode = Object.prototype.hasOwnProperty.call(patch, 'pais')
+      ? patch.pais
+      : Object.prototype.hasOwnProperty.call(patch, 'pais_id')
+        ? getActiveCountryById(Number(patch.pais_id))?.codigo
+        : current.pais ?? getActiveCountryById(Number(current.pais_id))?.codigo;
+    const vatCondition = Object.prototype.hasOwnProperty.call(patch, 'arca_condicion_iva')
+      ? patch.arca_condicion_iva
+      : current.arca_condicion_iva;
+    const vatPercentage = Object.prototype.hasOwnProperty.call(patch, 'igv_porcentaje')
+      ? patch.igv_porcentaje
+      : current.igv_porcentaje;
+
+    this.assertArgentinaIssuerVatInvariant(
+      countryCode,
+      vatCondition,
+      vatPercentage,
+    );
+  }
+
+  private async normalizeDianEndpointPatch(
+    tenantId: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    const touchesEndpoint = ['dian_url', 'dian_environment']
+      .some((key) => Object.prototype.hasOwnProperty.call(patch, key));
+    if (!touchesEndpoint) return;
+
+    const { data: currentConfig, error } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select('pais, pais_id, dian_url, dian_environment')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) throw error;
+    const current = (currentConfig ?? {}) as Record<string, unknown>;
+    const country = getActiveCountryByCode(patch.pais ?? current.pais)
+      ?? getActiveCountryById(patch.pais_id ?? current.pais_id);
+    if (country?.codigo !== 'CO') {
+      throw new BadRequestException('La configuración DIAN sólo está disponible para Colombia');
+    }
+
+    try {
+      const environment = normalizeDianTransportEnvironment(
+        Object.prototype.hasOwnProperty.call(patch, 'dian_environment')
+          ? patch.dian_environment
+          : current.dian_environment || 'HOMOLOGACION',
+      );
+      const requestedUrl = Object.prototype.hasOwnProperty.call(patch, 'dian_url')
+        ? patch.dian_url
+        : current.dian_url;
+      patch.dian_environment = environment === 'produccion' ? 'PRODUCCION' : 'HOMOLOGACION';
+      patch.dian_url = resolveOfficialDianEndpoint({ environment, url: requestedUrl });
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : 'Configuración DIAN inválida');
+    }
+  }
+
+  private async assertColombiaCertificatePatch(
+    tenantId: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    const protectedKeys = [
+      'pais',
+      'pais_id',
+      'ruc',
+      'dian_activo',
+      'certificado_pfx',
+      'certificado_password',
+    ];
+    if (!protectedKeys.some((key) => Object.prototype.hasOwnProperty.call(patch, key))) {
+      return;
+    }
+
+    const { data: currentConfig, error } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select('pais, pais_id, ruc, dian_activo, certificado_pfx, certificado_password')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error) throw error;
+    const current = (currentConfig ?? {}) as Record<string, unknown>;
+    const country = getActiveCountryByCode(
+      Object.prototype.hasOwnProperty.call(patch, 'pais') ? patch.pais : current.pais,
+    ) ?? getActiveCountryById(Number(
+      Object.prototype.hasOwnProperty.call(patch, 'pais_id') ? patch.pais_id : current.pais_id,
+    ));
+    if (country?.codigo !== 'CO') return;
+
+    const requestedNit = Object.prototype.hasOwnProperty.call(patch, 'ruc')
+      ? patch.ruc
+      : current.ruc;
+    const nit = parseColombiaNit(requestedNit);
+    if (!nit) {
+      throw new BadRequestException('Colombia requiere un NIT válido con dígito de verificación');
+    }
+
+    const certificateValue = Object.prototype.hasOwnProperty.call(patch, 'certificado_pfx')
+      ? patch.certificado_pfx
+      : current.certificado_pfx;
+    const passwordValue = Object.prototype.hasOwnProperty.call(patch, 'certificado_password')
+      ? patch.certificado_password
+      : current.certificado_password;
+    const dianActive = Object.prototype.hasOwnProperty.call(patch, 'dian_activo')
+      ? patch.dian_activo === true
+      : current.dian_activo === true;
+
+    if (!certificateValue || !passwordValue) {
+      if (dianActive) {
+        throw new BadRequestException(
+          'DIAN activo requiere un certificado digital que pertenezca al NIT configurado',
+        );
+      }
+      return;
+    }
+
+    try {
+      const buffer = decryptBuffer(this.configService, certificateValue);
+      if (!buffer) throw new Error('El certificado digital está vacío');
+      const validation = this.validateCertificateForIssuer(
+        buffer,
+        decryptText(this.configService, String(passwordValue)),
+        'CO',
+        nit.compact,
+      );
+      if (!validation.perteneceAlEmisor) {
+        throw new BadRequestException(validation.motivoTitularidad);
+      }
+      if (dianActive && validation.daysUntilExpiration < 0) {
+        throw new BadRequestException('DIAN activo requiere un certificado digital vigente');
+      }
+    } catch (certificateError) {
+      if (certificateError instanceof BadRequestException) throw certificateError;
+      throw new BadRequestException(
+        certificateError instanceof Error
+          ? certificateError.message
+          : 'No se pudo validar el certificado digital de Colombia',
+      );
+    }
+  }
+
+  private async normalizeColombiaTransportPatch(
+    tenantId: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    const transportKeys = [
+      'pais',
+      'pais_id',
+      'emision_cpe_modo',
+      'ose_activo',
+      'ose_url',
+      'ose_status_url',
+      'ose_username',
+      'ose_password',
+      'ose_api_key',
+      'ose_api_header',
+      'ose_bearer_token',
+    ];
+    if (!transportKeys.some((key) => Object.prototype.hasOwnProperty.call(patch, key))) {
+      return;
+    }
+
+    let current: Record<string, unknown> = {};
+    if (
+      !Object.prototype.hasOwnProperty.call(patch, 'pais')
+      && !Object.prototype.hasOwnProperty.call(patch, 'pais_id')
+    ) {
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('empresa_config')
+        .select('pais, pais_id')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (error) throw error;
+      current = (data ?? {}) as Record<string, unknown>;
+    }
+
+    const country = getActiveCountryByCode(patch.pais ?? current.pais)
+      ?? getActiveCountryById(Number(patch.pais_id ?? current.pais_id));
+    if (country?.codigo !== 'CO') return;
+
+    const requestedMode = String(patch.emision_cpe_modo ?? '').trim().toUpperCase();
+    const hasOseConfiguration = transportKeys
+      .filter((key) => key.startsWith('ose_') && key !== 'ose_activo')
+      .some((key) => String(patch[key] ?? '').trim().length > 0);
+    if (
+      (requestedMode && requestedMode !== 'DIAN_DIRECTO')
+      || patch.ose_activo === true
+      || hasOseConfiguration
+    ) {
+      throw new BadRequestException(
+        'Colombia emite exclusivamente por DIAN_DIRECTO; OSE sólo corresponde a Perú',
+      );
+    }
+
+    patch.emision_cpe_modo = 'DIAN_DIRECTO';
+    patch.ose_activo = false;
   }
 
   async updateEmpresaPatchAtomic(
@@ -122,6 +637,10 @@ export class ConfigurationService {
     operation: 'EMPRESA' | 'PARAMETROS' | 'GRE' | 'TENANT_UPDATE' = 'EMPRESA',
   ): Promise<any> {
     const atomic = this.requireAtomicContext(actorId, idempotencyKey);
+    await this.assertArgentinaIssuerVatPatch(tenantId, patch);
+    await this.normalizeColombiaTransportPatch(tenantId, patch);
+    await this.assertColombiaCertificatePatch(tenantId, patch);
+    await this.normalizeDianEndpointPatch(tenantId, patch);
     const { data, error } = await this.supabaseService.getClient().rpc(
       'actualizar_empresa_config_tx',
       {
@@ -218,6 +737,11 @@ export class ConfigurationService {
             'dian_resolucion_hasta',
             'dian_resolucion_fecha_inicio',
             'dian_resolucion_fecha_fin',
+            'dian_ultima_prueba_estado',
+            'dian_ultima_prueba_detalle',
+            'dian_habilitacion_estado',
+            'dian_habilitacion_at',
+            'dian_habilitacion_evidencia',
             'arca_activo',
             'arca_environment',
             'arca_wsaa_url',
@@ -333,7 +857,9 @@ export class ConfigurationService {
         if (!typedEmpresaConfig?.arca_wsfe_url) addFiscalMissingItem('URL WSFEv1');
         if (!typedEmpresaConfig?.arca_cuit_representada) addFiscalMissingItem('CUIT representada');
         if (!typedEmpresaConfig?.arca_punto_venta) addFiscalMissingItem('Punto de venta ARCA');
-        if (!typedEmpresaConfig?.arca_condicion_iva) addFiscalMissingItem('Condición frente al IVA');
+        if (!['RESPONSABLE_INSCRIPTO', 'MONOTRIBUTO', 'EXENTO'].includes(
+          String(typedEmpresaConfig?.arca_condicion_iva || '').toUpperCase(),
+        )) addFiscalMissingItem('Condición frente al IVA válida');
         if (!typedEmpresaConfig?.ingresos_brutos) addFiscalMissingItem('Inscripción en Ingresos Brutos');
         if (!typedEmpresaConfig?.fecha_inicio_actividades) addFiscalMissingItem('Fecha de inicio de actividades');
         if (!typedEmpresaConfig?.provincia_fiscal) addFiscalMissingItem('Jurisdicción fiscal');
@@ -342,21 +868,27 @@ export class ConfigurationService {
       if (requiereDian) {
         if (!dianActivo) addFiscalMissingItem('Activar DIAN');
         if (!typedEmpresaConfig?.dian_url) addFiscalMissingItem('URL DIAN');
-        if (!typedEmpresaConfig?.dian_usuario) addFiscalMissingItem('Usuario DIAN');
-        if (!typedEmpresaConfig?.dian_password) addFiscalMissingItem('Password DIAN');
         if (!typedEmpresaConfig?.dian_software_id) addFiscalMissingItem('Software ID DIAN');
         if (!typedEmpresaConfig?.dian_software_pin) addFiscalMissingItem('Software PIN DIAN');
         if (!typedEmpresaConfig?.dian_regimen_fiscal) addFiscalMissingItem('Régimen fiscal DIAN');
         if (!typedEmpresaConfig?.dian_tipo_contribuyente) addFiscalMissingItem('Tipo contribuyente DIAN');
-        if (dianEnvironment === 'HOMOLOGACION' && !typedEmpresaConfig?.dian_test_set_id) {
-          addFiscalMissingItem('Test Set ID DIAN');
-        }
+        if (!typedEmpresaConfig?.dian_test_set_id) addFiscalMissingItem('Test Set ID DIAN');
         if (!typedEmpresaConfig?.dian_resolucion_numero) addFiscalMissingItem('Resolución DIAN');
         if (!typedEmpresaConfig?.dian_resolucion_prefijo) addFiscalMissingItem('Prefijo DIAN');
         if (typedEmpresaConfig?.dian_resolucion_desde == null) addFiscalMissingItem('Rango inicio DIAN');
         if (typedEmpresaConfig?.dian_resolucion_hasta == null) addFiscalMissingItem('Rango fin DIAN');
         if (!typedEmpresaConfig?.dian_resolucion_fecha_inicio) addFiscalMissingItem('Vigencia inicio DIAN');
         if (!typedEmpresaConfig?.dian_resolucion_fecha_fin) addFiscalMissingItem('Vigencia fin DIAN');
+        const dianTestState = String(
+          typedEmpresaConfig?.dian_ultima_prueba_estado ?? '',
+        ).toUpperCase();
+        const dianPortalApproval = hasCurrentDianPortalApproval(typedEmpresaConfig);
+        if (!['LISTA_PARA_TESTSET', 'VALIDADA'].includes(dianTestState)) {
+          addFiscalMissingItem('Validar certificado, software y numeración con DIAN');
+        }
+        if (dianEnvironment === 'PRODUCCION' && !dianPortalApproval) {
+          addFiscalMissingItem('Registrar estado Habilitado del software desde el portal DIAN');
+        }
       }
 
       const effectiveCoreMissingItems = isDemo ? [] : coreMissingItems;
@@ -407,6 +939,13 @@ export class ConfigurationService {
           isEnabled: fiscalEnabled,
           isReady: !isDemo && fiscalMissingItems.length === 0 && certificateValidation.isValid,
           missingItems: isDemo ? [] : fiscalMissingItems,
+          environment: paisCodigo === 'CO' ? dianEnvironment : undefined,
+          technicalValidationState: paisCodigo === 'CO'
+            ? String(typedEmpresaConfig?.dian_ultima_prueba_estado ?? '') || undefined
+            : undefined,
+          externalApprovalValidated: paisCodigo === 'CO'
+            ? hasCurrentDianPortalApproval(typedEmpresaConfig)
+            : undefined,
         },
       };
 
@@ -661,18 +1200,7 @@ export class ConfigurationService {
         throw error;
       }
 
-      const typedData = data as any;
-      return {
-        id: typedData.id,
-        tenantId: typedData.tenant_id,
-        pasoActual: typedData.paso_actual,
-        pasosCompletados: typedData.pasos_completados || [],
-        configuracionTemporal: typedData.configuracion_temporal,
-        completado: typedData.completado,
-        completadoAt: typedData.completado_at ? new Date(typedData.completado_at) : undefined,
-        createdAt: new Date(typedData.created_at),
-        updatedAt: new Date(typedData.updated_at),
-      };
+      return this.mapWizardProgress(data as any);
     } catch (error) {
       this.logger.error(`Error getting wizard progress for tenant ${tenantId}:`, error);
       throw error;
@@ -724,6 +1252,7 @@ export class ConfigurationService {
   async validateCertificatePayload(
     tenantId: string,
     payload: ValidateWizardCertificateDto,
+    expectedIssuer?: { countryCode?: string; taxId?: unknown },
   ): Promise<WizardCertificateValidationResult> {
     if (!payload.certificateBase64) {
       throw new Error('El certificado es requerido');
@@ -736,11 +1265,10 @@ export class ConfigurationService {
     try {
       const normalizedBase64 = payload.certificateBase64.replace(/\s+/g, '');
       const buffer = Buffer.from(normalizedBase64, 'base64');
-      const metadata = parseCertificateBuffer(buffer, payload.certificatePassword);
 
-      // Un certificado puede cargar y estar vigente y aun asi no servir: SUNAT
-      // solo acepta el del contribuyente que emite. Se comprueba al subirlo y
-      // no al facturar, que es cuando ya seria tarde.
+      // Un certificado puede cargar y estar vigente y aun así pertenecer a
+      // otro contribuyente. El wizard pasa aquí la identidad nueva: consultar
+      // sólo empresa_config compararía contra el NIT anterior al cambio.
       const { data: empresa } = await this.supabaseService
         .getClient()
         .from('empresa_config')
@@ -748,46 +1276,26 @@ export class ConfigurationService {
         .eq('tenant_id', tenantId)
         .maybeSingle();
 
-      const isArgentina = String(empresa?.pais || '').toUpperCase() === 'AR';
-      const rucEmisor = isArgentina
+      const countryCode = String(
+        expectedIssuer?.countryCode ?? empresa?.pais ?? 'PE',
+      ).trim().toUpperCase();
+      const persistedIssuer = countryCode === 'AR'
         ? empresa?.arca_cuit_representada || empresa?.ruc || null
-        : empresa?.sunat_cert_expected_ruc || empresa?.ruc || null;
-      const titularidad = isArgentina
-        ? (() => {
-            const candidatos = metadata.subject.match(/(?<!\d)\d{11}(?!\d)/g) ?? [];
-            const cuits = [...new Set(candidatos.filter(validateArgentinaCuit))];
-            const coincide = Boolean(rucEmisor && cuits.includes(String(rucEmisor).replace(/\D/g, '')));
-            return {
-              coincide,
-              rucsEnCertificado: cuits,
-              error: coincide
-                ? undefined
-                : 'El certificado ARCA debe declarar el CUIT representado en su titular.',
-            };
-          })()
-        : verificarTitularidadCertificado(metadata.subject, rucEmisor);
-
-      const now = new Date();
-      const daysUntilExpiration = Math.ceil(
-        (metadata.validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        : countryCode === 'PE'
+          ? empresa?.sunat_cert_expected_ruc || empresa?.ruc || null
+          : empresa?.ruc || null;
+      const result = this.validateCertificateForIssuer(
+        buffer,
+        payload.certificatePassword,
+        countryCode,
+        expectedIssuer?.taxId ?? persistedIssuer,
       );
 
       this.logger.log(
-        `Certificate payload validated for tenant ${tenantId} (expira: ${metadata.validTo.toISOString()})`,
+        `Certificate payload validated for tenant ${tenantId} (expira: ${result.validTo.toISOString()})`,
       );
 
-      return {
-        subject: metadata.subject,
-        issuer: metadata.issuer,
-        serialNumber: metadata.serialNumber,
-        validFrom: metadata.validFrom,
-        validTo: metadata.validTo,
-        daysUntilExpiration,
-        rucEmisor,
-        rucsEnCertificado: titularidad.rucsEnCertificado,
-        perteneceAlEmisor: titularidad.coincide,
-        motivoTitularidad: titularidad.error,
-      };
+      return result;
     } catch (error) {
       this.logger.error(`Error validating certificate payload for tenant ${tenantId}:`, error);
       throw error instanceof Error
@@ -832,6 +1340,17 @@ export class ConfigurationService {
         config = progress.configuracionTemporal;
       }
 
+      if (
+        config.logoBase64 !== undefined
+        || config.logoFile !== undefined
+        || config.logoUrl !== undefined
+        || config.logo_url !== undefined
+      ) {
+        throw new BadRequestException(
+          'El logo debe cargarse mediante POST /api/configuration/empresa/logo',
+        );
+      }
+
       this.logger.log('Configuration payload received', {
         tenantId,
         hasCertificate: Boolean(config.certificateBase64),
@@ -857,6 +1376,57 @@ export class ConfigurationService {
         getActiveCountryById(config.pais_id) ??
         getActiveCountryByCode(INITIAL_ACTIVE_COUNTRY_CODE)!;
       const paisCodigo = country.codigo;
+      let canonicalDianEndpoint: string | null = null;
+      if (paisCodigo === 'CO') {
+        try {
+          const dianEnvironment = normalizeDianTransportEnvironment(
+            config.dian_environment || 'HOMOLOGACION',
+          );
+          config.dian_environment = dianEnvironment === 'produccion'
+            ? 'PRODUCCION'
+            : 'HOMOLOGACION';
+          canonicalDianEndpoint = resolveOfficialDianEndpoint({
+            environment: dianEnvironment,
+            url: config.dian_url,
+          });
+          config.dian_url = canonicalDianEndpoint;
+        } catch (error) {
+          throw new BadRequestException(
+            error instanceof Error ? error.message : 'Configuración DIAN inválida',
+          );
+        }
+
+        const requestedEmissionMode = String(
+          config.emision_cpe_modo ?? config.emisionCpeModo ?? '',
+        ).trim().toUpperCase();
+        const hasOseConfiguration = [
+          config.ose_url,
+          config.ose_status_url,
+          config.ose_username,
+          config.ose_password,
+          config.ose_api_key,
+          config.ose_api_header,
+          config.ose_bearer_token,
+          config.oseUrl,
+          config.oseStatusUrl,
+        ].some((value) => String(value ?? '').trim().length > 0);
+        if (
+          (requestedEmissionMode && requestedEmissionMode !== 'DIAN_DIRECTO')
+          || config.ose_activo === true
+          || config.oseActivo === true
+          || hasOseConfiguration
+        ) {
+          throw new BadRequestException(
+            'Colombia emite exclusivamente por DIAN_DIRECTO; OSE sólo corresponde a Perú',
+          );
+        }
+      }
+
+      this.assertArgentinaIssuerVatInvariant(
+        paisCodigo,
+        config.arca_condicion_iva,
+        config.igv_porcentaje ?? country.tasaImpuesto * 100,
+      );
 
       if (!String(config.ruc || '').trim() || !String(config.razonSocial || '').trim() || !String(config.direccion || '').trim()) {
         throw new Error('Documento fiscal, razón social y dirección son obligatorios para habilitar el ERP');
@@ -896,6 +1466,9 @@ export class ConfigurationService {
         ? await this.validateCertificatePayload(tenantId, {
             certificateBase64: config.certificateBase64,
             certificatePassword: config.certificatePassword,
+          }, {
+            countryCode: paisCodigo,
+            taxId: config.ruc,
           })
         : null;
       if (certificateValidation && certificateValidation.daysUntilExpiration < 0) {
@@ -936,10 +1509,13 @@ export class ConfigurationService {
           if (!config.arca_wsaa_url || !config.arca_wsfe_url) {
             throw new Error('ARCA activo requiere las URL WSAA y WSFEv1');
           }
-          if (!config.arca_punto_venta || Number(config.arca_punto_venta) < 1) {
-            throw new Error('ARCA requiere un punto de venta electrónico habilitado');
+          if (!config.arca_punto_venta || Number(config.arca_punto_venta) < 1
+              || Number(config.arca_punto_venta) > 99998) {
+            throw new Error('ARCA requiere un punto de venta electrónico habilitado entre 1 y 99998');
           }
-          if (!config.arca_condicion_iva || !config.ingresos_brutos || !config.provincia_fiscal) {
+          if (!['RESPONSABLE_INSCRIPTO', 'MONOTRIBUTO', 'EXENTO'].includes(
+            String(config.arca_condicion_iva || '').toUpperCase(),
+          ) || !config.ingresos_brutos || !config.provincia_fiscal) {
             throw new Error('ARCA activo requiere condición IVA, Ingresos Brutos y jurisdicción fiscal');
           }
           const existingCertificate = certificateValidation
@@ -951,26 +1527,39 @@ export class ConfigurationService {
         }
       }
       if (paisCodigo === 'CO') {
-        if (!validateColombiaNit(config.ruc)) {
+        const nit = parseColombiaNit(config.ruc);
+        if (!nit) {
           throw new Error('Colombia requiere un NIT válido con dígito de verificación');
+        }
+        if (!/^\d{5}$/.test(String(config.ubigeo || '').trim())) {
+          throw new Error('Colombia requiere el código DANE de 5 dígitos del municipio fiscal');
+        }
+        if (!String(config.departamento || '').trim() || !String(config.provincia || '').trim()) {
+          throw new Error('Colombia requiere departamento y municipio del domicilio fiscal');
+        }
+        if (!['1', '2'].includes(String(config.dian_tipo_contribuyente || '').trim())) {
+          throw new Error('Colombia requiere tipo de contribuyente DIAN (1 o 2)');
+        }
+        if (!/^O-\d{2}(?:;O-\d{2})*$/.test(String(config.dian_regimen_fiscal || '').trim().toUpperCase())) {
+          throw new Error('Colombia requiere una responsabilidad fiscal DIAN válida (por ejemplo O-13)');
+        }
+        const effectiveCertificate = certificateValidation
+          ?? await this.loadStoredCertificateForIssuer(tenantId, 'CO', nit.compact);
+        if (effectiveCertificate && !effectiveCertificate.perteneceAlEmisor) {
+          throw new BadRequestException(effectiveCertificate.motivoTitularidad);
         }
         if (config.dian_activo === true) {
           const requiredDianFields = [
             config.dian_url,
-            config.dian_usuario,
-            config.dian_password,
             config.dian_software_id,
             config.dian_software_pin,
             config.dian_resolucion_numero,
             config.dian_resolucion_prefijo,
           ];
           if (requiredDianFields.some((value) => !value)) {
-            throw new Error('DIAN activo requiere credenciales, software y resolución aportados por el cliente');
+            throw new Error('DIAN activo requiere software, numeración y certificado aportados por el cliente');
           }
-          const existingCertificate = certificateValidation
-            ? { isValid: true }
-            : await this.validationService.validateCertificate(tenantId);
-          if (!existingCertificate.isValid) {
+          if (!effectiveCertificate || effectiveCertificate.daysUntilExpiration < 0) {
             throw new Error('DIAN activo requiere el certificado digital vigente aportado por el cliente');
           }
         }
@@ -981,7 +1570,9 @@ export class ConfigurationService {
       this.logger.log('Saving ERP configuration through the atomic boundary');
       let certificateHash: string | undefined;
       const configurationPatch: Record<string, unknown> = {
-        ruc: String(config.ruc).trim(),
+        ruc: paisCodigo === 'CO'
+          ? parseColombiaNit(config.ruc)!.compact
+          : String(config.ruc).trim(),
         razon_social: String(config.razonSocial).trim(),
         direccion_fiscal: String(config.direccion).trim(),
         ubigeo: String(config.ubigeo || '').trim() || null,
@@ -994,7 +1585,7 @@ export class ConfigurationService {
         gre_obligatorio: config.gre_obligatorio === true,
         gre_automatico_habilitado: config.gre_automatico_habilitado === true,
         umbral_gre_automatico: config.umbral_gre_automatico || 700,
-        igv_porcentaje: config.igv_porcentaje || country.tasaImpuesto * 100,
+        igv_porcentaje: config.igv_porcentaje ?? country.tasaImpuesto * 100,
         retencion_renta_porcentaje: config.retencion_renta_porcentaje || 0,
         emision_cpe_modo:
           paisCodigo === 'AR'
@@ -1023,6 +1614,9 @@ export class ConfigurationService {
           configuration: config,
         }),
       };
+      if (canonicalDianEndpoint) {
+        configurationPatch.dian_url = canonicalDianEndpoint;
+      }
 
       const setIfPresent = (
         key: string,
@@ -1056,13 +1650,15 @@ export class ConfigurationService {
         encryptText(this.configService, value),
       );
       setIfPresent('sunat_cert_ruc_mismatch_reason', config.sunat_cert_ruc_mismatch_reason);
-      setIfPresent('ose_url', config.ose_url);
-      setIfPresent('ose_status_url', config.ose_status_url);
-      setIfPresent('ose_username', config.ose_username);
-      setIfPresent('ose_password', config.ose_password);
-      setIfPresent('ose_api_key', config.ose_api_key);
-      setIfPresent('ose_api_header', config.ose_api_header);
-      setIfPresent('ose_bearer_token', config.ose_bearer_token);
+      if (paisCodigo === 'PE') {
+        setIfPresent('ose_url', config.ose_url);
+        setIfPresent('ose_status_url', config.ose_status_url);
+        setIfPresent('ose_username', config.ose_username);
+        setIfPresent('ose_password', config.ose_password);
+        setIfPresent('ose_api_key', config.ose_api_key);
+        setIfPresent('ose_api_header', config.ose_api_header);
+        setIfPresent('ose_bearer_token', config.ose_bearer_token);
+      }
       if (paisCodigo === 'AR') {
         setIfPresent('arca_wsaa_url', config.arca_wsaa_url);
         setIfPresent('arca_wsfe_url', config.arca_wsfe_url);
@@ -1074,7 +1670,6 @@ export class ConfigurationService {
         setIfPresent('provincia_fiscal', config.provincia_fiscal);
       }
       if (paisCodigo === 'CO') {
-        setIfPresent('dian_url', config.dian_url);
         setIfPresent('dian_usuario', config.dian_usuario);
         setIfPresent('dian_password', config.dian_password, (value) =>
           encryptText(this.configService, value),
@@ -1093,7 +1688,6 @@ export class ConfigurationService {
         setIfPresent('dian_resolucion_fecha_inicio', config.dian_resolucion_fecha_inicio);
         setIfPresent('dian_resolucion_fecha_fin', config.dian_resolucion_fecha_fin);
       }
-      setIfPresent('logo_url', config.logoUrl || config.logoBase64);
 
       if (certificateValidation) {
         const certificateBuffer = Buffer.from(

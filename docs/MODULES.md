@@ -156,10 +156,115 @@ Código principal: `apps/erp-api/src/modules/pos`,
 
 - CPE construye UBL, firma, envía, consulta, almacena CDR y produce
   representación impresa.
-- La vista A4 muestra en HTML los datos fiscales, emisor, receptor, líneas y
-  totales con proporción 210 × 297 mm; no depende del visor PDF nativo del
-  navegador. Descargar o abrir/imprimir conserva el PDF A4 generado por el
-  backend. En demo ambas representaciones declaran que no tienen validez SUNAT.
+- El PDF A4 es la salida física elegida por el ERP: mide 210 × 297 mm y debe
+  imprimirse en papel A4, escala 100 % y sin «ajustar a página». SUNAT no impone
+  un único tamaño de papel; lo exigible es que la representación impresa sea
+  legible y contenga la información fiscal aplicable. El PDF del backend es la
+  representación autoritativa para comprobantes de una o varias páginas; la
+  vista HTML permite revisarla sin depender del visor PDF nativo y no debe
+  recortar líneas, totales ni el QR.
+- Para Perú, la representación usa las leyendas de factura, boleta y notas,
+  muestra las bases que tengan importe, unidad de medida y un QR negro en la
+  parte inferior: nivel de corrección Q, margen físico mínimo de 1 mm y tamaño
+  menor a 6 × 6 cm. El valor resumen se incluye cuando existe y también puede
+  mostrarse fuera del QR. Argentina y Colombia conservan sus propias etiquetas
+  e identificadores; nunca pasan por el validador QR de SUNAT.
+- El logo es marca opcional, no un requisito fiscal. Se carga únicamente por
+  `POST /api/configuration/empresa/logo` como PNG/JPEG de hasta 2 MiB, se guarda
+  en Supabase Storage bajo una ruta tenant-scoped y se reemplaza o elimina con
+  operación idempotente. No se aceptan data URLs ni hosts arbitrarios en la
+  configuración empresarial. En demo, PDF y vista declaran que el documento no
+  tiene validez tributaria.
+- Argentina emite por WSFEv1 únicamente comprobantes ordinarios A/B/C en pesos.
+  La clase se resuelve con la condición IVA del emisor y del receptor; una A
+  exige CUIT (`DocTipo=80`). La aceptación se cierra con CAE de 14 dígitos,
+  vencimiento, punto, tipo y número autorizados, que deben coincidir con el CPE.
+  `ImpNeto` contiene sólo la base gravada: las bases exentas y no gravadas se
+  informan por separado y nunca se duplican. El QR conserva exactamente el
+  `CbteFch` confirmado por ARCA y no vuelve a interpretar esa fecha por zona
+  horaria al preparar la representación.
+  Exportación E/WSFEXv1, CAEA, moneda extranjera, A-CBU y A sujeta a retención
+  permanecen bloqueadas mientras no exista su configuración e integración
+  específica. Los códigos históricos 51-53 representan A sujeta a retención,
+  no una clase M vigente.
+- Colombia usa **UBL 2.1 conforme al Anexo Técnico de Factura Electrónica de
+  Venta 1.9**; «1.9» es la versión del anexo DIAN y no otra versión de UBL.
+  Factura `01`, nota crédito `91` y nota débito `92` declaran afectación,
+  bases, tributos y totales desde el snapshot comercial. CUFE/CUDE se calculan
+  con SHA-384 y los secretos/autorización que corresponden al tipo documental;
+  `cpe.hash` sigue siendo el hash del XML y nunca se reutiliza como código
+  fiscal. Los `ProfileID` normativos son exactamente `DIAN 2.1: Factura
+  Electrónica de Venta`, `DIAN 2.1: Nota Crédito de Factura Electrónica de
+  Venta`, `DIAN 2.1: Nota Débito de Factura Electrónica de Venta` y `DIAN 2.1:
+  ApplicationResponse de Factura Electrónica de Venta`.
+- La firma colombiana es XMLDSig enveloped con XAdES-EPES 1.3.2. Una cuenta
+  real sólo usa el PFX y la contraseña cifrada de su tenant; un certificado o
+  NIT incongruente falla antes del I/O externo y nunca hereda credenciales
+  DIAN globales del proceso. La titularidad se compara con el NIT efectivo del
+  payload: activar DIAN o cambiar el NIT conservando un PFX de otro emisor se
+  rechaza antes del writer y del I/O externo. La firma del sobre SOAP 1.2 es independiente:
+  aplica WS-Addressing y WS-Security X.509, fija el destino oficial del ambiente
+  y rechaza redirecciones, faults, respuestas no XML y entidades externas.
+- La confianza en la respuesta DIAN es independiente del PFX del contribuyente.
+  El runtime exige un bundle CA público operativo y una allowlist de pins
+  SHA-256 del SPKI del firmante. Verifica cadena, pin, referencias XAdES y
+  anti-wrapping; una fuente ausente/ambigua, un pin malformado o una firma que no
+  encadene falla cerrado. El PFX privado de un tenant nunca se reutiliza como
+  trust store de la autoridad.
+- Habilitación envía por `SendTestSetAsync`; producción usa
+  `SendBillSync` y la variante asíncrona usa `SendBillAsync`.
+  `GetNumberingRange` confirma resolución, prefijo, rango, vigencia y clave
+  técnica antes de firmar una factura. Ese método no recibe el Software PIN:
+  valida transporte/certificado y numeración, pero nunca acredita el PIN. La
+  evidencia Software ID/TestSet/PIN procede del TestSet y del portal
+  `HABILITADO`. La recepción de un ZIP no es aceptación:
+  `GetStatusZip` consulta el `ZipKey`, mientras `GetStatus` consulta un
+  CUFE/CUDE. Pendiente, rechazado, no encontrado y error técnico permanecen
+  estados diferentes.
+- La operación de envío se reserva, sella con el XML firmado y finaliza de
+  forma durable. Un timeout después del sello consulta primero la clave tipada y
+  no reenvía a ciegas. Un retry reutiliza nombre ZIP, secuencia anual,
+  idempotencia, XML y código único; una clave nueva no puede repetir un evento
+  ya aceptado.
+- La respuesta `ApplicationResponse` que devuelve DIAN se conserva como
+  evidencia. El `AttachedDocument` sólo se construye cuando existen el XML
+  fiscal firmado y una respuesta DIAN verificable; no se fabrica una
+  aceptación desde un código o mensaje parcial. El contenedor exterior también
+  se firma con XAdES y conserva las firmas embebidas. El gate local incorporado
+  a CI deja verdes los nueve XML en XSD; factura, notas y eventos pasan además
+  el Schematron versionado de la caja oficial FEV 1.9. El XSL distribuido no
+  cubre la raíz de `AttachedDocument`.
+  Las divergencias internas conocidas se enumeran por regla y mensaje exactos;
+  no existe una exención genérica al validador.
+- La migración 528 impide que una factura o nota colombiana real pase a
+  `ACEPTADO` por un HTTP 200, `IsValid` o XML parcial. La operación debe estar
+  completada con código `00`; el `ApplicationResponse` debe tener raíz y
+  namespace UBL exactos, una sola `ds:Signature`, un solo
+  `DocumentResponse/DocumentReference/UUID` directo con el mismo CUFE/CUDE,
+  hash coincidente y la marca criptográfica de trust verificado. El verificador
+  PostgreSQL 16 prueba casos positivos y adulteraciones estructurales.
+- Los **eventos FEV 030-034** están implementados técnicamente en 527. La API
+  consulta `GetStatusEvent`, `GetStatus` y `GetXmlByDocumentKey`, importa y ancla
+  una FEV recibida inmutable, lista su historial y usa el ZIP oficial. 030-033
+  parten del adquirente sobre esa ancla; 034 parte del facturador sobre su CPE
+  emitido. Reserva, sello y finalización son tenant-safe e idempotentes; el retry
+  server-side recupera la operación por `operationId` sin depender de conservar
+  una clave de `sessionStorage`. Los verificadores 527/528 se ejecutan en una
+  reconstrucción limpia de PostgreSQL 16 y las suites API cubren la cadena.
+- La interfaz aplica RBAC separado: lectura de FEV/eventos, gestión de recibidas
+  030-033 y emisión 034. Un auditor puede consultar sin ver escrituras; una demo
+  o tenant no listo conserva historial pero no puede importar ni emitir. Chrome
+  Playwright cubre 8/8 casos, incluida la cadena 030→032→033 y 034, con APIs
+  interceptadas; no es una transmisión real.
+- 030-034 no equivalen a **habilitación RADIAN completa** ni dejan listo el
+  factoring. Para operar como participante directo se requiere un registro
+  separado, documentos/requisitos, verificación DIAN y superar el Set de pruebas
+  RADIAN vigente de 15 eventos. Los eventos de circulación no implementados
+  quedan fuera del alcance; los plazos y la aceptación jurídica los decide DIAN.
+- El perfil tributario del receptor no se infiere de un NIT. El cliente elige
+  expresamente consumidor final o adquirente NIT B2B; PostgreSQL valida la
+  combinación de responsabilidad/tributo y la congela en metadata del CPE para
+  que editar al cliente no reescriba un documento preparado.
 - Envío y consulta usan reserva, llamada externa y finalización durable. Un
   retry reutiliza la operación y no puede repetir una transmisión ya reclamada;
   el worker POS adopta el documento reservado sin crear otra factura o CxC.
@@ -545,6 +650,10 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   wizard, series y preferencia de país exigen actor y llave idempotente, toman
   locks por tenant y dejan auditoría. Crear o editar una serie usa el mismo
   contrato, sin recuperar el upsert directo anterior.
+- Las mutaciones de autenticación/configuración, conversión demo y material
+  fiscal sensible no son offline-capable. Certificados, PFX, credenciales y
+  secretos nunca entran en Web Storage ni SQLite; una lectura o sincronización
+  purga cualquier entrada legacy sensible antes de devolverla.
 - La demo pública PE/AR/CO se crea completa o no se crea: tenant, empresa,
   usuarios segregados, RBAC, almacén, stock canónico, clientes, proveedores,
   caja abierta, banco, plan contable y base de RR. HH. comparten un commit. Un
@@ -572,14 +681,29 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
 - La demo Colombia crea datos sintéticos en COP, NIT/CC y configuración DIAN,
   PILA y nómina electrónica simuladas, incluido un contrato colombiano con
   salario válido para ejercitar el cálculo completo. La transmisión real
-  permanece bloqueada hasta completar credenciales, certificado, resolución y
-  homologación.
-- La prueba DIAN consulta únicamente el WSDL oficial y registra si el transporte
-  es accesible, si detectó el servicio y si hubo transmisión (siempre `false` en
-  demo). Al convertir una demo colombiana, una RPC de servicio elimina todos los
-  secretos y afiliaciones sintéticos antes de marcarla como real. El envío de
-  documentos permanece fail-closed hasta disponer de SOAP WS-Security/XAdES
-  homologado; nunca se interpreta una respuesta JSON ficticia como aceptación.
+  permanece bloqueada aunque el código de transporte exista: completar campos
+  sintéticos nunca concede habilitación fiscal.
+- Una cuenta colombiana real sólo aparece lista para transmitir cuando tiene
+  identidad y PFX tenant-scoped, Software ID/PIN, TestSet, resolución y rango,
+  trust store/pins DIAN operativos, una validación técnica reciente y una
+  constancia administrativa de que el portal DIAN muestra ese mismo
+  software/TestSet como `HABILITADO`. Registrar
+  esa constancia exige ADMIN, referencia verificable, idempotencia y auditoría;
+  cambiar NIT, Software ID, TestSet o convertir la demo la invalida.
+- La prueba DIAN valida certificado, transporte y numeración contra el endpoint
+  oficial exacto del ambiente; una demo nunca la ejecuta. Al convertir una demo
+  colombiana, una RPC de servicio elimina todos los secretos y afiliaciones
+  sintéticos antes de marcarla como real. Ningún test local, WSDL accesible,
+  respuesta JSON o documento aceptado aislado sustituye el TestSet ni el estado
+  `HABILITADO` del portal.
+- La habilitación FEV anterior no habilita automáticamente al participante
+  directo RADIAN. Ese segundo proceso exige registro en Eventos RADIAN,
+  documentos/requisitos, verificación de DIAN y su Set de 15 eventos. El ERP no
+  presenta 030-034 como evidencia de factoring o habilitación RADIAN integral.
+- La representación A4 toma el país y el emisor del snapshot inmutable del CPE,
+  no de la configuración actual del tenant. Por eso cambiar de país o convertir
+  una demo no reetiqueta comprobantes históricos ni les concede validez fiscal:
+  los nacidos en demo continúan mostrándose explícitamente como muestra.
 - Un contribuyente tiene uno o varios **establecimientos anexos** del RUC. La
   casa matriz es el codigo `0000`, existe siempre, la crea un trigger al dar de
   alta el tenant y no se puede desactivar; los anexos llevan el codigo de cuatro

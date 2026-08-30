@@ -137,8 +137,8 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
     }
   }
 
-  // Un comprobante a un RUC que no existe lo rechaza SUNAT. Se avisa antes de
-  // emitir, y de paso se trae la razon social que debe ir en el documento.
+  // La fuente registral auxiliar avisa antes de emitir y propone la razón
+  // social. No sustituye la validación oficial que hará SUNAT al recibir el CPE.
   const rellenarConElPadron = (dato: ContribuyenteConsultado) => {
     if (!dato.razonSocial) return
     setFormData(prev => (prev.clienteRazonSocial?.trim() ? prev : { ...prev, clienteRazonSocial: dato.razonSocial! }))

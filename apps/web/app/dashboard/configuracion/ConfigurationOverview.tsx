@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Building2,
@@ -20,6 +20,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { parseDateLocal } from '@/lib/date-utils'
+import { LogoUploader } from '@/components/configuracion/LogoUploader'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import { useTenant } from '@/contexts/TenantContext'
 
 interface ConfigurationStatus {
   isComplete: boolean
@@ -44,6 +47,8 @@ interface ConfigurationStatus {
     isEnabled: boolean
     isReady: boolean
     missingItems?: string[]
+    technicalValidationState?: string
+    externalApprovalValidated?: boolean
   }
 }
 
@@ -61,6 +66,8 @@ interface EmpresaConfig {
   email?: string
   regimen?: string
   tipo_empresa?: string
+  logoUrl?: string
+  logo_url?: string
   usar_flujo_logistica?: boolean
   gre_obligatorio?: boolean
   gre_automatico_habilitado?: boolean
@@ -91,6 +98,10 @@ interface EmpresaConfig {
   dianResolucionNumero?: string
   dianResolucionPrefijo?: string
   dianRegimenFiscal?: string
+  dianUltimaPruebaEstado?: string
+  dianUltimaPruebaAt?: string
+  dianHabilitacionEstado?: string
+  dianHabilitacionAt?: string
 }
 
 interface OseStatus {
@@ -175,18 +186,54 @@ function SectionCard({
 
 export default function ConfigurationOverview({ section = 'resumen' }: { section?: Section }) {
   const country = useCountryContext()
+  const { user, isSuperAdmin } = useTenant()
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
   const isPeru = country.paisCodigo === 'PE'
   const documentoFiscal = country.documentoFiscal || 'RUC'
   const autoridadFiscal = country.servicioFiscal || 'SUNAT'
   const { get, post } = useApi({ showErrorToast: false, retries: 1, timeoutMs: 20000 })
+  const { post: postDianAction } = useApi({
+    showErrorToast: false,
+    throwOnError: true,
+    retries: 0,
+    timeoutMs: 30000,
+  })
+  const { request: logoRequest } = useApi({
+    showErrorToast: false,
+    throwOnError: true,
+    retries: 1,
+    timeoutMs: 20000,
+  })
   const [data, setData] = useState<LoadState>({ status: null, empresa: null, ose: null, rrhh: null })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dianTestResult, setDianTestResult] = useState<string | null>(null)
   const [testingDian, setTestingDian] = useState(false)
+  const [dianEvidenceReference, setDianEvidenceReference] = useState('')
+  const [dianEvidenceConfirmed, setDianEvidenceConfirmed] = useState(false)
+  const [registeringDianHabilitation, setRegisteringDianHabilitation] = useState(false)
+  const [dianHabilitationResult, setDianHabilitationResult] = useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
+  const [logoBusy, setLogoBusy] = useState(false)
+  const [confirmLogoRemoval, setConfirmLogoRemoval] = useState(false)
+  const [logoUploaderVersion, setLogoUploaderVersion] = useState(0)
+  const [logoFeedback, setLogoFeedback] = useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
+  const logoIntentRef = useRef<{
+    action: 'upload' | 'delete'
+    signature: string
+    key: string
+  } | null>(null)
+  const dianHabilitationIntentRef = useRef<{ reference: string; key: string } | null>(null)
+  const isTenantAdmin = isSuperAdmin || (user?.roles ?? []).some(
+    role => ['ADMIN', 'ADMINISTRADOR', 'SUPERADMIN'].includes(String(role).trim().toUpperCase()),
+  )
 
   const testDian = useCallback(async () => {
     setTestingDian(true)
@@ -247,9 +294,159 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
     }
   }, [autoridadFiscal, get, isPeru])
 
+  const registerDianHabilitation = useCallback(async () => {
+    const reference = dianEvidenceReference.trim()
+    if (!dianEvidenceConfirmed || reference.length < 8) {
+      setDianHabilitationResult({
+        type: 'error',
+        text: 'Confirma el estado HABILITADO e ingresa una referencia verificable de al menos 8 caracteres.',
+      })
+      return
+    }
+
+    setRegisteringDianHabilitation(true)
+    setDianHabilitationResult(null)
+    try {
+      if (dianHabilitationIntentRef.current?.reference !== reference) {
+        dianHabilitationIntentRef.current = {
+          reference,
+          key: `dian-habilitacion-ui:${window.crypto.randomUUID()}`,
+        }
+      }
+      const response = await postDianAction(
+        '/configuration/colombia/dian/habilitacion',
+        { confirmed: true, evidenceReference: reference },
+        { headers: { 'Idempotency-Key': dianHabilitationIntentRef.current.key } },
+      )
+      if (!response?.success) {
+        throw new Error(response?.message || 'No se pudo registrar la constancia DIAN')
+      }
+
+      setDianEvidenceConfirmed(false)
+      setDianEvidenceReference('')
+      dianHabilitationIntentRef.current = null
+      setDianHabilitationResult({
+        type: 'success',
+        text: 'Constancia HABILITADO registrada y configuración DIAN revalidada.',
+      })
+      await loadConfiguration(true)
+    } catch (error) {
+      setDianHabilitationResult({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo registrar la constancia DIAN',
+      })
+    } finally {
+      setRegisteringDianHabilitation(false)
+    }
+  }, [
+    dianEvidenceConfirmed,
+    dianEvidenceReference,
+    loadConfiguration,
+    postDianAction,
+  ])
+
   useEffect(() => {
     loadConfiguration()
   }, [loadConfiguration])
+
+  const getLogoIntentKey = useCallback((action: 'upload' | 'delete', signature: string) => {
+    if (
+      logoIntentRef.current?.action === action &&
+      logoIntentRef.current.signature === signature
+    ) {
+      return logoIntentRef.current.key
+    }
+
+    const key = `configuration-logo-${action}-${window.crypto.randomUUID()}`
+    logoIntentRef.current = { action, signature, key }
+    return key
+  }, [])
+
+  const handleLogoChange = useCallback(async (file: File | null) => {
+    if (!file) {
+      if (data.empresa?.logoUrl || data.empresa?.logo_url) {
+        setConfirmLogoRemoval(true)
+      }
+      return
+    }
+
+    setLogoBusy(true)
+    setLogoFeedback(null)
+
+    try {
+      const signature = `${file.name}:${file.size}:${file.lastModified}`
+      const form = new FormData()
+      form.append('file', file)
+
+      const response = await logoRequest('/api/configuration/empresa/logo', {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': getLogoIntentKey('upload', signature),
+        },
+        body: form,
+      })
+      const logoUrl = response?.data?.logo_url || response?.data?.logoUrl
+
+      if (response?.success !== true || !logoUrl) {
+        throw new Error(response?.message || 'No se pudo guardar el logo')
+      }
+
+      setData(current => ({
+        ...current,
+        empresa: current.empresa
+          ? { ...current.empresa, logoUrl, logo_url: logoUrl }
+          : current.empresa,
+      }))
+      setLogoFeedback({ type: 'success', text: 'Logo guardado correctamente.' })
+      logoIntentRef.current = null
+      await loadConfiguration(true)
+    } catch (err) {
+      setLogoUploaderVersion(version => version + 1)
+      setLogoFeedback({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'No se pudo actualizar el logo',
+      })
+    } finally {
+      setLogoBusy(false)
+    }
+  }, [data.empresa, getLogoIntentKey, loadConfiguration, logoRequest])
+
+  const removeCompanyLogo = useCallback(async () => {
+    const currentLogoUrl = data.empresa?.logoUrl || data.empresa?.logo_url || 'sin-logo'
+    setLogoBusy(true)
+    setLogoFeedback(null)
+
+    try {
+      const response = await logoRequest('/api/configuration/empresa/logo', {
+        method: 'DELETE',
+        headers: {
+          'Idempotency-Key': getLogoIntentKey('delete', currentLogoUrl),
+        },
+      })
+
+      if (response?.success !== true) {
+        throw new Error(response?.message || 'No se pudo quitar el logo')
+      }
+
+      setData(current => ({
+        ...current,
+        empresa: current.empresa
+          ? { ...current.empresa, logoUrl: undefined, logo_url: undefined }
+          : current.empresa,
+      }))
+      setLogoFeedback({ type: 'success', text: 'Logo eliminado correctamente.' })
+      logoIntentRef.current = null
+      await loadConfiguration(true)
+    } catch (err) {
+      setLogoUploaderVersion(version => version + 1)
+      setLogoFeedback({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'No se pudo quitar el logo',
+      })
+    } finally {
+      setLogoBusy(false)
+    }
+  }, [data.empresa, getLogoIntentKey, loadConfiguration, logoRequest])
 
   const checks = useMemo(() => {
     const status = data.status
@@ -274,11 +471,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             !!empresa?.arcaCuitRepresentada &&
             !!empresa?.arcaPuntoVenta)
         : isColombia
-          ? status?.isDemo === true ||
-            (empresa?.dianActivo === true &&
-              !!empresa?.dianSoftwareId &&
-              !!empresa?.dianResolucionNumero &&
-              !!empresa?.dianResolucionPrefijo)
+          ? status?.fiscal?.isReady === true
           : ose?.verificacion?.valid === true && ose?.configuracion?.certificateExists === true,
       fiscal: status?.fiscal?.isReady === true,
       sales: isArgentina
@@ -451,6 +644,38 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
               value={isArgentina ? (empresa as any)?.provinciaFiscal : empresa?.ubigeo}
             />
             <FieldRow label="Correo" value={empresa?.email} />
+            {section === 'empresa' && (
+              <div className="mt-4 border-t border-border pt-4">
+                <h3 className="mb-1 text-sm font-semibold text-foreground">Logo de la empresa</h3>
+                <p className="mb-3 text-xs leading-snug text-muted-foreground">
+                  Se usa en facturas, boletas y tickets. Acepta PNG o JPG de hasta 2 MiB.
+                </p>
+                <LogoUploader
+                  key={logoUploaderVersion}
+                  currentLogoUrl={empresa?.logoUrl || empresa?.logo_url}
+                  onLogoChange={(file) => { void handleLogoChange(file) }}
+                  disabled={logoBusy}
+                />
+                <div className="min-h-5" aria-live="polite">
+                  {logoBusy && (
+                    <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      Actualizando logo…
+                    </p>
+                  )}
+                  {!logoBusy && logoFeedback && (
+                    <p
+                      className={cn(
+                        'mt-2 text-xs font-medium',
+                        logoFeedback.type === 'success' ? 'text-primary' : 'text-destructive',
+                      )}
+                    >
+                      {logoFeedback.text}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
             {/* En una demo estos datos son los de la empresa de ejemplo y no se
                 pueden cambiar: el asistente pide certificado y credenciales
                 fiscales reales, que sólo corresponden al convertir la cuenta.
@@ -506,23 +731,99 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
                 <FieldRow
                   label="DIAN activo"
                   value={status?.isDemo === true ? 'Simulado, sin transmisión' : empresa?.dianActivo}
-                  ok={empresa?.dianActivo === true || status?.isDemo === true}
+                  ok={status?.isDemo === true || status?.fiscal?.isReady === true}
                 />
                 <FieldRow label="Software ID" value={empresa?.dianSoftwareId} ok={!!empresa?.dianSoftwareId} />
                 <FieldRow label="Test Set ID" value={empresa?.dianTestSetId} ok={!!empresa?.dianTestSetId} />
                 <FieldRow label="Resolución DIAN" value={empresa?.dianResolucionNumero} ok={!!empresa?.dianResolucionNumero} />
                 <FieldRow label="Prefijo autorizado" value={empresa?.dianResolucionPrefijo} ok={!!empresa?.dianResolucionPrefijo} />
                 <FieldRow label="Ambiente" value={empresa?.dianEnvironment} />
+                <FieldRow
+                  label="Validación técnica"
+                  value={status?.fiscal?.technicalValidationState || empresa?.dianUltimaPruebaEstado || 'No ejecutada'}
+                  ok={['LISTA_PARA_TESTSET', 'VALIDADA'].includes(
+                    String(status?.fiscal?.technicalValidationState || empresa?.dianUltimaPruebaEstado || '').toUpperCase(),
+                  )}
+                />
+                <FieldRow
+                  label="Constancia portal DIAN"
+                  value={
+                    status?.fiscal?.externalApprovalValidated === true
+                      ? 'HABILITADO'
+                      : empresa?.dianHabilitacionEstado || 'No registrada'
+                  }
+                  ok={
+                    status?.fiscal?.externalApprovalValidated === true
+                    || empresa?.dianHabilitacionEstado === 'HABILITADO'
+                  }
+                />
                 <button
                   type="button"
                   onClick={testDian}
-                  disabled={testingDian}
+                  disabled={testingDian || status?.isDemo === true}
+                  title={status?.isDemo === true ? 'La demo nunca contacta servicios DIAN reales' : undefined}
                   className="mt-3 inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-60"
                 >
                   {testingDian ? <RefreshCw className="mr-2 size-4 animate-spin" /> : <ShieldCheck className="mr-2 size-4" />}
-                  Probar conexión DIAN
+                  {status?.isDemo === true ? 'Prueba DIAN bloqueada en demo' : 'Validar certificado y numeración DIAN'}
                 </button>
                 {dianTestResult && <p className="mt-2 text-xs text-muted-foreground">{dianTestResult}</p>}
+                {isTenantAdmin && status?.isDemo !== true && (
+                  <div
+                    className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4"
+                    data-testid="dian-habilitacion-control"
+                  >
+                    <p className="text-sm font-bold text-foreground">Constancia HABILITADO del portal DIAN</p>
+                    <p id="dian-evidence-help" className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      Regístrala sólo después de que el portal de habilitación muestre el software como HABILITADO.
+                      Una factura aceptada dentro del TestSet no sustituye esta constancia. No pegues PIN, contraseña ni certificado.
+                    </p>
+                    <label htmlFor="dian-evidence-reference" className="mt-3 block text-xs font-semibold text-foreground">
+                      Referencia verificable de la constancia
+                    </label>
+                    <input
+                      id="dian-evidence-reference"
+                      value={dianEvidenceReference}
+                      onChange={event => setDianEvidenceReference(event.target.value)}
+                      aria-describedby="dian-evidence-help"
+                      placeholder="Radicado, URL o identificador del portal (sin secretos)"
+                      className="mt-1 min-h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                    />
+                    <label className="mt-3 flex items-start gap-2 text-xs text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={dianEvidenceConfirmed}
+                        onChange={event => setDianEvidenceConfirmed(event.target.checked)}
+                        className="mt-0.5 size-4"
+                      />
+                      Confirmo que el portal DIAN muestra este Software ID y TestSet en estado HABILITADO.
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { void registerDianHabilitation() }}
+                      disabled={
+                        registeringDianHabilitation
+                        || !dianEvidenceConfirmed
+                        || dianEvidenceReference.trim().length < 8
+                      }
+                      className="mt-3 inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {registeringDianHabilitation && <RefreshCw className="mr-2 size-4 animate-spin" />}
+                      Registrar constancia HABILITADO
+                    </button>
+                    {dianHabilitationResult && (
+                      <p
+                        className={cn(
+                          'mt-2 text-xs font-medium',
+                          dianHabilitationResult.type === 'success' ? 'text-emerald-600' : 'text-destructive',
+                        )}
+                        role="status"
+                      >
+                        {dianHabilitationResult.text}
+                      </p>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -627,6 +928,16 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
             </ul>
           </div>
         )}
+      <ConfirmDialog
+        isOpen={confirmLogoRemoval}
+        onClose={() => setConfirmLogoRemoval(false)}
+        onConfirm={removeCompanyLogo}
+        title="Quitar logo de la empresa"
+        message="El logo dejará de aparecer en las nuevas facturas, boletas y tickets. Puedes subir otro cuando lo necesites."
+        confirmText="Quitar logo"
+        cancelText="Conservar logo"
+        variant="danger"
+      />
     </div>
   )
 }

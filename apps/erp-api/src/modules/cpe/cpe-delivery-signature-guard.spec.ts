@@ -20,6 +20,7 @@ describe('CpeDeliveryService - frontera de firma 476', () => {
       update: jest.fn(),
     };
     const fiscal = {
+      obtenerCodigoPais: jest.fn().mockResolvedValue('PE'),
       obtenerNombreServicioFiscal: jest.fn(),
       enviarDocumento: jest.fn(),
     };

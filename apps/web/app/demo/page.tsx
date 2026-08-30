@@ -313,7 +313,8 @@ export default function DemoPage() {
           <h2 className="text-2xl font-bold tracking-normal">Listo para explorar</h2>
           <p className="mt-2 text-sm leading-6 text-foreground/80">
             Crearemos una empresa demo de {selectedCountry.nombre}, con {selectedCountry.moneda_codigo},
-            reglas de {selectedCountry.nombre_fiscal} y credenciales temporales.
+            configuración de {selectedCountry.nombre_fiscal} en modo demostración y credenciales temporales
+            para acceder al ERP. La transmisión real a {selectedCountry.nombre_fiscal} permanece desactivada.
           </p>
 
           <label htmlFor="demo-country" className="mt-5 block text-sm font-semibold text-foreground">

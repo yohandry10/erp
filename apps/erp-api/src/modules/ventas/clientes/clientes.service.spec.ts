@@ -266,6 +266,7 @@ describe('ClientesService', () => {
       expect(result).toEqual(expect.objectContaining({
         ruc: '20100066603',
         validado_formato: true,
+        consulta_padron: true,
         consulta_sunat: true,
         razon_social: 'SUNAT OPERACIONES EN LINEA',
         estado: 'ACTIVO',
@@ -283,6 +284,7 @@ describe('ClientesService', () => {
       expect(result).toEqual(expect.objectContaining({
         ruc: '20100066603',
         validado_formato: true,
+        consulta_padron: false,
         consulta_sunat: false,
         fuente: 'VALIDACION_LOCAL',
       }));

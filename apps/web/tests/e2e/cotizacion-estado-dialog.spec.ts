@@ -110,6 +110,13 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
         body: onePageA4Pdf(),
       })
     }
+    if (/\/api\/cpe\/comprobantes\/cpe-n[cd]-demo\/pdf\/?$/.test(pathname)) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/pdf',
+        body: onePageA4Pdf(),
+      })
+    }
     if (/\/api\/cpe\/comprobantes\/cpe-a4-demo\/?$/.test(pathname)) {
       return json({
         success: true,
@@ -119,29 +126,64 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
           serie: 'F001',
           numero: 42,
           fecha_emision: '2026-08-25',
+          pais_codigo: 'PE',
           moneda: 'PEN',
           estado: 'BORRADOR',
+          simulated_origin: true,
           razon_social_receptor: 'Cliente Vista Previa S.A.C.',
           documento_receptor: '20600000013',
           direccion_receptor: 'Av. Demo 123, Lima',
           total_gravadas: 100,
           total_igv: 18,
           total_venta: 118,
+          sunat_qr_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          valor_resumen: 'VALOR-RESUMEN-DEMO',
           emisor: {
             ruc: '20600000021',
             razon_social: 'Comercial Andina Demo S.A.C.',
             direccion_fiscal: 'Av. Emisor 456, Lima',
             telefono: '01 555 0101',
             email: 'ventas@demo.invalid',
+            logo_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
           },
-          items: [{
-            cantidad: 2,
-            descripcion: 'Audífonos Bluetooth',
-            precio_unitario: 50,
-            total_item: 118,
-          }],
+          items: Array.from({ length: 8 }, (_, index) => ({
+            cantidad: index === 0 ? 2 : 1,
+            unidad_medida: 'NIU',
+            descripcion: index === 0 ? 'Audífonos Bluetooth' : `Producto adicional ${index}`,
+            precio_unitario: index === 0 ? 50 : 1,
+            total_item: index === 0 ? 118 : 1,
+          })),
         },
       })
+    }
+    if (/\/api\/cpe\/comprobantes\/cpe-nc-demo\/?$/.test(pathname)) {
+      return json({ success: true, data: {
+        id: 'cpe-nc-demo', tipo_documento: '07', serie: 'FC01', numero: 7,
+        fecha_emision: '2026-08-29', pais_codigo: 'PE', moneda: 'PEN', estado: 'FIRMADO',
+        simulated_origin: true,
+        razon_social_receptor: 'Cliente Nota S.A.C.', documento_receptor: '20600000013',
+        total_gravadas: 50, total_igv: 9, total_venta: 59,
+        documento_referencia_tipo: '01', documento_referencia_serie: 'F001',
+        documento_referencia_numero: '15', tipo_nota_credito: '10',
+        motivo_nota: 'Devolución parcial acordada con el cliente',
+        fiscal_qr_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        emisor: { ruc: '20600000021', razon_social: 'Comercial Andina Demo S.A.C.', direccion_fiscal: 'Lima' },
+        items: [{ cantidad: 1, unidad_medida: 'NIU', descripcion: 'Producto devuelto', total_item: 59 }],
+      } })
+    }
+    if (/\/api\/cpe\/comprobantes\/cpe-nd-demo\/?$/.test(pathname)) {
+      return json({ success: true, data: {
+        id: 'cpe-nd-demo', tipo_documento: '08', serie: 'FD01', numero: 8,
+        fecha_emision: '2026-08-29', pais_codigo: 'PE', moneda: 'PEN', estado: 'FIRMADO',
+        simulated_origin: true,
+        razon_social_receptor: 'Cliente Nota S.A.C.', documento_receptor: '20600000013',
+        total_gravadas: 10, total_igv: 1.8, total_venta: 11.8,
+        documento_referencia_tipo: '03', documento_referencia_serie: 'B001',
+        documento_referencia_numero: '9', tipo_nota_debito: '01', motivo_nota: 'Intereses por mora',
+        fiscal_qr_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        emisor: { ruc: '20600000021', razon_social: 'Comercial Andina Demo S.A.C.', direccion_fiscal: 'Lima' },
+        items: [{ cantidad: 1, unidad_medida: 'ZZ', descripcion: 'Intereses', total_item: 11.8 }],
+      } })
     }
     if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
       return json({
@@ -159,6 +201,14 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
           moneda: 'PEN',
           estado: 'FIRMADO',
           fechaCreacion: '2026-08-25T12:00:00Z',
+        }, {
+          id: 'cpe-nc-demo', tipoDocumento: '07', tipoComprobante: 'Nota de crédito', serie: 'FC01', numero: 7,
+          fechaEmision: '29/08/2026', cliente: 'Cliente Nota S.A.C.', clienteRuc: '20600000013',
+          total: 59, moneda: 'PEN', estado: 'FIRMADO', fechaCreacion: '2026-08-29T12:00:00Z',
+        }, {
+          id: 'cpe-nd-demo', tipoDocumento: '08', tipoComprobante: 'Nota de débito', serie: 'FD01', numero: 8,
+          fechaEmision: '29/08/2026', cliente: 'Cliente Nota S.A.C.', clienteRuc: '20600000013',
+          total: 11.8, moneda: 'PEN', estado: 'FIRMADO', fechaCreacion: '2026-08-29T13:00:00Z',
         }],
       })
     }
@@ -174,7 +224,7 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
   }, user)
 
   await page.goto('/dashboard/cpe/?cpe_id=cpe-a4-demo', { waitUntil: 'domcontentloaded' })
-  await expect(page.getByText(/Usa “Vista A4” para revisar exactamente/i)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/Usa “Vista A4” para ver un resumen/i)).toBeVisible({ timeout: 30_000 })
 
   const dialog = page.getByRole('dialog', { name: /Factura F001-00000042/i })
   await expect(dialog).toBeVisible()
@@ -185,11 +235,182 @@ test('el cliente encuentra y abre la representación A4 de una factura demo', as
   await expect(dialog.getByText('Comercial Andina Demo S.A.C.', { exact: true })).toBeVisible()
   await expect(dialog.getByText('Cliente Vista Previa S.A.C.', { exact: true })).toBeVisible()
   await expect(dialog.getByText('Audífonos Bluetooth', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('NIU', { exact: true }).first()).toBeVisible()
+  await expect(dialog.getByTestId('cpe-a4-logo')).toBeVisible()
+  await expect(dialog.getByTestId('cpe-a4-qr')).toHaveCount(0)
+  await expect(dialog.getByText('Código QR SUNAT', { exact: true })).toHaveCount(0)
+  await expect(dialog.getByTestId('cpe-a4-additional-items')).toContainText('+ 2 líneas adicionales')
+  await expect(dialog.getByTestId('cpe-a4-preview-authority-note')).toContainText('PDF descargable es la representación completa y autoritativa')
+  await expect(dialog.getByText('Representación impresa de la Factura Electrónica.', { exact: false })).toBeVisible()
+  await expect(dialog.getByText(/imprime en A4 con escala 100%/i)).toBeVisible()
   await expect(dialog.getByText('S/ 118.00', { exact: true }).last()).toBeVisible()
   await expect(dialog.locator('iframe')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: 'Descargar A4' })).toBeEnabled()
-  await expect(dialog.getByRole('button', { name: 'Abrir / imprimir' })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: 'Abrir PDF / imprimir' })).toBeEnabled()
+
+  await page.goto('/dashboard/cpe/?cpe_id=cpe-nc-demo', { waitUntil: 'domcontentloaded' })
+  const creditDialog = page.getByRole('dialog', { name: /Nota de crédito FC01-00000007/i })
+  const creditReference = creditDialog.getByTestId('cpe-a4-note-reference')
+  await expect(creditReference).toContainText('Factura electrónica F001-00000015')
+  await expect(creditReference).toContainText(/Código de motivo:\s*10/)
+  await expect(creditReference).toContainText('Devolución parcial acordada con el cliente')
+
+  await page.goto('/dashboard/cpe/?cpe_id=cpe-nd-demo', { waitUntil: 'domcontentloaded' })
+  const debitDialog = page.getByRole('dialog', { name: /Nota de débito FD01-00000008/i })
+  const debitReference = debitDialog.getByTestId('cpe-a4-note-reference')
+  await expect(debitReference).toContainText('Boleta de venta electrónica B001-00000009')
+  await expect(debitReference).toContainText(/Código de motivo:\s*01/)
+  await expect(debitReference).toContainText('Intereses por mora')
   expect(browserErrors).toEqual([])
+})
+
+test('la representación A4 localiza etiquetas fiscales para Colombia y Argentina', async ({ context, page }) => {
+  const secret = process.env.JWT_SECRET
+  if (!secret) throw new Error('JWT_SECRET no está disponible para el E2E aislado de CPE CO')
+
+  const token = await new SignJWT({
+    tenant_id: user.tenant_id,
+    email: user.email,
+    roles: user.roles,
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(user.id)
+    .setIssuedAt()
+    .setExpirationTime('10m')
+    .sign(new TextEncoder().encode(secret))
+
+  await context.addCookies([{
+    name: 'access_token',
+    value: token,
+    url: process.env.BASE_URL || 'http://localhost:3001',
+    httpOnly: true,
+    sameSite: 'Lax',
+  }])
+
+  let activeCountry: 'CO' | 'AR' = 'CO'
+  await page.route('**/api/**', async (route) => {
+    const pathname = new URL(route.request().url()).pathname
+    const json = (body: unknown) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    })
+
+    if (/\/api\/auth\/profile\/?$/.test(pathname)) return json(user)
+    if (/\/api\/configuration\/context\/country\/?$/.test(pathname)) {
+      return json({ data: activeCountry === 'CO'
+        ? { pais_id: 3, pais: 'CO', paisCodigo: 'CO', monedaDefecto: 'COP', locale: 'es-CO' }
+        : { pais_id: 2, pais: 'AR', paisCodigo: 'AR', monedaDefecto: 'ARS', locale: 'es-AR' } })
+    }
+    if (/\/api\/demo\/status\/?$/.test(pathname)) {
+      return json({ is_demo: true, is_expired: false, dias_restantes: 14 })
+    }
+    if (/\/api\/usuarios-sistema\/me\/permissions\/?$/.test(pathname)) {
+      return json({ data: [{ id: 'cpe-pdf-co', modulo: 'cpe', recurso: 'comprobantes', accion: 'descargar_pdf' }] })
+    }
+    if (/\/api\/cpe\/stats\/?$/.test(pathname)) {
+      return json({ success: true, data: { cpeEmitidosHoy: 1, cpeDelMes: 1, montoFacturado: 119000, rechazados: 0 } })
+    }
+    if (/\/api\/cpe\/comprobantes\/cpe-co-demo\/pdf\/?$/.test(pathname)) {
+      return route.fulfill({ status: 200, contentType: 'application/pdf', body: onePageA4Pdf() })
+    }
+    if (/\/api\/cpe\/comprobantes\/cpe-ar-demo\/pdf\/?$/.test(pathname)) {
+      return route.fulfill({ status: 200, contentType: 'application/pdf', body: onePageA4Pdf() })
+    }
+    if (/\/api\/cpe\/comprobantes\/cpe-co-demo\/?$/.test(pathname)) {
+      return json({
+        success: true,
+        data: {
+          id: 'cpe-co-demo', tipo_documento: '01', serie: 'FV01', numero: 9,
+          fecha_emision: '2026-08-29', pais_codigo: 'CO', moneda: 'COP', estado: 'BORRADOR',
+          simulated_origin: true,
+          razon_social_receptor: 'Cliente Colombiano S.A.S.', documento_receptor: '9011234567',
+          direccion_receptor: 'Bogotá D.C.', total_gravadas: 100000, total_igv: 19000,
+          tasa_igv: 19, total_venta: 119000,
+          fiscal_qr_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          fiscal_print_info: {
+            authorizationNumber: '18764001234567', authorizationPrefix: 'FV01',
+            rangeFrom: 1, rangeTo: 5000, validFrom: '2026-01-01', validTo: '2027-01-01',
+            consecutive: 'FV01-9', generatedAt: '2026-08-29T10:15:00-05:00',
+            paymentForm: 'Contado', paymentTerm: 'Inmediato', paymentMethod: 'Transferencia',
+            taxQualities: ['Responsable de IVA'], softwareId: 'SOFTWARE-DIAN-DEMO',
+          },
+          emisor: {
+            ruc: '9001234567', razon_social: 'Emisor Colombia S.A.S.',
+            direccion_fiscal: 'Bogotá D.C.',
+          },
+          items: [{ cantidad: 1, unidad_medida: 'NIU', descripcion: 'Servicio Colombia', total_item: 119000 }],
+        },
+      })
+    }
+    if (/\/api\/cpe\/comprobantes\/cpe-ar-demo\/?$/.test(pathname)) {
+      return json({
+        success: true,
+        data: {
+          id: 'cpe-ar-demo', tipo_documento: '003', tipo_documento_fiscal: '003', serie: '00012', numero: 10,
+          fecha_emision: '2026-08-29', pais_codigo: 'AR', moneda: 'ARS', estado: 'BORRADOR',
+          simulated_origin: true,
+          razon_social_receptor: 'Cliente Argentino S.A.', documento_receptor: '30712345678',
+          direccion_receptor: 'Buenos Aires', total_gravadas: 100000, total_igv: 21000,
+          tasa_igv: 21, total_venta: 121000,
+          fiscal_qr_data_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          fiscal_print_info: {
+            authorizationCode: '70417054367476', authorizationLabel: 'CAE',
+            authorizationExpiry: '20260910', pointOfSale: 12, documentNumber: 10,
+            specialLegend: null,
+          },
+          emisor: { ruc: '30700000001', razon_social: 'Emisor Argentina S.A.', direccion_fiscal: 'Buenos Aires' },
+          items: [{ cantidad: 1, unidad_medida: 'UN', descripcion: 'Servicio Argentina', total_item: 121000 }],
+        },
+      })
+    }
+    if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
+      return json({ success: true, data: activeCountry === 'CO' ? [{
+        id: 'cpe-co-demo', tipoDocumento: '01', tipoComprobante: 'Factura', serie: 'FV01', numero: 9,
+        fechaEmision: '29/08/2026', cliente: 'Cliente Colombiano S.A.S.', clienteRuc: '9011234567',
+        total: 119000, moneda: 'COP', estado: 'FIRMADO',
+      }] : [{
+        id: 'cpe-ar-demo', tipoDocumento: '003', tipoComprobante: 'Nota de crédito', serie: '00012', numero: 10,
+        fechaEmision: '29/08/2026', cliente: 'Cliente Argentino S.A.', clienteRuc: '30712345678',
+        total: 121000, moneda: 'ARS', estado: 'FIRMADO',
+      }] })
+    }
+    return json({ success: true, data: [] })
+  })
+
+  await page.addInitScript((sessionUser) => {
+    const session = JSON.stringify({ user: sessionUser })
+    window.localStorage.setItem('erp.auth.session.snapshot', session)
+    window.sessionStorage.setItem('erp.auth.session.snapshot', session)
+    window.localStorage.setItem('erp_onboarding_completed', JSON.stringify(['admin']))
+    window.localStorage.setItem('selectedCountry', '3')
+  }, user)
+
+  await page.goto('/dashboard/cpe/?cpe_id=cpe-co-demo', { waitUntil: 'domcontentloaded' })
+  const dialog = page.getByRole('dialog', { name: /Factura FV01-00000009/i })
+  await expect(dialog).toBeVisible({ timeout: 30_000 })
+  await expect(dialog.getByText(/Muestra demo · sin validez DIAN/i)).toBeVisible()
+  await expect(dialog.getByText('NIT: 9001234567', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('IVA (19%):', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('Código QR DIAN', { exact: true })).toHaveCount(0)
+  await expect(dialog.getByTestId('cpe-dian-fiscal-info')).toContainText('18764001234567')
+  await expect(dialog.getByTestId('cpe-dian-fiscal-info')).toContainText('FV01 1 a 5000')
+  await expect(dialog.getByTestId('cpe-dian-fiscal-info')).toContainText('Transferencia')
+  await expect(dialog.getByText(/Representación gráfica de la Factura Electrónica de Venta/i)).toBeVisible()
+  await expect(dialog.getByText(/SUNAT/i)).toHaveCount(0)
+
+  activeCountry = 'AR'
+  await page.goto('/dashboard/cpe/?cpe_id=cpe-ar-demo', { waitUntil: 'domcontentloaded' })
+  const arDialog = page.getByRole('dialog', { name: /Nota de crédito 00012-00000010/i })
+  await expect(arDialog).toBeVisible({ timeout: 30_000 })
+  await expect(arDialog.getByText(/Muestra demo · sin validez ARCA/i)).toBeVisible()
+  await expect(arDialog.getByText('CUIT: 30700000001', { exact: true })).toBeVisible()
+  await expect(arDialog.getByText('IVA (21%):', { exact: true })).toBeVisible()
+  await expect(arDialog.getByTestId('cpe-arca-authorization')).toContainText('70417054367476')
+  await expect(arDialog.getByTestId('cpe-arca-authorization')).toContainText('00012')
+  await expect(arDialog.getByText('Código QR ARCA', { exact: true })).toHaveCount(0)
+  await expect(arDialog.getByText(/Representación gráfica de la Nota de Crédito Electrónica/i)).toBeVisible()
+  await expect(arDialog.getByText(/SUNAT|DIAN/i)).toHaveCount(0)
 })
 
 test('ADMIN autoaprueba su cotización en un solo flujo y conserva la observación', async ({ context, page }) => {

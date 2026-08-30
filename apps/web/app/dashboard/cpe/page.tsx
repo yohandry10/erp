@@ -9,6 +9,7 @@ import { ComprobantesFilters } from '@/components/cpe/ComprobantesFilters'
 import { ComprobantesTable } from '@/components/cpe/ComprobantesTable'
 import { AnulacionFinancieraModal } from '@/components/cpe/AnulacionFinancieraModal'
 import { ReferencedNoteModal } from '@/components/cpe/ReferencedNoteModal'
+import { DianEventsPanel } from '@/components/cpe/DianEventsPanel'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
 import { fetchApi } from '@/lib/api-fetch'
@@ -40,17 +41,24 @@ interface CpeStats {
   rechazados: number
 }
 
+interface FiscalConfigurationStatus {
+  isDemo?: boolean
+  fiscal?: {
+    isReady?: boolean
+    missingItems?: string[]
+  }
+}
+
 export default function CPEPage() {
   const country = useCountryContext()
   const fiscalLabel = country.servicioFiscal || 'SUNAT'
   const paisCodigo = (country.paisCodigo || 'PE').toUpperCase()
   const isArgentina = paisCodigo === 'AR'
   const isColombia = paisCodigo === 'CO'
-  const canSendToFiscal = paisCodigo === 'PE' || paisCodigo === 'AR' || paisCodigo === 'CO'
   const documentCenterLabel = isArgentina
     ? 'Comprobantes electrónicos ARCA'
     : isColombia
-      ? 'Facturación electrónica DIAN'
+      ? 'Documentos fiscales Colombia'
       : 'CPE'
   const money = new Intl.NumberFormat(country.locale || 'es-PE', {
     style: 'currency',
@@ -69,7 +77,28 @@ export default function CPEPage() {
   const [selectedDocumentNumber, setSelectedDocumentNumber] = useState<string | number>('')
   const [selectedCpeForGre, setSelectedCpeForGre] = useState<CpeDocument | null>(null)
   const [selectedCpeForCancellation, setSelectedCpeForCancellation] = useState<CpeDocument | null>(null)
+  const [fiscalConfiguration, setFiscalConfiguration] = useState<FiscalConfigurationStatus | null>(null)
+  const [fiscalConfigurationLoading, setFiscalConfigurationLoading] = useState(false)
+  const [fiscalConfigurationError, setFiscalConfigurationError] = useState<string | null>(null)
   const directPreviewHandled = useRef<string | null>(null)
+
+  const colombiaFiscalReady = isColombia
+    && fiscalConfiguration?.isDemo !== true
+    && fiscalConfiguration?.fiscal?.isReady === true
+  const canSendToFiscal = paisCodigo === 'PE' || paisCodigo === 'AR' || colombiaFiscalReady
+  const colombiaFiscalMissingItems = fiscalConfiguration?.fiscal?.missingItems
+    ?.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) ?? []
+  const colombiaReadinessMessage = fiscalConfigurationLoading
+    ? 'Verificando la habilitación fiscal DIAN…'
+    : fiscalConfigurationError
+      ? 'No se pudo verificar la habilitación DIAN. Por seguridad, el envío permanece bloqueado.'
+      : fiscalConfiguration?.isDemo === true
+        ? 'Modo demo: puedes crear, firmar y revisar la representación A4, pero nunca se transmite a DIAN.'
+        : colombiaFiscalReady
+          ? 'DIAN habilitada: los comprobantes firmados pueden transmitirse con las credenciales y la numeración validadas.'
+          : colombiaFiscalMissingItems.length > 0
+            ? `Envío DIAN bloqueado hasta completar: ${colombiaFiscalMissingItems.join(', ')}.`
+            : 'Envío DIAN bloqueado hasta validar certificado, software, numeración y constancia HABILITADO del TestSet.'
 
   const [filters, setFilters] = useState({
     tipoComprobante: '',
@@ -128,6 +157,33 @@ export default function CPEPage() {
     }
   }, [getStats])
 
+  const loadFiscalConfiguration = useCallback(async () => {
+    if (!isColombia) {
+      setFiscalConfiguration(null)
+      setFiscalConfigurationError(null)
+      setFiscalConfigurationLoading(false)
+      return
+    }
+
+    setFiscalConfigurationLoading(true)
+    setFiscalConfigurationError(null)
+    try {
+      const response = await fetchApi('/api/configuration/status', { method: 'GET' })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || payload?.success === false) {
+        throw new Error(payload?.message || `HTTP ${response.status}`)
+      }
+      setFiscalConfiguration(unwrapApiObject<FiscalConfigurationStatus>(payload, {}))
+    } catch (error) {
+      setFiscalConfiguration(null)
+      setFiscalConfigurationError(
+        error instanceof Error ? error.message : 'No se pudo leer el estado fiscal DIAN',
+      )
+    } finally {
+      setFiscalConfigurationLoading(false)
+    }
+  }, [isColombia])
+
   const loadData = useCallback(async () => {
     await Promise.all([
       loadDocuments(),
@@ -138,6 +194,10 @@ export default function CPEPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    void loadFiscalConfiguration()
+  }, [loadFiscalConfiguration])
 
   useEffect(() => {
     const requestedCpeId = new URLSearchParams(window.location.search).get('cpe_id')?.trim()
@@ -166,7 +226,7 @@ export default function CPEPage() {
 
   const sendToFiscal = async (documentId: string) => {
     if (!canSendToFiscal) {
-      alert(`⚠️ Envío a ${fiscalLabel} no disponible para este país.`)
+      alert(isColombia ? `⚠️ ${colombiaReadinessMessage}` : `⚠️ Envío a ${fiscalLabel} no disponible para este país.`)
       return
     }
 
@@ -284,13 +344,21 @@ export default function CPEPage() {
                 ERP {documentCenterLabel}
               </div>
               <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">
-                {isArgentina ? 'Comprobantes electrónicos' : isColombia ? 'Facturación electrónica' : 'Comprobantes de Pago Electrónicos'}
+                {isArgentina
+                  ? 'Comprobantes electrónicos'
+                  : isColombia
+                    ? colombiaFiscalReady ? 'Facturación electrónica DIAN' : 'Preparación de facturas electrónicas'
+                    : 'Comprobantes de Pago Electrónicos'}
               </h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                {isArgentina ? 'Facturas A/B/C' : isColombia ? 'Facturas de venta' : 'Facturas, boletas'} y notas conectadas a {fiscalLabel}.
+                {isArgentina
+                  ? 'Facturas A/B/C y notas conectadas a ARCA.'
+                  : isColombia
+                    ? colombiaReadinessMessage
+                    : `Facturas, boletas y notas conectadas a ${fiscalLabel}.`}
               </p>
               <p className="mt-1 max-w-3xl text-sm font-medium text-primary/90">
-                Usa “Vista A4” para revisar exactamente el formato y los datos que recibirá tu cliente.
+                Usa “Vista A4” para ver un resumen y abrir el PDF completo que recibirá tu cliente.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -302,11 +370,43 @@ export default function CPEPage() {
               )}
               <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
-                {isArgentina ? 'Nuevo comprobante' : isColombia ? 'Nueva factura DIAN' : 'Nuevo CPE'}
+                {isArgentina
+                  ? 'Nuevo comprobante'
+                  : isColombia
+                    ? colombiaFiscalReady ? 'Nueva factura DIAN' : 'Nueva factura sin transmisión'
+                    : 'Nuevo CPE'}
               </Button>
             </div>
           </div>
         </section>
+
+        {isColombia && (
+          <section
+            className={`flex items-start gap-3 rounded-2xl border p-4 ${
+              colombiaFiscalReady
+                ? 'border-emerald-400/30 bg-emerald-500/10'
+                : 'border-amber-400/30 bg-amber-500/10'
+            }`}
+            data-testid="colombia-fiscal-readiness"
+            data-ready={colombiaFiscalReady ? 'true' : 'false'}
+          >
+            <ShieldCheck className={`mt-0.5 h-5 w-5 shrink-0 ${colombiaFiscalReady ? 'text-emerald-500' : 'text-amber-500'}`} />
+            <div>
+              <p className="font-bold text-foreground">
+                {colombiaFiscalReady ? 'Transmisión DIAN habilitada' : 'Transmisión DIAN bloqueada'}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{colombiaReadinessMessage}</p>
+            </div>
+          </section>
+        )}
+
+        {isColombia && (
+          <DianEventsPanel
+            fiscalReady={colombiaFiscalReady}
+            isDemo={fiscalConfiguration?.isDemo === true}
+            issuedInvoices={documents}
+          />
+        )}
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[

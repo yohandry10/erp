@@ -38,7 +38,7 @@ export function RucConfigStep() {
     updateConfiguration({
       logoFile: file || undefined,
       logoUrl: previewUrl || undefined,
-      logoBase64: previewUrl || undefined, // El previewUrl ya es base64
+      logoBase64: undefined,
     })
   }
 
@@ -62,15 +62,20 @@ export function RucConfigStep() {
             placeholder={country.paisCodigo === 'AR'
               ? 'Ej: 30710158229'
               : country.paisCodigo === 'CO'
-                ? 'Ej: 900123456-8'
+                ? 'Ej: 9001234568'
                 : 'Ej: 20123456789'}
             value={state.configuration.ruc}
-            onChange={(e) => handleInputChange('ruc', e.target.value)}
-            maxLength={country.paisCodigo === 'CO' ? 12 : 11} className="text-base"
+            onChange={(e) => handleInputChange(
+              'ruc',
+              country.paisCodigo === 'CO'
+                ? e.target.value.replace(/\D/g, '').slice(0, 11)
+                : e.target.value,
+            )}
+            maxLength={11} className="text-base"
           />
           <p className="text-xs text-[var(--primary-500)] mt-1">
             {country.paisCodigo === 'CO'
-              ? 'Ingresa el NIT con su dígito de verificación.'
+              ? 'Ingresa sólo dígitos: la base del NIT seguida por su dígito de verificación.'
               : 'Debe tener 11 dígitos.'}
           </p>
           <ConsultaRuc
@@ -121,26 +126,31 @@ export function RucConfigStep() {
           </p>
         </div>
 
-        {country.paisCodigo === 'PE' && (
+        {(country.paisCodigo === 'PE' || country.paisCodigo === 'CO') && (
           <>
             <div>
               <Label htmlFor="ubigeo" className="mb-2 block">
-                Ubigeo del domicilio fiscal <span className="text-red-500">*</span>
+                {country.paisCodigo === 'CO' ? 'Código DANE del municipio fiscal' : 'Ubigeo del domicilio fiscal'} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="ubigeo"
                 type="text"
                 inputMode="numeric"
-                placeholder="Ej: 150101"
+                placeholder={country.paisCodigo === 'CO' ? 'Ej: 11001' : 'Ej: 150101'}
                 value={state.configuration.ubigeo}
-                onChange={(e) => handleInputChange('ubigeo', e.target.value.replace(/\D/g, '').slice(0, 6))}
-                minLength={6}
-                maxLength={6}
-                pattern="[0-9]{6}"
+                onChange={(e) => handleInputChange(
+                  'ubigeo',
+                  e.target.value.replace(/\D/g, '').slice(0, country.paisCodigo === 'CO' ? 5 : 6),
+                )}
+                minLength={country.paisCodigo === 'CO' ? 5 : 6}
+                maxLength={country.paisCodigo === 'CO' ? 5 : 6}
+                pattern={country.paisCodigo === 'CO' ? '[0-9]{5}' : '[0-9]{6}'}
                 className="text-base"
               />
               <p className="text-xs text-[var(--primary-500)] mt-1">
-                Código INEI de 6 dígitos requerido para emitir guías de remisión.
+                {country.paisCodigo === 'CO'
+                  ? 'Código DANE de 5 dígitos requerido en la factura electrónica DIAN.'
+                  : 'Código INEI de 6 dígitos requerido para emitir guías de remisión.'}
               </p>
             </div>
 
@@ -155,15 +165,17 @@ export function RucConfigStep() {
                 />
               </div>
               <div>
-                <Label htmlFor="provincia" className="mb-2 block">Provincia</Label>
+                <Label htmlFor="provincia" className="mb-2 block">
+                  {country.paisCodigo === 'CO' ? 'Municipio' : 'Provincia'}
+                </Label>
                 <Input
                   id="provincia"
                   value={state.configuration.provincia || ''}
                   onChange={(e) => handleInputChange('provincia', e.target.value)}
-                  placeholder="Lima"
+                  placeholder={country.paisCodigo === 'CO' ? 'Bogotá D.C.' : 'Lima'}
                 />
               </div>
-              <div>
+              {country.paisCodigo === 'PE' && <div>
                 <Label htmlFor="distrito" className="mb-2 block">Distrito</Label>
                 <Input
                   id="distrito"
@@ -171,7 +183,7 @@ export function RucConfigStep() {
                   onChange={(e) => handleInputChange('distrito', e.target.value)}
                   placeholder="Lima"
                 />
-              </div>
+              </div>}
             </div>
           </>
         )}
@@ -184,7 +196,6 @@ export function RucConfigStep() {
           <LogoUploader
             currentLogoUrl={state.configuration.logoUrl}
             onLogoChange={handleLogoChange}
-            maxSizeMB={2}
           />
         </div>
 

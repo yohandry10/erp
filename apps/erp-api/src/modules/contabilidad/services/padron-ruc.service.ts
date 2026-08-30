@@ -3,7 +3,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 /**
- * Consulta el padrón de RUC de SUNAT y guarda lo consultado.
+ * Consulta un proveedor auxiliar de datos públicos del RUC y guarda el
+ * resultado en caché. La implementación actual no descarga ni consulta
+ * directamente el padrón reducido oficial de SUNAT.
  *
  * ## Qué añade sobre lo que ya había
  *
@@ -56,7 +58,8 @@ export class PadronRucService {
   constructor(private readonly supabase: SupabaseService) {}
 
   /**
-   * Devuelve lo que SUNAT dice de ese RUC, de la caché si está fresco.
+   * Devuelve la respuesta auxiliar disponible para ese RUC, de la caché si
+   * está fresca. No constituye una certificación emitida por SUNAT.
    *
    * `null` significa «no se pudo averiguar», nunca «no existe»: la diferencia
    * importa, porque de lo primero no se debe concluir nada sobre el proveedor.

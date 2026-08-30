@@ -97,6 +97,7 @@ interface MetodoPago {
 interface Cliente {
   id: string
   tipo_documento: string
+  documento_tipo?: string
   numero_documento?: string | number | null
   documento_numero?: string | number | null
   ruc?: string | null
@@ -106,6 +107,7 @@ interface Cliente {
   razon_social?: string
   direccion?: string | null
   direccion_fiscal?: string | null
+  arca_condicion_iva?: string | null
 }
 
 interface EstadoCaja {
@@ -147,11 +149,32 @@ const getPosDocumentLabel = (sale: any) => {
   return 'Ticket de venta'
 }
 
-const inferirTipoDocumentoFiscal = (cliente?: Cliente | null, documentoFallback = '') => {
-  const tipo = String(cliente?.tipo_documento || '').trim().toUpperCase()
+const inferirTipoDocumentoFiscal = (
+  cliente?: Cliente | null,
+  documentoFallback = '',
+  countryCode = 'PE',
+) => {
+  const tipo = String(cliente?.documento_tipo || cliente?.tipo_documento || '').trim().toUpperCase()
   const documento = String(
     cliente?.numero_documento ?? cliente?.documento_numero ?? cliente?.ruc ?? documentoFallback,
   ).trim()
+  if (countryCode === 'AR') {
+    const arcaIdentity: Record<string, string> = {
+      CUIT: '80', CUIL: '86', CDI: '87', DNI: '96',
+      '80': '80', '86': '86', '87': '87', '96': '96', '99': '99',
+    }
+    return arcaIdentity[tipo] || (!documento || /^0+$/.test(documento) ? '99' : '')
+  }
+  if (countryCode === 'CO') {
+    const dianIdentity: Record<string, string> = {
+      NIT: '31', '31': '31',
+      CC: '13', CEDULA: '13', CEDULA_CIUDADANIA: '13', '13': '13',
+      CE: '22', CEDULA_EXTRANJERIA: '22', '22': '22',
+      TI: '12', TARJETA_IDENTIDAD: '12', '12': '12',
+      PASAPORTE: '41', PASSPORT: '41', '41': '41',
+    }
+    return dianIdentity[tipo] || ''
+  }
   if (tipo === 'RUC' || tipo === '6' || /^\d{11}$/.test(documento)) return '6'
   if (tipo === 'DNI' || tipo === '1' || /^\d{8}$/.test(documento)) return '1'
   if (tipo.includes('EXTRANJ') || tipo === '4') return '4'
@@ -190,6 +213,7 @@ export default function POSPage() {
   const paisResuelto = Boolean(country.paisCodigo) && !country.loading
   const paisCodigo = (country.paisCodigo || '').toUpperCase()
   const isPeru = paisCodigo === 'PE'
+  const isColombia = paisCodigo === 'CO'
   const aplicaLimiteItems = paisCodigo === 'PE' || paisCodigo === 'CO'
   const fiscalAuthority = country.servicioFiscal
   const documentoFiscal = country.documentoFiscal
@@ -232,7 +256,7 @@ export default function POSPage() {
   const [pagosMixtos, setPagosMixtos] = useState(false)
   const [pagos, setPagos] = useState<Array<{ metodo_pago_id: string; monto: string; referencia?: string }>>([])
   const [tipoComprobante, setTipoComprobante] = useState<'TICKET' | '03' | '01'>(
-    paisCodigo === 'PE' ? 'TICKET' : '03',
+    paisCodigo === 'PE' ? 'TICKET' : paisCodigo === 'CO' ? '01' : '03',
   )
 
   // Nuevos estados para funcionalidades avanzadas
@@ -296,10 +320,10 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   const documentoImprimibleRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!isPeru && tipoComprobante === 'TICKET') {
-      setTipoComprobante('03')
+    if (!isPeru && (tipoComprobante === 'TICKET' || (isColombia && tipoComprobante === '03'))) {
+      setTipoComprobante(isColombia ? '01' : '03')
     }
-  }, [isPeru, tipoComprobante])
+  }, [isColombia, isPeru, tipoComprobante])
 
   const formatMoney = (value: any): string => {
     const num = Number(value);
@@ -1051,21 +1075,37 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     // Validar documento de cliente seleccionado
     const clienteActual = clientes.find(c => c.id === clienteSeleccionado)
     const documento = getClienteDocumento(clienteActual)
-    if (!documento || documento.length < 8) {
+    const minDocumentLength = isColombia ? 5 : 8
+    if (!documento || documento.replace(/[.\s-]/g, '').length < minDocumentLength) {
       toast({
         variant: 'destructive',
         title: '❌ Documento inválido',
-        description: 'Seleccione un cliente con documento válido (mínimo 8 dígitos).',
+        description: `Seleccione un cliente con documento válido (mínimo ${minDocumentLength} caracteres).`,
       })
       return
     }
 
     // Validar que Factura requiere documento fiscal
-    if (tipoComprobante === '01' && clienteActual?.tipo_documento !== documentoFiscal) {
+    const clienteDocumentType = String(
+      clienteActual?.documento_tipo || clienteActual?.tipo_documento || '',
+    ).toUpperCase()
+    if (tipoComprobante === '01' && paisCodigo === 'PE' && clienteDocumentType !== documentoFiscal) {
       toast({
         variant: 'destructive',
         title: `❌ Factura requiere ${documentoFiscal}`,
         description: `Para emitir Factura, el cliente debe tener ${documentoFiscal}.`,
+      })
+      return
+    }
+    if (
+      paisCodigo === 'AR'
+      && tipoComprobante !== 'TICKET'
+      && !String(clienteActual?.arca_condicion_iva || '').trim()
+    ) {
+      toast({
+        variant: 'destructive',
+        title: '❌ Falta condición IVA',
+        description: 'Edite el cliente e indique su condición IVA antes de emitir con ARCA.',
       })
       return
     }
@@ -1246,10 +1286,15 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         cliente_id: clienteSeleccionado,
         cliente_nombre: clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Cliente General',
         cliente_documento: getClienteDocumento(clienteActual) || '00000000',
+        cliente_direccion: clienteActual?.direccion || '',
         cliente_tipo_documento: inferirTipoDocumentoFiscal(
           clienteActual,
           getClienteDocumento(clienteActual),
+          paisCodigo,
         ),
+        cliente_condicion_iva: paisCodigo === 'AR'
+          ? clienteActual?.arca_condicion_iva
+          : undefined,
         metodo_pago_id: pagosMixtos ? null : metodoPagoSeleccionado,
         referencia_pago: pagosMixtos ? null : referenciaPago,
         numero_comprobante: tipoComprobante === 'TICKET' ? undefined : comprobante.numero,
@@ -1566,7 +1611,9 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     // fiscal inmediata o cuando el usuario canjea el ticket posteriormente.
     const serie = tipoComprobante === 'TICKET'
       ? 'T001'
-      : tipoComprobante === '01' ? 'F001' : 'B001'
+      : isColombia
+        ? String(empresaInfo?.serie_factura || empresaInfo?.serieFactura || 'FE').toUpperCase()
+        : tipoComprobante === '01' ? 'F001' : 'B001'
 
     const comprobante = {
       serie,
@@ -1797,6 +1844,14 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     (m) => m.id === metodoPagoSeleccionado
   );
   const clienteActual = clientes.find((c) => c.id === clienteSeleccionado);
+  const tipoDocumentoClienteActual = inferirTipoDocumentoFiscal(
+    clienteActual,
+    getClienteDocumento(clienteActual),
+    paisCodigo,
+  )
+  const clientePuedeEmitirFactura = Boolean(
+    clienteActual && (isColombia ? tipoDocumentoClienteActual : clienteActual.tipo_documento === documentoFiscal),
+  )
   const clienteCanjeActual = clientes.find((c) => c.id === clienteCanjeId)
   const documentoCanjeActual = getClienteDocumento(clienteCanjeActual)
     || String(ventaParaCanje?.cliente_documento || '').trim()
@@ -2373,7 +2428,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                     ))}
                   </select>
                 </div>
-                <div className={`grid ${isPeru ? 'grid-cols-3' : 'grid-cols-2'} rounded-lg bg-muted p-1`}>
+                <div className={`grid ${isPeru ? 'grid-cols-3' : isColombia ? 'grid-cols-1' : 'grid-cols-2'} rounded-lg bg-muted p-1`}>
                   {isPeru && (
                     <button
                       type="button"
@@ -2383,18 +2438,24 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
                       Ticket
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setTipoComprobante('03')}
-                    className={`min-h-9 rounded-md px-3 text-sm font-medium transition ${tipoComprobante === '03' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                  >
-                    {consumerDocumentLabel}
-                  </button>
+                  {!isColombia && (
+                    <button
+                      type="button"
+                      onClick={() => setTipoComprobante('03')}
+                      className={`min-h-9 rounded-md px-3 text-sm font-medium transition ${tipoComprobante === '03' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      {consumerDocumentLabel}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setTipoComprobante('01')}
-                    disabled={!clienteActual || clienteActual.tipo_documento !== documentoFiscal}
-                    title={!clienteActual || clienteActual.tipo_documento !== documentoFiscal ? `Factura requiere cliente con ${documentoFiscal}` : ''}
+                    disabled={!clientePuedeEmitirFactura}
+                    title={!clientePuedeEmitirFactura
+                      ? isColombia
+                        ? 'Seleccione un cliente con NIT, CC, CE, TI o pasaporte válido'
+                        : `Factura requiere cliente con ${documentoFiscal}`
+                      : ''}
                     className={`min-h-9 rounded-md px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${tipoComprobante === '01' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     {businessDocumentLabel}

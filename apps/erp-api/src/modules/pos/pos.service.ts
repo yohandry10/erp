@@ -17,8 +17,9 @@ import Decimal from 'decimal.js';
 import { PosAuditService, TipoEventoPOS } from './services/pos-audit.service';
 import { ConfigService } from '@nestjs/config';
 import { toPostgresBytea } from '../../shared/utils/certificate.utils';
-import { validateColombiaNit } from '../paises/initial-country';
+import { parseColombiaNit } from '../paises/initial-country';
 import { CanjearTicketPosDto } from './dto/canjear-ticket-pos.dto';
+import { normalizeDianIdentity } from '../fiscal/colombia/dian-document.util';
 
 @Injectable()
 export class PosService {
@@ -65,10 +66,39 @@ export class PosService {
     return Buffer.concat([iv, tag, encrypted]).toString('base64');
   }
 
-  /**
-   * Infiere tipo de documento según catálogo SUNAT básico, permitiendo override explícito.
-   */
-  private inferirTipoDocumento(doc: string, tipoExplicito?: string): string {
+  /** Resuelve el catálogo de identidad del país sin reinterpretar códigos PE. */
+  private inferirTipoDocumento(doc: string, tipoExplicito?: string, countryCode = 'PE'): string {
+    const country = String(countryCode).trim().toUpperCase();
+    const explicit = String(tipoExplicito ?? '').trim().toUpperCase();
+    const cleaned = String(doc ?? '').trim();
+    if (country === 'AR') {
+      const argentina: Record<string, string> = {
+        CUIT: '80', CUIL: '86', CDI: '87', DNI: '96',
+        CONSUMIDOR_FINAL: '99', CF: '99',
+        '80': '80', '86': '86', '87': '87', '96': '96', '99': '99',
+      };
+      if (explicit && argentina[explicit]) return argentina[explicit];
+      if (!cleaned || /^0+$/.test(cleaned)) return '99';
+      if (/^\d{8}$/.test(cleaned)) return '96';
+      if (/^\d{11}$/.test(cleaned)) {
+        throw new BadRequestException(
+          'Documento argentino ambiguo: indique CUIT, CUIL o CDI antes de emitir',
+        );
+      }
+      throw new BadRequestException('Documento argentino inválido para ARCA');
+    }
+    if (country === 'CO') {
+      if (!explicit) {
+        throw new BadRequestException(
+          'DIAN requiere indicar el tipo de documento: NIT, CC, CE, TI o pasaporte',
+        );
+      }
+      try {
+        return normalizeDianIdentity(explicit, cleaned).type;
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : 'Documento DIAN inválido');
+      }
+    }
     const map: Record<string, string> = {
       DNI: '1',
       RUC: '6',
@@ -84,7 +114,6 @@ export class PosService {
       return map[normalized] || tipoExplicito;
     }
 
-    const cleaned = (doc || '').trim();
     if (/^(10|15|17|20)\d{9}$/.test(cleaned)) return '6'; // RUC
     if (/^\d{8}$/.test(cleaned)) return '1'; // DNI
     if (/^[A-Z0-9]{9,12}$/i.test(cleaned)) return '4'; // CE (carné de extranjería, 9-12 chars)
@@ -200,6 +229,42 @@ export class PosService {
     return PosService.TIPOS_PAGO_INMEDIATO.has(String(tipo ?? '').trim().toUpperCase());
   }
 
+  private dianMedioPago(tipo: unknown, codigo: unknown): string {
+    const normalized = `${String(tipo ?? '').trim()} ${String(codigo ?? '').trim()}`.toUpperCase();
+    const explicitCode = String(codigo ?? '').trim().toUpperCase();
+    if (/^[0-9A-Z]{2,3}$/.test(explicitCode)) return explicitCode;
+    if (normalized.includes('MIXTO')) return 'ZZ';
+    if (normalized.includes('EFECTIVO') || normalized.includes('CASH')) return '10';
+    if (normalized.includes('TRANSFER') || normalized.includes('CONSIGN')) return '42';
+    if (normalized.includes('TARJETA') || normalized.includes('CARD')) return '48';
+    if (normalized.includes('BILLETERA') || normalized.includes('DIGITAL')
+        || normalized.includes('NEQUI') || normalized.includes('DAVIPLATA')) return '42';
+    throw new BadRequestException(
+      'DIAN requiere un medio de pago identificable (efectivo, transferencia, tarjeta o mixto)',
+    );
+  }
+
+  private assertArgentinaIssuerVatInvariant(empresaConfig: Record<string, unknown>): void {
+    if (String(empresaConfig?.pais ?? '').trim().toUpperCase() !== 'AR') return;
+
+    const condition = String(empresaConfig?.arca_condicion_iva ?? '').trim().toUpperCase();
+    if (!['MONOTRIBUTO', 'EXENTO'].includes(condition)) return;
+
+    const rawPercentage = empresaConfig?.igv_porcentaje;
+    const percentage = Number(rawPercentage);
+    if (
+      rawPercentage === null
+      || rawPercentage === undefined
+      || rawPercentage === ''
+      || !Number.isFinite(percentage)
+      || percentage !== 0
+    ) {
+      throw new BadRequestException(
+        `ARCA: un emisor ${condition} no puede cobrar IVA; igv_porcentaje debe ser 0`,
+      );
+    }
+  }
+
   /**
    * Descuenta el descuento global de la base imponible de cada ítem, prorrateado
    * por su peso en el subtotal. El prorrateo evita mover base entre afectaciones
@@ -240,12 +305,17 @@ export class PosService {
    * queda en el último ítem gravado para que la suma sea exacta.
    */
   private repartirIgvEntreItems(items: any[], productosMap: Map<string, any>, igvTotal: number): void {
-    const esItemGravado = (item: any) => esGravado(productosMap.get(item.producto_id)?.afectacion_igv);
-    const gravados = items.filter(esItemGravado);
-
     for (const item of items) {
+      const afectacionCatalogo = String(
+        productosMap.get(item.producto_id)?.afectacion_igv ?? AFECTACION_IGV.GRAVADO,
+      ).trim();
+      // Esta copia viaja en el payload atómico y queda sellada junto al detalle.
+      // Nunca se confía en una afectación enviada por el navegador.
+      item.afectacion_igv = afectacionCatalogo || AFECTACION_IGV.GRAVADO;
       item.igv = 0;
     }
+
+    const gravados = items.filter((item: any) => esGravado(item.afectacion_igv));
 
     if (gravados.length === 0) return;
 
@@ -831,7 +901,7 @@ export class PosService {
       // Validar config de empresa antes de crear venta (hard-stop CPE)
       const { data: empresaCfg, error: empresaCfgErr } = await this.supabase.getClient()
         .from('empresa_config')
-        .select('ruc, razon_social, moneda_defecto, igv_porcentaje, serie_factura, serie_boleta, pais, pais_id, arca_punto_venta')
+        .select('ruc, razon_social, direccion_fiscal, ubigeo, departamento, provincia, moneda_defecto, igv_porcentaje, serie_factura, serie_boleta, pais, pais_id, is_demo, dian_regimen_fiscal, dian_tipo_contribuyente, arca_punto_venta, arca_condicion_iva')
         .eq('tenant_id', user.tenant_id)
         .single();
       if (empresaCfgErr) {
@@ -849,6 +919,12 @@ export class PosService {
           },
         };
       }
+
+      // La UI propone 0 para monotributistas/exentos, pero una cuenta antigua
+      // o un request manipulado puede dejar otra tasa persistida. El POS es la
+      // última frontera antes de cobrar: falla cerrado antes de resolver
+      // precios, mover caja o reservar el comprobante.
+      this.assertArgentinaIssuerVatInvariant(empresaCfg as Record<string, unknown>);
 
       // Recalcular totales server-side para evitar manipulación de cliente
       const tasaIgvEmpresa = Number(empresaCfg?.igv_porcentaje);
@@ -1045,7 +1121,7 @@ export class PosService {
             : 'T001'
       );
       const correlativo = ventaData?.comprobante?.correlativo || String(Date.now()).slice(-8);
-      const tipoDocumento = ventaData?.comprobante?.tipo || '03'; // Boleta por defecto
+      const tipoDocumento = ventaData?.comprobante?.tipo || (empresaCfg?.pais === 'CO' ? '01' : '03');
       const numeroComprobante = ventaData?.numero_comprobante
         || ventaData?.comprobante?.numero
         || `${serie}-${correlativo}`;
@@ -1060,10 +1136,8 @@ export class PosService {
 
       const documentoClienteFactura = String(ventaData.cliente_documento || '').trim();
       const documentoFacturaValido =
-        empresaCfg?.pais === 'AR'
-          ? /^\d{11}$/.test(documentoClienteFactura)
-          : empresaCfg?.pais === 'CO'
-            ? validateColombiaNit(documentoClienteFactura)
+        empresaCfg?.pais === 'AR' || empresaCfg?.pais === 'CO'
+            ? true
             : /^\d{11}$/.test(documentoClienteFactura);
       if (emitirCpe && tipoDocumento === '01' && !documentoFacturaValido) {
         const documentoFiscal = empresaCfg?.pais === 'AR' ? 'CUIT' : empresaCfg?.pais === 'CO' ? 'NIT' : 'RUC';
@@ -1118,35 +1192,121 @@ export class PosService {
         };
       }
 
-      const metodoPagoPrincipal =
+      let metodoPagoPrincipal =
         pagosNormalizados && pagosNormalizados.length > 0
           ? (pagosNormalizados.length > 1 ? 'MIXTO' : pagosNormalizados[0].codigo)
           : (ventaData.metodo_pago_id || 'efectivo');
 
+      let dianMedioPago: string | null = null;
+      if (emitirCpe && String(empresaCfg?.pais || '').trim().toUpperCase() === 'CO') {
+        if (pagosNormalizados && pagosNormalizados.length > 1) {
+          dianMedioPago = this.dianMedioPago('MIXTO', '');
+        } else if (pagosNormalizados?.[0]) {
+          dianMedioPago = this.dianMedioPago(pagosNormalizados[0].tipo, pagosNormalizados[0].codigo);
+        } else {
+          const metodo = await this.getMetodoPagoInfo(
+            ventaData.metodo_pago_id || ventaData.metodo_pago || 'efectivo',
+            user.tenant_id,
+          );
+          metodoPagoPrincipal = metodo.codigo;
+          dianMedioPago = this.dianMedioPago(metodo.tipo, metodo.codigo);
+        }
+      }
+
       const tipoComprobante = emitirCpe
-        ? String(ventaData?.comprobante?.tipo || '03').trim()
+        ? String(ventaData?.comprobante?.tipo || (empresaCfg?.pais === 'CO' ? '01' : '03')).trim()
         : 'TICKET';
       const prefijoFiscal = tipoComprobante === '01' ? 'F' : 'B';
       const serieSolicitada = String(ventaData?.comprobante?.serie ?? '').trim().toUpperCase();
       const serieConfigurada = String(
         (tipoComprobante === '01' ? empresaCfg.serie_factura : empresaCfg.serie_boleta) ?? '',
       ).trim().toUpperCase();
+      const countryCode = String(empresaCfg?.pais || 'PE').trim().toUpperCase();
       const esSerieFiscalValida = (serieFiscal: string) =>
-        /^[A-Z0-9]{4}$/.test(serieFiscal) &&
+        (countryCode === 'CO' ? /^[A-Z0-9]{1,10}$/.test(serieFiscal) : /^[A-Z0-9]{4}$/.test(serieFiscal)) &&
         !serieFiscal.startsWith('T') &&
         (empresaCfg?.pais !== 'PE' || serieFiscal.startsWith(prefijoFiscal));
-      const serieCpe = esSerieFiscalValida(serieSolicitada)
-        ? serieSolicitada
-        : esSerieFiscalValida(serieConfigurada)
-          ? serieConfigurada
-          : `${prefijoFiscal}001`;
-      const docReceptor = String(ventaData.cliente_documento || '').trim();
+      const arcaPointOfSale = Number(empresaCfg?.arca_punto_venta);
+      const serieCpe = countryCode === 'AR'
+        ? (Number.isInteger(arcaPointOfSale) && arcaPointOfSale >= 1 && arcaPointOfSale <= 99998
+          ? String(arcaPointOfSale).padStart(5, '0')
+          : (() => { throw new Error('Punto de venta ARCA inválido o no configurado'); })())
+        : esSerieFiscalValida(serieSolicitada)
+          ? serieSolicitada
+          : esSerieFiscalValida(serieConfigurada)
+            ? serieConfigurada
+            : `${prefijoFiscal}001`;
+      const docReceptorRaw = String(ventaData.cliente_documento || '').trim();
       const tipoDocReceptor = this.inferirTipoDocumento(
-        docReceptor,
+        docReceptorRaw,
         ventaData.cliente_tipo_documento,
+        countryCode,
       );
-      if (emitirCpe && tipoComprobante === '01' && tipoDocReceptor !== '6') {
+      const dianReceiver = countryCode === 'CO'
+        ? normalizeDianIdentity(tipoDocReceptor, docReceptorRaw)
+        : null;
+      const docReceptor = dianReceiver?.canonicalNumber ?? docReceptorRaw;
+      if (emitirCpe && countryCode === 'PE' && tipoComprobante === '01' && tipoDocReceptor !== '6') {
         throw new Error('Factura requiere RUC válido de 11 dígitos');
+      }
+      const arcaReceiverVatCondition = String(
+        ventaData.cliente_condicion_iva
+        ?? ventaData.arca_condicion_iva_receptor
+        ?? ventaData?.comprobante?.condicion_iva_receptor
+        ?? '',
+      ).trim();
+      if (emitirCpe && countryCode === 'AR') {
+        if (!String(empresaCfg.arca_condicion_iva ?? '').trim()) {
+          throw new Error('Condición IVA del emisor no configurada para ARCA');
+        }
+        if (!arcaReceiverVatCondition) {
+          throw new BadRequestException(
+            'Falta la condición IVA del receptor requerida para resolver comprobante A/B/C',
+          );
+        }
+      }
+
+      const dianIsDemo = countryCode === 'CO' && empresaCfg?.is_demo === true;
+      const dianNit = countryCode === 'CO' ? parseColombiaNit(empresaCfg?.ruc) : null;
+      let dianFiscalMetadata: Record<string, unknown> = {};
+      if (emitirCpe && countryCode === 'CO') {
+        if (tipoComprobante !== '01') {
+          throw new BadRequestException(
+            'DIAN: el POS sólo emite factura electrónica tipo 01; no se admite tipo 03',
+          );
+        }
+        if (!dianNit) throw new BadRequestException('DIAN: el NIT del emisor es inválido');
+
+        const rawRegimen = String(empresaCfg.dian_regimen_fiscal ?? '').trim().toUpperCase();
+        const rawContribuyente = String(empresaCfg.dian_tipo_contribuyente ?? '').trim();
+        const validRegimen = /^O-\d{2}(?:;O-\d{2})*$/.test(rawRegimen);
+        const validContribuyente = ['1', '2'].includes(rawContribuyente);
+        const rawDane = String(empresaCfg.ubigeo ?? '').trim();
+        const rawDireccion = String(empresaCfg.direccion_fiscal ?? '').trim();
+        const rawDepartamento = String(empresaCfg.departamento ?? '').trim();
+        const rawMunicipio = String(empresaCfg.provincia ?? '').trim();
+        const completeGeo = /^\d{5}$/.test(rawDane)
+          && Boolean(rawDireccion && rawDepartamento && rawMunicipio);
+
+        if (!dianIsDemo && (!validRegimen || !validContribuyente || !completeGeo || !dianMedioPago)) {
+          throw new BadRequestException(
+            'DIAN: complete código DANE, departamento, municipio, dirección, responsabilidad fiscal, tipo de contribuyente y medio de pago antes de vender',
+          );
+        }
+
+        dianFiscalMetadata = {
+          dian_is_demo: dianIsDemo,
+          dian_simulado: dianIsDemo,
+          dian_fixture_source: dianIsDemo ? 'empresa_config.is_demo=true' : null,
+          dian_direccion_emisor: rawDireccion || (dianIsDemo ? 'Carrera 7 # 72-41' : null),
+          dian_codigo_dane_emisor: /^\d{5}$/.test(rawDane) ? rawDane : (dianIsDemo ? '11001' : null),
+          dian_departamento_emisor: rawDepartamento || (dianIsDemo ? 'Bogotá D.C.' : null),
+          dian_municipio_emisor: rawMunicipio || (dianIsDemo ? 'Bogotá D.C.' : null),
+          dian_regimen_fiscal: validRegimen ? rawRegimen : (dianIsDemo ? 'O-13' : null),
+          dian_tipo_contribuyente: validContribuyente ? rawContribuyente : (dianIsDemo ? '1' : null),
+          dian_forma_pago: 'CONTADO',
+          dian_medio_pago: dianMedioPago || (dianIsDemo ? '10' : null),
+        };
       }
 
       // Frontera única 469 -> dispatcher 471: la BD aplica una vez venta, CxC,
@@ -1177,7 +1337,7 @@ export class PosService {
         cpe_data: emitirCpe ? {
           tipo_documento: tipoComprobante,
           serie: serieCpe,
-          ruc_emisor: empresaCfg.ruc,
+          ruc_emisor: dianNit?.compact ?? empresaCfg.ruc,
           razon_social_emisor: empresaCfg.razon_social,
           tipo_documento_receptor: tipoDocReceptor,
           documento_receptor: docReceptor,
@@ -1190,6 +1350,17 @@ export class PosService {
           total_exportacion: desgloseIgv.exportacion,
           total_igv: impuestosCalculados,
           total_venta: totalCalculado,
+          condicion_pago: countryCode === 'CO' ? 'CONTADO' : undefined,
+          medio_pago: countryCode === 'CO' ? dianMedioPago : undefined,
+          metadata: countryCode === 'AR'
+            ? {
+                arca_punto_venta: arcaPointOfSale,
+                arca_condicion_iva_emisor: empresaCfg.arca_condicion_iva,
+                arca_condicion_iva_receptor: arcaReceiverVatCondition,
+              }
+            : countryCode === 'CO'
+              ? dianFiscalMetadata
+              : {},
         } : null,
       };
 
@@ -1275,6 +1446,7 @@ export class PosService {
         redondeo_efectivo_legal: ventaTx.redondeo_efectivo_legal === true,
         monto_efectivo_cobrado: ventaTx.monto_efectivo_cobrado ?? null,
         monto_ajuste_redondeo: ventaTx.monto_ajuste_redondeo ?? null,
+        fiscal_simulado: emitirCpe && countryCode === 'CO' && dianIsDemo,
         message: tipoEmision === 'TICKET'
           ? 'Venta confirmada como ticket interno canjeable; sin correlativo fiscal reservado'
           : 'Venta confirmada atómicamente; CPE en cola durable',

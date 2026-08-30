@@ -115,6 +115,7 @@ DECLARE
   v_result jsonb;
   v_failed boolean;
   v_original_name text;
+  v_wizard_patch jsonb;
 BEGIN
   v_pe := public.create_demo_tenant_ready_tx(
     'VERIFY DEMO PE 464', 14, 'PE', 'verify-demo-pe-464', NULL, NULL, NULL
@@ -225,9 +226,22 @@ BEGIN
     v_tenant_co, v_user_co, 'verify-wizard-step-464', 3,
     jsonb_build_object('origen', 'verify-464')
   );
+  v_wizard_patch := jsonb_build_object(
+    'razon_social', 'VERIFY CO CONFIG COMPLETA'
+  );
+  IF strpos(
+       pg_get_functiondef(
+         'public.completar_wizard_config_tx(uuid,uuid,text,jsonb)'::regprocedure
+       ),
+       'hmac-v1:'
+     ) > 0 THEN
+    v_wizard_patch := v_wizard_patch || jsonb_build_object(
+      '_intent_fingerprint', 'hmac-v1:' || repeat('a', 64)
+    );
+  END IF;
   v_result := public.completar_wizard_config_tx(
     v_tenant_co, v_user_co, 'verify-wizard-complete-464',
-    jsonb_build_object('razon_social', 'VERIFY CO CONFIG COMPLETA')
+    v_wizard_patch
   );
   IF COALESCE((v_result->'progress'->>'completado')::boolean, false) IS NOT TRUE
      OR (SELECT configuracion_completa FROM public.empresa_config WHERE tenant_id = v_tenant_co) IS NOT TRUE THEN
