@@ -37,6 +37,33 @@ describe('ConfigurationService - secretos del progreso del wizard', () => {
     return { service, rpc };
   }
 
+  it('firma el intent de idempotencia con una clave de servidor y distingue secretos', () => {
+    const configService = {
+      get: jest.fn((key: string) => key === 'CERT_ENCRYPTION_KEY'
+        ? 'clave-fuerte-de-prueba-para-hmac-32-bytes'
+        : undefined),
+    };
+    const service = new ConfigurationService({} as any, {} as any, configService as any);
+    const fingerprint = (service as any).configurationIntentFingerprint.bind(service);
+
+    const first = fingerprint({ tenantId, certificatePassword: 'secreto-a' });
+    const replay = fingerprint({ certificatePassword: 'secreto-a', tenantId });
+    const changedSecret = fingerprint({ tenantId, certificatePassword: 'secreto-b' });
+    const serviceWithOtherKey = new ConfigurationService({} as any, {} as any, {
+      get: jest.fn((key: string) => key === 'CERT_ENCRYPTION_KEY'
+        ? 'otra-clave-fuerte-de-prueba-hmac-32-bytes'
+        : undefined),
+    } as any);
+    const sameIntentWithOtherKey = (serviceWithOtherKey as any)
+      .configurationIntentFingerprint({ tenantId, certificatePassword: 'secreto-a' });
+
+    expect(first).toMatch(/^[0-9a-f]{64}$/u);
+    expect(replay).toBe(first);
+    expect(changedSecret).not.toBe(first);
+    expect(sameIntentWithOtherKey).not.toBe(first);
+    expect(first).not.toContain('secreto-a');
+  });
+
   it('guarda sólo campos permitidos y elimina alias, variantes y secretos anidados', async () => {
     const { service, rpc } = createService();
     const progress = await service.saveWizardStep(tenantId, {

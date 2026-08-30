@@ -6,9 +6,15 @@ describe('ConfigurationService - política de logo', () => {
     const client = { rpc: jest.fn().mockResolvedValue({ data: {}, error: null }) };
     const supabase = { getClient: () => client };
     const config = {
-      get: jest.fn((key: string) => key === 'SUPABASE_URL'
-        ? 'https://wypnbcptofqdmoynlonq.supabase.co'
-        : undefined),
+      get: jest.fn((key: string) => {
+        if (key === 'SUPABASE_URL') {
+          return 'https://wypnbcptofqdmoynlonq.supabase.co';
+        }
+        if (key === 'CERT_ENCRYPTION_KEY') {
+          return 'clave-sintetica-logo-policy-32-bytes';
+        }
+        return undefined;
+      }),
     };
     return {
       service: new ConfigurationService(supabase as any, {} as any, config as any),

@@ -22,7 +22,11 @@ describe('ConfigurationService - invariante IVA del emisor argentino', () => {
     const service = new ConfigurationService(
       { getClient: () => client } as any,
       {} as any,
-      { get: jest.fn() } as any,
+      {
+        get: jest.fn((key: string) => key === 'CERT_ENCRYPTION_KEY'
+          ? 'clave-sintetica-argentina-vat-32-bytes'
+          : undefined),
+      } as any,
     );
     return { service, client, rpc };
   }
