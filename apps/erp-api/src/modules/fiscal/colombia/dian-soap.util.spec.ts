@@ -8,7 +8,11 @@ import {
 
 const NIT = '8001972684';
 
-function certificateFixture(subjectNit = NIT): { pfx: Buffer; publicKeyPem: string } {
+function certificateFixture(subjectNit = NIT): {
+  pfx: Buffer;
+  publicKeyPem: string;
+  certificateDer: Buffer;
+} {
   const keys = forge.pki.rsa.generateKeyPair(1024);
   const cert = forge.pki.createCertificate();
   cert.publicKey = keys.publicKey;
@@ -23,6 +27,10 @@ function certificateFixture(subjectNit = NIT): { pfx: Buffer; publicKeyPem: stri
   return {
     pfx: Buffer.from(forge.asn1.toDer(p12).getBytes(), 'binary'),
     publicKeyPem: forge.pki.publicKeyToPem(keys.publicKey),
+    certificateDer: Buffer.from(
+      forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes(),
+      'binary',
+    ),
   };
 }
 
@@ -45,6 +53,15 @@ describe('DIAN SOAP WS-Security', () => {
     expect(envelope).toContain('<wsu:Created>2026-08-29T12:00:00.000Z</wsu:Created>');
     expect(envelope).toContain('<wsu:Expires>2026-08-29T12:05:00.000Z</wsu:Expires>');
     expect(envelope).toContain('#ThumbprintSHA1');
+    expect(envelope).toContain('xmldsig-more#rsa-sha256');
+    expect(envelope).toContain('xmlenc#sha256');
+    expect(envelope).not.toContain('rsa-sha1');
+    expect(envelope).not.toMatch(/<ds:DigestMethod[^>]+(?:#|\/)sha1["']/iu);
+    const expectedThumbprint = Buffer.from(
+      new crypto.X509Certificate(certificate.certificateDer).fingerprint.replace(/:/gu, ''),
+      'hex',
+    ).toString('base64');
+    expect(envelope).toContain(`>${expectedThumbprint}</wsse:KeyIdentifier>`);
 
     const signedInfo = envelope.match(/<ds:SignedInfo\b[\s\S]*?<\/ds:SignedInfo>/u)?.[0];
     const signatureValue = envelope.match(/<ds:SignatureValue>([^<]+)<\/ds:SignatureValue>/u)?.[1];

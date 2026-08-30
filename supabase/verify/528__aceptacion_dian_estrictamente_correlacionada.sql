@@ -545,7 +545,12 @@ BEGIN
     v_tenant, v_actor, 'wizard_progress', 'UPDATE', v_wizard::text,
     jsonb_build_object('configuracion_temporal', v_unsafe),
     jsonb_build_object('configuracion_temporal', v_unsafe),
-    jsonb_build_object('accion', 'VERIFY_528_HISTORICAL_SECRET')
+    jsonb_build_object(
+      'accion', 'GUARDAR_PASO_WIZARD',
+      'source', 'configuration_464',
+      'verify_case', 'VERIFY_528_HISTORICAL_SECRET',
+      'fingerprint', repeat('b', 64)
+    )
   );
 
   INSERT INTO public.configuration_operation_intents (
@@ -569,16 +574,18 @@ BEGIN
      OR EXISTS (
        SELECT 1 FROM public.audit_log a
        WHERE a.tenant_id = v_tenant
-         AND a.metadata->>'accion' = 'VERIFY_528_HISTORICAL_SECRET'
-         AND strpos(coalesce(a.old_values::text, '') || coalesce(a.new_values::text, ''),
-                    'HIST_SECRET_528') > 0
-     )
-     OR EXISTS (
-       SELECT 1 FROM public.configuration_operation_intents i
-       WHERE i.tenant_id = v_tenant
-         AND i.idempotency_key = 'verify-historical-wizard-528'
-         AND strpos(i.result::text, 'HIST_SECRET_528') > 0
-     ) THEN
+          AND a.metadata->>'verify_case' = 'VERIFY_528_HISTORICAL_SECRET'
+          AND (
+            a.metadata ? 'fingerprint'
+            OR strpos(coalesce(a.old_values::text, '') || coalesce(a.new_values::text, ''),
+                       'HIST_SECRET_528') > 0
+          )
+      )
+      OR EXISTS (
+        SELECT 1 FROM public.configuration_operation_intents i
+        WHERE i.tenant_id = v_tenant
+          AND i.idempotency_key = 'verify-historical-wizard-528'
+      ) THEN
     RAISE EXCEPTION 'VERIFY_528_HISTORICAL_WIZARD_SECRET_SURVIVED:%', v_result;
   END IF;
 

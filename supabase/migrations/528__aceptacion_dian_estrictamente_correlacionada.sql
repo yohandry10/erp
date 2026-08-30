@@ -566,6 +566,8 @@ DECLARE
   v_progress integer := 0;
   v_audit integer := 0;
   v_intents integer := 0;
+  v_legacy_fingerprint_audit integer := 0;
+  v_legacy_fingerprint_intents integer := 0;
 BEGIN
   UPDATE public.wizard_progress wp
   SET configuracion_temporal = app.wizard_temporary_config_sanitize_528(
@@ -615,6 +617,19 @@ BEGIN
     );
   GET DIAGNOSTICS v_audit = ROW_COUNT;
 
+  -- Hasta este release WIZARD_COMPLETE podía recibir desde el API un SHA-256
+  -- no keyed del payload completo, incluidos PIN/contraseñas. Aunque no se
+  -- guardaba el valor en claro, conservar ese digest permitiría diccionario
+  -- offline y además es incompatible con el HMAC v1 del runtime nuevo.
+  UPDATE public.audit_log a
+  SET metadata = coalesce(a.metadata, '{}'::jsonb) - 'fingerprint'
+  WHERE coalesce(a.metadata->>'source', '') = 'configuration_464'
+    AND coalesce(a.metadata->>'accion', '') IN (
+      'GUARDAR_PASO_WIZARD', 'COMPLETAR_WIZARD'
+    )
+    AND a.metadata ? 'fingerprint';
+  GET DIAGNOSTICS v_legacy_fingerprint_audit = ROW_COUNT;
+
   UPDATE public.configuration_operation_intents i
   SET result = jsonb_set(
         i.result, '{progress,configuracion_temporal}',
@@ -631,10 +646,16 @@ BEGIN
       );
   GET DIAGNOSTICS v_intents = ROW_COUNT;
 
+  DELETE FROM public.configuration_operation_intents i
+  WHERE i.operation IN ('WIZARD_STEP', 'WIZARD_COMPLETE');
+  GET DIAGNOSTICS v_legacy_fingerprint_intents = ROW_COUNT;
+
   RETURN jsonb_build_object(
     'wizard_progress', v_progress,
     'audit_log', v_audit,
-    'configuration_operation_intents', v_intents
+    'configuration_operation_intents', v_intents,
+    'legacy_fingerprint_audit_purged', v_legacy_fingerprint_audit,
+    'legacy_fingerprint_intents_purged', v_legacy_fingerprint_intents
   );
 END;
 $function$;

@@ -14,8 +14,14 @@ import {
 } from './configuration.types';
 import { parseCertificateBuffer, toPostgresBytea } from '../../shared/utils/certificate.utils';
 import { verificarTitularidadCertificado } from '../../shared/utils/certificado-ruc-peru.util';
-import { createHash } from 'crypto';
-import { decryptBuffer, decryptText, encryptBuffer, encryptText } from '../../shared/utils/secure-config.utils';
+import { createHash, createHmac } from 'crypto';
+import {
+  decryptBuffer,
+  decryptText,
+  encryptBuffer,
+  encryptText,
+  getSecretKeys,
+} from '../../shared/utils/secure-config.utils';
 import {
   INITIAL_ACTIVE_COUNTRY_CODE,
   INITIAL_ACTIVE_COUNTRY_MESSAGE,
@@ -368,7 +374,13 @@ export class ConfigurationService {
           return result;
         }, {});
     };
-    return createHash('sha256')
+    // Es un identificador de idempotencia, no un hash de contraseña. Derivamos
+    // una subclave con dominio propio para no reutilizar directamente la clave
+    // AES; el HMAC impide ataques offline si se filtra la tabla de replays.
+    const fingerprintKey = createHmac('sha256', getSecretKeys(this.configService)[0])
+      .update('configuration-intent-fingerprint:v1', 'utf8')
+      .digest();
+    return createHmac('sha256', fingerprintKey)
       .update(JSON.stringify(canonicalize(input)))
       .digest('hex');
   }

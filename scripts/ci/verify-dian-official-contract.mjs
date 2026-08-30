@@ -185,6 +185,14 @@ function verifyOfficialGetStatusEventWsdl() {
   const action = 'http://wcf.dian.colombia/IWcfDianCustomerServices/GetStatusEvent';
   const assertions = [
     [
+      'WS-Security RequireThumbprintReference',
+      /<sp:RequireThumbprintReference\/>/u,
+    ],
+    [
+      'WS-Security MustSupportRefThumbprint',
+      /<sp:MustSupportRefThumbprint\/>/u,
+    ],
+    [
       'request trackId:string',
       /<xs:element name="GetStatusEvent"><xs:complexType><xs:sequence><xs:element minOccurs="0" name="trackId" nillable="true" type="xs:string"\/>/u,
     ],
@@ -205,7 +213,10 @@ function verifyOfficialGetStatusEventWsdl() {
   if (missing.length) {
     throw new Error(`DIAN_WSDL_GET_STATUS_EVENT_CONTRACT_MISMATCH: ${missing.join(', ')}`);
   }
-  console.log('Official DIAN WSDL OK: GetStatusEvent(trackId:string) -> DianResponse + WS-A/SOAP action');
+  console.log(
+    'Official DIAN WSDL OK: thumbprint policy + '
+    + 'GetStatusEvent(trackId:string) -> DianResponse + WS-A/SOAP action',
+  );
 }
 
 function run(command, args, options = {}) {

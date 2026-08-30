@@ -194,6 +194,19 @@ export function scalar(value: unknown): string {
   return String(value).trim();
 }
 
+function wsseThumbprintSha1(certificateDer: Buffer): string {
+  // WS-Security X.509 Token Profile 1.1 exige el identificador
+  // `#ThumbprintSHA1`. No protege la firma ni la integridad: el certificado
+  // completo viaja en BinarySecurityToken y SignedInfo usa RSA-SHA256/SHA-256.
+  // Usamos el identificador X.509 provisto por Node en vez de tratar SHA-1
+  // como un primitivo criptográfico de la aplicación.
+  const hex = new crypto.X509Certificate(certificateDer).fingerprint.replace(/:/gu, '');
+  if (!/^[0-9a-f]{40}$/iu.test(hex)) {
+    throw new Error('No se pudo obtener el ThumbprintSHA1 del certificado DIAN');
+  }
+  return Buffer.from(hex, 'hex').toString('base64');
+}
+
 function readPfxSigningMaterial(config: DianSoapSigningConfig): {
   privateKeyPem: string;
   certificateDerBase64: string;
@@ -265,6 +278,6 @@ function readPfxSigningMaterial(config: DianSoapSigningConfig): {
   return {
     privateKeyPem: forge.pki.privateKeyToPem(privateKey),
     certificateDerBase64: certificateDer.toString('base64'),
-    thumbprintSha1: crypto.createHash('sha1').update(certificateDer).digest('base64'),
+    thumbprintSha1: wsseThumbprintSha1(certificateDer),
   };
 }
