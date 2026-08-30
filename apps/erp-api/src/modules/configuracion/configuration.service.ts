@@ -380,12 +380,12 @@ export class ConfigurationService {
     const fingerprintKey = createHmac('sha256', getSecretKeys(this.configService)[0])
       .update('configuration-intent-fingerprint:v1', 'utf8')
       .digest();
+    const intentHmac = createHmac('sha256', fingerprintKey);
     // HMAC keyed y separado por dominio para identificar un payload; no almacena
     // ni verifica contraseñas, por lo que una KDF de password sería incorrecta.
     // codeql[js/insufficient-password-hash]
-    const intentMac = createHmac('sha256', fingerprintKey)
-      .update(JSON.stringify(canonicalize(input)))
-      .digest('hex');
+    intentHmac.update(JSON.stringify(canonicalize(input)));
+    const intentMac = intentHmac.digest('hex');
     return `hmac-v1:${intentMac}`;
   }
 
