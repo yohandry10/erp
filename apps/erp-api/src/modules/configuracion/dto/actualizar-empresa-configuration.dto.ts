@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsInt,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -14,9 +15,9 @@ import {
  *
  * Declara los 62 campos que el controlador lee, ni uno más: con
  * `forbidNonWhitelisted` activo, cualquier campo no declarado devolvería 400 y
- * lo que hoy funciona dejaría de funcionar. Los dos llamadores reales envían
- * subconjuntos —`{ logoUrl }` desde el resumen del wizard y
- * `{ usar_flujo_logistica: true }` desde inventario/logística—, ambos cubiertos.
+ * lo que hoy funciona dejaría de funcionar. `logoUrl` se conserva sólo para
+ * devolver el error explícito que dirige al endpoint multipart dedicado; este
+ * PUT nunca persiste el logo.
  *
  * Los nombres conviven en camelCase y snake_case porque así viajan hoy; el
  * handler los traduce a columnas. Normalizarlos sería cambiar el contrato.
@@ -69,12 +70,20 @@ export class ActualizarEmpresaConfigurationDto {
 
   // ARCA (Argentina)
   @IsOptional() @IsBoolean() arca_activo?: boolean;
-  @IsOptional() @IsString() @MaxLength(40) arca_environment?: string;
-  @IsOptional() @IsInt() @Min(1) arca_punto_venta?: number;
+  @IsOptional() @IsString() @IsIn(['homologacion', 'produccion'])
+  @MaxLength(40) arca_environment?: string;
+  @IsOptional() @IsInt() @Min(1) @Max(99998) arca_punto_venta?: number;
   @IsOptional() @IsString() @MaxLength(20) arca_cuit_representada?: string;
-  @IsOptional() @IsString() @MaxLength(40) arca_condicion_iva?: string;
-  @IsOptional() @IsString() @MaxLength(500) arca_wsaa_url?: string;
-  @IsOptional() @IsString() @MaxLength(500) arca_wsfe_url?: string;
+  @IsOptional() @IsString() @IsIn(['RESPONSABLE_INSCRIPTO', 'MONOTRIBUTO', 'EXENTO'])
+  @MaxLength(40) arca_condicion_iva?: string;
+  @IsOptional() @IsString() @IsIn([
+    'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
+    'https://wsaa.afip.gov.ar/ws/services/LoginCms',
+  ]) @MaxLength(500) arca_wsaa_url?: string;
+  @IsOptional() @IsString() @IsIn([
+    'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
+    'https://servicios1.afip.gov.ar/wsfev1/service.asmx',
+  ]) @MaxLength(500) arca_wsfe_url?: string;
   @IsOptional() @IsString() @MaxLength(150) provincia_fiscal?: string;
   @IsOptional() @IsString() @MaxLength(40) ingresos_brutos?: string;
   @IsOptional() @IsString() @MaxLength(20) fecha_inicio_actividades?: string;

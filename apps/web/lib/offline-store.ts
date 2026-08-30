@@ -100,6 +100,7 @@ interface ApiCacheEntry {
 
 const OUTBOX_KEY = 'erp.desktop.offline.outbox'
 const CACHE_KEY = 'erp.desktop.offline.cache'
+const SENSITIVE_OFFLINE_ERROR = 'Esta configuracion sensible requiere conexion en vivo y nunca se guarda en la cola offline.'
 const CACHE_LIMIT = 120
 const CACHE_ENTRY_BODY_LIMIT = 512 * 1024
 const BINARY_CACHE_BODY_LIMIT = 8 * 1024 * 1024
@@ -318,10 +319,49 @@ function isDeferredValidationEndpoint(endpoint: string) {
     || normalized.includes('/validate-')
 }
 
+/**
+ * La outbox es texto plano (localStorage en web y SQLite en escritorio). Una
+ * configuracion fiscal puede incluir PFX, contrasena del certificado, PIN de
+ * software DIAN y credenciales SUNAT/OSE/ARCA; por eso estas escrituras deben
+ * fallar cerradas si no existe una respuesta en vivo del servidor.
+ *
+ * El filtro se aplica tanto al endpoint logico como a la URL defensivamente:
+ * enqueueOfflineRequest tambien es API publica de este modulo.
+ */
+function isSensitiveNonQueueableEndpoint(endpoint: string, method: string) {
+  const normalizedMethod = method.trim().toUpperCase()
+  if (['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod)) return false
+
+  const normalized = localFirstEndpoint(endpoint).trim().toLowerCase()
+  const absolutePrefix = '^(?:https?:\\/\\/[^/]+)?'
+  const hasSensitiveSegment = normalized
+    .split(/[\/_-]/)
+    .some((segment) => ['certificate', 'certificado', 'credential', 'credencial', 'pfx', 'secret'].includes(segment))
+  return new RegExp(`${absolutePrefix}/api/configuration(?:/|$)`).test(normalized)
+    || new RegExp(`${absolutePrefix}/configuration(?:/|$)`).test(normalized)
+    || new RegExp(`${absolutePrefix}/api/configuracion(?:[-/]|$)`).test(normalized)
+    || new RegExp(`${absolutePrefix}/configuracion(?:[-/]|$)`).test(normalized)
+    || new RegExp(`${absolutePrefix}/api/auth(?:/|$)`).test(normalized)
+    || new RegExp(`${absolutePrefix}/auth(?:/|$)`).test(normalized)
+    || /\/demo\/convert-to-real(?:\/|$)/.test(normalized)
+    || hasSensitiveSegment
+}
+
+function isSensitiveOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url'>) {
+  return isSensitiveNonQueueableEndpoint(input.endpoint, input.method)
+    || isSensitiveNonQueueableEndpoint(input.url, input.method)
+}
+
+function sensitiveOfflineError() {
+  return new Error(SENSITIVE_OFFLINE_ERROR)
+}
+
 function isLiveConnectivityTestEndpoint(endpoint: string) {
   const normalized = localFirstEndpoint(endpoint)
   return normalized === '/api/configuration/colombia/dian/test'
     || normalized === '/configuration/colombia/dian/test'
+    || normalized === '/api/configuration/colombia/dian/habilitacion'
+    || normalized === '/configuration/colombia/dian/habilitacion'
     || normalized === '/api/rrhh/configuracion-laboral/colombia/pila/test'
     || normalized === '/rrhh/configuracion-laboral/colombia/pila/test'
 }
@@ -589,6 +629,8 @@ async function processLocalFirstWrite(
 }
 
 export async function enqueueOfflineRequest(input: OfflineRequestInput): Promise<OfflineQueueItem> {
+  if (isSensitiveOfflineRequest(input)) throw sensitiveOfflineError()
+
   const safeInput = { ...input, headers: sanitizePersistedHeaders(input.headers || []) }
   if (isDesktopRuntime()) {
     return invoke<OfflineQueueItem>('enqueue_offline_request', { request: safeInput })
@@ -622,8 +664,19 @@ export async function listOfflineRequests(tenantId?: string | null): Promise<Off
   } else {
     queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
   }
-  let changed = false
-  const sanitized = queue.map((item) => {
+  const sensitiveItems = queue.filter(isSensitiveOfflineRequest)
+  if (isDesktopRuntime()) {
+    for (const item of sensitiveItems) {
+      try {
+        await invoke('delete_offline_request', { id: item.id })
+      } catch (error) {
+        console.warn('[offline-store] No se pudo purgar una configuracion sensible legacy:', error)
+      }
+    }
+  }
+
+  let changed = sensitiveItems.length > 0
+  const sanitized = queue.filter((item) => !isSensitiveOfflineRequest(item)).map((item) => {
     const headers = sanitizePersistedHeaders(item.headers || [])
     changed ||= headers.length !== (item.headers || []).length
     return { ...item, headers }
@@ -718,9 +771,7 @@ export async function getOfflineStatus(tenantId?: string | null): Promise<Offlin
     }
   }
 
-  const queue = tenantId
-    ? readJson<OfflineQueueItem[]>(OUTBOX_KEY, []).filter((item) => item.tenant_id === tenantId)
-    : readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
+  const queue = await listOfflineRequests(tenantId)
   return {
     offline_mode: typeof navigator !== 'undefined' ? !navigator.onLine : false,
     total: queue.length,
@@ -943,6 +994,16 @@ export async function fetchWithOfflineSupport(
   const forceOffline = await isOfflineModeEnabled()
 
   if (forceOffline) {
+    if (isSensitiveNonQueueableEndpoint(meta.endpoint, method)) {
+      throw sensitiveOfflineError()
+    }
+
+    // Las validaciones y constancias fiscales externas no son trabajo
+    // diferible: encolarlas podría registrar después una habilitación que el
+    // usuario ya no está viendo o contra otra configuración.
+    if (isLiveConnectivityTestEndpoint(meta.endpoint)) {
+      throw new Error('Esta operación fiscal requiere conexión en vivo.')
+    }
     if (isDeferredValidationEndpoint(meta.endpoint)) {
       return deferredValidationResponse(meta.endpoint, init, meta, url, method)
     }
@@ -1000,6 +1061,10 @@ export async function fetchWithOfflineSupport(
     // Un abort se propaga como el fallo que es. Sólo se encola cuando la petición
     // no llegó a salir, que es para lo que existe el modo offline.
     if (esAbortoDeCliente(error)) throw error
+
+    if (isSensitiveNonQueueableEndpoint(meta.endpoint, method)) {
+      throw sensitiveOfflineError()
+    }
 
     // Una prueba de conectividad debe informar el fallo en vivo. Encolarla
     // produciría un falso positivo y podría repetir una operación diagnóstica.

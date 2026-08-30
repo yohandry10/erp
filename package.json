@@ -27,6 +27,7 @@
     "k8s:deploy": "helm upgrade --install erp infra/helm/erp-suite",
     "test:ui-styles": "node scripts/audit-frontend-styles.mjs",
     "test:quality": "node scripts/audit-test-quality.mjs",
+    "test:dian-contract": "node scripts/ci/verify-dian-official-contract.mjs",
     "format": "prettier --write \"apps/**/*.{ts,tsx,js,mjs,cjs,json,css,md}\" \"libs/**/*.{ts,tsx,js,mjs,cjs,json,md}\" \"scripts/**/*.{ts,js,mjs,cjs,json,md}\"",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,js,mjs,cjs,json,css,md}\" \"libs/**/*.{ts,tsx,js,mjs,cjs,json,md}\" \"scripts/**/*.{ts,js,mjs,cjs,json,md}\"",
     "check-encoding": "powershell -ExecutionPolicy Bypass -File ./scripts/check-encoding.ps1",
@@ -36,7 +37,8 @@
     "@types/node": "^20.12.7",
     "prettier": "^3.2.5",
     "turbo": "^1.13.4",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "xslt3": "2.7.0"
   },
   "packageManager": "pnpm@9.15.4",
   "pnpm": {
@@ -69,11 +71,12 @@
       "ws@>=8.0.0 <8.20.1": "8.21.0",
       "fast-uri": ">=3.1.2",
       "sharp": ">=0.35.0",
-      "js-yaml@>=4.0.0 <4.3.0": "4.3.0",
+      "js-yaml@>=4.0.0 <4.3.1": "4.3.1",
       "brace-expansion@<1.1.18": "1.1.18",
       "brace-expansion@>=2.0.0 <2.1.4": "2.1.4",
       "brace-expansion@>=4.0.0 <5.0.9": "5.0.9",
-      "js-yaml@<3.15.0": "3.15.0"
+      "js-yaml@<3.15.1": "3.15.1",
+      "nanoid@>=3.0.0 <3.3.18": "3.3.18"
     }
   }
 }

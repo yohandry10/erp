@@ -198,13 +198,14 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
         const response = await api.post('/api/documentos/validar-ruc', { ruc: taxId })
         const responseData: any = api.unwrap(response)
         if (responseData) {
-          if (!isArgentina && !isColombia && responseData.consulta_sunat) {
+          const consultaPadron = responseData.consulta_padron ?? responseData.consulta_sunat
+          if (!isArgentina && !isColombia && consultaPadron) {
             setFormData(prev => ({
               ...prev,
               receptor_razon_social: responseData.razon_social || prev.receptor_razon_social,
               receptor_direccion: responseData.direccion || prev.receptor_direccion
             }))
-            showSuccessToast(`${isArgentina ? 'CUIT' : 'RUC'} validado${isArgentina ? '' : ' con SUNAT'}`)
+            showSuccessToast('RUC válido; datos registrales auxiliares encontrados')
           } else {
             showSuccessToast(
               `${fiscalDocument} válido por formato y dígito verificador; complete los datos registrales`,

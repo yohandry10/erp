@@ -12,7 +12,7 @@ import { X, CheckCircle2, Loader2 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
-import { validateCountryTaxId } from '@/lib/country-tax-id'
+import { validateArgentinaCuit, validateCountryTaxId } from '@/lib/country-tax-id'
 
 // Simplified validation schema for quick create
 const quickClienteSchema = z.object({
@@ -24,9 +24,10 @@ const quickClienteSchema = z.object({
     .regex(/^[0-9A-Z]+$/, 'Solo números y letras mayúsculas'),
   razon_social: z.string()
     .min(3, 'Mínimo 3 caracteres')
-    .max(255, 'Máximo 255 caracteres')
+    .max(255, 'Máximo 255 caracteres'),
+  arca_condicion_iva: z.string().max(80).optional()
 }).refine((data) => {
-  if ([TipoDocumento.RUC, TipoDocumento.CUIT].includes(data.documento_tipo)) {
+  if ([TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI].includes(data.documento_tipo)) {
     return data.documento_numero.length === 11 && /^\d+$/.test(data.documento_numero)
   }
   if (data.documento_tipo === TipoDocumento.NIT) {
@@ -80,12 +81,15 @@ export default function ClienteQuickCreate({
       tipo: TipoCliente.PERSONA,
       documento_tipo: isColombia ? TipoDocumento.CC : TipoDocumento.DNI,
       documento_numero: '',
-      razon_social: ''
+      razon_social: '',
+      arca_condicion_iva: isArgentina ? 'CONSUMIDOR_FINAL' : undefined
     }
   })
 
   const documentoTipo = watch('documento_tipo')
   const documentoNumero = watch('documento_numero')
+  const argentinaTaxIdentity = [TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI]
+    .includes(documentoTipo)
 
   useEffect(() => {
     if (country.loading) return
@@ -95,7 +99,7 @@ export default function ClienteQuickCreate({
   }, [country.loading, country.paisCodigo, isColombia, setValue])
 
   const handleValidarRuc = async () => {
-    if (documentoTipo !== taxIdType || documentoNumero.length !== taxIdLength) {
+    if ((!argentinaTaxIdentity && documentoTipo !== taxIdType) || documentoNumero.length !== taxIdLength) {
       toast({
         title: 'Error',
         description: `El ${taxIdLabel} debe tener ${taxIdLength} dígitos`,
@@ -106,6 +110,17 @@ export default function ClienteQuickCreate({
 
     try {
       setValidatingRuc(true)
+      if (isArgentina) {
+        if (!validateArgentinaCuit(documentoNumero)) {
+          throw new Error(`El dígito verificador del ${documentoTipo} no es válido`)
+        }
+        setRucValidated(true)
+        toast({
+          title: `${documentoTipo} validado`,
+          description: 'Formato y dígito verificador válidos. Complete la condición IVA.',
+        })
+        return
+      }
       if (isColombia) {
         if (!validateCountryTaxId('CO', documentoNumero)) {
           throw new Error('El dígito de verificación del NIT no es válido')
@@ -123,14 +138,15 @@ export default function ClienteQuickCreate({
       const responseData: any = unwrap(response)
 
       if (responseData) {
-        if (responseData.consulta_sunat && responseData.razon_social) {
+        const consultaPadron = responseData.consulta_padron ?? responseData.consulta_sunat
+        if (consultaPadron && responseData.razon_social) {
           setValue('razon_social', responseData.razon_social)
         }
         setRucValidated(true)
         toast({
           title: `${taxIdLabel} validado`,
-          description: responseData.consulta_sunat
-            ? `Datos obtenidos de ${isArgentina ? 'ARCA' : 'SUNAT'}`
+          description: consultaPadron
+            ? 'Datos obtenidos de una fuente registral auxiliar; confirme en SUNAT antes de una decisión fiscal.'
             : 'Formato y dígito verificador válidos. Complete la razón social manualmente.'
         })
       }
@@ -240,7 +256,15 @@ export default function ClienteQuickCreate({
               ) : (
                 <option value={TipoDocumento.DNI}>DNI</option>
               )}
-              <option value={taxIdType}>{taxIdLabel}</option>
+              {isArgentina ? (
+                <>
+                  <option value={TipoDocumento.CUIT}>CUIT</option>
+                  <option value={TipoDocumento.CUIL}>CUIL</option>
+                  <option value={TipoDocumento.CDI}>CDI</option>
+                </>
+              ) : (
+                <option value={taxIdType}>{taxIdLabel}</option>
+              )}
               <option value={TipoDocumento.CE}>{isColombia ? 'Cédula de extranjería' : 'Carné de Extranjería'}</option>
               <option value={TipoDocumento.PASAPORTE}>Pasaporte</option>
             </select>
@@ -249,11 +273,31 @@ export default function ClienteQuickCreate({
             )}
           </div>
 
+          {isArgentina && (
+            <div className="space-y-2">
+              <Label htmlFor="quick-arca-condicion-iva">Condición IVA *</Label>
+              <select
+                id="quick-arca-condicion-iva"
+                {...register('arca_condicion_iva', { required: true })}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                disabled={isSubmitting}
+              >
+                <option value="RESPONSABLE_INSCRIPTO">Responsable inscripto</option>
+                <option value="MONOTRIBUTO">Monotributo</option>
+                <option value="EXENTO">Exento</option>
+                <option value="CONSUMIDOR_FINAL">Consumidor final</option>
+                <option value="SUJETO_NO_CATEGORIZADO">Sujeto no categorizado</option>
+                <option value="CLIENTE_EXTERIOR">Cliente del exterior</option>
+                <option value="IVA_NO_ALCANZADO">IVA no alcanzado</option>
+              </select>
+            </div>
+          )}
+
           {/* Número de Documento */}
           <div className="space-y-2">
             <Label htmlFor="quick-documento-numero">
               Número de Documento *
-              {documentoTipo === taxIdType && ` (${taxIdLength} dígitos)`}
+              {(documentoTipo === taxIdType || argentinaTaxIdentity) && ` (${taxIdLength} dígitos)`}
               {documentoTipo === TipoDocumento.DNI && ' (8 dígitos)'}
             </Label>
             <div className="flex gap-2">
@@ -261,13 +305,13 @@ export default function ClienteQuickCreate({
                 id="quick-documento-numero"
                 {...register('documento_numero', { onChange: () => setRucValidated(false) })}
                 placeholder={
-                  documentoTipo === taxIdType ? (isArgentina ? '20301234563' : isColombia ? '9001234568' : '20123456789') :
+                  (documentoTipo === taxIdType || argentinaTaxIdentity) ? (isArgentina ? '20301234563' : isColombia ? '9001234568' : '20123456789') :
                   documentoTipo === TipoDocumento.DNI ? '12345678' :
                   'Número de documento'
                 }
                 disabled={isSubmitting}
               />
-              {documentoTipo === taxIdType && (
+              {(documentoTipo === taxIdType || argentinaTaxIdentity) && (
                 <Button
                   type="button"
                   variant="outline"

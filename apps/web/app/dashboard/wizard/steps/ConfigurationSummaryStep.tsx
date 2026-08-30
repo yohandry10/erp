@@ -74,10 +74,7 @@ export function ConfigurationSummaryStep() {
   const router = useRouter()
   const country = useCountryContext()
   const [empresaConfig, setEmpresaConfig] = useState<EmpresaConfig | null>(null)
-  const [logoUrl, setLogoUrl] = useState('')
-  const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -94,7 +91,6 @@ export function ConfigurationSummaryStep() {
           const data = await response.json()
           if (data.success && data.data) {
             setEmpresaConfig(data.data)
-            setLogoUrl(data.data.logoUrl || '')
           }
         }
       } catch (error) {
@@ -108,44 +104,6 @@ export function ConfigurationSummaryStep() {
 
   const handleGoToDashboard = () => {
     router.push('/dashboard')
-  }
-
-  const handleSaveLogoUrl = async () => {
-    setSaving(true)
-    setMessage(null)
-
-    try {
-      const intentStorageKey = 'configuration-logo-intent'
-      let idempotencyKey = window.sessionStorage.getItem(intentStorageKey)
-      if (!idempotencyKey) {
-        idempotencyKey = `configuration-logo-${window.crypto.randomUUID()}`
-        window.sessionStorage.setItem(intentStorageKey, idempotencyKey)
-      }
-      const response = await fetchApi('/api/configuration/empresa', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
-        body: JSON.stringify({ logoUrl })
-      })
-
-      if (!response.ok) throw new Error('Error al guardar')
-
-      const data = await response.json()
-      if (data.success) {
-        window.sessionStorage.removeItem(intentStorageKey)
-        setEmpresaConfig(prev => prev ? { ...prev, logoUrl } : null)
-        setMessage({ type: 'success', text: 'Logo URL guardado correctamente' })
-      } else {
-        throw new Error(data.message || 'Error al guardar')
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Error al guardar' })
-    } finally {
-      setSaving(false)
-    }
   }
 
   const isColombia = country.paisCodigo === 'CO'
@@ -400,9 +358,11 @@ export function ConfigurationSummaryStep() {
         {isColombia && (
           <>
             <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
-              <span className="text-muted-foreground">DIAN Activo:</span>
+              <span className="text-muted-foreground">Configuración DIAN:</span>
               <span>
-                {empresaConfig?.dianActivo ? '✓ Sí' : 'No'}
+                {empresaConfig?.dianActivo
+                  ? 'Datos cargados · validar TestSet antes de producción'
+                  : 'No configurada'}
               </span>
             </div>
             <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
@@ -479,45 +439,21 @@ export function ConfigurationSummaryStep() {
       <div className="bg-card/40 border border-cyan-400/20 rounded-lg p-5">
         <h2 className="text-[0.875rem] mb-3 text-foreground/90 border-b pb-2">🖼️ Logo de la Empresa (para tickets y facturas)</h2>
 
-        <div className="mb-3">
-          <label htmlFor="configurationsummarystep-url-del-logo" className="block mb-1.5 text-foreground/90 text-[0.8rem]">
-            URL del Logo:
-          </label>
-          <input id="configurationsummarystep-url-del-logo"
-            type="url"
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://ejemplo.com/mi-logo.png" className="w-[100%] p-2 rounded-[6px] border text-[0.8rem]"
-          />
-          <p className="text-[0.7rem] text-muted-foreground mt-1">
-            Ingresa la URL de tu logo. Se mostrará en tickets y facturas impresas.
-          </p>
-        </div>
-
-        {logoUrl && (
+        {empresaConfig?.logoUrl ? (
           <div className="mb-3">
             <p className="text-[0.8rem] text-foreground/90 mb-1.5">Vista previa:</p>
             <Image
-              src={logoUrl}
-              alt="Logo preview"
+              src={empresaConfig.logoUrl}
+              alt="Logo de la empresa"
               width={180}
               height={60}
               unoptimized className="max-h-[60px] max-w-[180px] object-contain"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
             />
           </div>
-        )}
-
-        <button
-          onClick={handleSaveLogoUrl}
-          disabled={saving} className="py-1.5 px-[0.8rem] rounded-[6px] border-0 bg-blue-500 text-white font-medium text-[0.8rem]"
-        >
-          {saving ? 'Guardando...' : 'Guardar Logo'}
-        </button>
-
-        {message && (
-          <p className="mt-2 text-[0.8rem]">
-            {message.text}
+        ) : (
+          <p className="m-0 text-[0.8rem] text-muted-foreground">
+            Sin logo configurado. Puedes subirlo desde Configuración &gt; Empresa.
           </p>
         )}
       </div>

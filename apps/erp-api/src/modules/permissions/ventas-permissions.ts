@@ -43,7 +43,7 @@ export const VENTAS_CLIENTES_PERMISSIONS: PermissionDefinition[] = [
     modulo: 'ventas',
     recurso: 'clientes',
     accion: 'validar_ruc',
-    descripcion: 'Validar RUC con SUNAT',
+    descripcion: 'Validar formato y consultar datos públicos auxiliares del RUC',
   },
 ];
 

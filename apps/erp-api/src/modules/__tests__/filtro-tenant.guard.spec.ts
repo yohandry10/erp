@@ -10,7 +10,7 @@ import { join } from 'node:path';
  * única frontera entre los datos de dos empresas. Un `.from()` sin `tenant_id`
  * no da error, da los datos de otro.
  *
- * Las 17 excepciones de abajo se revisaron una a una y son legítimas por tres
+ * Las 18 excepciones de abajo se revisaron una a una y son legítimas por tres
  * razones distintas:
  *
  *  - Derivadas: la consulta filtra por un id que un `select` anterior ya acotó al
@@ -45,6 +45,7 @@ const EXCEPCIONES = [
   'modules/auth/auth.service.ts -> user_sessions',
   'modules/auth/auth.service.ts -> usuarios_sistema',
   'modules/cajas/cajas.service.ts -> movimientos_caja',
+  'modules/configuracion/configuration.controller.ts -> paises',
   'modules/contabilidad/listeners/contabilidad-events.listener.ts -> event_processing_log',
   'modules/contabilidad/services/centros-costo.service.ts -> detalle_asientos',
   'modules/paises/paises.service.ts -> configuracion_fiscal',

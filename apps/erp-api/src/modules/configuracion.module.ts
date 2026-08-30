@@ -14,6 +14,7 @@ import { DocumentosModule } from './documentos/documentos.module';
 import { AuditModule } from './audit/audit.module';
 import { FiscalModule } from './fiscal/fiscal.module';
 import { ConfigModule } from '@nestjs/config';
+import { CompanyLogoService } from './configuracion/company-logo.service';
 
 @Module({
   imports: [ConfigModule, SupabaseModule, OseModule, CryptoModule, ValidationModule, AuthModule, PermissionsModule, DocumentosModule, AuditModule, FiscalModule],
@@ -23,7 +24,7 @@ import { ConfigModule } from '@nestjs/config';
     ConfigurationContextController,
     ConfiguracionFiscalController,
   ],
-  providers: [ConfigurationService],
+  providers: [ConfigurationService, CompanyLogoService],
   exports: [ConfigurationService],
 })
 export class ConfiguracionModule {} 

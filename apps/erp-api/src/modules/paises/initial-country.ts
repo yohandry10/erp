@@ -129,12 +129,44 @@ export function calcularDigitoVerificacionNit(base: string): number {
   return remainder === 0 || remainder === 1 ? remainder : 11 - remainder;
 }
 
-export function validateColombiaNit(value: unknown): boolean {
+export interface ColombiaNitParts {
+  /** NIT sin el dígito de verificación, tal como se declara en CompanyID. */
+  base: string;
+  /** Dígito de verificación separado para el atributo schemeID de DIAN. */
+  dv: string;
+  /** Forma canónica persistible: sólo dígitos, incluyendo el DV al final. */
+  compact: string;
+  /** Forma legible para pantalla. */
+  formatted: string;
+}
+
+/**
+ * Separa el NIT y su DV sin perder información.
+ *
+ * Acepta las dos formas que usa el producto (9001234568 y 900123456-8), pero
+ * siempre devuelve una representación canónica sólo-dígitos. La versión previa
+ * aceptaba una base de diez dígitos únicamente si llevaba guion, por lo que el
+ * wizard, la configuración y el XML podían interpretar el mismo NIT distinto.
+ */
+export function parseColombiaNit(value: unknown): ColombiaNitParts | null {
   const normalized = String(value ?? '').trim().replace(/\s+/g, '');
-  const compactMatch = normalized.match(/^(\d{9})(\d)$/);
-  const match = normalized.match(/^(\d{9,10})-(\d)$/) ?? compactMatch;
-  if (!match) return false;
-  return calcularDigitoVerificacionNit(match[1]) === Number(match[2]);
+  const separated = normalized.match(/^(\d{9,10})-(\d)$/);
+  const compact = normalized.match(/^\d{10,11}$/);
+  const base = separated?.[1] ?? (compact ? normalized.slice(0, -1) : '');
+  const dv = separated?.[2] ?? (compact ? normalized.slice(-1) : '');
+  if (!base || !dv || calcularDigitoVerificacionNit(base) !== Number(dv)) {
+    return null;
+  }
+  return {
+    base,
+    dv,
+    compact: `${base}${dv}`,
+    formatted: `${base}-${dv}`,
+  };
+}
+
+export function validateColombiaNit(value: unknown): boolean {
+  return parseColombiaNit(value) !== null;
 }
 
 export function validateCountryTaxId(country: unknown, value: unknown): boolean {

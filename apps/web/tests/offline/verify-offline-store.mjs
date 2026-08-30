@@ -250,10 +250,124 @@ const assert = (condition, message) => {
     'validacion diferida debe marcar tipo de entidad local',
   )
 
+  const sensitiveBody = JSON.stringify({
+    certificateBase64: 'PFX-SECRETO-NO-PERSISTIR',
+    certificatePassword: 'clave-super-secreta',
+    dian_software_pin: 'pin-dian-secreto',
+  })
+  const queueBeforeSensitiveAttempts = (await mod.listOfflineRequests()).length
+  let sensitiveOfflineRejected = false
+  try {
+    await mod.fetchWithOfflineSupport(
+      'http://api.test/api/configuration/wizard/validate-certificate',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: sensitiveBody,
+      },
+      { endpoint: '/api/configuration/wizard/validate-certificate', tenantId: 'tenant-1' },
+    )
+  } catch (error) {
+    sensitiveOfflineRejected = String(error?.message || error).includes('nunca se guarda en la cola offline')
+  }
+  assert(sensitiveOfflineRejected, 'certificado/PIN offline debe fallar cerrado con mensaje explicito')
+  assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'certificado/PIN no debe entrar al outbox')
+
+  let directSensitiveEnqueueRejected = false
+  try {
+    await mod.enqueueOfflineRequest({
+      endpoint: '/api/configuration/wizard/step',
+      method: 'POST',
+      url: 'http://api.test/api/configuration/wizard/step',
+      headers: [],
+      body: sensitiveBody,
+      tenant_id: 'tenant-1',
+      user_id: 'user-1',
+    })
+  } catch {
+    directSensitiveEnqueueRejected = true
+  }
+  assert(directSensitiveEnqueueRejected, 'la API publica de enqueue tambien debe rechazar configuracion sensible')
+
+  const outboxKey = 'erp.desktop.offline.outbox'
+  const legacyQueue = JSON.parse(store.get(outboxKey))
+  legacyQueue.push({
+    id: 'legacy-sensitive-1',
+    endpoint: '/api/configuration/complete',
+    method: 'POST',
+    url: 'http://api.test/api/configuration/complete',
+    headers: [],
+    body: sensitiveBody,
+    tenant_id: 'tenant-1',
+    user_id: 'user-1',
+    status: 'pending',
+    attempts: 0,
+    created_at: Date.now(),
+    updated_at: Date.now(),
+    last_error: null,
+    response_status: null,
+    response_body: null,
+  })
+  store.set(outboxKey, JSON.stringify(legacyQueue))
+  queue = await mod.listOfflineRequests()
+  assert(!queue.some((item) => item.id === 'legacy-sensitive-1'), 'listado debe excluir configuracion sensible legacy')
+  assert(!store.get(outboxKey).includes('PFX-SECRETO-NO-PERSISTIR'), 'purga web debe borrar el secreto historico del storage')
+
+  online = true
+  mod.invalidateOfflineModeCache()
+  globalThis.fetch = async () => {
+    throw new Error('network down')
+  }
+  let sensitiveNetworkFailureRejected = false
+  try {
+    await mod.fetchWithOfflineSupport(
+      'http://api.test/api/configuration/complete',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: sensitiveBody },
+      { endpoint: '/api/configuration/complete', tenantId: 'tenant-1' },
+    )
+  } catch (error) {
+    sensitiveNetworkFailureRejected = String(error?.message || error).includes('nunca se guarda en la cola offline')
+  }
+  assert(sensitiveNetworkFailureRejected, 'fallo de red en configuracion sensible tampoco debe convertirse en cola')
+  assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'fallo de red sensible no debe persistir body')
+  online = false
+  mod.invalidateOfflineModeCache()
+
   const status = await mod.getOfflineStatus()
   assert(status.total === 5 && status.synced === 1 && status.failed === 2 && status.pending === 2, 'status debe contar synced/failed/pending')
 
   window.__TAURI__ = {}
+  let purgedDesktopSensitiveId = null
+  invokeHandler = async (command, args) => {
+    if (command === 'list_offline_requests') {
+      return [{
+        id: 'desktop-sensitive-legacy',
+        endpoint: '/api/configuration/wizard/step',
+        method: 'POST',
+        url: 'http://api.test/api/configuration/wizard/step',
+        headers: [],
+        body: sensitiveBody,
+        tenant_id: 'tenant-1',
+        user_id: 'user-1',
+        status: 'pending',
+        attempts: 0,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+        last_error: null,
+        response_status: null,
+        response_body: null,
+      }]
+    }
+    if (command === 'delete_offline_request') {
+      purgedDesktopSensitiveId = args.id
+      return null
+    }
+    throw new Error('invoke inesperado durante purga desktop: ' + command)
+  }
+  const desktopQueueAfterPurge = await mod.listOfflineRequests()
+  assert(desktopQueueAfterPurge.length === 0, 'listado Tauri no debe devolver configuracion sensible legacy')
+  assert(purgedDesktopSensitiveId === 'desktop-sensitive-legacy', 'purga Tauri debe borrar el registro SQLite sensible')
+
   let rewrittenSyncUrl = null
   let rewrittenSyncBody = null
   invokeCalls = []

@@ -8,13 +8,25 @@ import { perfilPaisDelTenant } from './pais-del-tenant';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { PdfFormatHelperService } from './pdf-format-helper.service';
 import { buildSunatQrDataUrl } from './sunat-qr.util';
+import {
+  buildArcaQrRepresentation,
+  buildDianQrRepresentation,
+  resolveAcceptedDianEvidence,
+} from './fiscal-qr.util';
 import { validateCountryTaxId } from '../paises/initial-country';
+import { resolveDianPrintedFiscalInfo, type DianPrintedFiscalInfo } from './dian-print.util';
+import { resolveArcaPrintedFiscalInfo, type ArcaPrintedFiscalInfo } from './arca-print.util';
+import { resolveHistoricalCpeCountry } from './historical-cpe-country.util';
 
 export const CPE_PDF_PRINT_FORMAT = {
   size: 'A4' as const,
   widthMm: 210,
   heightMm: 297,
 };
+
+export const CPE_PDF_QR_SIZE_MM = 42;
+
+export const CPE_PDF_PE_TAX_BOX_MIN_MM = { width: 80, height: 40 } as const;
 
 export const CPE_PDF_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -201,13 +213,81 @@ export function getCpeDemoPdfNotice(countryCode: string): string {
   return `MUESTRA DEMO · SIN ENVÍO NI VALIDEZ ${authority.toUpperCase()}`;
 }
 
+export function getCpeNonFiscalPdfNotice(countryCode: string, evidenceStatus: string): string {
+  if (String(evidenceStatus).toUpperCase() === 'SIMULATED') return getCpeDemoPdfNotice(countryCode);
+  if (String(evidenceStatus).toUpperCase() === 'LEGACY_UNVERIFIED') {
+    return 'SIN VALIDEZ FISCAL · PROCEDENCIA LEGACY NO VERIFICABLE';
+  }
+  const authority = getActiveCountryByCode(countryCode)?.autoridadFiscal ?? 'fiscal';
+  return `SIN ACEPTACIÓN NI VALIDEZ ${authority.toUpperCase()}`;
+}
+
+export interface CpePrintedNoteReference {
+  noteType: '07' | '08';
+  referenceType: string;
+  referenceLabel: string;
+  referenceNumber: string;
+  reasonCode: string;
+  reason: string;
+}
+
+export function resolveCpePrintedNoteReference(cpeData: any): CpePrintedNoteReference | null {
+  const noteType = String(cpeData?.tipo_documento || '').trim();
+  if (noteType !== '07' && noteType !== '08') return null;
+
+  const metadata = cpeData?.metadata && typeof cpeData.metadata === 'object'
+    ? cpeData.metadata
+    : {};
+  const referenceType = String(
+    cpeData.documento_referencia_tipo || cpeData.documento_afectado_tipo
+      || metadata.documento_referencia_tipo || '',
+  ).trim();
+  const referenceSeries = String(
+    cpeData.documento_referencia_serie || cpeData.documento_afectado_serie
+      || metadata.documento_referencia_serie || '',
+  ).trim().toUpperCase();
+  const rawReferenceNumber = String(
+    cpeData.documento_referencia_numero || cpeData.documento_afectado_numero
+      || metadata.documento_referencia_numero || '',
+  ).trim();
+  const paddedReferenceNumber = /^\d{1,8}$/.test(rawReferenceNumber)
+    ? rawReferenceNumber.padStart(8, '0')
+    : rawReferenceNumber;
+  const reasonCode = String(
+    noteType === '07'
+      ? cpeData.tipo_nota_credito || cpeData.codigo_motivo_nota || cpeData.tipo_nota
+        || metadata.codigo_motivo || ''
+      : cpeData.tipo_nota_debito || cpeData.codigo_motivo_nota || cpeData.tipo_nota
+        || metadata.codigo_motivo || '',
+  ).trim();
+  const reason = String(
+    cpeData.motivo_nota || cpeData.motivo || cpeData.observaciones || metadata.motivo_nota || '',
+  ).trim();
+  const referenceLabel = referenceType === '03'
+    ? 'BOLETA DE VENTA ELECTRÓNICA'
+    : referenceType === '01'
+      ? 'FACTURA ELECTRÓNICA'
+      : 'COMPROBANTE ELECTRÓNICO';
+
+  return {
+    noteType,
+    referenceType: referenceType || 'No consignado',
+    referenceLabel,
+    referenceNumber: referenceSeries && paddedReferenceNumber
+      ? `${referenceSeries}-${paddedReferenceNumber}`
+      : 'No consignado',
+    reasonCode: reasonCode || 'No consignado',
+    reason: reason || 'No consignado',
+  };
+}
+
 /**
- * Servicio para generar PDFs de comprobantes electrónicos con formato oficial
+ * Servicio para generar la representación PDF A4 de comprobantes electrónicos.
  * Soporta múltiples países: Perú (SUNAT), Colombia (DIAN), etc.
  * 
  * CUMPLIMIENTO NORMATIVO:
  * ✅ Código QR obligatorio (SUNAT/DIAN)
- * ✅ Diseño visual estándar por país
+ * ✅ Información mínima y leyendas según el país
  * ✅ Leyendas obligatorias según tipo de comprobante
  * ✅ Representación impresa del CPE
  */
@@ -221,8 +301,9 @@ export class PdfGeneratorService {
   ) {}
 
   /**
-   * Genera PDF con formato oficial para un CPE (multi-país)
-   * Detecta automáticamente el país y aplica el formato correspondiente
+   * Genera una representación PDF A4 para un CPE (multi-país).
+   * A4 es el formato físico elegido por el producto; no se presenta como un
+   * tamaño de papel impuesto por SUNAT.
    */
   async generateSunatCompliantPdf(cpeId: string, tenantId: string): Promise<Buffer> {
     try {
@@ -232,20 +313,49 @@ export class PdfGeneratorService {
       const cpeData = await this.getCpeData(cpeId, tenantId);
       
       // 2. Obtener código de país y validar la empresa con su documento fiscal.
-      const countryCode = await this.getCountryCode(tenantId);
-      const empresaConfig = await this.getEmpresaConfig(tenantId, countryCode);
+      const currentCountryCode = await this.getCountryCode(tenantId);
+      const currentEmpresaConfig = await this.getEmpresaConfig(tenantId, currentCountryCode);
+      const countryCode = resolveHistoricalCpeCountry(cpeData, currentCountryCode);
+      const issuerSnapshot = cpeData.issuer_snapshot && typeof cpeData.issuer_snapshot === 'object'
+        ? cpeData.issuer_snapshot
+        : {};
+      const empresaConfig = {
+        ...currentEmpresaConfig,
+        ruc: issuerSnapshot.tax_id || cpeData.ruc_emisor || currentEmpresaConfig.ruc,
+        razon_social: issuerSnapshot.legal_name || cpeData.razon_social_emisor || currentEmpresaConfig.razon_social,
+        direccion_fiscal: issuerSnapshot.address || currentEmpresaConfig.direccion_fiscal,
+      };
+      const simulatedOrigin = cpeData.simulated_origin !== false;
+      const dianAccepted = countryCode === 'CO' ? Boolean(resolveAcceptedDianEvidence(cpeData)) : true;
+      const allowUnofficialRepresentation = simulatedOrigin || (countryCode === 'CO' && !dianAccepted);
       const fiscalAuthority = this.pdfFormatHelper.getFiscalAuthorityName(countryCode);
+      const printableCpeData = {
+        ...cpeData,
+        ...(countryCode === 'CO'
+          ? { dian_print_info: resolveDianPrintedFiscalInfo(cpeData, empresaConfig, allowUnofficialRepresentation) }
+          : {}),
+        ...(countryCode === 'AR'
+          ? {
+              arca_print_info: resolveArcaPrintedFiscalInfo(cpeData, empresaConfig, simulatedOrigin),
+            }
+          : {}),
+      } as any;
+      if (countryCode === 'AR') {
+        printableCpeData.tipo_documento_fiscal = printableCpeData.arca_print_info.documentType;
+      }
 
       this.logger.log(`📄 Generando PDF con formato ${fiscalAuthority} (${countryCode})`);
 
-      // 4. Generar código QR si es requerido
+      // 4. Generar código QR si es requerido. En Perú es un requisito de la
+      // representación impresa: si no puede construirse, no se emite un PDF
+      // que aparente ser válido.
       let qrCode: string | null = null;
       if (this.pdfFormatHelper.isQRCodeRequired(countryCode)) {
-        qrCode = await this.generateQRCode(cpeData);
+        qrCode = await this.generateQRCode(printableCpeData, countryCode, allowUnofficialRepresentation);
       }
 
       // 5. Generar PDF con formato específico del país
-      const pdfBuffer = await this.buildPdfDocument(cpeData, empresaConfig, qrCode, countryCode);
+      const pdfBuffer = await this.buildPdfDocument(printableCpeData, empresaConfig, qrCode, countryCode);
 
       this.logger.log(`✅ PDF generado exitosamente para CPE: ${cpeId} (${fiscalAuthority})`);
       return pdfBuffer;
@@ -362,12 +472,40 @@ export class PdfGeneratorService {
    * Formato QR SUNAT:
    * RUC_EMISOR|TIPO_DOC|SERIE|NUMERO|IGV|TOTAL|FECHA_EMISION|TIPO_DOC_RECEPTOR|NUM_DOC_RECEPTOR|HASH
    */
-  private async generateQRCode(cpeData: any): Promise<string> {
+  private async generateQRCode(
+    cpeData: any,
+    countryCode: string = 'PE',
+    isDemo = false,
+  ): Promise<string | null> {
+    if (countryCode === 'CO') {
+      const representation = await buildDianQrRepresentation(cpeData);
+      if (!representation) {
+        if (isDemo) return null;
+        throw new Error(
+          'No se puede generar la representación CPE sin QR DIAN válido: falta evidencia terminal 525',
+        );
+      }
+      return representation.dataUrl;
+    }
+    if (countryCode === 'AR') {
+      try {
+        return (await buildArcaQrRepresentation(cpeData, {
+          allowMissingAuthorization: isDemo,
+        }))?.dataUrl ?? null;
+      } catch (error) {
+        throw new Error(
+          `No se puede generar la representación CPE sin QR ARCA válido: ${(error as Error).message}`,
+        );
+      }
+    }
+    // Este constructor implementa exclusivamente payloads PE y CO. Otros
+    // países no deben pasar sus identificadores por una validación SUNAT.
+    if (countryCode !== 'PE') return null;
     try {
       return await buildSunatQrDataUrl(cpeData);
     } catch (error) {
-      this.logger.warn('⚠️ Error generando QR, usando placeholder:', error);
-      return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const detail = (error as Error).message;
+      throw new Error(`No se puede generar la representación CPE sin QR SUNAT válido: ${detail}`);
     }
   }
 
@@ -444,18 +582,38 @@ export class PdfGeneratorService {
     });
   }
 
-  /**
-   * Construye el documento PDF con formato oficial SUNAT
-   */
+  /** Construye la representación A4 compatible con los requisitos del país. */
   private async buildPdfDocument(
     cpeData: any,
     empresaConfig: any,
-    qrCode: string,
+    qrCode: string | null,
     countryCode: string = 'PE',
   ): Promise<Buffer> {
     const PDFDocument = (await import('pdfkit')).default;
     const chunks: Buffer[] = [];
     const logoBuffer = await this.loadLogoBuffer(empresaConfig.logo_url);
+    const acceptedDianEvidence = countryCode === 'CO'
+      ? resolveAcceptedDianEvidence(cpeData)
+      : null;
+    // Nunca renderizar un QR entregado por el llamador como DIAN si el CPE no
+    // posee evidencia terminal dedicada. Esto evita promocionar hashes XML o
+    // URLs históricas arbitrarias a un QR fiscal oficial.
+    const effectiveQrCode = countryCode === 'CO' && !acceptedDianEvidence
+      ? null
+      : qrCode;
+    if (countryCode === 'CO' && !cpeData.dian_print_info) {
+      const allowUnofficial = cpeData.simulated_origin !== false
+        || !resolveAcceptedDianEvidence(cpeData);
+      cpeData.dian_print_info = resolveDianPrintedFiscalInfo(
+        cpeData, empresaConfig, allowUnofficial,
+      );
+    }
+    if (countryCode === 'AR' && !cpeData.arca_print_info) {
+      cpeData.arca_print_info = resolveArcaPrintedFiscalInfo(
+        cpeData, empresaConfig, cpeData.simulated_origin !== false,
+      );
+      cpeData.tipo_documento_fiscal = cpeData.arca_print_info.documentType;
+    }
 
     return new Promise((resolve, reject) => {
       try {
@@ -464,11 +622,22 @@ export class PdfGeneratorService {
           margins: { top: 50, bottom: 50, left: 50, right: 50 }
         });
 
-        if (empresaConfig.is_demo === true) {
-          const addDemoMark = () => this.addDemoWatermark(doc, countryCode);
+        const simulatedOrigin = cpeData.simulated_origin !== false;
+        const lacksDianAcceptance = countryCode === 'CO' && !acceptedDianEvidence;
+        if (simulatedOrigin || lacksDianAcceptance) {
+          const evidenceStatus = String(cpeData.fiscal_authority_evidence?.status || 'LEGACY_UNVERIFIED');
+          const addDemoMark = () => this.addNonFiscalWatermark(doc, countryCode, evidenceStatus);
           addDemoMark();
           doc.on('pageAdded', addDemoMark);
         }
+
+        if (effectiveQrCode && countryCode === 'CO') {
+          this.addRepeatedPageQRCode(doc, effectiveQrCode, 'DIAN');
+          doc.on('pageAdded', () => this.addRepeatedPageQRCode(doc, effectiveQrCode, 'DIAN'));
+        }
+        doc.on('pageAdded', () => {
+          this.addContinuationHeader(doc, empresaConfig, cpeData, countryCode);
+        });
 
         // Capturar el PDF en memoria
         doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -481,8 +650,18 @@ export class PdfGeneratorService {
         // ===== INFORMACIÓN DEL COMPROBANTE =====
         this.addComprobanteInfo(doc, cpeData, countryCode);
 
+        if (countryCode === 'CO') {
+          this.addDianFiscalInfo(doc, cpeData.dian_print_info);
+        }
+        if (countryCode === 'AR') {
+          this.addArcaAuthorizationInfo(doc, cpeData.arca_print_info);
+        }
+
         // ===== DATOS DEL CLIENTE =====
         this.addClienteInfo(doc, cpeData, countryCode);
+
+        // ===== COMPROBANTE MODIFICADO (NOTAS 07/08) =====
+        this.addNoteReferenceInfo(doc, cpeData, countryCode);
 
         // ===== DETALLE DE ITEMS =====
         this.addItemsTable(doc, cpeData);
@@ -491,7 +670,9 @@ export class PdfGeneratorService {
         this.addTotales(doc, cpeData, countryCode);
 
         // ===== CÓDIGO QR =====
-        this.addQRCode(doc, qrCode);
+        if (effectiveQrCode && countryCode !== 'CO') {
+          this.addQRCode(doc, effectiveQrCode);
+        }
 
         // ===== LEYENDAS OBLIGATORIAS =====
         this.addLeyendasObligatorias(doc, cpeData, countryCode);
@@ -519,78 +700,151 @@ export class PdfGeneratorService {
   ): void {
     const startY = 50;
     const taxIdLabel = countryCode === 'AR' ? 'CUIT' : countryCode === 'CO' ? 'NIT' : 'RUC';
+    const boxWidth = countryCode === 'PE' ? 80 * 72 / 25.4 : 165;
+    const boxHeight = countryCode === 'PE' ? 40 * 72 / 25.4 : 90;
+    const boxX = 545 - boxWidth;
+    const boxY = startY;
 
-    // Logo (si existe)
+    const companyTextX = logoBuffer ? 145 : 50;
+    const companyTextWidth = boxX - companyTextX - 12;
+
+    // Logo (si existe). Se reserva una columna propia para que nunca se
+    // superponga con la razón social o el domicilio fiscal.
     if (logoBuffer) {
-      try {
-        doc.image(logoBuffer, 50, startY, { width: 80 });
-      } catch {
-        // Ignorar si falla carga del logo
-      }
+      doc.image(logoBuffer, 50, startY, { fit: [80, 62], align: 'center', valign: 'center' });
     }
 
     // Información de la empresa (lado izquierdo)
     doc.fontSize(12).font('Helvetica-Bold')
-      .text(empresaConfig.razon_social, 50, startY);
+      .text(empresaConfig.razon_social, companyTextX, startY, { width: companyTextWidth });
+
+    let companyY = startY + Math.max(
+      15,
+      this.measureTextHeight(doc, empresaConfig.razon_social, companyTextWidth, 12),
+    );
 
     doc.fontSize(9).font('Helvetica')
-      .text(`${taxIdLabel}: ${empresaConfig.ruc}`, 50, startY + 15)
-      .text(empresaConfig.direccion_fiscal || empresaConfig.direccion || 'Dirección no especificada', 50, startY + 28)
-      .text(`Tel: ${empresaConfig.telefono || 'N/A'}`, 50, startY + 41)
-      .text(`Email: ${empresaConfig.email || 'N/A'}`, 50, startY + 54);
+      .text(`${taxIdLabel}: ${empresaConfig.ruc}`, companyTextX, companyY, { width: companyTextWidth });
+    companyY += 13;
+    const address = empresaConfig.direccion_fiscal || empresaConfig.direccion || 'Dirección no especificada';
+    doc.text(address, companyTextX, companyY, { width: companyTextWidth });
+    companyY += Math.max(13, this.measureTextHeight(doc, address, companyTextWidth, 9));
+    doc.text(`Tel: ${empresaConfig.telefono || 'N/A'}`, companyTextX, companyY, { width: companyTextWidth });
+    companyY += 13;
+    doc.text(`Email: ${empresaConfig.email || 'N/A'}`, companyTextX, companyY, { width: companyTextWidth });
+    companyY += 12;
 
     // Cuadro del comprobante (lado derecho)
-    const boxX = 380;
-    const boxY = startY;
-    const boxWidth = 165;
-    const boxHeight = 80;
-
     // Borde del cuadro
     doc.rect(boxX, boxY, boxWidth, boxHeight).stroke();
 
     // Tipo de comprobante
-    const tipoDoc = this.getTipoDocumentoText(cpeData.tipo_documento);
-    doc.fontSize(14).font('Helvetica-Bold')
-      .text(tipoDoc.toUpperCase(), boxX, boxY + 10, {
-        width: boxWidth,
+    const tipoDoc = this.pdfFormatHelper.getHeaderText(
+      countryCode,
+      String(cpeData.tipo_documento_fiscal || cpeData.tipo_documento || ''),
+    );
+    const typeY = boxY + 8;
+    doc.fontSize(11).font('Helvetica-Bold');
+    const typeHeight = Math.max(
+      13,
+      this.measureTextHeight(doc, tipoDoc.toUpperCase(), boxWidth - 12, 11),
+    );
+    doc.text(tipoDoc.toUpperCase(), boxX + 6, typeY, {
+        width: boxWidth - 12,
         align: 'center'
       });
 
     // Identificador fiscal del emisor
+    const taxIdY = typeY + typeHeight + 3;
     doc.fontSize(10).font('Helvetica')
-      .text(`${taxIdLabel}: ${cpeData.ruc_emisor}`, boxX, boxY + 30, {
+      .text(`${taxIdLabel}: ${cpeData.ruc_emisor}`, boxX, taxIdY, {
         width: boxWidth,
         align: 'center'
       });
 
     // Serie y número
+    const numberY = taxIdY + 16;
     doc.fontSize(12).font('Helvetica-Bold')
-      .text(`${cpeData.serie}-${String(cpeData.numero).padStart(8, '0')}`, boxX, boxY + 50, {
+      .text(`${cpeData.serie}-${String(cpeData.numero).padStart(8, '0')}`, boxX, numberY, {
         width: boxWidth,
         align: 'center'
       });
 
-    doc.moveDown(6);
+    doc.y = Math.max(companyY, startY + (logoBuffer ? 70 : 0), boxY + boxHeight) + 8;
   }
 
   /**
    * Agrega información del comprobante
    */
   private addComprobanteInfo(doc: any, cpeData: any, countryCode: string): void {
-    const y = doc.y + 10;
+    this.ensureVerticalSpace(doc, 48);
+    const y = doc.y + 5;
 
     doc.fontSize(9).font('Helvetica')
       .text(`Fecha de Emisión: ${this.formatDate(cpeData.fecha_emision, countryCode)}`, 50, y)
       .text(`Fecha de Vencimiento: ${this.formatDate(cpeData.fecha_vencimiento, countryCode)}`, 300, y)
       .text(`Moneda: ${cpeData.moneda || 'PEN'}`, 50, y + 15);
 
-    doc.moveDown(2);
+    doc.y = y + 34;
+  }
+
+  private addDianFiscalInfo(doc: any, info: DianPrintedFiscalInfo): void {
+    if (!info) throw new Error('Representación DIAN incompleta: falta bloque fiscal');
+    const qualities = info.taxQualities.length ? info.taxQualities.join(' · ') : 'No aplican calidades adicionales';
+    const qualitiesHeight = Math.max(12, this.measureTextHeight(doc, qualities, 475, 8));
+    this.ensureVerticalSpace(doc, 92 + qualitiesHeight);
+    const y = doc.y + 6;
+
+    doc.fontSize(10).font('Helvetica-Bold')
+      .text('INFORMACIÓN FISCAL DIAN', 50, y, { width: 495 });
+    doc.fontSize(8).font('Helvetica')
+      .text(`Autorización de numeración: ${info.authorizationNumber}`, 60, y + 16, { width: 235 })
+      .text(`Prefijo y rango: ${info.authorizationPrefix} ${info.rangeFrom} a ${info.rangeTo}`, 300, y + 16, { width: 235 })
+      .text(`Vigencia: ${info.validFrom} a ${info.validTo}`, 60, y + 30, { width: 235 })
+      .text(`Consecutivo: ${info.consecutive}`, 300, y + 30, { width: 235 })
+      .text(`Generación/expedición: ${info.generatedAt}`, 60, y + 44, { width: 475 })
+      .text(`Pago: ${info.paymentForm} · ${info.paymentTerm} · ${info.paymentMethod}`, 60, y + 58, { width: 475 })
+      .text(`Calidades tributarias: ${qualities}`, 60, y + 72, { width: 475 })
+      .text(`Software DIAN: ${info.softwareId}`, 60, y + 72 + qualitiesHeight, { width: 475 });
+    doc.y = y + 88 + qualitiesHeight;
+  }
+
+  private addArcaAuthorizationInfo(doc: any, info: ArcaPrintedFiscalInfo): void {
+    if (!info) throw new Error('Representación ARCA incompleta: falta bloque de autorización');
+    const extraHeight = info.specialLegend ? 15 : 0;
+    this.ensureVerticalSpace(doc, 62 + extraHeight);
+    const y = doc.y + 6;
+    doc.fontSize(10).font('Helvetica-Bold')
+      .text('COMPROBANTE AUTORIZADO', 50, y, { width: 495, align: 'center' });
+    doc.fontSize(9).font('Helvetica')
+      .text(`${info.authorizationLabel}: ${info.authorizationCode}`, 60, y + 17, { width: 225 })
+      .text(`Vencimiento ${info.authorizationLabel}: ${this.formatCompactFiscalDate(info.authorizationExpiry)}`, 300, y + 17, { width: 235 })
+      .text(
+        `Punto de venta: ${String(info.pointOfSale).padStart(5, '0')} · Comprobante: ${String(info.documentNumber).padStart(8, '0')}`,
+        60, y + 32, { width: 475, align: 'center' },
+      );
+    if (info.specialLegend) {
+      doc.fontSize(9).font('Helvetica-Bold')
+        .text(info.specialLegend, 60, y + 47, { width: 475, align: 'center' });
+    }
+    doc.y = y + 50 + extraHeight;
+  }
+
+  private formatCompactFiscalDate(value: string): string {
+    const normalized = String(value || '').replace(/\D/g, '');
+    if (!/^\d{8}$/.test(normalized)) return value;
+    return `${normalized.slice(6, 8)}/${normalized.slice(4, 6)}/${normalized.slice(0, 4)}`;
   }
 
   /**
    * Agrega información del cliente
    */
   private addClienteInfo(doc: any, cpeData: any, countryCode: string): void {
+    const clientName = cpeData.razon_social_receptor || 'Cliente General';
+    const clientAddress = cpeData.direccion_receptor || 'No especificada';
+    const nameHeight = Math.max(13, this.measureTextHeight(doc, `Señor(es): ${clientName}`, 495, 9));
+    const addressHeight = Math.max(13, this.measureTextHeight(doc, `Dirección: ${clientAddress}`, 495, 9));
+    this.ensureVerticalSpace(doc, 22 + nameHeight + 13 + addressHeight);
     const y = doc.y + 5;
 
     // Título
@@ -599,11 +853,65 @@ export class PdfGeneratorService {
 
     // Datos
     doc.fontSize(9).font('Helvetica')
-      .text(`Señor(es): ${cpeData.razon_social_receptor || 'Cliente General'}`, 50, y + 15)
-      .text(`${this.getTipoDocumentoReceptorText(cpeData.tipo_documento_receptor, countryCode)}: ${cpeData.documento_receptor || 'N/A'}`, 50, y + 28)
-      .text(`Dirección: ${cpeData.direccion_receptor || 'No especificada'}`, 50, y + 41);
+      .text(`Señor(es): ${clientName}`, 50, y + 15, { width: 495 });
+    const documentY = y + 15 + nameHeight;
+    doc.text(`${this.getTipoDocumentoReceptorText(cpeData.tipo_documento_receptor, countryCode)}: ${cpeData.documento_receptor || 'N/A'}`, 50, documentY, { width: 495 });
+    const addressY = documentY + 13;
+    doc.text(`Dirección: ${clientAddress}`, 50, addressY, { width: 495 });
+    doc.y = addressY + addressHeight + 4;
+  }
 
-    doc.moveDown(3);
+  private addContinuationHeader(
+    doc: any,
+    empresaConfig: any,
+    cpeData: any,
+    countryCode: string,
+  ): void {
+    const top = Number(doc.page.margins?.top || 50);
+    const taxIdLabel = countryCode === 'AR' ? 'CUIT' : countryCode === 'CO' ? 'NIT' : 'RUC';
+    const issuer = String(empresaConfig.razon_social || 'EMISOR').trim();
+    const issuerTaxId = String(empresaConfig.ruc || cpeData.ruc_emisor || 'No consignado').trim();
+    const documentTitle = this.pdfFormatHelper.getHeaderText(
+      countryCode,
+      String(cpeData.tipo_documento_fiscal || cpeData.tipo_documento || ''),
+    );
+    const documentNumber = `${String(cpeData.serie || '')}-${String(cpeData.numero ?? '').padStart(8, '0')}`;
+
+    doc.fontSize(8).font('Helvetica-Bold')
+      .text(issuer, 50, top, { width: 235, lineBreak: false, ellipsis: true })
+      .text(`${documentTitle} ${documentNumber}`, 300, top, {
+        width: 245, align: 'right', lineBreak: false, ellipsis: true,
+      });
+    doc.fontSize(7).font('Helvetica')
+      .text(`${taxIdLabel}: ${issuerTaxId}`, 50, top + 12, { width: 235, lineBreak: false })
+      .text('PÁGINA DE CONTINUACIÓN', 300, top + 12, {
+        width: 245, align: 'right', lineBreak: false,
+      });
+    doc.moveTo(50, top + 25).lineTo(545, top + 25).stroke();
+    doc._cpeContentTop = top + 33;
+    doc.y = doc._cpeContentTop;
+  }
+
+  private addNoteReferenceInfo(doc: any, cpeData: any, countryCode: string): void {
+    if (countryCode !== 'PE') return;
+    const reference = resolveCpePrintedNoteReference(cpeData);
+    if (!reference) return;
+
+    const documentText = `${reference.referenceLabel} ${reference.referenceNumber}`;
+    const reasonText = `Motivo o sustento: ${reference.reason}`;
+    const reasonHeight = Math.max(13, this.measureTextHeight(doc, reasonText, 475, 9));
+    const sectionHeight = 55 + reasonHeight;
+    this.ensureVerticalSpace(doc, sectionHeight);
+    const y = doc.y + 6;
+
+    doc.fontSize(10).font('Helvetica-Bold')
+      .text('INFORMACIÓN DE LA NOTA', 50, y, { width: 495 });
+    doc.fontSize(9).font('Helvetica')
+      .text(`Comprobante modificado: ${documentText}`, 60, y + 16, { width: 475 })
+      .text(`Código de motivo de la nota: ${reference.reasonCode}`, 60, y + 31, { width: 475 })
+      .text(reasonText, 60, y + 46, { width: 475 });
+
+    doc.y = y + 46 + reasonHeight + 5;
   }
 
   /**
@@ -611,17 +919,21 @@ export class PdfGeneratorService {
    */
   private addItemsTable(doc: any, cpeData: any): void {
     const items = Array.isArray(cpeData.items) ? cpeData.items : [];
-    const tableTop = doc.y + 10;
-    const itemHeight = 20;
+    // El encabezado y, como mínimo, una fila deben permanecer juntos. Sin
+    // esta guarda un bloque anterior podía dejar sólo el encabezado al pie.
+    this.ensureVerticalSpace(doc, 50);
+    const tableTop = doc.y + 8;
+    const minimumItemHeight = 20;
 
     // Encabezados de la tabla
     doc.fontSize(9).font('Helvetica-Bold');
     
     const headers = [
-      { text: 'CANT.', x: 50, width: 40 },
-      { text: 'DESCRIPCIÓN', x: 95, width: 240 },
-      { text: 'P. UNIT.', x: 340, width: 60 },
-      { text: 'TOTAL', x: 405, width: 60 }
+      { text: 'CANT.', x: 50, width: 38 },
+      { text: 'UND.', x: 88, width: 48 },
+      { text: 'DESCRIPCIÓN', x: 136, width: 224 },
+      { text: 'P. UNIT.', x: 360, width: 82 },
+      { text: 'TOTAL', x: 442, width: 103 }
     ];
 
     const drawHeaders = (y: number): number => {
@@ -631,31 +943,91 @@ export class PdfGeneratorService {
       });
       doc.moveTo(50, y + 15).lineTo(545, y + 15).stroke();
       doc.fontSize(8).font('Helvetica');
-      return y + 20;
+      return y + 22;
     };
 
     let currentY = drawHeaders(tableTop);
+    const bottomY = () => this.getContentBottom(doc);
 
     items.forEach((item: any) => {
-      if (currentY + itemHeight > 700) {
-        doc.addPage();
-        currentY = drawHeaders(50);
-      }
-
       const cantidad = item.cantidad || 1;
-      const descripcion = item.nombre_producto || item.descripcion || 'Producto';
+      const unidad = String(item.unidad_medida || item.unidad || 'NIU').trim().toUpperCase();
+      const rawDescription = String(item.nombre_producto || item.descripcion || '').trim();
+      let descripcionPendiente = rawDescription || 'Producto';
       // La representación impresa muestra importes brutos para que cada línea
       // concilie visualmente con el total a pagar; la base/IGV siguen intactos
       // en el XML y en la contabilidad.
       const precioUnitario = resolveCpePrintedUnitPrice(item);
       const total = resolveCpePrintedLineTotal(item);
+      let firstFragment = true;
 
-      doc.text(cantidad.toString(), 50, currentY, { width: 40, align: 'center' });
-      doc.text(descripcion, 95, currentY, { width: 240 });
-      doc.text(precioUnitario.toFixed(2), 340, currentY, { width: 60, align: 'right' });
-      doc.text(total.toFixed(2), 405, currentY, { width: 60, align: 'right' });
+      // Un ítem de altura normal debe permanecer unido. Antes se aprovechaba
+      // cualquier remanente al pie para imprimir sólo el inicio de la
+      // descripción; la página siguiente quedaba con texto huérfano, sin
+      // cantidad ni precio. Sólo se fragmentan descripciones que no caben ni
+      // siquiera en una página de continuación completa.
+      const completeDescriptionHeight = this.measureTextHeight(
+        doc,
+        descripcionPendiente,
+        224,
+        8,
+      );
+      const completeRowHeight = Math.max(
+        minimumItemHeight,
+        Math.ceil(completeDescriptionHeight) + 8,
+      );
+      const continuationRowsTop = Number(doc._cpeContentTop || 50) + 8 + 22;
+      const completePageCapacity = bottomY() - continuationRowsTop;
+      if (
+        completeRowHeight <= completePageCapacity
+        // `takeTextChunk` conserva ocho puntos adicionales para absorber el
+        // redondeo interno de PDFKit. La misma reserva debe participar en la
+        // decisión de mover la fila completa; de lo contrario una última
+        // línea podía quedar sola al inicio de la hoja siguiente.
+        && currentY + completeRowHeight + 8 > bottomY()
+      ) {
+        doc.addPage();
+        currentY = drawHeaders(Number(doc._cpeContentTop || 50) + 8);
+      }
 
-      currentY += itemHeight;
+      while (descripcionPendiente) {
+        if (currentY + minimumItemHeight > bottomY()) {
+          doc.addPage();
+          currentY = drawHeaders(Number(doc._cpeContentTop || 50) + 8);
+        }
+
+        // Se deja una guarda adicional además del padding de la fila: PDFKit
+        // trabaja con alturas fraccionarias y una fila calculada exactamente al
+        // borde puede disparar una página automática.
+        const maxTextHeight = Math.max(10, bottomY() - currentY - 16);
+        const { chunk, rest } = this.takeTextChunk(
+          doc,
+          descripcionPendiente,
+          224,
+          maxTextHeight,
+          8,
+        );
+        const descriptionHeight = this.measureTextHeight(doc, chunk, 224, 8);
+        const rowHeight = Math.max(minimumItemHeight, Math.ceil(descriptionHeight) + 8);
+
+        if (currentY + rowHeight > bottomY()) {
+          doc.addPage();
+          currentY = drawHeaders(Number(doc._cpeContentTop || 50) + 8);
+          continue;
+        }
+
+        if (firstFragment) {
+          doc.text(cantidad.toString(), 50, currentY + 3, { width: 38, align: 'center' });
+          doc.text(unidad || 'NIU', 88, currentY + 3, { width: 48, align: 'center' });
+          doc.text(precioUnitario.toFixed(2), 360, currentY + 3, { width: 82, align: 'right' });
+          doc.text(total.toFixed(2), 442, currentY + 3, { width: 103, align: 'right' });
+        }
+        doc.text(chunk, 136, currentY + 3, { width: 224 });
+        currentY += rowHeight;
+        doc.moveTo(50, currentY - 2).lineTo(545, currentY - 2).stroke();
+        descripcionPendiente = rest;
+        firstFragment = false;
+      }
     });
 
     // Línea final de la tabla
@@ -668,78 +1040,116 @@ export class PdfGeneratorService {
    * Agrega los totales del comprobante
    */
   private addTotales(doc: any, cpeData: any, countryCode: string): void {
-    const startY = doc.y + 10;
-    const labelX = 380;
-    const valueX = 480;
+    const totalValue = Number(cpeData.total_venta ?? cpeData.total ?? 0);
+    const conditionalRows = [
+      { label: 'Op. Gravadas', value: cpeData.total_gravadas },
+      { label: 'Op. Exoneradas', value: cpeData.total_exoneradas },
+      { label: 'Op. Inafectas', value: cpeData.total_inafectas },
+      { label: 'Op. Gratuitas', value: cpeData.total_gratuitas },
+      { label: 'Descuentos', value: cpeData.total_descuentos ?? cpeData.descuentos },
+      { label: 'ISC', value: cpeData.total_isc },
+      { label: 'ICBPER', value: cpeData.total_icbper },
+      { label: this.getTaxLabel(cpeData, countryCode), value: cpeData.total_igv },
+    ].filter((row) => Number.isFinite(Number(row.value)) && Math.abs(Number(row.value)) >= 0.005);
+    const sectionHeight = conditionalRows.length * 15 + 58;
+    this.ensureVerticalSpace(doc, sectionHeight + 10);
+    const startY = doc.y + 8;
+    const labelX = 350;
+    const valueX = 455;
 
     doc.fontSize(9).font('Helvetica');
 
-    // Subtotal (Gravadas)
-    doc.text('Op. Gravadas:', labelX, startY)
-      .text(`${cpeData.moneda || 'PEN'} ${this.formatMoney(cpeData.total_gravadas)}`, valueX, startY, { align: 'right' });
-
-    const taxLabel = this.getTaxLabel(cpeData, countryCode);
-
-    // Impuesto principal
-    doc.text(`${taxLabel}:`, labelX, startY + 15)
-      .text(`${cpeData.moneda || 'PEN'} ${this.formatMoney(cpeData.total_igv)}`, valueX, startY + 15, { align: 'right' });
+    let currentY = startY;
+    conditionalRows.forEach((row) => {
+      doc.text(`${row.label}:`, labelX, currentY, { width: 100, align: 'right' })
+        .text(`${cpeData.moneda || 'PEN'} ${this.formatMoney(Number(row.value))}`, valueX, currentY, { width: 90, align: 'right' });
+      currentY += 15;
+    });
 
     // Total
     doc.fontSize(11).font('Helvetica-Bold');
-    doc.text('TOTAL:', labelX, startY + 35)
-      .text(`${cpeData.moneda || 'PEN'} ${this.formatMoney(cpeData.total_venta)}`, valueX, startY + 35, { align: 'right' });
+    doc.text('TOTAL:', labelX, currentY + 3, { width: 100, align: 'right' })
+      .text(`${cpeData.moneda || 'PEN'} ${this.formatMoney(totalValue)}`, valueX, currentY + 3, { width: 90, align: 'right' });
 
     // Monto en letras
     doc.fontSize(9).font('Helvetica-Oblique');
-    const montoEnLetras = this.numeroALetras(cpeData.total_venta, cpeData.moneda);
-    doc.text(`SON: ${montoEnLetras}`, 50, startY + 60, { width: 300 });
-
-    doc.moveDown(5);
+    const montoEnLetras = this.numeroALetras(totalValue, cpeData.moneda);
+    const wordsY = currentY + 25;
+    doc.text(`SON: ${montoEnLetras}`, 50, wordsY, { width: 315 });
+    doc.y = wordsY + Math.max(14, this.measureTextHeight(doc, `SON: ${montoEnLetras}`, 315, 9)) + 4;
   }
 
   /**
    * Agrega el código QR
    */
   private addQRCode(doc: any, qrCodeDataUrl: string): void {
-    const qrY = doc.y + 10;
+    const qrSize = CPE_PDF_QR_SIZE_MM * 72 / 25.4;
+    const lowerPageY = doc.page.height * 0.54;
+    let qrY = Math.max(doc.y + 8, lowerPageY);
+    const requiredAfterQr = 82;
+
+    if (qrY + qrSize + requiredAfterQr > this.getContentBottom(doc)) {
+      doc.addPage();
+      qrY = Math.max(58, doc.page.height * 0.54);
+    }
     
     // Título
     doc.fontSize(8).font('Helvetica-Bold')
       .text('CÓDIGO QR', 50, qrY);
 
     // QR Code
-    try {
-      const qrBuffer = Buffer.from(qrCodeDataUrl.split(',')[1], 'base64');
-      doc.image(qrBuffer, 50, qrY + 15, { width: 100, height: 100 });
-    } catch (error) {
-      this.logger.warn('⚠️ No se pudo agregar código QR al PDF:', error);
+    const encoded = /^data:image\/png;base64,([a-z0-9+/]+={0,2})$/i.exec(qrCodeDataUrl)?.[1];
+    if (!encoded) {
+      throw new Error('El código QR fiscal no es una imagen PNG válida');
     }
+    const qrBuffer = Buffer.from(encoded, 'base64');
+    doc.image(qrBuffer, 50, qrY + 15, { width: qrSize, height: qrSize });
 
-    doc.y = qrY + 120;
+    doc.y = qrY + 15 + qrSize + 6;
+  }
+
+  private addRepeatedPageQRCode(doc: any, qrCodeDataUrl: string, authority: string): void {
+    const encoded = /^data:image\/png;base64,([a-z0-9+/]+={0,2})$/i.exec(qrCodeDataUrl)?.[1];
+    if (!encoded) throw new Error('El código QR fiscal no es una imagen PNG válida');
+    const qrBuffer = Buffer.from(encoded, 'base64');
+    const qrSize = 68;
+    const rightMargin = Number(doc.page.margins?.right || 50);
+    const bottomMargin = Number(doc.page.margins?.bottom || 50);
+    const qrX = doc.page.width - rightMargin - qrSize;
+    const qrY = doc.page.height - bottomMargin - qrSize - 12;
+    const currentY = doc.y;
+
+    // DIAN exige que el QR acompañe cada página de la representación
+    // gráfica. Se reserva esta franja para que nunca tape el detalle.
+    doc._cpeRepeatedQrBottomReserve = qrSize + 24;
+    doc.fontSize(6).font('Helvetica-Bold')
+      .text(`QR ${authority}`, qrX, qrY - 9, { width: qrSize, align: 'center', lineBreak: false });
+    doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
+    doc.y = currentY;
   }
 
   /**
    * Agrega leyendas obligatorias según SUNAT
    */
   private addLeyendasObligatorias(doc: any, cpeData: any, countryCode: string): void {
+    const leyendasEspecificas = this.getLeyendasEspecificas(cpeData);
+    this.ensureVerticalSpace(doc, 58 + leyendasEspecificas.length * 10);
     const y = doc.y + 10;
 
     doc.fontSize(7).font('Helvetica');
 
-    // Leyenda de representación impresa
+    // Leyenda exacta de la representación impresa
     doc.text(
-      'Representación impresa del Comprobante de Pago Electrónico.',
+      this.getPrintedRepresentationLegend(
+        cpeData.tipo_documento_fiscal || cpeData.tipo_documento,
+        countryCode,
+      ),
       50, y,
       { width: 495, align: 'center' }
     );
 
     // Leyenda de consulta
-    const consultaUrl =
-      countryCode === 'CO'
-        ? 'catalogo-vpfe.dian.gov.co'
-        : countryCode === 'AR'
-          ? 'www.afip.gob.ar/fe/qr'
-          : 'www.sunat.gob.pe';
+    const consultaUrl = this.getFiscalConsultUrl(countryCode);
     doc.text(
       `Consulte su comprobante en: ${consultaUrl}`,
       50, y + 12,
@@ -757,7 +1167,6 @@ export class PdfGeneratorService {
     }
 
     // Leyendas específicas declaradas por la operación
-    const leyendasEspecificas = this.getLeyendasEspecificas(cpeData);
     if (leyendasEspecificas.length > 0) {
       let currentY = y + 36;
       leyendasEspecificas.forEach(leyenda => {
@@ -768,6 +1177,79 @@ export class PdfGeneratorService {
     }
 
     doc.y = Math.max(doc.y, y + 48);
+  }
+
+  private getContentBottom(doc: any): number {
+    const bottomMargin = Number(doc.page.margins?.bottom || 50);
+    const repeatedQrReserve = Number(doc._cpeRepeatedQrBottomReserve || 0);
+    return doc.page.height - bottomMargin - 18 - repeatedQrReserve;
+  }
+
+  private ensureVerticalSpace(doc: any, requiredHeight: number): void {
+    if (doc.y + requiredHeight > this.getContentBottom(doc)) {
+      doc.addPage();
+      doc.y = Number(doc._cpeContentTop || 50);
+    }
+  }
+
+  private measureTextHeight(
+    doc: any,
+    value: unknown,
+    width: number,
+    fontSize: number,
+  ): number {
+    const text = String(value ?? '');
+    if (typeof doc.heightOfString === 'function') {
+      doc.fontSize(fontSize);
+      return Number(doc.heightOfString(text, { width })) || fontSize + 2;
+    }
+    const approximateCharactersPerLine = Math.max(1, Math.floor(width / (fontSize * 0.55)));
+    return Math.max(1, Math.ceil(text.length / approximateCharactersPerLine)) * (fontSize + 2);
+  }
+
+  private takeTextChunk(
+    doc: any,
+    value: string,
+    width: number,
+    maxHeight: number,
+    fontSize: number,
+  ): { chunk: string; rest: string } {
+    if (this.measureTextHeight(doc, value, width, fontSize) <= maxHeight) {
+      return { chunk: value, rest: '' };
+    }
+
+    let low = 1;
+    let high = value.length;
+    let best = 1;
+    while (low <= high) {
+      const middle = Math.floor((low + high) / 2);
+      const candidate = value.slice(0, middle);
+      if (this.measureTextHeight(doc, candidate, width, fontSize) <= maxHeight) {
+        best = middle;
+        low = middle + 1;
+      } else {
+        high = middle - 1;
+      }
+    }
+
+    let splitAt = best;
+    if (best < value.length) {
+      const whitespace = value.lastIndexOf(' ', best);
+      if (whitespace > 0) splitAt = whitespace;
+    }
+    const chunk = value.slice(0, Math.max(1, splitAt)).trimEnd();
+    const rest = value.slice(Math.max(1, splitAt)).trimStart();
+    return { chunk, rest };
+  }
+
+  private getPrintedRepresentationLegend(tipo: string, countryCode: string): string {
+    return this.pdfFormatHelper.getPrintedRepresentationLegend(countryCode, String(tipo || ''));
+  }
+
+  private getFiscalConsultUrl(countryCode: string): string {
+    if (countryCode === 'CO') return 'catalogo-vpfe.dian.gov.co';
+    if (countryCode === 'AR') return 'www.arca.gob.ar/fe/qr';
+    return 'www.sunat.gob.pe';
   }
 
   /**
@@ -798,8 +1280,9 @@ export class PdfGeneratorService {
       );
   }
 
-  private addDemoWatermark(doc: any, countryCode: string): void {
+  private addNonFiscalWatermark(doc: any, countryCode: string, evidenceStatus: string): void {
     const currentY = doc.y;
+    const explicitDemo = String(evidenceStatus).toUpperCase() === 'SIMULATED';
 
     doc.save();
     doc.opacity(0.1)
@@ -807,7 +1290,7 @@ export class PdfGeneratorService {
       .font('Helvetica-Bold')
       .fontSize(44)
       .rotate(-34, { origin: [doc.page.width / 2, doc.page.height / 2] })
-      .text('MUESTRA DEMO', 70, doc.page.height / 2 - 25, {
+      .text(explicitDemo ? 'MUESTRA DEMO' : 'SIN VALIDEZ FISCAL', 70, doc.page.height / 2 - 25, {
         width: doc.page.width - 140,
         align: 'center',
       });
@@ -819,7 +1302,7 @@ export class PdfGeneratorService {
       .font('Helvetica-Bold')
       .fontSize(8)
       .text(
-        getCpeDemoPdfNotice(countryCode),
+        getCpeNonFiscalPdfNotice(countryCode, evidenceStatus),
         50,
         28,
         { width: doc.page.width - 100, align: 'center' },
@@ -829,16 +1312,6 @@ export class PdfGeneratorService {
   }
 
   // ===== MÉTODOS AUXILIARES =====
-
-  private getTipoDocumentoText(tipo: string): string {
-    const tipos: Record<string, string> = {
-      '01': 'FACTURA ELECTRÓNICA',
-      '03': 'BOLETA DE VENTA ELECTRÓNICA',
-      '07': 'NOTA DE CRÉDITO ELECTRÓNICA',
-      '08': 'NOTA DE DÉBITO ELECTRÓNICA'
-    };
-    return tipos[tipo] || 'COMPROBANTE ELECTRÓNICO';
-  }
 
   private getTipoDocumentoReceptorText(tipo: string, countryCode: string = 'PE'): string {
     const normalized = String(tipo || '').toUpperCase();
@@ -882,6 +1355,10 @@ export class PdfGeneratorService {
 
   private formatDate(dateString: string, countryCode: string = 'PE'): string {
     if (!dateString) return 'N/A';
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateString));
+    if (dateOnly) {
+      return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`;
+    }
     const date = new Date(dateString);
     const locale = countryCode === 'AR' ? 'es-AR' : countryCode === 'CO' ? 'es-CO' : 'es-PE';
     return date.toLocaleDateString(locale, {

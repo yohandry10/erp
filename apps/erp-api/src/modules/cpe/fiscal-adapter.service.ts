@@ -14,7 +14,11 @@ import { getActiveCountryById } from '../paises/initial-country';
 import { perfilPaisDelTenant } from './pais-del-tenant';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { FiscalServiceFactory } from '../fiscal/fiscal-service.factory';
-import { DocumentoElectronico, FiscalResponse } from '../../shared/integration/fiscal.interfaces';
+import {
+  ConsultaEstado,
+  DocumentoElectronico,
+  FiscalResponse,
+} from '../../shared/integration/fiscal.interfaces';
 import { OseApiFiscalService, OseApiConfig, OseAuthTipo } from '../fiscal/ose-api-fiscal.service';
 import { OseService } from '../ose/ose.service';
 
@@ -45,11 +49,13 @@ export class FiscalAdapterService {
    */
   async enviarDocumento(
     documento: DocumentoElectronico,
-    tenantId: string
+    tenantId: string,
+    expectedCountryCode?: string,
   ): Promise<EnvioDocumentoResult> {
     try {
       // 1. Obtener país del tenant
       const paisId = await this.obtenerPaisTenant(tenantId);
+      this.assertExpectedCountry(paisId, expectedCountryCode);
       const emisionConfig = await this.obtenerEmisionConfig(tenantId);
 
       if (emisionConfig.isDemo) {
@@ -60,7 +66,10 @@ export class FiscalAdapterService {
         };
       }
 
-      if (emisionConfig.modo === 'OSE_API') {
+      // OSE es una modalidad peruana. Resolver el país antes de mirar un modo
+      // persistido evita que una fila CO/AR legada o manipulada desvíe el XML a
+      // una URL configurable en lugar de su autoridad fiscal canónica.
+      if (paisId === 1 && emisionConfig.modo === 'OSE_API') {
         this.logger.log(`🌍 Enviando documento via OSE API para tenant ${tenantId}`);
 
         if (!emisionConfig.activo) {
@@ -143,10 +152,13 @@ export class FiscalAdapterService {
     tipoDocumento: string,
     serie: string,
     numero: string,
-    hash?: string
+    hash?: string,
+    expectedCountryCode?: string,
+    dianQueryKind?: ConsultaEstado['dianQueryKind'],
   ): Promise<EnvioDocumentoResult> {
     try {
       const paisId = await this.obtenerPaisTenant(tenantId);
+      this.assertExpectedCountry(paisId, expectedCountryCode);
       const emisionConfig = await this.obtenerEmisionConfig(tenantId);
       if (emisionConfig.isDemo) {
         return {
@@ -155,7 +167,7 @@ export class FiscalAdapterService {
           descripcionRespuesta: 'La demo no consulta ni fabrica estados de aceptación fiscal.',
         };
       }
-      if (emisionConfig.modo === 'OSE_API') {
+      if (paisId === 1 && emisionConfig.modo === 'OSE_API') {
         if (!emisionConfig.activo) {
           return {
             success: false,
@@ -212,7 +224,8 @@ export class FiscalAdapterService {
         tipoDocumento,
         serie,
         numero,
-        hash
+        hash,
+        dianQueryKind,
       });
       
       return this.mapFiscalResponse(response);
@@ -230,13 +243,12 @@ export class FiscalAdapterService {
    * Obtiene el nombre del servicio fiscal según el país
    */
   async obtenerNombreServicioFiscal(tenantId: string): Promise<string> {
+    const paisId = await this.obtenerPaisTenant(tenantId);
     const emisionConfig = await this.obtenerEmisionConfig(tenantId);
-    if (emisionConfig.modo === 'OSE_API' && !emisionConfig.isDemo) {
+    if (paisId === 1 && emisionConfig.modo === 'OSE_API' && !emisionConfig.isDemo) {
       return 'OSE API';
     }
 
-    const paisId = await this.obtenerPaisTenant(tenantId);
-    
     // La tabla de autoridades vivía repetida aquí, en `cpe-helper` y en
     // `pdf-format-helper`; las otras dos se habían quedado sin Argentina.
     return getActiveCountryById(paisId)?.autoridadFiscal ?? 'Servicio Fiscal';
@@ -342,6 +354,17 @@ export class FiscalAdapterService {
       numeroComprobante: response.numeroComprobante,
       metadata: response.metadata
     };
+  }
+
+  private assertExpectedCountry(paisId: number, expectedCountryCode?: string): void {
+    const expected = String(expectedCountryCode ?? '').trim().toUpperCase();
+    if (!expected) return;
+    const actual = getActiveCountryById(paisId)?.codigo;
+    if (!actual || actual !== expected) {
+      throw new ServiceUnavailableException(
+        `Transporte fiscal bloqueado: el CPE pertenece a ${expected} y el tenant está configurado en ${actual || `país ${paisId}`}.`,
+      );
+    }
   }
 
   private buildSunatFileName(documento: DocumentoElectronico): string {

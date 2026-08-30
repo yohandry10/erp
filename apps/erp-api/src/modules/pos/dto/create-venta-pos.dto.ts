@@ -196,6 +196,12 @@ export class CreateVentaPosDto {
   @IsString()
   cliente_tipo_documento?: string;
 
+  /** Condición IVA ARCA (RG 5616); obligatoria al emitir para Argentina. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  cliente_condicion_iva?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(500)

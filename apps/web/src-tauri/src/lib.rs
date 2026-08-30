@@ -4373,6 +4373,9 @@ fn migrate_legacy_json_outbox(app: &AppHandle, conn: &Connection) -> Result<(), 
         serde_json::from_str(&raw).map_err(|e| format!("Cola offline legacy invalida: {e}"))?;
 
     for item in items {
+        if is_sensitive_offline_request(&item.endpoint, &item.url, &item.method) {
+            continue;
+        }
         insert_offline_item(conn, &item)?;
     }
 
@@ -4382,6 +4385,10 @@ fn migrate_legacy_json_outbox(app: &AppHandle, conn: &Connection) -> Result<(), 
 }
 
 fn insert_offline_item(conn: &Connection, item: &OfflineQueueItem) -> Result<(), String> {
+    if is_sensitive_offline_request(&item.endpoint, &item.url, &item.method) {
+        return Err(SENSITIVE_OFFLINE_ERROR.to_string());
+    }
+
     let safe_headers = strip_sensitive_request_headers(&item.headers);
     let headers_json = serde_json::to_string(&safe_headers)
         .map_err(|e| format!("No se pudo serializar headers offline: {e}"))?;
@@ -4784,11 +4791,22 @@ fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> 
         })
         .map_err(|e| format!("No se pudo leer cola offline SQLite: {e}"))?;
 
-    let mut items = Vec::new();
+    let mut loaded_items = Vec::new();
     for row in rows {
-        items.push(row.map_err(|e| format!("Fila offline SQLite invalida: {e}"))?);
+        loaded_items.push(row.map_err(|e| format!("Fila offline SQLite invalida: {e}"))?);
     }
     drop(stmt);
+
+    let mut items = Vec::new();
+    for item in loaded_items {
+        if is_sensitive_offline_request(&item.endpoint, &item.url, &item.method) {
+            conn.execute("DELETE FROM offline_requests WHERE id = ?1", params![&item.id])
+                .map_err(|e| format!("No se pudo purgar configuracion sensible legacy: {e}"))?;
+            continue;
+        }
+        items.push(item);
+    }
+
     for item in &items {
         let headers_json = serde_json::to_string(&item.headers)
             .map_err(|e| format!("No se pudo sanear headers offline: {e}"))?;
@@ -4830,6 +4848,70 @@ fn strip_sensitive_request_headers(headers: &[HeaderPair]) -> Vec<HeaderPair> {
         })
         .cloned()
         .collect()
+}
+
+const SENSITIVE_OFFLINE_ERROR: &str =
+    "Esta configuracion sensible requiere conexion en vivo y nunca se guarda en la cola offline.";
+
+fn offline_endpoint_path(endpoint: &str) -> String {
+    let without_query = endpoint.split('?').next().unwrap_or(endpoint).trim();
+    let path = if let Some(scheme) = without_query.find("://") {
+        without_query[(scheme + 3)..]
+            .find('/')
+            .map(|slash| &without_query[(scheme + 3 + slash)..])
+            .unwrap_or("/")
+    } else {
+        without_query
+    };
+    path.trim_end_matches('/').to_ascii_lowercase()
+}
+
+fn has_sensitive_path_segment(path: &str) -> bool {
+    path.split(|character| matches!(character, '/' | '-' | '_'))
+        .any(|segment| {
+            matches!(
+                segment,
+                "certificate"
+                    | "certificado"
+                    | "credential"
+                    | "credencial"
+                    | "pfx"
+                    | "secret"
+            )
+        })
+}
+
+fn is_sensitive_non_queueable_endpoint(endpoint: &str, method: &str) -> bool {
+    if matches!(
+        method.trim().to_ascii_uppercase().as_str(),
+        "GET" | "HEAD" | "OPTIONS"
+    ) {
+        return false;
+    }
+
+    let path = offline_endpoint_path(endpoint);
+    path == "/api/configuration"
+        || path.starts_with("/api/configuration/")
+        || path == "/configuration"
+        || path.starts_with("/configuration/")
+        || path == "/api/configuracion"
+        || path.starts_with("/api/configuracion/")
+        || path.starts_with("/api/configuracion-")
+        || path == "/configuracion"
+        || path.starts_with("/configuracion/")
+        || path.starts_with("/configuracion-")
+        || path == "/api/auth"
+        || path.starts_with("/api/auth/")
+        || path == "/auth"
+        || path.starts_with("/auth/")
+        || path == "/api/demo/convert-to-real"
+        || path == "/demo/convert-to-real"
+        || has_sensitive_path_segment(&path)
+}
+
+fn is_sensitive_offline_request(endpoint: &str, url: &str, method: &str) -> bool {
+    is_sensitive_non_queueable_endpoint(endpoint, method)
+        || is_sensitive_non_queueable_endpoint(url, method)
 }
 
 #[cfg(target_os = "windows")]
@@ -5057,6 +5139,10 @@ fn enqueue_offline_request(
     app: AppHandle,
     request: OfflineRequestInput,
 ) -> Result<OfflineQueueItem, String> {
+    if is_sensitive_offline_request(&request.endpoint, &request.url, &request.method) {
+        return Err(SENSITIVE_OFFLINE_ERROR.to_string());
+    }
+
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
     let timestamp = now_ms();
@@ -5747,4 +5833,45 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod offline_secret_policy_tests {
+    use super::{is_sensitive_non_queueable_endpoint, offline_endpoint_path};
+
+    #[test]
+    fn blocks_sensitive_configuration_writes_but_not_reads() {
+        assert!(is_sensitive_non_queueable_endpoint(
+            "/api/configuration/wizard/step",
+            "POST"
+        ));
+        assert!(is_sensitive_non_queueable_endpoint(
+            "https://erp.test/api/configuration/wizard/validate-certificate?step=3",
+            "POST"
+        ));
+        assert!(is_sensitive_non_queueable_endpoint(
+            "/api/validations/certificate",
+            "PUT"
+        ));
+        assert!(!is_sensitive_non_queueable_endpoint(
+            "/api/configuration/status",
+            "GET"
+        ));
+    }
+
+    #[test]
+    fn does_not_block_unrelated_business_configuration_paths() {
+        assert!(!is_sensitive_non_queueable_endpoint(
+            "/api/paises/usuario/configuracion",
+            "POST"
+        ));
+        assert!(!is_sensitive_non_queueable_endpoint(
+            "/api/ventas/pedidos",
+            "POST"
+        ));
+        assert_eq!(
+            offline_endpoint_path("https://erp.test/api/configuration/complete?retry=1"),
+            "/api/configuration/complete"
+        );
+    }
 }
