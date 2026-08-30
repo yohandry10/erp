@@ -1,0 +1,3 @@
+# Los contratos DIAN se fijan por SHA-256 contra la caja oficial. Git no debe
+# normalizar finales de línea ni denunciar whitespace contenido en el original.
+scripts/ci/fixtures/dian-fev-1.9/** -text -whitespace

@@ -5,6 +5,7 @@ import {
   Body,
   Headers,
   Param,
+  ParseUUIDPipe,
   Query,
   UseGuards,
   Res,
@@ -32,6 +33,8 @@ import {
 import { CrearNotaReferenciadaDto } from './dto/referenced-note.dto';
 import { ReferencedNotesService } from './referenced-notes.service';
 import { DesktopSignedCpeDto } from './dto/desktop-signed-cpe.dto';
+import { CreateDianEventDto, ImportDianReceivedInvoiceDto } from './dto/dian-event.dto';
+import { CpeDianEventsService } from './cpe-dian-events.service';
 
 import { CrearComprobanteUiDto } from './dto/crear-comprobante-ui.dto';
 
@@ -43,6 +46,7 @@ export class CpeController {
     private readonly cpeService: CpeService,
     private readonly cpeHelper: CpeHelperService,
     private readonly referencedNotes: ReferencedNotesService,
+    private readonly dianEvents: CpeDianEventsService,
   ) { }
 
   @Post('worker/create')
@@ -350,6 +354,115 @@ export class CpeController {
       message: `Operación CPE procesada por ${fiscalAuthority}`,
       data: result,
     };
+  }
+
+  @Post(':id/dian/eventos')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.dian.eventos_034.emitir')
+  @ApiOperation({
+    summary: 'Registrar evento DIAN 034 como facturador sobre una factura aceptada',
+  })
+  async registrarEventoDian(
+    @Param('id') id: string,
+    @Body() dto: CreateDianEventDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+  ) {
+    return this.dianEvents.emitirSobreFacturaEmitida(
+      id,
+      dto,
+      tenantId,
+      actorId,
+      idempotencyKey,
+    );
+  }
+
+  @Post('dian/eventos/:operationId/reintentar')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.dian.eventos_034.emitir')
+  @ApiOperation({
+    summary: 'Reconciliar/reintentar un evento DIAN 034 usando su clave idempotente persistida',
+  })
+  async reintentarEventoDianEmitido(
+    @Param('operationId', ParseUUIDPipe) operationId: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+  ) {
+    return this.dianEvents.reintentarEvento(
+      operationId,
+      tenantId,
+      actorId,
+      'ISSUED_CPE',
+    );
+  }
+
+  @Post('dian/facturas-recibidas/importar')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.dian.facturas_recibidas.gestionar')
+  @ApiOperation({ summary: 'Importar una FEV recibida aceptada y comprobada directamente en DIAN' })
+  async importarFacturaRecibidaDian(
+    @Body() dto: ImportDianReceivedInvoiceDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+  ) {
+    return this.dianEvents.importarFacturaRecibida(
+      dto,
+      tenantId,
+      actorId,
+      idempotencyKey,
+    );
+  }
+
+  @Post('dian/facturas-recibidas/:id/eventos')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.dian.facturas_recibidas.gestionar')
+  @ApiOperation({ summary: 'Registrar evento DIAN 030-033 como adquirente de una FEV recibida' })
+  async registrarEventoFacturaRecibidaDian(
+    @Param('id') id: string,
+    @Body() dto: CreateDianEventDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+  ) {
+    return this.dianEvents.emitirSobreFacturaRecibida(
+      id,
+      dto,
+      tenantId,
+      actorId,
+      idempotencyKey,
+    );
+  }
+
+  @Post('dian/facturas-recibidas/eventos/:operationId/reintentar')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.dian.facturas_recibidas.gestionar')
+  @ApiOperation({
+    summary: 'Reconciliar/reintentar un evento DIAN 030-033 con la clave persistida en servidor',
+  })
+  async reintentarEventoFacturaRecibidaDian(
+    @Param('operationId', ParseUUIDPipe) operationId: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') actorId: string,
+  ) {
+    return this.dianEvents.reintentarEvento(
+      operationId,
+      tenantId,
+      actorId,
+      'RECEIVED_INVOICE',
+    );
+  }
+
+  @Get('dian/facturas-recibidas')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.dian.facturas_recibidas.ver')
+  @ApiOperation({ summary: 'Listar FEV recibidas y sus eventos DIAN sin exponer XML/PFX' })
+  async listarFacturasRecibidasDian(
+    @CurrentTenant() tenantId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.dianEvents.listarFacturasRecibidas(tenantId, Number(limit));
   }
 
   @Get(':id/anulacion-financiera')

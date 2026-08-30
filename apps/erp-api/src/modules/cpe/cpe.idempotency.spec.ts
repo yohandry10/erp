@@ -3,12 +3,18 @@ import { CpeDeliveryService } from './cpe-delivery.service';
 describe('CpeDeliveryService - owner durable 476', () => {
   const cpe = {
     id: 'cpe-476', tenant_id: 'tenant-476', estado: 'FIRMADO',
+    simulated_origin: false,
     sunat_status: 'READY', xml_firmado: '<Invoice>signed</Invoice>',
     ruc_emisor: '20123456789', razon_social_emisor: 'Emisor',
     tipo_documento_receptor: '6', documento_receptor: '20999999999',
     razon_social_receptor: 'Cliente', tipo_documento: '01',
     serie: 'F476', numero: '00000001', moneda: 'PEN',
-    total_gravadas: 100, total_igv: 18, total_venta: 118, items: [],
+    total_gravadas: 100, total_igv: 18, total_venta: 118,
+    items: [{
+      descripcion: 'Servicio de prueba durable 476', cantidad: 1,
+      unidad_medida: 'NIU', precio_unitario: 100, valor_venta: 100,
+      igv: 18, tasa_igv: 18, total: 118,
+    }],
   };
 
   function createService(rpc: jest.Mock, isDemo = false) {

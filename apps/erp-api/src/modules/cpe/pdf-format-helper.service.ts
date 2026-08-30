@@ -1,6 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { getActiveCountryByCode } from '../paises/initial-country';
 
+export function normalizeFiscalDocumentType(countryCode: string, documentType: string): string {
+  const country = String(countryCode || '').trim().toUpperCase();
+  const type = String(documentType || '').trim().toUpperCase();
+  if (country !== 'AR') return type;
+
+  // 01/03/07/08 no determinan por sí solos A/B/C: la clase depende de las
+  // condiciones IVA y de la autorización. El backend debe entregar el código
+  // fiscal resuelto; este helper nunca lo adivina.
+  return type;
+}
+
 /**
  * PDF Format Helper Service
  * Handles country-specific PDF formatting for invoices
@@ -13,6 +24,7 @@ export class PdfFormatHelperService {
    * Get PDF header text based on country
    */
   getHeaderText(countryCode: string, documentType: string): string {
+    const normalizedType = normalizeFiscalDocumentType(countryCode, documentType);
     const headers: Record<string, Record<string, string>> = {
       PE: {
         '01': 'FACTURA ELECTRÓNICA',
@@ -22,12 +34,66 @@ export class PdfFormatHelperService {
       },
       CO: {
         '01': 'FACTURA ELECTRÓNICA DE VENTA',
-        '91': 'NOTA CRÉDITO ELECTRÓNICA',
-        '92': 'NOTA DÉBITO ELECTRÓNICA',
+        '91': 'NOTA DE CRÉDITO ELECTRÓNICA',
+        '92': 'NOTA DE DÉBITO ELECTRÓNICA',
+      },
+      AR: {
+        '001': 'FACTURA ELECTRÓNICA A',
+        '002': 'NOTA DE DÉBITO ELECTRÓNICA A',
+        '003': 'NOTA DE CRÉDITO ELECTRÓNICA A',
+        '006': 'FACTURA ELECTRÓNICA B',
+        '007': 'NOTA DE DÉBITO ELECTRÓNICA B',
+        '008': 'NOTA DE CRÉDITO ELECTRÓNICA B',
+        '011': 'FACTURA ELECTRÓNICA C',
+        '012': 'NOTA DE DÉBITO ELECTRÓNICA C',
+        '013': 'NOTA DE CRÉDITO ELECTRÓNICA C',
+        '019': 'FACTURA ELECTRÓNICA E',
+        '020': 'NOTA DE DÉBITO ELECTRÓNICA E',
+        '021': 'NOTA DE CRÉDITO ELECTRÓNICA E',
+        '051': 'FACTURA ELECTRÓNICA A - OPERACIÓN SUJETA A RETENCIÓN',
+        '052': 'NOTA DE DÉBITO ELECTRÓNICA A - OPERACIÓN SUJETA A RETENCIÓN',
+        '053': 'NOTA DE CRÉDITO ELECTRÓNICA A - OPERACIÓN SUJETA A RETENCIÓN',
       },
     };
 
-    return headers[countryCode]?.[documentType] || 'COMPROBANTE ELECTRÓNICO';
+    return headers[countryCode]?.[normalizedType] || 'COMPROBANTE ELECTRÓNICO';
+  }
+
+  getPrintedRepresentationLegend(countryCode: string, documentType: string): string {
+    const normalizedType = normalizeFiscalDocumentType(countryCode, documentType);
+    const legends: Record<string, Record<string, string>> = {
+      PE: {
+        '01': 'Representación impresa de la Factura Electrónica.',
+        '03': 'Representación impresa de la Boleta de Venta Electrónica.',
+        '07': 'Representación impresa de la Nota de Crédito Electrónica.',
+        '08': 'Representación impresa de la Nota de Débito Electrónica.',
+      },
+      CO: {
+        '01': 'Representación gráfica de la Factura Electrónica de Venta.',
+        '91': 'Representación gráfica de la Nota de Crédito Electrónica.',
+        '92': 'Representación gráfica de la Nota de Débito Electrónica.',
+      },
+      AR: {
+        '001': 'Representación gráfica de la Factura Electrónica A.',
+        '002': 'Representación gráfica de la Nota de Débito Electrónica A.',
+        '003': 'Representación gráfica de la Nota de Crédito Electrónica A.',
+        '006': 'Representación gráfica de la Factura Electrónica B.',
+        '007': 'Representación gráfica de la Nota de Débito Electrónica B.',
+        '008': 'Representación gráfica de la Nota de Crédito Electrónica B.',
+        '011': 'Representación gráfica de la Factura Electrónica C.',
+        '012': 'Representación gráfica de la Nota de Débito Electrónica C.',
+        '013': 'Representación gráfica de la Nota de Crédito Electrónica C.',
+        '019': 'Representación gráfica de la Factura Electrónica E.',
+        '020': 'Representación gráfica de la Nota de Débito Electrónica E.',
+        '021': 'Representación gráfica de la Nota de Crédito Electrónica E.',
+        '051': 'Representación gráfica de la Factura Electrónica A - Operación sujeta a retención.',
+        '052': 'Representación gráfica de la Nota de Débito Electrónica A - Operación sujeta a retención.',
+        '053': 'Representación gráfica de la Nota de Crédito Electrónica A - Operación sujeta a retención.',
+      },
+    };
+
+    return legends[countryCode]?.[normalizedType]
+      || `Representación gráfica del ${this.getHeaderText(countryCode, normalizedType).toLocaleLowerCase('es')}.`;
   }
 
   /**
@@ -64,20 +130,15 @@ export class PdfFormatHelperService {
    * Get footer legal text based on country
    */
   getFooterLegalText(countryCode: string, documentType: string): string[] {
-    const footers: Record<string, string[]> = {
-      PE: [
-        'Representación impresa de la Factura Electrónica',
-        'Autorizado mediante Resolución de Intendencia N° 034-005-0000832/SUNAT',
-        'Consulte su comprobante en: www.sunat.gob.pe',
-      ],
-      CO: [
-        'Factura Electrónica de Venta',
-        'Autorizada por la DIAN',
-        'Consulte la validez en: www.dian.gov.co',
-      ],
+    const consultation: Record<string, string> = {
+      PE: 'Consulte su comprobante en: www.sunat.gob.pe',
+      CO: 'Consulte la validez en: www.dian.gov.co',
+      AR: 'Consulte su comprobante en: www.arca.gob.ar/fe/qr',
     };
 
-    return footers[countryCode] || ['Comprobante Electrónico'];
+    const footer = [this.getPrintedRepresentationLegend(countryCode, documentType)];
+    if (consultation[countryCode]) footer.push(consultation[countryCode]);
+    return footer;
   }
 
   /**
@@ -138,8 +199,7 @@ export class PdfFormatHelperService {
    * Check if QR code is required for country
    */
   isQRCodeRequired(countryCode: string): boolean {
-    // Peru and Colombia require QR codes
-    return ['PE', 'CO'].includes(countryCode);
+    return ['PE', 'CO', 'AR'].includes(countryCode);
   }
 
   /**

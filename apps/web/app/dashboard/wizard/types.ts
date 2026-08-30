@@ -109,7 +109,7 @@ export interface WizardConfiguration {
   arca_cuit_representada?: string
   arca_punto_venta?: number
   arca_condicion_iva?:
-    | 'RESPONSABLE_INSCRIPTO' | 'MONOTRIBUTO' | 'EXENTO' | 'CONSUMIDOR_FINAL'
+    | 'RESPONSABLE_INSCRIPTO' | 'MONOTRIBUTO' | 'EXENTO'
   ingresos_brutos?: string
   fecha_inicio_actividades?: string
   provincia_fiscal?: string

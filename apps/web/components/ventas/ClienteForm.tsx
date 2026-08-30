@@ -37,10 +37,11 @@ const clienteSchema = z.object({
     .min(6, 'El teléfono debe tener al menos 6 caracteres')
     .max(20, 'El teléfono no puede exceder 20 caracteres')
     .optional()
-    .or(z.literal(''))
+    .or(z.literal('')),
+  arca_condicion_iva: z.string().max(80).optional().or(z.literal(''))
 }).refine((data) => {
   // RUC validation: must be 11 digits
-  if ([TipoDocumento.RUC, TipoDocumento.CUIT].includes(data.documento_tipo)) {
+  if ([TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI].includes(data.documento_tipo)) {
     return data.documento_numero.length === 11 && /^\d+$/.test(data.documento_numero)
   }
   if (data.documento_tipo === TipoDocumento.NIT) {
@@ -82,7 +83,7 @@ export default function ClienteForm({
   const { post, unwrap } = useApi()
   const [validatingRuc, setValidatingRuc] = useState(false)
   const [rucValidated, setRucValidated] = useState(false)
-  // Lo que respondio el padron de SUNAT, si respondio. Se guarda aparte de
+  // Lo que respondió la fuente auxiliar de datos de RUC, si respondió. Se guarda aparte de
   // `rucValidated` porque validar el digito verificador y encontrar al
   // contribuyente son dos cosas distintas y solo la segunda dice si esta habido.
   const [datosDelPadron, setDatosDelPadron] = useState<{
@@ -107,7 +108,8 @@ export default function ClienteForm({
       nombre_comercial: initialData?.nombre_comercial || '',
       direccion: initialData?.direccion || '',
       email: initialData?.email || '',
-      telefono: initialData?.telefono || ''
+      telefono: initialData?.telefono || '',
+      arca_condicion_iva: initialData?.arca_condicion_iva || (isArgentina ? 'CONSUMIDOR_FINAL' : '')
     }
   })
 
@@ -132,7 +134,7 @@ export default function ClienteForm({
   }, [country.loading, country.paisCodigo, initialData?.documento_tipo, isArgentina, isColombia, setValue])
 
   const handleValidarRuc = async () => {
-    if (![TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.NIT].includes(documentoTipo)) {
+    if (![TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI, TipoDocumento.NIT].includes(documentoTipo)) {
       toast({
         title: 'Error',
         description: 'La validación local solo aplica a RUC/CUIT/NIT',
@@ -153,13 +155,13 @@ export default function ClienteForm({
 
     try {
       setValidatingRuc(true)
-      if (documentoTipo === TipoDocumento.CUIT) {
+      if ([TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI].includes(documentoTipo)) {
         if (!validateArgentinaCuit(documentoNumero)) {
           throw new Error('El dígito verificador del CUIT no es válido')
         }
         setRucValidated(true)
         toast({
-          title: 'CUIT validado',
+          title: `${documentoTipo} validado`,
           description: 'Formato y dígito verificador válidos. Complete los datos registrales.',
         })
         return
@@ -181,19 +183,20 @@ export default function ClienteForm({
       const responseData: any = unwrap(response)
 
       if (responseData) {
+        const consultaPadron = responseData.consulta_padron ?? responseData.consulta_sunat
         // Solo autocompletar si el backend confirma una consulta registral real.
-        if (responseData.consulta_sunat && responseData.razon_social) {
+        if (consultaPadron && responseData.razon_social) {
           setValue('razon_social', responseData.razon_social)
         }
-        if (responseData.consulta_sunat && responseData.direccion) {
+        if (consultaPadron && responseData.direccion) {
           setValue('direccion', responseData.direccion)
         }
-        if (responseData.consulta_sunat && responseData.nombre_comercial) {
+        if (consultaPadron && responseData.nombre_comercial) {
           setValue('nombre_comercial', responseData.nombre_comercial)
         }
 
         setDatosDelPadron(
-          responseData.consulta_sunat
+          consultaPadron
             ? {
                 razonSocial: responseData.razon_social ?? null,
                 estado: responseData.estado ?? null,
@@ -205,8 +208,8 @@ export default function ClienteForm({
         setRucValidated(true)
         toast({
           title: 'RUC Validado',
-          description: responseData.consulta_sunat
-            ? String(responseData.mensaje || 'Datos obtenidos de SUNAT correctamente')
+          description: consultaPadron
+            ? String(responseData.mensaje || 'Datos obtenidos de una fuente registral auxiliar; confirme en SUNAT antes de una decisión fiscal.')
             : 'Formato y dígito verificador válidos. No se pudo consultar el padrón; complete los datos registrales manualmente.'
         })
       }
@@ -286,7 +289,11 @@ export default function ClienteForm({
                 <option value={TipoDocumento.DNI}>DNI</option>
               )}
               {isArgentina ? (
-                <option value={TipoDocumento.CUIT}>CUIT</option>
+                <>
+                  <option value={TipoDocumento.CUIT}>CUIT</option>
+                  <option value={TipoDocumento.CUIL}>CUIL</option>
+                  <option value={TipoDocumento.CDI}>CDI</option>
+                </>
               ) : isColombia ? (
                 <option value={TipoDocumento.NIT}>NIT</option>
               ) : (
@@ -307,7 +314,7 @@ export default function ClienteForm({
         <div className="flex flex-col gap-2">
           <Label htmlFor="documento_numero">
             Número de Documento *
-            {[TipoDocumento.RUC, TipoDocumento.CUIT].includes(documentoTipo) && ' (11 dígitos)'}
+            {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI].includes(documentoTipo) && ' (11 dígitos)'}
             {documentoTipo === TipoDocumento.NIT && ' (10 dígitos, incluido DV)'}
             {documentoTipo === TipoDocumento.DNI && ' (8 dígitos)'}
           </Label>
@@ -319,7 +326,7 @@ export default function ClienteForm({
                 ref={documentoNumeroField.ref}
                 onBlur={documentoNumeroField.onBlur}
                 placeholder={
-                  documentoTipo === TipoDocumento.CUIT ? '30710158229' :
+                  [TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI].includes(documentoTipo) ? '30710158229' :
                   documentoTipo === TipoDocumento.NIT ? '9001234568' :
                   documentoTipo === TipoDocumento.RUC ? '20123456789' :
                   documentoTipo === TipoDocumento.DNI ? '12345678' :
@@ -333,7 +340,7 @@ export default function ClienteForm({
                 }}
               />
             </div>
-            {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.NIT].includes(documentoTipo) && (
+            {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI, TipoDocumento.NIT].includes(documentoTipo) && (
               <Button
                 type="button"
                 variant="outline"
@@ -361,10 +368,10 @@ export default function ClienteForm({
               {errors.documento_numero.message}
             </p>
           )}
-          {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.NIT].includes(documentoTipo) && !datosDelPadron && (
+          {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI, TipoDocumento.NIT].includes(documentoTipo) && !datosDelPadron && (
             <p className="text-xs text-[var(--primary-500)] m-0">
               {documentoTipo === TipoDocumento.RUC
-                ? 'Comprueba el dígito verificador y consulta el padrón de SUNAT: razón social, estado y condición.'
+                ? 'Comprueba el dígito verificador y consulta una fuente auxiliar de datos públicos: razón social, estado y condición.'
                 : `Valida formato y dígito verificador. No consulta el padrón de ${isArgentina ? 'ARCA' : 'DIAN/RUT'}.`}
             </p>
           )}
@@ -391,6 +398,29 @@ export default function ClienteForm({
           )}
         </div>
       </div>
+
+      {isArgentina && (
+        <div className="bg-[var(--primary-50)] p-6 flex flex-col gap-2">
+          <Label htmlFor="arca_condicion_iva">Condición IVA del receptor *</Label>
+          <select
+            id="arca_condicion_iva"
+            {...register('arca_condicion_iva', { required: true })}
+            className="w-full py-[0.875rem] px-4 border text-base bg-card text-[var(--primary-800)]"
+            disabled={loading}
+          >
+            <option value="RESPONSABLE_INSCRIPTO">Responsable inscripto</option>
+            <option value="MONOTRIBUTO">Monotributo</option>
+            <option value="EXENTO">Exento</option>
+            <option value="CONSUMIDOR_FINAL">Consumidor final</option>
+            <option value="SUJETO_NO_CATEGORIZADO">Sujeto no categorizado</option>
+            <option value="CLIENTE_EXTERIOR">Cliente del exterior</option>
+            <option value="IVA_NO_ALCANZADO">IVA no alcanzado</option>
+          </select>
+          <p className="text-xs text-muted-foreground m-0">
+            ARCA usa este dato para determinar la clase A, B o C; no se deduce del CUIT/CUIL/CDI.
+          </p>
+        </div>
+      )}
 
       {/* Datos del Cliente */}
       <div className="bg-[var(--primary-50)] p-6 flex flex-col gap-4">

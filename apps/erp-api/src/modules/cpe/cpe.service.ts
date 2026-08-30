@@ -20,8 +20,8 @@ import { CpeCancellationService } from './cpe-cancellation.service';
 import { CpeDeliveryService } from './cpe-delivery.service';
 import { CpeRegistrationService } from './cpe-registration.service';
 import { DocumentoFiscal } from '../documentos/interfaces/documento-fiscal.interface';
-import { validateColombiaNit } from '../paises/initial-country';
 import { DesktopSignedCpeDto } from './dto/desktop-signed-cpe.dto';
+import { normalizeDianIdentity } from '../fiscal/colombia/dian-document.util';
 
 @Injectable()
 export class CpeService {
@@ -189,11 +189,34 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
     }
 
     if (paisCodigo === 'CO') {
-      if (tipo === '31' && !validateColombiaNit(documento)) {
-        throw new BadRequestException('El NIT del adquirente debe incluir un dígito de verificación válido');
+      try {
+        const identity = normalizeDianIdentity(tipo, documento);
+        (dto as any).tipo_documento_receptor = identity.type;
+        (dto as any).documento_receptor = identity.canonicalNumber;
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : 'Documento DIAN inválido');
       }
-      if (tipo === '13' && !/^\d{6,10}$/.test(documento)) {
-        throw new BadRequestException('La cédula de ciudadanía debe tener entre 6 y 10 dígitos');
+      return;
+    }
+
+    if (paisCodigo === 'AR') {
+      const allowed = new Set(['80', '86', '87', '96', '99']);
+      if (!allowed.has(tipo)) {
+        throw new BadRequestException('Tipo de documento del receptor no válido para ARCA');
+      }
+      if (['80', '86', '87'].includes(tipo) && !/^\d{11}$/.test(documento)) {
+        throw new BadRequestException('CUIT/CUIL/CDI del receptor debe tener 11 dígitos');
+      }
+      if (tipo === '96' && !/^\d{7,8}$/.test(documento)) {
+        throw new BadRequestException('DNI argentino del receptor debe tener 7 u 8 dígitos');
+      }
+      if (tipo === '99' && !/^0*$/.test(documento)) {
+        throw new BadRequestException('Consumidor Final ARCA no debe llevar un documento inventado');
+      }
+      if (!String((dto as any).arca_condicion_iva_receptor ?? '').trim()) {
+        throw new BadRequestException(
+          'La emisión ARCA exige la condición IVA del receptor para resolver la clase A/B/C',
+        );
       }
       return;
     }
@@ -241,6 +264,14 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
     if (paisCodigo === 'CO') {
       if (!/^[A-Z0-9]{1,4}$/.test(serie)) {
         throw new BadRequestException('El prefijo DIAN debe tener entre 1 y 4 caracteres alfanuméricos');
+      }
+      return;
+    }
+
+
+    if (paisCodigo === 'AR') {
+      if (!/^\d{5}$/.test(serie) || Number(serie) < 1) {
+        throw new BadRequestException('La serie ARCA debe ser el punto de venta de cinco dígitos');
       }
       return;
     }
@@ -579,6 +610,11 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       }
       const supabaseClient = this.supabaseService.getClient();
       const paisCodigo = (await this.fiscalAdapter.obtenerCodigoPais(tenantId)).toUpperCase();
+      if (paisCodigo === 'CO' && requestedType !== '01') {
+        throw new BadRequestException(
+          'DIAN: la frontera POS/CPE sólo admite factura electrónica tipo 01',
+        );
+      }
       const eventId = randomUUID();
       const emissionDate = this.resolveEmissionDate((createFacturaDto as any).fecha_emision);
       const issueTime = this.resolveIssueTime((createFacturaDto as any).fecha_emision);
@@ -686,10 +722,12 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       // decide SUNAT: cada sucursal tiene sus propias series y el codigo viaja
       // en cbc:AddressTypeCode. Hasta la 503 estaba fijado a '0000' en el
       // constructor del XML porque no habia de donde sacarlo.
-      const codigoEstablecimiento = await this.sucursalesService.codigoEstablecimientoDeSerie(
-        tenantId,
-        createFacturaDto.serie,
-      );
+      const codigoEstablecimiento = paisCodigo === 'PE'
+        ? await this.sucursalesService.codigoEstablecimientoDeSerie(
+          tenantId,
+          createFacturaDto.serie,
+        )
+        : '0000';
 
       // Generate XML content
       const xmlContent = this.generateXmlContent({
@@ -726,6 +764,11 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         total_exportacion: (createFacturaDto as any).total_exportacion ?? 0,
         total_igv: createFacturaDto.total_igv,
         total_venta: createFacturaDto.total_venta,
+        metadata: paisCodigo === 'AR' ? {
+          arca_punto_venta: Number(createFacturaDto.serie),
+          arca_condicion_iva_emisor: (createFacturaDto as any).arca_condicion_iva_emisor ?? null,
+          arca_condicion_iva_receptor: (createFacturaDto as any).arca_condicion_iva_receptor,
+        } : {},
         // producto_id queda en documento_detalles. Se excluye del JSON legado
         // de CPE para que un retry posterior al despliegue pueda reconciliar
         // comprobantes creados por el payload histórico sin cambiar su huella.
@@ -879,7 +922,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
     const emisor = await this.getEmpresaEmisorInfoStrict(tenantId);
     const documentoReceptor = String(
       payload?.documento_receptor ?? payload?.clienteRuc ?? payload?.clienteDocumento ?? '',
-    ).replace(/\D/g, '');
+    ).trim();
     const tipoDocumentoReceptor = this.resolveTipoDocumentoReceptor(
       tipoDocumento,
       payload?.tipo_documento_receptor ?? payload?.clienteTipoDocumento,

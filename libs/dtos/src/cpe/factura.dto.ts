@@ -119,6 +119,18 @@ export class CreateFacturaDto {
   @IsOptional()
   direccion_receptor?: string;
 
+  /** Snapshot fiscal ARCA. No se infiere a partir de CUIT/CUIL/CDI. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  arca_condicion_iva_receptor?: string;
+
+  /** Condición del emisor congelada al crear el comprobante ARCA. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  arca_condicion_iva_emisor?: string;
+
   @IsString()
   moneda: string;
 

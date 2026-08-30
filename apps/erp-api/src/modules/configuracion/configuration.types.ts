@@ -23,6 +23,9 @@ export interface ConfigurationStatus {
     isEnabled: boolean;
     isReady: boolean;
     missingItems: string[];
+    environment?: string;
+    technicalValidationState?: string;
+    externalApprovalValidated?: boolean;
   };
 }
 

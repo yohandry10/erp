@@ -14,6 +14,7 @@ export function CompletionStep() {
   const { markWizardAsCompleted, resetConfiguration } = usePosConfig()
   const country = useCountryContext()
   const documentoFiscal = country.documentoFiscal || 'RUC'
+  const isColombia = country.paisCodigo === 'CO'
 
   const [isCompleting, setIsCompleting] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
@@ -102,12 +103,14 @@ export function CompletionStep() {
           <div>
             <h4 className="text-base font-semibold text-[var(--primary-900)] mb-1">
               {state.configuration.certificateBase64
-                ? 'Certificado Digital Activo'
+                ? (isColombia ? 'Certificado digital cargado' : 'Certificado Digital Activo')
                 : 'Emisión electrónica pendiente (opcional)'}
             </h4>
             <p className="text-[0.875rem] text-[var(--primary-600)] leading-6 m-0">
               {state.configuration.certificateBase64
-                ? 'Tu certificado digital está cargado y listo para firmar documentos'
+                ? (isColombia
+                    ? 'El certificado quedó cargado y la firma XAdES está disponible; completa el TestSet para habilitar producción.'
+                    : 'Tu certificado digital está cargado y listo para firmar documentos')
                 : 'Cuando quieras emitir, carga el certificado y las credenciales propias de tu empresa'}
             </p>
           </div>

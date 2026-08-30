@@ -305,7 +305,7 @@ export default function DocumentosPage() {
                 {isArgentina
                   ? 'Repositorio de facturas A/B, notas, contratos y documentos emitidos mediante ARCA.'
                   : isColombia
-                    ? 'Facturas electrónicas, documentos equivalentes, notas y contratos con validación DIAN.'
+                    ? 'Borradores fiscales, representaciones gráficas y contratos; la validación DIAN permanece pendiente de homologación.'
                     : `Facturas, boletas, notas y contratos con validación ${country.servicioFiscal}.`}
               </p>
             </div>
@@ -316,7 +316,7 @@ export default function DocumentosPage() {
               </Button>
               <Button type="button" onClick={openNewDocumentFlow} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
-                {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Crear documento DIAN' : 'Crear documento'}
+                {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Crear borrador fiscal' : 'Crear documento'}
               </Button>
             </div>
           </div>
@@ -402,7 +402,7 @@ export default function DocumentosPage() {
             </div>
             <Button type="button" onClick={openNewDocumentFlow} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <Plus className="h-4 w-4" />
-              {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Nuevo documento DIAN' : 'Nuevo documento'}
+              {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Nuevo borrador fiscal' : 'Nuevo documento'}
             </Button>
           </CardHeader>
           <CardContent className="p-0">
@@ -414,12 +414,12 @@ export default function DocumentosPage() {
                   {isArgentina
                     ? 'Los comprobantes fiscales se emiten desde el módulo ARCA y aparecen aquí como documentos.'
                     : isColombia
-                      ? 'Comienza creando tu primer documento electrónico para DIAN.'
+                      ? 'Comienza preparando tu primer documento; todavía no se transmitirá a DIAN.'
                       : 'Comienza creando tu primer documento.'}
                 </p>
                 <Button type="button" onClick={openNewDocumentFlow} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
                   <Plus className="h-4 w-4" />
-                  {isArgentina ? 'Ir a Comprobantes ARCA' : isColombia ? 'Crear documento DIAN' : 'Crear primer documento'}
+                  {isArgentina ? 'Ir a Comprobantes ARCA' : isColombia ? 'Crear borrador fiscal' : 'Crear primer documento'}
                 </Button>
               </div>
             ) : (

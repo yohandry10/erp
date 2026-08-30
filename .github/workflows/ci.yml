@@ -179,7 +179,7 @@ jobs:
           --health-retries 20
     env:
       E2E_EPHEMERAL_LOCAL_DB: "1"
-      REQUIRED_DATABASE_SCHEMA_VERSION: "522"
+      REQUIRED_DATABASE_SCHEMA_VERSION: "528"
       PGPASSWORD: postgres
       PGHOST: 127.0.0.1
       PGPORT: 5432
@@ -210,14 +210,52 @@ jobs:
         run: |
           echo "## PostgreSQL 16 schema gate" >> "$GITHUB_STEP_SUMMARY"
           echo '- Reconstrucción limpia de todas las migraciones.' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Todos los verificadores SQL desde 491 hasta el esquema requerido 498.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Todos los verificadores SQL desde 491 hasta el esquema requerido, más los históricos vigentes.' >> "$GITHUB_STEP_SUMMARY"
           echo '- Una migración nueva sin verificador del mismo prefijo falla el job.' >> "$GITHUB_STEP_SUMMARY"
+
+  dian-official-contract:
+    name: DIAN FEV 1.9 official XML contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [install]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup Java for official XSD validation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate and validate DIAN documents
+        run: pnpm test:dian-contract
+
+      - name: DIAN contract summary
+        if: always()
+        run: |
+          echo "## DIAN FEV 1.9 official contract" >> "$GITHUB_STEP_SUMMARY"
+          echo '- Fixture hashes, official XSD, compiled Schematron and production WSDL checked.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Invoice, credit/debit notes, FEV events 030-034 and AttachedDocument generated from production code.' >> "$GITHUB_STEP_SUMMARY"
 
   build:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [test, database-contracts]
+    needs: [test, database-contracts, dian-official-contract]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

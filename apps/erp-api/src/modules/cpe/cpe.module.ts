@@ -19,6 +19,7 @@ import { PermissionsModule } from '../permissions/permissions.module';
 import { FiscalModule } from '../fiscal/fiscal.module';
 import { ReferencedNotesService } from './referenced-notes.service';
 import { SucursalesModule } from '../sucursales/sucursales.module';
+import { CpeDianEventsService } from './cpe-dian-events.service';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { SucursalesModule } from '../sucursales/sucursales.module';
     ComunicacionBajaService,
     FiscalAdapterService,
     ReferencedNotesService,
+    CpeDianEventsService,
   ],
   exports: [
     CpeService,
@@ -52,6 +54,7 @@ import { SucursalesModule } from '../sucursales/sucursales.module';
     ComunicacionBajaService,
     FiscalAdapterService,
     ReferencedNotesService,
+    CpeDianEventsService,
   ],
 })
 export class CpeModule {}

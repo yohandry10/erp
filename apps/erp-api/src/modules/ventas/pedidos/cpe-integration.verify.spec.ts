@@ -275,6 +275,16 @@ describe('CPE Integration Verification', () => {
             total_gravadas: 100,
             total_igv: 18,
             total_venta: 118,
+            items: [{
+                descripcion: 'Producto de integración pedido-CPE',
+                cantidad: 1,
+                unidad_medida: 'NIU',
+                precio_unitario: 100,
+                valor_venta: 100,
+                igv: 18,
+                tasa_igv: 18,
+                total: 118,
+            }],
             estado: 'FIRMADO',
             xml_firmado: '<xml>signed</xml>',
             hash: 'hash-123',
@@ -367,6 +377,7 @@ describe('CPE Integration Verification', () => {
         const reservedCpe = {
                 ...mockCreatedCpe,
                 tenant_id: tenantId,
+                simulated_origin: false,
                 ruc_emisor: '20987654321',
                 tipo_documento: '01',
                 xml_firmado: '<xml>signed</xml>'
@@ -418,6 +429,7 @@ describe('CPE Integration Verification', () => {
             xmlContent: '<xml>signed</xml>',
           }),
           tenantId,
+          'PE',
         );
         expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
           'finalizar_envio_cpe_tx',
