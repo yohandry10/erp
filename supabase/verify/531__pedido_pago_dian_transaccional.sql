@@ -65,6 +65,7 @@ BEGIN
 
   IF to_regprocedure('public.crear_pedido_comercial_pago_tx_531(jsonb,jsonb,jsonb)') IS NULL
      OR to_regprocedure('public.actualizar_pedido_comercial_pago_tx_531(uuid,uuid,jsonb,jsonb,jsonb)') IS NULL
+     OR to_regprocedure('public.actualizar_pedido_comercial_legacy_531(uuid,uuid,jsonb,jsonb)') IS NULL
      OR to_regprocedure('public.convertir_cotizacion_comercial_a_pedido_pago_tx_531(uuid,uuid,uuid,text,jsonb)') IS NULL
      OR has_function_privilege('authenticated',
        'public.crear_pedido_comercial_pago_tx_531(jsonb,jsonb,jsonb)', 'EXECUTE')
@@ -72,6 +73,8 @@ BEGIN
        'public.crear_pedido_comercial_pago_tx_531(jsonb,jsonb,jsonb)', 'EXECUTE')
      OR NOT has_function_privilege('service_role',
        'public.actualizar_pedido_comercial_pago_tx_531(uuid,uuid,jsonb,jsonb,jsonb)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role',
+       'public.actualizar_pedido_comercial_tx(uuid,uuid,jsonb,jsonb)', 'EXECUTE')
      OR NOT has_function_privilege('service_role',
        'public.congelar_pago_dian_pedido_tx_531(uuid,uuid,text)', 'EXECUTE')
      OR NOT has_function_privilege('service_role',
@@ -83,10 +86,24 @@ BEGIN
      OR has_function_privilege('authenticated',
        'public.abortar_snapshot_dian_pedido_tx_531(uuid,uuid,text,text)', 'EXECUTE')
      OR has_function_privilege('service_role',
-       'public.actualizar_pedido_comercial_tx(uuid,uuid,jsonb,jsonb)', 'EXECUTE')
+       'public.actualizar_pedido_comercial_legacy_531(uuid,uuid,jsonb,jsonb)', 'EXECUTE')
      OR has_function_privilege('service_role',
        'public.actualizar_pedido_venta_tx(uuid,uuid,jsonb,jsonb)', 'EXECUTE') THEN
     RAISE EXCEPTION 'VERIFY_531_RPC_CONTRACT_OR_ACL_INVALID';
+  END IF;
+END;
+$contract$;
+
+DO $contract$
+DECLARE
+  v_definition text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.actualizar_pedido_comercial_tx(uuid,uuid,jsonb,jsonb)'::regprocedure
+  ) INTO v_definition;
+  IF v_definition NOT ILIKE '%actualizar_pedido_comercial_pago_tx_531%'
+     OR v_definition ILIKE '%actualizar_pedido_comercial_legacy_531%' THEN
+    RAISE EXCEPTION 'VERIFY_531_EXPAND_CONTRACT_ADAPTER_INVALID';
   END IF;
 END;
 $contract$;
@@ -301,7 +318,22 @@ BEGIN
         * (1 + app.tasa_impuesto_tenant(v_tenant)), 2),
       updated_at = now()
   WHERE id = v_pedido AND tenant_id = v_tenant;
-  v_original_observaciones := 'CANONICAL-531';
+
+  -- Durante el despliegue DB-first, el runtime 528 todavía usa la firma de
+  -- cuatro argumentos. Debe conservar una edición normal antes del freeze,
+  -- pero entrar por el mismo guard 531 que bloquea cualquier cambio después.
+  v_result := public.actualizar_pedido_comercial_tx(
+    v_pedido, v_tenant,
+    '{"observaciones":"CANONICAL-ADAPTER-531"}'::jsonb,
+    NULL
+  );
+  IF (SELECT observaciones FROM public.pedidos_venta
+      WHERE id = v_pedido AND tenant_id = v_tenant)
+     IS DISTINCT FROM 'CANONICAL-ADAPTER-531'
+     OR v_result->>'id' IS DISTINCT FROM v_pedido::text THEN
+    RAISE EXCEPTION 'VERIFY_531_LEGACY_ADAPTER_PRE_FREEZE_FAILED:%', v_result;
+  END IF;
+  v_original_observaciones := 'CANONICAL-ADAPTER-531';
 
   -- En una empresa CO real no se persiste ningún corte fiscal si los maestros
   -- tributarios están incompletos. Ambas comprobaciones se hacen bajo los
@@ -347,7 +379,7 @@ BEGIN
   v_result := public.congelar_pago_dian_pedido_tx_531(
     v_tenant, v_pedido, v_key
   );
-  IF v_result#>>'{fiscal_snapshot,pedido,observaciones}' <> 'CANONICAL-531'
+  IF v_result#>>'{fiscal_snapshot,pedido,observaciones}' <> 'CANONICAL-ADAPTER-531'
      OR v_result#>>'{fiscal_snapshot,detalle,0,descripcion}' <> 'DETALLE CANONICO 531'
      OR (v_result#>>'{fiscal_snapshot,detalle,0,cantidad}')::numeric <> 2
      OR v_result#>>'{fiscal_snapshot,cliente,razon_social}' <> 'CLIENTE CANONICO 531'
@@ -410,6 +442,19 @@ BEGIN
   IF (SELECT observaciones FROM public.pedidos_venta WHERE id = v_pedido)
      IS DISTINCT FROM v_original_observaciones THEN
     RAISE EXCEPTION 'VERIFY_531_PAYMENT_FROZEN_MUTATED_ORDER';
+  END IF;
+
+  BEGIN
+    PERFORM public.actualizar_pedido_comercial_tx(
+      v_pedido, v_tenant, '{"observaciones":"LEGACY-FROZEN-531"}'::jsonb, NULL
+    );
+    RAISE EXCEPTION 'VERIFY_531_LEGACY_ADAPTER_BYPASSED_FREEZE';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM <> 'PEDIDO_DIAN_PAYMENT_FROZEN' THEN RAISE; END IF;
+  END;
+  IF (SELECT observaciones FROM public.pedidos_venta WHERE id = v_pedido)
+     IS DISTINCT FROM v_original_observaciones THEN
+    RAISE EXCEPTION 'VERIFY_531_LEGACY_ADAPTER_MUTATED_FROZEN_ORDER';
   END IF;
 
   -- La sola existencia del outbox de la intención basta para impedir release.
