@@ -194,6 +194,15 @@ BEGIN
 END;
 $$;
 
+-- Expand/contract para DB-first: el runtime 528 todavía invoca la firma
+-- histórica. Conservamos ese nombre como adaptador seguro durante el deploy,
+-- pero movemos la implementación real a un símbolo privado para que ninguna
+-- llamada service_role pueda saltarse el guard de congelamiento de 531.
+ALTER FUNCTION public.actualizar_pedido_comercial_tx(uuid,uuid,jsonb,jsonb)
+  RENAME TO actualizar_pedido_comercial_legacy_531;
+REVOKE ALL ON FUNCTION public.actualizar_pedido_comercial_legacy_531(uuid,uuid,jsonb,jsonb)
+  FROM PUBLIC, anon, authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.actualizar_pedido_comercial_pago_tx_531(
   p_pedido_id uuid,
   p_tenant_id uuid,
@@ -232,7 +241,7 @@ BEGIN
       coalesce(v_pedido.metadata, '{}'::jsonb)->'dian_payment_intent'
     );
   END IF;
-  v_result := public.actualizar_pedido_comercial_tx(
+  v_result := public.actualizar_pedido_comercial_legacy_531(
     p_pedido_id, p_tenant_id, p_patch, p_detalle
   );
   IF v_intent IS NOT NULL THEN
@@ -244,6 +253,26 @@ BEGIN
   END IF;
   RETURN v_result;
 END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.actualizar_pedido_comercial_tx(
+  p_pedido_id uuid,
+  p_tenant_id uuid,
+  p_patch jsonb,
+  p_detalle jsonb
+)
+RETURNS jsonb
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, app, pg_temp
+AS $$
+  SELECT public.actualizar_pedido_comercial_pago_tx_531(
+    p_pedido_id,
+    p_tenant_id,
+    p_patch,
+    p_detalle,
+    NULL
+  );
 $$;
 
 CREATE OR REPLACE FUNCTION public.convertir_cotizacion_comercial_a_pedido_pago_tx_531(
@@ -881,17 +910,19 @@ REVOKE ALL ON FUNCTION public.consumir_snapshot_dian_pedido_tx_531(uuid,uuid,tex
 REVOKE ALL ON FUNCTION public.abortar_snapshot_dian_pedido_tx_531(uuid,uuid,text,text)
   FROM PUBLIC, anon, authenticated;
 
--- Una instancia API anterior no debe poder saltarse el guard de congelamiento
--- llamando directamente a los writers que 531 envuelve. El wrapper SECURITY
--- DEFINER conserva acceso como owner y es el único writer público del runtime.
-REVOKE EXECUTE ON FUNCTION public.actualizar_pedido_comercial_tx(uuid,uuid,jsonb,jsonb)
-  FROM service_role;
+-- Una instancia API anterior conserva el nombre comercial mediante el adaptador
+-- seguro anterior. El writer base y la variante 441 sí permanecen privados, de
+-- modo que ni el runtime viejo ni uno nuevo pueden saltarse el congelamiento.
+REVOKE ALL ON FUNCTION public.actualizar_pedido_comercial_tx(uuid,uuid,jsonb,jsonb)
+  FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.actualizar_pedido_venta_tx(uuid,uuid,jsonb,jsonb)
   FROM service_role;
 
 GRANT EXECUTE ON FUNCTION public.crear_pedido_comercial_pago_tx_531(jsonb,jsonb,jsonb)
   TO service_role;
 GRANT EXECUTE ON FUNCTION public.actualizar_pedido_comercial_pago_tx_531(uuid,uuid,jsonb,jsonb,jsonb)
+  TO service_role;
+GRANT EXECUTE ON FUNCTION public.actualizar_pedido_comercial_tx(uuid,uuid,jsonb,jsonb)
   TO service_role;
 GRANT EXECUTE ON FUNCTION public.convertir_cotizacion_comercial_a_pedido_pago_tx_531(uuid,uuid,uuid,text,jsonb)
   TO service_role;
@@ -901,5 +932,10 @@ GRANT EXECUTE ON FUNCTION public.consumir_snapshot_dian_pedido_tx_531(uuid,uuid,
   TO service_role;
 GRANT EXECUTE ON FUNCTION public.abortar_snapshot_dian_pedido_tx_531(uuid,uuid,text,text)
   TO service_role;
+
+COMMENT ON FUNCTION public.actualizar_pedido_comercial_tx(uuid,uuid,jsonb,jsonb)
+IS 'Adaptador expand/contract para runtime 528: delega al guard 531 sin intención de pago y nunca salta un snapshot congelado.';
+COMMENT ON FUNCTION public.actualizar_pedido_comercial_legacy_531(uuid,uuid,jsonb,jsonb)
+IS 'Implementación comercial previa a 531; privada y accesible sólo desde el adaptador SECURITY DEFINER.';
 
 COMMIT;

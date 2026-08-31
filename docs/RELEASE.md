@@ -157,8 +157,13 @@ de un go-live colombiano deben cumplirse, en este orden:
    renombra y envuelve el writer 443; por eso sus verificadores deben incluir
    compatibilidad 443/446/461, reintento semántico y concurrencia de numeración.
    La 531 congela bajo lock la intención de pago y el snapshot comercial que
-   consumirá la emisión; la 532 bloquea la nota SUNAT `07` del RMA cuando el
-   tenant es Colombia antes de cualquier mutación.
+   consumirá la emisión. Para permitir este orden DB-first sin abrir una ventana
+   de bypass, la firma de cuatro argumentos que usa el runtime 528 permanece
+   como adaptador temporal al guard 531; el writer anterior se renombra y queda
+   sin `EXECUTE` para `service_role`. El verificador debe demostrar una edición
+   previa al freeze y el rechazo de la misma firma después del freeze. La 532
+   bloquea la nota SUNAT `07` del RMA cuando el tenant es Colombia antes de
+   cualquier mutación.
 4. Cargar por tenant el PFX, Software ID/PIN, TestSet,
    resolución/rango/fechas, prefijo sólo si DIAN lo asignó y clave técnica;
    confirmar que el PFX pertenece
