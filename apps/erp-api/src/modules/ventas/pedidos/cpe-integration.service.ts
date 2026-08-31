@@ -1,4 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CpeService } from '../../cpe/cpe.service';
 import { ValidationService } from '../../validations/validation.service';
@@ -8,6 +10,43 @@ import { CondicionPago, CreateFacturaDto, TipoDocumento, ItemFacturaDto } from '
 import { PedidoVenta, PedidoDetalle } from './entities';
 import { IntegrationAlertsService } from '../../notifications/integration-alerts.service';
 import { fechaHoyDelTenant } from '../../../shared/utils/fecha-tenant.util';
+import { fechaHoyEnPais } from '../../../shared/utils/fecha-peru.util';
+import { normalizeDianIdentity } from '../../fiscal/colombia/dian-document.util';
+import {
+  DIAN_PAYMENT_INTENT_KEY,
+  DIAN_PAYMENT_SNAPSHOT_KEY,
+} from './pedido-payment.util';
+
+interface DianPedidoPaymentSnapshot {
+  condicionPago: CondicionPago;
+  medioPago: string;
+  plazoPagoDias: number;
+  fechaEmision: string;
+  fechaVencimiento: string;
+}
+
+interface DianFiscalProductSnapshot {
+  id?: string;
+  codigo?: string | null;
+  afectacion_igv?: string | null;
+}
+
+interface DianFiscalOrderSnapshot {
+  version: number;
+  sha256: string;
+  pedido: PedidoVenta;
+  detalle: PedidoDetalle[];
+  cliente: Record<string, unknown>;
+  empresa: Record<string, unknown>;
+  productos: Record<string, DianFiscalProductSnapshot>;
+  tasa_impuesto: number | string;
+  payment_snapshot: Record<string, unknown>;
+}
+
+type PedidoDianFacturable = PedidoVenta & {
+  detalle: PedidoDetalle[];
+  __dianFiscalSnapshot?: DianFiscalOrderSnapshot;
+};
 
 /**
  * CPEIntegrationService
@@ -25,6 +64,370 @@ export class CPEIntegrationService {
     private readonly integrationAlerts: IntegrationAlertsService,
     private readonly taxCalculator: TaxCalculatorService,
   ) {}
+
+  /**
+   * Conserva el snapshot de pago que ya venga congelado en el pedido. La tabla
+   * comercial no tiene columnas dedicadas para esos datos, pero sí `metadata`;
+   * por compatibilidad también se aceptan propiedades directas al hidratar un
+   * pedido legado. Dos fuentes distintas nunca pueden contradecirse.
+   */
+  private resolverPagoDianPedido(pedido: PedidoVenta): DianPedidoPaymentSnapshot {
+    const condicion = this.resolverValorPedido(
+      pedido,
+      ['condicion_pago', 'condicionPago', 'dian_forma_pago'],
+      (valor) => this.normalizarCondicionPagoDian(valor),
+      'condición de pago',
+    );
+    const medio = this.resolverValorPedido(
+      pedido,
+      ['medio_pago', 'medioPago', 'dian_medio_pago'],
+      (valor) => this.normalizarMedioPagoDian(valor),
+      'medio de pago',
+    );
+    const plazo = this.resolverValorPedido(
+      pedido,
+      ['plazo_pago_dias', 'plazoPagoDias'],
+      (valor) => this.normalizarPlazoPagoDian(valor),
+      'plazo de pago',
+    );
+    const fechaEmision = this.resolverValorPedido(
+      pedido,
+      ['fecha_emision', 'fechaEmision'],
+      (valor) => this.normalizarFechaCalendarioDian(valor, 'emisión'),
+      'fecha de emisión',
+    ) ?? fechaHoyEnPais('CO');
+    const fechaVencimiento = this.resolverValorPedido(
+      pedido,
+      ['fecha_vencimiento', 'fechaVencimiento'],
+      (valor) => this.normalizarFechaCalendarioDian(valor, 'vencimiento'),
+      'fecha de vencimiento',
+    );
+
+    const tieneDetallePago = medio !== undefined || plazo !== undefined || fechaVencimiento !== undefined;
+    if (condicion === undefined && tieneDetallePago) {
+      throw new BadRequestException({
+        message:
+          'DIAN: el pedido tiene medio, plazo o vencimiento, pero no declara si la venta es CONTADO o CREDITO',
+        code: 'PEDIDO_DIAN_PAYMENT_INCOMPLETE',
+      });
+    }
+
+    // Sin snapshot explícito se usa la única semántica que no crea una deuda:
+    // contado, código 10 y vencimiento el mismo día calendario de Colombia.
+    const condicionPago = condicion ?? CondicionPago.CONTADO;
+    if (condicionPago === CondicionPago.CONTADO) {
+      const plazoPagoDias = plazo ?? 0;
+      const vencimiento = fechaVencimiento ?? fechaEmision;
+      if (plazoPagoDias !== 0 || vencimiento !== fechaEmision) {
+        throw new BadRequestException({
+          message:
+            'DIAN: un pedido al contado debe tener plazo 0 y vencimiento igual a la fecha de emisión',
+          code: 'PEDIDO_DIAN_PAYMENT_INCONSISTENT',
+        });
+      }
+      return {
+        condicionPago,
+        medioPago: medio ?? '10',
+        plazoPagoDias,
+        fechaEmision,
+        fechaVencimiento: vencimiento,
+      };
+    }
+
+    if (plazo === undefined && fechaVencimiento === undefined) {
+      throw new BadRequestException({
+        message: 'DIAN: un pedido a crédito requiere plazo o fecha de vencimiento explícitos',
+        code: 'PEDIDO_DIAN_PAYMENT_INCOMPLETE',
+      });
+    }
+
+    const diasPorFecha = fechaVencimiento === undefined
+      ? undefined
+      : this.diasEntreFechasCalendario(fechaEmision, fechaVencimiento);
+    const plazoPagoDias = plazo ?? diasPorFecha!;
+    if (plazoPagoDias < 1 || (diasPorFecha !== undefined && diasPorFecha !== plazoPagoDias)) {
+      throw new BadRequestException({
+        message:
+          'DIAN: el plazo de crédito debe ser positivo y coincidir exactamente con la fecha de vencimiento',
+        code: 'PEDIDO_DIAN_PAYMENT_INCONSISTENT',
+      });
+    }
+
+    return {
+      condicionPago,
+      // Código 1 es el medio DIAN «no definido» cuando el crédito no declara
+      // otro código del catálogo 49; no inventa efectivo ni transferencia.
+      medioPago: medio ?? '1',
+      plazoPagoDias,
+      fechaEmision,
+      fechaVencimiento: fechaVencimiento
+        ?? this.sumarDiasCalendario(fechaEmision, plazoPagoDias),
+    };
+  }
+
+  private resolverValorPedido<T>(
+    pedido: PedidoVenta,
+    claves: string[],
+    normalizar: (valor: unknown) => T,
+    etiqueta: string,
+  ): T | undefined {
+    const metadata = pedido.metadata && typeof pedido.metadata === 'object'
+      ? pedido.metadata
+      : {};
+    const intent = metadata[DIAN_PAYMENT_INTENT_KEY];
+    const snapshot = metadata[DIAN_PAYMENT_SNAPSHOT_KEY];
+    const fuentesAnidadas = [snapshot, intent].filter(
+      (valor): valor is Record<string, unknown> => Boolean(valor) && typeof valor === 'object',
+    );
+    const valores = [
+      ...claves.map((clave) => (pedido as unknown as Record<string, unknown>)[clave]),
+      ...claves.map((clave) => metadata[clave]),
+      ...fuentesAnidadas.flatMap((fuente) => claves.map((clave) => fuente[clave])),
+    ].filter((valor) => valor !== undefined && valor !== null && String(valor).trim() !== '');
+
+    if (valores.length === 0) return undefined;
+    const normalizados = valores.map(normalizar);
+    const primero = JSON.stringify(normalizados[0]);
+    if (normalizados.some((valor) => JSON.stringify(valor) !== primero)) {
+      throw new BadRequestException({
+        message: `DIAN: el pedido contiene valores contradictorios para ${etiqueta}`,
+        code: 'PEDIDO_DIAN_PAYMENT_CONFLICT',
+      });
+    }
+    return normalizados[0];
+  }
+
+  private normalizarCondicionPagoDian(valor: unknown): CondicionPago {
+    const normalizado = String(valor).trim().toUpperCase();
+    if (normalizado === '1' || normalizado === 'CONTADO') return CondicionPago.CONTADO;
+    if (['2', 'CREDITO', 'CRÉDITO'].includes(normalizado)) return CondicionPago.CREDITO;
+    throw new BadRequestException({
+      message: 'DIAN: la condición del pedido debe ser CONTADO o CREDITO',
+      code: 'PEDIDO_DIAN_PAYMENT_INVALID',
+    });
+  }
+
+  private normalizarMedioPagoDian(valor: unknown): string {
+    const normalizado = String(valor).trim().toUpperCase();
+    if (/^\d{1,3}$/.test(normalizado) || normalizado === 'ZZZ') return normalizado;
+    throw new BadRequestException({
+      message: 'DIAN: el medio del pedido debe ser un código de 1 a 3 dígitos o ZZZ',
+      code: 'PEDIDO_DIAN_PAYMENT_INVALID',
+    });
+  }
+
+  private normalizarPlazoPagoDian(valor: unknown): number {
+    const normalizado = Number(valor);
+    if (Number.isSafeInteger(normalizado) && normalizado >= 0) return normalizado;
+    throw new BadRequestException({
+      message: 'DIAN: el plazo del pedido debe ser un número entero no negativo',
+      code: 'PEDIDO_DIAN_PAYMENT_INVALID',
+    });
+  }
+
+  private normalizarFechaCalendarioDian(valor: unknown, etiqueta: string): string {
+    const normalizado = String(valor).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizado)) {
+      throw new BadRequestException({
+        message: `DIAN: la fecha de ${etiqueta} del pedido debe usar YYYY-MM-DD`,
+        code: 'PEDIDO_DIAN_PAYMENT_INVALID',
+      });
+    }
+    const fecha = new Date(`${normalizado}T00:00:00.000Z`);
+    if (Number.isNaN(fecha.getTime()) || fecha.toISOString().slice(0, 10) !== normalizado) {
+      throw new BadRequestException({
+        message: `DIAN: la fecha de ${etiqueta} del pedido no existe en el calendario`,
+        code: 'PEDIDO_DIAN_PAYMENT_INVALID',
+      });
+    }
+    return normalizado;
+  }
+
+  private diasEntreFechasCalendario(desde: string, hasta: string): number {
+    return Math.trunc(
+      (Date.parse(`${hasta}T00:00:00.000Z`) - Date.parse(`${desde}T00:00:00.000Z`))
+        / 86_400_000,
+    );
+  }
+
+  private sumarDiasCalendario(fecha: string, dias: number): string {
+    const resultado = new Date(`${fecha}T00:00:00.000Z`);
+    resultado.setUTCDate(resultado.getUTCDate() + dias);
+    return resultado.toISOString().slice(0, 10);
+  }
+
+  private llaveFiscalDianPedido(
+    pedidoId: string,
+    tenantId: string,
+    idempotencyKey?: string,
+  ): string {
+    const canonical = `ventas.cpe.factura:${tenantId}:${pedidoId}`;
+    const provided = String(idempotencyKey ?? '').trim();
+    if (provided && provided !== canonical) {
+      throw new BadRequestException({
+        message: 'DIAN: la llave idempotente del pedido debe ser su identidad fiscal canónica',
+        code: 'PEDIDO_DIAN_IDEMPOTENCY_KEY_INVALID',
+      });
+    }
+    return canonical;
+  }
+
+  private async consumirSnapshotDianPedido(
+    pedidoId: string,
+    tenantId: string,
+    idempotencyKey: string,
+    cpeId: string,
+  ): Promise<void> {
+    const { data, error } = await this.supabase.getClient().rpc(
+      'consumir_snapshot_dian_pedido_tx_531',
+      {
+        p_tenant_id: tenantId,
+        p_pedido_id: pedidoId,
+        p_idempotency_key: idempotencyKey,
+        p_cpe_id: cpeId,
+      },
+    );
+    if (error || data?.state !== 'CONSUMED') {
+      throw new BadRequestException({
+        message: error?.message || 'No se pudo confirmar el consumo del snapshot fiscal DIAN',
+        code: 'PEDIDO_DIAN_LIFECYCLE_CONSUME_FAILED',
+      });
+    }
+  }
+
+  private async abortarSnapshotDianPedidoSeguro(
+    pedidoId: string,
+    tenantId: string,
+    idempotencyKey: string,
+  ): Promise<void> {
+    try {
+      const { data, error } = await this.supabase.getClient().rpc(
+        'abortar_snapshot_dian_pedido_tx_531',
+        {
+          p_tenant_id: tenantId,
+          p_pedido_id: pedidoId,
+          p_idempotency_key: idempotencyKey,
+          p_reason: 'API_CPE_CREATE_FAILED',
+        },
+      );
+      if (error) {
+        this.logger.warn(
+          `No se pudo evaluar el release del snapshot DIAN del pedido ${pedidoId}: ${error.message}`,
+        );
+      } else if (data?.state === 'PREPARED' && data?.released === false) {
+        this.logger.warn(
+          `Snapshot DIAN del pedido ${pedidoId} permanece PREPARED: ya existe evidencia fiscal`,
+        );
+      }
+    } catch (lifecycleError) {
+      // El fallo de limpieza nunca reemplaza el error original de emisión. El
+      // estado conservador es mantener PREPARED para un retry idempotente.
+      this.logger.warn(
+        `No se pudo evaluar el release del snapshot DIAN del pedido ${pedidoId}`,
+        lifecycleError,
+      );
+    }
+  }
+
+  /**
+   * Congela la fecha calendario colombiana y la forma de pago antes de que el
+   * writer reserve el consecutivo DIAN. El CAS sobre `updated_at` evita que dos
+   * emisores congelen intenciones distintas; un retry reutiliza exactamente el
+   * mismo snapshot aunque ya haya cruzado la medianoche en Bogotá.
+   */
+  private async congelarPagoDianPedido(
+    pedido: PedidoVenta & { detalle: PedidoDetalle[] },
+    tenantId: string,
+    idempotencyKey?: string,
+  ): Promise<{
+    pedido: PedidoDianFacturable;
+    cliente: Record<string, unknown>;
+    empresaConfig: Record<string, unknown>;
+  }> {
+    const key = this.llaveFiscalDianPedido(pedido.id, tenantId, idempotencyKey);
+    if (!key) {
+      throw new BadRequestException({
+        message: 'DIAN: la facturación del pedido requiere una llave idempotente estable',
+        code: 'PEDIDO_DIAN_IDEMPOTENCY_REQUIRED',
+      });
+    }
+
+    const { data, error } = await this.supabase.getClient().rpc(
+      'congelar_pago_dian_pedido_tx_531',
+      {
+        p_tenant_id: tenantId,
+        p_pedido_id: pedido.id,
+        p_idempotency_key: key,
+      },
+    );
+    if (error || !data?.metadata || !data?.fiscal_snapshot) {
+      throw new BadRequestException({
+        message: error?.message || 'No se pudo congelar el snapshot fiscal del pedido',
+        code: 'PEDIDO_DIAN_PAYMENT_FREEZE_FAILED',
+      });
+    }
+    const persistedMetadata = data.metadata as Record<string, unknown>;
+    const fiscalSnapshot = data.fiscal_snapshot as DianFiscalOrderSnapshot;
+    const canonicalSnapshot = String(data.fiscal_snapshot_canonical ?? '');
+    let canonicalPayload: unknown;
+    try {
+      canonicalPayload = JSON.parse(canonicalSnapshot);
+    } catch {
+      canonicalPayload = null;
+    }
+    const snapshotPayload = fiscalSnapshot && typeof fiscalSnapshot === 'object'
+      ? { ...fiscalSnapshot } as Record<string, unknown>
+      : {};
+    delete snapshotPayload.sha256;
+    const snapshotHash = canonicalSnapshot
+      ? createHash('sha256').update(canonicalSnapshot, 'utf8').digest('hex')
+      : '';
+    const pedidoCanonico = fiscalSnapshot?.pedido;
+    const detalleCanonico = fiscalSnapshot?.detalle;
+    const clienteCanonico = fiscalSnapshot?.cliente;
+    const empresaCanonica = fiscalSnapshot?.empresa;
+    if (
+      fiscalSnapshot?.version !== 1
+      || !/^[0-9a-f]{64}$/.test(String(fiscalSnapshot?.sha256 ?? ''))
+      || snapshotHash !== fiscalSnapshot?.sha256
+      || !isDeepStrictEqual(canonicalPayload, snapshotPayload)
+      || !isDeepStrictEqual(
+        persistedMetadata[DIAN_PAYMENT_SNAPSHOT_KEY],
+        fiscalSnapshot?.payment_snapshot,
+      )
+      || pedidoCanonico?.id !== pedido.id
+      || pedidoCanonico?.tenant_id !== tenantId
+      || !Array.isArray(detalleCanonico)
+      || detalleCanonico.length === 0
+      || !clienteCanonico
+      || !empresaCanonica
+      || !fiscalSnapshot.payment_snapshot
+      || typeof fiscalSnapshot.payment_snapshot !== 'object'
+      || !fiscalSnapshot.productos
+      || typeof fiscalSnapshot.productos !== 'object'
+    ) {
+      throw new BadRequestException({
+        message: 'DIAN: el snapshot fiscal canónico del pedido es inválido o incompleto',
+        code: 'PEDIDO_DIAN_FISCAL_SNAPSHOT_INVALID',
+      });
+    }
+
+    return {
+      pedido: {
+        ...pedidoCanonico,
+        // A partir de aquí el resolvedor sólo puede ver los términos de pago
+        // incluidos en el payload hash-bound. Intención y claves directas de
+        // metadata no vuelven a competir como fuentes durante la emisión.
+        metadata: {
+          [DIAN_PAYMENT_SNAPSHOT_KEY]: fiscalSnapshot.payment_snapshot,
+        },
+        detalle: detalleCanonico,
+        __dianFiscalSnapshot: fiscalSnapshot,
+      },
+      cliente: clienteCanonico,
+      empresaConfig: empresaCanonica,
+    };
+  }
 
   /**
    * Genera una factura desde un pedido
@@ -50,21 +453,11 @@ export class CPEIntegrationService {
     this.logger.log(`Generando factura desde pedido ${pedido.id}`);
 
     const startedAt = Date.now();
+    let dianLifecycleKey: string | null = null;
+    let dianSnapshotPrepared = false;
 
     try {
-      // 1. Validar que no supere 999 items (Requirement 15.3, 19.5)
-      if (pedido.detalle.length > 999) {
-        throw new BadRequestException({
-          message: 'No se puede generar factura: El pedido supera el límite de 999 ítems permitidos por SUNAT',
-          code: 'MAX_ITEMS_EXCEEDED',
-          details: {
-            items_count: pedido.detalle.length,
-            max_allowed: 999,
-          },
-        });
-      }
-
-      // 2. Validar certificado digital vigente (Requirement 15.5, 19.6, 19.7)
+      // 1. Validar certificado digital vigente (Requirement 15.5, 19.6, 19.7)
       const certificateValidation = await this.validationService.validateCertificate(tenantId);
       if (!certificateValidation.isValid) {
         this.logger.error(`Certificado inválido para tenant ${tenantId}: ${certificateValidation.errors.join(', ')}`);
@@ -80,24 +473,87 @@ export class CPEIntegrationService {
         this.logger.warn(`Advertencias del certificado: ${certificateValidation.warnings.join(', ')}`);
       }
 
-      // 3. Obtener datos del cliente
-      const cliente = await this.obtenerCliente(pedido.cliente_id, tenantId);
+      // 2. Determinar el adaptador fiscal. En Colombia el RPC retorna el corte
+      // canónico completo tomado bajo locks; ningún dato precargado del pedido,
+      // sus líneas o el cliente vuelve a participar en la emisión.
+      let empresaConfig = await this.obtenerEmpresaConfig(tenantId);
+      let pedidoFacturable: PedidoDianFacturable = pedido;
+      let cliente: Record<string, unknown>;
+      if (String(empresaConfig.pais ?? '').trim().toUpperCase() === 'CO') {
+        dianLifecycleKey = this.llaveFiscalDianPedido(
+          pedido.id,
+          tenantId,
+          idempotencyKey,
+        );
+        const congelado = await this.congelarPagoDianPedido(
+          pedido,
+          tenantId,
+          dianLifecycleKey,
+        );
+        dianSnapshotPrepared = true;
+        pedidoFacturable = congelado.pedido;
+        cliente = congelado.cliente;
+        empresaConfig = congelado.empresaConfig;
+      } else {
+        cliente = await this.obtenerCliente(pedido.cliente_id, tenantId);
+      }
 
-      // 4. Obtener configuración de la empresa
-      const empresaConfig = await this.obtenerEmpresaConfig(tenantId);
+      // 3. El límite se valida sobre el detalle canónico, no sobre el DTO que
+      // pudo quedar obsoleto mientras la solicitud esperaba el lock fiscal.
+      if (pedidoFacturable.detalle.length > 999) {
+        throw new BadRequestException({
+          message: 'No se puede generar factura: El pedido supera el límite de 999 ítems permitidos por SUNAT',
+          code: 'MAX_ITEMS_EXCEEDED',
+          details: {
+            items_count: pedidoFacturable.detalle.length,
+            max_allowed: 999,
+          },
+        });
+      }
 
-      // 5. Mapear datos de pedido a formato CPE (Requirement 10.2)
-      const facturaData = await this.mapearPedidoACPE(pedido, cliente, empresaConfig);
+      // 4. Mapear datos de pedido a formato CPE (Requirement 10.2)
+      const facturaData = await this.mapearPedidoACPE(pedidoFacturable, cliente, empresaConfig);
 
       // HARDENING: dedupe de reintentos (ventas→CPE) con una llave estable por pedido.
-      if (idempotencyKey && !(facturaData as any).idempotency_key) {
-        (facturaData as any).idempotency_key = String(idempotencyKey).trim();
+      const cpeIdempotencyKey = dianLifecycleKey
+        ?? (idempotencyKey ? String(idempotencyKey).trim() : null);
+      const mappedIdempotencyKey = String(
+        (facturaData as any).idempotency_key ?? '',
+      ).trim();
+      if (
+        dianLifecycleKey
+        && mappedIdempotencyKey
+        && mappedIdempotencyKey !== dianLifecycleKey
+      ) {
+        throw new BadRequestException({
+          message: 'DIAN: la llave del CPE no coincide con la intención fiscal congelada',
+          code: 'PEDIDO_DIAN_IDEMPOTENCY_CONFLICT',
+        });
+      }
+      if (cpeIdempotencyKey) {
+        (facturaData as any).idempotency_key = cpeIdempotencyKey;
       }
 
       // 6. Llamar a CPEService para generar XML/UBL 2.1, QR, hash, PDF (Requirement 10.3, 19.8)
       this.logger.log('Llamando a CPEService para crear factura');
-      const factura = await this.cpeService.create(facturaData, tenantId, userId);
+      const factura = await this.cpeService.create(
+        facturaData,
+        tenantId,
+        userId,
+        dianLifecycleKey
+          ? { pedidoFiscalOwnerId: pedido.id }
+          : undefined,
+      );
       const documentoId = (factura as any).documento_id ?? (factura as any).documentoId ?? null;
+
+      if (dianSnapshotPrepared && dianLifecycleKey) {
+        await this.consumirSnapshotDianPedido(
+          pedido.id,
+          tenantId,
+          dianLifecycleKey,
+          factura.id,
+        );
+      }
 
       this.logger.log(`✅ Factura generada exitosamente: ${factura.id}`);
 
@@ -137,6 +593,14 @@ export class CPEIntegrationService {
       this.logger.error(`Error generando factura desde pedido ${pedido.id}:`, error);
       const durationMs = Date.now() - startedAt;
 
+      if (dianSnapshotPrepared && dianLifecycleKey) {
+        await this.abortarSnapshotDianPedidoSeguro(
+          pedido.id,
+          tenantId,
+          dianLifecycleKey,
+        );
+      }
+
       // Registrar error para reintentos (Requirement 19.10)
       await this.registrarErrorIntegracion({
         pedidoId: pedido.id,
@@ -154,20 +618,58 @@ export class CPEIntegrationService {
    * Requirements: 10.2, 15.3
    */
   private async mapearPedidoACPE(
-    pedido: PedidoVenta & { detalle: PedidoDetalle[] },
+    pedido: PedidoDianFacturable,
     cliente: any,
     empresaConfig: any,
   ): Promise<CreateFacturaDto> {
-    // ✅ CORRECCIÓN SRP: Obtener tasa de IGV una sola vez usando TaxCalculatorService
-    const tasaIgv = await this.taxCalculator.getTasaIgv(pedido.tenant_id);
+    const fiscalSnapshot = pedido.__dianFiscalSnapshot;
+    const tasaIgv = fiscalSnapshot
+      ? Number(fiscalSnapshot.tasa_impuesto)
+      : await this.taxCalculator.getTasaIgv(pedido.tenant_id);
+    if (!Number.isFinite(tasaIgv) || tasaIgv < 0 || tasaIgv > 1) {
+      throw new BadRequestException({
+        message: 'DIAN: el snapshot fiscal contiene una tasa tributaria inválida',
+        code: 'PEDIDO_DIAN_FISCAL_SNAPSHOT_INVALID',
+      });
+    }
 
     // La afectación del IGV vive en el producto (SUNAT Catálogo 07): sin ella,
     // una factura con bienes exonerados cobraría IGV que no corresponde.
     const productoIds = pedido.detalle.map((item) => item.producto_id);
-    const [afectacionPorProducto, costoPorProducto] = await Promise.all([
-      this.obtenerAfectacionPorProducto(pedido.tenant_id, productoIds),
-      this.obtenerCostoPorProducto(pedido.tenant_id, productoIds),
-    ]);
+    const countryCode = String(empresaConfig.pais ?? '').trim().toUpperCase();
+    const exigeAfectacionExplicita = countryCode === 'CO' && empresaConfig.is_demo !== true;
+    let afectacionPorProducto: Map<string, string>;
+    let costoPorProducto: Map<string, number>;
+    if (fiscalSnapshot) {
+      afectacionPorProducto = new Map<string, string>();
+      costoPorProducto = new Map<string, number>();
+      const faltantes: string[] = [];
+      for (const productoId of Array.from(new Set(productoIds))) {
+        const perfil = fiscalSnapshot.productos[productoId];
+        const afectacion = String(perfil?.afectacion_igv ?? '').trim();
+        if (!perfil || !afectacion) {
+          faltantes.push(productoId);
+          continue;
+        }
+        afectacionPorProducto.set(productoId, afectacion);
+      }
+      if (exigeAfectacionExplicita && faltantes.length > 0) {
+        throw new BadRequestException({
+          message: 'DIAN: el snapshot fiscal no contiene todos los perfiles tributarios',
+          code: 'PEDIDO_DIAN_TAX_PROFILE_INCOMPLETE',
+          details: { producto_ids: faltantes },
+        });
+      }
+    } else {
+      [afectacionPorProducto, costoPorProducto] = await Promise.all([
+        this.obtenerAfectacionPorProducto(
+          pedido.tenant_id,
+          productoIds,
+          exigeAfectacionExplicita,
+        ),
+        this.obtenerCostoPorProducto(pedido.tenant_id, productoIds),
+      ]);
+    }
 
     // Mapear items del pedido a items de factura
     const items: ItemFacturaDto[] = pedido.detalle.map((item) => {
@@ -176,7 +678,9 @@ export class CPEIntegrationService {
       const valorVenta = Number(item.subtotal ?? cantidad * precioUnitario);
       const afectacion = afectacionPorProducto.get(item.producto_id) ?? AFECTACION_IGV.GRAVADO;
       const igv = esGravado(afectacion) ? valorVenta * tasaIgv : 0;
-      const precioVenta = valorVenta + igv;
+      // ItemFacturaDto conserva precio_venta como precio unitario con tributos;
+      // el total de linea se deriva de valorVenta + igv.
+      const precioVenta = cantidad > 0 ? (valorVenta + igv) / cantidad : 0;
 
       return {
         pedido_detalle_id: item.id,
@@ -212,11 +716,15 @@ export class CPEIntegrationService {
       });
     }
 
-    const tipoDocumentoSunat = this.mapearTipoDocumentoSunat(cliente.documento_tipo);
+    const dianIdentity = countryCode === 'CO'
+      ? normalizeDianIdentity(cliente.documento_tipo, numeroDocumentoCliente)
+      : null;
+    const tipoDocumentoReceptor = dianIdentity?.type
+      ?? this.mapearTipoDocumentoSunat(cliente.documento_tipo);
     const razonSocialCliente = cliente.razon_social || cliente.nombre_comercial;
 
-    const esRucValido = tipoDocumentoSunat === '6' && /^\d{11}$/.test(numeroDocumentoCliente);
-    if (tipoDocumentoSunat === '6' && !esRucValido) {
+    const esRucValido = tipoDocumentoReceptor === '6' && /^\d{11}$/.test(numeroDocumentoCliente);
+    if (countryCode !== 'CO' && tipoDocumentoReceptor === '6' && !esRucValido) {
       throw new BadRequestException({
         message: 'El cliente marcado como RUC debe tener 11 dígitos para emitir factura',
         code: 'CLIENTE_RUC_INVALIDO',
@@ -226,13 +734,20 @@ export class CPEIntegrationService {
     // SUNAT: la factura (01) exige receptor RUC; consumidores con DNI, CE,
     // pasaporte u otro documento reciben boleta (03). El pedido no debe forzar
     // una factura sólo por provenir del flujo comercial.
-    const tipoDocumentoCpe = esRucValido
+    const tipoDocumentoCpe = countryCode === 'CO'
       ? TipoDocumento.FACTURA
-      : TipoDocumento.BOLETA;
-    const { serie, numero } = await this.obtenerSerieYNumero(
-      pedido.tenant_id,
-      tipoDocumentoCpe,
-    );
+      : esRucValido
+        ? TipoDocumento.FACTURA
+        : TipoDocumento.BOLETA;
+    const { serie, numero } = countryCode === 'CO' && empresaConfig.is_demo !== true
+      ? {
+          // Esos valores son únicamente un placeholder interno: CpeService los
+          // reemplaza obligatoriamente por la reserva DIAN asociada a la clave
+          // estable del pedido antes de firmar o persistir.
+          serie: String(empresaConfig.dian_resolucion_prefijo ?? '').trim().toUpperCase(),
+          numero: 0,
+        }
+      : await this.obtenerSerieYNumero(pedido.tenant_id, tipoDocumentoCpe);
 
     if (!razonSocialCliente) {
       throw new BadRequestException({
@@ -251,6 +766,10 @@ export class CPEIntegrationService {
       );
     }
 
+    const pagoDian = countryCode === 'CO'
+      ? this.resolverPagoDianPedido(pedido)
+      : null;
+
     // Construir DTO de factura
     const facturaDto: CreateFacturaDto = {
       serie: serie,
@@ -258,8 +777,8 @@ export class CPEIntegrationService {
       tipo_documento: tipoDocumentoCpe,
       ruc_emisor: empresaConfig.ruc,
       razon_social_emisor: empresaConfig.razon_social,
-      tipo_documento_receptor: tipoDocumentoSunat,
-      documento_receptor: numeroDocumentoCliente,
+      tipo_documento_receptor: tipoDocumentoReceptor,
+      documento_receptor: dianIdentity?.canonicalNumber ?? numeroDocumentoCliente,
       razon_social_receptor: razonSocialCliente,
       // Sin dirección se envía vacío, no un texto inventado: el campo es opcional
       // en el contrato y «DIRECCIÓN NO REGISTRADA» viajaba dentro del comprobante
@@ -275,20 +794,46 @@ export class CPEIntegrationService {
       total_exportacion: desgloseIgv.exportacion,
       total_igv: desgloseIgv.igv,
       total_venta: desgloseIgv.total,
-      condicion_pago: CondicionPago.CREDITO,
+      // Colombia conserva el snapshot comercial cuando existe. Si el pedido no
+      // declara pago, el resolvedor usa contado sin crear una deuda ficticia.
+      condicion_pago: pagoDian?.condicionPago ?? CondicionPago.CREDITO,
       pedido_id: pedido.id,
     };
 
-    (facturaDto as any).costo_ventas = Number(
-      pedido.detalle
-        .reduce(
-          (sum, item) =>
-            sum + Number(costoPorProducto.get(item.producto_id) ?? 0) * Number(item.cantidad ?? 0),
-          0,
-        )
-        .toFixed(2),
-    );
+    if (pagoDian) {
+      facturaDto.fecha_emision = pagoDian.fechaEmision;
+      facturaDto.fecha_vencimiento = pagoDian.fechaVencimiento;
+      (facturaDto as any).medio_pago = pagoDian.medioPago;
+      (facturaDto as any).plazo_pago_dias = pagoDian.plazoPagoDias;
+    }
+
+    // En Colombia el writer transaccional facturar_pedido_venta_tx relee y
+    // calcula el costo autoritativo bajo lock. No lo copiamos al snapshot del
+    // pedido porque ese metadata también es visible para el rol vendedor.
+    if (countryCode !== 'CO') {
+      (facturaDto as any).costo_ventas = Number(
+        pedido.detalle
+          .reduce(
+            (sum, item) =>
+              sum + Number(costoPorProducto.get(item.producto_id) ?? 0) * Number(item.cantidad ?? 0),
+            0,
+          )
+          .toFixed(2),
+      );
+    }
     (facturaDto as any).cliente_id = pedido.cliente_id;
+    if (countryCode === 'CO') {
+      // El perfil forma parte del snapshot hash-bound de 531. Se transporta de
+      // manera explícita para que CpeService pueda detectar una edición
+      // concurrente del maestro antes de reservar o firmar el comprobante.
+      (facturaDto as any).dian_receptor_tax_profile = {
+        profile: String(cliente.dian_perfil_fiscal ?? '').trim(),
+        taxLevelCode: String(cliente.dian_responsabilidad_fiscal ?? '').trim(),
+        taxLevelListName: String(cliente.dian_responsabilidad_list_name ?? '').trim(),
+        taxSchemeId: String(cliente.dian_tributo_id ?? '').trim(),
+        taxSchemeName: String(cliente.dian_tributo_nombre ?? '').trim(),
+      };
+    }
 
     return facturaDto;
   }
@@ -300,6 +845,7 @@ export class CPEIntegrationService {
   private async obtenerAfectacionPorProducto(
     tenantId: string,
     productoIds: string[],
+    exigeAfectacionExplicita = false,
   ): Promise<Map<string, string>> {
     const ids = Array.from(new Set((productoIds ?? []).filter(Boolean)));
     const afectaciones = new Map<string, string>();
@@ -316,6 +862,12 @@ export class CPEIntegrationService {
         .in('id', ids);
 
       if (error) {
+        if (exigeAfectacionExplicita) {
+          throw new BadRequestException({
+            message: 'DIAN: no se pudo verificar la afectación tributaria de los productos',
+            code: 'PEDIDO_DIAN_TAX_PROFILE_UNAVAILABLE',
+          });
+        }
         this.logger.warn(
           `No se pudo leer la afectación IGV de los productos del pedido: ${error.message}`,
         );
@@ -323,9 +875,29 @@ export class CPEIntegrationService {
       }
 
       for (const producto of data ?? []) {
-        afectaciones.set(producto.id, String(producto.afectacion_igv ?? AFECTACION_IGV.GRAVADO));
+        if (producto.afectacion_igv !== null && producto.afectacion_igv !== undefined) {
+          afectaciones.set(producto.id, String(producto.afectacion_igv));
+        }
+      }
+
+      if (exigeAfectacionExplicita) {
+        const faltantes = ids.filter((id) => !afectaciones.has(id));
+        if (faltantes.length > 0) {
+          throw new BadRequestException({
+            message: 'DIAN: todos los productos requieren afectación tributaria explícita',
+            code: 'PEDIDO_DIAN_TAX_PROFILE_INCOMPLETE',
+            details: { producto_ids: faltantes },
+          });
+        }
       }
     } catch (error) {
+      if (exigeAfectacionExplicita) {
+        if (error instanceof BadRequestException) throw error;
+        throw new BadRequestException({
+          message: 'DIAN: no se pudo verificar la afectación tributaria de los productos',
+          code: 'PEDIDO_DIAN_TAX_PROFILE_UNAVAILABLE',
+        });
+      }
       this.logger.warn(
         `No se pudo leer la afectación IGV de los productos del pedido: ${(error as Error)?.message}`,
       );
@@ -496,7 +1068,7 @@ export class CPEIntegrationService {
   private async obtenerEmpresaConfig(tenantId: string): Promise<any> {
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('ruc, razon_social, serie_factura, serie_boleta, moneda_defecto, pais, pais_id')
+      .select('ruc, razon_social, serie_factura, serie_boleta, moneda_defecto, pais, pais_id, is_demo, dian_resolucion_prefijo')
       .eq('tenant_id', tenantId)
       .single();
 

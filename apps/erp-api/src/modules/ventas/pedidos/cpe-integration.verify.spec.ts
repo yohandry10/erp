@@ -216,19 +216,8 @@ describe('CPE Integration Verification', () => {
         } as any;
 
         // Mock DB responses
-        // 1. Cliente
-        mockSupabaseClient.single.mockResolvedValueOnce({
-            data: {
-                id: 'cliente-123',
-                documento_tipo: 'RUC',
-                numero_documento: '20123456789',
-                razon_social: 'Cliente Test SAC',
-                direccion: 'Av. Test 123',
-            },
-            error: null,
-        });
-
-        // 2. Empresa Config
+        // 1. Empresa Config: el servicio decide primero la jurisdicción para
+        // saber si debe congelar un snapshot DIAN o seguir el flujo SUNAT.
         mockSupabaseClient.single.mockResolvedValueOnce({
             data: {
                 ruc: '20987654321',
@@ -236,7 +225,20 @@ describe('CPE Integration Verification', () => {
                 moneda_defecto: 'PEN',
                 serie_factura: 'F001',
                 ultimo_numero_factura: 100,
-                pais_id: 1, // Perú
+                pais: 'PE',
+                pais_id: 1,
+            },
+            error: null,
+        });
+
+        // 2. Cliente
+        mockSupabaseClient.single.mockResolvedValueOnce({
+            data: {
+                id: 'cliente-123',
+                documento_tipo: 'RUC',
+                numero_documento: '20123456789',
+                razon_social: 'Cliente Test SAC',
+                direccion: 'Av. Test 123',
             },
             error: null,
         });

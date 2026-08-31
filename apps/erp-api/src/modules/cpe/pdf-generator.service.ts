@@ -691,6 +691,19 @@ export class PdfGeneratorService {
   /**
    * Agrega el encabezado del documento
    */
+  private formatPrintedDocumentNumber(cpeData: any, countryCode: string): string {
+    const series = String(cpeData?.serie ?? '').trim().toUpperCase();
+    const rawNumber = String(cpeData?.numero ?? '').trim();
+    if (countryCode === 'CO') {
+      const numeric = Number(rawNumber);
+      const consecutive = Number.isSafeInteger(numeric) && numeric >= 0
+        ? String(numeric)
+        : rawNumber;
+      return `${series}${consecutive}`;
+    }
+    return `${series}-${rawNumber.padStart(8, '0')}`;
+  }
+
   private addHeader(
     doc: any,
     empresaConfig: any,
@@ -765,7 +778,7 @@ export class PdfGeneratorService {
     // Serie y número
     const numberY = taxIdY + 16;
     doc.fontSize(12).font('Helvetica-Bold')
-      .text(`${cpeData.serie}-${String(cpeData.numero).padStart(8, '0')}`, boxX, numberY, {
+      .text(this.formatPrintedDocumentNumber(cpeData, countryCode), boxX, numberY, {
         width: boxWidth,
         align: 'center'
       });
@@ -799,7 +812,7 @@ export class PdfGeneratorService {
       .text('INFORMACIÓN FISCAL DIAN', 50, y, { width: 495 });
     doc.fontSize(8).font('Helvetica')
       .text(`Autorización de numeración: ${info.authorizationNumber}`, 60, y + 16, { width: 235 })
-      .text(`Prefijo y rango: ${info.authorizationPrefix} ${info.rangeFrom} a ${info.rangeTo}`, 300, y + 16, { width: 235 })
+      .text(`Prefijo y rango: ${info.authorizationPrefix || 'Sin prefijo'} · ${info.rangeFrom} a ${info.rangeTo}`, 300, y + 16, { width: 235 })
       .text(`Vigencia: ${info.validFrom} a ${info.validTo}`, 60, y + 30, { width: 235 })
       .text(`Consecutivo: ${info.consecutive}`, 300, y + 30, { width: 235 })
       .text(`Generación/expedición: ${info.generatedAt}`, 60, y + 44, { width: 475 })
@@ -875,7 +888,7 @@ export class PdfGeneratorService {
       countryCode,
       String(cpeData.tipo_documento_fiscal || cpeData.tipo_documento || ''),
     );
-    const documentNumber = `${String(cpeData.serie || '')}-${String(cpeData.numero ?? '').padStart(8, '0')}`;
+    const documentNumber = this.formatPrintedDocumentNumber(cpeData, countryCode);
 
     doc.fontSize(8).font('Helvetica-Bold')
       .text(issuer, 50, top, { width: 235, lineBreak: false, ellipsis: true })

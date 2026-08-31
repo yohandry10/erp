@@ -5,18 +5,29 @@ import { RmaService } from './rma.service';
 describe('RmaService - fronteras atómicas 456', () => {
   let service: RmaService;
   let rpc: jest.Mock;
+  let maybeSingle: jest.Mock;
 
   beforeEach(async () => {
     rpc = jest.fn().mockResolvedValue({
       data: { success: true, rma_id: 'rma-1', idempotent: false },
       error: null,
     });
+    maybeSingle = jest.fn().mockResolvedValue({ data: { pais: 'PE' }, error: null });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RmaService,
         {
           provide: SupabaseService,
-          useValue: { getClient: () => ({ rpc }) },
+          useValue: {
+            getClient: () => ({
+              rpc,
+              from: jest.fn(() => ({
+                select: jest.fn(() => ({
+                  eq: jest.fn(() => ({ maybeSingle })),
+                })),
+              })),
+            }),
+          },
         },
       ],
     }).compile();
@@ -70,6 +81,46 @@ describe('RmaService - fronteras atómicas 456', () => {
       },
       p_idempotency_key: 'rma:nc:001',
     });
+  });
+
+  it('bloquea en Colombia la RPC SUNAT 07 y dirige al flujo DIAN 91', async () => {
+    maybeSingle.mockResolvedValueOnce({ data: { pais: 'CO' }, error: null });
+
+    await expect(
+      service.generarNotaCredito(
+        'tenant-co',
+        'actor-2',
+        'rma-1',
+        { motivo: 'Devolución por ítems', tipo_nota_credito: '07' },
+        'rma:nc:co:001',
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'RMA_DIAN_CREDIT_NOTE_REQUIRES_REFERENCED_NOTE_FLOW',
+      }),
+    });
+
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('bloquea en Argentina la RPC SUNAT 07 hasta usar la nota referenciada ARCA con CAE', async () => {
+    maybeSingle.mockResolvedValueOnce({ data: { pais: 'AR' }, error: null });
+
+    await expect(
+      service.generarNotaCredito(
+        'tenant-ar',
+        'actor-2',
+        'rma-1',
+        { motivo: 'Devolución por ítems', tipo_nota_credito: '07' },
+        'rma:nc:ar:001',
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'RMA_ARCA_CREDIT_NOTE_REQUIRES_REFERENCED_NOTE_FLOW',
+      }),
+    });
+
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it('aplica, reembolsa y revierte el pasivo sin simular un cobro', async () => {

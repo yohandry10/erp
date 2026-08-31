@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useApi } from '@/hooks/use-api'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 interface CuentaPorCobrarResumen {
   id: string
@@ -39,6 +40,8 @@ const formatCurrency = (value: number, currency: string = 'PEN') =>
 
 export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCreditoModalProps) {
   const { post } = useApi({ showSuccessToast: true })
+  const country = useCountryContext()
+  const isColombia = country.paisCodigo === 'CO'
   const [monto, setMonto] = useState('')
   const [fechaEmision, setFechaEmision] = useState(() => new Date().toISOString().split('T')[0])
   const [serie, setSerie] = useState('')
@@ -46,6 +49,7 @@ export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCre
   const [motivo, setMotivo] = useState('Ajuste por nota de crédito')
   const [referencia, setReferencia] = useState('')
   const [notas, setNotas] = useState('')
+  const [codigoMotivo, setCodigoMotivo] = useState('10')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const retryIntent = useRef<{ fingerprint: string; key: string } | null>(null)
@@ -58,8 +62,9 @@ export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCre
     setMonto(String(cuenta.saldo ?? ''))
     setSerie(cuenta.serie ?? '')
     setNumero(cuenta.numero ?? '')
+    setCodigoMotivo(isColombia ? '1' : '10')
     setError(null)
-  }, [isOpen, cuenta])
+  }, [isOpen, cuenta, isColombia])
 
   const handleClose = () => {
     if (submitting) return
@@ -94,7 +99,7 @@ export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCre
         motivo: motivo || undefined,
         referencia: referencia || undefined,
         notas: notas || undefined,
-        codigo_motivo: '10',
+        codigo_motivo: codigoMotivo,
       }
 
       const fingerprint = JSON.stringify(basePayload)
@@ -124,9 +129,11 @@ export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCre
     <Dialog open={isOpen} onOpenChange={(open) => (open ? undefined : handleClose())}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Aplicar nota de crédito</DialogTitle>
+          <DialogTitle>{isColombia ? 'Emitir nota crédito DIAN 91' : 'Aplicar nota de crédito'}</DialogTitle>
           <DialogDescription>
-            Registra una nota de crédito asociada a la cuenta seleccionada.
+            {isColombia
+              ? 'Crea una nota 91 referenciada. La CxC sólo se ajustará después de que la DIAN acepte el documento.'
+              : 'Registra una nota de crédito asociada a la cuenta seleccionada.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -171,6 +178,36 @@ export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCre
             </div>
 
             <div>
+              <Label htmlFor="nc-codigo-motivo">Código de motivo</Label>
+              <select
+                id="nc-codigo-motivo"
+                value={codigoMotivo}
+                onChange={(event) => setCodigoMotivo(event.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {(isColombia
+                  ? [
+                      ['1', 'Devolución parcial o no aceptación parcial'],
+                      ['2', 'Anulación de factura electrónica'],
+                      ['3', 'Rebaja o descuento'],
+                      ['4', 'Ajuste de precio'],
+                      ['5', 'Otros'],
+                    ]
+                  : [
+                      ['04', 'Descuento global'],
+                      ['05', 'Descuento por ítem'],
+                      ['08', 'Bonificación'],
+                      ['09', 'Disminución en el valor'],
+                      ['10', 'Otros conceptos'],
+                      ['11', 'Ajuste de exportación'],
+                      ['12', 'Ajuste IVAP'],
+                      ['13', 'Corrección del monto neto pendiente'],
+                    ]
+                ).map(([code, label]) => <option key={code} value={code}>{code} - {label}</option>)}
+              </select>
+            </div>
+
+            <div>
               <Label htmlFor="nc-motivo">Motivo</Label>
               <Input
                 id="nc-motivo"
@@ -208,7 +245,7 @@ export function NotaCreditoModal({ isOpen, cuenta, onClose, onSuccess }: NotaCre
               Cancelar
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? 'Aplicando...' : 'Aplicar nota de crédito'}
+              {submitting ? 'Procesando...' : isColombia ? 'Crear nota DIAN 91' : 'Aplicar nota de crédito'}
             </Button>
           </DialogFooter>
         </form>

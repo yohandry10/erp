@@ -14,6 +14,8 @@ import { useApi } from '@/hooks/use-api'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 const createCollectionIntentKey = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -66,6 +68,7 @@ const formatCurrency = (value: number, currency: string = 'PEN') =>
   }).format(value || 0)
 
 export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalProps) {
+  const country = useCountryContext()
   const { get, post } = useApi({ showSuccessToast: true })
   const [monto, setMonto] = useState('')
   const [fechaPago, setFechaPago] = useState(() => new Date().toISOString().split('T')[0])
@@ -209,9 +212,9 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
 
   const tituloDocumento = useMemo(() => {
     if (!cuenta) return ''
-    const numero = [cuenta.serie, cuenta.numero].filter(Boolean).join('-')
+    const numero = formatFiscalDocumentNumber(country.paisCodigo, cuenta.serie, cuenta.numero)
     return numero || cuenta.id
-  }, [cuenta])
+  }, [country.paisCodigo, cuenta])
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (open ? undefined : handleClose())}>

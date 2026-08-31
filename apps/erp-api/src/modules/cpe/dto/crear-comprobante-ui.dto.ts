@@ -3,9 +3,13 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
+  Max,
   MaxLength,
   Min,
   ValidateNested,
@@ -55,6 +59,24 @@ export class ComprobanteItemUiDto {
   @IsOptional() @IsNumber() @Min(0) impuesto_igv?: number;
   @IsOptional() @IsNumber() @Min(0) total_impuestos?: number;
   @IsOptional() @IsNumber() @Min(0) total?: number;
+
+  // Impuesto Nacional al Consumo. El normalizador fiscal soporta el nombre
+  // histórico SUNAT (`isc`), el nombre DIAN (`inc`) y sus alias snake/camel.
+  @IsOptional() @IsNumber() @Min(0) impuesto_isc?: number;
+  @IsOptional() @IsNumber() @Min(0) impuesto_inc?: number;
+  @IsOptional() @IsNumber() @Min(0) impuestoInc?: number;
+  @IsOptional() @IsNumber() @Min(0) inc?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(100) tasa_isc?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(100) tasa_inc?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(100) tasaInc?: number;
+
+  // Afectación tributaria por línea. No puede reconstruirse a partir del IGV
+  // ni de los totales del documento: una línea exenta y una excluida tienen
+  // impuesto cero, pero se declaran de forma distinta ante DIAN.
+  @IsOptional() @IsIn(['10', '20', '30', '40']) afectacion_igv?: string;
+  @IsOptional() @IsIn(['10', '20', '30', '40']) tipo_afectacion_igv?: string;
+  @IsOptional() @IsIn(['10', '20', '30', '40']) afectacionIgv?: string;
+  @IsOptional() @IsIn(['10', '20', '30', '40']) tipoAfectacionIgv?: string;
 }
 
 export class CrearComprobanteUiDto {
@@ -67,6 +89,9 @@ export class CrearComprobanteUiDto {
   @IsOptional() @IsNumber() @Min(1) correlativo?: number;
 
   // Receptor
+  @IsOptional()
+  @IsUUID()
+  cliente_id?: string;
   @IsOptional() @IsString() @MaxLength(20) documento_receptor?: string;
   @IsOptional() @IsString() @MaxLength(20) clienteRuc?: string;
   @IsOptional() @IsString() @MaxLength(20) clienteDocumento?: string;
@@ -80,6 +105,13 @@ export class CrearComprobanteUiDto {
 
   @IsOptional() @IsString() @MaxLength(10) moneda?: string;
 
+  @IsOptional() @IsIn(['CONTADO', 'CREDITO']) condicion_pago?: 'CONTADO' | 'CREDITO';
+  @IsOptional() @IsIn(['CONTADO', 'CREDITO']) condicionPago?: 'CONTADO' | 'CREDITO';
+  @IsOptional() @IsString() @MaxLength(3) medio_pago?: string;
+  @IsOptional() @IsString() @MaxLength(3) medioPago?: string;
+  @IsOptional() @IsInt() @Min(0) plazo_pago_dias?: number;
+  @IsOptional() @IsInt() @Min(0) plazoPagoDias?: number;
+
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(500)
@@ -90,6 +122,12 @@ export class CrearComprobanteUiDto {
   // Totales: si no llegan, el servicio los deriva de los ítems.
   @IsOptional() @IsNumber() total_gravadas?: number;
   @IsOptional() @IsNumber() subtotal?: number;
+  @IsOptional() @IsNumber() total_exoneradas?: number;
+  @IsOptional() @IsNumber() totalExoneradas?: number;
+  @IsOptional() @IsNumber() total_inafectas?: number;
+  @IsOptional() @IsNumber() totalInafectas?: number;
+  @IsOptional() @IsNumber() total_exportacion?: number;
+  @IsOptional() @IsNumber() totalExportacion?: number;
   @IsOptional() @IsNumber() total_igv?: number;
   @IsOptional() @IsNumber() totalIgv?: number;
   @IsOptional() @IsNumber() total_venta?: number;
@@ -100,8 +138,18 @@ export class CrearComprobanteUiDto {
   @IsOptional() @IsString() @MaxLength(30) fecha_vencimiento?: string;
   @IsOptional() @IsString() @MaxLength(30) fechaVencimiento?: string;
 
-  @IsOptional() @IsString() @MaxLength(200) idempotency_key?: string;
-  @IsOptional() @IsString() @MaxLength(200) idempotencyKey?: string;
+  // Se dejan las propiedades en una línea propia: además de ValidationPipe,
+  // el verificador estático Web→DTO las extrae del contrato y debe poder
+  // demostrar que el payload real no será rechazado por whitelist.
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  idempotency_key?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  idempotencyKey?: string;
 
   /** Aceptados y descartados: el formulario los envía y el servicio no los lee. */
   @IsOptional() @IsString() @MaxLength(10) tipoOperacion?: string;

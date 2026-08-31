@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { TipoCliente, TipoDocumento, Cliente } from '@/types/ventas'
+import { TipoCliente, TipoDocumento, Cliente, DianPerfilFiscal } from '@/types/ventas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,9 +13,15 @@ import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { validateArgentinaCuit, validateCountryTaxId } from '@/lib/country-tax-id'
+import {
+  dianPerfilFiscalSchema,
+  hasCapturableColombiaNitLength,
+  validateClienteFiscalForm,
+} from '@/lib/validations/cliente-fiscal'
 
-// Simplified validation schema for quick create
-const quickClienteSchema = z.object({
+// El alta rápida usa el mismo contrato fiscal que el maestro completo: DIAN
+// exige una elección explícita y el DV del NIT se comprueba antes del POST.
+const createQuickClienteSchema = (isColombia: boolean) => z.object({
   tipo: z.nativeEnum(TipoCliente),
   documento_tipo: z.nativeEnum(TipoDocumento),
   documento_numero: z.string()
@@ -25,27 +31,11 @@ const quickClienteSchema = z.object({
   razon_social: z.string()
     .min(3, 'Mínimo 3 caracteres')
     .max(255, 'Máximo 255 caracteres'),
-  arca_condicion_iva: z.string().max(80).optional()
-}).refine((data) => {
-  if ([TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI].includes(data.documento_tipo)) {
-    return data.documento_numero.length === 11 && /^\d+$/.test(data.documento_numero)
-  }
-  if (data.documento_tipo === TipoDocumento.NIT) {
-    return data.documento_numero.length === 10 && /^\d+$/.test(data.documento_numero)
-  }
-  if ([TipoDocumento.CC, TipoDocumento.TI].includes(data.documento_tipo)) {
-    return /^[0-9]{6,10}$/.test(data.documento_numero)
-  }
-  if (data.documento_tipo === TipoDocumento.DNI) {
-    return data.documento_numero.length === 8 && /^\d+$/.test(data.documento_numero)
-  }
-  return true
-}, {
-  message: 'El documento no tiene la longitud o formato requerido',
-  path: ['documento_numero']
-})
+  arca_condicion_iva: z.string().max(80).optional(),
+  dian_perfil_fiscal: dianPerfilFiscalSchema.optional().or(z.literal(''))
+}).superRefine((data, context) => validateClienteFiscalForm(data, isColombia, context))
 
-type QuickClienteFormData = z.infer<typeof quickClienteSchema>
+type QuickClienteFormData = z.infer<ReturnType<typeof createQuickClienteSchema>>
 
 interface ClienteQuickCreateProps {
   isOpen: boolean
@@ -62,9 +52,9 @@ export default function ClienteQuickCreate({
   const country = useCountryContext()
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
+  const quickClienteSchema = useMemo(() => createQuickClienteSchema(isColombia), [isColombia])
   const taxIdType = isArgentina ? TipoDocumento.CUIT : isColombia ? TipoDocumento.NIT : TipoDocumento.RUC
   const taxIdLabel = isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC'
-  const taxIdLength = isColombia ? 10 : 11
   const [validatingRuc, setValidatingRuc] = useState(false)
   const [rucValidated, setRucValidated] = useState(false)
 
@@ -82,7 +72,8 @@ export default function ClienteQuickCreate({
       documento_tipo: isColombia ? TipoDocumento.CC : TipoDocumento.DNI,
       documento_numero: '',
       razon_social: '',
-      arca_condicion_iva: isArgentina ? 'CONSUMIDOR_FINAL' : undefined
+      arca_condicion_iva: isArgentina ? 'CONSUMIDOR_FINAL' : undefined,
+      dian_perfil_fiscal: ''
     }
   })
 
@@ -95,14 +86,20 @@ export default function ClienteQuickCreate({
     if (country.loading) return
     setValue('documento_tipo', isColombia ? TipoDocumento.CC : TipoDocumento.DNI)
     setValue('documento_numero', '')
+    setValue('dian_perfil_fiscal', '')
     setRucValidated(false)
   }, [country.loading, country.paisCodigo, isColombia, setValue])
 
   const handleValidarRuc = async () => {
-    if ((!argentinaTaxIdentity && documentoTipo !== taxIdType) || documentoNumero.length !== taxIdLength) {
+    const validLength = isColombia
+      ? hasCapturableColombiaNitLength(documentoNumero)
+      : /^\d{11}$/.test(documentoNumero)
+    if ((!argentinaTaxIdentity && documentoTipo !== taxIdType) || !validLength) {
       toast({
         title: 'Error',
-        description: `El ${taxIdLabel} debe tener ${taxIdLength} dígitos`,
+        description: isColombia
+          ? 'El NIT debe tener 10 u 11 dígitos, incluido el DV'
+          : `El ${taxIdLabel} debe tener 11 dígitos`,
         variant: 'destructive'
       })
       return
@@ -163,7 +160,12 @@ export default function ClienteQuickCreate({
 
   const onSubmit = async (data: QuickClienteFormData) => {
     try {
-      const response = await post('/api/ventas/clientes', data)
+      const payload = {
+        ...data,
+        arca_condicion_iva: isArgentina ? data.arca_condicion_iva : undefined,
+        dian_perfil_fiscal: isColombia ? data.dian_perfil_fiscal || undefined : undefined,
+      }
+      const response = await post('/api/ventas/clientes', payload)
       const responseData: any = unwrap(response)
 
       if (responseData?.id) {
@@ -186,7 +188,17 @@ export default function ClienteQuickCreate({
   }
 
   const handleClose = () => {
-    reset()
+    // react-hook-form conserva los defaultValues del primer render. En un
+    // cambio de tenant/país, reset() sin valores podía reabrir Colombia con
+    // DNI aunque el formulario visible ya estuviese en contexto DIAN.
+    reset({
+      tipo: TipoCliente.PERSONA,
+      documento_tipo: isColombia ? TipoDocumento.CC : TipoDocumento.DNI,
+      documento_numero: '',
+      razon_social: '',
+      arca_condicion_iva: isArgentina ? 'CONSUMIDOR_FINAL' : undefined,
+      dian_perfil_fiscal: '',
+    })
     setRucValidated(false)
     onClose()
   }
@@ -214,7 +226,7 @@ export default function ClienteQuickCreate({
           <button
             onClick={handleClose}
             className="text-muted-foreground hover:text-foreground/80 transition-colors"
-            disabled={isSubmitting}
+            disabled={isSubmitting || country.loading}
           >
             <X className="w-5 h-5" />
           </button>
@@ -229,7 +241,7 @@ export default function ClienteQuickCreate({
               id="quick-tipo"
               {...register('tipo')}
               className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitting}
+              disabled={isSubmitting || country.loading}
             >
               <option value={TipoCliente.PERSONA}>Persona Natural</option>
               <option value={TipoCliente.EMPRESA}>Empresa</option>
@@ -246,7 +258,7 @@ export default function ClienteQuickCreate({
               id="quick-documento-tipo"
               {...register('documento_tipo', { onChange: () => setRucValidated(false) })}
               className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitting}
+              disabled={isSubmitting || country.loading}
             >
               {isColombia ? (
                 <>
@@ -280,7 +292,7 @@ export default function ClienteQuickCreate({
                 id="quick-arca-condicion-iva"
                 {...register('arca_condicion_iva', { required: true })}
                 className="w-full px-3 py-2 border border-border rounded-md bg-background"
-                disabled={isSubmitting}
+                disabled={isSubmitting || country.loading}
               >
                 <option value="RESPONSABLE_INSCRIPTO">Responsable inscripto</option>
                 <option value="MONOTRIBUTO">Monotributo</option>
@@ -293,11 +305,35 @@ export default function ClienteQuickCreate({
             </div>
           )}
 
+          {isColombia && (
+            <div className="space-y-2">
+              <Label htmlFor="quick-dian-perfil-fiscal">Perfil tributario DIAN *</Label>
+              <select
+                id="quick-dian-perfil-fiscal"
+                {...register('dian_perfil_fiscal')}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                disabled={isSubmitting || country.loading}
+              >
+                <option value="">Seleccione el perfil tributario</option>
+                <option value={DianPerfilFiscal.CONSUMIDOR_FINAL}>Consumidor final</option>
+                <option value={DianPerfilFiscal.ADQUIRIENTE_NIT_B2B}>Adquirente con NIT (B2B)</option>
+              </select>
+              {errors.dian_perfil_fiscal && (
+                <p className="text-sm text-destructive">{errors.dian_perfil_fiscal.message}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                B2B exige NIT con DV válido; consumidor final usa un documento personal.
+              </p>
+            </div>
+          )}
+
           {/* Número de Documento */}
           <div className="space-y-2">
             <Label htmlFor="quick-documento-numero">
               Número de Documento *
-              {(documentoTipo === taxIdType || argentinaTaxIdentity) && ` (${taxIdLength} dígitos)`}
+              {(documentoTipo === taxIdType || argentinaTaxIdentity) && (
+                isColombia ? ' (10 u 11 dígitos, DV incluido)' : ' (11 dígitos)'
+              )}
               {documentoTipo === TipoDocumento.DNI && ' (8 dígitos)'}
             </Label>
             <div className="flex gap-2">
@@ -309,14 +345,21 @@ export default function ClienteQuickCreate({
                   documentoTipo === TipoDocumento.DNI ? '12345678' :
                   'Número de documento'
                 }
-                disabled={isSubmitting}
+                disabled={isSubmitting || country.loading}
               />
               {(documentoTipo === taxIdType || argentinaTaxIdentity) && (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleValidarRuc}
-                  disabled={isSubmitting || validatingRuc || documentoNumero.length !== taxIdLength}
+                  disabled={
+                    isSubmitting ||
+                    country.loading ||
+                    validatingRuc ||
+                    (isColombia
+                      ? !hasCapturableColombiaNitLength(documentoNumero)
+                      : documentoNumero.length !== 11)
+                  }
                   className="whitespace-nowrap"
                 >
                   {validatingRuc ? (
@@ -343,7 +386,7 @@ export default function ClienteQuickCreate({
               id="quick-razon-social"
               {...register('razon_social')}
               placeholder="Nombre completo o razón social"
-              disabled={isSubmitting}
+              disabled={isSubmitting || country.loading}
             />
             {errors.razon_social && (
               <p className="text-sm text-destructive">{errors.razon_social.message}</p>
@@ -363,13 +406,13 @@ export default function ClienteQuickCreate({
               type="button"
               variant="outline"
               onClick={handleClose}
-              disabled={isSubmitting}
+              disabled={isSubmitting || country.loading}
             >
               Cancelar
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || country.loading}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {isSubmitting ? (

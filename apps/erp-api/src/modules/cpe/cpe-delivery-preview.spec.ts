@@ -84,6 +84,115 @@ describe('CpeDeliveryService - datos de la vista A4', () => {
     expect(configChain.select).toHaveBeenCalledWith(expect.stringContaining('logo_url'));
   });
 
+  it('no expone internals ni costos al consultar un CPE con permiso genérico de lectura', async () => {
+    const sensitiveCpe = {
+      id: 'cpe-safe-detail',
+      tenant_id: 'tenant-safe-detail',
+      tipo_documento: '01',
+      serie: 'F001',
+      numero: 7,
+      fecha_emision: '2026-08-30',
+      moneda: 'PEN',
+      items: [{
+        codigo: 'SKU-1', descripcion: 'Producto', cantidad: 1,
+        precio_unitario: 118, valor_venta: 100, igv: 18, total: 118,
+        costo: 40, costo_unitario: 40, precio_compra: 40,
+        metadata: { proveedor: 'privado' }, idempotency_key: 'line-secret',
+      }],
+      total_gravadas: 100,
+      total_igv: 18,
+      total_venta: 118,
+      metadata: { private_note: 'secret', idempotency_key: 'metadata-secret' },
+      idempotency_key: 'cpe-secret',
+      xml_firmado: '<SignedInvoice>secret</SignedInvoice>',
+      hash_firma: 'signature-secret',
+      cdr_sunat: '<CDR>secret</CDR>',
+      issuer_snapshot: { private_certificate_hash: 'secret' },
+      fiscal_authority_evidence: { private_transport_trace: 'secret' },
+      created_at: '2026-08-30T12:00:00.000Z',
+      updated_at: '2026-08-30T12:00:00.000Z',
+    };
+    const cpeChain: any = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: sensitiveCpe, error: null }),
+    };
+    const client = { from: jest.fn(() => cpeChain) };
+    const service = new CpeDeliveryService(
+      { getClient: () => client } as any, {} as any, {} as any, {} as any,
+    );
+
+    const result = await service.findOne('cpe-safe-detail', 'tenant-safe-detail') as any;
+
+    expect(cpeChain.select).not.toHaveBeenCalledWith('*');
+    expect(result).toMatchObject({ id: 'cpe-safe-detail', items: [{ descripcion: 'Producto' }] });
+    for (const privateField of [
+      'tenant_id', 'metadata', 'idempotency_key', 'xml_firmado',
+      'hash_firma', 'cdr_sunat', 'issuer_snapshot', 'fiscal_authority_evidence',
+    ]) {
+      expect(result).not.toHaveProperty(privateField);
+    }
+    expect(result.items[0]).not.toEqual(expect.objectContaining({
+      costo: expect.anything(),
+      costo_unitario: expect.anything(),
+      precio_compra: expect.anything(),
+      metadata: expect.anything(),
+      idempotency_key: expect.anything(),
+    }));
+  });
+
+  it('preserva la descarga XML explícita pero consulta sólo sus columnas necesarias', async () => {
+    const cpeChain: any = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({
+        data: {
+          tipo_documento: '01', pais: 'PE', issuer_snapshot: null,
+          xml_firmado: '<Invoice>contenido autorizado</Invoice>',
+        },
+        error: null,
+      }),
+    };
+    const client = { from: jest.fn(() => cpeChain) };
+    const service = new CpeDeliveryService(
+      { getClient: () => client } as any, {} as any, {} as any, {} as any,
+    );
+
+    await expect(service.getSignedXml('cpe-xml', 'tenant-xml'))
+      .resolves.toBe('<Invoice>contenido autorizado</Invoice>');
+    expect(cpeChain.select).toHaveBeenCalledWith(
+      'tipo_documento,pais,issuer_snapshot,xml_firmado',
+    );
+  });
+
+  it('mantiene el contrato útil de create/list sin adjuntar artefactos ni internals', () => {
+    const service = new CpeDeliveryService(
+      {} as any, {} as any, {} as any, {} as any,
+    );
+
+    const result = service.mapToDto({
+      id: 'cpe-public-create', documento_id: 'doc-public-create',
+      tipo_documento: '01', serie: 'FV', numero: 10,
+      estado: 'FIRMADO', sunat_status: 'READY', hash: 'CUFE-PUBLICO',
+      moneda: 'COP', items: [], total_gravadas: 100,
+      total_igv: 19, total_venta: 119,
+      tenant_id: 'tenant-secret', idempotency_key: 'key-secret',
+      metadata: { private: true }, costo_ventas: 45,
+      xml_firmado: '<Invoice>secret</Invoice>', cdr_sunat: '<CDR>secret</CDR>',
+    }) as any;
+
+    expect(result).toMatchObject({
+      id: 'cpe-public-create', documento_id: 'doc-public-create',
+      numero: 10, estado: 'FIRMADO', sunat_status: 'READY', hash: 'CUFE-PUBLICO',
+    });
+    for (const privateField of [
+      'tenant_id', 'idempotency_key', 'metadata', 'costo_ventas',
+      'xml_firmado', 'cdr_sunat', 'hash_firma',
+    ]) {
+      expect(result).not.toHaveProperty(privateField);
+    }
+  });
+
   it('expone el contrato QR fiscal genérico para Colombia sin alias SUNAT', async () => {
     (perfilPaisDelTenant as jest.Mock).mockResolvedValueOnce({ codigo: 'CO' });
     const cpeChain: any = {
@@ -94,7 +203,10 @@ describe('CpeDeliveryService - datos de la vista A4', () => {
           id: 'cpe-co',
           tenant_id: 'tenant-co',
           tipo_documento: '01',
-          serie: 'FV01',
+          // En DIAN `serie` conserva únicamente el prefijo autorizado. El
+          // identificador visible se obtiene como prefijo + consecutivo, sin
+          // sufijos inventados ni relleno del navegador.
+          serie: 'FV',
           numero: 9,
           hash: 'CUFE-CO-9',
           fecha_emision: '2026-08-29T10:15:00-05:00',

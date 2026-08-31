@@ -187,14 +187,14 @@ describe('representación impresa CPE', () => {
     service.addDianFiscalInfo(doc, {
       authorizationNumber: '18760000001', authorizationPrefix: 'FE',
       rangeFrom: 1, rangeTo: 50000, validFrom: '2026-01-01', validTo: '2027-12-31',
-      consecutive: 'FE-00000009', generatedAt: '2026-08-29T10:15:00-05:00',
+      consecutive: 'FE9', generatedAt: '2026-08-29T10:15:00-05:00',
       paymentForm: 'CREDITO', paymentTerm: '30 días', paymentMethod: 'TRANSFERENCIA',
       taxQualities: ['Gran contribuyente'], softwareId: 'SOFTWARE-DIAN-01',
     });
     expect(calls).toEqual(expect.arrayContaining([
       'INFORMACIÓN FISCAL DIAN',
       'Autorización de numeración: 18760000001',
-      'Prefijo y rango: FE 1 a 50000',
+      'Prefijo y rango: FE · 1 a 50000',
       'Generación/expedición: 2026-08-29T10:15:00-05:00',
       'Pago: CREDITO · 30 días · TRANSFERENCIA',
       'Software DIAN: SOFTWARE-DIAN-01',
@@ -371,7 +371,7 @@ describe('representación impresa CPE', () => {
 
   it.each([
     ['PE', '01', 'RUC: 20600000013', 'FACTURA ELECTRÓNICA F001-00000001'],
-    ['CO', '91', 'NIT: 9001234567', 'NOTA DE CRÉDITO ELECTRÓNICA NC01-00000002'],
+    ['CO', '91', 'NIT: 9001234567', 'NOTA DE CRÉDITO ELECTRÓNICA NC012'],
     ['AR', '002', 'CUIT: 30700000001', 'NOTA DE DÉBITO ELECTRÓNICA A 00005-00000003'],
   ])(
     'identifica emisor y comprobante en el encabezado de continuación %s',
@@ -418,7 +418,7 @@ describe('representación impresa CPE', () => {
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
     const pdf = await service.buildPdfDocument(
       {
-        tipo_documento: '01', ruc_emisor: '9001234567', serie: 'FV01', numero: 20,
+        tipo_documento: '01', ruc_emisor: '9001234567', serie: 'FV', numero: 20,
         simulated_origin: false,
         fiscal_authority_evidence: {
           status: 'ACCEPTED', authority: 'DIAN', country_code: 'CO',

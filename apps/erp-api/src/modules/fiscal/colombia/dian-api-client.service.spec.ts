@@ -490,6 +490,29 @@ describe('DianApiClientService SOAP 1.2', () => {
     });
   });
 
+  it.each([
+    ['ausente', ''],
+    ['vacío', '<Prefix></Prefix>'],
+  ])('acepta el prefijo DIAN %s cuando la resolución no lo asigna', async (_case, prefixXml) => {
+    const service = new DianApiClientService();
+    jest.spyOn((service as any).axiosInstance, 'post').mockResolvedValue({
+      status: 200,
+      data: `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><GetNumberingRangeResponse><GetNumberingRangeResult><OperationCode>100</OperationCode><ResponseList><NumberRangeResponse><ResolutionNumber>18764000002</ResolutionNumber>${prefixXml}<FromNumber>7</FromNumber><ToNumber>900</ToNumber><ValidDateFrom>2026-01-01</ValidDateFrom><ValidDateTo>2027-01-01</ValidDateTo><TechnicalKey>clave-sin-prefijo</TechnicalKey></NumberRangeResponse></ResponseList></GetNumberingRangeResult></GetNumberingRangeResponse></s:Body></s:Envelope>`,
+    });
+    await expect(service.consultarRangosAutorizados(config())).resolves.toEqual({
+      rangos: [expect.objectContaining({ prefijo: '', desde: 7, hasta: 900 })],
+    });
+  });
+
+  it('descarta un prefijo DIAN que excede cuatro alfanuméricos', async () => {
+    const service = new DianApiClientService();
+    jest.spyOn((service as any).axiosInstance, 'post').mockResolvedValue({
+      status: 200,
+      data: '<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><GetNumberingRangeResponse><GetNumberingRangeResult><OperationCode>100</OperationCode><ResponseList><NumberRangeResponse><ResolutionNumber>18764000003</ResolutionNumber><Prefix>ABCDE</Prefix><FromNumber>1</FromNumber><ToNumber>9</ToNumber><ValidDateFrom>2026-01-01</ValidDateFrom><ValidDateTo>2027-01-01</ValidDateTo><TechnicalKey>clave</TechnicalKey></NumberRangeResponse></ResponseList></GetNumberingRangeResult></GetNumberingRangeResponse></s:Body></s:Envelope>',
+    });
+    await expect(service.consultarRangosAutorizados(config())).resolves.toEqual({ rangos: [] });
+  });
+
   it('no inventa SendEventUpdateStatus desde CUFE y motivo parciales', async () => {
     const service = new DianApiClientService();
     const post = jest.spyOn((service as any).axiosInstance, 'post');

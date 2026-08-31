@@ -102,7 +102,7 @@ export class ActualizarEmpresaConfigurationDto {
   @IsOptional() @IsString() @MaxLength(60) dianTipoContribuyente?: string;
   @IsOptional() @IsString() @MaxLength(60) dian_tipo_contribuyente?: string;
   @IsOptional() @IsString() @MaxLength(60) dianResolucionNumero?: string;
-  @IsOptional() @IsString() @MaxLength(20) dianResolucionPrefijo?: string;
+  @IsOptional() @IsString() @MaxLength(4) dianResolucionPrefijo?: string;
   @IsOptional() @IsInt() @Min(0) dianResolucionDesde?: number;
   @IsOptional() @IsInt() @Min(0) dianResolucionHasta?: number;
   @IsOptional() @IsString() @MaxLength(20) dianResolucionFechaInicio?: string;

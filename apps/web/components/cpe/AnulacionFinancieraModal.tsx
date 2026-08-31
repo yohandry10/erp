@@ -6,6 +6,8 @@ import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 type Cobro = {
   id: string
@@ -27,8 +29,8 @@ type SesionCaja = {
 }
 
 type EstadoAnulacion = {
-  cpe: { id: string; serie: string; numero: number; moneda: string; estado: string; tipo_documento?: string }
-  nota_credito?: { id: string; serie: string; numero: number; estado: string; estado_sunat?: string; cdr_sunat?: string } | null
+  cpe: { id: string; serie?: string; numero: number; moneda: string; estado: string; tipo_documento?: string }
+  nota_credito?: { id: string; serie?: string; numero: number; estado: string; estado_sunat?: string; cdr_sunat?: string } | null
   cxc?: { id: string; numero_documento?: string; estado: string; monto_pendiente?: number; saldo_pendiente?: number; saldo?: number } | null
   cobros: Cobro[]
   ajustes_financieros: Array<{
@@ -69,6 +71,7 @@ const isCash = (cobro: Cobro) =>
   ['EFECTIVO', 'CAJA', 'CASH'].includes(String(cobro.metodo_pago ?? '').toUpperCase())
 
 export function AnulacionFinancieraModal({ cpeId, label, onClose, onCompleted }: Props) {
+  const country = useCountryContext()
   const { get, post } = useApi({ throwOnError: true })
   const { toast } = useToast()
   const requestKey = useRef(newKey('solicitar-anulacion'))
@@ -206,7 +209,12 @@ export function AnulacionFinancieraModal({ cpeId, label, onClose, onCompleted }:
           <div className="space-y-5 p-5">
             <div className="grid gap-3 sm:grid-cols-3">
               <Summary label="Estado" value={state.estado_flujo.replaceAll('_', ' ')} />
-              <Summary label="Nota de crédito" value={state.nota_credito ? `${state.nota_credito.serie}-${state.nota_credito.numero} · ${state.nota_credito.estado}` : 'Pendiente'} />
+              <Summary
+                label="Nota de crédito"
+                value={state.nota_credito
+                  ? `${formatFiscalDocumentNumber(country.paisCodigo, state.nota_credito.serie, state.nota_credito.numero)} · ${state.nota_credito.estado}`
+                  : 'Pendiente'}
+              />
               <Summary label="Cobros por devolver" value={String(state.cobros_activos)} />
             </div>
 

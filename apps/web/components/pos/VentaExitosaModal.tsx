@@ -12,6 +12,7 @@ import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { multiplicarMoneda } from '@/lib/format-utils'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 interface VentaExitosaData {
   venta_id: string | number
@@ -138,7 +139,7 @@ export default function VentaExitosaModal({
   const loadCpePrintData = useCallback(async (cpeId: string): Promise<CpePrintData | null> => {
     const result = await get(`/api/cpe/comprobantes/${encodeURIComponent(cpeId)}`)
     const data = result?.data || result
-    if (data?.id || data?.serie) {
+    if (data?.id || data?.numero != null) {
       setCpePrintData(data)
       return data
     }
@@ -210,7 +211,12 @@ export default function VentaExitosaModal({
 
     if (cpe) {
       return {
-        numero: [cpe.serie, cpe.numero].filter(Boolean).join('-') || ventaData.numero_ticket,
+        numero: formatFiscalDocumentNumber(
+          country.paisCodigo,
+          cpe.serie,
+          cpe.numero,
+          { fallback: ventaData.numero_ticket },
+        ),
         tipo: getDocumentoLabelFromCpe(cpe.tipo_documento),
         fecha: cpe.fecha_emision || cpe.created_at || ventaData.fecha,
         clienteNombre: cpe.razon_social_receptor || ventaData.cliente_nombre,
@@ -248,7 +254,7 @@ export default function VentaExitosaModal({
         total: Number(item.subtotal) || 0,
       })),
     }
-  }, [ventaData, cpePrintData, documentoLabel])
+  }, [ventaData, cpePrintData, country.paisCodigo, documentoLabel])
 
   if (!isOpen || !ventaData) return null
 
@@ -309,8 +315,8 @@ export default function VentaExitosaModal({
   const cpeListo = Boolean(currentCpeId)
   // `cpePrintData` llega despues de `currentCpeId`, asi que hasta que cargue se
   // sigue mostrando el correlativo interno en vez de un hueco.
-  const numeroFiscal = cpePrintData?.serie
-    ? [cpePrintData.serie, cpePrintData.numero].filter(Boolean).join('-')
+  const numeroFiscal = cpePrintData?.numero != null
+    ? formatFiscalDocumentNumber(country.paisCodigo, cpePrintData.serie, cpePrintData.numero)
     : null
   const etiquetaFiscal = getDocumentoLabelFromCpe(cpePrintData?.tipo_documento) === 'FACTURA'
     ? 'Factura'
@@ -334,7 +340,7 @@ export default function VentaExitosaModal({
               </div>
               <div>
                 {/* Emitido el comprobante, lo que el cliente necesita ver es su
-                    numero fiscal --B001-00000001--, no el correlativo interno
+                    número fiscal exacto, no el correlativo interno
                     del ticket. Antes solo salia el interno y habia que ir a
                     buscar la boleta al listado para saber su numero. */}
                 <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200/80">

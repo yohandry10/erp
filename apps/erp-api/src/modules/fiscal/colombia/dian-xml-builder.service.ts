@@ -490,10 +490,17 @@ export class DianXmlBuilderService {
       const auth = context.authorization;
       if (!auth) throw new Error('DIAN: falta autorización de numeración');
       this.nonEmpty(auth.number, 'número de resolución');
-      this.nonEmpty(auth.prefix, 'prefijo autorizado');
       this.nonEmpty(auth.technicalKey, 'clave técnica del rango');
+      const authorizedPrefix = String(auth.prefix ?? '').trim().toUpperCase();
+      const documentPrefix = String(documento.serie ?? '').trim().toUpperCase();
+      if (!/^[A-Z0-9]{0,4}$/.test(authorizedPrefix)
+          || !/^[A-Z0-9]{0,4}$/.test(documentPrefix)) {
+        throw new Error(
+          'DIAN: el prefijo es opcional; cuando exista debe tener máximo 4 alfanuméricos',
+        );
+      }
       const number = this.integerDocumentNumber(documento.numero);
-      if (auth.prefix.toUpperCase() !== String(documento.serie).trim().toUpperCase()) {
+      if (authorizedPrefix !== documentPrefix) {
         throw new Error('DIAN: la serie no coincide con el prefijo autorizado');
       }
       if (!Number.isSafeInteger(auth.rangeFrom) || !Number.isSafeInteger(auth.rangeTo)
@@ -513,7 +520,13 @@ export class DianXmlBuilderService {
     kind: DocumentKind,
     context: DianGenerationContext,
   ): DocumentIdentity {
-    const id = `${this.nonEmpty(documento.serie, 'serie')}${this.nonEmpty(documento.numero, 'número')}`;
+    const prefix = String(documento.serie ?? '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{0,4}$/.test(prefix)) {
+      throw new Error(
+        'DIAN: el prefijo es opcional; cuando exista debe tener máximo 4 alfanuméricos',
+      );
+    }
+    const id = `${prefix}${this.nonEmpty(documento.numero, 'número')}`;
     const date = this.formatDate(documento.fechaEmision);
     const time = this.formatTime(documento.fechaEmision);
     const emisor = normalizeDianIdentity(documento.emisor.tipoDocumento || '31', documento.emisor.numeroDocumento);
@@ -559,7 +572,8 @@ export class DianXmlBuilderService {
       period.ele('cbc:StartDate').txt(this.isoDate(auth.validFrom));
       period.ele('cbc:EndDate').txt(this.isoDate(auth.validTo));
       const authorized = control.ele('sts:AuthorizedInvoices');
-      authorized.ele('sts:Prefix').txt(auth.prefix);
+      const prefix = String(auth.prefix ?? '').trim().toUpperCase();
+      if (prefix) authorized.ele('sts:Prefix').txt(prefix);
       authorized.ele('sts:From').txt(String(auth.rangeFrom));
       authorized.ele('sts:To').txt(String(auth.rangeTo));
     }
@@ -769,8 +783,15 @@ export class DianXmlBuilderService {
     const form = raw === '1' || raw === 'CONTADO' ? '1'
       : raw === '2' || raw === 'CREDITO' || raw === 'CRÉDITO' ? '2' : '';
     if (!form) throw new Error('DIAN: forma de pago inválida');
-    const means = this.required(documento, documento.medioPago, 'medio de pago DIAN', '10');
-    if (!/^\d{2}$/.test(means)) throw new Error('DIAN: medio de pago inválido');
+    const rawMeans = String(
+      this.required(documento, documento.medioPago, 'medio de pago DIAN', form === '2' ? '1' : '10'),
+    ).trim().toUpperCase();
+    const means = form === '2' && ['2', 'CREDITO', 'CRÉDITO'].includes(rawMeans)
+      ? '1'
+      : rawMeans;
+    if (!/^\d{1,3}$/.test(means) && means !== 'ZZZ') {
+      throw new Error('DIAN: medio de pago inválido');
+    }
     const payment = root.ele('cac:PaymentMeans');
     payment.ele('cbc:ID').txt(form);
     payment.ele('cbc:PaymentMeansCode').txt(means);

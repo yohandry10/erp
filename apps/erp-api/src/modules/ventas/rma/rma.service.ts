@@ -413,13 +413,40 @@ export class RmaService {
     });
   }
 
-  generarNotaCredito(
+  async generarNotaCredito(
     tenantId: string,
     userId: string | null | undefined,
     rmaId: string,
     dto: GenerarNotaCreditoDto,
     idempotencyKey?: string,
   ) {
+    const client = this.supabase.getClient();
+    const { data: tenantConfig, error: tenantConfigError } = await client
+      .from('empresa_config')
+      .select('pais')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (tenantConfigError || !tenantConfig) {
+      throw new BadRequestException(
+        'No se pudo verificar el país fiscal del tenant antes de emitir la nota de crédito',
+      );
+    }
+    const fiscalCountry = String((tenantConfig as any).pais ?? '').trim().toUpperCase();
+    if (fiscalCountry === 'CO') {
+      throw new BadRequestException({
+        code: 'RMA_DIAN_CREDIT_NOTE_REQUIRES_REFERENCED_NOTE_FLOW',
+        message:
+          'Colombia no usa la nota RMA SUNAT 07. Emite una Nota Crédito DIAN 91 desde CPE > Notas referenciadas; el efecto financiero se aplicará sólo después de la aceptación DIAN.',
+      });
+    }
+    if (fiscalCountry === 'AR') {
+      throw new BadRequestException({
+        code: 'RMA_ARCA_CREDIT_NOTE_REQUIRES_REFERENCED_NOTE_FLOW',
+        message:
+          'Argentina no usa la nota RMA SUNAT 07. La nota de crédito debe emitirse mediante el flujo ARCA referenciado y no puede afectar la CxC antes de obtener CAE.',
+      });
+    }
+
     return this.rpc('emitir_nota_credito_rma_tx', {
       p_tenant_id: tenantId,
       p_actor_id: this.requireActor(userId),

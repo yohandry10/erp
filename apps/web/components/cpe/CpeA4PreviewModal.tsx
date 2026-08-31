@@ -6,6 +6,7 @@ import { fetchApi } from '@/lib/api-fetch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 interface CpePreviewMetadata {
   id?: string
@@ -442,7 +443,7 @@ function CpeA4Sheet({
           <p className="mb-2 font-black uppercase">Información fiscal DIAN</p>
           <div className="grid grid-cols-[10rem_1fr] gap-x-3 gap-y-1 text-[0.92em]">
             <span className="font-bold">Autorización:</span><span>{fiscalPrintInfo.authorizationNumber}</span>
-            <span className="font-bold">Prefijo y rango:</span><span>{fiscalPrintInfo.authorizationPrefix} {fiscalPrintInfo.rangeFrom} a {fiscalPrintInfo.rangeTo}</span>
+            <span className="font-bold">Prefijo y rango:</span><span>{fiscalPrintInfo.authorizationPrefix || 'Sin prefijo'} · {fiscalPrintInfo.rangeFrom} a {fiscalPrintInfo.rangeTo}</span>
             <span className="font-bold">Vigencia:</span><span>{fiscalPrintInfo.validFrom} a {fiscalPrintInfo.validTo}</span>
             <span className="font-bold">Generación/expedición:</span><span>{fiscalPrintInfo.generatedAt}</span>
             <span className="font-bold">Pago:</span><span>{fiscalPrintInfo.paymentForm} · {fiscalPrintInfo.paymentTerm} · {fiscalPrintInfo.paymentMethod}</span>
@@ -526,9 +527,11 @@ export default function CpeA4PreviewModal({
   const resolvedSerie = serie || metadata?.serie
   const resolvedNumero = numero || metadata?.numero
   const label = useMemo(() => documentName(resolvedType, resolvedCountry), [resolvedCountry, resolvedType])
-  const numberLabel = resolvedSerie
-    ? `${resolvedSerie}-${String(resolvedNumero ?? '').padStart(8, '0')}`
-    : documentId
+  const numberLabel = resolvedCountry === 'CO' && resolvedNumero != null
+    ? formatFiscalDocumentNumber('CO', resolvedSerie, resolvedNumero, { fallback: documentId })
+    : resolvedSerie
+      ? `${resolvedSerie}-${String(resolvedNumero ?? '').padStart(8, '0')}`
+      : documentId
   const lacksFiscalAcceptance = metadata?.simulated !== false
   const evidenceStatus = String(metadata?.fiscal_acceptance_status || 'LEGACY_UNVERIFIED').toUpperCase()
   const explicitDemo = evidenceStatus === 'SIMULATED' || metadata?.simulated_origin === true

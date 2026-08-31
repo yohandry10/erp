@@ -106,7 +106,13 @@ function createService(options: {
     externalApprovalValidated: false,
     certificateBuffer: Buffer.from('pfx'),
     snapshot: {
-      isDemo: false, resolutionNumber: '18760000001', resolutionPrefix: 'FV',
+      isDemo: false,
+      taxId: '9001234568',
+      certificateSha256: 'c'.repeat(64),
+      signingConfigSha256: 'd'.repeat(64),
+      resolutionNumber: '18760000001', resolutionPrefix: 'FV',
+      rangeFrom: 1, rangeTo: 50000,
+      validFrom: '2026-01-01', validTo: '2027-12-31',
     },
   };
   const loadTenantConfig = jest.spyOn(service as any, 'loadTenantConfig')
@@ -118,6 +124,61 @@ function createService(options: {
 }
 
 describe('DianFiscalService · orquestación FEV 1.9', () => {
+  it('prevalida una sola vez y firma con el snapshot oficial sin segundo GetNumberingRange', async () => {
+    const ctx = createService();
+    const issuerIdentity = {
+      contractVersion: 529 as const,
+      taxId: '9001234568',
+      certificateSha256: 'c'.repeat(64),
+      signingConfigSha256: 'd'.repeat(64),
+    };
+    const authorization = await ctx.service.prepararContextoFacturaAntesDeReserva({
+      documentType: '01', series: 'FV', issueDate: '2026-08-29',
+      issuerIdentity, taxes: { iva: 19, inc: 0, ica: 0 },
+    }, '11111111-1111-4111-8111-111111111111');
+    const document = realDocument();
+    document.fiscalContext.dianIssuerIdentity = issuerIdentity;
+    document.dianContext = authorization;
+
+    const xml = await ctx.service.generarYFirmarDocumentoSinTransmitir(
+      document,
+      '11111111-1111-4111-8111-111111111111',
+    );
+
+    expect(xml).toContain('<ds:Signature Id="signature-real"/>');
+    expect(ctx.consultarRangosAutorizados).toHaveBeenCalledTimes(1);
+    expect(ctx.signer.firmarXML).toHaveBeenCalledTimes(1);
+    expect(authorization.authorization).toEqual(expect.objectContaining({
+      number: '18760000001', prefix: 'FV', rangeFrom: 1, rangeTo: 50000,
+      technicalKey: 'CLAVE-TECNICA-REAL-NO-PERSISTIR',
+    }));
+  });
+
+  it('rechaza divergencia del rango oficial antes de que el llamador pueda reservar', async () => {
+    const ctx = createService();
+    ctx.consultarRangosAutorizados.mockResolvedValue({
+      rangos: [{
+        prefijo: 'FV', desde: 1, hasta: 99999, resolucion: 'OTRA-RESOLUCION',
+        fechaInicio: new Date('2026-01-01T05:00:00Z'),
+        fechaFin: new Date('2027-12-31T05:00:00Z'),
+        claveTecnica: 'CLAVE-DIVERGENTE',
+      }],
+    });
+
+    await expect(ctx.service.prepararContextoFacturaAntesDeReserva({
+      documentType: '01', series: 'FV', issueDate: '2026-08-29',
+      issuerIdentity: {
+        contractVersion: 529, taxId: '9001234568',
+        certificateSha256: 'c'.repeat(64), signingConfigSha256: 'd'.repeat(64),
+      },
+      taxes: { iva: 19, inc: 0, ica: 0 },
+    }, '11111111-1111-4111-8111-111111111111')).rejects.toThrow(
+      'no coinciden con GetNumberingRange',
+    );
+    expect(ctx.signer.firmarXML).not.toHaveBeenCalled();
+    expect(ctx.enviarDocumento).not.toHaveBeenCalled();
+  });
+
   it('reserva paquete, obtiene TechnicalKey, firma, sella sin secreto y luego envía', async () => {
     const ctx = createService();
     const result = await ctx.service.enviarDocumento(realDocument());
@@ -155,6 +216,32 @@ describe('DianFiscalService · orquestación FEV 1.9', () => {
     });
     expect(JSON.stringify(sealPayload)).not.toContain('CLAVE-TECNICA-REAL-NO-PERSISTIR');
     expect(JSON.stringify(sealPayload)).not.toContain('PIN-REAL-NO-PERSISTIR');
+  });
+
+  it('orquesta una factura de resolución sin prefijo con identidad fiscal no rellenada', async () => {
+    const ctx = createService();
+    const document = realDocument();
+    document.serie = '';
+    ctx.consultarRangosAutorizados.mockResolvedValue({
+      rangos: [{
+        prefijo: '', desde: 1, hasta: 50000, resolucion: '18760000001',
+        fechaInicio: new Date('2026-01-01T05:00:00Z'),
+        fechaFin: new Date('2027-12-31T05:00:00Z'),
+        claveTecnica: 'CLAVE-TECNICA-REAL-NO-PERSISTIR',
+      }],
+    });
+    ctx.loadTenantConfig.mockResolvedValue({
+      ...ctx.tenantRuntime,
+      snapshot: { ...ctx.tenantRuntime.snapshot, resolutionPrefix: '' },
+    });
+
+    const result = await ctx.service.enviarDocumento(document);
+
+    expect(result.success).toBe(true);
+    const unsigned = ctx.signer.firmarXML.mock.calls[0][0];
+    expect(unsigned).toContain('<cbc:ID>125</cbc:ID>');
+    expect(unsigned).not.toContain('<sts:Prefix');
+    expect(ctx.enviarDocumento).toHaveBeenCalledTimes(1);
   });
 
   it('falla antes de rango, firma y transporte si no puede reservar el paquete', async () => {

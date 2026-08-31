@@ -1,4 +1,5 @@
 import * as Joi from 'joi';
+import { MINIMUM_DATABASE_SCHEMA_VERSION } from './database-schema-version';
 
 export interface AppEnvironment {
   NODE_ENV: string;
@@ -162,7 +163,7 @@ export const envSchema = Joi.object({
   REQUIRED_DATABASE_SCHEMA_VERSION: Joi.when('NODE_ENV', {
     is: 'production',
     then: Joi.number().integer().min(1).required(),
-    otherwise: Joi.number().integer().min(1).default(502),
+    otherwise: Joi.number().integer().min(1).default(MINIMUM_DATABASE_SCHEMA_VERSION),
   }),
   APP_VERSION: Joi.string().max(100).optional(),
   APP_COMMIT_SHA: Joi.string().max(100).optional(),

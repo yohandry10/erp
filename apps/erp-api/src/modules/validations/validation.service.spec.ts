@@ -310,6 +310,27 @@ describe('ValidationService', () => {
       expect(result.errors.some(e => e.code === 'DOC_004')).toBe(true);
     });
 
+    it.each([
+      ['prefijo corto', 'FV', '123456789', true],
+      ['sin prefijo', '', '123456789', true],
+      ['prefijo demasiado largo', 'ABCDE', '123', false],
+    ])('aplica la regla DIAN para %s', async (_case, serie, correlativo, expected) => {
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({ data: { pais_id: 'pais-co' }, error: null })
+        .mockResolvedValueOnce({ data: null, error: null })
+        .mockResolvedValueOnce({ data: { codigo_iso: 'CO' }, error: null });
+
+      const result = await service.validateDocumentBeforeEmission({
+        serie,
+        correlativo,
+        total: 1000,
+        items: [],
+      }, 'tenant-co');
+
+      expect(result.isValid).toBe(expected);
+      expect(result.errors.some(e => e.code === 'DOC_003')).toBe(!expected);
+    });
+
     it('debe rechazar monto total negativo', async () => {
       const document = {
         serie: 'F001',
