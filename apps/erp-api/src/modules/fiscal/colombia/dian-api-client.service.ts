@@ -1191,14 +1191,14 @@ export class DianApiClientService {
   }
 
   private parseNumberRange(value: unknown): DianNumberRange | null {
-    const prefijo = scalar(findFirstByKey(value, 'Prefix'));
+    const prefijo = scalar(findFirstByKey(value, 'Prefix')).trim().toUpperCase();
     const desde = Number(scalar(findFirstByKey(value, 'FromNumber')));
     const hasta = Number(scalar(findFirstByKey(value, 'ToNumber')));
     const resolucion = scalar(findFirstByKey(value, 'ResolutionNumber'));
     const claveTecnica = scalar(findFirstByKey(value, 'TechnicalKey'));
     const fechaInicio = new Date(scalar(findFirstByKey(value, 'ValidDateFrom')));
     const fechaFin = new Date(scalar(findFirstByKey(value, 'ValidDateTo')));
-    if (!prefijo || !resolucion || !claveTecnica || !Number.isSafeInteger(desde) || !Number.isSafeInteger(hasta) ||
+    if (!/^[A-Z0-9]{0,4}$/.test(prefijo) || !resolucion || !claveTecnica || !Number.isSafeInteger(desde) || !Number.isSafeInteger(hasta) ||
         desde <= 0 || hasta < desde || !Number.isFinite(fechaInicio.getTime()) || !Number.isFinite(fechaFin.getTime())) {
       return null;
     }

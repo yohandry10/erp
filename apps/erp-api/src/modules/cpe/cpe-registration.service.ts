@@ -22,11 +22,57 @@ export class CpeRegistrationService {
     private readonly certificateService: CpeCertificateService,
   ) {}
 
+  private hashStoredDianCertificate(value: unknown): string {
+    if (value === null || value === undefined || value === '') return '';
+    let bytes: Buffer;
+    if (Buffer.isBuffer(value)) bytes = value;
+    else if (value instanceof Uint8Array) bytes = Buffer.from(value);
+    else if (Array.isArray(value)) bytes = Buffer.from(value);
+    else if (typeof value === 'object' && Array.isArray((value as any).data)) {
+      bytes = Buffer.from((value as any).data);
+    } else {
+      const stored = String(value);
+      bytes = /^\\x[0-9a-f]+$/iu.test(stored)
+        ? Buffer.from(stored.slice(2), 'hex')
+        : Buffer.from(stored, 'utf8');
+    }
+    return bytes.length > 0
+      ? crypto.createHash('sha256').update(bytes).digest('hex')
+      : '';
+  }
+
+  private hashDianSigningConfig(row: Record<string, any>, certificateSha256: string): string {
+    if (!certificateSha256) return '';
+    return crypto.createHash('sha256').update([
+      certificateSha256,
+      row.dian_activo === true ? 'true' : 'false',
+      String(row.dian_url ?? '').trim(),
+      String(row.dian_software_id ?? '').trim(),
+      String(row.dian_test_set_id ?? '').trim(),
+      String(row.dian_environment ?? '').trim().toUpperCase(),
+      String(row.dian_resolucion_numero ?? '').trim(),
+      String(row.dian_resolucion_prefijo ?? '').trim().toUpperCase(),
+      row.dian_resolucion_desde == null ? '' : String(row.dian_resolucion_desde),
+      row.dian_resolucion_hasta == null ? '' : String(row.dian_resolucion_hasta),
+      String(row.dian_resolucion_fecha_inicio ?? '').trim(),
+      String(row.dian_resolucion_fecha_fin ?? '').trim(),
+      String(row.dian_habilitacion_estado ?? '').trim().toUpperCase(),
+    ].join('\u001f'), 'utf8').digest('hex');
+  }
+
 async getEmpresaEmisorInfoStrict(tenantId: string) {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('empresa_config')
-      .select('ruc, razon_social, direccion_fiscal, ubigeo, departamento, provincia, pais, moneda_defecto, dian_regimen_fiscal, dian_tipo_contribuyente')
+      .select([
+        'ruc', 'razon_social', 'direccion_fiscal', 'ubigeo', 'departamento', 'provincia',
+        'pais', 'moneda_defecto', 'igv_porcentaje', 'is_demo',
+        'dian_regimen_fiscal', 'dian_tipo_contribuyente',
+        'dian_resolucion_numero', 'dian_resolucion_prefijo', 'dian_resolucion_desde',
+        'dian_resolucion_hasta', 'dian_resolucion_fecha_inicio', 'dian_resolucion_fecha_fin',
+        'certificado_pfx', 'dian_activo', 'dian_url', 'dian_software_id',
+        'dian_test_set_id', 'dian_environment', 'dian_habilitacion_estado',
+      ].join(','))
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
@@ -51,6 +97,7 @@ async getEmpresaEmisorInfoStrict(tenantId: string) {
         `No se puede crear el comprobante: faltan ${perfil.documentoFiscal} o razón social válidos en empresa_config`,
       );
     }
+    const certificateSha256 = this.hashStoredDianCertificate(typedData?.certificado_pfx);
 
     return {
       ruc,
@@ -61,8 +108,18 @@ async getEmpresaEmisorInfoStrict(tenantId: string) {
       codigoUbigeo: typedData?.ubigeo ?? '',
       pais,
       moneda: typedData?.moneda_defecto || perfil.moneda,
+      igvPorcentaje: typedData?.igv_porcentaje,
       regimenFiscal: typedData?.dian_regimen_fiscal ?? '',
       tipoContribuyente: typedData?.dian_tipo_contribuyente ?? '',
+      isDemo: typedData?.is_demo === true,
+      dianResolucionNumero: typedData?.dian_resolucion_numero ?? '',
+      dianResolucionPrefijo: typedData?.dian_resolucion_prefijo ?? '',
+      dianResolucionDesde: typedData?.dian_resolucion_desde ?? null,
+      dianResolucionHasta: typedData?.dian_resolucion_hasta ?? null,
+      dianResolucionFechaInicio: typedData?.dian_resolucion_fecha_inicio ?? '',
+      dianResolucionFechaFin: typedData?.dian_resolucion_fecha_fin ?? '',
+      certificateSha256,
+      signingConfigSha256: this.hashDianSigningConfig(typedData ?? {}, certificateSha256),
     };
   }
 
@@ -82,6 +139,13 @@ async registerDesktopSignedXml(payload: DesktopSignedCpeDto, tenantId: string, u
       throw new BadRequestException('El hash SHA-256 del XML firmado no coincide con el contenido recibido');
     }
 
+    const emisor = await this.getEmpresaEmisorInfoStrict(tenantId);
+    if (emisor.pais === 'CO' && !emisor.isDemo) {
+      throw new BadRequestException(
+        'DIAN: el XML de una empresa real se genera y firma exclusivamente en el servidor con numeración autorizada; el registro desktop no está permitido',
+      );
+    }
+
     const signer = await this.certificateService.getXmlSigner(tenantId);
     if (!signer.validateSignatureStrict(signedXml)) {
       throw new BadRequestException(
@@ -90,7 +154,6 @@ async registerDesktopSignedXml(payload: DesktopSignedCpeDto, tenantId: string, u
     }
 
     const parsed = this.parseInvoiceXml(signedXml);
-    const emisor = await this.getEmpresaEmisorInfoStrict(tenantId);
     const invoiceId = this.xmlText(parsed.ID);
     const [xmlSerie, xmlNumero] = invoiceId.split('-', 2);
     const xmlTipo = this.xmlText(parsed.InvoiceTypeCode);
@@ -381,7 +444,7 @@ resolveTipoDocumentoReceptor(
     return resolved;
   }
 
-normalizeComprobanteItems(items: any[]): any[] {
+  normalizeComprobanteItems(items: any[]): any[] {
     if (!Array.isArray(items) || items.length === 0) {
       throw new BadRequestException('El comprobante debe incluir al menos un item');
     }
@@ -392,11 +455,33 @@ normalizeComprobanteItems(items: any[]): any[] {
         item?.valor_unitario ?? item?.valorUnitario ?? item?.precio_unitario ?? item?.precioUnitario ?? 0,
         6,
       );
+      const descuentoUnitario = this.roundMoney(
+        item?.descuento_unitario
+        ?? item?.descuentoUnitario
+        ?? (cantidad > 0 && item?.descuento_monto != null
+          ? Number(item.descuento_monto) / cantidad
+          : 0),
+        6,
+      );
       const valorVenta = this.roundMoney(
-        item?.valor_venta ?? item?.valorVenta ?? cantidad * valorUnitario,
+        item?.valor_venta
+        ?? item?.valorVenta
+        ?? cantidad * (valorUnitario - descuentoUnitario),
       );
       const igv = this.roundMoney(item?.igv ?? item?.impuesto_igv ?? item?.total_impuestos ?? 0);
-      const total = this.roundMoney(item?.total ?? item?.precio_venta ?? valorVenta + igv);
+      const isc = this.roundMoney(
+        item?.impuesto_isc ?? item?.impuesto_inc ?? item?.impuestoInc ?? item?.inc ?? 0,
+      );
+      const total = this.roundMoney(
+        item?.total ?? item?.total_item ?? item?.totalItem ?? valorVenta + igv + isc,
+      );
+      // `precio_venta` es el precio unitario bruto (AlternativeConditionPrice
+      // en SUNAT), no el total de línea. Mantener ambas magnitudes separadas
+      // evita que una cantidad > 1 llegue contradictoria al guard DIAN.
+      const precioVenta = this.roundMoney(
+        item?.precio_venta ?? item?.precioVenta ?? (cantidad > 0 ? total / cantidad : 0),
+        6,
+      );
       const precioUnitario = this.roundMoney(item?.precio_unitario ?? item?.precioUnitario ?? valorUnitario, 6);
 
       if (cantidad <= 0) {
@@ -406,16 +491,44 @@ normalizeComprobanteItems(items: any[]): any[] {
         throw new BadRequestException(`El item ${index + 1} requiere descripcion`);
       }
 
+      const afectaciones = [
+        item?.afectacion_igv,
+        item?.tipo_afectacion_igv,
+        item?.afectacionIgv,
+        item?.tipoAfectacionIgv,
+      ]
+        .filter((value) => value !== undefined && value !== null && String(value).trim() !== '')
+        .map((value) => String(value).trim());
+      const afectacionesDistintas = [...new Set(afectaciones)];
+      if (afectacionesDistintas.length > 1) {
+        throw new BadRequestException(
+          `El item ${index + 1} declara afectaciones tributarias contradictorias`,
+        );
+      }
+      const afectacionIgv = afectacionesDistintas[0] ?? '10';
+      if (!['10', '20', '30', '40'].includes(afectacionIgv)) {
+        throw new BadRequestException(
+          `El item ${index + 1} declara una afectacion tributaria no soportada`,
+        );
+      }
+
       return {
         codigo: String(item?.codigo ?? item?.codigo_producto ?? `ITEM-${index + 1}`).trim(),
         descripcion: String(item.descripcion).trim(),
         cantidad,
         unidad: String(item?.unidad ?? item?.unidad_medida ?? item?.unidadMedida ?? 'NIU').trim().toUpperCase(),
         precio_unitario: precioUnitario,
+        descuento_unitario: descuentoUnitario,
         valor_venta: valorVenta,
         igv,
-        precio_venta: total,
+        impuesto_isc: isc,
+        tasa_igv: item?.tasa_igv ?? item?.tasaIgv,
+        tasa_isc: item?.tasa_isc ?? item?.tasa_inc ?? item?.tasaInc,
+        precio_venta: precioVenta,
+        total_item: total,
         total,
+        tipo_afectacion_igv: afectacionIgv,
+        afectacion_igv: afectacionIgv,
       };
     });
   }

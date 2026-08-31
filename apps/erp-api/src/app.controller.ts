@@ -15,6 +15,7 @@ import { Public } from './common/decorators/public.decorator';
 import { RequirePermission } from './common/decorators/require-permission.decorator';
 import { SupabaseService } from './shared/supabase/supabase.service';
 import { CacheService } from './shared/cache/cache.service';
+import { MINIMUM_DATABASE_SCHEMA_VERSION } from './config/database-schema-version';
 
 @ApiTags('app')
 @Controller()
@@ -211,7 +212,10 @@ export class AppController {
       p_max_oldest_seconds: this.readPositiveInt('OUTBOX_READY_MAX_OLDEST_SECONDS', 900),
       p_max_dead_letter: this.readPositiveInt('OUTBOX_READY_MAX_DEAD_LETTER', 100),
       p_processing_stale_seconds: this.readPositiveInt('OUTBOX_READY_STALE_SECONDS', 900),
-      p_required_schema_version: this.readPositiveInt('REQUIRED_DATABASE_SCHEMA_VERSION', 502),
+      p_required_schema_version: Math.max(
+        this.readPositiveInt('REQUIRED_DATABASE_SCHEMA_VERSION', MINIMUM_DATABASE_SCHEMA_VERSION),
+        MINIMUM_DATABASE_SCHEMA_VERSION,
+      ),
     });
     const responseWithError = response as {
       data?: Record<string, unknown> | null;

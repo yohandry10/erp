@@ -43,4 +43,5 @@ export interface PedidoVenta {
   tracking_estado?: string;
   tracking_actualizado_en?: string | null;
   tracking_notas?: string | null;
+  metadata?: Record<string, unknown>;
 }

@@ -1,15 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { ConsultaRuc, type ContribuyenteConsultado } from '@/components/shared/ConsultaRuc'
+import { fiscalDateForCountry } from '@/lib/fiscal-date'
+import ClienteSelector from '@/components/ventas/ClienteSelector'
+import type { Cliente } from '@/types/ventas'
 
 interface CpeModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+}
+
+function addDaysToFiscalDate(date: string, days: number): string {
+  const parsed = new Date(`${date}T12:00:00Z`)
+  if (Number.isNaN(parsed.getTime())) return ''
+  parsed.setUTCDate(parsed.getUTCDate() + days)
+  return parsed.toISOString().slice(0, 10)
 }
 
 export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) {
@@ -18,6 +28,8 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   const isColombia = country.paisCodigo === 'CO'
   const { tasaIgv, nombreImpuesto } = useTaxConfig()
   const taxPercent = Math.round(tasaIgv * 10000) / 100
+  const automaticEmissionDateRef = useRef(fiscalDateForCountry(country.paisCodigo))
+  const wasOpenRef = useRef(false)
   const formatMoney = (value: number) =>
     new Intl.NumberFormat(country.locale || 'es-PE', {
       style: 'currency',
@@ -26,13 +38,17 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   const [formData, setFormData] = useState({
     tipoComprobante: '01', // Factura por defecto
     serie: 'F001',
+    clienteId: '',
     clienteTipoDocumento: 'RUC',
     clienteRuc: '',
     clienteRazonSocial: '',
     clienteDireccion: '',
-    fechaEmision: new Date().toISOString().split('T')[0],
+    fechaEmision: automaticEmissionDateRef.current,
     fechaVencimiento: '',
     moneda: 'PEN',
+    condicionPago: 'CONTADO',
+    medioPago: '10',
+    plazoPagoDias: 0,
     tipoOperacion: '0101',
     observaciones: '',
     items: [
@@ -41,6 +57,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
         descripcion: '',
         cantidad: 1,
         unidadMedida: 'NIU',
+        afectacionIgv: '10',
         valorUnitario: 0,
         precioUnitario: 0,
         descuento: 0,
@@ -50,52 +67,113 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
     ]
   })
 
-  const api = useApiCall()
+  // Crear y firmar un CPE puede superar el timeout genérico de lectura en un
+  // cold start. La intención se conserva ante un timeout para que un reintento
+  // no pueda emitir un segundo comprobante si el servidor sí alcanzó a guardar
+  // el primero.
+  const api = useApiCall({ throwOnError: true, timeoutMs: 30_000 })
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [selectedColombiaClient, setSelectedColombiaClient] = useState<Cliente | null>(null)
+  const idempotencyKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!country.moneda) return
+    const opening = isOpen && !wasOpenRef.current
+    wasOpenRef.current = isOpen
+    if (!country.moneda || !isOpen) return
+    const fiscalToday = fiscalDateForCountry(country.paisCodigo)
     setFormData((current) => ({
       ...current,
       moneda: country.moneda,
-      serie: isArgentina ? '00001' : isColombia ? 'FE' : current.serie,
+      // Colombia no acepta una serie inventada por la pantalla: el prefijo
+      // (incluido el caso válido sin prefijo) sale de la resolución DIAN que
+      // el servidor reserva para el tenant.
+      serie: isArgentina ? '00001' : isColombia ? '' : current.serie,
       clienteTipoDocumento: isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC',
+      // El contexto de país suele terminar de hidratar después del primer
+      // render. Sólo reemplazamos la fecha mientras el usuario no la haya
+      // editado, evitando emitir "mañana" al cruzar medianoche UTC.
+      fechaEmision:
+        opening || current.fechaEmision === automaticEmissionDateRef.current
+          ? fiscalToday
+          : current.fechaEmision,
     }))
-  }, [country.moneda, isArgentina, isColombia])
+    automaticEmissionDateRef.current = fiscalToday
+  }, [country.moneda, country.paisCodigo, isArgentina, isColombia, isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError(null)
+
+    if (isColombia && !formData.clienteId) {
+      setSubmitError('Selecciona un cliente maestro con perfil tributario DIAN antes de emitir.')
+      return
+    }
+    if (isColombia && !selectedColombiaClient?.dian_perfil_fiscal) {
+      setSubmitError('El cliente seleccionado no tiene perfil tributario DIAN. Edítalo antes de emitir.')
+      return
+    }
 
     // Calcular totales
     const subtotal = formData.items.reduce((sum, item) => sum + (item.valorUnitario * item.cantidad), 0)
     const totalIgv = formData.items.reduce((sum, item) => sum + item.igv, 0)
     const total = subtotal + totalIgv
 
+    // Un ref cierra también la ventana de doble clic anterior al siguiente
+    // render; dos submits concurrentes comparten la misma intención.
+    const currentIdempotencyKey = idempotencyKeyRef.current ?? `cpe-ui-${crypto.randomUUID()}`
+    idempotencyKeyRef.current = currentIdempotencyKey
+
+    const { clienteId, serie, ...requestFormData } = formData
     const cpeData = {
-      ...formData,
+      ...requestFormData,
+      ...(!isColombia ? { serie } : {}),
+      cliente_id: isColombia ? formData.clienteId : undefined,
+      idempotency_key: currentIdempotencyKey,
+      items: formData.items.map(({ afectacionIgv, ...item }) => ({
+        ...item,
+        ...(isColombia
+          ? {
+              afectacion_igv: afectacionIgv,
+              tipo_afectacion_igv: afectacionIgv,
+            }
+          : {}),
+      })),
       subtotal,
       totalIgv,
-      total
+      total,
     }
 
-    const result = await api.post('/api/cpe/comprobantes', cpeData)
+    try {
+      const result = await api.post('/api/cpe/comprobantes', cpeData, {
+        headers: { 'Idempotency-Key': currentIdempotencyKey },
+      })
 
-    if (result) {
+      if (!result) return
+
+      idempotencyKeyRef.current = null
+      setSelectedColombiaClient(null)
       onSuccess()
       onClose()
       // Reset form
+      const fiscalToday = fiscalDateForCountry(country.paisCodigo)
+      automaticEmissionDateRef.current = fiscalToday
       setFormData({
         tipoComprobante: '01',
-        serie: isArgentina ? '00001' : isColombia ? 'FE' : 'F001',
+        serie: isArgentina ? '00001' : isColombia ? '' : 'F001',
+        clienteId: '',
         clienteTipoDocumento: isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC',
         clienteRuc: '',
         clienteRazonSocial: '',
         clienteDireccion: '',
-        fechaEmision: new Date().toISOString().split('T')[0],
+        fechaEmision: fiscalToday,
         fechaVencimiento: '',
         // Sin `|| 'PEN'`: esto es el estado inicial de un comprobante y viaja al
         // servidor. Con el país sin resolver `country.moneda` es cadena vacía, y el
         // respaldo emitía en soles para cualquier contribuyente.
         moneda: country.moneda,
+        condicionPago: 'CONTADO',
+        medioPago: '10',
+        plazoPagoDias: 0,
         tipoOperacion: '0101',
         observaciones: '',
         items: [
@@ -104,6 +182,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             descripcion: '',
             cantidad: 1,
             unidadMedida: 'NIU',
+            afectacionIgv: '10',
             valorUnitario: 0,
             precioUnitario: 0,
             descuento: 0,
@@ -112,19 +191,28 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
           }
         ]
       })
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo crear el comprobante. Puedes reintentar sin duplicarlo.',
+      )
     }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
+    const normalizedValue = name === 'plazoPagoDias' ? Number(value) : value
+    idempotencyKeyRef.current = null
+    setSubmitError(null)
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: normalizedValue
     }))
 
     // Auto-update serie based on tipo comprobante
     if (name === 'tipoComprobante') {
-      let newSerie = isArgentina ? '00001' : isColombia ? 'FE' : 'F001'
+      let newSerie = isArgentina ? '00001' : isColombia ? '' : 'F001'
       if (isArgentina || isColombia) {
         setFormData(prev => ({ ...prev, serie: newSerie }))
         return
@@ -135,6 +223,34 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       }
       setFormData(prev => ({ ...prev, serie: newSerie }))
     }
+    if (name === 'condicionPago') {
+      setFormData((prev) => ({
+        ...prev,
+        condicionPago: value,
+        plazoPagoDias: value === 'CREDITO' ? 30 : 0,
+        fechaVencimiento: value === 'CREDITO'
+          ? addDaysToFiscalDate(prev.fechaEmision, 30)
+          : '',
+      }))
+    }
+    if (name === 'fechaEmision') {
+      setFormData((prev) => ({
+        ...prev,
+        fechaEmision: value,
+        fechaVencimiento: prev.condicionPago === 'CREDITO'
+          ? addDaysToFiscalDate(value, prev.plazoPagoDias)
+          : prev.fechaVencimiento,
+      }))
+    }
+    if (name === 'plazoPagoDias') {
+      setFormData((prev) => ({
+        ...prev,
+        plazoPagoDias: Number(value),
+        fechaVencimiento: prev.condicionPago === 'CREDITO'
+          ? addDaysToFiscalDate(prev.fechaEmision, Number(value))
+          : prev.fechaVencimiento,
+      }))
+    }
   }
 
   // La fuente registral auxiliar avisa antes de emitir y propone la razón
@@ -144,21 +260,50 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
     setFormData(prev => (prev.clienteRazonSocial?.trim() ? prev : { ...prev, clienteRazonSocial: dato.razonSocial! }))
   }
 
+  const seleccionarClienteColombia = (clienteId: string, cliente?: Cliente) => {
+    idempotencyKeyRef.current = null
+    setSubmitError(null)
+    setSelectedColombiaClient(cliente ?? null)
+    setFormData((current) => ({
+      ...current,
+      clienteId,
+      clienteTipoDocumento: cliente?.documento_tipo ?? 'NIT',
+      clienteRuc: String(cliente?.documento_numero ?? cliente?.numero_documento ?? cliente?.ruc ?? ''),
+      clienteRazonSocial: cliente?.razon_social ?? '',
+      clienteDireccion: cliente?.direccion ?? '',
+    }))
+  }
+
   const handleItemChange = (index: number, field: string, value: any) => {
+    const numericFields = new Set([
+      'cantidad',
+      'valorUnitario',
+      'precioUnitario',
+      'descuento',
+      'igv',
+      'total',
+    ])
+    const normalizedValue = numericFields.has(field) ? Number(value) : value
     const newItems = [...formData.items]
-    newItems[index] = { ...newItems[index], [field]: value }
+    newItems[index] = { ...newItems[index], [field]: normalizedValue }
+    idempotencyKeyRef.current = null
+    setSubmitError(null)
 
     // Recalcular totales del item
-    if (field === 'cantidad' || field === 'valorUnitario') {
-      const cantidad = field === 'cantidad' ? value : newItems[index].cantidad
-      const valorUnitario = field === 'valorUnitario' ? value : newItems[index].valorUnitario
+    if (field === 'cantidad' || field === 'valorUnitario' || field === 'afectacionIgv') {
+      const cantidad = field === 'cantidad' ? normalizedValue : newItems[index].cantidad
+      const valorUnitario = field === 'valorUnitario' ? normalizedValue : newItems[index].valorUnitario
+      const afectacionIgv = field === 'afectacionIgv' ? normalizedValue : newItems[index].afectacionIgv
       const subtotalItem = cantidad * valorUnitario
-      const igvItem = subtotalItem * tasaIgv
+      const igvItem = afectacionIgv === '10' ? subtotalItem * tasaIgv : 0
       const totalItem = subtotalItem + igvItem
 
       newItems[index] = {
         ...newItems[index],
-        precioUnitario: valorUnitario * (1 + tasaIgv),
+        // En DIAN PriceAmount es el precio base de la línea. Mantener el valor
+        // con IVA aquí produciría una Invoice que declara 119 como precio y
+        // 100 como extensión para una unidad gravada al 19 %.
+        precioUnitario: isColombia ? valorUnitario : valorUnitario * (1 + tasaIgv),
         igv: igvItem,
         total: totalItem
       }
@@ -168,6 +313,8 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   }
 
   const addItem = () => {
+    idempotencyKeyRef.current = null
+    setSubmitError(null)
     setFormData(prev => ({
       ...prev,
       items: [...prev.items, {
@@ -175,6 +322,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
         descripcion: '',
         cantidad: 1,
         unidadMedida: 'NIU',
+        afectacionIgv: '10',
         valorUnitario: 0,
         precioUnitario: 0,
         descuento: 0,
@@ -186,6 +334,8 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
   const removeItem = (index: number) => {
     if (formData.items.length > 1) {
+      idempotencyKeyRef.current = null
+      setSubmitError(null)
       setFormData(prev => ({
         ...prev,
         items: prev.items.filter((_, i) => i !== index)
@@ -229,21 +379,31 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   required className="w-[100%] p-3 border rounded-[6px] text-sm"
                 >
                   <option value="01">01 - {isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura'}</option>
-                  <option value="03">03 - {isArgentina ? 'Factura B' : isColombia ? 'Documento equivalente' : 'Boleta de Venta'}</option>
+                  {!isColombia && (
+                    <option value="03">03 - {isArgentina ? 'Factura B' : 'Boleta de Venta'}</option>
+                  )}
                 </select>
               </div>
 
               <div>
                 <label htmlFor="cpe-modal-serie" className="block mb-2 font-semibold text-foreground/85">
-                  Serie *
+                  {isColombia ? 'Prefijo fiscal' : 'Serie *'}
                 </label>
                 <input id="cpe-modal-serie"
                   type="text"
                   name="serie"
                   value={formData.serie}
                   onChange={handleChange}
-                  required className="w-[100%] p-3 border rounded-[6px] text-sm"
+                  readOnly={isColombia}
+                  required={!isColombia}
+                  placeholder={isColombia ? 'Asignado por DIAN / sin prefijo' : undefined}
+                  className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
+                {isColombia && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    El servidor usará exactamente el prefijo de la resolución DIAN vigente; puede no existir.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -275,9 +435,83 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   ) : (
                     <option value="PEN">PEN - Soles</option>
                   )}
-                  <option value="USD">USD - Dólares</option>
                 </select>
               </div>
+
+              {isColombia && (
+                <>
+                  <div>
+                    <label htmlFor="cpe-modal-condicion-pago" className="block mb-2 font-semibold text-foreground/85">
+                      Forma de pago *
+                    </label>
+                    <select
+                      id="cpe-modal-condicion-pago"
+                      name="condicionPago"
+                      value={formData.condicionPago}
+                      onChange={handleChange}
+                      required
+                      className="w-[100%] p-3 border rounded-[6px] text-sm"
+                    >
+                      <option value="CONTADO">Contado</option>
+                      <option value="CREDITO">Crédito</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="cpe-modal-medio-pago" className="block mb-2 font-semibold text-foreground/85">
+                      Medio de pago DIAN *
+                    </label>
+                    <select
+                      id="cpe-modal-medio-pago"
+                      name="medioPago"
+                      value={formData.medioPago}
+                      onChange={handleChange}
+                      required
+                      className="w-[100%] p-3 border rounded-[6px] text-sm"
+                    >
+                      <option value="10">10 - Efectivo</option>
+                      <option value="42">42 - Consignación bancaria</option>
+                      <option value="47">47 - Transferencia bancaria</option>
+                      <option value="48">48 - Tarjeta de crédito</option>
+                      <option value="49">49 - Tarjeta débito</option>
+                    </select>
+                  </div>
+                  {formData.condicionPago === 'CREDITO' && (
+                    <>
+                      <div>
+                        <label htmlFor="cpe-modal-plazo-pago" className="block mb-2 font-semibold text-foreground/85">
+                          Plazo (días) *
+                        </label>
+                        <input
+                          id="cpe-modal-plazo-pago"
+                          type="number"
+                          name="plazoPagoDias"
+                          min="1"
+                          step="1"
+                          value={formData.plazoPagoDias}
+                          onChange={handleChange}
+                          required
+                          className="w-[100%] p-3 border rounded-[6px] text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="cpe-modal-fecha-vencimiento" className="block mb-2 font-semibold text-foreground/85">
+                          Fecha de vencimiento *
+                        </label>
+                        <input
+                          id="cpe-modal-fecha-vencimiento"
+                          type="date"
+                          name="fechaVencimiento"
+                          min={formData.fechaEmision}
+                          value={formData.fechaVencimiento}
+                          onChange={handleChange}
+                          required
+                          className="w-[100%] p-3 border rounded-[6px] text-sm"
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -286,6 +520,22 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             <h3 className="text-xl font-semibold mb-4 text-foreground/85">
               Datos del Cliente
             </h3>
+            {isColombia && (
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold text-foreground/85">
+                  Cliente maestro con perfil DIAN *
+                </label>
+                <ClienteSelector
+                  value={formData.clienteId}
+                  onChange={seleccionarClienteColombia}
+                  baseEndpoint="/api/cpe/receptores"
+                  error={submitError && !formData.clienteId ? submitError : undefined}
+                />
+                <p className="mt-2 text-sm text-muted-foreground">
+                  El NIT, nombre y perfil tributario se tomarán del maestro para evitar inconsistencias ante DIAN.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4">
               <div>
                 <label htmlFor="cpe-modal-cliente-tipo-documento" className="block mb-2 font-semibold text-foreground/85">
@@ -296,6 +546,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="clienteTipoDocumento"
                   value={formData.clienteTipoDocumento}
                   onChange={handleChange}
+                  disabled={isColombia}
                   required
                   className="w-[100%] p-3 border rounded-[6px] text-sm"
                 >
@@ -329,6 +580,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="clienteRuc"
                   value={formData.clienteRuc}
                   onChange={handleChange}
+                  readOnly={isColombia}
                   required className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
                 <ConsultaRuc
@@ -347,6 +599,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="clienteRazonSocial"
                   value={formData.clienteRazonSocial}
                   onChange={handleChange}
+                  readOnly={isColombia}
                   required className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
               </div>
@@ -359,7 +612,8 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   type="text"
                   name="clienteDireccion"
                   value={formData.clienteDireccion}
-                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-sm"
+                  onChange={handleChange}
+                  readOnly={isColombia} className="w-[100%] p-3 border rounded-[6px] text-sm"
                 />
               </div>
             </div>
@@ -380,7 +634,11 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
             </div>
 
             {formData.items.map((item, index) => (
-              <div key={index} className="border rounded-lg p-4 mb-4 bg-muted">
+              <div
+                key={index}
+                data-testid={`cpe-item-${index}`}
+                className="border rounded-lg p-4 mb-4 bg-muted"
+              >
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="text-base font-semibold text-foreground/85">
                     Item {index + 1}
@@ -397,10 +655,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
                 <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4">
                   <div>
-                    <label htmlFor="cpemodal-codigo" className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor={`cpe-item-codigo-${index}`} className="block mb-2 font-semibold text-foreground/85">
                       Código
                     </label>
-                    <input id="cpemodal-codigo"
+                    <input id={`cpe-item-codigo-${index}`}
                       type="text"
                       value={item.codigo}
                       onChange={(e) => handleItemChange(index, 'codigo', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-sm"
@@ -408,10 +666,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   </div>
 
                   <div>
-                    <label htmlFor="cpemodal-descripcion" className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor={`cpe-item-descripcion-${index}`} className="block mb-2 font-semibold text-foreground/85">
                       Descripción *
                     </label>
-                    <input id="cpemodal-descripcion"
+                    <input id={`cpe-item-descripcion-${index}`}
                       type="text"
                       value={item.descripcion}
                       onChange={(e) => handleItemChange(index, 'descripcion', e.target.value)}
@@ -420,10 +678,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   </div>
 
                   <div>
-                    <label htmlFor="cpemodal-cantidad" className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor={`cpe-item-cantidad-${index}`} className="block mb-2 font-semibold text-foreground/85">
                       Cantidad *
                     </label>
-                    <input id="cpemodal-cantidad"
+                    <input id={`cpe-item-cantidad-${index}`}
                       type="number"
                       value={item.cantidad}
                       onChange={(e) => handleItemChange(index, 'cantidad', parseFloat(e.target.value) || 0)}
@@ -434,10 +692,10 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   </div>
 
                   <div>
-                    <label htmlFor="cpemodal-valor-unitario" className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor={`cpe-item-valor-unitario-${index}`} className="block mb-2 font-semibold text-foreground/85">
                       Valor Unitario *
                     </label>
-                    <input id="cpemodal-valor-unitario"
+                    <input id={`cpe-item-valor-unitario-${index}`}
                       type="number"
                       value={item.valorUnitario}
                       onChange={(e) => handleItemChange(index, 'valorUnitario', parseFloat(e.target.value) || 0)}
@@ -459,11 +717,34 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                     />
                   </div>
 
+                  {isColombia && (
+                    <div>
+                      <label
+                        htmlFor={`cpe-item-afectacion-${index}`}
+                        className="block mb-2 font-semibold text-foreground/85"
+                      >
+                        Afectación IVA DIAN *
+                      </label>
+                      <select
+                        id={`cpe-item-afectacion-${index}`}
+                        data-testid={`cpe-item-afectacion-${index}`}
+                        value={item.afectacionIgv}
+                        onChange={(e) => handleItemChange(index, 'afectacionIgv', e.target.value)}
+                        required
+                        className="w-[100%] p-2 border rounded-[4px] text-sm"
+                      >
+                        <option value="10">10 - Gravado con IVA</option>
+                        <option value="20">20 - Exento de IVA</option>
+                        <option value="30">30 - Excluido de IVA</option>
+                      </select>
+                    </div>
+                  )}
+
                   <div>
-                    <label htmlFor="cpemodal-total" className="block mb-2 font-semibold text-foreground/85">
+                    <label htmlFor={`cpe-item-total-${index}`} className="block mb-2 font-semibold text-foreground/85">
                       Total
                     </label>
-                    <input id="cpemodal-total"
+                    <input id={`cpe-item-total-${index}`}
                       type="number"
                       value={item.total.toFixed(2)}
                       readOnly className="w-[100%] p-2 border rounded-[4px] text-sm bg-muted font-semibold"
@@ -507,6 +788,15 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
               rows={3} className="w-[100%] p-3 border rounded-[6px] text-sm"
             />
           </div>
+
+          {submitError && (
+            <div
+              role="alert"
+              className="mb-6 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800"
+            >
+              {submitError}
+            </div>
+          )}
 
           <div className="flex gap-4 justify-end">
             <button

@@ -16,6 +16,7 @@ interface ClienteSelectorProps {
   onCreateNew?: () => void
   disabled?: boolean
   error?: string
+  baseEndpoint?: string
 }
 
 export default function ClienteSelector({
@@ -23,7 +24,8 @@ export default function ClienteSelector({
   onChange,
   onCreateNew,
   disabled = false,
-  error
+  error,
+  baseEndpoint = '/api/ventas/clientes',
 }: ClienteSelectorProps) {
   const { get } = useApi()
   const country = useCountryContext()
@@ -37,19 +39,19 @@ export default function ClienteSelector({
 
   const loadClienteById = useCallback(async (clienteId: string) => {
     try {
-      const response = await get(`/api/ventas/clientes/${clienteId}`)
+      const response = await get(`${baseEndpoint}/${clienteId}`)
       if (response?.success && response.data) {
         setSelectedCliente(response.data)
       }
     } catch (error) {
       console.error('Error loading cliente:', error)
     }
-  }, [get])
+  }, [baseEndpoint, get])
 
   const loadAllClientes = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await get('/api/ventas/clientes?limit=100')
+      const response = await get(`${baseEndpoint}?limit=100`)
       setClientes(unwrapApiArray<Cliente>(response))
     } catch (error) {
       console.error('❌ [ClienteSelector] Error loading clientes:', error)
@@ -57,12 +59,12 @@ export default function ClienteSelector({
     } finally {
       setLoading(false)
     }
-  }, [get])
+  }, [baseEndpoint, get])
 
   const searchClientes = useCallback(async (search: string) => {
     try {
       setLoading(true)
-      const response = await get(`/api/ventas/clientes?search=${encodeURIComponent(search)}&limit=10`)
+      const response = await get(`${baseEndpoint}?search=${encodeURIComponent(search)}&limit=10`)
       // ClientesService devuelve { data, pagination } sin `success`; otros
       // despliegues pueden envolverlo como { success, data }. Normalizar ambos
       // contratos evita que una búsqueda válida deje el selector vacío.
@@ -74,7 +76,7 @@ export default function ClienteSelector({
     } finally {
       setLoading(false)
     }
-  }, [get])
+  }, [baseEndpoint, get])
 
   // Load selected cliente on mount if value is provided
   useEffect(() => {

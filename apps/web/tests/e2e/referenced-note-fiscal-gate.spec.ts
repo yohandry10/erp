@@ -138,6 +138,10 @@ test.describe("NC/ND referenciada con gate fiscal 494", () => {
     await expect(
       page.getByRole("heading", { name: "Nueva nota referenciada" }),
     ).toBeVisible();
+    await expect(page.getByTestId("referenced-note-type").locator("option")).toHaveText([
+      "Nota de crédito (07)",
+      "Nota de débito (08)",
+    ]);
     await expect(
       page.getByText(/no modifica CxC, saldo a favor ni contabilidad/i),
     ).toBeVisible();

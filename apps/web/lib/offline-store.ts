@@ -101,6 +101,7 @@ interface ApiCacheEntry {
 const OUTBOX_KEY = 'erp.desktop.offline.outbox'
 const CACHE_KEY = 'erp.desktop.offline.cache'
 const SENSITIVE_OFFLINE_ERROR = 'Esta configuracion sensible requiere conexion en vivo y nunca se guarda en la cola offline.'
+const FISCAL_OFFLINE_ERROR = 'La emision fiscal requiere conexion en vivo. No se guarda en la cola offline ni se considera emitida.'
 const CACHE_LIMIT = 120
 const CACHE_ENTRY_BODY_LIMIT = 512 * 1024
 const BINARY_CACHE_BODY_LIMIT = 8 * 1024 * 1024
@@ -292,6 +293,15 @@ function localFirstEndpoint(endpoint: string) {
   return path.replace(/\/+$/, '')
 }
 
+function offlineEndpointPath(endpoint: string) {
+  const withoutQuery = endpoint.split('?')[0]?.trim() || ''
+  const schemeIndex = withoutQuery.indexOf('://')
+  if (schemeIndex < 0) return withoutQuery.replace(/\/+$/, '').toLowerCase()
+
+  const pathIndex = withoutQuery.indexOf('/', schemeIndex + 3)
+  return (pathIndex < 0 ? '/' : withoutQuery.slice(pathIndex)).replace(/\/+$/, '').toLowerCase()
+}
+
 function isLocalFirstGetEndpoint(endpoint: string) {
   const normalized = localFirstEndpoint(endpoint)
   if (!isBusinessLocalFirstEndpoint(normalized)) return false
@@ -352,8 +362,73 @@ function isSensitiveOfflineRequest(input: Pick<OfflineRequestInput, 'endpoint' |
     || isSensitiveNonQueueableEndpoint(input.url, input.method)
 }
 
+function isFiscalEmissionEndpoint(endpoint: string, method: string) {
+  const normalizedMethod = method.trim().toUpperCase()
+  if (['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod)) return false
+
+  const path = offlineEndpointPath(endpoint)
+  return path === '/api/cpe'
+    || path.startsWith('/api/cpe/')
+    || path === '/cpe'
+    || path.startsWith('/cpe/')
+}
+
+function isPosFiscalIntent(
+  input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url' | 'body'>,
+) {
+  const normalizedMethod = input.method.trim().toUpperCase()
+  if (normalizedMethod !== 'POST') return false
+  const endpointPath = offlineEndpointPath(input.endpoint)
+  const urlPath = offlineEndpointPath(input.url)
+  if (endpointPath !== '/api/pos/venta' && urlPath !== '/api/pos/venta') return false
+
+  try {
+    const payload = input.body ? JSON.parse(input.body) : null
+    return payload?.emitir_cpe === true
+      || ['01', '03', '07', '08'].includes(String(payload?.tipo_comprobante || '').toUpperCase())
+  } catch {
+    // Una intención POS ilegible no es segura para diferir: el backend vivo
+    // debe validar el DTO antes de que exista cualquier efecto local.
+    return true
+  }
+}
+
+function isFiscalOfflineRequest(
+  input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url' | 'body'>,
+) {
+  return isFiscalEmissionEndpoint(input.endpoint, input.method)
+    || isFiscalEmissionEndpoint(input.url, input.method)
+    || isPosFiscalIntent(input)
+}
+
+function isNonQueueableOfflineRequest(
+  input: Pick<OfflineRequestInput, 'endpoint' | 'method' | 'url' | 'body'>,
+) {
+  return isSensitiveOfflineRequest(input) || isFiscalOfflineRequest(input)
+}
+
 function sensitiveOfflineError() {
   return new Error(SENSITIVE_OFFLINE_ERROR)
+}
+
+function fiscalOfflineError() {
+  return new Error(FISCAL_OFFLINE_ERROR)
+}
+
+async function nonQueueableOfflineError(
+  endpoint: string,
+  url: string,
+  method: string,
+  body: BodyInit | null | undefined,
+) {
+  if (isSensitiveOfflineRequest({ endpoint, url, method })) return sensitiveOfflineError()
+
+  const serializedBody = offlineEndpointPath(endpoint) === '/api/pos/venta'
+    || offlineEndpointPath(url) === '/api/pos/venta'
+    ? await offlineBodyToString(body)
+    : null
+  if (isFiscalOfflineRequest({ endpoint, url, method, body: serializedBody })) return fiscalOfflineError()
+  return null
 }
 
 function isLiveConnectivityTestEndpoint(endpoint: string) {
@@ -630,6 +705,7 @@ async function processLocalFirstWrite(
 
 export async function enqueueOfflineRequest(input: OfflineRequestInput): Promise<OfflineQueueItem> {
   if (isSensitiveOfflineRequest(input)) throw sensitiveOfflineError()
+  if (isFiscalOfflineRequest(input)) throw fiscalOfflineError()
 
   const safeInput = { ...input, headers: sanitizePersistedHeaders(input.headers || []) }
   if (isDesktopRuntime()) {
@@ -664,7 +740,7 @@ export async function listOfflineRequests(tenantId?: string | null): Promise<Off
   } else {
     queue = readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
   }
-  const sensitiveItems = queue.filter(isSensitiveOfflineRequest)
+  const sensitiveItems = queue.filter(isNonQueueableOfflineRequest)
   if (isDesktopRuntime()) {
     for (const item of sensitiveItems) {
       try {
@@ -676,7 +752,7 @@ export async function listOfflineRequests(tenantId?: string | null): Promise<Off
   }
 
   let changed = sensitiveItems.length > 0
-  const sanitized = queue.filter((item) => !isSensitiveOfflineRequest(item)).map((item) => {
+  const sanitized = queue.filter((item) => !isNonQueueableOfflineRequest(item)).map((item) => {
     const headers = sanitizePersistedHeaders(item.headers || [])
     changed ||= headers.length !== (item.headers || []).length
     return { ...item, headers }
@@ -994,9 +1070,8 @@ export async function fetchWithOfflineSupport(
   const forceOffline = await isOfflineModeEnabled()
 
   if (forceOffline) {
-    if (isSensitiveNonQueueableEndpoint(meta.endpoint, method)) {
-      throw sensitiveOfflineError()
-    }
+    const policyError = await nonQueueableOfflineError(meta.endpoint, url, method, init.body)
+    if (policyError) throw policyError
 
     // Las validaciones y constancias fiscales externas no son trabajo
     // diferible: encolarlas podría registrar después una habilitación que el
@@ -1062,9 +1137,8 @@ export async function fetchWithOfflineSupport(
     // no llegó a salir, que es para lo que existe el modo offline.
     if (esAbortoDeCliente(error)) throw error
 
-    if (isSensitiveNonQueueableEndpoint(meta.endpoint, method)) {
-      throw sensitiveOfflineError()
-    }
+    const policyError = await nonQueueableOfflineError(meta.endpoint, url, method, init.body)
+    if (policyError) throw policyError
 
     // Una prueba de conectividad debe informar el fallo en vivo. Encolarla
     // produciría un falso positivo y podría repetir una operación diagnóstica.

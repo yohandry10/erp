@@ -7,6 +7,7 @@ import {
   FiscalResponse, 
   DocumentoElectronico, 
   DianGenerationContext,
+  DianInvoiceAuthorizationIntent,
   ValidacionDocumento,
   ConsultaEstado,
   LibroContableFiscal 
@@ -35,6 +36,9 @@ import { hasCurrentDianPortalApproval } from './colombia/dian-habilitation-evide
 
 interface TenantDianSnapshot {
   isDemo: boolean;
+  taxId?: string;
+  certificateSha256?: string;
+  signingConfigSha256?: string;
   resolutionNumber?: string;
   resolutionPrefix?: string;
   rangeFrom?: number;
@@ -50,6 +54,48 @@ interface TenantDianRuntime {
   externalApprovalValidated: boolean;
   certificateBuffer?: Buffer;
   snapshot?: TenantDianSnapshot;
+}
+
+function hashStoredDianCertificate(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '';
+  let bytes: Buffer;
+  if (Buffer.isBuffer(value)) {
+    bytes = value;
+  } else if (value instanceof Uint8Array) {
+    bytes = Buffer.from(value);
+  } else if (Array.isArray(value)) {
+    bytes = Buffer.from(value);
+  } else if (typeof value === 'object'
+      && Array.isArray((value as { data?: unknown }).data)) {
+    bytes = Buffer.from((value as { data: number[] }).data);
+  } else {
+    const stored = String(value);
+    bytes = /^\\x[0-9a-f]+$/iu.test(stored)
+      ? Buffer.from(stored.slice(2), 'hex')
+      : Buffer.from(stored, 'utf8');
+  }
+  return bytes.length > 0
+    ? createHash('sha256').update(bytes).digest('hex')
+    : '';
+}
+
+function hashDianSigningConfig(row: Record<string, any>, certificateSha256: string): string {
+  if (!certificateSha256) return '';
+  return createHash('sha256').update([
+    certificateSha256,
+    row.dian_activo === true ? 'true' : 'false',
+    String(row.dian_url ?? '').trim(),
+    String(row.dian_software_id ?? '').trim(),
+    String(row.dian_test_set_id ?? '').trim(),
+    String(row.dian_environment ?? '').trim().toUpperCase(),
+    String(row.dian_resolucion_numero ?? '').trim(),
+    String(row.dian_resolucion_prefijo ?? '').trim().toUpperCase(),
+    row.dian_resolucion_desde == null ? '' : String(row.dian_resolucion_desde),
+    row.dian_resolucion_hasta == null ? '' : String(row.dian_resolucion_hasta),
+    String(row.dian_resolucion_fecha_inicio ?? '').trim(),
+    String(row.dian_resolucion_fecha_fin ?? '').trim(),
+    String(row.dian_habilitacion_estado ?? '').trim().toUpperCase(),
+  ].join('\u001f'), 'utf8').digest('hex');
 }
 
 export type DianEventCode = '030' | '031' | '032' | '033' | '034';
@@ -173,7 +219,7 @@ export class DianFiscalService extends FiscalServiceAbstract {
       }
       this.logOperation('Enviando documento a DIAN', { 
         tipo: documento.tipoDocumento, 
-        numero: `${documento.serie}-${documento.numero}` 
+        numero: this.numeroFiscalDian(documento),
       });
 
       // 1. Reservar el nombre ZIP en la misma operación SEND antes de leer el
@@ -271,7 +317,7 @@ export class DianFiscalService extends FiscalServiceAbstract {
         const documentKey = String(dianResponse.cufe).trim().toUpperCase();
         this.logSuccess('Documento aceptado por DIAN', { 
           cufe: documentKey,
-          documento: `${documento.serie}-${documento.numero}` 
+          documento: this.numeroFiscalDian(documento),
         });
 
         return {
@@ -475,7 +521,7 @@ export class DianFiscalService extends FiscalServiceAbstract {
       valido: errores.length === 0,
       errores,
       advertencias,
-      numeroDocumento: `${documento.serie}-${documento.numero}`,
+      numeroDocumento: this.numeroFiscalDian(documento),
       tipoDocumento: documento.tipoDocumento
     };
   }
@@ -484,6 +530,53 @@ export class DianFiscalService extends FiscalServiceAbstract {
     const runtime = await this.loadTenantConfig();
     const prepared = await this.prepararDocumentoDian(documento, runtime);
     return this.generarXmlPreparado(prepared);
+  }
+
+  /** Genera y firma con una sola lectura coherente de configuración DIAN. */
+  async generarYFirmarDocumentoSinTransmitir(
+    documento: DocumentoElectronico,
+    tenantId: string,
+  ): Promise<string> {
+    const runtime = await this.loadTenantConfig(tenantId);
+    const prepared = await this.prepararDocumentoDian(documento, runtime);
+    const xml = await this.generarXmlPreparado(prepared);
+    return this.firmarXmlWithRuntime(xml, runtime);
+  }
+
+  /**
+   * Consulta y sella en memoria la autorización oficial antes de que el
+   * llamador reserve un correlativo local. El contexto retornado puede usarse
+   * una sola vez dentro de la misma solicitud para construir/firmar sin una
+   * segunda llamada divergente a GetNumberingRange.
+   */
+  async prepararContextoFacturaAntesDeReserva(
+    intent: DianInvoiceAuthorizationIntent,
+    tenantId: string,
+  ): Promise<DianGenerationContext> {
+    const runtime = await this.loadTenantConfig(tenantId);
+    if (runtime.snapshot?.isDemo === true) {
+      throw new Error('DIAN: una demo no consulta autorización oficial de numeración');
+    }
+    if (!runtime.dianActive) {
+      throw new Error('DIAN_DISABLED');
+    }
+    this.assertIssuerRuntimeIdentity(intent.issuerIdentity, runtime);
+    const softwareId = String(runtime.dianConfig.softwareId ?? '').trim();
+    const softwarePin = String(runtime.dianConfig.softwarePin ?? '').trim();
+    if (!softwareId || !softwarePin) {
+      throw new Error('DIAN: faltan Software ID o Software PIN');
+    }
+    const authorization = await this.resolveOfficialAuthorizationIntent(intent, runtime);
+    return {
+      environmentId: runtime.dianConfig.environment === 'produccion' ? '1' : '2',
+      software: { id: softwareId, pin: softwarePin },
+      authorization,
+      taxes: {
+        iva: Number(intent.taxes.iva),
+        inc: Number(intent.taxes.inc),
+        ica: Number(intent.taxes.ica),
+      },
+    };
   }
 
   private async generarXmlPreparado(documento: DocumentoElectronico): Promise<string> {
@@ -849,9 +942,14 @@ export class DianFiscalService extends FiscalServiceAbstract {
     documento: DocumentoElectronico,
     runtime: TenantDianRuntime,
   ): Promise<DocumentoElectronico> {
+    const expectedIssuer = documento.fiscalContext?.dianIssuerIdentity;
+    if (expectedIssuer) this.assertIssuerRuntimeIdentity(expectedIssuer, runtime);
     // Un contexto ya sellado puede venir de la operación idempotente de
     // delivery. El builder vuelve a validar prefijo, rango, fecha y sumas.
-    if (documento.dianContext) return { ...documento };
+    if (documento.dianContext) {
+      this.assertPrevalidatedInvoiceContext(documento, runtime, documento.dianContext);
+      return { ...documento };
+    }
 
     const softwareId = String(runtime.dianConfig.softwareId ?? '').trim();
     const softwarePin = String(runtime.dianConfig.softwarePin ?? '').trim();
@@ -898,44 +996,121 @@ export class DianFiscalService extends FiscalServiceAbstract {
     documento: DocumentoElectronico,
     runtime: TenantDianRuntime,
   ): Promise<NonNullable<DianGenerationContext['authorization']>> {
+    const authorization = await this.resolveOfficialAuthorizationIntent({
+      documentType: '01',
+      series: String(documento.serie ?? '').trim().toUpperCase(),
+      issueDate: this.bogotaDate(documento.fechaEmision),
+      issuerIdentity: documento.fiscalContext?.dianIssuerIdentity ?? {
+        contractVersion: 529,
+        taxId: String(runtime.snapshot?.taxId ?? ''),
+        certificateSha256: String(runtime.snapshot?.certificateSha256 ?? ''),
+        signingConfigSha256: String(runtime.snapshot?.signingConfigSha256 ?? ''),
+      },
+      taxes: this.resolveTaxSeed(documento) ?? { iva: 0, inc: 0, ica: 0 },
+    }, runtime);
     const number = this.documentNumber(documento.numero);
-    const prefix = String(documento.serie ?? '').trim().toUpperCase();
+    if (number < authorization.rangeFrom || number > authorization.rangeTo) {
+      throw new Error('DIAN: el consecutivo está fuera del rango oficial autorizado');
+    }
+    return authorization;
+  }
+
+  private async resolveOfficialAuthorizationIntent(
+    intent: DianInvoiceAuthorizationIntent,
+    runtime: TenantDianRuntime,
+  ): Promise<NonNullable<DianGenerationContext['authorization']>> {
+    const prefix = String(intent.series ?? '').trim().toUpperCase();
+    if (intent.documentType !== '01' || !/^[A-Z0-9]{0,4}$/.test(prefix)) {
+      throw new Error('DIAN: el prefijo es opcional; cuando exista debe tener máximo 4 alfanuméricos');
+    }
+    const issueDate = this.bogotaDate(intent.issueDate);
+    const snapshot = runtime.snapshot;
+    const snapshotFrom = Number(snapshot?.rangeFrom);
+    const snapshotTo = Number(snapshot?.rangeTo);
+    const snapshotValidFrom = this.dateOnly(snapshot?.validFrom);
+    const snapshotValidTo = this.dateOnly(snapshot?.validTo);
+    if (!snapshot?.resolutionNumber
+        || snapshot?.resolutionPrefix === undefined
+        || !Number.isSafeInteger(snapshotFrom) || snapshotFrom < 1
+        || !Number.isSafeInteger(snapshotTo) || snapshotTo < snapshotFrom
+        || snapshotValidFrom > snapshotValidTo
+        || prefix !== snapshot.resolutionPrefix.toUpperCase()) {
+      throw new Error('DIAN: la resolución local de numeración está incompleta o es incoherente');
+    }
+
     const result = await this.apiClient.consultarRangosAutorizados(runtime.dianConfig);
     const ranges = Array.isArray(result?.rangos) ? result.rangos as any[] : [];
-    const issueDate = this.bogotaDate(documento.fechaEmision);
-    const range = ranges.find((candidate) => {
-      const validFrom = this.dateOnly(candidate.fechaInicio);
-      const validTo = this.dateOnly(candidate.fechaFin);
-      return String(candidate.prefijo ?? '').trim().toUpperCase() === prefix
-        && number >= Number(candidate.desde)
-        && number <= Number(candidate.hasta)
-        && issueDate >= validFrom
-        && issueDate <= validTo;
-    });
+    const range = ranges.find((candidate) =>
+      String(candidate.resolucion ?? '').trim() === snapshot.resolutionNumber
+      && String(candidate.prefijo ?? '').trim().toUpperCase() === prefix
+      && Number(candidate.desde) === snapshotFrom
+      && Number(candidate.hasta) === snapshotTo
+      && this.dateOnly(candidate.fechaInicio) === snapshotValidFrom
+      && this.dateOnly(candidate.fechaFin) === snapshotValidTo
+      && issueDate >= snapshotValidFrom
+      && issueDate <= snapshotValidTo,
+    );
     if (!range) {
-      throw new Error('DIAN: GetNumberingRange no devolvió un rango vigente para la factura');
+      throw new Error('DIAN: la resolución, prefijo, rango o vigencia configurados no coinciden con GetNumberingRange');
     }
-    if (!String(range.claveTecnica ?? '').trim()) {
+    const technicalKey = String(range.claveTecnica ?? '').trim();
+    if (!technicalKey) {
       throw new Error('DIAN: el rango oficial no contiene TechnicalKey');
     }
-    const snapshot = runtime.snapshot;
-    if (snapshot?.resolutionNumber
-        && snapshot.resolutionNumber !== String(range.resolucion).trim()) {
-      throw new Error('DIAN: la resolución configurada no coincide con GetNumberingRange');
-    }
-    if (snapshot?.resolutionPrefix
-        && snapshot.resolutionPrefix.toUpperCase() !== prefix) {
-      throw new Error('DIAN: el prefijo configurado no coincide con el documento');
-    }
     return {
-      number: String(range.resolucion).trim(),
-      prefix: String(range.prefijo).trim(),
-      rangeFrom: Number(range.desde),
-      rangeTo: Number(range.hasta),
-      validFrom: this.dateOnly(range.fechaInicio),
-      validTo: this.dateOnly(range.fechaFin),
-      technicalKey: String(range.claveTecnica).trim(),
+      number: snapshot.resolutionNumber,
+      prefix,
+      rangeFrom: snapshotFrom,
+      rangeTo: snapshotTo,
+      validFrom: snapshotValidFrom,
+      validTo: snapshotValidTo,
+      technicalKey,
     };
+  }
+
+  private assertIssuerRuntimeIdentity(
+    expectedIssuer: NonNullable<DocumentoElectronico['fiscalContext']>['dianIssuerIdentity'],
+    runtime: TenantDianRuntime,
+  ): void {
+    if (!expectedIssuer
+        || expectedIssuer.contractVersion !== 529
+        || String(expectedIssuer.taxId ?? '').trim() !== String(runtime.snapshot?.taxId ?? '').trim()
+        || !/^[0-9a-f]{64}$/iu.test(String(expectedIssuer.certificateSha256 ?? ''))
+        || String(expectedIssuer.certificateSha256).toLowerCase()
+          !== String(runtime.snapshot?.certificateSha256 ?? '').toLowerCase()
+        || !/^[0-9a-f]{64}$/iu.test(String(expectedIssuer.signingConfigSha256 ?? ''))
+        || String(expectedIssuer.signingConfigSha256).toLowerCase()
+          !== String(runtime.snapshot?.signingConfigSha256 ?? '').toLowerCase()) {
+      throw new Error('DIAN_NOTE_ISSUER_RUNTIME_IDENTITY_MISMATCH');
+    }
+  }
+
+  private assertPrevalidatedInvoiceContext(
+    documento: DocumentoElectronico,
+    runtime: TenantDianRuntime,
+    context: DianGenerationContext,
+  ): void {
+    if (documento.tipoDocumento !== '01') return;
+    const authorization = context.authorization;
+    const number = this.documentNumber(documento.numero);
+    const issueDate = this.bogotaDate(documento.fechaEmision);
+    const runtimeEnvironment = runtime.dianConfig.environment === 'produccion' ? '1' : '2';
+    if (!authorization
+        || context.environmentId !== runtimeEnvironment
+        || context.software.id !== String(runtime.dianConfig.softwareId ?? '').trim()
+        || context.software.pin !== String(runtime.dianConfig.softwarePin ?? '').trim()
+        || !String(authorization.technicalKey ?? '').trim()
+        || authorization.prefix !== String(documento.serie ?? '').trim().toUpperCase()
+        || number < authorization.rangeFrom || number > authorization.rangeTo
+        || issueDate < authorization.validFrom || issueDate > authorization.validTo
+        || authorization.number !== String(runtime.snapshot?.resolutionNumber ?? '').trim()
+        || authorization.prefix !== String(runtime.snapshot?.resolutionPrefix ?? '').trim().toUpperCase()
+        || authorization.rangeFrom !== Number(runtime.snapshot?.rangeFrom)
+        || authorization.rangeTo !== Number(runtime.snapshot?.rangeTo)
+        || authorization.validFrom !== this.dateOnly(runtime.snapshot?.validFrom)
+        || authorization.validTo !== this.dateOnly(runtime.snapshot?.validTo)) {
+      throw new Error('DIAN_PREVALIDATED_AUTHORIZATION_CONTEXT_MISMATCH');
+    }
   }
 
   private demoAuthorization(
@@ -943,7 +1118,7 @@ export class DianFiscalService extends FiscalServiceAbstract {
     snapshot: TenantDianSnapshot | undefined,
   ): NonNullable<DianGenerationContext['authorization']> {
     const number = this.documentNumber(documento.numero);
-    if (!snapshot?.resolutionNumber || !snapshot.resolutionPrefix
+    if (!snapshot?.resolutionNumber || snapshot.resolutionPrefix === undefined
         || snapshot.rangeFrom == null || snapshot.rangeTo == null
         || !snapshot.validFrom || !snapshot.validTo) {
       throw new Error('DIAN: fixture demo sin resolución de numeración completa');
@@ -1067,7 +1242,6 @@ export class DianFiscalService extends FiscalServiceAbstract {
       softwareId: row.dian_software_id,
       softwarePin: row.dian_software_pin,
       resolucion: row.dian_resolucion_numero,
-      prefijo: row.dian_resolucion_prefijo,
       rangoDesde: row.dian_resolucion_desde,
       rangoHasta: row.dian_resolucion_hasta,
       vigenciaDesde: row.dian_resolucion_fecha_inicio,
@@ -1101,12 +1275,13 @@ export class DianFiscalService extends FiscalServiceAbstract {
     const ranges = Array.isArray(rangeResult?.rangos) ? rangeResult.rangos : [];
     const configuredResolution = String(row.dian_resolucion_numero ?? '').trim();
     const configuredPrefix = String(row.dian_resolucion_prefijo ?? '').trim().toUpperCase();
+    const configuredPrefixValid = /^[A-Z0-9]{0,4}$/.test(configuredPrefix);
     const configuredFrom = Number(row.dian_resolucion_desde);
     const configuredTo = Number(row.dian_resolucion_hasta);
     const configuredValidFrom = this.dateOnly(row.dian_resolucion_fecha_inicio);
     const configuredValidTo = this.dateOnly(row.dian_resolucion_fecha_fin);
     const todayBogota = this.bogotaDate(new Date());
-    const numberingValidated = ranges.some((range: any) => {
+    const numberingValidated = configuredPrefixValid && ranges.some((range: any) => {
       const officialFrom = Number(range.desde);
       const officialTo = Number(range.hasta);
       const officialValidFrom = this.dateOnly(range.fechaInicio);
@@ -1342,10 +1517,16 @@ export class DianFiscalService extends FiscalServiceAbstract {
     const certificateBuffer = decryptBuffer(this.configService, typedData.certificado_pfx) || undefined;
     dianConfig.certificatePfx = certificateBuffer;
     dianConfig.certificatePassword = fiscalConfig.certificatePassword;
+    const certificateSha256 = hashStoredDianCertificate(typedData.certificado_pfx);
     const snapshot: TenantDianSnapshot = {
       isDemo: typedData.is_demo === true,
+      taxId: String(typedData.ruc ?? '').trim(),
+      certificateSha256,
+      signingConfigSha256: hashDianSigningConfig(typedData, certificateSha256),
       resolutionNumber: String(typedData.dian_resolucion_numero ?? '').trim() || undefined,
-      resolutionPrefix: String(typedData.dian_resolucion_prefijo ?? '').trim() || undefined,
+      // DIAN permite resoluciones sin prefijo. Se conserva `''` para distinguir
+      // ese contrato válido de un snapshot que ni siquiera cargó el campo.
+      resolutionPrefix: String(typedData.dian_resolucion_prefijo ?? '').trim().toUpperCase(),
       rangeFrom: typedData.dian_resolucion_desde == null
         ? undefined : Number(typedData.dian_resolucion_desde),
       rangeTo: typedData.dian_resolucion_hasta == null
@@ -1361,5 +1542,9 @@ export class DianFiscalService extends FiscalServiceAbstract {
       certificateBuffer,
       snapshot,
     };
+  }
+
+  private numeroFiscalDian(documento: Pick<DocumentoElectronico, 'serie' | 'numero'>): string {
+    return `${String(documento.serie ?? '').trim().toUpperCase()}${String(documento.numero).trim()}`;
   }
 }

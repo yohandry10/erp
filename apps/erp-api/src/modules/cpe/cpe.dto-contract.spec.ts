@@ -61,4 +61,51 @@ describe('CreateFacturaDto — contrato público de condición de pago', () => {
 
     expect(errors.some((error) => error.property === 'condicion_pago')).toBe(true);
   });
+
+  it('acepta el medio y el plazo exigidos por una factura DIAN a crédito', async () => {
+    const dto = plainToInstance(CreateFacturaDto, {
+      ...facturaValida,
+      moneda: 'COP',
+      condicion_pago: CondicionPago.CREDITO,
+      medio_pago: '42',
+      plazo_pago_dias: 30,
+    });
+
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    expect(errors).toEqual([]);
+    expect(dto.medio_pago).toBe('42');
+    expect(dto.plazo_pago_dias).toBe(30);
+  });
+
+  it('mantiene compatibles los payloads PE/AR que no declaran datos de crédito DIAN', async () => {
+    const dto = plainToInstance(CreateFacturaDto, facturaValida);
+
+    await expect(validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    })).resolves.toEqual([]);
+  });
+
+  it.each([
+    ['medio_pago', 42],
+    ['plazo_pago_dias', -1],
+    ['plazo_pago_dias', 1.5],
+    ['plazo_pago_dias', 36501],
+  ])('rechaza %s inválido en el contrato público', async (field, value) => {
+    const dto = plainToInstance(CreateFacturaDto, {
+      ...facturaValida,
+      [field]: value,
+    });
+
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    expect(errors.some((error) => error.property === field)).toBe(true);
+  });
 });

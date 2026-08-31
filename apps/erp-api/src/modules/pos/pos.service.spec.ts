@@ -268,9 +268,11 @@ describe('PosService atomic transaction contract', () => {
   const empresaColombiaReal = {
     ruc: '9001234568', razon_social: 'EMPRESA CO S.A.S.', pais: 'CO', is_demo: false,
     moneda_defecto: 'COP', igv_porcentaje: 19, serie_factura: 'FE',
+    dian_resolucion_prefijo: 'FE',
     direccion_fiscal: 'Carrera 7 # 72-41', ubigeo: '11001',
     departamento: 'Bogotá D.C.', provincia: 'Bogotá D.C.',
     dian_regimen_fiscal: 'O-13', dian_tipo_contribuyente: '1',
+    dias_vencimiento_factura: 30,
   };
 
   it('atraviesa POS real -> CPE 01/31 -> XML DIAN con NIT y pago canónicos', async () => {
@@ -284,7 +286,7 @@ describe('PosService atomic transaction contract', () => {
       cliente_direccion: 'Calle 1 # 2-3',
       metodo_pago_id: 'mp-efectivo',
       emitir_cpe: true,
-      comprobante: { tipo: '01', serie: 'FE' },
+      comprobante: { tipo: '01', serie: 'HACK' },
       moneda: 'COP',
     }, user);
 
@@ -345,6 +347,101 @@ describe('PosService atomic transaction contract', () => {
     });
     expect(xml).toContain('<cbc:InvoiceTypeCode>01</cbc:InvoiceTypeCode>');
     expect(xml).toContain('schemeID="8" schemeName="31" schemeAgencyID="195">900123456</cbc:ID>');
+  });
+
+  it('acepta una resolución DIAN sin prefijo y descarta la serie enviada por el navegador', async () => {
+    const ctx = createService({
+      empresaConfig: { ...empresaColombiaReal, dian_resolucion_prefijo: '' },
+    });
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase,
+      cliente_id: 'cliente-co-sin-prefijo',
+      cliente_documento: '900123456-8',
+      cliente_tipo_documento: 'NIT',
+      cliente_nombre: 'CLIENTE CO SIN PREFIJO S.A.S.',
+      cliente_direccion: 'Calle 1 # 2-3',
+      metodo_pago_id: 'mp-efectivo',
+      emitir_cpe: true,
+      comprobante: { tipo: '01', serie: 'HACK' },
+      moneda: 'COP',
+    }, user);
+
+    expect(result.success).toBe(true);
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1]?.p_payload.cpe_data).toEqual(expect.objectContaining({
+      serie: '',
+      condicion_pago: 'CONTADO',
+      medio_pago: '10',
+      plazo_pago_dias: 0,
+    }));
+  });
+
+  it('congela CREDITO en el snapshot DIAN cuando el pago POS es a crédito', async () => {
+    const ctx = createService({
+      empresaConfig: empresaColombiaReal,
+      metodoPago: { id: 'mp-credito', codigo: 'credito', tipo: 'CREDITO' },
+    });
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase,
+      cliente_id: 'cliente-co-credito',
+      cliente_documento: '900123456-8',
+      cliente_tipo_documento: 'NIT',
+      cliente_nombre: 'CLIENTE CO CREDITO S.A.S.',
+      cliente_direccion: 'Calle 1 # 2-3',
+      emitir_cpe: true,
+      comprobante: { tipo: '01', serie: 'IGNORADA' },
+      moneda: 'COP',
+      pagos: [{ metodo_pago_id: 'mp-credito', monto: 119 }],
+    }, user);
+
+    expect(result.success).toBe(true);
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1]?.p_payload.cpe_data).toEqual(expect.objectContaining({
+      serie: 'FE',
+      condicion_pago: 'CREDITO',
+      medio_pago: '1',
+      plazo_pago_dias: 30,
+      metadata: expect.objectContaining({
+        dian_forma_pago: 'CREDITO',
+        plazo_pago_dias: 30,
+      }),
+    }));
+  });
+
+  it('usa ZZZ para pago mixto DIAN y congela el plazo de crédito solicitado', async () => {
+    const ctx = createService({
+      empresaConfig: empresaColombiaReal,
+      metodoPago: { id: 'mp-credito', codigo: 'credito', tipo: 'CREDITO' },
+    });
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase,
+      cliente_id: 'cliente-co-mixto',
+      cliente_documento: '900123456-8',
+      cliente_tipo_documento: 'NIT',
+      cliente_nombre: 'CLIENTE CO MIXTO S.A.S.',
+      cliente_direccion: 'Calle 1 # 2-3',
+      emitir_cpe: true,
+      comprobante: { tipo: '01', serie: 'IGNORADA' },
+      moneda: 'COP',
+      plazo_pago_dias: 45,
+      pagos: [
+        { metodo_pago_id: 'mp-credito', monto: 60, referencia: 'cuota-1' },
+        { metodo_pago_id: 'mp-credito', monto: 59, referencia: 'cuota-2' },
+      ],
+    }, user);
+
+    expect(result.success).toBe(true);
+    const rpc = ctx.rpcMock.mock.calls.find(([fn]) => fn === 'pos_registrar_venta_comercial_tx');
+    expect(rpc?.[1]?.p_payload.cpe_data).toEqual(expect.objectContaining({
+      condicion_pago: 'CREDITO',
+      medio_pago: 'ZZZ',
+      plazo_pago_dias: 45,
+      metadata: expect.objectContaining({
+        dian_forma_pago: 'CREDITO',
+        dian_medio_pago: 'ZZZ',
+        plazo_pago_dias: 45,
+      }),
+    }));
   });
 
   it('preserva 10/20/30 desde catálogo autoritativo hasta el XML DIAN mixto', async () => {
@@ -1309,6 +1406,34 @@ describe('PosService atomic transaction contract', () => {
       descuento_monto: 10,
       subtotal: 190,
     }));
+  });
+
+  it('bloquea descuentos en POS CO real antes de cobrar, mover stock o reservar numeración', async () => {
+    const ctx = createService({ empresaConfig: empresaColombiaReal });
+
+    const result = await ctx.service.procesarVenta({
+      ...ventaBase,
+      cliente_id: 'cliente-co-descuento',
+      cliente_documento: '900123456-8',
+      cliente_tipo_documento: 'NIT',
+      cliente_nombre: 'CLIENTE CO DESCUENTO S.A.S.',
+      cliente_direccion: 'Calle 1 # 2-3',
+      metodo_pago_id: 'mp-efectivo',
+      emitir_cpe: true,
+      comprobante: { tipo: '01' },
+      moneda: 'COP',
+      items: [{
+        ...ventaBase.items[0],
+        descuento_monto: 10,
+      }],
+    }, user);
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('AllowanceCharge');
+    expect(ctx.rpcMock).not.toHaveBeenCalledWith(
+      'pos_registrar_venta_comercial_tx',
+      expect.anything(),
+    );
   });
 
   it('registra un ticket interno real sin enviar intención CPE ni reservar datos fiscales', async () => {

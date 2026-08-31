@@ -3,20 +3,27 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { TipoCliente, TipoDocumento, Cliente } from '@/types/ventas'
+import { TipoCliente, TipoDocumento, Cliente, DianPerfilFiscal } from '@/types/ventas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { validateArgentinaCuit, validateCountryTaxId } from '@/lib/country-tax-id'
+import {
+  dianPerfilFiscalSchema,
+  hasCapturableColombiaNitLength,
+  validateClienteFiscalForm,
+} from '@/lib/validations/cliente-fiscal'
 
-// Validation schema with Zod
-const clienteSchema = z.object({
+// El país se resuelve en runtime. La selección DIAN sólo es obligatoria para
+// Colombia, pero las combinaciones documento/perfil se validan también en Web
+// para no delegar al error genérico del writer una decisión que toma el usuario.
+const createClienteSchema = (isColombia: boolean) => z.object({
   tipo: z.nativeEnum(TipoCliente, {
     errorMap: () => ({ message: 'Seleccione un tipo de cliente' })
   }),
@@ -38,29 +45,11 @@ const clienteSchema = z.object({
     .max(20, 'El teléfono no puede exceder 20 caracteres')
     .optional()
     .or(z.literal('')),
-  arca_condicion_iva: z.string().max(80).optional().or(z.literal(''))
-}).refine((data) => {
-  // RUC validation: must be 11 digits
-  if ([TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI].includes(data.documento_tipo)) {
-    return data.documento_numero.length === 11 && /^\d+$/.test(data.documento_numero)
-  }
-  if (data.documento_tipo === TipoDocumento.NIT) {
-    return data.documento_numero.length === 10 && /^\d+$/.test(data.documento_numero)
-  }
-  if ([TipoDocumento.CC, TipoDocumento.TI].includes(data.documento_tipo)) {
-    return /^[0-9]{6,10}$/.test(data.documento_numero)
-  }
-  // DNI validation: must be 8 digits
-  if (data.documento_tipo === TipoDocumento.DNI) {
-    return data.documento_numero.length === 8 && /^\d+$/.test(data.documento_numero)
-  }
-  return true
-}, {
-  message: 'El documento no tiene la longitud o formato requerido',
-  path: ['documento_numero']
-})
+  arca_condicion_iva: z.string().max(80).optional().or(z.literal('')),
+  dian_perfil_fiscal: dianPerfilFiscalSchema.optional().or(z.literal(''))
+}).superRefine((data, context) => validateClienteFiscalForm(data, isColombia, context))
 
-type ClienteFormData = z.infer<typeof clienteSchema>
+type ClienteFormData = z.infer<ReturnType<typeof createClienteSchema>>
 
 interface ClienteFormProps {
   initialData?: Partial<Cliente>
@@ -80,6 +69,7 @@ export default function ClienteForm({
   const country = useCountryContext()
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
+  const clienteSchema = useMemo(() => createClienteSchema(isColombia), [isColombia])
   const { post, unwrap } = useApi()
   const [validatingRuc, setValidatingRuc] = useState(false)
   const [rucValidated, setRucValidated] = useState(false)
@@ -109,7 +99,8 @@ export default function ClienteForm({
       direccion: initialData?.direccion || '',
       email: initialData?.email || '',
       telefono: initialData?.telefono || '',
-      arca_condicion_iva: initialData?.arca_condicion_iva || (isArgentina ? 'CONSUMIDOR_FINAL' : '')
+      arca_condicion_iva: initialData?.arca_condicion_iva || (isArgentina ? 'CONSUMIDOR_FINAL' : ''),
+      dian_perfil_fiscal: initialData?.dian_perfil_fiscal || ''
     }
   })
 
@@ -117,7 +108,7 @@ export default function ClienteForm({
   const documentoNumero = watch('documento_numero')
   const documentoTipoField = register('documento_tipo')
   const documentoNumeroField = register('documento_numero')
-  const loading = isSubmitting || externalLoading
+  const loading = isSubmitting || externalLoading || country.loading
 
   // El país llega de forma asíncrona. No dejes el DNI peruano que se usó
   // durante el primer render como valor por defecto de un tenant CO/AR.
@@ -143,11 +134,15 @@ export default function ClienteForm({
       return
     }
 
-    const expectedLength = documentoTipo === TipoDocumento.NIT ? 10 : 11
-    if (documentoNumero.length !== expectedLength) {
+    const validLength = documentoTipo === TipoDocumento.NIT
+      ? hasCapturableColombiaNitLength(documentoNumero)
+      : /^\d{11}$/.test(documentoNumero)
+    if (!validLength) {
       toast({
         title: 'Error',
-        description: `El ${isArgentina ? 'CUIT' : isColombia ? 'NIT' : 'RUC'} debe tener ${expectedLength} dígitos`,
+        description: documentoTipo === TipoDocumento.NIT
+          ? 'El NIT debe tener 10 u 11 dígitos, incluido el DV'
+          : `El ${isArgentina ? 'CUIT' : 'RUC'} debe tener 11 dígitos`,
         variant: 'destructive'
       })
       return
@@ -232,6 +227,7 @@ export default function ClienteForm({
         direccion: data.direccion?.trim() || undefined,
         email: data.email?.trim() || undefined,
         telefono: data.telefono?.trim() || undefined,
+        dian_perfil_fiscal: isColombia ? data.dian_perfil_fiscal || undefined : undefined,
       }
 
       await onSubmit(normalizedData)
@@ -315,7 +311,7 @@ export default function ClienteForm({
           <Label htmlFor="documento_numero">
             Número de Documento *
             {[TipoDocumento.RUC, TipoDocumento.CUIT, TipoDocumento.CUIL, TipoDocumento.CDI].includes(documentoTipo) && ' (11 dígitos)'}
-            {documentoTipo === TipoDocumento.NIT && ' (10 dígitos, incluido DV)'}
+            {documentoTipo === TipoDocumento.NIT && ' (10 u 11 dígitos, DV incluido)'}
             {documentoTipo === TipoDocumento.DNI && ' (8 dígitos)'}
           </Label>
           <div className="flex gap-2">
@@ -345,7 +341,13 @@ export default function ClienteForm({
                 type="button"
                 variant="outline"
                 onClick={handleValidarRuc}
-                disabled={loading || validatingRuc || documentoNumero.length !== (documentoTipo === TipoDocumento.NIT ? 10 : 11)} className="whitespace-nowrap"
+                disabled={
+                  loading ||
+                  validatingRuc ||
+                  (documentoTipo === TipoDocumento.NIT
+                    ? !hasCapturableColombiaNitLength(documentoNumero)
+                    : documentoNumero.length !== 11)
+                } className="whitespace-nowrap"
               >
                 {validatingRuc ? (
                   <>
@@ -418,6 +420,30 @@ export default function ClienteForm({
           </select>
           <p className="text-xs text-muted-foreground m-0">
             ARCA usa este dato para determinar la clase A, B o C; no se deduce del CUIT/CUIL/CDI.
+          </p>
+        </div>
+      )}
+
+      {isColombia && (
+        <div className="bg-[var(--primary-50)] p-6 flex flex-col gap-2">
+          <Label htmlFor="dian_perfil_fiscal">Perfil tributario DIAN del receptor *</Label>
+          <select
+            id="dian_perfil_fiscal"
+            {...register('dian_perfil_fiscal')}
+            className="w-full py-[0.875rem] px-4 border text-base bg-card text-[var(--primary-800)]"
+            disabled={loading}
+          >
+            <option value="">Seleccione el perfil tributario</option>
+            <option value={DianPerfilFiscal.CONSUMIDOR_FINAL}>Consumidor final</option>
+            <option value={DianPerfilFiscal.ADQUIRIENTE_NIT_B2B}>Adquirente con NIT (B2B)</option>
+          </select>
+          {errors.dian_perfil_fiscal && (
+            <p className="text-[0.875rem] text-[var(--red-600)] m-0">
+              {errors.dian_perfil_fiscal.message}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground m-0">
+            La elección es explícita: consumidor final usa un documento personal; adquirente B2B exige NIT con DV válido.
           </p>
         </div>
       )}

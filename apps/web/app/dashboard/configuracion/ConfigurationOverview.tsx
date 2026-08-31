@@ -477,7 +477,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
       sales: isArgentina
         ? !!empresa?.arcaPuntoVenta && !!empresa?.arcaCondicionIva
         : isColombia
-          ? !!empresa?.dianResolucionPrefijo && !!empresa?.dianResolucionNumero
+          ? !!empresa?.dianResolucionNumero
           : !!empresa?.serieFactura && !!empresa?.serieBoleta,
       logistics: !isPeru || !logisticsEnabled || !!empresa?.serieGuiaRemision,
       labor: isArgentina || isColombia ? data.rrhh?.readiness?.ready === true : true,
@@ -736,7 +736,11 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
                 <FieldRow label="Software ID" value={empresa?.dianSoftwareId} ok={!!empresa?.dianSoftwareId} />
                 <FieldRow label="Test Set ID" value={empresa?.dianTestSetId} ok={!!empresa?.dianTestSetId} />
                 <FieldRow label="Resolución DIAN" value={empresa?.dianResolucionNumero} ok={!!empresa?.dianResolucionNumero} />
-                <FieldRow label="Prefijo autorizado" value={empresa?.dianResolucionPrefijo} ok={!!empresa?.dianResolucionPrefijo} />
+                <FieldRow
+                  label="Prefijo autorizado"
+                  value={empresa?.dianResolucionPrefijo || 'Sin prefijo asignado'}
+                  ok={true}
+                />
                 <FieldRow label="Ambiente" value={empresa?.dianEnvironment} />
                 <FieldRow
                   label="Validación técnica"

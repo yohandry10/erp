@@ -33,6 +33,8 @@ const comprobanteDeLaPantalla = {
       descripcion: 'Cuaderno A4 96 hojas',
       cantidad: 10,
       unidadMedida: 'NIU',
+      afectacion_igv: '10',
+      tipo_afectacion_igv: '10',
       valorUnitario: 5.5,
       precioUnitario: 6.49,
       descuento: 0,
@@ -43,6 +45,7 @@ const comprobanteDeLaPantalla = {
   subtotal: 55,
   totalIgv: 9.9,
   total: 64.9,
+  idempotency_key: 'cpe-ui-screen-contract-1',
 };
 
 describe('CrearComprobanteUiDto', () => {
@@ -72,6 +75,71 @@ describe('CrearComprobanteUiDto', () => {
         items: [{ descripcion: 'Servicio', cantidad: 1, valor_venta: 55, igv: 9.9 }],
       }),
     ).toHaveLength(0);
+  });
+
+  it.each(['10', '20', '30'])('acepta y conserva la afectación por línea %s', (afectacion) => {
+    const dto = plainToInstance(CrearComprobanteUiDto, {
+      tipoComprobante: '01',
+      items: [{
+        codigo: 'SKU-1', descripcion: 'Producto', cantidad: 1,
+        valorUnitario: 100, igv: 0, total: 100,
+        afectacion_igv: afectacion,
+      }],
+    });
+
+    expect(validateSync(dto, OPCIONES)).toHaveLength(0);
+    expect(dto.items[0].afectacion_igv).toBe(afectacion);
+  });
+
+  it('rechaza una afectación por línea no soportada', () => {
+    const errores = validar({
+      tipoComprobante: '01',
+      items: [{
+        codigo: 'SKU-1', descripcion: 'Producto', cantidad: 1,
+        valorUnitario: 100, igv: 0, total: 100,
+        afectacion_igv: '99',
+      }],
+    });
+    expect(errores.map((e) => e.property)).toContain('items');
+  });
+
+  it.each([
+    ['impuesto_isc', 'tasa_isc'],
+    ['impuesto_inc', 'tasa_inc'],
+    ['impuestoInc', 'tasaInc'],
+    ['inc', 'tasa_inc'],
+  ])('acepta y conserva el INC mediante los alias %s/%s', (amountAlias, rateAlias) => {
+    const dto = plainToInstance(CrearComprobanteUiDto, {
+      tipoComprobante: '01',
+      items: [{
+        codigo: 'SKU-INC', descripcion: 'Producto con INC', cantidad: 1,
+        valorUnitario: 100, igv: 19, total: 127,
+        [amountAlias]: 8,
+        [rateAlias]: 8,
+      }],
+    });
+
+    expect(validateSync(dto, OPCIONES)).toHaveLength(0);
+    expect((dto.items[0] as any)[amountAlias]).toBe(8);
+    expect((dto.items[0] as any)[rateAlias]).toBe(8);
+  });
+
+  it.each([
+    [{ impuesto_isc: -0.01 }, 'monto negativo'],
+    [{ tasa_inc: -1 }, 'tasa negativa'],
+    [{ tasaInc: 101 }, 'tasa mayor a 100'],
+    [{ impuestoInc: '8' }, 'monto no numérico'],
+  ])('rechaza INC inválido: %s (%s)', (incFields, _reason) => {
+    const errores = validar({
+      tipoComprobante: '01',
+      items: [{
+        codigo: 'SKU-INC', descripcion: 'Producto con INC', cantidad: 1,
+        valorUnitario: 100, igv: 19, total: 127,
+        ...incFields,
+      }],
+    });
+
+    expect(errores.map((e) => e.property)).toContain('items');
   });
 
   it('exige al menos un ítem', () => {

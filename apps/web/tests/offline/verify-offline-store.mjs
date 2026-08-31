@@ -273,6 +273,50 @@ const assert = (condition, message) => {
   assert(sensitiveOfflineRejected, 'certificado/PIN offline debe fallar cerrado con mensaje explicito')
   assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'certificado/PIN no debe entrar al outbox')
 
+  let fiscalOfflineRejected = false
+  try {
+    await mod.fetchWithOfflineSupport(
+      'http://api.test/api/cpe/comprobantes',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo_documento: '01', total_venta: 119 }),
+      },
+      { endpoint: '/api/cpe/comprobantes', tenantId: 'tenant-co-real', userId: 'user-1' },
+    )
+  } catch (error) {
+    fiscalOfflineRejected = String(error?.message || error).includes('emision fiscal requiere conexion en vivo')
+  }
+  assert(fiscalOfflineRejected, 'emision CPE offline debe fallar antes de la outbox')
+
+  let fiscalPosOfflineRejected = false
+  try {
+    await mod.fetchWithOfflineSupport(
+      'http://api.test/api/pos/venta',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emitir_cpe: true, tipo_comprobante: '01', total: 119 }),
+      },
+      { endpoint: '/api/pos/venta', tenantId: 'tenant-co-real', userId: 'user-1' },
+    )
+  } catch (error) {
+    fiscalPosOfflineRejected = String(error?.message || error).includes('emision fiscal requiere conexion en vivo')
+  }
+  assert(fiscalPosOfflineRejected, 'POS fiscal offline no debe prometer una emision posterior')
+  let malformedPosOfflineRejected = false
+  try {
+    await mod.fetchWithOfflineSupport(
+      'http://api.test/api/pos/venta',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{payload-invalido' },
+      { endpoint: '/api/pos/venta', tenantId: 'tenant-co-real', userId: 'user-1' },
+    )
+  } catch (error) {
+    malformedPosOfflineRejected = String(error?.message || error).includes('emision fiscal requiere conexion en vivo')
+  }
+  assert(malformedPosOfflineRejected, 'payload POS ilegible no debe entrar a la cola offline')
+  assert((await mod.listOfflineRequests()).length === queueBeforeSensitiveAttempts, 'CPE/POS fiscal no deben persistir intenciones offline')
+
   let directSensitiveEnqueueRejected = false
   try {
     await mod.enqueueOfflineRequest({
@@ -428,6 +472,7 @@ const assert = (condition, message) => {
       assert(
         [
           '/api/pos/productos',
+          '/api/cpe/comprobantes',
           '/api/inventario/productos',
           '/api/ventas/clientes',
           '/api/ventas/cotizaciones',
@@ -509,6 +554,13 @@ const assert = (condition, message) => {
   )
   assert(localProducts.headers.get('x-erp-local-first') === 'true', 'GET POS offline debe salir de SQLite local-first')
   assert((await localProducts.json()).data[0].id === 'p1', 'GET POS local-first debe preservar data')
+
+  const localCpeList = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/cpe/comprobantes',
+    { method: 'GET' },
+    { endpoint: '/api/cpe/comprobantes', tenantId: 'tenant-1' },
+  )
+  assert(localCpeList.headers.get('x-erp-local-first') === 'true', 'lectura CPE offline debe conservar vista/cache local')
 
   const localSale = await mod.fetchWithOfflineSupport(
     'http://api.test/api/pos/venta',

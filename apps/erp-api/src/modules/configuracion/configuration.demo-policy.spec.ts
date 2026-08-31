@@ -125,7 +125,8 @@ describe('ConfigurationService - política demo', () => {
           dian_regimen_fiscal: 'RESPONSABLE_IVA',
           dian_tipo_contribuyente: 'PERSONA_JURIDICA',
           dian_resolucion_numero: '18760000001',
-          dian_resolucion_prefijo: 'SETP',
+          // DIAN no asigna prefijo en todas las resoluciones; vacío no bloquea readiness.
+          dian_resolucion_prefijo: null,
           dian_resolucion_desde: 1,
           dian_resolucion_hasta: 5000,
           dian_resolucion_fecha_inicio: '2026-01-01',

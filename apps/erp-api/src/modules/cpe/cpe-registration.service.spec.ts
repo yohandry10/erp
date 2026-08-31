@@ -53,7 +53,7 @@ describe('CpeRegistrationService - snapshot desktop 476', () => {
     total_gravadas: 100, total_igv: 18, total_venta: 118,
   });
 
-  function createService(signatureValid = true) {
+  function createService(signatureValid = true, country = 'PE', isDemo = false) {
     const rpc = jest.fn().mockResolvedValue({
       data: {
         cpe: { id: 'cpe-desktop-476' }, documento_id: 'documento-desktop-476',
@@ -66,7 +66,8 @@ describe('CpeRegistrationService - snapshot desktop 476', () => {
       eq: jest.fn().mockReturnThis(),
       maybeSingle: jest.fn().mockResolvedValue({
         data: {
-          ruc: '20131312955', razon_social: 'Empresa QA 476', pais: 'PE',
+          ruc: country === 'CO' ? '9001234568' : '20131312955',
+          razon_social: 'Empresa QA 476', pais: country, is_demo: isDemo,
           moneda_defecto: 'PEN', direccion_fiscal: 'Lima',
         },
         error: null,
@@ -121,6 +122,15 @@ describe('CpeRegistrationService - snapshot desktop 476', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it('bloquea XML desktop en una empresa CO real antes de usar un firmador no DIAN', async () => {
+    const { service, rpc, certificate } = createService(true, 'CO', false);
+
+    await expect(service.registerDesktopSignedXml(validPayload(), 'tenant-476', 'actor-476'))
+      .rejects.toThrow('el registro desktop no está permitido');
+    expect(certificate.getXmlSigner).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it.each(['07', '08'] as const)('bloquea tipo %s y deriva al contrato 472', async (tipo) => {
     const { service, rpc, certificate } = createService();
 
@@ -165,5 +175,48 @@ describe('CpeRegistrationService - snapshot desktop 476', () => {
     }));
     expect(supabase.insert).not.toHaveBeenCalled();
     expect(supabase.update).not.toHaveBeenCalled();
+  });
+
+  it('normaliza y conserva las afectaciones tributarias 10, 20 y 30 por línea', () => {
+    const { service } = createService();
+
+    expect(service.normalizeComprobanteItems([
+      { codigo: 'G', descripcion: 'Gravado', cantidad: 1, valorUnitario: 100, igv: 18, afectacion_igv: '10' },
+      { codigo: 'E', descripcion: 'Exento', cantidad: 1, valorUnitario: 100, igv: 0, tipoAfectacionIgv: '20' },
+      { codigo: 'X', descripcion: 'Excluido', cantidad: 1, valorUnitario: 100, igv: 0, afectacionIgv: '30' },
+    ])).toEqual([
+      expect.objectContaining({ codigo: 'G', afectacion_igv: '10', tipo_afectacion_igv: '10' }),
+      expect.objectContaining({ codigo: 'E', afectacion_igv: '20', tipo_afectacion_igv: '20' }),
+      expect.objectContaining({ codigo: 'X', afectacion_igv: '30', tipo_afectacion_igv: '30' }),
+    ]);
+  });
+
+  it('rechaza aliases contradictorios de afectación en el mismo ítem', () => {
+    const { service } = createService();
+
+    expect(() => service.normalizeComprobanteItems([{
+      codigo: 'BAD', descripcion: 'Contradictorio', cantidad: 1, valorUnitario: 100,
+      igv: 0, afectacion_igv: '20', tipo_afectacion_igv: '30',
+    }])).toThrow('afectaciones tributarias contradictorias');
+  });
+
+  it('mantiene precio_venta como unitario bruto y total como importe de línea para cantidad mayor a uno', () => {
+    const { service } = createService();
+
+    expect(service.normalizeComprobanteItems([{
+      codigo: 'Q2', descripcion: 'Dos unidades', cantidad: 2,
+      precio_unitario: 100, valor_venta: 200, igv: 38,
+      precio_venta: 119, total_item: 238, afectacion_igv: '10',
+    }])).toEqual([
+      expect.objectContaining({
+        cantidad: 2,
+        precio_unitario: 100,
+        valor_venta: 200,
+        igv: 38,
+        precio_venta: 119,
+        total_item: 238,
+        total: 238,
+      }),
+    ]);
   });
 });

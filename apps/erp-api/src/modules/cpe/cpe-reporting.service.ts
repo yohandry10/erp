@@ -192,6 +192,10 @@ private getTipoComprobanteText(tipo: string): string {
         return 'Nota Crédito';
       case '08':
         return 'Nota Débito';
+      case '91':
+        return 'Nota Crédito DIAN';
+      case '92':
+        return 'Nota Débito DIAN';
       case 'TICKET':
         return 'Ticket';
       default:

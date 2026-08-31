@@ -11,11 +11,21 @@ import { AuditService } from '../audit/audit.service';
 describe('CpeCancellationService', () => {
   const build = (response: { data?: any; error?: any } = { data: null }) => {
     const rpc = jest.fn().mockResolvedValue({ error: null, ...response });
+    const maybeSingle = jest.fn().mockResolvedValue({ data: { pais: 'PE' }, error: null });
     const service = new CpeCancellationService(
-      { getClient: () => ({ rpc }) } as unknown as SupabaseService,
+      {
+        getClient: () => ({
+          rpc,
+          from: jest.fn(() => ({
+            select: jest.fn(() => ({
+              eq: jest.fn(() => ({ maybeSingle })),
+            })),
+          })),
+        }),
+      } as unknown as SupabaseService,
       {} as unknown as AuditService,
     );
-    return { service, rpc };
+    return { service, rpc, maybeSingle };
   };
 
   describe('solicitud atómica de nota 07', () => {
@@ -74,6 +84,28 @@ describe('CpeCancellationService', () => {
           p_idempotency_key: 'cpe.cancel.request:tenant-1:cpe-1',
         }),
       );
+    });
+
+    it('no ejecuta la RPC SUNAT 07 para un tenant Colombia', async () => {
+      const { service, rpc, maybeSingle } = build({ data: result });
+      maybeSingle.mockResolvedValueOnce({ data: { pais: 'CO' }, error: null });
+
+      await expect(
+        service.anularComprobante(
+          'cpe-co-1',
+          'Devolución total',
+          'tenant-co',
+          'user-1',
+          '01',
+          'request-co-448',
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: 'CPE_CANCELLATION_JURISDICTION_UNSUPPORTED',
+        }),
+      });
+
+      expect(rpc).not.toHaveBeenCalled();
     });
 
     it('expone conflicto de key/payload sin intentar una segunda escritura', async () => {

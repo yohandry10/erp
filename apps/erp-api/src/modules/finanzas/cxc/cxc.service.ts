@@ -745,6 +745,28 @@ export class CxcService {
     if (!userId) {
       throw new BadRequestException('La nota de crédito requiere un actor autenticado');
     }
+    const client = this.supabase.getClient();
+    const { data: tenantConfig, error: tenantConfigError } = await client
+      .from('empresa_config')
+      .select('pais,is_demo')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (tenantConfigError || !tenantConfig) {
+      throw new BadRequestException(
+        'No se pudo verificar la jurisdicción fiscal antes de emitir la nota de crédito',
+      );
+    }
+    const countryCode = String((tenantConfig as any).pais ?? '').trim().toUpperCase();
+    const isColombia = countryCode === 'CO';
+    const reasonCode = String(dto.codigo_motivo ?? (isColombia ? '1' : '10')).trim();
+    const validReasons = isColombia
+      ? new Set(['1', '2', '3', '4', '5'])
+      : new Set(['04', '05', '08', '09', '10', '11', '12', '13']);
+    if (!validReasons.has(reasonCode)) {
+      throw new BadRequestException(
+        `El motivo ${reasonCode || '(vacío)'} no pertenece al catálogo de notas de crédito de ${isColombia ? 'DIAN' : 'SUNAT'}`,
+      );
+    }
     const cuenta = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
     if (!cuenta?.documento_id) {
       throw new BadRequestException(
@@ -758,14 +780,14 @@ export class CxcService {
     if (key.length < 8 || key.length > 200) {
       throw new BadRequestException('idempotency_key es obligatorio y debe tener entre 8 y 200 caracteres');
     }
-    const { data, error } = await this.supabase.getClient().rpc(
+    const { data, error } = await client.rpc(
       'crear_nota_referenciada_tx',
       {
         p_tenant_id: tenantId,
         p_actor_id: userId,
         p_documento_origen_id: cuenta.documento_id,
-        p_tipo_documento: '07',
-        p_codigo_motivo: dto.codigo_motivo ?? '10',
+        p_tipo_documento: isColombia ? '91' : '07',
+        p_codigo_motivo: reasonCode,
         p_motivo: dto.motivo ?? dto.notas ?? 'Ajuste comercial de cuenta por cobrar',
         p_monto_total: dto.monto,
         p_idempotency_key: key,

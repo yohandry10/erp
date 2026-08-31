@@ -162,7 +162,7 @@ export class CpeController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.emitir')
   @ApiOperation({
-    summary: 'Crear borrador NC/ND fiscalmente neutro; el efecto nace al aceptar el CDR',
+    summary: 'Crear borrador NC/ND fiscalmente neutro; el efecto nace con aceptación fiscal durable',
   })
   async crearNotaReferenciada(
     @Body() dto: CrearNotaReferenciadaDto,
@@ -177,7 +177,7 @@ export class CpeController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.emitir')
   @ApiOperation({
-    summary: 'Firmar una NC/ND pendiente; todavía no modifica CxC ni contabilidad',
+    summary: 'Preparar y firmar una NC/ND pendiente; todavía no modifica CxC ni contabilidad',
   })
   async firmarNotaReferenciada(
     @Param('id') id: string,
@@ -216,10 +216,39 @@ export class CpeController {
   @ApiOperation({ summary: 'Crear comprobante CPE desde UI' })
   async createComprobante(
     @Body() payload: CrearComprobanteUiDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @CurrentTenant() tenantId: string,
     @CurrentUser('id') userId?: string,
   ): Promise<FacturaDto> {
-    return this.cpeService.createFromComprobantePayload(payload, tenantId, userId);
+    return this.cpeService.createFromComprobantePayload(
+      payload,
+      tenantId,
+      userId,
+      idempotencyKey,
+    );
+  }
+
+  @Get('receptores')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.comprobantes.emitir')
+  @ApiOperation({ summary: 'Listar receptores maestros disponibles para emitir CPE' })
+  async listReceivers(
+    @CurrentTenant() tenantId: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.cpeService.listColombiaReceivers(tenantId, search, limit);
+  }
+
+  @Get('receptores/:clienteId')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.comprobantes.emitir')
+  @ApiOperation({ summary: 'Obtener un receptor maestro para emitir CPE' })
+  async getReceiver(
+    @CurrentTenant() tenantId: string,
+    @Param('clienteId', new ParseUUIDPipe()) clienteId: string,
+  ) {
+    return { success: true, data: await this.cpeService.getColombiaReceiver(tenantId, clienteId) };
   }
 
   @Post('desktop/signed')

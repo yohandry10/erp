@@ -65,6 +65,80 @@ function normalizeDianTaxCategory(value: unknown):
   return undefined;
 }
 
+/**
+ * Proyección permitida para los endpoints protegidos sólo por
+ * `cpe.comprobantes.ver`. Los artefactos fiscales completos se entregan por
+ * endpoints separados con permisos de descarga específicos.
+ */
+const CPE_PUBLIC_DETAIL_COLUMNS = [
+  'id', 'documento_id', 'tipo_documento', 'serie', 'numero',
+  'fecha_emision', 'fecha_vencimiento', 'fecha_envio',
+  'ruc_emisor', 'razon_social_emisor', 'direccion_emisor',
+  'tipo_documento_receptor', 'documento_receptor',
+  'razon_social_receptor', 'direccion_receptor',
+  'moneda', 'items',
+  'total_gravadas', 'total_exoneradas', 'total_inafectas',
+  'total_exportacion', 'total_igv', 'total_venta', 'total',
+  'estado', 'estado_sunat', 'sunat_status', 'pais', 'simulated_origin', 'hash',
+  'documento_referencia_tipo', 'documento_referencia_serie',
+  'documento_referencia_numero', 'documento_referencia_id',
+  'tipo_nota_credito', 'tipo_nota_debito', 'motivo_nota',
+  'numero_comprobante_sunat', 'created_at', 'updated_at',
+].join(',');
+
+/** Datos internos necesarios sólo para construir la representación visual. */
+const CPE_PREVIEW_INTERNAL_COLUMNS = [
+  CPE_PUBLIC_DETAIL_COLUMNS,
+  'metadata', 'issuer_snapshot', 'fiscal_authority_evidence', 'hash_firma',
+].join(',');
+
+const PUBLIC_CPE_ITEM_FIELDS = [
+  'codigo', 'codigo_producto', 'nombre_producto', 'descripcion',
+  'cantidad', 'unidad', 'unidad_medida', 'unidadMedida',
+  'precio_unitario', 'precioUnitario', 'precio_venta', 'precioVenta',
+  'valor_venta', 'valorVenta', 'subtotal', 'total', 'total_item', 'totalItem',
+  'descuento', 'descuento_unitario', 'descuentoUnitario',
+  'igv', 'impuesto_igv', 'total_impuestos',
+  'impuesto_isc', 'impuesto_inc', 'impuestoInc', 'inc',
+  'tasa_igv', 'tasaIgv', 'tasa_isc', 'tasa_inc', 'tasaInc',
+  'afectacion_igv', 'tipo_afectacion_igv', 'afectacionIgv', 'tipoAfectacionIgv',
+] as const;
+
+function sanitizePublicCpeItems(rawItems: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(rawItems)) return [];
+  return rawItems.map((rawItem) => {
+    if (!rawItem || typeof rawItem !== 'object' || Array.isArray(rawItem)) return {};
+    const item = rawItem as Record<string, unknown>;
+    const safeItem: Record<string, unknown> = {};
+    for (const field of PUBLIC_CPE_ITEM_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(item, field)) {
+        safeItem[field] = item[field];
+      }
+    }
+    return safeItem;
+  });
+}
+
+type DianNoteIssuerSnapshot529 = {
+  contractVersion: 525;
+  noteContractVersion: 529;
+  configIdentityContractVersion: 529;
+  source: 'DIAN_REFERENCED_NOTE_529';
+  countryCode: 'CO';
+  taxId: string;
+  legalName: string;
+  address: string;
+  municipality: string;
+  department: string;
+  municipalityCode: string;
+  departmentCode: string;
+  taxRegime: string;
+  contributorType: string;
+  currencyCode: string;
+  certificateSha256: string;
+  signingConfigSha256: string;
+};
+
 /** Convierte el JSON snake_case persistido en el contrato fiscal camelCase. */
 export function normalizePersistedFiscalItems(
   rawItems: unknown,
@@ -176,6 +250,196 @@ export class CpeDeliveryService {
     return this.certificateService.getXmlSigner(tenantId);
   }
 
+  private buildDianReferencedNoteDocument(
+    cpeData: Record<string, any>,
+    tenantId: string,
+    parts: {
+      metadata: Record<string, any>;
+      issuerSnapshot: DianNoteIssuerSnapshot529;
+      totals: ReturnType<typeof normalizePersistedFiscalTotals>;
+      taxRate: number;
+      items: DocumentoElectronico['items'];
+      reference: DocumentoElectronico['documentoReferencia'];
+      discrepancy: NonNullable<DocumentoElectronico['dianDiscrepancy']>;
+      receiverTaxProfile: DianReceiverTaxProfile;
+      deliveryOperation?: {
+        operationId: string;
+        claimToken: string;
+      };
+    },
+  ): DocumentoElectronico {
+    const noteType = String(cpeData.tipo_documento ?? '').trim();
+    if (!['91', '92'].includes(noteType)) {
+      throw new Error('Sólo las notas DIAN 91/92 usan el firmador referenciado colombiano');
+    }
+    if (cpeData.simulated_origin !== false) {
+      throw new Error(
+        'La nota nació como demo o es legacy sin procedencia fiscal verificable; no se genera una firma DIAN',
+      );
+    }
+
+    const { metadata, issuerSnapshot, totals, taxRate, items } = parts;
+
+    return {
+      id: cpeData.id,
+      tipoDocumento: noteType,
+      serie: cpeData.serie,
+      numero: cpeData.numero?.toString() || '',
+      fechaEmision: cpeData.fecha_emision,
+      fechaVencimiento: cpeData.fecha_vencimiento,
+      emisor: {
+        tipoDocumento: '31',
+        numeroDocumento: issuerSnapshot.taxId,
+        razonSocial: issuerSnapshot.legalName,
+        direccion: issuerSnapshot.address,
+        ciudad: issuerSnapshot.municipality,
+        departamento: issuerSnapshot.department,
+        codigoUbigeo: issuerSnapshot.municipalityCode,
+        codigoDepartamento: issuerSnapshot.departmentCode,
+        regimenFiscal: issuerSnapshot.taxRegime,
+        tipoContribuyente: issuerSnapshot.contributorType,
+      },
+      receptor: {
+        tipoDocumento: cpeData.tipo_documento_receptor
+          || cpeData.tipo_documento_cliente
+          || '',
+        numeroDocumento: cpeData.documento_receptor
+          || cpeData.numero_documento_cliente
+          || '',
+        razonSocial: cpeData.razon_social_receptor
+          || cpeData.razon_social_cliente
+          || 'Cliente',
+        direccion: cpeData.direccion_receptor || cpeData.direccion_cliente || '',
+        dianTaxProfile: parts.receiverTaxProfile,
+      },
+      moneda: String(cpeData.moneda || 'COP').trim().toUpperCase(),
+      subtotal: totals.subtotal,
+      totalGravadas: Number(cpeData.total_gravadas ?? totals.subtotal),
+      totalExoneradas: Number(cpeData.total_exoneradas ?? 0),
+      totalInafectas: Number(cpeData.total_inafectas ?? 0),
+      totalImpuestos: totals.totalImpuestos,
+      importeTotal: totals.importeTotal,
+      tasaImpuesto: taxRate,
+      formaPago: String(
+        metadata.dian_forma_pago
+        ?? cpeData.forma_pago
+        ?? cpeData.condicion_pago
+        ?? '',
+      ).trim() || undefined,
+      plazoPagoDias: (cpeData.plazo_pago_dias ?? metadata.plazo_pago_dias) == null
+        ? undefined
+        : finiteFiscalNumber(
+            cpeData.plazo_pago_dias ?? metadata.plazo_pago_dias,
+            'plazo de pago',
+            { min: 0 },
+          ),
+      medioPago: String(
+        metadata.dian_medio_pago
+        ?? cpeData.medio_pago
+        ?? cpeData.metodo_pago
+        ?? '',
+      ).trim() || undefined,
+      fiscalContext: {
+        isDemo: false,
+        simulated: metadata.dian_simulado === true,
+        fixtureSource: String(metadata.dian_fixture_source ?? '').trim() || undefined,
+        dianIssuerIdentity: {
+          contractVersion: 529,
+          taxId: issuerSnapshot.taxId,
+          certificateSha256: issuerSnapshot.certificateSha256,
+          signingConfigSha256: issuerSnapshot.signingConfigSha256,
+        },
+        ...(parts.deliveryOperation
+          ? {
+              deliveryOperation: {
+                tenantId,
+                operationId: parts.deliveryOperation.operationId,
+                claimToken: parts.deliveryOperation.claimToken,
+              },
+            }
+          : {}),
+      },
+      items,
+      documentoReferencia: parts.reference,
+      dianDiscrepancy: parts.discrepancy,
+    };
+  }
+
+  /**
+   * Genera la evidencia UBL DIAN firmada que deja una nota 91/92 lista para el
+   * pipeline común. No reserva SEND, no sella un paquete y no transmite.
+   */
+  async firmarNotaDianReferenciada(
+    cpeData: Record<string, any>,
+    tenantId: string,
+  ): Promise<string> {
+    const currentCountryCode = (await this.fiscalAdapter.obtenerCodigoPais(tenantId)).toUpperCase();
+    const historicalCountryCode = resolveHistoricalCpeCountry(cpeData, currentCountryCode);
+    if (currentCountryCode !== 'CO' || historicalCountryCode !== 'CO') {
+      throw new Error(
+        `Firma DIAN bloqueada: la nota pertenece a ${historicalCountryCode} y el tenant está en ${currentCountryCode}`,
+      );
+    }
+
+    const fiscalConfig = await this.fiscalAdapter.obtenerConfiguracionFiscal(tenantId);
+    const metadata = cpeData.metadata && typeof cpeData.metadata === 'object'
+      ? cpeData.metadata as Record<string, any>
+      : {};
+    const issuerSnapshot = this.resolveDianNoteIssuerSnapshot(cpeData);
+    const totals = normalizePersistedFiscalTotals(cpeData);
+    const taxRate = normalizeFiscalRate(fiscalConfig?.tasaImpuesto ?? 0);
+    const items = normalizePersistedFiscalItems(cpeData.items, taxRate);
+    const itemBase = items.reduce((sum, item) => sum + item.valorVenta, 0);
+    const itemTaxes = items.reduce((sum, item) => sum + Number(item.igv ?? 0), 0);
+    if (Math.abs(itemBase - totals.subtotal) > 0.02) {
+      throw new Error('Dato fiscal inválido: la base de los ítems no coincide con el subtotal');
+    }
+    if (Math.abs(itemTaxes - totals.totalImpuestos) > 0.02) {
+      throw new Error('Dato fiscal inválido: los impuestos de los ítems no coinciden con la cabecera');
+    }
+
+    const reference = await this.resolveAuthorizedDianReference(cpeData, tenantId);
+    const discrepancy = this.resolveDianDiscrepancy(cpeData);
+    const receiverTaxProfile = this.resolveDianReceiverTaxProfile(cpeData);
+    if (!reference || !discrepancy) {
+      throw new Error('La nota DIAN no conserva su referencia y discrepancia fiscal');
+    }
+    const documento = this.buildDianReferencedNoteDocument(cpeData, tenantId, {
+      metadata,
+      issuerSnapshot,
+      totals,
+      taxRate,
+      items,
+      reference,
+      discrepancy,
+      receiverTaxProfile,
+    });
+    this.assertDianNoteIssuerStillCurrent(
+      issuerSnapshot,
+      await this.getEmpresaEmisorInfo(tenantId),
+    );
+    const signedXml = await this.fiscalAdapter.generarYFirmarDocumentoSinTransmitir(
+      documento,
+      tenantId,
+      'CO',
+    );
+    const parsed = new DOMParser().parseFromString(signedXml, 'application/xml');
+    const expectedRoot = String(cpeData.tipo_documento) === '91' ? 'CreditNote' : 'DebitNote';
+    const expectedNamespace = `urn:oasis:names:specification:ubl:schema:xsd:${expectedRoot}-2`;
+    const signatures = parsed.getElementsByTagNameNS(
+      'http://www.w3.org/2000/09/xmldsig#',
+      'Signature',
+    );
+    if (parsed.documentElement?.localName !== expectedRoot
+        || parsed.documentElement?.namespaceURI !== expectedNamespace
+        || signatures.length !== 1) {
+      throw new Error(
+        `La firma local no produjo un UBL DIAN ${expectedRoot} con una firma XMLDSig única`,
+      );
+    }
+    return signedXml;
+  }
+
 async getEmpresaEmisorInfo(tenantId: string) {
     const { data } = await this.supabaseService
       .getClient()
@@ -189,6 +453,19 @@ async getEmpresaEmisorInfo(tenantId: string) {
         'provincia',
         'dian_regimen_fiscal',
         'dian_tipo_contribuyente',
+        'certificado_pfx',
+        'dian_activo',
+        'dian_url',
+        'dian_software_id',
+        'dian_test_set_id',
+        'dian_environment',
+        'dian_resolucion_numero',
+        'dian_resolucion_prefijo',
+        'dian_resolucion_desde',
+        'dian_resolucion_hasta',
+        'dian_resolucion_fecha_inicio',
+        'dian_resolucion_fecha_fin',
+        'dian_habilitacion_estado',
         'is_demo',
         'arca_condicion_iva',
         'arca_punto_venta',
@@ -197,6 +474,22 @@ async getEmpresaEmisorInfo(tenantId: string) {
       .maybeSingle();
 
     const typedData = data as any;
+    const certificateSha256 = this.hashStoredCertificate(typedData?.certificado_pfx);
+    const signingConfigParts = [
+      certificateSha256,
+      typedData?.dian_activo === true ? 'true' : 'false',
+      String(typedData?.dian_url ?? '').trim(),
+      String(typedData?.dian_software_id ?? '').trim(),
+      String(typedData?.dian_test_set_id ?? '').trim(),
+      String(typedData?.dian_environment ?? '').trim().toUpperCase(),
+      String(typedData?.dian_resolucion_numero ?? '').trim(),
+      String(typedData?.dian_resolucion_prefijo ?? '').trim().toUpperCase(),
+      typedData?.dian_resolucion_desde == null ? '' : String(typedData.dian_resolucion_desde),
+      typedData?.dian_resolucion_hasta == null ? '' : String(typedData.dian_resolucion_hasta),
+      String(typedData?.dian_resolucion_fecha_inicio ?? '').trim(),
+      String(typedData?.dian_resolucion_fecha_fin ?? '').trim(),
+      String(typedData?.dian_habilitacion_estado ?? '').trim().toUpperCase(),
+    ];
     return {
       ruc: typedData?.ruc ?? '',
       razonSocial: typedData?.razon_social ?? '',
@@ -209,10 +502,171 @@ async getEmpresaEmisorInfo(tenantId: string) {
         : '',
       regimenFiscal: typedData?.dian_regimen_fiscal ?? '',
       tipoContribuyente: typedData?.dian_tipo_contribuyente ?? '',
+      certificateSha256,
+      signingConfigSha256: certificateSha256
+        ? createHash('sha256').update(signingConfigParts.join('\u001f'), 'utf8').digest('hex')
+        : '',
       condicionIva: typedData?.arca_condicion_iva ?? '',
       puntoVenta: typedData?.arca_punto_venta ?? null,
       isDemo: typedData?.is_demo === true,
     };
+  }
+
+  private hashStoredCertificate(value: unknown): string {
+    if (value === null || value === undefined || value === '') return '';
+    let bytes: Buffer;
+    if (Buffer.isBuffer(value)) {
+      bytes = value;
+    } else if (value instanceof Uint8Array) {
+      bytes = Buffer.from(value);
+    } else if (Array.isArray(value)) {
+      bytes = Buffer.from(value);
+    } else if (typeof value === 'object'
+        && Array.isArray((value as { data?: unknown }).data)) {
+      bytes = Buffer.from((value as { data: number[] }).data);
+    } else {
+      const stored = String(value);
+      bytes = /^\\x[0-9a-f]+$/iu.test(stored)
+        ? Buffer.from(stored.slice(2), 'hex')
+        : Buffer.from(stored, 'utf8');
+    }
+    return bytes.length > 0
+      ? createHash('sha256').update(bytes).digest('hex')
+      : '';
+  }
+
+  private resolveDianNoteIssuerSnapshot(
+    cpeData: Record<string, any>,
+  ): DianNoteIssuerSnapshot529 {
+    const raw = cpeData.issuer_snapshot;
+    const metadata = cpeData.metadata && typeof cpeData.metadata === 'object'
+      && !Array.isArray(cpeData.metadata)
+      ? cpeData.metadata as Record<string, any>
+      : null;
+    const metadataSnapshot = metadata?.issuer_snapshot;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)
+        || !metadataSnapshot || typeof metadataSnapshot !== 'object'
+        || Array.isArray(metadataSnapshot)) {
+      throw new Error('La nota DIAN no conserva un snapshot inmutable del emisor');
+    }
+    const text = (key: string, uppercase = false) => {
+      const value = String(raw[key] ?? '').trim();
+      return uppercase ? value.toUpperCase() : value;
+    };
+    const snapshot: DianNoteIssuerSnapshot529 = {
+      contractVersion: Number(raw.contract_version) as 525,
+      noteContractVersion: Number(raw.dian_note_issuer_contract_version) as 529,
+      configIdentityContractVersion: Number(raw.config_identity_contract_version) as 529,
+      source: text('source') as DianNoteIssuerSnapshot529['source'],
+      countryCode: text('country_code', true) as 'CO',
+      taxId: text('tax_id'),
+      legalName: text('legal_name'),
+      address: text('address'),
+      municipality: text('municipality'),
+      department: text('department'),
+      municipalityCode: text('municipality_code'),
+      departmentCode: text('department_code'),
+      taxRegime: text('tax_regime', true),
+      contributorType: text('contributor_type', true),
+      currencyCode: text('currency_code', true),
+      certificateSha256: text('certificate_sha256').toLowerCase(),
+      signingConfigSha256: text('signing_config_sha256').toLowerCase(),
+    };
+    const sameSnapshotField = (key: string, normalized: string) => {
+      const other = String(metadataSnapshot[key] ?? '').trim();
+      return ['country_code', 'tax_regime', 'contributor_type', 'currency_code'].includes(key)
+        ? other.toUpperCase() === normalized
+        : ['certificate_sha256', 'signing_config_sha256'].includes(key)
+          ? other.toLowerCase() === normalized
+          : other === normalized;
+    };
+    const required = [
+      snapshot.taxId, snapshot.legalName, snapshot.address, snapshot.municipality,
+      snapshot.department, snapshot.municipalityCode, snapshot.departmentCode,
+      snapshot.taxRegime, snapshot.contributorType, snapshot.currencyCode,
+    ];
+    const metadataMatches = [
+      ['source', snapshot.source],
+      ['country_code', snapshot.countryCode],
+      ['tax_id', snapshot.taxId],
+      ['legal_name', snapshot.legalName],
+      ['address', snapshot.address],
+      ['municipality', snapshot.municipality],
+      ['department', snapshot.department],
+      ['municipality_code', snapshot.municipalityCode],
+      ['department_code', snapshot.departmentCode],
+      ['tax_regime', snapshot.taxRegime],
+      ['contributor_type', snapshot.contributorType],
+      ['currency_code', snapshot.currencyCode],
+      ['certificate_sha256', snapshot.certificateSha256],
+      ['signing_config_sha256', snapshot.signingConfigSha256],
+    ].every(([key, value]) => sameSnapshotField(key, value));
+    if (snapshot.contractVersion !== 525
+        || snapshot.noteContractVersion !== 529
+        || snapshot.configIdentityContractVersion !== 529
+        || snapshot.source !== 'DIAN_REFERENCED_NOTE_529'
+        || snapshot.countryCode !== 'CO'
+        || metadata?.dian_note_issuer_contract_version !== 529
+        || Number(metadataSnapshot.contract_version) !== 525
+        || Number(metadataSnapshot.dian_note_issuer_contract_version) !== 529
+        || Number(metadataSnapshot.config_identity_contract_version) !== 529
+        || required.some((value) => !value)
+        || !/^\d{5}$/u.test(snapshot.municipalityCode)
+        || !/^\d{2}$/u.test(snapshot.departmentCode)
+        || snapshot.departmentCode !== snapshot.municipalityCode.slice(0, 2)
+        || !/^[0-9a-f]{64}$/u.test(snapshot.certificateSha256)
+        || !/^[0-9a-f]{64}$/u.test(snapshot.signingConfigSha256)
+        || !metadataMatches) {
+      throw new Error('El snapshot inmutable del emisor DIAN es incompleto o contradictorio');
+    }
+    const persistedFields = [
+      [String(cpeData.ruc_emisor ?? '').trim(), snapshot.taxId],
+      [String(cpeData.razon_social_emisor ?? '').trim(), snapshot.legalName],
+      [String(cpeData.direccion_emisor ?? '').trim(), snapshot.address],
+      [String(cpeData.moneda ?? '').trim().toUpperCase(), snapshot.currencyCode],
+      [String(metadata.dian_direccion_emisor ?? '').trim(), snapshot.address],
+      [String(metadata.dian_municipio_emisor ?? '').trim(), snapshot.municipality],
+      [String(metadata.dian_departamento_emisor ?? '').trim(), snapshot.department],
+      [String(metadata.dian_codigo_dane_emisor ?? '').trim(), snapshot.municipalityCode],
+      [String(metadata.dian_codigo_departamento_emisor ?? '').trim(), snapshot.departmentCode],
+      [String(metadata.dian_regimen_fiscal ?? '').trim().toUpperCase(), snapshot.taxRegime],
+      [String(metadata.dian_tipo_contribuyente ?? '').trim().toUpperCase(), snapshot.contributorType],
+    ];
+    if (persistedFields.some(([persisted, frozen]) => persisted !== frozen)) {
+      throw new Error('El emisor persistido de la nota DIAN diverge de su snapshot inmutable');
+    }
+    return snapshot;
+  }
+
+  private assertDianNoteIssuerStillCurrent(
+    snapshot: DianNoteIssuerSnapshot529,
+    current: Record<string, any>,
+  ): void {
+    if (!current || current.isDemo === true) {
+      throw new Error('La configuración vigente del emisor DIAN no es apta para firma real');
+    }
+    const profilePairs = [
+      [String(current.ruc ?? '').trim(), snapshot.taxId],
+      [String(current.razonSocial ?? '').trim(), snapshot.legalName],
+      [String(current.direccion ?? '').trim(), snapshot.address],
+      [String(current.ciudad ?? '').trim(), snapshot.municipality],
+      [String(current.departamento ?? '').trim(), snapshot.department],
+      [String(current.codigoUbigeo ?? '').trim(), snapshot.municipalityCode],
+      [String(current.codigoDepartamento ?? '').trim(), snapshot.departmentCode],
+      [String(current.regimenFiscal ?? '').trim().toUpperCase(), snapshot.taxRegime],
+      [String(current.tipoContribuyente ?? '').trim().toUpperCase(), snapshot.contributorType],
+    ];
+    if (profilePairs.some(([configured, frozen]) => configured !== frozen)) {
+      throw new Error('La configuración vigente del emisor DIAN diverge del snapshot de la nota');
+    }
+    if (String(current.certificateSha256 ?? '').toLowerCase()
+        !== snapshot.certificateSha256) {
+      throw new Error('El certificado DIAN vigente diverge del snapshot de la nota');
+    }
+    if (String(current.signingConfigSha256 ?? '').toLowerCase()
+        !== snapshot.signingConfigSha256) {
+      throw new Error('La configuración de firma DIAN vigente diverge del snapshot de la nota');
+    }
   }
 
 async findOne(id: string, tenantId: string): Promise<FacturaDto> {
@@ -220,7 +674,7 @@ async findOne(id: string, tenantId: string): Promise<FacturaDto> {
       const { data, error } = await this.supabaseService
         .getClient()
         .from('cpe')
-        .select('*')
+        .select(CPE_PUBLIC_DETAIL_COLUMNS)
         .eq('id', id)
         .eq('tenant_id', tenantId)
         .single();
@@ -229,7 +683,7 @@ async findOne(id: string, tenantId: string): Promise<FacturaDto> {
         throw new NotFoundException('CPE not found');
       }
 
-      return this.mapToDto(data);
+      return this.mapToPublicDto(data);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -244,7 +698,7 @@ async getCpeById(id: string, tenantId: string): Promise<any> {
       
       const { data: cpeData, error } = await this.supabaseService.getClient()
         .from('cpe')
-        .select('*')
+        .select(CPE_PREVIEW_INTERNAL_COLUMNS)
         .eq('id', id)
         .eq('tenant_id', tenantId)
         .single();
@@ -316,8 +770,8 @@ async getCpeById(id: string, tenantId: string): Promise<any> {
       }
 
       this.logger.debug(`Representación del CPE ${id} preparada (${countryCode})`);
-      return {
-        ...cpeData,
+      const publicCpe = this.mapToPublicRecord(typedCpeData);
+      return Object.assign(publicCpe, {
         simulated: typedCpeData.simulated_origin !== false
           || (countryCode === 'CO' && !resolveAcceptedDianEvidence(typedCpeData)),
         simulated_origin: typedCpeData.simulated_origin !== false,
@@ -342,8 +796,10 @@ async getCpeById(id: string, tenantId: string): Promise<any> {
         // publican como si fueran un QR SUNAT para otro país.
         sunat_qr_content: countryCode === 'PE' ? fiscalQrContent : null,
         sunat_qr_data_url: countryCode === 'PE' ? fiscalQrDataUrl : null,
-        valor_resumen: typedCpeData.valor_resumen || typedCpeData.hash_firma || typedCpeData.hash || null,
-      };
+        // El hash público/CUFE es suficiente para la representación. La firma
+        // y su digest interno sólo se entregan por la descarga autorizada.
+        valor_resumen: typedCpeData.hash || null,
+      });
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'error desconocido';
       this.logger.error(`No se pudo preparar la representación del CPE ${id}: ${detail}`);
@@ -369,13 +825,67 @@ async generatePdf(id: string, tenantId: string): Promise<Buffer> {
   }
 
 async getSignedXml(id: string, tenantId: string): Promise<string> {
-    const cpe = await this.findOne(id, tenantId);
-    
-    if (!cpe.xml_firmado) {
+    const { data: cpe, error } = await this.supabaseService.getClient()
+      .from('cpe')
+      .select('tipo_documento,pais,issuer_snapshot,xml_firmado')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (error || !cpe) throw new NotFoundException('CPE not found');
+    if (!(cpe as any).xml_firmado) {
       throw new BadRequestException('XML not available for this CPE');
     }
+    const currentCountryCode = (await perfilPaisDelTenant(
+      this.supabaseService.getClient(),
+      tenantId,
+    )).codigo;
+    const historicalCountryCode = resolveHistoricalCpeCountry(cpe as any, currentCountryCode);
+    if (historicalCountryCode === 'CO'
+        && !this.isNativeDianCpeXml((cpe as any).xml_firmado, (cpe as any).tipo_documento)) {
+      throw new BadRequestException(
+        'El CPE colombiano aún no conserva un UBL DIAN nativo; no se entrega XML SUNAT o provisional',
+      );
+    }
+    return String((cpe as any).xml_firmado);
+  }
 
-    return cpe.xml_firmado;
+  private isNativeDianCpeXml(xmlInput: unknown, typeInput: unknown): boolean {
+    const xml = String(xmlInput ?? '').trim();
+    const type = String(typeInput ?? '').trim();
+    const roots: Record<string, string> = {
+      '01': 'Invoice',
+      '91': 'CreditNote',
+      '92': 'DebitNote',
+    };
+    const rootName = roots[type];
+    if (!xml || !rootName || xml.includes('PE:SUNAT')) return false;
+    try {
+      const parsed = new DOMParser().parseFromString(xml, 'application/xml');
+      if (parsed.documentElement?.localName !== rootName
+          || parsed.documentElement?.namespaceURI
+            !== `urn:oasis:names:specification:ubl:schema:xsd:${rootName}-2`) {
+        return false;
+      }
+      if (parsed.getElementsByTagNameNS(
+        'http://www.w3.org/2000/09/xmldsig#',
+        'Signature',
+      ).length !== 1) return false;
+      const uuids = parsed.getElementsByTagNameNS(
+        'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2',
+        'UUID',
+      );
+      for (let index = 0; index < uuids.length; index += 1) {
+        const node = uuids.item(index);
+        const expectedScheme = type === '01' ? 'CUFE-SHA384' : 'CUDE-SHA384';
+        if (node?.getAttribute('schemeName') === expectedScheme
+            && /^[0-9a-f]{96}$/i.test(node.textContent?.trim() ?? '')) {
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
 async resendToOse(
@@ -587,6 +1097,11 @@ async retrySendToOse(
       const metadata = cpeData.metadata && typeof cpeData.metadata === 'object'
         ? cpeData.metadata as Record<string, any>
         : {};
+      const isDianReferencedNote = paisCodigo === 'CO'
+        && ['91', '92'].includes(String(cpeData.tipo_documento ?? '').trim());
+      const dianIssuerSnapshot = isDianReferencedNote
+        ? this.resolveDianNoteIssuerSnapshot(cpeData)
+        : undefined;
       let arcaReceiverVatCondition = String(
         metadata.arca_condicion_iva_receptor
         ?? cpeData.arca_condicion_iva_receptor
@@ -657,7 +1172,22 @@ async retrySendToOse(
       const dianReceiverTaxProfile = paisCodigo === 'CO'
         ? this.resolveDianReceiverTaxProfile(cpeData)
         : undefined;
-      const documento: DocumentoElectronico = {
+      const documento: DocumentoElectronico = isDianReferencedNote
+        ? this.buildDianReferencedNoteDocument(cpeData, tenantId, {
+            metadata,
+            issuerSnapshot: dianIssuerSnapshot!,
+            totals,
+            taxRate,
+            items,
+            reference: authorizedDianReference!,
+            discrepancy: dianDiscrepancy!,
+            receiverTaxProfile: dianReceiverTaxProfile!,
+            deliveryOperation: {
+              operationId: String(claim.operation.id),
+              claimToken: String(claim.operation.claim_token),
+            },
+          })
+        : {
         id: cpeData.id,
         tipoDocumento: cpeData.tipo_documento,
         serie: cpeData.serie,
@@ -707,7 +1237,7 @@ async retrySendToOse(
             : undefined,
           dianTaxProfile: dianReceiverTaxProfile,
         },
-        moneda: cpeData.moneda || 'PEN',
+        moneda: cpeData.moneda || (paisCodigo === 'CO' ? 'COP' : 'PEN'),
         subtotal: totals.subtotal,
         totalGravadas: Number(cpeData.total_gravadas ?? totals.subtotal),
         totalExoneradas: Number(cpeData.total_exoneradas ?? 0),
@@ -721,9 +1251,13 @@ async retrySendToOse(
           ?? cpeData.condicion_pago
           ?? '',
         ).trim() || undefined,
-        plazoPagoDias: cpeData.plazo_pago_dias == null
+        plazoPagoDias: (cpeData.plazo_pago_dias ?? metadata.plazo_pago_dias) == null
           ? undefined
-          : finiteFiscalNumber(cpeData.plazo_pago_dias, 'plazo de pago', { min: 0 }),
+          : finiteFiscalNumber(
+              cpeData.plazo_pago_dias ?? metadata.plazo_pago_dias,
+              'plazo de pago',
+              { min: 0 },
+            ),
         medioPago: String(
           metadata.dian_medio_pago
           ?? cpeData.medio_pago
@@ -757,8 +1291,14 @@ async retrySendToOse(
           : undefined),
         dianDiscrepancy,
         xmlContent: cpeData.xml_firmado,
-      };
+        };
 
+      if (dianIssuerSnapshot) {
+        this.assertDianNoteIssuerStillCurrent(
+          dianIssuerSnapshot,
+          await this.getEmpresaEmisorInfo(tenantId),
+        );
+      }
       const response = await this.fiscalAdapter.enviarDocumento(documento, tenantId, paisCodigo);
       const expectedDianCode = paisCodigo === 'CO'
         ? await this.loadSealedDianCode(claim)
@@ -862,7 +1402,7 @@ async retrySendToOse(
     const { data, error } = await this.supabaseService.getClient()
       .from('cpe')
       .select(
-        'id,documento_id,tipo_documento,serie,numero,fecha_emision,simulated_origin,fiscal_authority_evidence',
+        'id,documento_id,tipo_documento,serie,numero,fecha_emision,metadata,simulated_origin,fiscal_authority_evidence',
       )
       .eq('tenant_id', tenantId)
       .eq('documento_id', sourceDocumentId)
@@ -881,28 +1421,48 @@ async retrySendToOse(
     }
 
     const persistedReference = {
-      tipo: String(cpeData.documento_referencia_tipo ?? '').trim(),
-      serie: String(cpeData.documento_referencia_serie ?? '').trim(),
-      numero: String(cpeData.documento_referencia_numero ?? '').trim(),
+      tipo: String(cpeData.documento_referencia_tipo ?? '').trim().toUpperCase(),
+      serie: String(cpeData.documento_referencia_serie ?? '').trim().toUpperCase(),
+      numero: String(cpeData.documento_referencia_numero ?? '').trim().toUpperCase(),
     };
-    const sourceReference = {
-      tipo: String(source.tipo_documento ?? '').trim(),
-      serie: String(source.serie ?? '').trim(),
-      numero: String(source.numero ?? '').trim(),
-    };
-    if (!persistedReference.tipo || !persistedReference.serie || !persistedReference.numero) {
+    const sourceMetadata = source.metadata && typeof source.metadata === 'object'
+      && !Array.isArray(source.metadata)
+      ? source.metadata as Record<string, unknown>
+      : null;
+    if (!sourceMetadata
+        || !Object.prototype.hasOwnProperty.call(sourceMetadata, 'dian_prefijo_autorizado')
+        || !Object.prototype.hasOwnProperty.call(sourceMetadata, 'numero_fiscal')
+        || String(sourceMetadata.dian_numbering_contract_version ?? '') !== '530') {
+      throw new Error('El CPE DIAN origen no conserva su identidad fiscal exacta');
+    }
+    const authorizedPrefix = String(sourceMetadata.dian_prefijo_autorizado ?? '').trim();
+    const exactFiscalNumber = String(sourceMetadata.numero_fiscal ?? '').trim();
+    const sourceType = String(source.tipo_documento ?? '').trim().toUpperCase();
+    const sourceSeries = String(source.serie ?? '').trim().toUpperCase();
+    const sourceOperationalNumber = String(source.numero ?? '').trim();
+    const sourceCorrelative = sourceOperationalNumber.replace(/^0+/u, '');
+    if (authorizedPrefix !== authorizedPrefix.toUpperCase()
+        || !/^[A-Z0-9]{0,4}$/u.test(authorizedPrefix)
+        || exactFiscalNumber !== exactFiscalNumber.toUpperCase()
+        || !/^\d+$/u.test(sourceOperationalNumber)
+        || !/^[1-9]\d*$/u.test(sourceCorrelative)
+        || sourceSeries !== authorizedPrefix
+        || exactFiscalNumber !== `${authorizedPrefix}${sourceCorrelative}`) {
+      throw new Error('El CPE DIAN origen conserva una identidad fiscal contradictoria');
+    }
+    if (!persistedReference.tipo || !persistedReference.numero) {
       throw new Error('Nota DIAN con referencia fiscal incompleta');
     }
-    const sameNumber = this.normalizeReferenceNumber(persistedReference.numero)
-      === this.normalizeReferenceNumber(sourceReference.numero);
-    if (persistedReference.tipo !== sourceReference.tipo
-        || persistedReference.serie.toUpperCase() !== sourceReference.serie.toUpperCase()
-        || !sameNumber) {
+    if (persistedReference.tipo !== sourceType
+        || persistedReference.serie !== authorizedPrefix
+        || persistedReference.numero !== exactFiscalNumber) {
       throw new Error('La referencia fiscal de la nota DIAN no coincide con el CPE origen aceptado');
     }
 
     return {
-      ...sourceReference,
+      tipo: sourceType,
+      serie: authorizedPrefix,
+      numero: exactFiscalNumber,
       fecha: source.fecha_emision,
       uuid: evidence.uniqueCode,
       uuidSchemeName: evidence.kind === 'CUFE' ? 'CUFE-SHA384' : 'CUDE-SHA384',
@@ -973,13 +1533,6 @@ async retrySendToOse(
       return { profile, taxLevelCode, taxLevelListName, taxSchemeId, taxSchemeName };
     }
     throw new Error('DIAN: perfil tributario del receptor ausente o inconsistente');
-  }
-
-  private normalizeReferenceNumber(value: unknown): string {
-    const normalized = String(value ?? '').trim();
-    return /^\d+$/.test(normalized)
-      ? normalized.replace(/^0+(?=\d)/u, '')
-      : normalized.toUpperCase();
   }
 
   private async findDianRecoveryCandidate(cpeId: string, tenantId: string): Promise<any | null> {
@@ -1448,36 +2001,67 @@ private isTechnicalError(codigoRespuesta: string, descripcionRespuesta: string):
     return technicalKeywords.some(keyword => errorMessage.includes(keyword));
   }
 
-mapToDto(cpeData: any): FacturaDto {
-    const dto: FacturaDto & { documento_id?: string | null; documentoId?: string | null } = {
+  private mapToPublicRecord(cpeData: any): Record<string, any> {
+    const items = sanitizePublicCpeItems(cpeData?.items);
+    const totalIsc = items.reduce((sum, item) => {
+      const value = Number(
+        item.impuesto_isc ?? item.impuesto_inc ?? item.impuestoInc ?? item.inc ?? 0,
+      );
+      return sum + (Number.isFinite(value) && value >= 0 ? value : 0);
+    }, 0);
+
+    return {
       id: cpeData.id,
       documento_id: cpeData.documento_id ?? null,
       documentoId: cpeData.documento_id ?? null,
       tipo_documento: cpeData.tipo_documento,
       serie: cpeData.serie,
       numero: cpeData.numero,
+      fecha_emision: cpeData.fecha_emision,
+      fecha_vencimiento: cpeData.fecha_vencimiento,
+      fecha_envio: cpeData.fecha_envio,
       ruc_emisor: cpeData.ruc_emisor,
       razon_social_emisor: cpeData.razon_social_emisor,
+      direccion_emisor: cpeData.direccion_emisor,
       tipo_documento_receptor: cpeData.tipo_documento_receptor,
       documento_receptor: cpeData.documento_receptor,
       razon_social_receptor: cpeData.razon_social_receptor,
       direccion_receptor: cpeData.direccion_receptor,
       moneda: cpeData.moneda,
-      items: cpeData.items,
-      total_gravadas: parseFloat(cpeData.total_gravadas),
-      total_igv: parseFloat(cpeData.total_igv),
-      total_venta: parseFloat(cpeData.total_venta),
+      items,
+      total_gravadas: Number(cpeData.total_gravadas ?? 0),
+      total_exoneradas: Number(cpeData.total_exoneradas ?? 0),
+      total_inafectas: Number(cpeData.total_inafectas ?? 0),
+      total_exportacion: Number(cpeData.total_exportacion ?? 0),
+      total_igv: Number(cpeData.total_igv ?? 0),
+      total_isc: Math.round(totalIsc * 100) / 100,
+      total_venta: Number(cpeData.total_venta ?? cpeData.total ?? 0),
+      total: Number(cpeData.total ?? cpeData.total_venta ?? 0),
       estado: cpeData.estado,
+      estado_sunat: cpeData.estado_sunat,
+      sunat_status: cpeData.sunat_status,
+      pais: cpeData.pais,
+      simulated_origin: cpeData.simulated_origin,
       hash: cpeData.hash,
-      xml_firmado: cpeData.xml_firmado,
-      cdr_sunat: cpeData.cdr_sunat,
-      error_message: cpeData.error_message,
-      tenant_id: cpeData.tenant_id,
-      created_at: new Date(cpeData.created_at),
-      updated_at: new Date(cpeData.updated_at),
+      documento_referencia_tipo: cpeData.documento_referencia_tipo,
+      documento_referencia_serie: cpeData.documento_referencia_serie,
+      documento_referencia_numero: cpeData.documento_referencia_numero,
+      documento_referencia_id: cpeData.documento_referencia_id,
+      tipo_nota_credito: cpeData.tipo_nota_credito,
+      tipo_nota_debito: cpeData.tipo_nota_debito,
+      motivo_nota: cpeData.motivo_nota,
+      numero_comprobante_sunat: cpeData.numero_comprobante_sunat,
+      created_at: cpeData.created_at,
+      updated_at: cpeData.updated_at,
     };
+  }
 
-    return dto;
+  private mapToPublicDto(cpeData: any): FacturaDto {
+    return this.mapToPublicRecord(cpeData) as unknown as FacturaDto;
+  }
+
+mapToDto(cpeData: any): FacturaDto {
+    return this.mapToPublicDto(cpeData);
   }
 
 pickFirstNonEmpty(values: Array<string | null | undefined>, fallback = ''): string {

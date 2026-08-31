@@ -38,6 +38,25 @@ export class CpeCancellationService {
     }
 
     const client = this.supabaseService.getClient();
+    const { data: tenantConfig, error: tenantConfigError } = await client
+      .from('empresa_config')
+      .select('pais')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (tenantConfigError || !tenantConfig) {
+      throw new BadRequestException(
+        'No se pudo verificar el país fiscal antes de solicitar la anulación',
+      );
+    }
+    const countryCode = String((tenantConfig as any).pais ?? '').trim().toUpperCase();
+    if (countryCode !== 'PE') {
+      throw new BadRequestException({
+        code: 'CPE_CANCELLATION_JURISDICTION_UNSUPPORTED',
+        message: countryCode === 'CO'
+          ? 'Colombia no usa la anulación SUNAT 07. Emite una Nota Crédito DIAN 91 desde CPE > Notas referenciadas; el efecto financiero se aplicará sólo después de la aceptación DIAN.'
+          : 'Esta anulación SUNAT sólo está habilitada para Perú; usa el flujo fiscal propio de la jurisdicción del tenant.',
+      });
+    }
     const idempotencyKey = String(
       requestIdempotencyKey ?? `cpe.cancel.request:${tenantId}:${cpeId}`,
     ).trim();

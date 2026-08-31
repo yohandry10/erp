@@ -18,6 +18,7 @@ import {
 import { useApi } from '@/hooks/use-api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLocalizedMoney } from '@/hooks/use-localized-money'
+import { useCountryContext } from '@/hooks/use-country-context'
 import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -88,6 +89,7 @@ export default function RmaDetailPage() {
   const { get, post } = useApi({ throwOnError: true })
   const { session } = useAuth()
   const { formatCurrency } = useLocalizedMoney()
+  const country = useCountryContext()
   const { toast } = useToast()
   const [rma, setRma] = useState<Rma | null>(null)
   const [recursos, setRecursos] = useState<Recursos>({ control_calidad_requerido: false, almacenes: [], ubicaciones: [] })
@@ -209,7 +211,11 @@ export default function RmaDetailPage() {
 
           {['PARCIAL', 'RECIBIDA'].includes(rma.estado) && !rma.nota_credito_documento_id && <ActionCard icon={RotateCcw} title="Revertir recepción" description="Revierte todos los ingresos físicos activos y devuelve la RMA a APROBADA."><Input aria-label="Motivo de la reversión" value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} /><Button className="mt-3 w-full" variant="outline" disabled={saving || reverseReason.trim().length < 3} onClick={() => void run('reverse', `/api/ventas/rma/${rma.id}/revertir-recepcion`, { motivo: reverseReason }, 'Recepción revertida')}>Revertir íntegramente</Button></ActionCard>}
 
-          {rma.estado === 'RECIBIDA' && <ActionCard icon={FileCheck2} title="Emitir nota de crédito" description="Crea documento interno, deriva una serie FC/BC compatible con el CPE origen, reduce CxC y registra saldo a favor. La transmisión legal espera credenciales del cliente."><label className="block"><span className="mb-1 block text-xs font-medium">Motivo</span><Input value={creditReason} onChange={(event) => setCreditReason(event.target.value)} /></label><p className="mt-3 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">La serie no se ingresa manualmente: se deriva del comprobante original para evitar una NC fiscal incompatible.</p><Button className="mt-4 w-full" disabled={saving || creditReason.trim().length < 3} onClick={() => void run('credit-note', `/api/ventas/rma/${rma.id}/nota-credito`, { motivo: creditReason, tipo_nota_credito: '07' }, 'Nota de crédito emitida')}>Emitir NC por líneas devueltas</Button></ActionCard>}
+          {rma.estado === 'RECIBIDA' && country.paisCodigo === 'CO' && <ActionCard icon={FileCheck2} title="Nota crédito DIAN" description="La recepción ya quedó registrada. En Colombia la nota fiscal debe emitirse como documento DIAN 91 y su efecto financiero sólo se aplica después de la aceptación de la DIAN."><p className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">No se generará una nota SUNAT 07 ni se reducirá la CxC antes de la aceptación fiscal.</p><Button asChild className="mt-4 w-full"><Link href="/dashboard/cpe">Ir a CPE y emitir Nota Crédito 91</Link></Button></ActionCard>}
+
+          {rma.estado === 'RECIBIDA' && country.paisCodigo === 'AR' && <ActionCard icon={FileCheck2} title="Nota crédito ARCA" description="La recepción ya quedó registrada, pero la nota fiscal argentina requiere referencia ARCA y CAE antes de producir un efecto financiero."><p className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">Esta pantalla no emitirá una nota SUNAT 07 ni reducirá la CxC. Usa el flujo fiscal referenciado de CPE.</p><Button asChild className="mt-4 w-full"><Link href="/dashboard/cpe">Ir al flujo fiscal ARCA</Link></Button></ActionCard>}
+
+          {rma.estado === 'RECIBIDA' && !country.loading && country.paisCodigo === 'PE' && <ActionCard icon={FileCheck2} title="Emitir nota de crédito" description="Crea documento interno, deriva una serie FC/BC compatible con el CPE origen, reduce CxC y registra saldo a favor. La transmisión legal espera credenciales del cliente."><label className="block"><span className="mb-1 block text-xs font-medium">Motivo</span><Input value={creditReason} onChange={(event) => setCreditReason(event.target.value)} /></label><p className="mt-3 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">La serie no se ingresa manualmente: se deriva del comprobante original para evitar una NC fiscal incompatible.</p><Button className="mt-4 w-full" disabled={saving || creditReason.trim().length < 3} onClick={() => void run('credit-note', `/api/ventas/rma/${rma.id}/nota-credito`, { motivo: creditReason, tipo_nota_credito: '07' }, 'Nota de crédito emitida')}>Emitir NC por líneas devueltas</Button></ActionCard>}
 
           {rma.estado === 'CERRADA' && <ActionCard icon={BadgeDollarSign} title="Cierre financiero" description="La factura original permanece vigente; sólo se acreditaron las líneas devueltas."><Info label="Documento NC" value={rma.nota_credito_documento_id ?? '—'} /><Info label="CPE 07" value={rma.nota_credito_cpe_id ?? '—'} />{rma.saldo_favor && <div className="mt-4 rounded-xl bg-emerald-500/10 p-4"><p className="text-xs font-bold uppercase text-emerald-700 dark:text-emerald-300">Saldo a favor disponible</p><p className="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-300">{formatCurrency(Number(rma.saldo_favor.monto_disponible), rma.saldo_favor.moneda)}</p><Button asChild variant="link" className="mt-1 h-auto p-0"><Link href="/dashboard/ventas/rma">Gestionar aplicación o reembolso</Link></Button></div>}</ActionCard>}
 
