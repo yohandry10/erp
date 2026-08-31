@@ -2,6 +2,8 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { SignJWT } from 'jose'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fiscalDateForCountry } from '../../lib/fiscal-date'
+import { formatFiscalDocumentNumber } from '../../lib/fiscal-document-number'
 
 const user = {
   id: '52600000-0000-4000-8000-000000000090',
@@ -40,6 +42,46 @@ const dianAdminPermissions: PermissionFixture[] = [
 const dianReadOnlyPermissions = dianAdminPermissions.filter((permission) =>
   permission.id === 'p-read' || permission.id === 'p-cpe-read',
 )
+
+const colombiaConsumer = {
+  id: '52600000-0000-4000-8000-000000000092',
+  documento_tipo: 'CC',
+  documento_numero: '1234567890',
+  razon_social: 'Cliente Demo Colombia',
+  direccion: 'Calle 26 # 10-20, Bogotá D.C.',
+  dian_perfil_fiscal: 'CONSUMIDOR_FINAL',
+  dian_responsabilidad_fiscal: 'R-99-PN',
+  dian_responsabilidad_list_name: '49',
+  dian_tributo_id: 'ZY',
+  dian_tributo_nombre: 'No causa',
+}
+
+const colombiaLegacyDocuments = [
+  {
+    id: '52600000-0000-4000-8000-000000000093',
+    tipo_documento: 'FACTURA',
+    serie: 'FE01',
+    numero: '00000073',
+    fecha_emision: '2026-08-29',
+    receptor_numero_doc: '9001234568',
+    receptor_razon_social: 'Cliente legado borrador S.A.S.',
+    total: 119_000,
+    moneda: 'COP',
+    estado: 'BORRADOR',
+  },
+  {
+    id: '52600000-0000-4000-8000-000000000094',
+    tipo_documento: 'FACTURA',
+    serie: 'FE01',
+    numero: '00000074',
+    fecha_emision: '2026-08-29',
+    receptor_numero_doc: '9011234567',
+    receptor_razon_social: 'Cliente legado emitido S.A.S.',
+    total: 238_000,
+    moneda: 'COP',
+    estado: 'EMITIDO',
+  },
+]
 
 function jwtSecret() {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET
@@ -131,6 +173,15 @@ async function prepareColombiaSession(
         },
       })
     }
+    if (/\/api\/cpe\/receptores\/[^/]+\/?$/.test(pathname)) {
+      return json({ success: true, data: colombiaConsumer })
+    }
+    if (/\/api\/cpe\/receptores\/?$/.test(pathname)) {
+      return json({
+        data: [colombiaConsumer],
+        pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+      })
+    }
     if (/\/api\/cpe\/comprobantes\/?$/.test(pathname)) {
       return json({
         success: true,
@@ -152,6 +203,22 @@ async function prepareColombiaSession(
         ],
       })
     }
+    if (/\/api\/documentos\/lista\/?$/.test(pathname)) {
+      return json({ success: true, data: colombiaLegacyDocuments })
+    }
+    if (/\/api\/documentos\/stats\/?$/.test(pathname)) {
+      return json({
+        success: true,
+        data: {
+          totalDocumentos: 2,
+          facturas: 2,
+          boletas: 0,
+          notasCredito: 0,
+          contratos: 0,
+          pendientesEnvio: 2,
+        },
+      })
+    }
     return json({ success: true, data: [] })
   })
 
@@ -165,6 +232,54 @@ async function prepareColombiaSession(
 }
 
 test.describe('habilitación fiscal DIAN en CPE', () => {
+  test('la fecha fiscal de Colombia no salta al día UTC siguiente', () => {
+    expect(fiscalDateForCountry('CO', new Date('2026-08-30T03:30:00.000Z'))).toBe('2026-08-29')
+  })
+
+  test('la identidad DIAN concatena prefijo y consecutivo sin guion ni padding', () => {
+    expect(formatFiscalDocumentNumber('CO', 'FE01', '00000073')).toBe('FE0173')
+    expect(formatFiscalDocumentNumber('CO', '', '00000073')).toBe('73')
+    expect(formatFiscalDocumentNumber('PE', 'F001', 73, { padNonColombiaTo: 8 })).toBe('F001-00000073')
+    expect(formatFiscalDocumentNumber('AR', '00001', 73, { padNonColombiaTo: 8 })).toBe('00001-00000073')
+  })
+
+  test('Documentos Colombia queda como historial y deriva toda acción fiscal al Centro CPE', async ({
+    context,
+    page,
+  }) => {
+    await prepareColombiaSession(context, page, {
+      isDemo: true,
+      fiscal: { isReady: false, missingItems: ['Modo demo'] },
+    })
+
+    const legacyFiscalRequests: string[] = []
+    page.on('request', (request) => {
+      const pathname = new URL(request.url()).pathname
+      if (/\/api\/documentos\/[^/]+\/(?:generar-xml|enviar-sunat)\/?$/.test(pathname)) {
+        legacyFiscalRequests.push(`${request.method()} ${pathname}`)
+      }
+    })
+
+    await page.goto('/dashboard/documentos/', { waitUntil: 'domcontentloaded' })
+
+    await expect(
+      page.getByRole('heading', { name: 'Gestión Documental y Facturación Electrónica' }),
+    ).toBeVisible()
+    await expect(page.getByText(/se gestionan exclusivamente desde el Centro CPE/i)).toBeVisible()
+    await expect(page.getByText('FE0173', { exact: true })).toBeVisible()
+    await expect(page.getByText('FE0174', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Editar', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'XML', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'XML firmado', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Enviar', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Gestionar en Centro CPE' })).toHaveCount(2)
+
+    await page.getByRole('button', { name: 'Ir al Centro CPE' }).first().click()
+    await expect(page).toHaveURL(/\/dashboard\/cpe\/?$/)
+    expect(legacyFiscalRequests).toEqual([])
+  })
+
   test('el administrador registra una constancia portal explícita e idempotente', async ({
     context,
     page,
@@ -283,6 +398,130 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
     await expect(page.getByTestId('dian-events-panel')).toContainText(
       'no consulta ni registra eventos reales en DIAN',
     )
+  })
+
+  test('la factura demo usa afectación DIAN por línea e idempotencia estable al reintentar', async ({
+    context,
+    page,
+  }) => {
+    await page.clock.setFixedTime(new Date('2026-08-30T03:30:00.000Z'))
+    await prepareColombiaSession(context, page, {
+      isDemo: true,
+      fiscal: { isReady: false, missingItems: ['Modo demo'] },
+    })
+
+    const requests: Array<{ body: Record<string, unknown>; idempotencyKey?: string }> = []
+    await page.route(/\/api\/cpe\/comprobantes\/?$/, async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      requests.push({
+        body: route.request().postDataJSON(),
+        idempotencyKey: (await route.request().headerValue('Idempotency-Key')) ?? undefined,
+      })
+      if (requests.length === 1) {
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: false, message: 'Fallo controlado de emisión' }),
+        })
+      }
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { id: 'cpe-demo-colombia' } }),
+      })
+    })
+
+    await page.goto('/dashboard/cpe', { waitUntil: 'domcontentloaded' })
+    await page.getByRole('button', { name: 'Nueva factura sin transmisión' }).click()
+
+    await expect(page.getByLabel('Fecha de Emisión *')).toHaveValue('2026-08-29')
+    await expect(page.getByLabel('Prefijo fiscal')).toHaveValue('')
+    await expect(page.getByLabel('Prefijo fiscal')).toHaveAttribute(
+      'placeholder',
+      'Asignado por DIAN / sin prefijo',
+    )
+    await page.getByLabel('Buscar').click()
+    await page.getByRole('button', { name: /Cliente Demo Colombia/ }).click()
+    await expect(page.getByLabel('Tipo de identificación *')).toHaveValue('CC')
+    await expect(page.getByLabel('NIT/CC *')).toHaveValue('1234567890')
+    await expect(page.getByLabel('NIT/CC *')).toHaveAttribute('readonly', '')
+    await expect(page.getByLabel('Razón Social/Nombre *')).toHaveValue('Cliente Demo Colombia')
+    const gravado = page.getByTestId('cpe-item-0')
+    await gravado.getByLabel('Código').fill('SERV-GRAVADO')
+    await gravado.getByLabel('Descripción *').fill('Servicio gravado')
+    await gravado.getByLabel('Cantidad *').fill('2')
+    await gravado.getByLabel('Valor Unitario *').fill('100000')
+    await expect(gravado.getByLabel('Afectación IVA DIAN *')).toHaveValue('10')
+
+    await page.getByRole('button', { name: '+ Agregar Item' }).click()
+    const exento = page.getByTestId('cpe-item-1')
+    await exento.getByLabel('Código').fill('SERV-EXENTO')
+    await exento.getByLabel('Descripción *').fill('Servicio exento')
+    await exento.getByLabel('Cantidad *').fill('1')
+    await exento.getByLabel('Valor Unitario *').fill('50000')
+    await exento.getByLabel('Afectación IVA DIAN *').selectOption('20')
+    await expect(exento.getByRole('spinbutton', { name: 'IVA', exact: true })).toHaveValue('0.00')
+
+    await page.getByRole('button', { name: '+ Agregar Item' }).click()
+    const excluido = page.getByTestId('cpe-item-2')
+    await excluido.getByLabel('Código').fill('SERV-EXCLUIDO')
+    await excluido.getByLabel('Descripción *').fill('Servicio excluido')
+    await excluido.getByLabel('Cantidad *').fill('1')
+    await excluido.getByLabel('Valor Unitario *').fill('25000')
+    await excluido.getByLabel('Afectación IVA DIAN *').selectOption('30')
+    await expect(excluido.getByRole('spinbutton', { name: 'IVA', exact: true })).toHaveValue('0.00')
+
+    await page.getByRole('button', { name: 'Crear Comprobante' }).click()
+    await expect(page.locator('form [role="alert"]')).toHaveText('Fallo controlado de emisión')
+
+    expect(requests).toHaveLength(1)
+    const first = requests[0]?.body as {
+      fechaEmision: string
+      subtotal: unknown
+      totalIgv: unknown
+      total: unknown
+      cliente_id: string
+      idempotency_key: string
+      items: Array<Record<string, unknown>>
+    }
+    expect(first).toMatchObject({
+      fechaEmision: '2026-08-29',
+      subtotal: 275_000,
+      totalIgv: 38_000,
+      total: 313_000,
+      cliente_id: colombiaConsumer.id,
+    })
+    expect(first).not.toHaveProperty('serie')
+    expect(requests[0]?.idempotencyKey).toMatch(/^cpe-ui-/)
+    expect(first.idempotency_key).toBe(requests[0]?.idempotencyKey)
+    expect(first).not.toHaveProperty('idempotencyKey')
+    expect(typeof first.items[0]?.cantidad).toBe('number')
+    expect(typeof first.items[0]?.valorUnitario).toBe('number')
+    expect(first.items).toEqual([
+      expect.objectContaining({
+        codigo: 'SERV-GRAVADO', afectacion_igv: '10', tipo_afectacion_igv: '10',
+        precioUnitario: 100_000, igv: 38_000,
+      }),
+      expect.objectContaining({
+        codigo: 'SERV-EXENTO', afectacion_igv: '20', tipo_afectacion_igv: '20',
+        precioUnitario: 50_000, igv: 0,
+      }),
+      expect.objectContaining({
+        codigo: 'SERV-EXCLUIDO', afectacion_igv: '30', tipo_afectacion_igv: '30',
+        precioUnitario: 25_000, igv: 0,
+      }),
+    ])
+
+    await page.getByRole('button', { name: 'Crear Comprobante' }).click()
+    await expect(page.getByRole('heading', { name: 'Nuevo Comprobante Electrónico' })).toBeHidden()
+
+    expect(requests).toHaveLength(2)
+    expect(requests[1]?.idempotencyKey).toBe(requests[0]?.idempotencyKey)
+    expect(requests[1]?.body.idempotency_key).toBe(requests[0]?.idempotencyKey)
+
+    await page.clock.setFixedTime(new Date('2026-08-30T05:30:00.000Z'))
+    await page.getByRole('button', { name: 'Nueva factura sin transmisión' }).click()
+    await expect(page.getByLabel('Fecha de Emisión *')).toHaveValue('2026-08-30')
   })
 
   test('un tenant real no habilitado conserva el historial pero oculta todas las escrituras', async ({
@@ -574,6 +813,8 @@ test.describe('habilitación fiscal DIAN en CPE', () => {
     await expect(panel).toHaveAttribute('data-operational', 'true')
     await expect(panel).toContainText('SETP990000001')
     await expect(panel).toContainText('Proveedor DIAN S.A.S.')
+    await expect(panel).toContainText('FE011')
+    await expect(panel).not.toContainText('FE01-1')
 
     await panel.getByTestId('dian-received-cufe').fill(cufe)
     await panel.getByTestId('dian-received-provider').selectOption(

@@ -28,11 +28,13 @@ describe('PedidosService', () => {
             eq: jest.fn().mockReturnThis(),
             single: jest.fn().mockReturnThis(),
             insert: jest.fn().mockReturnThis(),
+            update: jest.fn().mockReturnThis(),
             delete: jest.fn().mockReturnThis(),
             rpc: jest.fn(),
             order: jest.fn().mockReturnThis(),
             like: jest.fn().mockReturnThis(),
             limit: jest.fn(),
+            maybeSingle: jest.fn(),
         };
 
         mockTaxCalculator = {
@@ -110,7 +112,7 @@ describe('PedidosService', () => {
 
             expect(result).toBeDefined();
             expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-                'crear_pedido_comercial_tx',
+                'crear_pedido_comercial_pago_tx_531',
                 expect.objectContaining({
                     p_pedido: expect.objectContaining({
                         tenant_id: tenantId,
@@ -138,6 +140,41 @@ describe('PedidosService', () => {
             expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
         });
 
+        it('persiste una intención de crédito validada desde el DTO del pedido', async () => {
+            const dto = {
+                ...createDto,
+                condicion_pago: 'CREDITO',
+                medio_pago: '42',
+                plazo_pago_dias: 30,
+                fecha_vencimiento: '2026-09-30',
+            };
+            mockSupabaseClient.single.mockResolvedValueOnce({ data: { id: 'client-1' }, error: null });
+            mockTaxCalculator.calcularImpuestos.mockResolvedValue({
+                subtotal: 100,
+                igv: 18,
+                total: 118,
+            });
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: { pedido_id: 'pedido-credito' },
+                error: null,
+            });
+            jest.spyOn(service, 'findOne').mockResolvedValue({ id: 'pedido-credito' } as any);
+
+            await service.create(dto as any, tenantId, userId);
+
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+                'crear_pedido_comercial_pago_tx_531',
+                expect.objectContaining({
+                    p_payment_intent: {
+                        condicion_pago: 'CREDITO',
+                        medio_pago: '42',
+                        plazo_pago_dias: 30,
+                        fecha_vencimiento: '2026-09-30',
+                    },
+                }),
+            );
+        });
+
         it('mantiene precisión decimal en el payload transaccional', async () => {
             const dto = {
                 cliente_id: 'client-1',
@@ -158,7 +195,7 @@ describe('PedidosService', () => {
             await service.create(dto as any, tenantId, userId);
 
             expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
-                'crear_pedido_comercial_tx',
+                'crear_pedido_comercial_pago_tx_531',
                 expect.objectContaining({
                     p_pedido: expect.objectContaining({ subtotal: 0.3 }),
                 }),
@@ -495,7 +532,7 @@ describe('PedidosService', () => {
             await service.create(createDto as any, tenantA, 'actor-a');
 
             const [functionName, rpcPayload] = mockSupabaseClient.rpc.mock.calls[0];
-            expect(functionName).toBe('crear_pedido_comercial_tx');
+            expect(functionName).toBe('crear_pedido_comercial_pago_tx_531');
             expect(rpcPayload).toEqual(
                 expect.objectContaining({
                     p_pedido: expect.objectContaining({

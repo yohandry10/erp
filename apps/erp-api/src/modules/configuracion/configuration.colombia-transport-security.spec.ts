@@ -91,6 +91,63 @@ describe('ConfigurationController · transporte fiscal Colombia', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it('rechaza un prefijo DIAN no alfanumérico', async () => {
+    const rpc = jest.fn();
+    const service = new ConfigurationService(
+      { getClient: () => ({ rpc }) } as any,
+      {} as any,
+      { get: jest.fn() } as any,
+    );
+
+    await expect(service.completeWizard(
+      'tenant-co',
+      {
+        pais: 'CO',
+        pais_id: 2,
+        dian_url: 'https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc',
+        dian_resolucion_prefijo: 'A-B',
+      },
+      'actor-admin',
+      'idem-co-invalid-prefix',
+    )).rejects.toThrow(
+      'El prefijo DIAN, cuando la resolución lo asigna, admite hasta 4 caracteres alfanuméricos',
+    );
+
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('permite limpiar el prefijo opcional y persiste el valor vacío', async () => {
+    const query: any = {
+      select: jest.fn(() => query),
+      eq: jest.fn(() => query),
+      maybeSingle: jest.fn().mockResolvedValue({
+        data: { pais: 'CO', pais_id: 2 },
+        error: null,
+      }),
+    };
+    const rpc = jest.fn().mockResolvedValue({ data: { configuracion: {} }, error: null });
+    const service = new ConfigurationService(
+      { getClient: () => ({ from: () => query, rpc }) } as any,
+      {} as any,
+      { get: jest.fn() } as any,
+    );
+
+    await expect(service.updateEmpresaPatchAtomic(
+      'tenant-co',
+      { dian_resolucion_prefijo: '   ' },
+      'actor-admin',
+      'idem-co-empty-prefix',
+      'EMPRESA',
+    )).resolves.toEqual({});
+
+    expect(rpc).toHaveBeenCalledWith(
+      'actualizar_empresa_config_tx',
+      expect.objectContaining({
+        p_patch: { dian_resolucion_prefijo: '' },
+      }),
+    );
+  });
+
   it('la frontera atómica rechaza OSE aunque un llamador interno omita el controlador', async () => {
     const query: any = {
       select: jest.fn(() => query),

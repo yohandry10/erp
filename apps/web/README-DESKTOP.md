@@ -10,7 +10,7 @@ Aplicación desktop del sistema ERP tributario peruano construida con Tauri + Ne
 
 La app desktop es **offline-first operativa con sincronización**: empaqueta la UI web como cliente Tauri y usa SQLite local para continuidad sin red. Cuando hay conexión consume el backend API real mediante `NEXT_PUBLIC_API_URL`; cuando no hay conexión o el usuario activa `offline_mode`, las lecturas usan cache/snapshots locales y las escrituras serializables se guardan en SQLite para sincronizarse después.
 
-La base autoritativa final y la respuesta SUNAT/OSE viven fuera del dispositivo. En offline, la app desktop puede generar documentos fiscales locales, PDF local, hash, correlativo SQLite y cola de envío; no declara aceptación SUNAT/CDR hasta que el backend/SUNAT/OSE procese la cola al reconectar.
+La base autoritativa final y la respuesta fiscal viven fuera del dispositivo. En offline, la app desktop puede conservar una representación local (XML/PDF/hash/correlativo SQLite) para consulta, pero no encola una emisión ni la presenta como pendiente de la autoridad. Emitir o transmitir un CPE exige conexión viva con el backend.
 
 ## Características Desktop
 
@@ -26,7 +26,7 @@ La base autoritativa final y la respuesta SUNAT/OSE viven fuera del dispositivo.
 - **Cobertura genérica local-first para módulos restantes**: RRHH, compras, finanzas, contabilidad, documentos, configuración operativa, usuarios y reportes JSON hidratan snapshots locales. Las escrituras JSON no especializadas se guardan como registros locales pendientes y se sincronizan con el backend.
 - **Mapeo local-remoto**: las entidades creadas offline guardan metadata de ID local en la cola y registran el ID autoritativo devuelto por backend al sincronizar.
 - **Cache binario básico**: PDFs/reportes/binarios ya descargados online se guardan en SQLite desktop para relectura offline.
-- **Paquete fiscal local**: ventas POS offline generan documento fiscal local con XML, hash, PDF base64, correlativo local y estado `PENDIENTE_ENVIO` cuando la configuración fiscal local está completa.
+- **Representación fiscal local**: XML, hash, PDF base64 y correlativo local pueden conservarse como `GENERADO_LOCAL`/`FIRMADO_LOCAL`; nunca equivalen a una emisión y no entran en la outbox fiscal.
 - **Adjuntos offline**: las cargas `FormData` serializables se guardan en cola con archivos en base64 y se reconstruyen al sincronizar.
 - **Sesión y permisos offline**: desktop conserva snapshot local de sesión y permisos para operar sin consultar `/auth/profile` o RBAC remoto mientras no haya red.
 - **Outbox offline durable por tenant** en SQLite desktop para operaciones pendientes de otros módulos.
@@ -157,14 +157,14 @@ apps/web/
 - `list_local_id_mappings()` - Listar mapeos local-remoto confirmados por sync.
 - `cache_binary_response(endpoint, url, status, headers, bodyBase64)` - Guardar respuesta binaria local.
 - `get_binary_response(endpoint, url)` - Leer respuesta binaria local.
-- `generate_offline_fiscal_document(document)` - Generar documento fiscal local con XML/PDF/hash/correlativo y cola de envío.
+- `generate_offline_fiscal_document(document)` - Generar sólo una representación local XML/PDF/hash/correlativo, sin cola de emisión.
 - `hydrate_local_first_response(endpoint, url, status, headers, body)` - Hidratar SQLite con snapshots POS/caja al operar online.
 - `get_local_first_response(endpoint, url)` - Leer snapshots/tablas locales para endpoints POS/caja offline.
 - `process_local_first_write(request)` - Procesar transacciones locales de POS/caja y dejar sync pendiente.
 
 ### Procesamiento de Documentos
 - `sign_xml(xmlContent)` - Prepara/firma localmente usando el certificado configurado y marca el XML como pendiente de envío externo.
-- `send_to_sunat(signedXml)` - Encola el XML firmado para envío backend/SUNAT/OSE al reconectar; no simula aceptación.
+- `send_to_sunat(signedXml)` - Falla cerrado sin conexión: la transmisión fiscal se realiza únicamente por el backend en vivo.
 - `generate_pdf(xmlContent, template)` - Genera PDF local básico para operación offline.
 
 ### Impresión
@@ -180,7 +180,7 @@ apps/web/
 El modo offline tiene dos niveles:
 
 - **POS + caja local-first**: productos, clientes, métodos de pago, empresa, ventas recientes, cajas y sesión abierta se hidratan en SQLite cuando hay red. Sin red, el POS lee SQLite; ventas, apertura y cierre de caja se guardan transaccionalmente en SQLite, descuentan stock local y quedan pendientes de sincronización.
-- **Fiscal POS offline**: si RUC/razón social están configurados, cada venta POS local genera un documento fiscal local con serie/correlativo SQLite, XML, hash, PDF y cola de envío. El estado sigue pendiente hasta recibir respuesta SUNAT/OSE.
+- **Fiscal POS offline**: una venta que solicita factura/boleta/CPE falla antes de escribir en SQLite. El usuario debe reconectar y emitir por el backend; las vistas y PDFs descargados previamente continúan disponibles en caché local.
 - **Clientes e inventario base local-first**: `/dashboard/ventas/clientes` y `/dashboard/inventario/productos` pueden leer SQLite offline. Crear, editar y eliminar clientes/productos se guarda localmente y se encola para sync. Inventario comparte la tabla local de productos con POS, por lo que el stock descontado por ventas offline se refleja en el catálogo local.
 - **Ventas comerciales local-first**: `/dashboard/ventas/cotizaciones` y `/dashboard/ventas/pedidos` leen SQLite offline. Crear/editar/eliminar cotizaciones y pedidos se guarda en SQLite y se encola para sync. Los pedidos creados offline reservan stock local, pero confirmación, despacho, facturación y GRE/CPE quedan sujetos al backend.
 - **Resto de módulos**: continuidad operativa local-first genérica. `GET` JSON hidrata snapshots SQLite y los mezcla con registros locales pendientes; `POST/PUT/DELETE` JSON serializable se guarda como entidad local con `sync_status=pending` y también se encola para sincronización.
@@ -199,7 +199,7 @@ Restricciones deliberadas:
 
 - Las cargas `FormData` se soportan para cola offline cuando los archivos pueden leerse en memoria; archivos enormes deben validarse operacionalmente por tamaño/tiempo de sync.
 - El cache de respuestas tiene limite por entrada y falla suave si el almacenamiento local esta lleno; la respuesta online no se invalida por un fallo de cache.
-- Las operaciones fiscales no obtienen CDR en offline; quedan pendientes hasta procesarse en backend.
+- Las operaciones fiscales no se encolan ni quedan supuestamente pendientes en offline; emisión, firma autoritativa y respuesta de la autoridad requieren el backend en vivo.
 - Conflictos de negocio, correlativos y validaciones SUNAT/OSE se resuelven en backend al sincronizar.
 - La firma criptográfica SUNAT/OSE definitiva depende del certificado real del cliente y de la validación externa; el desktop deja el paquete local preparado y trazable.
 - La contraseña local del certificado no se considera respaldo autoritativo; el onboarding/backend siguen siendo la fuente de configuración fiscal productiva.

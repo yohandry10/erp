@@ -6,6 +6,7 @@ import { fetchApi } from '@/lib/api-fetch'
 import { usePermission } from '@/hooks/use-permission'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 type DianEventCode = '030' | '031' | '032' | '033' | '034'
 
@@ -49,7 +50,7 @@ interface ReceivedDianInvoice {
 
 export interface IssuedDianInvoice {
   id: string
-  serie: string
+  serie?: string
   numero: number
   fechaEmision: string
   cliente: string
@@ -708,7 +709,9 @@ export function DianEventsPanel({ fiscalReady, isDemo, issuedInvoices }: Props) 
             {acceptedIssuedInvoices.slice(0, 10).map((invoice) => (
               <div key={invoice.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/35 p-3">
                 <div>
-                  <p className="font-bold text-foreground">{invoice.serie}-{invoice.numero}</p>
+                  <p className="font-bold text-foreground">
+                    {formatFiscalDocumentNumber('CO', invoice.serie, invoice.numero)}
+                  </p>
                   <p className="text-xs text-muted-foreground">{invoice.cliente} · {invoice.fechaEmision}</p>
                 </div>
                 <Button
@@ -719,7 +722,7 @@ export function DianEventsPanel({ fiscalReady, isDemo, issuedInvoices }: Props) 
                   onClick={() => startEvent({
                     anchorId: invoice.id,
                     anchorKind: 'ISSUED',
-                    label: `${invoice.serie}-${invoice.numero}`,
+                    label: formatFiscalDocumentNumber('CO', invoice.serie, invoice.numero),
                     eventCode: '034',
                   })}
                 >034 Tácita</Button>

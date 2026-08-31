@@ -232,8 +232,10 @@ export class PosService {
   private dianMedioPago(tipo: unknown, codigo: unknown): string {
     const normalized = `${String(tipo ?? '').trim()} ${String(codigo ?? '').trim()}`.toUpperCase();
     const explicitCode = String(codigo ?? '').trim().toUpperCase();
-    if (/^[0-9A-Z]{2,3}$/.test(explicitCode)) return explicitCode;
-    if (normalized.includes('MIXTO')) return 'ZZ';
+    if (['2', 'CREDITO', 'CRÉDITO'].includes(explicitCode)) return '1';
+    if (/^\d{1,3}$/.test(explicitCode) || explicitCode === 'ZZZ') return explicitCode;
+    if (normalized.includes('MIXTO')) return 'ZZZ';
+    if (normalized.includes('CREDITO') || normalized.includes('CRÉDITO')) return '1';
     if (normalized.includes('EFECTIVO') || normalized.includes('CASH')) return '10';
     if (normalized.includes('TRANSFER') || normalized.includes('CONSIGN')) return '42';
     if (normalized.includes('TARJETA') || normalized.includes('CARD')) return '48';
@@ -901,7 +903,7 @@ export class PosService {
       // Validar config de empresa antes de crear venta (hard-stop CPE)
       const { data: empresaCfg, error: empresaCfgErr } = await this.supabase.getClient()
         .from('empresa_config')
-        .select('ruc, razon_social, direccion_fiscal, ubigeo, departamento, provincia, moneda_defecto, igv_porcentaje, serie_factura, serie_boleta, pais, pais_id, is_demo, dian_regimen_fiscal, dian_tipo_contribuyente, arca_punto_venta, arca_condicion_iva')
+        .select('ruc, razon_social, direccion_fiscal, ubigeo, departamento, provincia, moneda_defecto, igv_porcentaje, dias_vencimiento_factura, serie_factura, serie_boleta, pais, pais_id, is_demo, dian_regimen_fiscal, dian_tipo_contribuyente, dian_resolucion_prefijo, arca_punto_venta, arca_condicion_iva')
         .eq('tenant_id', user.tenant_id)
         .single();
       if (empresaCfgErr) {
@@ -974,6 +976,23 @@ export class PosService {
       // dejarlo fuera del recálculo hacía que el POS mostrara un total con
       // descuento pero registrara y cobrara el total sin él.
       this.aplicarDescuentoGlobal(recomputed, ventaData?.descuento_global);
+
+      // El UBL DIAN exige AllowanceCharge con código y motivo explícitos. La UI
+      // POS todavía no captura ese catálogo; dejar avanzar el descuento haría
+      // que caja/stock se comprometan y el finalizador fiscal falle después.
+      // Bloquear aquí mantiene la operación completa antes de la RPC atómica.
+      const isRealDianSale = emitirCpe
+        && String(empresaCfg?.pais ?? '').trim().toUpperCase() === 'CO'
+        && empresaCfg?.is_demo !== true;
+      const hasUnsupportedDianDiscount = recomputed.some((item: any) =>
+        Number(item?.descuento_monto ?? 0) > 0.005
+        || Number(item?.descuento_unitario ?? 0) > 0.005,
+      );
+      if (isRealDianSale && hasUnsupportedDianDiscount) {
+        throw new BadRequestException(
+          'DIAN: el POS no admite descuentos en emisión real hasta registrar código y motivo de AllowanceCharge',
+        );
+      }
 
       // Los productos se validan ANTES de calcular el dinero: su afectación del
       // IGV (Catálogo 07) decide qué parte de la venta es gravada. Calcular un
@@ -1198,7 +1217,12 @@ export class PosService {
           : (ventaData.metodo_pago_id || 'efectivo');
 
       let dianMedioPago: string | null = null;
+      let dianFormaPago: 'CONTADO' | 'CREDITO' = 'CONTADO';
+      let dianPlazoPagoDias = 0;
       if (emitirCpe && String(empresaCfg?.pais || '').trim().toUpperCase() === 'CO') {
+        dianFormaPago = pagosNormalizados?.some((pago) => pago.tipo === 'CREDITO')
+          ? 'CREDITO'
+          : 'CONTADO';
         if (pagosNormalizados && pagosNormalizados.length > 1) {
           dianMedioPago = this.dianMedioPago('MIXTO', '');
         } else if (pagosNormalizados?.[0]) {
@@ -1210,6 +1234,20 @@ export class PosService {
           );
           metodoPagoPrincipal = metodo.codigo;
           dianMedioPago = this.dianMedioPago(metodo.tipo, metodo.codigo);
+          dianFormaPago = metodo.tipo === 'CREDITO' ? 'CREDITO' : 'CONTADO';
+        }
+        if (dianFormaPago === 'CREDITO') {
+          const requestedPaymentTerm = Number(
+            ventaData?.plazo_pago_dias
+            ?? ventaData?.comprobante?.plazo_pago_dias
+            ?? empresaCfg?.dias_vencimiento_factura,
+          );
+          if (!Number.isSafeInteger(requestedPaymentTerm) || requestedPaymentTerm < 1) {
+            throw new BadRequestException(
+              'DIAN: una venta POS a crédito requiere un plazo de pago positivo',
+            );
+          }
+          dianPlazoPagoDias = requestedPaymentTerm;
         }
       }
 
@@ -1218,20 +1256,24 @@ export class PosService {
         : 'TICKET';
       const prefijoFiscal = tipoComprobante === '01' ? 'F' : 'B';
       const serieSolicitada = String(ventaData?.comprobante?.serie ?? '').trim().toUpperCase();
-      const serieConfigurada = String(
-        (tipoComprobante === '01' ? empresaCfg.serie_factura : empresaCfg.serie_boleta) ?? '',
-      ).trim().toUpperCase();
       const countryCode = String(empresaCfg?.pais || 'PE').trim().toUpperCase();
+      const serieConfigurada = String(
+        countryCode === 'CO'
+          ? empresaCfg.dian_resolucion_prefijo
+          : (tipoComprobante === '01' ? empresaCfg.serie_factura : empresaCfg.serie_boleta),
+      ).trim().toUpperCase();
       const esSerieFiscalValida = (serieFiscal: string) =>
-        (countryCode === 'CO' ? /^[A-Z0-9]{1,10}$/.test(serieFiscal) : /^[A-Z0-9]{4}$/.test(serieFiscal)) &&
-        !serieFiscal.startsWith('T') &&
+        (countryCode === 'CO'
+          ? (serieFiscal === '' || /^[A-Z0-9]{1,4}$/.test(serieFiscal))
+          : /^[A-Z0-9]{4}$/.test(serieFiscal)) &&
+        (countryCode === 'CO' || !serieFiscal.startsWith('T')) &&
         (empresaCfg?.pais !== 'PE' || serieFiscal.startsWith(prefijoFiscal));
       const arcaPointOfSale = Number(empresaCfg?.arca_punto_venta);
       const serieCpe = countryCode === 'AR'
         ? (Number.isInteger(arcaPointOfSale) && arcaPointOfSale >= 1 && arcaPointOfSale <= 99998
           ? String(arcaPointOfSale).padStart(5, '0')
           : (() => { throw new Error('Punto de venta ARCA inválido o no configurado'); })())
-        : esSerieFiscalValida(serieSolicitada)
+        : countryCode !== 'CO' && esSerieFiscalValida(serieSolicitada)
           ? serieSolicitada
           : esSerieFiscalValida(serieConfigurada)
             ? serieConfigurada
@@ -1304,8 +1346,9 @@ export class PosService {
           dian_municipio_emisor: rawMunicipio || (dianIsDemo ? 'Bogotá D.C.' : null),
           dian_regimen_fiscal: validRegimen ? rawRegimen : (dianIsDemo ? 'O-13' : null),
           dian_tipo_contribuyente: validContribuyente ? rawContribuyente : (dianIsDemo ? '1' : null),
-          dian_forma_pago: 'CONTADO',
+          dian_forma_pago: dianFormaPago,
           dian_medio_pago: dianMedioPago || (dianIsDemo ? '10' : null),
+          plazo_pago_dias: dianPlazoPagoDias,
         };
       }
 
@@ -1350,8 +1393,9 @@ export class PosService {
           total_exportacion: desgloseIgv.exportacion,
           total_igv: impuestosCalculados,
           total_venta: totalCalculado,
-          condicion_pago: countryCode === 'CO' ? 'CONTADO' : undefined,
+          condicion_pago: countryCode === 'CO' ? dianFormaPago : undefined,
           medio_pago: countryCode === 'CO' ? dianMedioPago : undefined,
+          plazo_pago_dias: countryCode === 'CO' ? dianPlazoPagoDias : undefined,
           metadata: countryCode === 'AR'
             ? {
                 arca_punto_venta: arcaPointOfSale,

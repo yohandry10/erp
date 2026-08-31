@@ -1,5 +1,7 @@
 'use client'
 
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
+
 interface CpeDocument {
   id: string
   tipoDocumento?: string
@@ -27,6 +29,7 @@ interface Props {
   onGre?: (doc: CpeDocument) => void
   fiscalLabel: string
   canSend: boolean
+  countryCode?: string
 }
 
 const estadoColor: Record<string, string> = {
@@ -39,15 +42,23 @@ const estadoColor: Record<string, string> = {
   BORRADOR: 'border-border/30 bg-slate-400/10 text-foreground/90',
 }
 
-export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, onCancel, onGre, fiscalLabel, canSend }: Props) {
+export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, onCancel, onGre, fiscalLabel, canSend, countryCode }: Props) {
+  const isColombia = String(countryCode || '').toUpperCase() === 'CO'
+  const canUseSunatCancellation = String(countryCode || '').toUpperCase() === 'PE'
   return (
     <div className="overflow-auto rounded-2xl border border-cyan-400/10">
       <table className="min-w-full !bg-card/80 text-sm">
         <thead className="!bg-card/90 text-xs uppercase tracking-[0.12em] text-primary/80">
           <tr className="text-left">
             <th className="!bg-card/90 p-3">Tipo</th>
-            <th className="!bg-card/90 p-3">Serie</th>
-            <th className="!bg-card/90 p-3">Numero</th>
+            {isColombia ? (
+              <th className="!bg-card/90 p-3" colSpan={2}>Número DIAN</th>
+            ) : (
+              <>
+                <th className="!bg-card/90 p-3">Serie</th>
+                <th className="!bg-card/90 p-3">Numero</th>
+              </>
+            )}
             <th className="!bg-card/90 p-3">Fecha</th>
             <th className="!bg-card/90 p-3">Cliente</th>
             <th className="!bg-card/90 p-3">Total</th>
@@ -58,13 +69,21 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
         <tbody className="divide-y divide-cyan-400/10">
           {documents.map((doc) => {
             const type = String(doc.tipoDocumento || doc.tipoComprobante).toUpperCase()
-            const isNote = ['07', '08'].some((code) => type.includes(code)) || type.includes('NOTA')
+            const isNote = ['07', '08', '91', '92'].some((code) => type.includes(code)) || type.includes('NOTA')
             const canSendDocument = canSend && ['FIRMADO', 'ERROR'].includes(doc.estado)
             return (
             <tr key={doc.id} className="bg-card/50 text-foreground/90 transition hover:bg-card/80">
               <td className="p-3 font-semibold text-foreground">{doc.tipoComprobante}</td>
-              <td className="p-3 font-mono text-foreground">{doc.serie}</td>
-              <td className="p-3 font-mono text-foreground">{doc.numero}</td>
+              {isColombia ? (
+                <td className="p-3 font-mono text-foreground" colSpan={2}>
+                  {formatFiscalDocumentNumber('CO', doc.serie, doc.numero)}
+                </td>
+              ) : (
+                <>
+                  <td className="p-3 font-mono text-foreground">{doc.serie}</td>
+                  <td className="p-3 font-mono text-foreground">{doc.numero}</td>
+                </>
+              )}
               <td className="p-3 text-muted-foreground">{doc.fechaEmision}</td>
               <td className="p-3">
                 <div className="flex flex-col">
@@ -110,7 +129,7 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
                 {onGre && (
                   <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-cyan-400/15" onClick={() => onGre(doc)}>GRE</button>
                 )}
-                {onCancel && doc.estado !== 'ANULADO' && ['01', '03', 'FACTURA', 'BOLETA'].some((tipo) => String(doc.tipoDocumento || doc.tipoComprobante).toUpperCase().includes(tipo)) && (
+                {canUseSunatCancellation && onCancel && doc.estado !== 'ANULADO' && ['01', '03', 'FACTURA', 'BOLETA'].some((tipo) => String(doc.tipoDocumento || doc.tipoComprobante).toUpperCase().includes(tipo)) && (
                   <button
                     className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-500/15 dark:text-red-300"
                     onClick={() => onCancel(doc)}

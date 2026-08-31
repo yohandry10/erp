@@ -161,6 +161,39 @@ describe('DianFiscalService · aislamiento de transporte demo', () => {
     expect(JSON.stringify(update.mock.calls)).not.toContain('NO-DEBE-PERSISTIRSE');
     expect(persistEq).toHaveBeenCalledWith('tenant_id', 'tenant-real-co');
 
+    configRow.dian_resolucion_prefijo = '';
+    consultarRangosAutorizados.mockResolvedValueOnce({
+      rangos: [{
+        prefijo: '', desde: 1, hasta: 5000, resolucion: '18760000001',
+        fechaInicio: new Date('2026-01-01T05:00:00Z'),
+        fechaFin: new Date('2027-12-31T05:00:00Z'),
+        claveTecnica: 'NO-DEBE-PERSISTIRSE',
+      }],
+    });
+    await expect(service.probarConfiguracion('tenant-real-co')).resolves.toEqual(
+      expect.objectContaining({
+        ready: true,
+        numberingValidated: true,
+      }),
+    );
+
+    configRow.dian_resolucion_prefijo = 'ABCDE';
+    consultarRangosAutorizados.mockResolvedValueOnce({
+      rangos: [{
+        prefijo: 'ABCDE', desde: 1, hasta: 5000, resolucion: '18760000001',
+        fechaInicio: new Date('2026-01-01T05:00:00Z'),
+        fechaFin: new Date('2027-12-31T05:00:00Z'),
+      }],
+    });
+    await expect(service.probarConfiguracion('tenant-real-co')).resolves.toEqual(
+      expect.objectContaining({
+        ready: false,
+        numberingValidated: false,
+        blocker: 'DIAN_NUMBERING_NOT_VALIDATED',
+      }),
+    );
+    configRow.dian_resolucion_prefijo = 'SETP';
+
     consultarRangosAutorizados.mockResolvedValueOnce({
       rangos: [{
         prefijo: 'OTRO', desde: 1, hasta: 5000, resolucion: '18760000001',
@@ -359,6 +392,26 @@ describe('DianFiscalService · aislamiento de transporte demo', () => {
     );
     expect(result.valido).toBe(false);
     expect(result.errores).toContain('Número de factura fuera del rango autorizado por DIAN');
+  });
+
+  it('expone el número DIAN sin guion ni padding cuando la resolución no tiene prefijo', async () => {
+    const service = new DianFiscalService(
+      { get: jest.fn(() => undefined) } as any,
+      {} as any, {} as any, { configurar: jest.fn() } as any, {} as any,
+      { getTenantId: jest.fn(() => 'tenant-real-co') } as any,
+    );
+    jest.spyOn(service as any, 'loadTenantConfig').mockResolvedValue(runtime());
+    jest.spyOn(service as any, 'validarRangoAutorizado').mockResolvedValue(true);
+
+    const result = await service.validarDocumento({
+      tipoDocumento: '01', serie: '', numero: '7',
+      fechaEmision: new Date('2026-08-29T10:00:00-05:00'), moneda: 'COP',
+      emisor: { numeroDocumento: '9003739135' },
+      receptor: { numeroDocumento: '9012345678' }, items: [],
+      totales: { subtotal: 0, impuestos: 0, total: 0 },
+    } as any);
+
+    expect(result.numeroDocumento).toBe('7');
   });
 
   it('no declara una prueba lista si la base rechaza persistir su evidencia', async () => {

@@ -488,6 +488,44 @@ export class ConfigurationService {
     }
   }
 
+  private async normalizeDianPrefixPatch(
+    tenantId: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    if (!Object.prototype.hasOwnProperty.call(patch, 'dian_resolucion_prefijo')) {
+      return;
+    }
+
+    let current: Record<string, unknown> = {};
+    if (
+      !Object.prototype.hasOwnProperty.call(patch, 'pais')
+      && !Object.prototype.hasOwnProperty.call(patch, 'pais_id')
+    ) {
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('empresa_config')
+        .select('pais, pais_id')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (error) throw error;
+      current = (data ?? {}) as Record<string, unknown>;
+    }
+
+    const country = getActiveCountryByCode(patch.pais ?? current.pais)
+      ?? getActiveCountryById(Number(patch.pais_id ?? current.pais_id));
+    if (country?.codigo !== 'CO') {
+      throw new BadRequestException('El prefijo de resolución DIAN sólo está disponible para Colombia');
+    }
+
+    const prefix = String(patch.dian_resolucion_prefijo ?? '').trim().toUpperCase();
+    if (prefix && !/^[A-Z0-9]{1,4}$/.test(prefix)) {
+      throw new BadRequestException(
+        'El prefijo DIAN, cuando la resolución lo asigna, admite hasta 4 caracteres alfanuméricos',
+      );
+    }
+    patch.dian_resolucion_prefijo = prefix;
+  }
+
   private async assertColombiaCertificatePatch(
     tenantId: string,
     patch: Record<string, unknown>,
@@ -639,6 +677,7 @@ export class ConfigurationService {
     const atomic = this.requireAtomicContext(actorId, idempotencyKey);
     await this.assertArgentinaIssuerVatPatch(tenantId, patch);
     await this.normalizeColombiaTransportPatch(tenantId, patch);
+    await this.normalizeDianPrefixPatch(tenantId, patch);
     await this.assertColombiaCertificatePatch(tenantId, patch);
     await this.normalizeDianEndpointPatch(tenantId, patch);
     const { data, error } = await this.supabaseService.getClient().rpc(
@@ -874,7 +913,12 @@ export class ConfigurationService {
         if (!typedEmpresaConfig?.dian_tipo_contribuyente) addFiscalMissingItem('Tipo contribuyente DIAN');
         if (!typedEmpresaConfig?.dian_test_set_id) addFiscalMissingItem('Test Set ID DIAN');
         if (!typedEmpresaConfig?.dian_resolucion_numero) addFiscalMissingItem('Resolución DIAN');
-        if (!typedEmpresaConfig?.dian_resolucion_prefijo) addFiscalMissingItem('Prefijo DIAN');
+        const dianResolutionPrefix = String(
+          typedEmpresaConfig?.dian_resolucion_prefijo ?? '',
+        ).trim().toUpperCase();
+        if (dianResolutionPrefix && !/^[A-Z0-9]{1,4}$/.test(dianResolutionPrefix)) {
+          addFiscalMissingItem('Prefijo DIAN inválido (máximo 4 caracteres alfanuméricos)');
+        }
         if (typedEmpresaConfig?.dian_resolucion_desde == null) addFiscalMissingItem('Rango inicio DIAN');
         if (typedEmpresaConfig?.dian_resolucion_hasta == null) addFiscalMissingItem('Rango fin DIAN');
         if (!typedEmpresaConfig?.dian_resolucion_fecha_inicio) addFiscalMissingItem('Vigencia inicio DIAN');
@@ -1390,6 +1434,15 @@ export class ConfigurationService {
             url: config.dian_url,
           });
           config.dian_url = canonicalDianEndpoint;
+          const dianResolutionPrefix = String(
+            config.dian_resolucion_prefijo ?? '',
+          ).trim().toUpperCase();
+          if (dianResolutionPrefix && !/^[A-Z0-9]{1,4}$/.test(dianResolutionPrefix)) {
+            throw new Error(
+              'El prefijo DIAN, cuando la resolución lo asigna, admite hasta 4 caracteres alfanuméricos',
+            );
+          }
+          config.dian_resolucion_prefijo = dianResolutionPrefix;
         } catch (error) {
           throw new BadRequestException(
             error instanceof Error ? error.message : 'Configuración DIAN inválida',
@@ -1554,7 +1607,6 @@ export class ConfigurationService {
             config.dian_software_id,
             config.dian_software_pin,
             config.dian_resolucion_numero,
-            config.dian_resolucion_prefijo,
           ];
           if (requiredDianFields.some((value) => !value)) {
             throw new Error('DIAN activo requiere software, numeración y certificado aportados por el cliente');
@@ -1614,6 +1666,11 @@ export class ConfigurationService {
           configuration: config,
         }),
       };
+      if (paisCodigo === 'CO') {
+        configurationPatch.dian_resolucion_prefijo = String(
+          config.dian_resolucion_prefijo ?? '',
+        );
+      }
       if (canonicalDianEndpoint) {
         configurationPatch.dian_url = canonicalDianEndpoint;
       }
@@ -1682,7 +1739,6 @@ export class ConfigurationService {
         setIfPresent('dian_regimen_fiscal', config.dian_regimen_fiscal);
         setIfPresent('dian_tipo_contribuyente', config.dian_tipo_contribuyente);
         setIfPresent('dian_resolucion_numero', config.dian_resolucion_numero);
-        setIfPresent('dian_resolucion_prefijo', config.dian_resolucion_prefijo);
         setIfPresent('dian_resolucion_desde', config.dian_resolucion_desde, Number);
         setIfPresent('dian_resolucion_hasta', config.dian_resolucion_hasta, Number);
         setIfPresent('dian_resolucion_fecha_inicio', config.dian_resolucion_fecha_inicio);

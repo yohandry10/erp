@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { downloadCsv } from '@/lib/csv-export'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 type EstadoCxc = 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO'
 
@@ -141,7 +142,7 @@ export default function CuentasPorCobrarPage() {
       `cuentas-por-cobrar-${new Date().toISOString().slice(0, 10)}.csv`,
       ['Documento', 'Tipo', 'Cliente', 'Documento cliente', 'Emisión', 'Vencimiento', 'Moneda', 'Total', 'Saldo', 'Estado'],
       cuentas.map((cuenta) => [
-        [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || 'N/A',
+        formatFiscalDocumentNumber(country.paisCodigo, cuenta.serie, cuenta.numero, { fallback: 'N/A' }),
         cuenta.tipo_documento,
         cuenta.clientes?.razon_social,
         cuenta.clientes?.documento_numero,
@@ -414,7 +415,7 @@ export default function CuentasPorCobrarPage() {
                   </thead>
                   <tbody className="divide-y divide-cyan-400/10">
                     {cuentas.map((cuenta) => {
-                      const numeroCompleto = [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || 'N/A'
+                      const numeroCompleto = formatFiscalDocumentNumber(country.paisCodigo, cuenta.serie, cuenta.numero, { fallback: 'N/A' })
                       const diasAtraso = computeDiasAtraso(cuenta.fecha_vencimiento)
                       const saldo = Number(cuenta.saldo ?? 0)
                       const estadoNormalizado = normalizeEstadoCxc(cuenta.estado)

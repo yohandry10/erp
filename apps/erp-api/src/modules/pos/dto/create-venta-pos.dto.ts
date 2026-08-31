@@ -10,6 +10,7 @@ import {
   MaxLength,
   Min,
   IsObject,
+  IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -210,6 +211,12 @@ export class CreateVentaPosDto {
   @IsOptional()
   @IsString()
   metodo_pago_id?: string;
+
+  /** Plazo fiscal DIAN para ventas a crédito; si se omite usa la empresa. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  plazo_pago_dias?: number;
 
   @IsOptional()
   @IsString()

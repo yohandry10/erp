@@ -10,6 +10,9 @@ export interface DocumentoDetalleFiscal {
   valor_venta: number;
   impuesto_igv: number;
   total_item: number;
+  afectacion_igv?: string | null;
+  tipo_afectacion_igv?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface DocumentoFiscalCliente {

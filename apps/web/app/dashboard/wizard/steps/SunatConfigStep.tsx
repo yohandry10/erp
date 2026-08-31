@@ -600,9 +600,25 @@ export function SunatConfigStep() {
               </div>
               <div>
                 <Label htmlFor="dian_resolucion_prefijo" className={labelClass}>
-                  Prefijo <span className={requiredClass}>*</span>
+                  Prefijo (si la resolución lo asigna)
                 </Label>
-                <Input id="dian_resolucion_prefijo" value={state.configuration.dian_resolucion_prefijo || ''} onChange={(e) => updateConfiguration({ dian_resolucion_prefijo: e.target.value.toUpperCase() })} placeholder="FE" maxLength={4} className={inputClass} />
+                <Input
+                  id="dian_resolucion_prefijo"
+                  value={state.configuration.dian_resolucion_prefijo || ''}
+                  onChange={(e) => updateConfiguration({
+                    dian_resolucion_prefijo: e.target.value
+                      .toUpperCase()
+                      .replace(/[^A-Z0-9]/g, '')
+                      .slice(0, 4),
+                  })}
+                  placeholder="Ej. FE (opcional)"
+                  maxLength={4}
+                  inputMode="text"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Déjalo vacío cuando la resolución DIAN no tenga prefijo; si existe, admite hasta 4 caracteres alfanuméricos.
+                </p>
               </div>
               <div>
                 <Label htmlFor="dian_resolucion_desde" className={labelClass}>

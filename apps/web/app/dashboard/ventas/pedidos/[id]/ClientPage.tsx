@@ -17,6 +17,7 @@ import { usePermission } from '@/hooks/use-permission'
 import CpeA4PreviewModal from '@/components/cpe/CpeA4PreviewModal'
 import { Button } from '@/components/ui/button'
 import { Eye } from 'lucide-react'
+import { useCountryContext } from '@/hooks/use-country-context'
 
 const ESTADO_COLORS: Record<EstadoPedido, { bg: string; text: string }> = {
   [EstadoPedido.PENDIENTE]: { bg: '#fef3c7', text: '#92400e' },
@@ -43,6 +44,7 @@ export default function PedidoDetailPage() {
   const params = useParams()
   const { get, post } = useApi()
   const { config: empresaConfig, loading: empresaConfigLoading } = useEmpresaConfig()
+  const country = useCountryContext()
 
   const [pedido, setPedido] = useState<PedidoVenta | null>(null)
   const [loading, setLoading] = useState(true)
@@ -140,8 +142,12 @@ export default function PedidoDetailPage() {
   const clienteEsRuc =
     ['RUC', '6'].includes(clienteTipoDocumento) &&
     /^\d{11}$/.test(String(clienteDocumento ?? ''))
-  const documentType = clienteEsRuc ? 'FACTURA' : 'BOLETA'
-  const documentTypeCode = clienteEsRuc ? '01' : '03'
+  // Colombia no tiene una "boleta" equivalente a la 03 de SUNAT. El backend
+  // emite siempre la factura de venta DIAN 01 y el receptor se expresa con su
+  // perfil tributario (NIT B2B o consumidor final), no cambiando el tipo CPE.
+  const esColombia = country.paisCodigo === 'CO'
+  const documentType = esColombia || clienteEsRuc ? 'FACTURA' : 'BOLETA'
+  const documentTypeCode = esColombia || clienteEsRuc ? '01' : '03'
 
   const facturaButtonConfig = {
     usar_flujo_logistica: empresaConfig?.usar_flujo_logistica ?? false,

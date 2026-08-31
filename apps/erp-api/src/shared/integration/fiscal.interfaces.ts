@@ -54,6 +54,28 @@ export interface DianGenerationContext {
   operationCode?: string;
 }
 
+/**
+ * Intención interna para validar la autorización oficial de una factura antes
+ * de consumir un correlativo. No contiene ni acepta TechnicalKey, PIN o PFX;
+ * esos secretos se resuelven exclusivamente dentro de DianFiscalService.
+ */
+export interface DianInvoiceAuthorizationIntent {
+  documentType: '01';
+  series: string;
+  issueDate: string;
+  issuerIdentity: {
+    contractVersion: 529;
+    taxId: string;
+    certificateSha256: string;
+    signingConfigSha256: string;
+  };
+  taxes: {
+    iva: number;
+    inc: number;
+    ica: number;
+  };
+}
+
 export type DianReceiverTaxProfile =
   | {
       profile: 'CONSUMIDOR_FINAL';
@@ -124,6 +146,13 @@ export interface DocumentoElectronico {
     isDemo: boolean;
     fixtureSource?: string;
     simulated?: boolean;
+    /** Identidad congelada de emisor/config para notas DIAN 91/92. */
+    dianIssuerIdentity?: {
+      contractVersion: 529;
+      taxId: string;
+      certificateSha256: string;
+      signingConfigSha256: string;
+    };
     /** Claim interno para sellar XML/CUFE antes del I/O externo. */
     deliveryOperation?: {
       tenantId: string;

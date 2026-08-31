@@ -9,7 +9,7 @@ import { SupabaseService } from '../shared/supabase/supabase.service';
 import { CacheInvalidationService } from '../shared/cache/cache-invalidation.service';
 import { CpeService } from './cpe/cpe.service';
 import { validateArgentinaTaxId } from './fiscal/arca-fiscal.service';
-import { validateColombiaNit } from './paises/initial-country';
+import { getActiveCountryById, validateColombiaNit } from './paises/initial-country';
 import {
   ActualizarDocumentoManualDto,
   CrearDocumentoManualDto,
@@ -301,6 +301,7 @@ export class DocumentosService {
   ) {
     const tenant = this.requireTenantId(tenantId);
     const actor = this.requireActorId(userId);
+    await this.assertLegacyFiscalEndpointAllowed(tenant);
     const existing = await this.resolveCpeVinculado(id, tenant);
     if (existing) {
       const persisted = await this.cpeService.findOne(existing.id, tenant);
@@ -316,7 +317,10 @@ export class DocumentosService {
     const documento = (await this.getDocumento(id, tenant)).data as DocumentoConDetalles;
     const dto = await this.buildCpeDto(documento, tenant, idempotencyKey);
     const cpe = await this.cpeService.create(dto, tenant, actor);
-    if (!cpe.id || !cpe.xml_firmado) {
+    const xmlFirmado = cpe.id && !cpe.xml_firmado
+      ? await this.cpeService.getSignedXml(cpe.id, tenant)
+      : cpe.xml_firmado;
+    if (!cpe.id || !xmlFirmado) {
       throw new BadRequestException('La emisión no devolvió un CPE firmado');
     }
     await this.invalidateDocumentoCache(tenant);
@@ -325,7 +329,7 @@ export class DocumentosService {
       data: {
         cpe_id: cpe.id,
         documento_id: (cpe as any).documento_id ?? id,
-        xml_content: cpe.xml_firmado,
+        xml_content: xmlFirmado,
         codigo_hash: cpe.hash,
       },
       idempotent: false,
@@ -341,6 +345,7 @@ export class DocumentosService {
   ) {
     const tenant = this.requireTenantId(tenantId);
     this.requireActorId(userId);
+    await this.assertLegacyFiscalEndpointAllowed(tenant);
     const cpe = await this.resolveCpeVinculado(id, tenant);
     if (!cpe) throw new ConflictException('El documento no tiene un CPE firmado vinculado');
     const result = await this.cpeService.resendToOse(cpe.id, tenant, {
@@ -511,16 +516,43 @@ export class DocumentosService {
     return verificador === Number(ruc[10]);
   }
 
-  private async obtenerContextoPaisTenant(tenantId: string): Promise<{ pais: 'PE' | 'AR' | 'CO' }> {
+  private async obtenerContextoPaisTenant(
+    tenantId: string,
+    requireConfigured = false,
+  ): Promise<{ pais: 'PE' | 'AR' | 'CO' }> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('empresa_config')
-      .select('pais')
+      .select('pais, pais_id')
       .eq('tenant_id', tenantId)
       .maybeSingle();
     if (error) throw new BadRequestException(`No se pudo resolver el país fiscal: ${error.message}`);
-    const raw = String(data?.pais ?? 'PE').toUpperCase();
-    return { pais: raw === 'AR' ? 'AR' : raw === 'CO' ? 'CO' : 'PE' };
+    const raw = String(data?.pais ?? '').trim().toUpperCase();
+    const byCode = ['PE', 'AR', 'CO'].includes(raw) ? raw as 'PE' | 'AR' | 'CO' : null;
+    const byId = getActiveCountryById(data?.pais_id)?.codigo ?? null;
+    if (byCode && byId && byCode !== byId) {
+      throw new ConflictException('La configuración fiscal tiene país y pais_id inconsistentes');
+    }
+    const pais = byCode ?? byId;
+    if (pais) return { pais };
+    if (requireConfigured) {
+      throw new ConflictException(
+        'No se pudo determinar el país fiscal del tenant; la operación fiscal legacy queda bloqueada',
+      );
+    }
+    // Compatibilidad de lecturas/validaciones históricas no fiscales. Las rutas
+    // de emisión y envío invocan este resolver en modo estricto.
+    return { pais: 'PE' };
+  }
+
+  private async assertLegacyFiscalEndpointAllowed(tenantId: string): Promise<void> {
+    const { pais } = await this.obtenerContextoPaisTenant(tenantId, true);
+    if (pais === 'CO') {
+      throw new ConflictException(
+        'En Colombia la emisión y transmisión DIAN se realizan exclusivamente desde el Centro CPE; '
+        + 'el endpoint fiscal legado de Documentos está deshabilitado',
+      );
+    }
   }
 
   async getSeries(tenantId?: string) {

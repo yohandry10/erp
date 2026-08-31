@@ -611,6 +611,9 @@ export function useWizard() {
       if (country.paisCodigo === 'CO') {
         if (state.configuration.dian_activo !== true) return true
         const homologacion = (state.configuration.dian_environment || 'HOMOLOGACION') === 'HOMOLOGACION'
+        const prefijoResolucion = String(
+          state.configuration.dian_resolucion_prefijo || '',
+        ).trim().toUpperCase()
         return !!(
           state.configuration.dian_activo &&
           state.configuration.dian_url &&
@@ -618,7 +621,7 @@ export function useWizard() {
           state.configuration.dian_software_pin &&
           (!homologacion || state.configuration.dian_test_set_id) &&
           state.configuration.dian_resolucion_numero &&
-          state.configuration.dian_resolucion_prefijo &&
+          (!prefijoResolucion || /^[A-Z0-9]{1,4}$/.test(prefijoResolucion)) &&
           state.configuration.dian_resolucion_desde &&
           state.configuration.dian_resolucion_hasta &&
           state.configuration.dian_resolucion_fecha_inicio &&

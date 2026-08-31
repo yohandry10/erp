@@ -186,7 +186,7 @@ describe('CotizacionesService', () => {
 
       expect(result.success).toBe(true);
       expect(result.data.pedido_id).toBe('ped-123');
-      expect(mockClient.rpc).toHaveBeenCalledWith('convertir_cotizacion_comercial_a_pedido_tx', expect.objectContaining({
+      expect(mockClient.rpc).toHaveBeenCalledWith('convertir_cotizacion_comercial_a_pedido_pago_tx_531', expect.objectContaining({
         p_cotizacion_id: 'cot-123',
         p_tenant_id: tenantId,
       }));
@@ -243,7 +243,7 @@ describe('CotizacionesService', () => {
       await expect(service.convertirAPedido('cot-123', convertirDto, tenantId, userId))
         .rejects.toThrow('No se puede convertir una cotización vencida');
       expect(mockClient.rpc).toHaveBeenCalledWith(
-        'convertir_cotizacion_comercial_a_pedido_tx',
+        'convertir_cotizacion_comercial_a_pedido_pago_tx_531',
         expect.objectContaining({ p_cotizacion_id: 'cot-123', p_tenant_id: tenantId }),
       );
     });

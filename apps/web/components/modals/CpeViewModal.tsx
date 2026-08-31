@@ -17,6 +17,7 @@ import {
 import { useCountryContext } from '@/hooks/use-country-context'
 import { parseDateLocal } from '@/lib/date-utils'
 import { multiplicarMoneda } from '@/lib/format-utils'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 interface CpeViewModalProps {
   isOpen: boolean
@@ -139,7 +140,12 @@ export default function CpeViewModal({
       return
     }
 
-    const numeroFormateado = `${cpeData.serie}-${(typeof cpeData.numero === 'number' ? cpeData.numero : parseInt(String(cpeData.numero || '0'), 10)).toString().padStart(8, '0')}`
+    const numeroFormateado = formatFiscalDocumentNumber(
+      country.paisCodigo,
+      cpeData.serie,
+      cpeData.numero,
+      { padNonColombiaTo: 8 },
+    )
 
     // Generar HTML del logo si existe
     const logoUrl = safeImageUrl(cpeData.logo_url)
@@ -288,6 +294,15 @@ export default function CpeViewModal({
 
   if (!isOpen) return null
 
+  const numeroVisible = cpeData
+    ? formatFiscalDocumentNumber(
+        country.paisCodigo,
+        cpeData.serie,
+        cpeData.numero,
+        { padNonColombiaTo: 8 },
+      )
+    : ''
+
   return (
     <div
       className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
@@ -309,14 +324,7 @@ export default function CpeViewModal({
               </Badge>
               <h2 className="text-xl font-semibold tracking-normal text-foreground">{getDocumentTypeName()}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {cpeData
-                  ? `${cpeData.serie}-${(typeof cpeData.numero === 'number'
-                      ? cpeData.numero
-                      : parseInt(String(cpeData.numero || '0'), 10)
-                    )
-                      .toString()
-                    .padStart(8, '0')}`
-                  : ''}
+                {numeroVisible}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -365,13 +373,17 @@ export default function CpeViewModal({
                   <div className="rounded-md border border-cyan-400/25 bg-cyan-400/10 p-4 text-center">
                     <h2 className="text-sm font-semibold uppercase text-primary">{getDocumentTypeName()}</h2>
                     <p className="mt-2 text-xl font-semibold text-foreground">
-                      {cpeData.serie} -{' '}
-                      {(typeof cpeData.numero === 'number'
-                        ? cpeData.numero
-                        : parseInt(String(cpeData.numero || '0'), 10)
-                      )
-                        .toString()
-                        .padStart(8, '0')}
+                      {isColombia ? numeroVisible : (
+                        <>
+                          {cpeData.serie} -{' '}
+                          {(typeof cpeData.numero === 'number'
+                            ? cpeData.numero
+                            : parseInt(String(cpeData.numero || '0'), 10)
+                          )
+                            .toString()
+                            .padStart(8, '0')}
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="mt-4 space-y-2 text-sm text-muted-foreground">

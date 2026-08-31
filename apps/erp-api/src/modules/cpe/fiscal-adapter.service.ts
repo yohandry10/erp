@@ -16,6 +16,8 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { FiscalServiceFactory } from '../fiscal/fiscal-service.factory';
 import {
   ConsultaEstado,
+  DianGenerationContext,
+  DianInvoiceAuthorizationIntent,
   DocumentoElectronico,
   FiscalResponse,
 } from '../../shared/integration/fiscal.interfaces';
@@ -43,6 +45,69 @@ export class FiscalAdapterService {
     private readonly oseApiService: OseApiFiscalService,
     private readonly oseService: OseService,
   ) {}
+
+  /**
+   * Valida la autorización oficial DIAN antes de consumir numeración local.
+   * El TechnicalKey/PIN sólo existen en memoria dentro del servicio fiscal y
+   * nunca se serializan como metadata ni se devuelven al controlador.
+   */
+  async prepararContextoDianFacturaAntesDeReserva(
+    intent: DianInvoiceAuthorizationIntent,
+    tenantId: string,
+    expectedCountryCode = 'CO',
+  ): Promise<DianGenerationContext> {
+    const paisId = await this.obtenerPaisTenant(tenantId);
+    this.assertExpectedCountry(paisId, expectedCountryCode);
+    const emisionConfig = await this.obtenerEmisionConfig(tenantId);
+    if (emisionConfig.isDemo) {
+      throw new ServiceUnavailableException(
+        'La demo no consulta ni consume una autorización oficial DIAN.',
+      );
+    }
+    const fiscalService = this.fiscalServiceFactory.getServiceByPaisId(paisId);
+    const dianService = fiscalService as typeof fiscalService & {
+      prepararContextoFacturaAntesDeReserva?: (
+        input: DianInvoiceAuthorizationIntent,
+        scopedTenantId: string,
+      ) => Promise<DianGenerationContext>;
+    };
+    if (expectedCountryCode.trim().toUpperCase() !== 'CO'
+        || typeof dianService.prepararContextoFacturaAntesDeReserva !== 'function') {
+      throw new ServiceUnavailableException(
+        'El preflight oficial de numeración DIAN no está disponible.',
+      );
+    }
+    return dianService.prepararContextoFacturaAntesDeReserva(intent, tenantId);
+  }
+
+  /** Genera y firma el UBL del país sin efectuar I/O con la autoridad fiscal. */
+  async generarYFirmarDocumentoSinTransmitir(
+    documento: DocumentoElectronico,
+    tenantId: string,
+    expectedCountryCode: string,
+  ): Promise<string> {
+    const paisId = await this.obtenerPaisTenant(tenantId);
+    this.assertExpectedCountry(paisId, expectedCountryCode);
+    const emisionConfig = await this.obtenerEmisionConfig(tenantId);
+    if (emisionConfig.isDemo) {
+      throw new ServiceUnavailableException(
+        'La demo no genera una firma fiscal DIAN ni fabrica aceptación de la autoridad.',
+      );
+    }
+    const fiscalService = this.fiscalServiceFactory.getServiceByPaisId(paisId);
+    const coherentDianSigner = fiscalService as typeof fiscalService & {
+      generarYFirmarDocumentoSinTransmitir?: (
+        input: DocumentoElectronico,
+        scopedTenantId: string,
+      ) => Promise<string>;
+    };
+    if (expectedCountryCode.trim().toUpperCase() === 'CO'
+        && typeof coherentDianSigner.generarYFirmarDocumentoSinTransmitir === 'function') {
+      return coherentDianSigner.generarYFirmarDocumentoSinTransmitir(documento, tenantId);
+    }
+    const xml = await fiscalService.generarXML(documento);
+    return fiscalService.firmarXML(xml);
+  }
 
   /**
    * Envía un documento electrónico al servicio fiscal correcto según el país del tenant

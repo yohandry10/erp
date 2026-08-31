@@ -17,7 +17,9 @@ describe('AppController runtime contract', () => {
       RENDER_GIT_COMMIT: 'render-sha-492',
       RENDER_SERVICE_ID: 'srv-local-492',
       APP_VERSION: '1.2.3',
-      REQUIRED_DATABASE_SCHEMA_VERSION: '502',
+      // Simula una variable rezagada en el proveedor de despliegue. El binario
+      // no debe aceptar un esquema inferior al contractual compilado.
+      REQUIRED_DATABASE_SCHEMA_VERSION: '519',
     };
     const config = { get: jest.fn((key: string) => configValues[key]) };
     const cache = {
@@ -46,10 +48,28 @@ describe('AppController runtime contract', () => {
       }),
     }));
     expect(rpc).toHaveBeenCalledWith('outbox_runtime_health_492', expect.objectContaining({
-      p_required_schema_version: 502,
+      p_required_schema_version: 532,
     }));
     expect(rpc).not.toHaveBeenCalledWith('pgrst_reload_schema', expect.anything());
     expect(cache.getRuntimeHealth).toHaveBeenCalledTimes(1);
+  });
+
+  it('permite que el despliegue eleve, pero no rebaje, el piso contractual', async () => {
+    const { controller, rpc } = build();
+    (controller as any).configService.get.mockImplementation((key: string) => (
+      key === 'REQUIRED_DATABASE_SCHEMA_VERSION' ? '533' : {
+        NODE_ENV: 'production',
+        RENDER_GIT_COMMIT: 'render-sha-492',
+        RENDER_SERVICE_ID: 'srv-local-492',
+        APP_VERSION: '1.2.3',
+      }[key]
+    ));
+
+    await controller.getReadyHealth();
+
+    expect(rpc).toHaveBeenCalledWith('outbox_runtime_health_492', expect.objectContaining({
+      p_required_schema_version: 533,
+    }));
   });
 
   it.each([

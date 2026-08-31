@@ -34,7 +34,7 @@ export class AplicarNotaCreditoDto {
   notas?: string;
 
   @IsOptional()
-  @IsIn(['04', '05', '08', '09', '10', '11', '12', '13'])
+  @IsIn(['1', '2', '3', '4', '5', '04', '05', '08', '09', '10', '11', '12', '13'])
   codigo_motivo?: string;
 
   @IsString()

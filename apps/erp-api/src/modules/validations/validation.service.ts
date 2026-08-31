@@ -411,6 +411,7 @@ export class ValidationService {
       let maxItems = 999; // Default SUNAT limit
       let maxAmount = 999999999.99; // Default SUNAT limit
       let fiscalAuthority = 'SUNAT';
+      let fiscalCountryCode = 'PE';
 
       if (tenantId) {
         const { data: empresa } = await this.supabaseService
@@ -447,6 +448,7 @@ export class ValidationService {
               : pais?.codigo_iso === 'AR'
                 ? 'ARCA'
                 : 'SUNAT';
+          fiscalCountryCode = String(pais?.codigo_iso ?? 'PE').trim().toUpperCase();
         }
       }
 
@@ -484,10 +486,31 @@ export class ValidationService {
         }
       }
 
-      // Validate serie format (4 alphanumeric characters)
-      if (document.serie) {
-        const seriePattern = /^[A-Z0-9]{4}$/;
-        if (!seriePattern.test(document.serie)) {
+      // SUNAT usa cuatro caracteres; DIAN admite prefijo opcional de hasta
+      // cuatro y ARCA un punto de venta numérico de cinco. La validación
+      // genérica anterior rechazaba prefijos DIAN reales como `FV`.
+      const serie = String(document.serie ?? '').trim().toUpperCase();
+      if (fiscalCountryCode === 'CO') {
+        if (!/^[A-Z0-9]{0,4}$/.test(serie)) {
+          errors.push({
+            field: 'serie',
+            code: ValidationErrorCode.INVALID_SERIE_FORMAT,
+            message: 'El prefijo DIAN es opcional y, cuando existe, admite hasta 4 caracteres alfanuméricos',
+            severity: 'error',
+          });
+          isValid = false;
+        }
+      } else if (fiscalCountryCode === 'AR') {
+        if (serie && (!/^\d{5}$/.test(serie) || Number(serie) < 1)) {
+          errors.push({
+            field: 'serie',
+            code: ValidationErrorCode.INVALID_SERIE_FORMAT,
+            message: 'El punto de venta ARCA debe tener 5 dígitos',
+            severity: 'error',
+          });
+          isValid = false;
+        }
+      } else if (serie && !/^[A-Z0-9]{4}$/.test(serie)) {
           errors.push({
             field: 'serie',
             code: ValidationErrorCode.INVALID_SERIE_FORMAT,
@@ -495,7 +518,6 @@ export class ValidationService {
             severity: 'error',
           });
           isValid = false;
-        }
       }
 
       // Validate correlative number format (max 8 digits)
@@ -509,7 +531,7 @@ export class ValidationService {
             severity: 'error',
           });
           isValid = false;
-        } else if (correlativoStr.length > 8) {
+        } else if (fiscalCountryCode !== 'CO' && correlativoStr.length > 8) {
           errors.push({
             field: 'correlativo',
             code: ValidationErrorCode.INVALID_CORRELATIVE_FORMAT,
