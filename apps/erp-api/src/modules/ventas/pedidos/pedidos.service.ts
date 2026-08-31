@@ -11,6 +11,7 @@ import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { calcularDesgloseIgv } from '../../../shared/utils/igv-afectacion.util';
 import { canUseRuntimeDemoCertificate } from '../../../shared/utils/demo-certificate.utils';
 import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
+import { tieneEntradaPagoPedido } from './pedido-payment.util';
 
 interface ConfiguracionEmpresa {
   usar_flujo_logistica: boolean;
@@ -140,9 +141,18 @@ export class PedidosService {
     });
 
     // 🔴 CRÍTICO FIX: Uso de RPC para transacción atómica (Header + Detalle)
-    const { data: rpcResult, error: rpcError } = await client.rpc('crear_pedido_comercial_tx', {
+    const paymentIntent = tieneEntradaPagoPedido(createPedidoDto)
+      ? {
+          condicion_pago: createPedidoDto.condicion_pago,
+          medio_pago: createPedidoDto.medio_pago,
+          plazo_pago_dias: createPedidoDto.plazo_pago_dias,
+          fecha_vencimiento: createPedidoDto.fecha_vencimiento,
+        }
+      : null;
+    const { data: rpcResult, error: rpcError } = await client.rpc('crear_pedido_comercial_pago_tx_531', {
       p_pedido: pedidoData,
-      p_detalle: detalleData
+      p_detalle: detalleData,
+      p_payment_intent: paymentIntent,
     });
 
     if (rpcError) {
@@ -609,11 +619,20 @@ export class PedidosService {
 
     }
 
-    const { data: pedidoActualizadoRpc, error } = await client.rpc('actualizar_pedido_comercial_tx', {
+    const paymentIntent = tieneEntradaPagoPedido(updatePedidoDto)
+      ? {
+          condicion_pago: updatePedidoDto.condicion_pago,
+          medio_pago: updatePedidoDto.medio_pago,
+          plazo_pago_dias: updatePedidoDto.plazo_pago_dias,
+          fecha_vencimiento: updatePedidoDto.fecha_vencimiento,
+        }
+      : null;
+    const { data: pedidoActualizadoRpc, error } = await client.rpc('actualizar_pedido_comercial_pago_tx_531', {
       p_pedido_id: id,
       p_tenant_id: tenantId,
       p_patch: updateData,
       p_detalle: detalleData,
+      p_payment_intent: paymentIntent,
     });
 
     if (error) {

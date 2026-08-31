@@ -31,9 +31,20 @@ BEGIN
   ---------------------------------------------------------------------------
   -- 1. La funcion del POS escribe la afectacion en el metadata del detalle
   ---------------------------------------------------------------------------
+  -- Desde la 530 la frontera publica es un wrapper que enlaza la reserva DIAN
+  -- y la implementacion de la 521 queda preservada con nombre explicito. Este
+  -- verificador debe inspeccionar esa implementacion, que es donde se arma el
+  -- INSERT del detalle, y seguir funcionando antes de que exista la 530.
   SELECT pg_get_functiondef(p.oid) INTO v_fuente
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-  WHERE n.nspname = 'public' AND p.proname = 'finalizar_cpe_pos_tx';
+  WHERE n.nspname = 'public'
+    AND p.proname = CASE
+      WHEN to_regprocedure(
+        'public.finalizar_cpe_pos_tx_521_legacy_530(uuid,uuid,uuid,jsonb,text)'
+      ) IS NOT NULL
+        THEN 'finalizar_cpe_pos_tx_521_legacy_530'
+      ELSE 'finalizar_cpe_pos_tx'
+    END;
 
   IF v_fuente IS NULL THEN
     RAISE EXCEPTION 'VERIFY_521: no existe public.finalizar_cpe_pos_tx';

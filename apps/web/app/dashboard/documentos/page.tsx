@@ -14,11 +14,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
 import { buildApiUrl } from '@/lib/api-url'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 interface Documento {
   id: string
   tipo_documento: string
-  serie: string
+  serie?: string
   numero: string
   fecha_emision: string
   receptor_numero_doc: string
@@ -134,9 +135,10 @@ export default function DocumentosPage() {
 
   const showSuccessToast = (message: string) => toast({ title: 'Operacion completada', description: message })
   const showErrorToast = (message: string) => toast({ title: 'No se pudo completar', description: message, variant: 'destructive' })
+  const openCpeCenter = () => window.location.assign('/dashboard/cpe/')
   const openNewDocumentFlow = () => {
-    if (isArgentina) {
-      window.location.assign('/dashboard/cpe/')
+    if (isArgentina || isColombia) {
+      openCpeCenter()
       return
     }
     setSelectedDocumento(null)
@@ -246,7 +248,7 @@ export default function DocumentosPage() {
   const getTipoDocumentoDisplay = (tipo: string) => {
     const tipos: Record<string, string> = {
       FACTURA: isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura',
-      BOLETA: isArgentina ? 'Factura B' : isColombia ? 'Documento equivalente' : 'Boleta',
+      BOLETA: isArgentina ? 'Factura B' : isColombia ? 'Registro tipo boleta (legado)' : 'Boleta',
       NOTA_CREDITO: 'Nota de Credito',
       NOTA_DEBITO: 'Nota de Debito',
       CONTRATO: 'Contrato',
@@ -274,10 +276,15 @@ export default function DocumentosPage() {
   const statCards: StatCard[] = [
     { label: 'Total documentos', value: stats?.totalDocumentos || 0, description: 'Registrados', icon: FileText },
     { label: 'Facturas', value: stats?.facturas || 0, description: 'Emitidas', icon: FileText },
-    { label: isArgentina ? 'Facturas B' : isColombia ? 'Documentos equivalentes' : 'Boletas', value: stats?.boletas || 0, description: 'Emitidos', icon: FileText },
+    { label: isArgentina ? 'Facturas B' : isColombia ? 'Boletas legacy' : 'Boletas', value: stats?.boletas || 0, description: isColombia ? 'Históricas' : 'Emitidos', icon: FileText },
     { label: 'Notas credito', value: stats?.notasCredito || 0, description: 'Notas emitidas', icon: FileText },
     { label: 'Contratos', value: stats?.contratos || 0, description: 'Registrados', icon: FileText },
-    { label: 'Pendientes envio', value: stats?.pendientesEnvio || 0, description: `Por enviar a ${country.servicioFiscal}`, icon: Send },
+    {
+      label: isColombia ? 'Pendientes legacy' : 'Pendientes envio',
+      value: stats?.pendientesEnvio || 0,
+      description: isColombia ? 'Gestionar en Centro CPE' : `Por enviar a ${country.servicioFiscal}`,
+      icon: Send,
+    },
   ]
 
   if (documentosLoading && documentos.length === 0) {
@@ -305,7 +312,7 @@ export default function DocumentosPage() {
                 {isArgentina
                   ? 'Repositorio de facturas A/B, notas, contratos y documentos emitidos mediante ARCA.'
                   : isColombia
-                    ? 'Borradores fiscales, representaciones gráficas y contratos; la validación DIAN permanece pendiente de homologación.'
+                    ? 'Repositorio histórico de documentos y representaciones. La emisión, firma y transmisión DIAN se gestionan exclusivamente desde el Centro CPE.'
                     : `Facturas, boletas, notas y contratos con validación ${country.servicioFiscal}.`}
               </p>
             </div>
@@ -316,7 +323,7 @@ export default function DocumentosPage() {
               </Button>
               <Button type="button" onClick={openNewDocumentFlow} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
                 <Plus className="h-4 w-4" />
-                {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Crear borrador fiscal' : 'Crear documento'}
+                {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Ir al Centro CPE' : 'Crear documento'}
               </Button>
             </div>
           </div>
@@ -349,7 +356,7 @@ export default function DocumentosPage() {
               <select className={inputClass} value={filters.tipo_documento} onChange={(event) => setFilters((prev) => ({ ...prev, tipo_documento: event.target.value }))}>
                 <option value="">Todos los tipos</option>
                 <option value="FACTURA">Facturas</option>
-                <option value="BOLETA">{isArgentina ? 'Facturas B' : isColombia ? 'Documentos equivalentes' : 'Boletas'}</option>
+                <option value="BOLETA">{isArgentina ? 'Facturas B' : isColombia ? 'Boletas legacy' : 'Boletas'}</option>
                 <option value="NOTA_CREDITO">Notas de Credito</option>
                 <option value="NOTA_DEBITO">Notas de Debito</option>
                 <option value="CONTRATO">Contratos</option>
@@ -402,7 +409,7 @@ export default function DocumentosPage() {
             </div>
             <Button type="button" onClick={openNewDocumentFlow} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
               <Plus className="h-4 w-4" />
-              {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Nuevo borrador fiscal' : 'Nuevo documento'}
+              {isArgentina ? 'Emitir en ARCA' : isColombia ? 'Ir al Centro CPE' : 'Nuevo documento'}
             </Button>
           </CardHeader>
           <CardContent className="p-0">
@@ -414,12 +421,12 @@ export default function DocumentosPage() {
                   {isArgentina
                     ? 'Los comprobantes fiscales se emiten desde el módulo ARCA y aparecen aquí como documentos.'
                     : isColombia
-                      ? 'Comienza preparando tu primer documento; todavía no se transmitirá a DIAN.'
+                      ? 'Los comprobantes DIAN se crean en el Centro CPE y luego aparecen aquí como historial descargable.'
                       : 'Comienza creando tu primer documento.'}
                 </p>
                 <Button type="button" onClick={openNewDocumentFlow} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
                   <Plus className="h-4 w-4" />
-                  {isArgentina ? 'Ir a Comprobantes ARCA' : isColombia ? 'Crear borrador fiscal' : 'Crear primer documento'}
+                  {isArgentina ? 'Ir a Comprobantes ARCA' : isColombia ? 'Ir al Centro CPE' : 'Crear primer documento'}
                 </Button>
               </div>
             ) : (
@@ -440,7 +447,9 @@ export default function DocumentosPage() {
                     {documentos.map((documento) => (
                       <tr key={documento.id} className="bg-card/35 text-foreground/90 transition hover:bg-card/70">
                         <td className="px-4 py-3 font-semibold text-foreground">{getTipoDocumentoDisplay(documento.tipo_documento)}</td>
-                        <td className="px-4 py-3 font-mono font-semibold text-foreground">{documento.serie}-{documento.numero}</td>
+                        <td className="px-4 py-3 font-mono font-semibold text-foreground">
+                          {formatFiscalDocumentNumber(country.paisCodigo, documento.serie, documento.numero)}
+                        </td>
                         <td className="px-4 py-3 text-muted-foreground">{parseDateLocal(documento.fecha_emision).toLocaleDateString(country.locale || 'es-PE')}</td>
                         <td className="px-4 py-3">
                           <div className="font-semibold text-foreground">{documento.receptor_razon_social}</div>
@@ -456,37 +465,51 @@ export default function DocumentosPage() {
                           <div className="flex flex-wrap justify-end gap-2">
                             {documento.estado === 'BORRADOR' && (
                               <>
-                                {!isArgentina && ['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
-                                  <Button type="button" size="sm" onClick={() => generarXML(documento.id)} className="gap-1 bg-blue-600 text-white hover:bg-blue-500">
+                                {isColombia ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={openCpeCenter}
+                                    className="gap-1 bg-blue-600 text-white hover:bg-blue-500"
+                                  >
                                     <FileText className="h-4 w-4" />
-                                    XML
+                                    Gestionar en Centro CPE
                                   </Button>
+                                ) : (
+                                  <>
+                                    {!isArgentina && ['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
+                                      <Button type="button" size="sm" onClick={() => generarXML(documento.id)} className="gap-1 bg-blue-600 text-white hover:bg-blue-500">
+                                        <FileText className="h-4 w-4" />
+                                        XML
+                                      </Button>
+                                    )}
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedDocumento(documento)
+                                        setIsModalOpen(true)
+                                      }}
+                                      variant="outline"
+                                      className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                      Editar
+                                    </Button>
+                                  </>
                                 )}
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedDocumento(documento)
-                                    setIsModalOpen(true)
-                                  }}
-                                  variant="outline"
-                                  className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                  Editar
-                                </Button>
                               </>
                             )}
                             {documento.estado === 'EMITIDO' && (
                               <>
-                                {['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
+                                {!isColombia && ['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
                                   <Button type="button" size="sm" onClick={() => enviarFiscal(documento.id)} className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500">
                                     <Send className="h-4 w-4" />
                                     Enviar
                                   </Button>
                                 )}
-                                {!isArgentina && ['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
-                                  <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
+                                {!isArgentina && !isColombia && ['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
+                                  <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${formatFiscalDocumentNumber(country.paisCodigo, documento.serie, documento.numero)}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
                                     <Download className="h-4 w-4" />
                                     XML firmado
                                   </Button>
@@ -495,12 +518,12 @@ export default function DocumentosPage() {
                             )}
                             {['ENVIADO_SUNAT', 'ACEPTADO'].includes(documento.estado) && (
                               <>
-                                <Button type="button" size="sm" onClick={() => descargarPDF(documento.id, `${documento.serie}-${documento.numero}.pdf`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
+                                <Button type="button" size="sm" onClick={() => descargarPDF(documento.id, `${formatFiscalDocumentNumber(country.paisCodigo, documento.serie, documento.numero)}.pdf`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
                                   <Download className="h-4 w-4" />
                                   PDF
                                 </Button>
-                                {!isArgentina && (
-                                  <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
+                                {!isArgentina && !isColombia && (
+                                  <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${formatFiscalDocumentNumber(country.paisCodigo, documento.serie, documento.numero)}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-primary hover:bg-cyan-400/15 hover:text-foreground">
                                     <Download className="h-4 w-4" />
                                     XML
                                   </Button>
@@ -527,12 +550,12 @@ export default function DocumentosPage() {
                               <Button
                                 type="button"
                                 size="sm"
-                                onClick={() => window.location.assign('/dashboard/cpe/')}
+                                onClick={openCpeCenter}
                                 variant="outline"
                                 className="gap-1 border-amber-300/25 bg-amber-300/10 text-amber-400 hover:bg-amber-300/15 dark:text-amber-200"
                               >
                                 <XCircle className="h-4 w-4" />
-                                Anular en CPE
+                                {isColombia ? 'Gestionar en Centro CPE' : 'Anular en CPE'}
                               </Button>
                             )}
                           </div>
@@ -561,7 +584,7 @@ export default function DocumentosPage() {
             <DialogTitle>Anular documento fiscal</DialogTitle>
             <DialogDescription>
               {documentoAAnular
-                ? `Se anulará el borrador ${documentoAAnular.serie}-${documentoAAnular.numero}; no se generarán movimientos fiscales ni comerciales.`
+                ? `Se anulará el borrador ${formatFiscalDocumentNumber(country.paisCodigo, documentoAAnular.serie, documentoAAnular.numero)}; no se generarán movimientos fiscales ni comerciales.`
                 : 'Sólo los borradores sin CPE pueden anularse desde esta pantalla.'}
             </DialogDescription>
           </DialogHeader>
@@ -601,15 +624,17 @@ export default function DocumentosPage() {
         </DialogContent>
       </Dialog>
 
-      <DocumentoModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setSelectedDocumento(null)
-        }}
-        onSuccess={handleDocumentoCreated}
-        documento={selectedDocumento}
-      />
+      {!isColombia && (
+        <DocumentoModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false)
+            setSelectedDocumento(null)
+          }}
+          onSuccess={handleDocumentoCreated}
+          documento={selectedDocumento}
+        />
+      )}
     </div>
   )
 }

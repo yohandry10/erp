@@ -13,6 +13,7 @@ import { DianEventsPanel } from '@/components/cpe/DianEventsPanel'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
 import { fetchApi } from '@/lib/api-fetch'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { FileText, Plus, ShieldCheck } from 'lucide-react'
@@ -93,7 +94,7 @@ export default function CPEPage() {
     : fiscalConfigurationError
       ? 'No se pudo verificar la habilitación DIAN. Por seguridad, el envío permanece bloqueado.'
       : fiscalConfiguration?.isDemo === true
-        ? 'Modo demo: puedes crear, firmar y revisar la representación A4, pero nunca se transmite a DIAN.'
+        ? 'Modo demo: puedes explorar el centro documental, pero no se fabrican aceptaciones DIAN ni se transmite a la autoridad fiscal.'
         : colombiaFiscalReady
           ? 'DIAN habilitada: los comprobantes firmados pueden transmitirse con las credenciales y la numeración validadas.'
           : colombiaFiscalMissingItems.length > 0
@@ -325,6 +326,10 @@ export default function CPEPage() {
         return 'Nota Crédito'
       case '08':
         return 'Nota Débito'
+      case '91':
+        return 'Nota Crédito DIAN'
+      case '92':
+        return 'Nota Débito DIAN'
       default:
         return tipo
     }
@@ -362,10 +367,16 @@ export default function CPEPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {paisCodigo === 'PE' && (
-                <Button type="button" variant="outline" onClick={() => setIsNoteModalOpen(true)} className="gap-2">
+              {(paisCodigo === 'PE' || isColombia) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsNoteModalOpen(true)}
+                  className="gap-2"
+                  data-testid="open-referenced-note"
+                >
                   <FileText className="h-4 w-4" />
-                  Nueva NC / ND
+                  {isColombia ? 'Nueva NC / ND DIAN' : 'Nueva NC / ND'}
                 </Button>
               )}
               <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
@@ -458,10 +469,11 @@ export default function CPEPage() {
               onPdf={downloadPdf}
               onSend={sendToFiscal}
               onSign={signReferencedNote}
-              onCancel={setSelectedCpeForCancellation}
+              onCancel={paisCodigo === 'PE' ? setSelectedCpeForCancellation : undefined}
               onGre={paisCodigo === 'PE' ? openGreModal : undefined}
               fiscalLabel={fiscalLabel}
               canSend={canSendToFiscal}
+              countryCode={paisCodigo}
             />
           </CardContent>
         </Card>
@@ -478,6 +490,7 @@ export default function CPEPage() {
         isOpen={isNoteModalOpen}
         onClose={() => setIsNoteModalOpen(false)}
         onSuccess={handleCpeCreated}
+        countryCode={isColombia ? 'CO' : 'PE'}
       />
 
       {/* CPE View Modal */}
@@ -503,7 +516,11 @@ export default function CPEPage() {
       {selectedCpeForCancellation && (
         <AnulacionFinancieraModal
           cpeId={selectedCpeForCancellation.id}
-          label={`${selectedCpeForCancellation.serie}-${selectedCpeForCancellation.numero}`}
+          label={formatFiscalDocumentNumber(
+            paisCodigo,
+            selectedCpeForCancellation.serie,
+            selectedCpeForCancellation.numero,
+          )}
           onClose={() => setSelectedCpeForCancellation(null)}
           onCompleted={loadData}
         />

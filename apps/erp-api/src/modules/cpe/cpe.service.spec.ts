@@ -266,6 +266,32 @@ describe('CpeService', () => {
             );
         });
 
+        it('acepta finalizar un documento POS PE/AR sin exigir metadata de numeración DIAN', async () => {
+            mockSupabaseClient.single.mockResolvedValueOnce({
+                data: {
+                    id: 'venta-pos-1',
+                    documento_id: 'doc-pos-1',
+                    cpe_data: {
+                        documento_id: 'doc-pos-1',
+                        serie: 'F001',
+                        numero: 1,
+                        metadata: {},
+                    },
+                    total: 118,
+                    cliente_documento: '20600600600',
+                    accounting_event_id: 'event-pos-1',
+                    atomic_result: { venta_id: 'venta-pos-1' },
+                },
+                error: null,
+            });
+
+            await expect((service as any).validarDocumentoPosReservado({
+                ...mockCreateFacturaDto,
+                documento_id: 'doc-pos-1',
+                venta_pos_id: 'venta-pos-1',
+            }, mockTenantId, false)).resolves.toBeNull();
+        });
+
         it('debe crear un CPE exitosamente si pasa todas las validaciones', async () => {
             // 1. Validaciones
             validationService.validateCertificate.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
@@ -332,6 +358,10 @@ describe('CpeService', () => {
         });
 
         it('debe crear la CxC y sus ajustes dentro de la misma RPC para una venta a crédito', async () => {
+            const completedDirectRetrySpy = jest.spyOn(
+                service as any,
+                'findCompletedDirectDianCpe',
+            );
             validationService.validateCertificate.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
             validationService.validateRucConfiguration.mockResolvedValue({ isValid: true, missingFields: [], errors: [] });
             validationService.validateDocumentBeforeEmission.mockResolvedValue({ isValid: true, warnings: [], errors: [] });
@@ -390,6 +420,7 @@ describe('CpeService', () => {
                 }),
             );
             expect(eventBusService.emitFacturaEmitidaEvent).not.toHaveBeenCalled();
+            expect(completedDirectRetrySpy).not.toHaveBeenCalled();
         });
 
         it('debe lanzar BadRequestException si falla validación de certificado', async () => {
@@ -425,6 +456,10 @@ describe('CpeService', () => {
         });
 
         it('debe reconciliar un CPE existente mediante la RPC en vez de retornar temprano', async () => {
+            const completedDirectRetrySpy = jest.spyOn(
+                service as any,
+                'findCompletedDirectDianCpe',
+            );
             const existingCpe = { id: 'existing-1', ...mockCreateFacturaDto };
             mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: existingCpe, error: null } as any);
 
@@ -457,6 +492,7 @@ describe('CpeService', () => {
                 expect.any(Object),
             );
             expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+            expect(completedDirectRetrySpy).not.toHaveBeenCalled();
         });
     });
 
@@ -846,6 +882,10 @@ describe('CpeService', () => {
         };
 
         it('debe crear CPE desde documento fiscal mediante la RPC atómica', async () => {
+            const completedDirectRetrySpy = jest.spyOn(
+                service as any,
+                'findCompletedDirectDianCpe',
+            );
             const mockDocumento = buildDocumento();
             prepararEmisionAtomica('cpe-doc-1');
 
@@ -862,9 +902,14 @@ describe('CpeService', () => {
             expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
             expect(eventBusService.emitComprobanteCreadoEvent).not.toHaveBeenCalled();
             expect(eventBusService.emitFacturaEmitidaEvent).not.toHaveBeenCalled();
+            expect(completedDirectRetrySpy).not.toHaveBeenCalled();
         });
 
         it('debe reconciliar el retry mediante la misma RPC atómica', async () => {
+            const completedDirectRetrySpy = jest.spyOn(
+                service as any,
+                'findCompletedDirectDianCpe',
+            );
             const mockDocumento = buildDocumento();
             prepararEmisionAtomica('cpe-existing-1', true);
 
@@ -876,6 +921,7 @@ describe('CpeService', () => {
                 expect.objectContaining({ p_idempotency_key: 'doc.cpe:doc-1' }),
             );
             expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+            expect(completedDirectRetrySpy).not.toHaveBeenCalled();
         });
     });
 

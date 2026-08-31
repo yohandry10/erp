@@ -169,9 +169,9 @@ describe('DocumentosService — contrato atómico 461/443/448', () => {
     cpe.create.mockResolvedValueOnce({
       id: 'cpe-1',
       documento_id: documentoId,
-      xml_firmado: '<Invoice><ds:Signature/></Invoice>',
       hash: 'abc',
     } as any);
+    cpe.getSignedXml.mockResolvedValueOnce('<Invoice><ds:Signature/></Invoice>');
 
     const result = await service.generarXML(
       documentoId,
@@ -195,10 +195,15 @@ describe('DocumentosService — contrato atómico 461/443/448', () => {
       tenantId,
       actorId,
     );
-    expect(result.data).toMatchObject({ cpe_id: 'cpe-1', documento_id: documentoId });
+    expect(cpe.getSignedXml).toHaveBeenCalledWith('cpe-1', tenantId);
+    expect(result.data).toMatchObject({
+      cpe_id: 'cpe-1', documento_id: documentoId,
+      xml_content: '<Invoice><ds:Signature/></Invoice>',
+    });
   });
 
   it('reutiliza el CPE firmado vinculado sin volver a emitir ni duplicar CxC/outbox', async () => {
+    tableResults.empresa_config = [{ data: { pais: 'PE', pais_id: 1 }, error: null }];
     tableResults.cpe = [{ data: { id: 'cpe-existing' }, error: null }];
     cpe.findOne.mockResolvedValueOnce({
       id: 'cpe-existing',
@@ -214,7 +219,37 @@ describe('DocumentosService — contrato atómico 461/443/448', () => {
     expect(result.idempotent).toBe(true);
   });
 
+  it('falla cerrado en Colombia si se invocan los endpoints fiscales legacy de Documentos', async () => {
+    tableResults.empresa_config = [
+      { data: { pais: null, pais_id: 2 }, error: null },
+      { data: { pais: '', pais_id: 2 }, error: null },
+    ];
+
+    await expect(
+      service.generarXML(documentoId, 'document-emit:co-legacy', tenantId, actorId),
+    ).rejects.toThrow('exclusivamente desde el Centro CPE');
+    await expect(
+      service.enviarSUNAT(documentoId, 'document-send:co-legacy', tenantId, actorId),
+    ).rejects.toThrow('exclusivamente desde el Centro CPE');
+
+    expect(client.from).not.toHaveBeenCalledWith('cpe');
+    expect(cpe.create).not.toHaveBeenCalled();
+    expect(cpe.resendToOse).not.toHaveBeenCalled();
+  });
+
+  it('falla cerrado si el tenant no tiene país fiscal resoluble', async () => {
+    tableResults.empresa_config = [{ data: null, error: null }];
+
+    await expect(
+      service.generarXML(documentoId, 'document-emit:missing-country', tenantId, actorId),
+    ).rejects.toThrow('operación fiscal legacy queda bloqueada');
+
+    expect(client.from).not.toHaveBeenCalledWith('cpe');
+    expect(cpe.create).not.toHaveBeenCalled();
+  });
+
   it('nunca responde éxito para un CPE legacy vinculado sin XML, hash ni estado reparable', async () => {
+    tableResults.empresa_config = [{ data: { pais: 'PE', pais_id: 1 }, error: null }];
     tableResults.cpe = [{
       data: { id: 'cpe-incomplete', idempotency_key: 'legacy-partial-key' },
       error: null,
@@ -233,6 +268,7 @@ describe('DocumentosService — contrato atómico 461/443/448', () => {
   });
 
   it('mantiene reintento cuando el transporte fiscal termina en ERROR técnico', async () => {
+    tableResults.empresa_config = [{ data: { pais: 'PE', pais_id: 1 }, error: null }];
     tableResults.cpe = [
       { data: { id: 'cpe-technical' }, error: null },
       {
@@ -264,6 +300,7 @@ describe('DocumentosService — contrato atómico 461/443/448', () => {
   });
 
   it('rechaza firmar un contrato porque no es un comprobante fiscal', async () => {
+    tableResults.empresa_config = [{ data: { pais: 'PE', pais_id: 1 }, error: null }];
     tableResults.cpe = [{ data: null, error: null }];
     tableResults.documentos = [{
       data: {

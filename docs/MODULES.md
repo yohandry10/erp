@@ -197,6 +197,10 @@ Código principal: `apps/erp-api/src/modules/pos`,
   Electrónica de Venta`, `DIAN 2.1: Nota Crédito de Factura Electrónica de
   Venta`, `DIAN 2.1: Nota Débito de Factura Electrónica de Venta` y `DIAN 2.1:
   ApplicationResponse de Factura Electrónica de Venta`.
+- La tasa general se toma de la configuración del tenant como única fuente para
+  ventas y compras. Cada línea conserva su afectación `10/20/30`; los aliases
+  de INC se normalizan y base, impuesto y total se recalculan en servidor. El
+  navegador no puede imponer una tasa arbitraria ni contradecir la afectación.
 - La firma colombiana es XMLDSig enveloped con XAdES-EPES 1.3.2. Una cuenta
   real sólo usa el PFX y la contraseña cifrada de su tenant; un certificado o
   NIT incongruente falla antes del I/O externo y nunca hereda credenciales
@@ -213,14 +217,59 @@ Código principal: `apps/erp-api/src/modules/pos`,
   trust store de la autoridad.
 - Habilitación envía por `SendTestSetAsync`; producción usa
   `SendBillSync` y la variante asíncrona usa `SendBillAsync`.
-  `GetNumberingRange` confirma resolución, prefijo, rango, vigencia y clave
-  técnica antes de firmar una factura. Ese método no recibe el Software PIN:
+  `GetNumberingRange` confirma resolución, rango, vigencia, clave técnica y el
+  prefijo únicamente cuando DIAN lo asigna, antes de reservar o firmar una
+  factura real. El contexto oficial prevalidado se conserva sólo en memoria y
+  se reutiliza durante la firma; no existe una segunda consulta divergente ni
+  se persisten el Software PIN o la clave técnica. Ese
+  método no recibe el Software PIN:
   valida transporte/certificado y numeración, pero nunca acredita el PIN. La
   evidencia Software ID/TestSet/PIN procede del TestSet y del portal
   `HABILITADO`. La recepción de un ZIP no es aceptación:
   `GetStatusZip` consulta el `ZipKey`, mientras `GetStatus` consulta un
   CUFE/CUDE. Pendiente, rechazado, no encontrado y error técnico permanecen
   estados diferentes.
+- Para una factura `01` real creada desde la UI, el navegador sólo declara la
+  intención. La RPC `reservar_numeracion_dian_ui_tx` de la 530 obtiene el
+  correlativo y el prefijo opcional de la resolución activa del tenant, valida actor, fecha, rango y
+  vigencia y reserva el número por clave idempotente. No recibe serie libre. Un
+  retry de la misma intención recupera el mismo número; cambiar tipo o fecha con
+  esa clave falla. Las demos usan su numeración local y no consumen resolución
+  DIAN.
+- El atajo de retry ya completado sólo aplica a una emisión directa Colombia y
+  exige tenant, actor, tipo y huella fiscal completa coincidentes. Los namespaces
+  internos de pedido, POS y Documentos conservan su RPC transaccional; una fila
+  legacy o incompleta entra a la reconciliación normal en vez de saltar masters,
+  reserva o writer.
+- La RPC 531 congela bajo el mismo lock el pedido, su intención de pago, sus
+  detalles y la identidad fiscal del cliente. La emisión descarta cualquier DTO
+  comercial cargado antes del lock y mapea únicamente ese snapshot canónico;
+  una edición concurrente no puede mezclar cabecera, líneas o receptor de dos
+  instantes distintos. La intención y la reserva incluyen `pedido_id`: una clave
+  que llegue por el endpoint CPE genérico no puede pre-ocupar ni consumir la
+  factura de otro pedido, y el cierre exige que CPE, documento y `factura_id` del
+  pedido apunten al mismo artefacto.
+- La identidad fiscal visible usa exactamente `prefijo + consecutivo`: no se
+  añade guion ni se rellena con ceros; una resolución sin prefijo muestra sólo
+  el consecutivo. CPE, UBL, venta/documento, CxC, outbox, PDF y reintentos deben
+  conservar esa misma identidad reservada por servidor; ninguna serie o número
+  enviado por el navegador puede sustituirla.
+- La factura se construye desde el cliente maestro del mismo tenant. La UI
+  muestra el snapshot receptor como sólo lectura y el backend rechaza un cliente
+  inexistente, perfil incompleto o snapshot divergente. En crédito, emisión,
+  vencimiento y plazo deben coincidir como fechas calendario. La huella
+  transaccional 530 incorpora cliente, fechas, forma/medio/plazo y perfil DIAN,
+  de modo que un retry no pueda sustituirlos silenciosamente.
+- Una cuenta CO real genera y firma la `Invoice` UBL DIAN antes de persistir la
+  emisión. El XML debe tener namespace `Invoice-2`, una sola firma XMLDSig,
+  CUFE SHA-384 y ninguna marca `PE:SUNAT`; si no cumple, falla antes del writer.
+  Un XML SUNAT histórico asociado a procedencia Colombia no se entrega por la
+  API. En demo se conserva una representación explícitamente simulada y sin
+  transporte externo.
+- Las respuestas públicas de lista y detalle eliminan XML firmado, CDR,
+  firmas, costos de transporte, metadata sensible, tenant e idempotencia. El
+  XML sólo sale por descargas explícitas con autorización; la vista histórica
+  de Documentos resuelve el mismo endpoint protegido.
 - La operación de envío se reserva, sella con el XML firmado y finaliza de
   forma durable. Un timeout después del sello consulta primero la clave tipada y
   no reenvía a ciegas. Un retry reutiliza nombre ZIP, secuencia anual,
@@ -243,6 +292,19 @@ Código principal: `apps/erp-api/src/modules/pos`,
   `DocumentResponse/DocumentReference/UUID` directo con el mismo CUFE/CUDE,
   hash coincidente y la marca criptográfica de trust verificado. El verificador
   PostgreSQL 16 prueba casos positivos y adulteraciones estructurales.
+- La migración 529 habilita desde la bandeja CPE la creación de notas `91/92`
+  sólo sobre un comprobante colombiano real y aceptado del mismo tenant. El
+  usuario elige tipo, motivo DIAN, descripción, líneas y, cuando corresponde, un
+  prorrateo explícito; el servidor exige saldo disponible y conserva la
+  referencia, CUFE/CUDE y efecto. Identidad, ubicación, régimen, certificado y
+  configuración pública del emisor quedan congelados y se revalidan antes de
+  firmar o entregar; nunca se persisten el PIN ni la contraseña del PFX en una
+  huella. Una demo muestra el bloqueo y no precarga una aceptación ficticia.
+- Para Colombia, `Documentos` es únicamente un repositorio histórico de lectura:
+  las acciones fiscales nuevas se desvían a Centro CPE y se ocultan los writers
+  SUNAT heredados. CxC crea una nota DIAN `91` referenciada; cancelación y RMA no
+  pueden reutilizar la nota `07`. La migración 532 hace cumplir esa frontera en
+  el writer histórico antes de cualquier cambio de stock, caja o contabilidad.
 - Los **eventos FEV 030-034** están implementados técnicamente en 527. La API
   consulta `GetStatusEvent`, `GetStatus` y `GetXmlByDocumentKey`, importa y ancla
   una FEV recibida inmutable, lista su historial y usa el ZIP oficial. 030-033
@@ -254,7 +316,7 @@ Código principal: `apps/erp-api/src/modules/pos`,
 - La interfaz aplica RBAC separado: lectura de FEV/eventos, gestión de recibidas
   030-033 y emisión 034. Un auditor puede consultar sin ver escrituras; una demo
   o tenant no listo conserva historial pero no puede importar ni emitir. Chrome
-  Playwright cubre 8/8 casos, incluida la cadena 030→032→033 y 034, con APIs
+  Playwright cubre la cadena 030→032→033 y 034, con APIs
   interceptadas; no es una transmisión real.
 - 030-034 no equivalen a **habilitación RADIAN completa** ni dejan listo el
   factoring. Para operar como participante directo se requiere un registro
@@ -651,9 +713,12 @@ Código principal: `apps/erp-api/src/modules/rrhh`.
   locks por tenant y dejan auditoría. Crear o editar una serie usa el mismo
   contrato, sin recuperar el upsert directo anterior.
 - Las mutaciones de autenticación/configuración, conversión demo y material
-  fiscal sensible no son offline-capable. Certificados, PFX, credenciales y
-  secretos nunca entran en Web Storage ni SQLite; una lectura o sincronización
-  purga cualquier entrada legacy sensible antes de devolverla.
+  fiscal sensible no son offline-capable. En Colombia, numeración, emisión,
+  notas, firma, consulta y transmisión DIAN requieren backend en línea y se
+  bloquean antes de entrar a la cola; un ticket local no fiscal puede seguir
+  operando, pero nunca se promueve a CPE real por replay. Certificados, PFX,
+  credenciales y secretos nunca entran en Web Storage ni SQLite; una lectura o
+  sincronización purga cualquier entrada legacy sensible antes de devolverla.
 - La demo pública PE/AR/CO se crea completa o no se crea: tenant, empresa,
   usuarios segregados, RBAC, almacén, stock canónico, clientes, proveedores,
   caja abierta, banco, plan contable y base de RR. HH. comparten un commit. Un

@@ -7,6 +7,7 @@ import { calcularDesgloseIgv } from '../../../shared/utils/igv-afectacion.util';
 import { NotificationType, NotificationSeverity } from '../../notifications/notification.types';
 import { CreateCotizacionDto, UpdateCotizacionDto, ConvertirPedidoDto } from './dto';
 import { Cotizacion, EstadoCotizacion, CotizacionDetalle } from './entities';
+import { tieneEntradaPagoPedido } from '../pedidos/pedido-payment.util';
 
 /**
  * CotizacionesService
@@ -417,11 +418,19 @@ export class CotizacionesService {
 
     // ✅ CORRECCIÓN BRECHA 2: Usar función RPC transaccional
     const { data: resultado, error: rpcError } = await client
-      .rpc('convertir_cotizacion_comercial_a_pedido_tx', {
+      .rpc('convertir_cotizacion_comercial_a_pedido_pago_tx_531', {
         p_cotizacion_id: id,
         p_tenant_id: tenantId,
         p_user_id: userId || null,
         p_notas: convertirPedidoDto.notas ?? cotizacion.observaciones ?? null,
+        p_payment_intent: tieneEntradaPagoPedido(convertirPedidoDto)
+          ? {
+              condicion_pago: convertirPedidoDto.condicion_pago,
+              medio_pago: convertirPedidoDto.medio_pago,
+              plazo_pago_dias: convertirPedidoDto.plazo_pago_dias,
+              fecha_vencimiento: convertirPedidoDto.fecha_vencimiento,
+            }
+          : null,
       });
 
     if (rpcError) {

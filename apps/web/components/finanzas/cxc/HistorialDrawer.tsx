@@ -9,6 +9,8 @@ import {
 } from '@/components/ui/dialog'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 interface PagoCxc {
   id: string
@@ -50,11 +52,12 @@ const humanizeDate = (date?: string | null) => {
 }
 
 export function HistorialDrawer({ isOpen, onClose, detalle }: HistorialDrawerProps) {
+  const country = useCountryContext()
   const pagosOrdenados = (detalle?.pagos || []).slice().sort((a, b) => {
     return new Date(b.fecha_pago).getTime() - new Date(a.fecha_pago).getTime()
   })
 
-  const tituloDocumento = [detalle?.serie, detalle?.numero].filter(Boolean).join('-')
+  const tituloDocumento = formatFiscalDocumentNumber(country.paisCodigo, detalle?.serie, detalle?.numero)
   const isLoading = !detalle
 
   return (

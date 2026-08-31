@@ -34,12 +34,69 @@ describe('resolveDianPrintedFiscalInfo', () => {
       metadata: { gran_contribuyente: true },
     }, config)).toEqual(expect.objectContaining({
       authorizationNumber: '18760000001',
-      consecutive: 'FE-00000025',
+      consecutive: 'FE25',
       generatedAt: '2026-08-29T14:35:12-05:00',
       paymentForm: 'CREDITO',
       paymentTerm: '30 días',
       paymentMethod: 'TRANSFERENCIA',
       taxQualities: expect.arrayContaining(['Persona jurídica', 'Responsable de IVA', 'Gran contribuyente']),
+    }));
+  });
+
+  it('imprime el consecutivo exacto cuando la resolución no asigna prefijo', () => {
+    const withoutPrefix = {
+      ...evidence,
+      fiscal_authority_evidence: {
+        ...evidence.fiscal_authority_evidence,
+        authorization: {
+          ...evidence.fiscal_authority_evidence.authorization,
+          prefix: '',
+        },
+      },
+    };
+    expect(resolveDianPrintedFiscalInfo({
+      ...withoutPrefix,
+      serie: '', numero: 25, fecha_emision: '2026-08-29T14:35:12-05:00',
+      condicion_pago: 'CONTADO', medio_pago: '10',
+    }, { ...config, dian_resolucion_prefijo: '' })).toEqual(expect.objectContaining({
+      authorizationPrefix: '',
+      consecutive: '25',
+    }));
+  });
+
+  it('presenta en Bogotá un instante UTC que cruza de día y valida esa fecha local', () => {
+    const evidenceForLocalDay = {
+      ...evidence,
+      fiscal_authority_evidence: {
+        ...evidence.fiscal_authority_evidence,
+        authorization: {
+          ...evidence.fiscal_authority_evidence.authorization,
+          valid_from: '2026-08-29',
+          valid_to: '2026-08-29',
+        },
+      },
+    };
+
+    expect(resolveDianPrintedFiscalInfo({
+      ...evidenceForLocalDay,
+      serie: 'FE', numero: 25, fecha_emision: '2026-08-30T02:30:00.000Z',
+      condicion_pago: 'CONTADO', medio_pago: 'EFECTIVO',
+    }, config)).toEqual(expect.objectContaining({
+      generatedAt: '2026-08-29T21:30:00-05:00',
+    }));
+  });
+
+  it.each([
+    '2026-08-29',
+    '2026-08-29T00:00:00.000Z',
+  ])('conserva el día civil %s y expresa su hora en Bogotá', (fechaEmision) => {
+    expect(resolveDianPrintedFiscalInfo({
+      ...evidence,
+      serie: 'FE', numero: 25, fecha_emision: fechaEmision,
+      hora_emision: '23:45:12',
+      condicion_pago: 'CONTADO', medio_pago: 'EFECTIVO',
+    }, config)).toEqual(expect.objectContaining({
+      generatedAt: '2026-08-29T23:45:12-05:00',
     }));
   });
 

@@ -10,6 +10,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useCountryContext } from '@/hooks/use-country-context'
+import { formatFiscalDocumentNumber } from '@/lib/fiscal-document-number'
 
 type Detail = {
   id: string
@@ -48,6 +50,7 @@ export default function NuevaRmaPage() {
   const { get, post } = useApi({ throwOnError: true })
   const { toast } = useToast()
   const { formatCurrency } = useLocalizedMoney()
+  const country = useCountryContext()
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [pedidoId, setPedidoId] = useState('')
   const [documentoId, setDocumentoId] = useState('')
@@ -135,7 +138,7 @@ export default function NuevaRmaPage() {
               <div className="space-y-4">
                 <label className="block"><span className="mb-1.5 block text-sm font-medium">Pedido</span><select className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm" value={pedidoId} onChange={(event) => choosePedido(event.target.value)}><option value="">Selecciona un pedido</option>{candidates.map((item) => <option key={item.id} value={item.id}>{item.numero} · {item.clientes?.razon_social ?? item.clientes?.nombre ?? 'Cliente'} · {item.estado}</option>)}</select></label>
                 {pedido && <div className="grid gap-3 rounded-xl bg-muted/40 p-4 sm:grid-cols-3"><Info label="Cliente" value={pedido.clientes?.razon_social ?? pedido.clientes?.nombre ?? '—'} /><Info label="Estado" value={pedido.estado} /><Info label="Total" value={formatCurrency(Number(pedido.total ?? 0), pedido.moneda)} /></div>}
-                {pedido && <label className="block"><span className="mb-1.5 block text-sm font-medium">Comprobante de origen</span><select className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm" value={documentoId} onChange={(event) => setDocumentoId(event.target.value)}><option value="">{pedido.documentos.length === 0 ? 'Sin comprobante elegible' : 'Selecciona el comprobante'}</option>{pedido.documentos.map((documento) => <option key={documento.id} value={documento.id}>{documento.tipo_documento} {documento.serie}-{documento.numero} · {formatCurrency(Number(documento.total ?? 0), pedido.moneda)}</option>)}</select></label>}
+                {pedido && <label className="block"><span className="mb-1.5 block text-sm font-medium">Comprobante de origen</span><select className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm" value={documentoId} onChange={(event) => setDocumentoId(event.target.value)}><option value="">{pedido.documentos.length === 0 ? 'Sin comprobante elegible' : 'Selecciona el comprobante'}</option>{pedido.documentos.map((documento) => <option key={documento.id} value={documento.id}>{documento.tipo_documento} {formatFiscalDocumentNumber(country.paisCodigo, documento.serie, documento.numero)} · {formatCurrency(Number(documento.total ?? 0), pedido.moneda)}</option>)}</select></label>}
               </div>
             )}
           </section>

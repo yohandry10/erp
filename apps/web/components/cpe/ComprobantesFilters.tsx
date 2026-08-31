@@ -45,8 +45,17 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
         <option value="">Todos los tipos</option>
         <option value="01">{isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura'}</option>
         <option value="03">{isArgentina ? 'Factura B' : isColombia ? 'Documento equivalente' : 'Boleta'}</option>
-        <option value="07">Nota Crédito</option>
-        <option value="08">Nota Débito</option>
+        {isColombia ? (
+          <>
+            <option value="91">Nota Crédito DIAN (91)</option>
+            <option value="92">Nota Débito DIAN (92)</option>
+          </>
+        ) : (
+          <>
+            <option value="07">Nota Crédito</option>
+            <option value="08">Nota Débito</option>
+          </>
+        )}
       </select>
       <select aria-label="Estado"
         className="rounded-xl border border-cyan-400/20 bg-card/75 px-3 py-3 text-sm text-foreground outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"

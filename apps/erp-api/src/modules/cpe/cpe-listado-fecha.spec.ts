@@ -16,6 +16,7 @@ import { fechaDeDocumentoEnPais } from '../../shared/utils/fecha-peru.util';
  */
 describe('fecha de un comprobante en el listado', () => {
   const LIMA = 'America/Lima';
+  const BOGOTA = 'America/Bogota';
 
   it('una fecha pura no se mueve de día', () => {
     // El caso que estaba roto.
@@ -41,6 +42,12 @@ describe('fecha de un comprobante en el listado', () => {
     expect(fechaDeDocumentoEnPais('2026-08-29T02:30:00.000Z', 'America/Lima')).toBe('2026-08-28');
     expect(fechaDeDocumentoEnPais('2026-08-29T02:30:00.000Z', 'America/Argentina/Buenos_Aires')).toBe('2026-08-28');
     expect(fechaDeDocumentoEnPais('2026-08-29T04:30:00.000Z', 'America/Argentina/Buenos_Aires')).toBe('2026-08-29');
+  });
+
+  it('en Colombia conserva la fecha civil y convierte un instante UTC a Bogotá', () => {
+    expect(fechaDeDocumentoEnPais('2026-08-29', BOGOTA)).toBe('2026-08-29');
+    expect(fechaDeDocumentoEnPais('2026-08-30T02:30:00.000Z', BOGOTA)).toBe('2026-08-29');
+    expect(fechaDeDocumentoEnPais('2026-08-29T23:30:00-05:00', BOGOTA)).toBe('2026-08-29');
   });
 
   it('un valor vacío o ilegible no inventa una fecha', () => {

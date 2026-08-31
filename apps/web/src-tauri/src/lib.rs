@@ -3322,6 +3322,10 @@ fn process_local_pos_sale(
     let sesion_caja_id = value_string(&payload, "sesion_caja_id")
         .ok_or_else(|| "La venta local requiere sesion_caja_id".to_string())?;
     let total = value_number(&payload, "total");
+    let emitir_cpe = payload
+        .get("emitir_cpe")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let permite_sin_stock = payload
         .get("permite_venta_sin_stock")
         .and_then(Value::as_bool)
@@ -3400,8 +3404,8 @@ fn process_local_pos_sale(
             "impuestos": value_number(&payload, "impuestos"),
             "estado": "PENDIENTE_SYNC",
             "factura_electronica": false,
-            "facturacion_pendiente": true,
-            "cpe_pendiente": true,
+            "facturacion_pendiente": emitir_cpe,
+            "cpe_pendiente": emitir_cpe,
             "sesion_caja_id": sesion_caja_id,
             "cliente_nombre": value_string(&payload, "cliente_nombre").unwrap_or_else(|| "Cliente General".to_string()),
             "cliente_documento": value_string(&payload, "cliente_documento").unwrap_or_else(|| "00000000".to_string()),
@@ -3436,7 +3440,7 @@ fn process_local_pos_sale(
     let queued_input = with_local_sync_contract(input, &sale_id, "pos_sale")?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
 
-    if !config.ruc.trim().is_empty() && !config.razon_social.trim().is_empty() {
+    if emitir_cpe && !config.ruc.trim().is_empty() && !config.razon_social.trim().is_empty() {
         let fiscal_input = OfflineFiscalDocumentInput {
             document_type: if value_string(&payload, "tipo_comprobante")
                 .unwrap_or_default()
@@ -4275,6 +4279,15 @@ fn process_local_first_write(
     app: AppHandle,
     request: LocalFirstWriteInput,
 ) -> Result<LocalFirstResponse, String> {
+    if let Some(error) = non_queueable_offline_error(
+        &request.endpoint,
+        &request.url,
+        &request.method,
+        request.body.as_deref(),
+    ) {
+        return Err(error.to_string());
+    }
+
     let _guard = lock_offline_queue()?;
     let config = load_config(app.clone()).unwrap_or_default();
     let conn = open_local_db(&app)?;
@@ -4373,7 +4386,14 @@ fn migrate_legacy_json_outbox(app: &AppHandle, conn: &Connection) -> Result<(), 
         serde_json::from_str(&raw).map_err(|e| format!("Cola offline legacy invalida: {e}"))?;
 
     for item in items {
-        if is_sensitive_offline_request(&item.endpoint, &item.url, &item.method) {
+        if non_queueable_offline_error(
+            &item.endpoint,
+            &item.url,
+            &item.method,
+            item.body.as_deref(),
+        )
+        .is_some()
+        {
             continue;
         }
         insert_offline_item(conn, &item)?;
@@ -4385,8 +4405,13 @@ fn migrate_legacy_json_outbox(app: &AppHandle, conn: &Connection) -> Result<(), 
 }
 
 fn insert_offline_item(conn: &Connection, item: &OfflineQueueItem) -> Result<(), String> {
-    if is_sensitive_offline_request(&item.endpoint, &item.url, &item.method) {
-        return Err(SENSITIVE_OFFLINE_ERROR.to_string());
+    if let Some(error) = non_queueable_offline_error(
+        &item.endpoint,
+        &item.url,
+        &item.method,
+        item.body.as_deref(),
+    ) {
+        return Err(error.to_string());
     }
 
     let safe_headers = strip_sensitive_request_headers(&item.headers);
@@ -4799,9 +4824,16 @@ fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> 
 
     let mut items = Vec::new();
     for item in loaded_items {
-        if is_sensitive_offline_request(&item.endpoint, &item.url, &item.method) {
+        if non_queueable_offline_error(
+            &item.endpoint,
+            &item.url,
+            &item.method,
+            item.body.as_deref(),
+        )
+        .is_some()
+        {
             conn.execute("DELETE FROM offline_requests WHERE id = ?1", params![&item.id])
-                .map_err(|e| format!("No se pudo purgar configuracion sensible legacy: {e}"))?;
+                .map_err(|e| format!("No se pudo purgar operacion sensible o fiscal legacy: {e}"))?;
             continue;
         }
         items.push(item);
@@ -4852,6 +4884,8 @@ fn strip_sensitive_request_headers(headers: &[HeaderPair]) -> Vec<HeaderPair> {
 
 const SENSITIVE_OFFLINE_ERROR: &str =
     "Esta configuracion sensible requiere conexion en vivo y nunca se guarda en la cola offline.";
+const FISCAL_OFFLINE_ERROR: &str =
+    "La emision fiscal requiere conexion en vivo. No se guarda en la cola offline ni se considera emitida.";
 
 fn offline_endpoint_path(endpoint: &str) -> String {
     let without_query = endpoint.split('?').next().unwrap_or(endpoint).trim();
@@ -4912,6 +4946,78 @@ fn is_sensitive_non_queueable_endpoint(endpoint: &str, method: &str) -> bool {
 fn is_sensitive_offline_request(endpoint: &str, url: &str, method: &str) -> bool {
     is_sensitive_non_queueable_endpoint(endpoint, method)
         || is_sensitive_non_queueable_endpoint(url, method)
+}
+
+fn is_fiscal_emission_endpoint(endpoint: &str, method: &str) -> bool {
+    if matches!(
+        method.trim().to_ascii_uppercase().as_str(),
+        "GET" | "HEAD" | "OPTIONS"
+    ) {
+        return false;
+    }
+
+    let path = offline_endpoint_path(endpoint);
+    path == "/api/cpe"
+        || path.starts_with("/api/cpe/")
+        || path == "/cpe"
+        || path.starts_with("/cpe/")
+}
+
+fn is_pos_fiscal_intent(endpoint: &str, url: &str, method: &str, body: Option<&str>) -> bool {
+    if !method.trim().eq_ignore_ascii_case("POST") {
+        return false;
+    }
+    let endpoint_path = offline_endpoint_path(endpoint);
+    let url_path = offline_endpoint_path(url);
+    if endpoint_path != "/api/pos/venta" && url_path != "/api/pos/venta" {
+        return false;
+    }
+
+    let Some(payload) = body.and_then(|raw| serde_json::from_str::<Value>(raw).ok()) else {
+        // Un payload POS ilegible no puede diferirse de forma segura: sólo el
+        // backend vivo debe validar el DTO antes de producir efectos locales.
+        return true;
+    };
+    if payload
+        .get("emitir_cpe")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    matches!(
+        value_string(&payload, "tipo_comprobante")
+            .unwrap_or_default()
+            .to_ascii_uppercase()
+            .as_str(),
+        "01" | "03" | "07" | "08"
+    )
+}
+
+fn is_fiscal_offline_request(
+    endpoint: &str,
+    url: &str,
+    method: &str,
+    body: Option<&str>,
+) -> bool {
+    is_fiscal_emission_endpoint(endpoint, method)
+        || is_fiscal_emission_endpoint(url, method)
+        || is_pos_fiscal_intent(endpoint, url, method, body)
+}
+
+fn non_queueable_offline_error(
+    endpoint: &str,
+    url: &str,
+    method: &str,
+    body: Option<&str>,
+) -> Option<&'static str> {
+    if is_sensitive_offline_request(endpoint, url, method) {
+        Some(SENSITIVE_OFFLINE_ERROR)
+    } else if is_fiscal_offline_request(endpoint, url, method, body) {
+        Some(FISCAL_OFFLINE_ERROR)
+    } else {
+        None
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -5139,8 +5245,13 @@ fn enqueue_offline_request(
     app: AppHandle,
     request: OfflineRequestInput,
 ) -> Result<OfflineQueueItem, String> {
-    if is_sensitive_offline_request(&request.endpoint, &request.url, &request.method) {
-        return Err(SENSITIVE_OFFLINE_ERROR.to_string());
+    if let Some(error) = non_queueable_offline_error(
+        &request.endpoint,
+        &request.url,
+        &request.method,
+        request.body.as_deref(),
+    ) {
+        return Err(error.to_string());
     }
 
     let _guard = lock_offline_queue()?;
@@ -5414,8 +5525,8 @@ fn create_local_fiscal_document_with_conn(
     config: &AppConfig,
     document: OfflineFiscalDocumentInput,
     tenant_id: Option<String>,
-    user_id: Option<String>,
-    access_token: Option<String>,
+    _user_id: Option<String>,
+    _access_token: Option<String>,
 ) -> Result<OfflineFiscalDocument, String> {
     if config.ruc.trim().is_empty() || config.razon_social.trim().is_empty() {
         return Err("Configura RUC y razon social en desktop antes de emitir offline".to_string());
@@ -5448,7 +5559,7 @@ fn create_local_fiscal_document_with_conn(
         serie: serie.clone(),
         numero,
         estado: if signed_xml.is_some() {
-            "PENDIENTE_ENVIO".to_string()
+            "FIRMADO_LOCAL".to_string()
         } else {
             "GENERADO_LOCAL".to_string()
         },
@@ -5459,54 +5570,6 @@ fn create_local_fiscal_document_with_conn(
         created_at: timestamp,
     };
     save_local_fiscal_document(conn, &result, &document, tenant_id.as_deref())?;
-    let sync_items = normalize_fiscal_sync_items(&document.items);
-
-    if let Some(signed_xml) = result.signed_xml.clone() {
-        if tenant_id.as_deref().unwrap_or("").trim().is_empty()
-            || user_id.as_deref().unwrap_or("").trim().is_empty()
-            || access_token.as_deref().unwrap_or("").trim().is_empty()
-        {
-            return Err("El CPE fue guardado localmente, pero no puede encolarse sin tenant, actor y sesion autenticada".to_string());
-        }
-        let receiver = document.cliente_ruc.clone().unwrap_or_default();
-        let receiver_type = if receiver.len() == 11 { "6" } else { "1" };
-        let queued_body = serde_json::to_string(&serde_json::json!({
-            "local_fiscal_id": result.id,
-            "idempotency_key": format!("desktop.offline.cpe:{}", result.id),
-            "tipo_documento": result.document_type,
-            "serie": result.serie,
-            "numero": result.numero,
-            "signed_xml": signed_xml,
-            "hash": result.hash,
-            "fecha_emision": current_utc_date(),
-            "source_type": document.source_type.clone().unwrap_or_default(),
-            "source_id": document.source_id.clone(),
-            "documento_receptor": receiver,
-            "tipo_documento_receptor": receiver_type,
-            "razon_social_receptor": document.cliente_nombre.clone().unwrap_or_default(),
-            "moneda": document.moneda.clone().unwrap_or_default(),
-            "items": sync_items,
-            "total_gravadas": document.subtotal,
-            "total_igv": document.igv,
-            "total_venta": document.total
-        }))
-        .map_err(|e| format!("No se pudo serializar documento fiscal para sync: {e}"))?;
-        let queued = LocalFirstWriteInput {
-            endpoint: "/api/cpe/desktop/signed".to_string(),
-            method: "POST".to_string(),
-            url: "/api/cpe/desktop/signed".to_string(),
-            headers: offline_sync_headers(
-                access_token.as_deref(),
-                tenant_id.as_deref(),
-                &result.id,
-                "fiscal_document",
-            ),
-            body: Some(queued_body),
-            tenant_id,
-            user_id,
-        };
-        enqueue_offline_request_with_conn(conn, &queued)?;
-    }
     Ok(result)
 }
 
@@ -5575,73 +5638,13 @@ async fn sign_xml(app: AppHandle, xml_content: String) -> Result<String, String>
 
 #[tauri::command]
 async fn send_to_sunat(
-    app: AppHandle,
-    signed_xml: String,
-    tenant_id: Option<String>,
+    _app: AppHandle,
+    _signed_xml: String,
+    _tenant_id: Option<String>,
     _user_id: Option<String>,
     _access_token: Option<String>,
 ) -> Result<String, String> {
-    let _guard = lock_offline_queue()?;
-    let conn = open_local_db(&app)?;
-    let hash = hash_base64(&signed_xml);
-    let tenant = tenant_id.as_deref();
-    let local_fiscal_id: Option<String> = conn
-        .query_row(
-            r#"
-            SELECT id FROM local_fiscal_documents
-            WHERE hash = ?1 AND tenant_id = ?2
-            LIMIT 1
-            "#,
-            params![&hash, tenant_scope(tenant)],
-            |row| row.get(0),
-        )
-        .ok();
-    let local_fiscal_id = local_fiscal_id.ok_or_else(|| {
-        "No se puede sincronizar un XML aislado: no existe su documento fiscal local completo".to_string()
-    })?;
-    let mut stmt = conn
-        .prepare(
-            r#"
-            SELECT body, status
-            FROM offline_requests
-            WHERE endpoint = '/api/cpe/desktop/signed'
-              AND tenant_id = ?1
-              AND body IS NOT NULL
-            ORDER BY created_at DESC
-            "#,
-        )
-        .map_err(|e| format!("No se pudo inspeccionar la cola fiscal local: {e}"))?;
-    let rows = stmt
-        .query_map(params![tenant_scope(tenant)], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|e| format!("No se pudo leer la cola fiscal local: {e}"))?;
-    for row in rows {
-        let (body, status) = row.map_err(|e| format!("Entrada fiscal local invalida: {e}"))?;
-        let Ok(payload) = serde_json::from_str::<Value>(&body) else {
-            continue;
-        };
-        let has_full_items = payload
-            .get("items")
-            .and_then(Value::as_array)
-            .is_some_and(|items| !items.is_empty());
-        if value_string(&payload, "local_fiscal_id").as_deref() == Some(local_fiscal_id.as_str())
-            && value_string(&payload, "hash").as_deref() == Some(hash.as_str())
-            && value_string(&payload, "signed_xml").as_deref() == Some(signed_xml.as_str())
-            && has_full_items
-            && value_string(&payload, "idempotency_key").is_some()
-            && value_string(&payload, "documento_receptor").is_some()
-        {
-            return Ok(format!(
-                "{}: se reutiliza la intencion fiscal local completa; no se creo una cola parcial",
-                status.to_uppercase()
-            ));
-        }
-    }
-    Err(
-        "No se puede sincronizar el XML sin su snapshot fiscal completo (receptor, totales e items); regenere el documento local"
-            .to_string(),
-    )
+    Err(FISCAL_OFFLINE_ERROR.to_string())
 }
 
 #[tauri::command]
@@ -5837,7 +5840,11 @@ pub fn run() {
 
 #[cfg(test)]
 mod offline_secret_policy_tests {
-    use super::{is_sensitive_non_queueable_endpoint, offline_endpoint_path};
+    use super::{
+        is_fiscal_emission_endpoint, is_pos_fiscal_intent,
+        is_sensitive_non_queueable_endpoint, non_queueable_offline_error,
+        offline_endpoint_path, FISCAL_OFFLINE_ERROR,
+    };
 
     #[test]
     fn blocks_sensitive_configuration_writes_but_not_reads() {
@@ -5873,5 +5880,57 @@ mod offline_secret_policy_tests {
             offline_endpoint_path("https://erp.test/api/configuration/complete?retry=1"),
             "/api/configuration/complete"
         );
+    }
+
+    #[test]
+    fn blocks_fiscal_mutations_but_preserves_reads_and_local_views() {
+        assert!(is_fiscal_emission_endpoint(
+            "/api/cpe/comprobantes",
+            "POST"
+        ));
+        assert!(is_fiscal_emission_endpoint(
+            "https://erp.test/api/cpe/desktop/signed",
+            "POST"
+        ));
+        assert!(!is_fiscal_emission_endpoint(
+            "/api/cpe/comprobantes",
+            "GET"
+        ));
+        assert!(!is_fiscal_emission_endpoint(
+            "/api/cpe/comprobantes/demo/pdf",
+            "GET"
+        ));
+    }
+
+    #[test]
+    fn blocks_pos_fiscal_intent_before_it_reaches_sqlite() {
+        let body = r#"{"emitir_cpe":true,"tipo_comprobante":"01"}"#;
+        assert!(is_pos_fiscal_intent(
+            "/api/pos/venta",
+            "https://erp.test/api/pos/venta",
+            "POST",
+            Some(body),
+        ));
+        assert_eq!(
+            non_queueable_offline_error(
+                "/api/pos/venta",
+                "https://erp.test/api/pos/venta",
+                "POST",
+                Some(body),
+            ),
+            Some(FISCAL_OFFLINE_ERROR),
+        );
+        assert!(!is_pos_fiscal_intent(
+            "/api/pos/venta",
+            "https://erp.test/api/pos/venta",
+            "POST",
+            Some(r#"{"emitir_cpe":false,"tipo_comprobante":"TICKET"}"#),
+        ));
+        assert!(is_pos_fiscal_intent(
+            "/api/pos/venta",
+            "https://erp.test/api/pos/venta",
+            "POST",
+            Some("{payload-invalido"),
+        ));
     }
 }

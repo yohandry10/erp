@@ -66,7 +66,21 @@ describe('CxcService - acciones complementarias', () => {
   });
 
   describe('aplicarNotaCredito', () => {
+    const mockTenantCountry = (pais: string) => {
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table !== 'empresa_config') throw new Error(`Tabla inesperada: ${table}`);
+        return {
+          select: jest.fn(() => ({
+            eq: jest.fn(() => ({
+              maybeSingle: jest.fn().mockResolvedValue({ data: { pais, is_demo: false }, error: null }),
+            })),
+          })),
+        };
+      });
+    };
+
     it('crea la nota fiscal referenciada mediante la RPC atómica 472', async () => {
+      mockTenantCountry('PE');
       jest.spyOn(service, 'obtenerCuentaPorCobrar').mockResolvedValue({
         id: 'cxc-1',
         documento_id: '11111111-1111-4111-8111-111111111111',
@@ -107,6 +121,44 @@ describe('CxcService - acciones complementarias', () => {
       });
     });
 
+    it('despacha Colombia como nota DIAN 91 y conserva el motivo del catálogo DIAN', async () => {
+      mockTenantCountry('CO');
+      jest.spyOn(service, 'obtenerCuentaPorCobrar').mockResolvedValue({
+        id: 'cxc-co-1',
+        documento_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      } as any);
+      mockSupabaseClient.rpc = jest.fn().mockResolvedValue({
+        data: {
+          documento_id: 'nota-doc-co-1',
+          cpe_id: 'nota-cpe-co-1',
+          financial_effect_status: 'PENDING_FISCAL_ACCEPTANCE',
+        },
+        error: null,
+      });
+
+      await service.aplicarNotaCredito(
+        'tenant-co',
+        'cxc-co-1',
+        {
+          monto: 150,
+          fecha_emision: '2026-08-31',
+          motivo: 'Devolución parcial',
+          codigo_motivo: '1',
+          idempotency_key: 'cxc-note:co:test-1',
+        },
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      );
+
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'crear_nota_referenciada_tx',
+        expect.objectContaining({
+          p_tipo_documento: '91',
+          p_codigo_motivo: '1',
+          p_documento_origen_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        }),
+      );
+    });
+
     it('falla cerrado sin actor, documento origen o llave idempotente', async () => {
       const dto: AplicarNotaCreditoDto = {
         monto: 99.9,
@@ -119,6 +171,7 @@ describe('CxcService - acciones complementarias', () => {
         service.aplicarNotaCredito('tenant-2', 'cxc-2', dto),
       ).rejects.toThrow('actor autenticado');
 
+      mockTenantCountry('PE');
       jest.spyOn(service, 'obtenerCuentaPorCobrar').mockResolvedValue({
         id: 'cxc-2', documento_id: null,
       } as any);

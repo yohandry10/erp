@@ -5,6 +5,7 @@ import {
   ValidateNested,
   IsOptional,
   IsEnum,
+  IsInt,
   Min,
   Max,
   MaxLength,
@@ -193,6 +194,19 @@ export class CreateFacturaDto {
   @IsOptional()
   @IsEnum(CondicionPago)
   condicion_pago?: CondicionPago;
+
+  /** Código o descripción del medio de pago; DIAN exige el dato en ventas a crédito. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  medio_pago?: string;
+
+  /** Plazo comercial en días. Opcional para conservar los contratos PE/AR existentes. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(36500)
+  plazo_pago_dias?: number;
 
   @IsOptional()
   @IsNumber()

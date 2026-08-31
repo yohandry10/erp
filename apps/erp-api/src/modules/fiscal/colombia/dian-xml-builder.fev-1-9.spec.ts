@@ -68,6 +68,23 @@ describe('DianXmlBuilderService · FEV Anexo 1.9', () => {
     expect(xml).toContain('<cbc:Name>No causa</cbc:Name>');
   });
 
+  it('omite sts:Prefix y usa sólo el consecutivo cuando la resolución no asigna prefijo', async () => {
+    const xml = await service.generarFacturaElectronica(invoice({
+      serie: '',
+      numero: '125',
+      dianContext: {
+        ...context,
+        authorization: { ...context.authorization, prefix: '' },
+      },
+    }));
+
+    expect(xml).toContain('<cbc:ID>125</cbc:ID>');
+    expect(xml).not.toContain('<sts:Prefix');
+    expect(xml).toContain('<sts:From>1</sts:From>');
+    expect(xml).toContain('<sts:To>50000</sts:To>');
+    expect(xml).toMatch(/<cbc:UUID schemeID="2" schemeName="CUFE-SHA384">[0-9a-f]{96}<\/cbc:UUID>/);
+  });
+
   it('emite el adquirente NIT B2B con responsabilidad O-99 e IVA', async () => {
     const xml = await service.generarFacturaElectronica(invoice({
       receptor: {
@@ -82,6 +99,20 @@ describe('DianXmlBuilderService · FEV Anexo 1.9', () => {
     expect(xml).toContain('<cbc:TaxLevelCode listName="04">O-99</cbc:TaxLevelCode>');
     expect(xml).toContain('<cbc:ID>01</cbc:ID>');
     expect(xml).toContain('<cbc:Name>IVA</cbc:Name>');
+  });
+
+  it('normaliza crédito genérico al código 1 del catálogo 49 y exige PaymentDueDate coherente', async () => {
+    const xml = await service.generarFacturaElectronica(invoice({
+      fechaEmision: '2026-08-31',
+      fechaVencimiento: '2026-09-30',
+      formaPago: 'CREDITO',
+      medioPago: '2',
+      plazoPagoDias: 30,
+    }));
+
+    expect(xml).toContain('<cbc:ID>2</cbc:ID>');
+    expect(xml).toContain('<cbc:PaymentMeansCode>1</cbc:PaymentMeansCode>');
+    expect(xml).toContain('<cbc:PaymentDueDate>2026-09-30</cbc:PaymentDueDate>');
   });
 
   it('cierra si falta el perfil fiscal o si un NIT intenta usar consumidor final', async () => {

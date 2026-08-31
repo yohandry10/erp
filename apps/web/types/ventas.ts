@@ -21,6 +21,13 @@ export enum TipoDocumento {
   PASAPORTE = 'PASAPORTE'
 }
 
+export const DianPerfilFiscal = {
+  CONSUMIDOR_FINAL: 'CONSUMIDOR_FINAL',
+  ADQUIRIENTE_NIT_B2B: 'ADQUIRIENTE_NIT_B2B',
+} as const
+
+export type DianPerfilFiscal = typeof DianPerfilFiscal[keyof typeof DianPerfilFiscal]
+
 export interface Cliente {
   id: string
   tenant_id: string
@@ -36,6 +43,11 @@ export interface Cliente {
   email?: string
   telefono?: string
   arca_condicion_iva?: string
+  dian_perfil_fiscal?: DianPerfilFiscal
+  dian_responsabilidad_fiscal?: 'R-99-PN' | 'O-99'
+  dian_responsabilidad_list_name?: '49' | '04'
+  dian_tributo_id?: 'ZY' | '01'
+  dian_tributo_nombre?: 'No causa' | 'IVA'
   created_at: string
   updated_at: string
   created_by?: string
