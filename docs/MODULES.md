@@ -305,6 +305,13 @@ Código principal: `apps/erp-api/src/modules/pos`,
   configuración pública del emisor quedan congelados y se revalidan antes de
   firmar o entregar; nunca se persisten el PIN ni la contraseña del PFX en una
   huella. Una demo muestra el bloqueo y no precarga una aceptación ficticia.
+- Para Argentina, `Documentos` consulta clase A/B/C y estado desde el CPE
+  vinculado del mismo tenant. Conserva la procedencia demo aunque cambie la
+  cuenta; una muestra se identifica sin validez ARCA. `FACTURA` no implica
+  clase A y `BOLETA` no implica clase B. Si falta evidencia, presenta el tipo
+  genérico y remite al Centro ARCA. Las acciones fiscales y la edición se
+  gestionan allí; los endpoints heredados de emisión/envío de Documentos
+  rechazan Argentina antes de llamar al transporte.
 - Para Colombia, `Documentos` es únicamente un repositorio histórico de lectura:
   las acciones fiscales nuevas se desvían a Centro CPE y se ocultan los writers
   SUNAT heredados. CxC crea una nota DIAN `91` referenciada; cancelación y RMA no

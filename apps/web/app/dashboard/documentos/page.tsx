@@ -29,6 +29,7 @@ interface Documento {
   estado: 'BORRADOR' | 'EMITIDO' | 'ENVIADO_SUNAT' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO'
   estado_sunat?: string
   observaciones?: string
+  arca?: { cpe_id: string; codigo: number | null; estado: string; is_demo: boolean }
 }
 
 interface DocumentoStats {
@@ -75,6 +76,7 @@ export default function DocumentosPage() {
   const isArgentina = country.paisCodigo === 'AR'
   const isColombia = country.paisCodigo === 'CO'
   const isPeru = country.paisCodigo === 'PE'
+  const fiscalHistoryOnly = isArgentina || isColombia
   const { toast } = useToast()
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [stats, setStats] = useState<DocumentoStats | null>(null)
@@ -241,20 +243,28 @@ export default function DocumentosPage() {
       ACEPTADO: 'Aceptado',
       RECHAZADO: 'Rechazado',
       ANULADO: 'Anulado',
+      FIRMADO: 'Preparado',
+      ENVIADO: 'Enviado ARCA',
     }
     return estados[estado] || estado
   }
 
-  const getTipoDocumentoDisplay = (tipo: string) => {
+  const getTipoDocumentoDisplay = (documento: Documento) => {
+    if (isArgentina && documento.arca?.codigo) {
+      const codigo = documento.arca.codigo
+      const familia = codigo <= 3 ? ['A', 1] : codigo <= 8 ? ['B', 6] : codigo <= 13 ? ['C', 11] : codigo <= 21 ? ['E', 19] : ['A sujeta a retención', 51]
+      const naturaleza = ['Factura', 'Nota de Débito', 'Nota de Crédito'][codigo - Number(familia[1])]
+      if (naturaleza) return `${naturaleza} ${familia[0]}`
+    }
     const tipos: Record<string, string> = {
-      FACTURA: isArgentina ? 'Factura A' : isColombia ? 'Factura electrónica' : 'Factura',
-      BOLETA: isArgentina ? 'Factura B' : isColombia ? 'Registro tipo boleta (legado)' : 'Boleta',
+      FACTURA: isColombia ? 'Factura electrónica' : 'Factura',
+      BOLETA: isArgentina ? 'Registro histórico' : isColombia ? 'Registro tipo boleta (legado)' : 'Boleta',
       NOTA_CREDITO: 'Nota de Credito',
       NOTA_DEBITO: 'Nota de Debito',
       CONTRATO: 'Contrato',
       GUIA_REMISION: 'Guia de Remision',
     }
-    return tipos[tipo] || tipo
+    return tipos[documento.tipo_documento] || documento.tipo_documento
   }
 
   const handleDocumentoCreated = () => {
@@ -275,16 +285,16 @@ export default function DocumentosPage() {
 
   const statCards: StatCard[] = [
     { label: 'Total documentos', value: stats?.totalDocumentos || 0, description: 'Registrados', icon: FileText },
-    { label: 'Facturas', value: stats?.facturas || 0, description: 'Emitidas', icon: FileText },
-    { label: isArgentina ? 'Facturas B' : isColombia ? 'Boletas legacy' : 'Boletas', value: stats?.boletas || 0, description: isColombia ? 'Históricas' : 'Emitidos', icon: FileText },
+    { label: isArgentina ? 'Facturas A/B/C' : 'Facturas', value: stats?.facturas || 0, description: 'Registradas', icon: FileText },
+    ...(!isArgentina ? [{ label: isColombia ? 'Boletas legacy' : 'Boletas', value: stats?.boletas || 0, description: isColombia ? 'Históricas' : 'Emitidos', icon: FileText }] : []),
     { label: 'Notas credito', value: stats?.notasCredito || 0, description: 'Notas emitidas', icon: FileText },
     { label: 'Contratos', value: stats?.contratos || 0, description: 'Registrados', icon: FileText },
-    {
+    ...(!isArgentina ? [{
       label: isColombia ? 'Pendientes legacy' : 'Pendientes envio',
       value: stats?.pendientesEnvio || 0,
       description: isColombia ? 'Gestionar en Centro CPE' : `Por enviar a ${country.servicioFiscal}`,
       icon: Send,
-    },
+    }] : []),
   ]
 
   if (documentosLoading && documentos.length === 0) {
@@ -310,7 +320,7 @@ export default function DocumentosPage() {
               <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground">Gestión Documental y Facturación Electrónica</h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 {isArgentina
-                  ? 'Repositorio de facturas A/B, notas, contratos y documentos emitidos mediante ARCA.'
+                  ? 'Historial de facturas A/B/C, notas y contratos. La clase, el estado fiscal y las muestras sin validez se consultan desde el comprobante ARCA vinculado.'
                   : isColombia
                     ? 'Repositorio histórico de documentos y representaciones. La emisión, firma y transmisión DIAN se gestionan exclusivamente desde el Centro CPE.'
                     : `Facturas, boletas, notas y contratos con validación ${country.servicioFiscal}.`}
@@ -355,15 +365,15 @@ export default function DocumentosPage() {
               <span className={labelClass}>Tipo</span>
               <select className={inputClass} value={filters.tipo_documento} onChange={(event) => setFilters((prev) => ({ ...prev, tipo_documento: event.target.value }))}>
                 <option value="">Todos los tipos</option>
-                <option value="FACTURA">Facturas</option>
-                <option value="BOLETA">{isArgentina ? 'Facturas B' : isColombia ? 'Boletas legacy' : 'Boletas'}</option>
+                <option value="FACTURA">{isArgentina ? 'Facturas A/B/C' : 'Facturas'}</option>
+                {!isArgentina && <option value="BOLETA">{isColombia ? 'Boletas legacy' : 'Boletas'}</option>}
                 <option value="NOTA_CREDITO">Notas de Credito</option>
                 <option value="NOTA_DEBITO">Notas de Debito</option>
                 <option value="CONTRATO">Contratos</option>
               </select>
             </label>
             <label className="space-y-2">
-              <span className={labelClass}>Estado</span>
+              <span className={labelClass}>{isArgentina ? 'Estado del registro histórico' : 'Estado'}</span>
               <select className={inputClass} value={filters.estado} onChange={(event) => setFilters((prev) => ({ ...prev, estado: event.target.value }))}>
                 <option value="">Todos</option>
                 <option value="BORRADOR">Borrador</option>
@@ -446,7 +456,7 @@ export default function DocumentosPage() {
                   <tbody className="divide-y divide-cyan-400/10">
                     {documentos.map((documento) => (
                       <tr key={documento.id} className="bg-card/35 text-foreground/90 transition hover:bg-card/70">
-                        <td className="px-4 py-3 font-semibold text-foreground">{getTipoDocumentoDisplay(documento.tipo_documento)}</td>
+                        <td className="px-4 py-3 font-semibold text-foreground">{getTipoDocumentoDisplay(documento)}</td>
                         <td className="px-4 py-3 font-mono font-semibold text-foreground">
                           {formatFiscalDocumentNumber(country.paisCodigo, documento.serie, documento.numero)}
                         </td>
@@ -458,14 +468,17 @@ export default function DocumentosPage() {
                         <td className="px-4 py-3 text-right font-bold text-primary">{documento.moneda} {documento.total.toFixed(2)}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${estadoClasses[documento.estado] || estadoClasses.BORRADOR}`}>
-                            {getEstadoText(documento.estado)}
+                            {isArgentina
+                              ? documento.arca?.is_demo ? 'MUESTRA LOCAL · SIN VALIDEZ ARCA'
+                                : documento.arca ? getEstadoText(documento.arca.estado) : 'Consultar en Centro ARCA'
+                              : getEstadoText(documento.estado)}
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap justify-end gap-2">
                             {documento.estado === 'BORRADOR' && (
                               <>
-                                {isColombia ? (
+                                {fiscalHistoryOnly ? (
                                   <Button
                                     type="button"
                                     size="sm"
@@ -502,7 +515,7 @@ export default function DocumentosPage() {
                             )}
                             {documento.estado === 'EMITIDO' && (
                               <>
-                                {!isColombia && ['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
+                                {!fiscalHistoryOnly && ['FACTURA', 'BOLETA'].includes(documento.tipo_documento) && (
                                   <Button type="button" size="sm" onClick={() => enviarFiscal(documento.id)} className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500">
                                     <Send className="h-4 w-4" />
                                     Enviar
@@ -530,7 +543,7 @@ export default function DocumentosPage() {
                                 )}
                               </>
                             )}
-                            {documento.estado === 'BORRADOR' && (
+                            {!isArgentina && documento.estado === 'BORRADOR' && (
                               <Button
                                 type="button"
                                 size="sm"
@@ -555,7 +568,7 @@ export default function DocumentosPage() {
                                 className="gap-1 border-amber-300/25 bg-amber-300/10 text-amber-400 hover:bg-amber-300/15 dark:text-amber-200"
                               >
                                 <XCircle className="h-4 w-4" />
-                                {isColombia ? 'Gestionar en Centro CPE' : 'Anular en CPE'}
+                                {isArgentina ? 'Ver en Centro ARCA' : isColombia ? 'Gestionar en Centro CPE' : 'Anular en CPE'}
                               </Button>
                             )}
                           </div>
@@ -624,7 +637,7 @@ export default function DocumentosPage() {
         </DialogContent>
       </Dialog>
 
-      {!isColombia && (
+      {!fiscalHistoryOnly && (
         <DocumentoModal
           isOpen={isModalOpen}
           onClose={() => {
