@@ -14,6 +14,11 @@ export interface ExcelSheet {
   columns: ExcelColumn[]
 }
 
+interface ExcelNumber {
+  value: number
+  format: 'Decimal' | 'Percentage'
+}
+
 /**
  * Export data to Excel file
  */
@@ -33,19 +38,19 @@ export function exportToExcel(sheets: ExcelSheet[], filename: string) {
   URL.revokeObjectURL(url)
 }
 
-function createSpreadsheetXml(sheets: ExcelSheet[]): string {
+export function createSpreadsheetXml(sheets: ExcelSheet[]): string {
   const worksheets = sheets.map(sheet => {
     const columns = sheet.columns
       .map(column => `<Column ss:Width="${(column.width || 15) * 7}"/>`)
       .join('')
 
     const headerRow = `<Row>${sheet.columns
-      .map(column => createCell(column.header, 'String'))
+      .map(column => createCell(column.header))
       .join('')}</Row>`
 
     const dataRows = sheet.data
       .map(row => `<Row>${sheet.columns
-        .map(column => createCell(row[column.key] ?? '', 'String'))
+        .map(column => createCell(row[column.key] ?? ''))
         .join('')}</Row>`)
       .join('')
 
@@ -59,12 +64,25 @@ function createSpreadsheetXml(sheets: ExcelSheet[]): string {
   xmlns:x="urn:schemas-microsoft-com:office:excel"
   xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
   xmlns:html="http://www.w3.org/TR/REC-html40">
+  <Styles>
+    <Style ss:ID="Decimal"><NumberFormat ss:Format="#,##0.00;(#,##0.00)"/></Style>
+    <Style ss:ID="Percentage"><NumberFormat ss:Format="0.00%"/></Style>
+  </Styles>
   ${worksheets}
 </Workbook>`
 }
 
-function createCell(value: unknown, type: 'String' | 'Number'): string {
-  return `<Cell><Data ss:Type="${type}">${escapeXml(String(value))}</Data></Cell>`
+function createCell(value: unknown): string {
+  let format: ExcelNumber['format'] | undefined
+  if (typeof value === 'object' && value !== null && 'value' in value && 'format' in value) {
+    const cell = value as ExcelNumber
+    if (cell.format !== 'Decimal' && cell.format !== 'Percentage') throw new Error('Formato de celda no admitido')
+    format = cell.format
+    value = cell.value
+  }
+  if (typeof value === 'number' && !Number.isFinite(value)) throw new Error('El reporte contiene un importe no válido')
+  const type = typeof value === 'number' ? 'Number' : 'String'
+  return `<Cell${format ? ` ss:StyleID="${format}"` : ''}><Data ss:Type="${type}">${escapeXml(String(value))}</Data></Cell>`
 }
 
 function escapeXml(value: string): string {
@@ -79,16 +97,14 @@ function escapeXml(value: string): string {
 /**
  * Format currency for Excel
  */
-export function formatCurrencyForExcel(amount: number): string {
-  return new Intl.NumberFormat('es-PE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amount)
+export function formatCurrencyForExcel(amount: number): ExcelNumber {
+  return { value: amount, format: 'Decimal' }
 }
 
 /**
  * Format percentage for Excel
  */
-export function formatPercentageForExcel(value: number): string {
-  return `${value.toFixed(2)}%`
+export function formatPercentageForExcel(value: number): ExcelNumber | '' {
+  // Una razón sin denominador no es un 0% ni un valor numérico exportable.
+  return Number.isFinite(value) ? { value: value / 100, format: 'Percentage' } : ''
 }

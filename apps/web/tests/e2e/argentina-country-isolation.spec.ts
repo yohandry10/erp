@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { SignJWT } from 'jose'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createSpreadsheetXml, formatCurrencyForExcel, formatPercentageForExcel } from '../../lib/excel-export'
 
 const baseURL = process.env.BASE_URL || 'http://localhost:3001'
 
@@ -243,6 +244,147 @@ test.describe('Argentina · aislamiento jurisdiccional y factura ARCA', () => {
     await demo.getByRole('button', { name: 'Ver en Centro ARCA' }).click()
     await expect(page).toHaveURL(/\/dashboard\/cpe\//)
     expect(writes.filter((url) => /\/api\/documentos\//.test(url))).toEqual([])
+  })
+
+  test('el asiento conserva el borrador y explica el período faltante para corregir y reintentar', async ({ page }) => {
+    const periodError = 'El período contable 2026-09 no existe. Debe crearse explícitamente antes de registrar movimientos.'
+    const submissions: Record<string, unknown>[] = []
+    let periodOpen = false
+    await page.route(/\/api\/contabilidad\/plan-cuentas\/?(?:\?|$)/, (route) => route.fulfill({
+      contentType: 'application/json', body: JSON.stringify({ success: true, data: [
+        { id: '11111111-1111-4111-8111-111111111111', codigo: '101', nombre: 'Caja' },
+        { id: '22222222-2222-4222-8222-222222222222', codigo: '50', nombre: 'Capital' },
+      ] }),
+    }))
+    await page.route(/\/api\/contabilidad\/asiento-contable\/?$/, (route) => {
+      submissions.push(route.request().postDataJSON())
+      return route.fulfill({ status: periodOpen ? 200 : 400, contentType: 'application/json', body: JSON.stringify(periodOpen
+        ? { success: true, data: { id: '33333333-3333-4333-8333-333333333333' } }
+        : { message: periodError }) })
+    })
+    await page.goto('/dashboard/contabilidad/asientos/nuevo/')
+    await page.locator('#asiento-form-fecha').fill('2026-09-04')
+    await page.locator('#asiento-form-referencia').fill('QA-AR-CONT-001')
+    await page.locator('#asiento-form-concepto').fill('Aporte de capital de prueba')
+    await page.locator('select').nth(0).selectOption({ label: '101 - Caja' })
+    await page.locator('select').nth(2).selectOption({ label: '50 - Capital' })
+    await page.getByPlaceholder('Descripcion del movimiento').nth(0).fill('Ingreso de capital')
+    await page.getByPlaceholder('Descripcion del movimiento').nth(1).fill('Contrapartida capital')
+    await page.locator('input[type="number"]').nth(0).fill('1000')
+    await page.locator('input[type="number"]').nth(3).fill('900')
+    await expect(page.getByRole('button', { name: 'Guardar asiento', exact: true })).toBeDisabled()
+    await page.locator('input[type="number"]').nth(3).fill('1000')
+    await page.getByRole('checkbox').check()
+    await page.getByRole('button', { name: 'Guardar asiento', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: periodError })).toBeVisible()
+    await expect(page.locator('#asiento-form-referencia')).toHaveValue('QA-AR-CONT-001')
+    await expect(page.locator('input[type="number"]').nth(0)).toHaveValue('1000')
+    await expect(page.getByRole('link', { name: 'Revisar períodos contables en otra pestaña' })).toHaveAttribute('target', '_blank')
+    expect(submissions).toHaveLength(1)
+    expect(submissions[0]).toMatchObject({ estado: 'BORRADOR', referencia: 'QA-AR-CONT-001' })
+    periodOpen = true
+    await page.getByRole('button', { name: 'Guardar asiento', exact: true }).click()
+    await expect.poll(() => submissions.length).toBe(2)
+    // El detalle se compila bajo demanda en el servidor local de esta suite.
+    await expect(page).toHaveURL(/\/asientos\/33333333-3333-4333-8333-333333333333/, { timeout: 20000 })
+    expect(submissions[1]).toEqual(submissions[0])
+  })
+
+  for (const superadmin of [false, true]) {
+    test(`reapertura de período: ${superadmin ? 'superadmin conserva el rechazo del servidor' : 'usuario de tenant no recibe una acción reservada'}`, async ({ page }) => {
+      if (superadmin) await page.route(/\/api\/auth\/profile\/?$/, (route) => route.fulfill({
+        contentType: 'application/json', body: JSON.stringify({ ...user, is_super_admin: true }),
+      }))
+      await page.route(/\/api\/contabilidad\/periodos\/44444444-4444-4444-8444-444444444444\/?$/, (route) => route.fulfill({
+        contentType: 'application/json', body: JSON.stringify({ success: true, data: {
+          id: '44444444-4444-4444-8444-444444444444', anio: 2026, mes: 8, estado: 'CERRADO',
+          fecha_cierre: '2026-09-04', created_at: '2026-09-04', updated_at: '2026-09-04',
+        } }),
+      }))
+      let writes = 0
+      await page.route(/\/api\/contabilidad\/periodos\/44444444-4444-4444-8444-444444444444\/reabrir\/?$/, (route) => {
+        writes++
+        return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ message: 'Reapertura denegada por el servidor' }) })
+      })
+      await page.goto('/dashboard/contabilidad/periodos/44444444-4444-4444-8444-444444444444/')
+      await expect(page.getByRole('heading', { name: 'Período Cerrado', exact: true })).toBeVisible({ timeout: 20000 })
+      const reopen = page.getByRole('button', { name: 'Reabrir Período (Superadmin)', exact: true })
+      if (!superadmin) {
+        await expect(reopen).toHaveCount(0)
+        expect(writes).toBe(0)
+      } else {
+        await reopen.click()
+        await page.getByRole('button', { name: 'Confirmar', exact: true }).click()
+        await expect(page.getByRole('alert').filter({ hasText: 'Reapertura denegada por el servidor' })).toBeVisible()
+        await expect(page.getByRole('heading', { name: 'Período Cerrado', exact: true })).toBeVisible()
+        expect(writes).toBe(1)
+      }
+      await expect(page.locator('body')).not.toContainText('setiembre')
+    })
+  }
+
+  test('la exportación conserva importes numéricos e identificadores de texto', () => {
+    const xml = createSpreadsheetXml([{ name: 'Contabilidad AR', columns: [
+      { header: 'Cuenta', key: 'cuenta' }, { header: 'Importe (ARS)', key: 'importe' },
+      { header: 'Proporción', key: 'porcentaje' },
+    ], data: [
+      { cuenta: '00101', importe: formatCurrencyForExcel(1200.25), porcentaje: formatPercentageForExcel(21) },
+      { cuenta: '=1+1 & <texto>', importe: formatCurrencyForExcel(-1200.25), porcentaje: formatPercentageForExcel(Number.NaN) },
+    ] }])
+    expect(xml).toContain('<Data ss:Type="Number">1200.25</Data>')
+    expect(xml).toContain('<Data ss:Type="Number">-1200.25</Data>')
+    expect(xml).toContain('<Data ss:Type="Number">0.21</Data>')
+    expect(xml).toContain('<Data ss:Type="String">00101</Data>')
+    expect(xml).toContain('<Data ss:Type="String">=1+1 &amp; &lt;texto&gt;</Data>')
+    expect(xml).not.toMatch(/ss:Formula|NaN|Infinity/)
+    expect(() => createSpreadsheetXml([{ name: 'Error', columns: [{ header: 'Monto', key: 'monto' }], data: [{ monto: formatCurrencyForExcel(Infinity) }] }])).toThrow('importe no válido')
+  })
+
+  test('los estados descargan moneda e importes utilizables y no dividen entre cero', async ({ page }, testInfo) => {
+    await page.route(/\/api\/contabilidad\/estados\/estado-resultados\/?(?:\?|$)/, (route) => route.fulfill({
+      contentType: 'application/json', body: JSON.stringify({ success: true, data: {
+        ingresos: { ventas: 0, otros_ingresos: 0, total_ingresos: 0 },
+        costos: { costo_ventas: 0, utilidad_bruta: 0 },
+        gastos: { gastos_administrativos: 0, gastos_ventas: 0, gastos_financieros: 0, total_gastos: 0 }, utilidad_neta: 0,
+      } }),
+    }))
+    await page.route(/\/api\/contabilidad\/estados\/balance-general\/?(?:\?|$)/, (route) => route.fulfill({
+      contentType: 'application/json', body: JSON.stringify({ success: true, data: {
+        activos: { corrientes: { efectivo: 1200, cuentas_por_cobrar: 0, inventarios: 0, otros_activos: 0, total_corrientes: 1200 },
+          no_corrientes: { activos_fijos: 100, depreciacion_acumulada: 10, activos_fijos_neto: 90, otros_activos: 0, total_no_corrientes: 90 }, total_activos: 1290 },
+        pasivos: { corrientes: { cuentas_por_pagar: 90, tributos_por_pagar: 0, remuneraciones_por_pagar: 0, otros_pasivos: 0, total_corrientes: 90 },
+          no_corrientes: { deudas_largo_plazo: 0, otros_pasivos: 0, total_no_corrientes: 0 }, total_pasivos: 90 },
+        patrimonio: { capital: 1200, resultados_acumulados: 0, resultado_ejercicio: 0, total_patrimonio: 1200 },
+      } }),
+    }))
+    await page.goto('/dashboard/contabilidad/estados/')
+    await page.getByRole('tab', { name: 'Balance General', exact: true }).click()
+    await expect(page.getByText('Total activos', { exact: true }).first()).toBeVisible()
+    const excelPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Exportar Excel', exact: true }).click()
+    const excel = await excelPromise
+    await excel.saveAs(testInfo.outputPath('balance-general.xls'))
+    const xml = fs.readFileSync((await excel.path())!, 'utf8')
+    expect(xml).toContain('Monto (ARS)')
+    expect(xml).toContain('<Data ss:Type="Number">1200</Data>')
+    expect(xml).toContain('<Data ss:Type="Number">-10</Data>')
+    expect(xml).not.toMatch(/\[object Object\]|ss:Type="String">1,200/)
+    const pdfPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Exportar PDF', exact: true }).click()
+    const pdf = await pdfPromise
+    await pdf.saveAs(testInfo.outputPath('balance-general.pdf'))
+    const pdfBytes = fs.readFileSync((await pdf.path())!)
+    expect(pdfBytes.subarray(0, 5).toString()).toBe('%PDF-')
+    expect(pdfBytes.toString('latin1')).toContain('1.200,00')
+    await page.getByRole('tab', { name: 'Estado de Resultados', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Estado de Resultados (P&L)', exact: true })).toBeVisible()
+    const resultsPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Exportar PDF', exact: true }).click()
+    const results = await resultsPromise
+    await results.saveAs(testInfo.outputPath('estado-resultados-sin-ingresos.pdf'))
+    const resultText = fs.readFileSync((await results.path())!).toString('latin1')
+    expect(resultText).not.toMatch(/NaN|Infinity|100\.00%/)
+    expect(resultText).toContain('No aplica')
   })
 
   test('el centro de ayuda sólo ofrece fichas y contenido argentinos', async ({ page }) => {

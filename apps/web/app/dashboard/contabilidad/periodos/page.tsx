@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { AlertCircle, Calendar, Lock, Loader2, PlusCircle, RefreshCw, ShieldAlert, Unlock } from 'lucide-react'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
 import { useApi } from '@/hooks/use-api'
+import { useCountryContext } from '@/hooks/use-country-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -24,6 +25,7 @@ interface Periodo {
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-primary/80'
 
 export default function PeriodosPage() {
+  const country = useCountryContext()
   const router = useRouter()
   const [periodos, setPeriodos] = useState<Periodo[]>([])
   const [loading, setLoading] = useState(true)
@@ -270,7 +272,7 @@ export default function PeriodosPage() {
                         <td className="px-4 py-3">{getEstadoBadge(periodo.estado)}</td>
                         <td className="px-4 py-3 text-muted-foreground">
                           {periodo.fecha_cierre
-                            ? parseDateLocal(periodo.fecha_cierre).toLocaleDateString('es-PE', {
+                            ? parseDateLocal(periodo.fecha_cierre).toLocaleDateString(country.locale, {
                                 year: 'numeric',
                                 month: 'short',
                                 day: 'numeric',
