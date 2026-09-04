@@ -43,15 +43,18 @@ El release Colombia `529..532` se promovió el 2026-08-31 mediante el PR
 reconstrucción limpia de PostgreSQL 16, los verificadores vigentes e históricos,
 281 suites/2673 pruebas API, 46 pruebas Playwright, lint, type-check, builds,
 CodeQL, auditoría de dependencias y el contrato DIAN oficial. Las migraciones se
-aplicaron DB-first con preflight y respaldo verificable; Render y Vercel sirven
-el mismo SHA. `/health/ready` confirma
+aplicaron DB-first con preflight y respaldo verificable; Render y Vercel
+sirvieron ese mismo SHA. En ese corte, `/health/ready` confirmó
 `schema_version = required_schema_version = 532`, DB y Redis listos y outbox sin
 filas claimable, processing, failed ni stale. Los siete `dead_letter` restantes
-son históricos. Falta la revalidación visual autenticada del flujo Colombia en
-PROD y, por contribuyente, los gates externos descritos abajo.
+eran históricos. El release 533-534/#99 que lo reemplaza y sus gates vigentes se
+describen a continuación.
 
-El candidato siguiente añade `533..534` y, al corte del 2026-09-04, está
-**verificado sólo localmente y pre-PR**. La 533 hace fail-closed la procedencia
+El release siguiente añade `533..534`. El PR
+[#98](https://github.com/yohandry10/erp/pull/98) quedó fusionado en `main` el
+2026-09-04 como `e09c3945042cb95aca7bdef697c837908c57d983`; sus 24 checks y
+los tres workflows de `main` —CI, E2E aislado y Security Scan— terminaron en
+verde. La 533 hace fail-closed la procedencia
 de CPE de demos Colombia: representación local no UBL/sin firma, sin
 `SEND`/`QUERY`, aceptación ni evidencia externa, incluso después de convertir
 el tenant a real. La 534 implementa el flujo atómico RMA→Nota Crédito DIAN `91`:
@@ -61,13 +64,46 @@ efecto y permite corregir/reintentar. La respuesta comercial usa la procedencia
 persistida del CPE, reconsultada por `id + tenant_id`, y falla cerrado si no es
 inequívoca; no decide con `empresa_config` mutable.
 
-Su evidencia pre-PR es 283 suites/2693 pruebas API, type-check y builds API/Web,
+La evidencia del release es 283 suites/2693 pruebas API, type-check y builds API/Web,
 52 pruebas Playwright más 1 contrato visual móvil, nueve XML DIAN y una
 reconstrucción limpia PostgreSQL 16 con 531 migraciones, 44 verificadores
-vigentes y 67 históricos hasta la 534. Esto no autoriza producción: faltan PR,
-CI remoto, preflight y respaldo PROD, promoción DB-first `533..534`, despliegue
-Render/Vercel, postchecks y retest visual autenticado sobre el mismo SHA. PROD
-permanece en 532 mientras esa cadena no termine.
+vigentes y 67 históricos hasta la 534. Antes de escribir se ejecutó el preflight
+PROD y se creó el respaldo custom PostgreSQL 17
+`artifacts/db-backups/prod-pre-533-534-20260904T085500Z.dump`: 16 530 787 bytes,
+6 138 entradas de catálogo y SHA-256
+`F34592FDD8F7A08B7FA3ECECF3E57CA4F86930B1B876DFD0AA2256D9E50E4E2E`.
+El 2026-09-04 se promovieron en orden 533 y 534 exclusivamente a
+`wypnbcptofqdmoynlonq`; los conteos se conservaron en 90 tenants, 84 CPE y cero
+RMA. PROD registra 534, RLS activo en las cuatro tablas RMA, cero funciones
+internas con `EXECUTE` público y los wrappers únicamente para `service_role`.
+Los verificadores exactos 533/534 están diseñados para una base efímera,
+escriben datos sintéticos dentro de `ROLLBACK` y rechazan expresamente PROD;
+por eso allí se ejecutaron postchecks equivalentes de sólo lectura, no se anuló
+su guard. El `db push --include-all --dry-run` detectó además deriva histórica
+003..382, por lo que no se ejecutó una promoción masiva: se aplicaron sólo los
+dos SQL versionados y se reparó únicamente su historia como `applied`.
+
+El primer retest productivo detectó una incompatibilidad acotada: una demo CO
+con resolución legítimamente sin prefijo no podía persistir su representación
+local. El PR [#99](https://github.com/yohandry10/erp/pull/99) centralizó la
+resolución de serie demo y usa `DEMO` exclusivamente como identificador local,
+nunca como prefijo DIAN autorizado ni como dato transmisible. Sus 24 checks
+quedaron verdes y se fusionó como
+`dd813abfbcd78c2139de6e129562ba791e75cd4b`.
+
+Render desplegó ese SHA en `dep-dadeknrm8hqs73fdr9sg` y quedó `Live`;
+`/health/version` coincide exactamente, mientras `/health/ready` confirma DB y
+Redis listos, esquema 534 requerido/aplicado, cero filas claimable, processing,
+failed o stale y siete `dead_letter` históricos. GitHub/Vercel registra un
+deployment `Production` exitoso del mismo SHA y el alias productivo responde.
+En el navegador integrado, una demo oficial CO creó `DEMO1` por COP 119.000,
+mostró `MUESTRA LOCAL`, abrió un A4 marcado `Muestra demo · sin validez DIAN` y
+mantuvo envío/consulta/aceptación reales bloqueados. Un `503` controlado del
+estado demo conservó esos bloqueos; después de restaurar la red, una recarga
+limpia no mostró errores de consola ni respuestas HTTP fallidas. RMA no tuvo una
+venta elegible y su botón de creación permaneció deshabilitado; la neutralidad
+de CxC y el bloqueo de NC 91 fiscal en demo tienen evidencia API/SQL, no un
+recorrido visible de aceptación DIAN.
 
 La regla estable se mantiene: después de cada deploy, `/health/ready` debe
 informar `schema_version = required_schema_version`; que el esquema supere un
@@ -149,7 +185,7 @@ continúe el rechazo `2112`.
 
 ## Colombia DIAN
 
-El alcance funcional interno FEV del candidato 533-534 queda cubierto por
+El alcance funcional interno FEV del release 533-534 queda cubierto por
 código, una reconstrucción PostgreSQL 16 desde cero con 531 migraciones, 44
 verificadores vigentes y 67 históricos, y 283 suites/2693 pruebas API. El perfil
 aislado completo pasa 52 pruebas Playwright más 1 contrato visual móvil;
@@ -161,30 +197,30 @@ resolución/rango, trust/pins, ejecutar `GetNumberingRange` y `SendTestSetAsync`
 conservar el resultado terminal, acreditar `HABILITADO` en el portal y realizar
 el smoke oficial de factura, notas, adjunto y eventos.
 
-La base desplegada hasta 532 implementa el núcleo FEV 1.9, la aceptación
+La base de código implementa el núcleo FEV 1.9, la aceptación
 estricta 528, las notas desde UI 529, la numeración/idempotencia reforzada 530,
 el snapshot transaccional de pedidos 531 y el guard jurisdiccional RMA 532. La factura CO
 real nace como UBL DIAN nativo firmado; la UI no puede escoger el consecutivo ni
 el prefijo que DIAN haya asignado —y admite una resolución sin prefijo—, y el
 retry no puede cambiar cliente, fechas, pago o perfil receptor.
-El candidato 533 sella la procedencia demo CO y el 534 completa RMA→NC DIAN 91
-sin efecto financiero hasta aceptación; ambos siguen pre-PR. También se
+La 533 sella la procedencia demo CO y la 534 completa RMA→NC DIAN 91 sin efecto
+financiero hasta aceptación; ambas están fusionadas y promovidas en PROD.
+También se
 implementan los eventos FEV 030-034 sobre anclas emitidas/recibidas, pero nada de ello
 habilita por sí solo a ningún contribuyente ni constituye RADIAN integral. Antes
 de un go-live colombiano deben cumplirse, en este orden:
 
-1. Abrir el PR del candidato 533-534 y exigir CI verde: gate oficial de nueve
-   XML con `ProfileID` normativos, 283 suites/2693 pruebas API, type-check y
-   builds API/Web, 52 Playwright más 1 visual móvil, y reconstrucción PostgreSQL
-   16 con 531 migraciones, 44 verificadores vigentes y 67 históricos hasta 534.
-   Las pruebas Chrome usan APIs interceptadas y no sustituyen el backend
-   productivo.
+1. Mantener alineados API/worker y Web con el SHA release, y exigir que
+   `/health/ready` obtenga el esquema requerido. Para 533-534 esta compuerta se
+   cerró en `dd813ab`/534 y la muestra demo pasó el retest visible. Las pruebas
+   Chrome aisladas y la demo local nunca sustituyen una respuesta DIAN real.
 2. Configurar el bundle CA público y los pins SHA-256 de SPKI oficiales en el
    runtime. Una fuente ambigua, cadena no confiable o pin divergente debe fallar
    cerrado; nunca usar el PFX privado del tenant como trust store.
-3. Tras preflight, respaldo y ensayo transaccional, promover `533..534`
-   DB-first y comprobar `schema_version = required_schema_version = 534` antes
-   de desplegar API/worker y Web. El preflight de 533 debe abortar ante cualquier
+3. Para una promoción futura equivalente, ejecutar preflight, respaldo y ensayo
+   transaccional, promover DB-first y comprobar
+   `schema_version = required_schema_version` antes de desplegar API/worker y
+   Web. El preflight de 533 debe abortar ante cualquier
    demo CO con estado/evidencia externa o una operación fiscal reclamada; no
    corrige historia ambigua. El de 534 exige los contratos RMA 456/532 y notas
    DIAN 529. Después de aplicar, ejecutar sus verificadores vigentes y los
@@ -221,9 +257,9 @@ La fuente primaria para el requisito separado es el
 [Abecé RADIAN oficial vigente](https://micrositios.dian.gov.co/sistema-de-facturacion-electronica/abece-radian/),
 consultado el 2026-08-29. Sin PFX, Software ID/PIN, TestSet FEV,
 resolución/numeración, trust/pins y estado portal `HABILITADO` reales, el estado
-correcto es: **base 532 técnicamente implementada y desplegada; candidato
-533-534 técnicamente probado sólo en local; contribuyente no homologado ni listo
-para emitir legalmente**. Para RADIAN directo faltan además su registro,
+correcto es: **release 533-534 técnicamente implementado, probado, fusionado,
+desplegado y revalidado para la muestra local; contribuyente no homologado ni
+listo para emitir legalmente**. Para RADIAN directo faltan además su registro,
 requisitos y Set de 15 eventos. Las demos permanecen simuladas y no contactan
 DIAN.
 
@@ -266,11 +302,10 @@ correctivo probado. Nunca improvisarlo sobre PROD.
 ## Bloqueantes actuales
 
 - Certificado productivo compatible con el RUC.
-- Interno Colombia: la base 532 está desplegada en
-  `f6455355d12c8834a0c77a73b238647119dff04a`, pero su revalidación visual/API
-  autenticada sigue pendiente. Para el candidato 533-534 faltan además PR/CI,
-  preflight y respaldo PROD, promoción DB-first, despliegues Render/Vercel y
-  retest visual sobre el mismo SHA.
+- Interno Colombia: código, PR/CI, respaldo, promoción DB-first 533-534,
+  Render/Vercel y retest visible de la muestra CPE están cerrados en
+  `dd813ab`/534. El circuito comercial completo y RMA→NC 91 real siguen sin
+  recorrido visual productivo porque requieren una factura `01` aceptada.
 - Para Colombia: PFX compatible con el NIT, Software ID/PIN, TestSet,
   resolución/numeración, trust store/pins y constancia `HABILITADO` del portal;
   falta ejecutar y conservar el TestSet FEV y smoke DIAN reales. Para operación
