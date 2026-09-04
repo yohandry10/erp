@@ -123,26 +123,26 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
 
     const margenBruto = data.ingresos.total_ingresos > 0
       ? (data.costos.utilidad_bruta / data.ingresos.total_ingresos) * 100
-      : 0
+      : Number.NaN
     const margenNeto = data.ingresos.total_ingresos > 0
       ? (data.utilidad_neta / data.ingresos.total_ingresos) * 100
-      : 0
+      : Number.NaN
 
     const exportData = [
       { Concepto: 'INGRESOS', Monto: '', Porcentaje: '' },
       { Concepto: 'Ventas', Monto: formatCurrencyForExcel(data.ingresos.ventas), Porcentaje: '' },
       { Concepto: 'Otros Ingresos', Monto: formatCurrencyForExcel(data.ingresos.otros_ingresos), Porcentaje: '' },
-      { Concepto: 'Total Ingresos', Monto: formatCurrencyForExcel(data.ingresos.total_ingresos), Porcentaje: '100.00%' },
+      { Concepto: 'Total Ingresos', Monto: formatCurrencyForExcel(data.ingresos.total_ingresos), Porcentaje: data.ingresos.total_ingresos !== 0 ? formatPercentageForExcel(100) : '' },
       { Concepto: '', Monto: '', Porcentaje: '' },
       { Concepto: 'COSTOS', Monto: '', Porcentaje: '' },
-      { Concepto: 'Costo de Ventas', Monto: `(${formatCurrencyForExcel(data.costos.costo_ventas)})`, Porcentaje: formatPercentageForExcel((data.costos.costo_ventas / data.ingresos.total_ingresos) * 100) },
+      { Concepto: 'Costo de Ventas', Monto: formatCurrencyForExcel(-data.costos.costo_ventas), Porcentaje: formatPercentageForExcel((data.costos.costo_ventas / data.ingresos.total_ingresos) * 100) },
       { Concepto: 'Utilidad Bruta', Monto: formatCurrencyForExcel(data.costos.utilidad_bruta), Porcentaje: formatPercentageForExcel(margenBruto) },
       { Concepto: '', Monto: '', Porcentaje: '' },
       { Concepto: 'GASTOS OPERATIVOS', Monto: '', Porcentaje: '' },
-      { Concepto: 'Gastos Administrativos', Monto: `(${formatCurrencyForExcel(data.gastos.gastos_administrativos)})`, Porcentaje: formatPercentageForExcel((data.gastos.gastos_administrativos / data.ingresos.total_ingresos) * 100) },
-      { Concepto: 'Gastos de Ventas', Monto: `(${formatCurrencyForExcel(data.gastos.gastos_ventas)})`, Porcentaje: formatPercentageForExcel((data.gastos.gastos_ventas / data.ingresos.total_ingresos) * 100) },
-      { Concepto: 'Gastos Financieros', Monto: `(${formatCurrencyForExcel(data.gastos.gastos_financieros)})`, Porcentaje: formatPercentageForExcel((data.gastos.gastos_financieros / data.ingresos.total_ingresos) * 100) },
-      { Concepto: 'Total Gastos', Monto: `(${formatCurrencyForExcel(data.gastos.total_gastos)})`, Porcentaje: formatPercentageForExcel((data.gastos.total_gastos / data.ingresos.total_ingresos) * 100) },
+      { Concepto: 'Gastos Administrativos', Monto: formatCurrencyForExcel(-data.gastos.gastos_administrativos), Porcentaje: formatPercentageForExcel((data.gastos.gastos_administrativos / data.ingresos.total_ingresos) * 100) },
+      { Concepto: 'Gastos de Ventas', Monto: formatCurrencyForExcel(-data.gastos.gastos_ventas), Porcentaje: formatPercentageForExcel((data.gastos.gastos_ventas / data.ingresos.total_ingresos) * 100) },
+      { Concepto: 'Gastos Financieros', Monto: formatCurrencyForExcel(-data.gastos.gastos_financieros), Porcentaje: formatPercentageForExcel((data.gastos.gastos_financieros / data.ingresos.total_ingresos) * 100) },
+      { Concepto: 'Total Gastos', Monto: formatCurrencyForExcel(-data.gastos.total_gastos), Porcentaje: formatPercentageForExcel((data.gastos.total_gastos / data.ingresos.total_ingresos) * 100) },
       { Concepto: '', Monto: '', Porcentaje: '' },
       { Concepto: 'UTILIDAD NETA', Monto: formatCurrencyForExcel(data.utilidad_neta), Porcentaje: formatPercentageForExcel(margenNeto) }
     ]
@@ -154,7 +154,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
           data: exportData,
           columns: [
             { header: 'Concepto', key: 'Concepto', width: 35 },
-            { header: 'Monto', key: 'Monto', width: 20 },
+            { header: `Monto (${country.moneda})`, key: 'Monto', width: 20 },
             { header: '% sobre Ingresos', key: 'Porcentaje', width: 18 }
           ]
         }
@@ -169,7 +169,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
       return
     }
 
-    exportEstadoResultadosToPDF(data, anio, mes, country.moneda)
+    exportEstadoResultadosToPDF(data, anio, mes, country.moneda, country.locale)
   }
 
   if (loading) {

@@ -7,6 +7,7 @@ import { ArrowLeft, FileText, Loader2, RefreshCw } from 'lucide-react'
 import AsientoForm from '@/components/contabilidad/AsientoForm'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { useToast } from '@/components/ui/use-toast'
 
 interface Cuenta {
   id: string
@@ -34,7 +35,8 @@ interface AsientoFormData {
 
 export default function NuevoAsientoPage() {
   const router = useRouter()
-  const { get, post } = useApi()
+  const { get, post } = useApi({ throwOnError: true, showErrorToast: false })
+  const { toast } = useToast()
 
   const [cuentas, setCuentas] = useState<Cuenta[]>([])
   const [centrosCosto, setCentrosCosto] = useState<CentroCosto[]>([])
@@ -76,11 +78,9 @@ export default function NuevoAsientoPage() {
       })
 
       if (response?.success) {
-        alert(
-          comoBorrador
+        toast({ title: comoBorrador ? 'Borrador guardado' : 'Asiento creado', description: comoBorrador
             ? 'Asiento guardado como borrador. Podra corregirlo antes de confirmarlo.'
-            : 'Asiento contable creado exitosamente'
-        )
+            : 'Asiento contable creado exitosamente' })
         router.push(`/dashboard/contabilidad/asientos/${response.data.id}`)
       } else {
         throw new Error(response?.message || 'Error al crear el asiento')
@@ -88,7 +88,6 @@ export default function NuevoAsientoPage() {
     } catch (err: any) {
       console.error('Error creating asiento:', err)
       setError(err.message || 'Error al crear el asiento contable')
-      alert(`Error: ${err.message || 'Error al crear el asiento contable'}`)
     } finally {
       setLoading(false)
     }
@@ -178,6 +177,16 @@ export default function NuevoAsientoPage() {
             </span>
           </label>
         </section>
+
+        {error && (
+          <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-foreground">
+            <p className="font-semibold">No se pudo confirmar el guardado</p>
+            <p className="mt-1 text-sm">{error}</p>
+            <a href="/dashboard/contabilidad/periodos/" target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-primary underline">
+              Revisar períodos contables en otra pestaña
+            </a>
+          </div>
+        )}
 
         <AsientoForm
           onSubmit={handleSubmit}

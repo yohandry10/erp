@@ -146,7 +146,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
       { Concepto: '', Monto: '' },
       { Concepto: 'Activos No Corrientes', Monto: '' },
       { Concepto: '  Activos Fijos', Monto: formatCurrencyForExcel(data.activos.no_corrientes.activos_fijos) },
-      { Concepto: '  (-) Depreciación Acumulada', Monto: `(${formatCurrencyForExcel(data.activos.no_corrientes.depreciacion_acumulada)})` },
+      { Concepto: '  (-) Depreciación Acumulada', Monto: formatCurrencyForExcel(-data.activos.no_corrientes.depreciacion_acumulada) },
       { Concepto: '  Otros Activos', Monto: formatCurrencyForExcel(data.activos.no_corrientes.otros_activos) },
       { Concepto: 'Total Activos No Corrientes', Monto: formatCurrencyForExcel(data.activos.no_corrientes.total_no_corrientes) },
       { Concepto: '', Monto: '' },
@@ -187,7 +187,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
           data: exportData,
           columns: [
             { header: 'Concepto', key: 'Concepto', width: 40 },
-            { header: 'Monto', key: 'Monto', width: 20 },
+            { header: `Monto (${country.moneda})`, key: 'Monto', width: 20 },
           ],
         },
       ],
@@ -201,7 +201,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
       return
     }
 
-    exportBalanceGeneralToPDF(data, anio, mes, country.moneda)
+    exportBalanceGeneralToPDF(data, anio, mes, country.moneda, country.locale)
   }
 
   const renderLine = (item: LineItem) => (
