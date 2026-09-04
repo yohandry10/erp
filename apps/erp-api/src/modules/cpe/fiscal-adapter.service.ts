@@ -80,6 +80,33 @@ export class FiscalAdapterService {
     return dianService.prepararContextoFacturaAntesDeReserva(intent, tenantId);
   }
 
+  /** Consulta la cotización oficial WSFEv1 antes de reservar una venta AR. */
+  async obtenerCotizacionOficialArca(
+    moneda: string,
+    fecha: Date | string,
+    tenantId: string,
+  ): Promise<{ monedaArca: string; cotizacion: number; fecha: string }> {
+    const paisId = await this.obtenerPaisTenant(tenantId);
+    this.assertExpectedCountry(paisId, 'AR');
+    const emisionConfig = await this.obtenerEmisionConfig(tenantId);
+    if (emisionConfig.isDemo) {
+      throw new ServiceUnavailableException(
+        'La demo Argentina no consulta una cotización oficial ni emite en moneda extranjera.',
+      );
+    }
+    const fiscalService = this.fiscalServiceFactory.getServiceByPaisId(paisId);
+    const arcaService = fiscalService as typeof fiscalService & {
+      obtenerCotizacionOficial?: (
+        currency: string,
+        issueDate: Date | string,
+      ) => Promise<{ monedaArca: string; cotizacion: number; fecha: string }>;
+    };
+    if (typeof arcaService.obtenerCotizacionOficial !== 'function') {
+      throw new ServiceUnavailableException('La consulta de cotización oficial ARCA no está disponible.');
+    }
+    return arcaService.obtenerCotizacionOficial(moneda, fecha);
+  }
+
   /** Genera y firma el UBL del país sin efectuar I/O con la autoridad fiscal. */
   async generarYFirmarDocumentoSinTransmitir(
     documento: DocumentoElectronico,

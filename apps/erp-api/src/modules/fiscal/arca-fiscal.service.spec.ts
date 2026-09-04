@@ -71,7 +71,7 @@ describe('ArcaFiscalService', () => {
     );
 
     expect(result.valido).toBe(false);
-    expect(result.errores.join(' ')).toContain('este release: ARS');
+    expect(result.errores.join(' ')).toContain('use ARS o USD');
     expect(result.errores.join(' ')).toContain('Subtotal + IVA');
     expect(result.errores.join(' ')).toContain('18%');
   });
@@ -82,6 +82,141 @@ describe('ArcaFiscalService', () => {
     expect(xml).toContain('<Tipo>1</Tipo>');
     expect(xml).toContain('<Moneda>ARS</Moneda>');
     expect(xml).toContain('<IVA>21.00</IVA>');
+  });
+
+  it('emite USD con cotización oficial persistida y CanMisMonExt', async () => {
+    const fiscalDocument = documento({
+      moneda: 'USD',
+      arcaPagoMismaMoneda: 'S',
+      arcaCotizacion: 1325.75,
+    });
+
+    await expect(service.validarDocumento(fiscalDocument)).resolves.toMatchObject({ valido: true });
+    const xml = (service as any).buildAuthorizeRequest(
+      { cuit: '30710158229', puntoVenta: 12 },
+      { token: 't', sign: 's' },
+      fiscalDocument,
+      1,
+      40,
+      1,
+    );
+
+    expect(xml).toContain('<ar:MonId>DOL</ar:MonId>');
+    expect(xml).toContain('<ar:MonCotiz>1325.750000</ar:MonCotiz>');
+    expect(xml).toContain('<ar:CanMisMonExt>S</ar:CanMisMonExt>');
+    const qr = (service as any).buildQrUrl(
+      { cuit: '30710158229', puntoVenta: 12 },
+      fiscalDocument,
+      1,
+      40,
+      '75000000000000',
+    );
+    const payload = JSON.parse(
+      Buffer.from(new URL(qr).searchParams.get('p') as string, 'base64').toString('utf8'),
+    );
+    expect(payload).toMatchObject({ moneda: 'DOL', ctz: 1325.75 });
+  });
+
+  it('consulta FEParamGetCotizacion por moneda y fecha fiscal exactas', async () => {
+    const config = {
+      environment: 'homologacion',
+      wsfeUrl: ARCA_ENDPOINTS.homologacion.wsfe,
+      activo: true,
+    };
+    jest.spyOn(service as any, 'loadTenantConfig').mockResolvedValue(config);
+    jest.spyOn(service as any, 'getAccessTicket').mockResolvedValue({ token: 't', sign: 's' });
+    const post = jest.spyOn(service as any, 'postSoap').mockResolvedValue(
+      '<ResultGet><MonId>DOL</MonId><MonCotiz>1325.75</MonCotiz><FchCotiz>20260904</FchCotiz></ResultGet>',
+    );
+
+    await expect(service.obtenerCotizacionOficial('USD', '2026-09-04')).resolves.toEqual({
+      monedaArca: 'DOL',
+      cotizacion: 1325.75,
+      fecha: '20260904',
+    });
+    expect(post.mock.calls[0][1]).toContain('<ar:MonId>DOL</ar:MonId>');
+    expect(post.mock.calls[0][1]).toContain('<ar:FchCotiz>20260904</ar:FchCotiz>');
+    jest.restoreAllMocks();
+  });
+
+  it('declara concepto servicios y sus tres fechas obligatorias en WSFEv1', async () => {
+    const fiscalDocument = documento({
+      arcaConcepto: 2,
+      arcaFechaServicioDesde: '2026-07-01',
+      arcaFechaServicioHasta: '2026-07-31',
+      arcaFechaVencimientoPago: '2026-08-10',
+    });
+
+    await expect(service.validarDocumento(fiscalDocument)).resolves.toMatchObject({ valido: true });
+    const xml = (service as any).buildAuthorizeRequest(
+      { cuit: '30710158229', puntoVenta: 12 },
+      { token: 't', sign: 's' },
+      fiscalDocument,
+      1,
+      40,
+      1,
+    );
+
+    expect(xml).toContain('<ar:Concepto>2</ar:Concepto>');
+    expect(xml).toContain('<ar:FchServDesde>20260701</ar:FchServDesde>');
+    expect(xml).toContain('<ar:FchServHasta>20260731</ar:FchServHasta>');
+    expect(xml).toContain('<ar:FchVtoPago>20260810</ar:FchVtoPago>');
+  });
+
+  it('rechaza servicios si falta una fecha obligatoria', async () => {
+    const result = await service.validarDocumento(documento({
+      arcaConcepto: 2,
+      arcaFechaServicioDesde: '2026-07-01',
+      arcaFechaServicioHasta: '2026-07-31',
+    }));
+
+    expect(result.valido).toBe(false);
+    expect(result.errores.join(' ')).toContain('FchVtoPago');
+  });
+
+  it('incluye otros tributos y cuadra ImpTotal con ImpTrib', async () => {
+    const fiscalDocument = documento({
+      totalTributos: 3,
+      importeTotal: 124,
+      arcaTributos: [{
+        id: 1,
+        descripcion: 'Impuestos nacionales',
+        baseImponible: 100,
+        alicuota: 3,
+        importe: 3,
+      }],
+    });
+
+    await expect(service.validarDocumento(fiscalDocument)).resolves.toMatchObject({ valido: true });
+    const xml = (service as any).buildAuthorizeRequest(
+      { cuit: '30710158229', puntoVenta: 12 },
+      { token: 't', sign: 's' },
+      fiscalDocument,
+      1,
+      40,
+      1,
+    );
+
+    expect(xml).toContain('<ar:ImpTrib>3.00</ar:ImpTrib>');
+    expect(xml).toContain('<ar:Tributos><ar:Tributo><ar:Id>1</ar:Id>');
+    expect(xml).toContain('<ar:Alic>3.00</ar:Alic><ar:Importe>3.00</ar:Importe>');
+  });
+
+  it('rechaza un importe de tributo manipulado', async () => {
+    const result = await service.validarDocumento(documento({
+      totalTributos: 7,
+      importeTotal: 128,
+      arcaTributos: [{
+        id: 99,
+        descripcion: 'Otro',
+        baseImponible: 100,
+        alicuota: 3,
+        importe: 7,
+      }],
+    }));
+
+    expect(result.valido).toBe(false);
+    expect(result.errores.join(' ')).toContain('base por alícuota');
   });
 
   /**

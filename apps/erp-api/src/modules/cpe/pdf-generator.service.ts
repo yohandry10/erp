@@ -1054,17 +1054,20 @@ export class PdfGeneratorService {
    */
   private addTotales(doc: any, cpeData: any, countryCode: string): void {
     const totalValue = Number(cpeData.total_venta ?? cpeData.total ?? 0);
+    const otherTaxLabel = countryCode === 'AR'
+      ? 'Otros tributos'
+      : countryCode === 'CO' ? 'INC' : 'ISC';
     const conditionalRows = [
       { label: 'Op. Gravadas', value: cpeData.total_gravadas },
       { label: 'Op. Exoneradas', value: cpeData.total_exoneradas },
       { label: 'Op. Inafectas', value: cpeData.total_inafectas },
       { label: 'Op. Gratuitas', value: cpeData.total_gratuitas },
       { label: 'Descuentos', value: cpeData.total_descuentos ?? cpeData.descuentos },
-      { label: 'ISC', value: cpeData.total_isc },
+      { label: otherTaxLabel, value: cpeData.total_isc },
       { label: 'ICBPER', value: cpeData.total_icbper },
       { label: this.getTaxLabel(cpeData, countryCode), value: cpeData.total_igv },
     ].filter((row) => Number.isFinite(Number(row.value)) && Math.abs(Number(row.value)) >= 0.005);
-    const sectionHeight = conditionalRows.length * 15 + 58;
+    const sectionHeight = conditionalRows.length * 15 + 58 + (countryCode === 'AR' ? 48 : 0);
     this.ensureVerticalSpace(doc, sectionHeight + 10);
     const startY = doc.y + 8;
     const labelX = 350;
@@ -1090,6 +1093,28 @@ export class PdfGeneratorService {
     const wordsY = currentY + 25;
     doc.text(`SON: ${montoEnLetras}`, 50, wordsY, { width: 315 });
     doc.y = wordsY + Math.max(14, this.measureTextHeight(doc, `SON: ${montoEnLetras}`, 315, 9)) + 4;
+
+    if (countryCode === 'AR') {
+      const metadata = cpeData.metadata && typeof cpeData.metadata === 'object'
+        ? cpeData.metadata
+        : {};
+      const tributes = Array.isArray(metadata.arca_tributos) ? metadata.arca_tributos : [];
+      const nationalIndirectTaxes = tributes
+        .filter((tribute: any) => [1, 4].includes(Number(tribute?.id)))
+        .reduce((sum: number, tribute: any) => {
+          const amount = Number(tribute?.importe ?? 0);
+          return sum + (Number.isFinite(amount) ? amount : 0);
+        }, 0);
+      const transparencyY = doc.y + 3;
+      doc.fontSize(8).font('Helvetica-Bold')
+        .text('Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)', 50, transparencyY, {
+          width: 300,
+        });
+      doc.fontSize(8).font('Helvetica')
+        .text(`IVA Contenido: ${cpeData.moneda || 'ARS'} ${this.formatMoney(Number(cpeData.total_igv || 0))}`, 50, transparencyY + 13, { width: 300 })
+        .text(`Otros Impuestos Nacionales Indirectos: ${cpeData.moneda || 'ARS'} ${this.formatMoney(nationalIndirectTaxes)}`, 50, transparencyY + 26, { width: 300 });
+      doc.y = transparencyY + 41;
+    }
   }
 
   /**

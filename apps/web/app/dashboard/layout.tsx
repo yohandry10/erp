@@ -13,6 +13,7 @@ import { useCountryContext } from "@/hooks/use-country-context";
 import { NotificationBell } from "@/components/notifications";
 import { OfflineStatusBadge } from "@/components/offline/OfflineStatusBadge";
 import { useDashboardTheme } from "@/hooks/use-dashboard-theme";
+import { jurisdictionRedirectFor } from "@/lib/jurisdiction-routes";
 
 // useLayoutEffect corre antes del paint en el cliente; en SSR no se ejecuta.
 const useIsomorphicLayoutEffect =
@@ -31,6 +32,9 @@ export default function DashboardLayout({
   const esSuperadminSinTenant = Boolean(
     session?.user?.is_super_admin && !session.user.tenant_id,
   );
+  const jurisdictionRedirect = country.loading || country.requiresSetup
+    ? null
+    : jurisdictionRedirectFor(pathname, country.paisCodigo);
 
   // El script del layout raíz solo fija el tema en cargas completas. En navegación
   // cliente (p.ej. login → dashboard) <html> queda sin data-erp-theme y los tokens
@@ -96,6 +100,12 @@ export default function DashboardLayout({
     router,
   ]);
 
+  useEffect(() => {
+    if (!authLoading && session && jurisdictionRedirect) {
+      router.replace(jurisdictionRedirect);
+    }
+  }, [authLoading, jurisdictionRedirect, router, session]);
+
   if (!authLoading && !session) {
     return null;
   }
@@ -128,6 +138,10 @@ export default function DashboardLayout({
   ) {
     return null;
   }
+
+  // No se pinta ni un frame de la jurisdicción equivocada mientras Next
+  // reemplaza una URL directa o un marcador histórico.
+  if (jurisdictionRedirect) return null;
 
   return (
     <EmpresaConfigProvider>

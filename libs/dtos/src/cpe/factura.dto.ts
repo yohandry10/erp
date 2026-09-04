@@ -11,6 +11,7 @@ import {
   MaxLength,
   IsISO8601,
   IsUUID,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -85,6 +86,31 @@ export class ItemFacturaDto {
   descuento_unitario?: number;
 }
 
+export class ArcaTributoDto {
+  @IsInt()
+  @IsIn([1, 2, 3, 4, 99])
+  id: 1 | 2 | 3 | 4 | 99;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  descripcion?: string;
+
+  @IsNumber()
+  @Min(0)
+  base_imponible: number;
+
+  @IsNumber()
+  @Min(0)
+  @Max(999.99)
+  alicuota: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  importe?: number;
+}
+
 export class CreateFacturaDto {
   @IsString()
   serie: string;
@@ -134,6 +160,33 @@ export class CreateFacturaDto {
 
   @IsString()
   moneda: string;
+
+  @IsOptional()
+  @IsInt()
+  @IsIn([1, 2, 3])
+  arca_concepto?: 1 | 2 | 3;
+
+  @IsOptional()
+  @IsISO8601()
+  arca_fecha_servicio_desde?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  arca_fecha_servicio_hasta?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  arca_fecha_vencimiento_pago?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ArcaTributoDto)
+  arca_tributos?: ArcaTributoDto[];
+
+  @IsOptional()
+  @IsIn(['S', 'N'])
+  arca_pago_misma_moneda?: 'S' | 'N';
 
   @IsArray()
   @ValidateNested({ each: true })

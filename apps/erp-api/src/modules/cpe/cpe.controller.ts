@@ -237,7 +237,7 @@ export class CpeController {
     @Query('search') search?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.cpeService.listColombiaReceivers(tenantId, search, limit);
+    return this.cpeService.listFiscalReceivers(tenantId, search, limit);
   }
 
   @Get('receptores/:clienteId')
@@ -248,7 +248,7 @@ export class CpeController {
     @CurrentTenant() tenantId: string,
     @Param('clienteId', new ParseUUIDPipe()) clienteId: string,
   ) {
-    return { success: true, data: await this.cpeService.getColombiaReceiver(tenantId, clienteId) };
+    return { success: true, data: await this.cpeService.getFiscalReceiver(tenantId, clienteId) };
   }
 
   @Post('desktop/signed')

@@ -67,6 +67,7 @@ async getEmpresaEmisorInfoStrict(tenantId: string) {
       .select([
         'ruc', 'razon_social', 'direccion_fiscal', 'ubigeo', 'departamento', 'provincia',
         'pais', 'moneda_defecto', 'igv_porcentaje', 'is_demo',
+        'arca_cuit_representada', 'arca_punto_venta', 'arca_condicion_iva',
         'dian_regimen_fiscal', 'dian_tipo_contribuyente',
         'dian_resolucion_numero', 'dian_resolucion_prefijo', 'dian_resolucion_desde',
         'dian_resolucion_hasta', 'dian_resolucion_fecha_inicio', 'dian_resolucion_fecha_fin',
@@ -109,6 +110,9 @@ async getEmpresaEmisorInfoStrict(tenantId: string) {
       pais,
       moneda: typedData?.moneda_defecto || perfil.moneda,
       igvPorcentaje: typedData?.igv_porcentaje,
+      arcaCuitRepresentada: typedData?.arca_cuit_representada ?? '',
+      arcaPuntoVenta: typedData?.arca_punto_venta ?? null,
+      arcaCondicionIva: typedData?.arca_condicion_iva ?? '',
       regimenFiscal: typedData?.dian_regimen_fiscal ?? '',
       tipoContribuyente: typedData?.dian_tipo_contribuyente ?? '',
       isDemo: typedData?.is_demo === true,
@@ -407,13 +411,29 @@ async resolveNumeroCpe(
     return Math.trunc(next);
   }
 
-resolveTipoDocumentoReceptor(
+  resolveTipoDocumentoReceptor(
     tipoDocumentoCpe: string,
     provided: any,
     documentoReceptor: string,
     pais = 'PE',
   ): string {
     const normalized = String(provided || '').trim().toUpperCase();
+    if (pais === 'AR') {
+      const map: Record<string, string> = {
+        '80': '80', CUIT: '80',
+        '86': '86', CUIL: '86',
+        '87': '87', CDI: '87',
+        '96': '96', DNI: '96',
+        '99': '99', CONSUMIDOR_FINAL: '99', CF: '99',
+      };
+      const resolved = map[normalized];
+      if (!resolved) {
+        throw new BadRequestException(
+          'ARCA requiere CUIT, CUIL, CDI, DNI o Consumidor Final como identificación del receptor',
+        );
+      }
+      return resolved;
+    }
     if (pais === 'CO') {
       if (!normalized) {
         throw new BadRequestException(

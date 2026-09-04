@@ -18,6 +18,9 @@ interface CountryContext {
   simboloMoneda: string;
   impuesto: string; // IGV, IVA, etc.
   impuestoRate: number;
+  isDemo: boolean;
+  arcaPuntoVenta: number | null;
+  arcaCondicionIva: string;
   locale: string;
   requiresSetup: boolean;
   loading: boolean;
@@ -33,6 +36,9 @@ const EMPTY_CONTEXT: CountryContext = {
   simboloMoneda: '',
   impuesto: '',
   impuestoRate: 0,
+  isDemo: false,
+  arcaPuntoVenta: null,
+  arcaCondicionIva: '',
   locale: 'es-PE',
   requiresSetup: true,
   loading: false,
@@ -44,7 +50,10 @@ const INITIAL_CONTEXT: CountryContext = {
   loading: true,
 };
 
-const CONTEXT_MAP: Record<string, Omit<CountryContext, 'paisId' | 'paisCodigo' | 'loading' | 'requiresSetup'>> = {
+const CONTEXT_MAP: Record<string, Omit<
+  CountryContext,
+  'paisId' | 'paisCodigo' | 'loading' | 'requiresSetup' | 'isDemo' | 'arcaPuntoVenta' | 'arcaCondicionIva'
+>> = {
   ...Object.fromEntries(ACTIVE_COUNTRIES.map((country) => [
     country.codigo_iso,
     {
@@ -115,6 +124,15 @@ function buildCountryContext(empresaConfig: any): CountryContext {
     impuesto: etiquetaImpuesto(countryData.impuesto, impuestoRate),
     moneda: resolvedMoneda,
     simboloMoneda: resolveCurrencySymbol(resolvedMoneda, countryData.simboloMoneda),
+    isDemo: empresaConfig.isDemo === true,
+    arcaPuntoVenta:
+      Number.isInteger(Number(empresaConfig.arcaPuntoVenta))
+        ? Number(empresaConfig.arcaPuntoVenta)
+        : null,
+    arcaCondicionIva:
+      typeof empresaConfig.arcaCondicionIva === 'string'
+        ? empresaConfig.arcaCondicionIva.trim().toUpperCase()
+        : '',
     requiresSetup: false,
     loading: false,
   };

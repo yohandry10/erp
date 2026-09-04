@@ -79,7 +79,149 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
 
 
 
-  private recalculateTotals(createFacturaDto: CreateFacturaDto) {
+  private normalizeArgentinaDateOnly(value: unknown, field: string): string {
+    const normalized = String(value ?? '').trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      throw new BadRequestException(`ARCA: ${field} debe usar formato YYYY-MM-DD`);
+    }
+    const [year, month, day] = normalized.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year
+        || date.getUTCMonth() !== month - 1
+        || date.getUTCDate() !== day) {
+      throw new BadRequestException(`ARCA: ${field} no es una fecha válida`);
+    }
+    return normalized;
+  }
+
+  private normalizeArgentinaFiscalFields(
+    dto: CreateFacturaDto,
+  ): NonNullable<CreateFacturaDto['arca_tributos']> {
+    const concept = Number((dto as any).arca_concepto ?? 1);
+    if (![1, 2, 3].includes(concept)) {
+      throw new BadRequestException('ARCA: concepto debe ser 1 productos, 2 servicios o 3 mixto');
+    }
+    (dto as any).arca_concepto = concept;
+
+    const rawDates = [
+      (dto as any).arca_fecha_servicio_desde,
+      (dto as any).arca_fecha_servicio_hasta,
+      (dto as any).arca_fecha_vencimiento_pago,
+    ];
+    const hasAnyDate = rawDates.some((value) => String(value ?? '').trim() !== '');
+    if ((concept === 2 || concept === 3 || hasAnyDate)
+        && rawDates.some((value) => String(value ?? '').trim() === '')) {
+      throw new BadRequestException(
+        'ARCA: servicios y conceptos mixtos exigen fecha desde, fecha hasta y vencimiento de pago',
+      );
+    }
+    if (hasAnyDate) {
+      const from = this.normalizeArgentinaDateOnly(rawDates[0], 'fecha de servicio desde');
+      const until = this.normalizeArgentinaDateOnly(rawDates[1], 'fecha de servicio hasta');
+      const due = this.normalizeArgentinaDateOnly(rawDates[2], 'fecha de vencimiento de pago');
+      if (from > until) {
+        throw new BadRequestException('ARCA: la fecha de servicio desde no puede superar la fecha hasta');
+      }
+      const issueDate = this.normalizeArgentinaDateOnly(
+        (dto as any).fecha_emision,
+        'fecha de emisión',
+      );
+      if (due < issueDate) {
+        throw new BadRequestException(
+          'ARCA: la fecha de vencimiento de pago no puede ser anterior a la emisión',
+        );
+      }
+      (dto as any).arca_fecha_servicio_desde = from;
+      (dto as any).arca_fecha_servicio_hasta = until;
+      (dto as any).arca_fecha_vencimiento_pago = due;
+    }
+
+    const descriptions: Record<number, string> = {
+      1: 'Impuestos nacionales',
+      2: 'Impuestos provinciales',
+      3: 'Impuestos municipales',
+      4: 'Impuestos internos',
+    };
+    const rawTributes = (dto as any).arca_tributos ?? [];
+    if (!Array.isArray(rawTributes) || rawTributes.length > 20) {
+      throw new BadRequestException('ARCA: tributos debe ser una lista de hasta 20 conceptos');
+    }
+    const tributes = rawTributes.map((raw: any, index: number) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new BadRequestException(`ARCA: tributo ${index + 1} inválido`);
+      }
+      const id = Number(raw.id);
+      if (![1, 2, 3, 4, 99].includes(id)) {
+        throw new BadRequestException(`ARCA: tipo de tributo ${index + 1} no admitido por WSFEv1`);
+      }
+      const description = String(raw.descripcion ?? descriptions[id] ?? '').trim();
+      if (!description || description.length > 80) {
+        throw new BadRequestException(
+          `ARCA: la descripción del tributo ${index + 1} es obligatoria y admite hasta 80 caracteres`,
+        );
+      }
+      const base = Number(raw.base_imponible ?? raw.baseImponible);
+      const rate = Number(raw.alicuota);
+      if (!Number.isFinite(base) || base < 0 || !Number.isFinite(rate) || rate < 0 || rate > 999.99) {
+        throw new BadRequestException(`ARCA: base o alícuota inválida en el tributo ${index + 1}`);
+      }
+      const amount = Math.round(base * rate) / 100;
+      if (raw.importe !== undefined && raw.importe !== null && raw.importe !== '') {
+        const provided = Number(raw.importe);
+        if (!Number.isFinite(provided) || Math.abs(provided - amount) > 0.01) {
+          throw new BadRequestException(
+            `ARCA: el importe del tributo ${index + 1} no coincide con base × alícuota`,
+          );
+        }
+      }
+      return {
+        id: id as 1 | 2 | 3 | 4 | 99,
+        descripcion: description,
+        base_imponible: Number(base.toFixed(2)),
+        alicuota: Number(rate.toFixed(2)),
+        importe: Number(amount.toFixed(2)),
+      };
+    });
+    (dto as any).arca_tributos = tributes;
+    return tributes;
+  }
+
+  private async prepareArgentinaCurrency(
+    dto: CreateFacturaDto,
+    tenantId: string,
+    emissionDate: string,
+  ): Promise<void> {
+    const currency = String(dto.moneda ?? '').trim().toUpperCase();
+    if (currency === 'ARS') {
+      (dto as any).tipo_cambio = 1;
+      delete (dto as any).arca_pago_misma_moneda;
+      return;
+    }
+    if (currency !== 'USD') {
+      throw new BadRequestException('ARCA: la moneda debe ser ARS o USD');
+    }
+    const sameCurrencyPayment = String(
+      (dto as any).arca_pago_misma_moneda ?? '',
+    ).trim().toUpperCase();
+    if (!['S', 'N'].includes(sameCurrencyPayment)) {
+      throw new BadRequestException(
+        'ARCA: USD exige informar si el cobro se realiza en la misma moneda extranjera',
+      );
+    }
+    const official = await this.fiscalAdapter.obtenerCotizacionOficialArca(
+      currency,
+      emissionDate,
+      tenantId,
+    );
+    if (official.monedaArca !== 'DOL' || official.fecha !== emissionDate.replace(/-/g, '')
+        || !Number.isFinite(official.cotizacion) || official.cotizacion <= 0) {
+      throw new BadRequestException('ARCA: la consulta oficial devolvió una cotización inconsistente');
+    }
+    (dto as any).arca_pago_misma_moneda = sameCurrencyPayment;
+    (dto as any).tipo_cambio = Number(official.cotizacion.toFixed(6));
+  }
+
+  private recalculateTotals(createFacturaDto: CreateFacturaDto, paisCodigo = 'PE') {
     if (!Array.isArray(createFacturaDto.items) || createFacturaDto.items.length === 0) {
       throw new BadRequestException('El comprobante debe incluir al menos un ítem');
     }
@@ -131,6 +273,11 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
         default:
           gravadas += valorVenta;
       }
+    }
+
+    if (paisCodigo === 'AR') {
+      totalIsc = ((createFacturaDto as any).arca_tributos ?? [])
+        .reduce((sum: number, tribute: any) => sum + sanitizeNumber(tribute.importe), 0);
     }
 
     const total = subtotal + totalIgv + totalIsc;
@@ -220,9 +367,30 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
       if (tipo === '99' && !/^0*$/.test(documento)) {
         throw new BadRequestException('Consumidor Final ARCA no debe llevar un documento inventado');
       }
-      if (!String((dto as any).arca_condicion_iva_receptor ?? '').trim()) {
+      const receiverVatCondition = String(
+        (dto as any).arca_condicion_iva_receptor ?? '',
+      ).trim().toUpperCase();
+      if (!receiverVatCondition) {
         throw new BadRequestException(
           'La emisión ARCA exige la condición IVA del receptor para resolver la clase A/B/C',
+        );
+      }
+      if (tipo === '99' && receiverVatCondition !== 'CONSUMIDOR_FINAL') {
+        throw new BadRequestException(
+          'El documento 99 de ARCA sólo corresponde a un Consumidor Final sin identificar',
+        );
+      }
+      // ARCA exige identificar al consumidor final cuando el importe total es
+      // igual o superior al umbral vigente. No se acepta dividir el dato entre
+      // UI y transporte: el guard corre antes de firmar o reservar el envío.
+      const currency = String((dto as any).moneda ?? 'ARS').trim().toUpperCase();
+      const exchangeRate = currency === 'USD'
+        ? Number((dto as any).tipo_cambio ?? 0)
+        : 1;
+      const totalInArs = Number((dto as any).total_venta ?? 0) * exchangeRate;
+      if (tipo === '99' && totalInArs >= 10_000_000) {
+        throw new BadRequestException(
+          'ARCA exige identificar al consumidor final en operaciones desde ARS 10.000.000',
         );
       }
       return;
@@ -1419,6 +1587,19 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         && !internalDocumentKey);
       const supabaseClient = this.supabaseService.getClient();
       const paisCodigo = (await this.fiscalAdapter.obtenerCodigoPais(tenantId)).toUpperCase();
+      const hasArgentinaOnlyFields = [
+        (createFacturaDto as any).arca_concepto,
+        (createFacturaDto as any).arca_fecha_servicio_desde,
+        (createFacturaDto as any).arca_fecha_servicio_hasta,
+        (createFacturaDto as any).arca_fecha_vencimiento_pago,
+        (createFacturaDto as any).arca_pago_misma_moneda,
+      ].some((value) => value !== undefined && value !== null && value !== '')
+        || ((createFacturaDto as any).arca_tributos?.length ?? 0) > 0;
+      if (paisCodigo === 'AR') {
+        this.normalizeArgentinaFiscalFields(createFacturaDto);
+      } else if (hasArgentinaOnlyFields) {
+        throw new BadRequestException('Los campos WSFEv1 sólo corresponden a tenants de Argentina');
+      }
       if (paisCodigo === 'CO' && requestedType !== '01') {
         throw new BadRequestException(
           'DIAN: la frontera POS/CPE sólo admite factura electrónica tipo 01',
@@ -1504,11 +1685,13 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
           dianCreationContext?.emisor.igvPorcentaje,
         );
       }
-      const totalesCalculados = this.recalculateTotals(createFacturaDto);
+      const totalesCalculados = this.recalculateTotals(createFacturaDto, paisCodigo);
       const { subtotal, totalIgv, totalIsc, total, gravadas, exoneradas, inafectas, exportacion } =
         totalesCalculados;
       this.assertProvidedTotalsMatch(createFacturaDto, totalesCalculados);
-      this.assertReceptorValido(createFacturaDto, paisCodigo);
+      // Los guards jurisdiccionales evalúan el total recalculado por el
+      // servidor, aunque el navegador omita o intente manipular `total_venta`.
+      (createFacturaDto as any).total_venta = total;
       const providedIdempotencyKey = String(
         (createFacturaDto as any).idempotency_key ?? '',
       ).trim();
@@ -1547,6 +1730,10 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         paisCodigo,
       );
       this.assertFechaEmisionNoFutura(emissionDate, paisCodigo);
+      if (paisCodigo === 'AR') {
+        await this.prepareArgentinaCurrency(createFacturaDto, tenantId, emissionDate);
+      }
+      this.assertReceptorValido(createFacturaDto, paisCodigo);
       const idempotencyKey = this.resolveIdempotencyKey(createFacturaDto, tenantId);
       if (finalizaDocumentoPosReservado) {
         const reservedPosIssueTime = await this.validarDocumentoPosReservado(
@@ -1791,6 +1978,14 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
           arca_punto_venta: Number(createFacturaDto.serie),
           arca_condicion_iva_emisor: (createFacturaDto as any).arca_condicion_iva_emisor ?? null,
           arca_condicion_iva_receptor: (createFacturaDto as any).arca_condicion_iva_receptor,
+          arca_concepto: (createFacturaDto as any).arca_concepto,
+          arca_fecha_servicio_desde: (createFacturaDto as any).arca_fecha_servicio_desde ?? null,
+          arca_fecha_servicio_hasta: (createFacturaDto as any).arca_fecha_servicio_hasta ?? null,
+          arca_fecha_vencimiento_pago: (createFacturaDto as any).arca_fecha_vencimiento_pago ?? null,
+          arca_tributos: (createFacturaDto as any).arca_tributos ?? [],
+          arca_tributos_total: totalIsc,
+          arca_can_mis_mon_ext: (createFacturaDto as any).arca_pago_misma_moneda ?? null,
+          arca_cotizacion: Number((createFacturaDto as any).tipo_cambio ?? 1),
         } : paisCodigo === 'CO' ? {
           ...(
             (createFacturaDto as any).metadata
@@ -2011,19 +2206,23 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       : null;
     const configuredSeries = emisor.pais === 'CO'
       ? String((emisor as any).dianResolucionPrefijo ?? '').trim().toUpperCase()
-      : '';
+      : emisor.pais === 'AR'
+        ? this.resolveArgentinaPointOfSaleSeries((emisor as any).arcaPuntoVenta)
+        : '';
     const localSeries = emisor.pais === 'CO' && emisor.isDemo
       ? this.resolveColombiaDemoSeries(configuredSeries)
       : configuredSeries;
     let serie = String(
       existingIntent?.serie
-      ?? (emisor.pais === 'CO' ? localSeries : payload?.serie)
+      ?? (emisor.pais === 'CO' || emisor.pais === 'AR' ? localSeries : payload?.serie)
       ?? this.defaultSerieForTipo(tipoDocumento),
     ).trim().toUpperCase();
     let numero = existingIntent?.numero ?? 0;
     const clienteMaestro = emisor.pais === 'CO'
       ? await this.loadColombiaReceiverMaster(tenantId, payload?.cliente_id)
-      : null;
+      : emisor.pais === 'AR'
+        ? await this.loadArgentinaReceiverMaster(tenantId, payload?.cliente_id)
+        : null;
     const documentoReceptor = String(
       clienteMaestro?.documentoNumero
       ?? payload?.documento_receptor
@@ -2079,19 +2278,39 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
     const totalIgv = this.roundMoney(
       payload?.total_igv ?? payload?.totalIgv ?? items.reduce((sum, item) => sum + item.igv, 0),
     );
+    const fechaEmision = String(
+      payload?.fecha_emision ?? payload?.fechaEmision ?? '',
+    ).trim();
+    const argentinaFiscalFields = {
+      fecha_emision: fechaEmision,
+      arca_concepto: payload?.arca_concepto ?? payload?.arcaConcepto ?? 1,
+      arca_fecha_servicio_desde:
+        payload?.arca_fecha_servicio_desde ?? payload?.arcaFechaServicioDesde,
+      arca_fecha_servicio_hasta:
+        payload?.arca_fecha_servicio_hasta ?? payload?.arcaFechaServicioHasta,
+      arca_fecha_vencimiento_pago:
+        payload?.arca_fecha_vencimiento_pago ?? payload?.arcaFechaVencimientoPago,
+      arca_tributos: payload?.arca_tributos ?? payload?.arcaTributos ?? [],
+      arca_pago_misma_moneda:
+        payload?.arca_pago_misma_moneda ?? payload?.arcaPagoMismaMoneda,
+    } as unknown as CreateFacturaDto;
+    const arcaTributos = emisor.pais === 'AR'
+      ? this.normalizeArgentinaFiscalFields(argentinaFiscalFields)
+      : [];
+    const totalOtrosTributos = this.roundMoney(
+      arcaTributos.reduce((sum, tribute) => sum + Number(tribute.importe ?? 0), 0),
+    );
     const totalVenta = this.roundMoney(
       payload?.total_venta
       ?? payload?.total
-      ?? totalGravadas + totalExoneradas + totalInafectas + totalExportacion + totalIgv,
+      ?? totalGravadas + totalExoneradas + totalInafectas + totalExportacion
+        + totalIgv + totalOtrosTributos,
     );
     let condicionPago = String(
       payload?.condicion_pago ?? payload?.condicionPago ?? 'CONTADO',
     ).trim().toUpperCase();
     let medioPago = String(payload?.medio_pago ?? payload?.medioPago ?? '').trim();
     const plazoPagoDias = Number(payload?.plazo_pago_dias ?? payload?.plazoPagoDias ?? 0);
-    const fechaEmision = String(
-      payload?.fecha_emision ?? payload?.fechaEmision ?? '',
-    ).trim();
     let fechaVencimiento = String(
       payload?.fecha_vencimiento ?? payload?.fechaVencimiento ?? '',
     ).trim();
@@ -2128,7 +2347,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
           tenantId,
           tipoDocumento,
           serie,
-          payload?.numero ?? payload?.correlativo,
+          emisor.pais === 'AR' ? undefined : payload?.numero ?? payload?.correlativo,
         );
       }
     }
@@ -2155,6 +2374,7 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       total_inafectas: totalInafectas,
       total_exportacion: totalExportacion,
       total_igv: totalIgv,
+      total_isc: totalOtrosTributos,
       total_venta: totalVenta,
       fecha_emision: fechaEmision || undefined,
       fecha_vencimiento: fechaVencimiento || undefined,
@@ -2166,11 +2386,30 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         `cpe.ui:${tenantId}:${tipoDocumento}:${serie}:${numero}`,
     } as CreateFacturaDto;
 
+    if (emisor.pais === 'AR') {
+      (dto as any).arca_concepto = (argentinaFiscalFields as any).arca_concepto;
+      (dto as any).arca_fecha_servicio_desde =
+        (argentinaFiscalFields as any).arca_fecha_servicio_desde;
+      (dto as any).arca_fecha_servicio_hasta =
+        (argentinaFiscalFields as any).arca_fecha_servicio_hasta;
+      (dto as any).arca_fecha_vencimiento_pago =
+        (argentinaFiscalFields as any).arca_fecha_vencimiento_pago;
+      (dto as any).arca_tributos = arcaTributos;
+      (dto as any).arca_pago_misma_moneda =
+        (argentinaFiscalFields as any).arca_pago_misma_moneda;
+    }
+
     if (clienteMaestro) {
       // Valor interno obtenido del maestro tenant-scoped. create() vuelve a leer
       // el maestro y exige igualdad antes de reservar, cerrando una modificación
       // concurrente del perfil tributario entre ambas capas.
-      (dto as any).dian_receptor_tax_profile = clienteMaestro.dianTaxProfile;
+      if ('dianTaxProfile' in clienteMaestro) {
+        (dto as any).dian_receptor_tax_profile = clienteMaestro.dianTaxProfile;
+      }
+      if ('arcaVatCondition' in clienteMaestro) {
+        (dto as any).arca_condicion_iva_emisor = (emisor as any).arcaCondicionIva;
+        (dto as any).arca_condicion_iva_receptor = clienteMaestro.arcaVatCondition;
+      }
     }
 
     return this.create(dto, tenantId, userId);
@@ -2307,6 +2546,75 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
     return { ...row, hash: persistedHash };
   }
 
+  private resolveArgentinaPointOfSaleSeries(value: unknown): string {
+    const point = Number(value);
+    if (!Number.isInteger(point) || point < 1 || point > 99998) {
+      throw new BadRequestException(
+        'ARCA: configura un punto de venta válido (1 a 99998) antes de emitir',
+      );
+    }
+    return String(point).padStart(5, '0');
+  }
+
+  private async loadArgentinaReceiverMaster(tenantId: string, clienteIdInput: unknown): Promise<{
+    id: string;
+    documentoTipo: string;
+    documentoNumero: string;
+    razonSocial: string;
+    direccion: string;
+    arcaVatCondition: string;
+  }> {
+    const clienteId = String(clienteIdInput ?? '').trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clienteId)) {
+      throw new BadRequestException('ARCA: selecciona un cliente maestro válido');
+    }
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('clientes')
+      .select([
+        'id', 'documento_tipo', 'documento_numero', 'numero_documento', 'ruc', 'codigo',
+        'razon_social', 'nombre', 'direccion', 'arca_condicion_iva',
+      ].join(','))
+      .eq('tenant_id', tenantId)
+      .eq('id', clienteId)
+      .maybeSingle();
+    if (error) {
+      throw new BadRequestException(`ARCA: no se pudo leer el cliente maestro: ${error.message}`);
+    }
+    if (!data) throw new BadRequestException('ARCA: el cliente no existe dentro de esta empresa');
+
+    const row = data as Record<string, any>;
+    const documentoTipo = String(row.documento_tipo ?? '').trim().toUpperCase();
+    const documentoNumero = String(
+      row.documento_numero ?? row.numero_documento ?? row.ruc ?? row.codigo ?? '',
+    ).trim();
+    this.registrationService.resolveTipoDocumentoReceptor(
+      '01', documentoTipo, documentoNumero, 'AR',
+    );
+    const razonSocial = String(row.razon_social ?? row.nombre ?? '').trim();
+    if (!razonSocial) throw new BadRequestException('ARCA: el cliente maestro no tiene razón social o nombre');
+    const arcaVatCondition = String(row.arca_condicion_iva ?? '').trim().toUpperCase();
+    const allowedVatConditions = new Set([
+      'RESPONSABLE_INSCRIPTO', 'MONOTRIBUTO', 'EXENTO', 'CONSUMIDOR_FINAL',
+      'SUJETO_NO_CATEGORIZADO', 'PROVEEDOR_EXTERIOR', 'CLIENTE_EXTERIOR',
+      'IVA_LIBERADO', 'MONOTRIBUTISTA_SOCIAL', 'IVA_NO_ALCANZADO',
+      'MONOTRIBUTO_TRABAJADOR_INDEPENDIENTE_PROMOVIDO',
+    ]);
+    if (!allowedVatConditions.has(arcaVatCondition)) {
+      throw new BadRequestException(
+        'ARCA: el cliente maestro no tiene una condición frente al IVA válida',
+      );
+    }
+    return {
+      id: clienteId,
+      documentoTipo,
+      documentoNumero,
+      razonSocial,
+      direccion: String(row.direccion ?? '').trim(),
+      arcaVatCondition,
+    };
+  }
+
   private async loadColombiaReceiverMaster(tenantId: string, clienteIdInput: unknown): Promise<{
     id: string;
     documentoTipo: string;
@@ -2387,6 +2695,78 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       dian_responsabilidad_list_name: receiver.dianTaxProfile.taxLevelListName,
       dian_tributo_id: receiver.dianTaxProfile.taxSchemeId,
       dian_tributo_nombre: receiver.dianTaxProfile.taxSchemeName,
+    };
+  }
+
+  async getFiscalReceiver(tenantId: string, clienteId: string) {
+    const country = (await this.fiscalAdapter.obtenerCodigoPais(tenantId)).toUpperCase();
+    if (country === 'CO') return this.getColombiaReceiver(tenantId, clienteId);
+    if (country === 'AR') {
+      const receiver = await this.loadArgentinaReceiverMaster(tenantId, clienteId);
+      return {
+        id: receiver.id,
+        documento_tipo: receiver.documentoTipo,
+        documento_numero: receiver.documentoNumero,
+        razon_social: receiver.razonSocial,
+        direccion: receiver.direccion,
+        arca_condicion_iva: receiver.arcaVatCondition,
+      };
+    }
+    throw new BadRequestException(
+      'El catálogo fiscal de receptores sólo está disponible para Argentina y Colombia',
+    );
+  }
+
+  async listFiscalReceivers(tenantId: string, searchInput?: string, limitInput?: string) {
+    const country = (await this.fiscalAdapter.obtenerCodigoPais(tenantId)).toUpperCase();
+    if (country === 'CO') return this.listColombiaReceivers(tenantId, searchInput, limitInput);
+    if (country !== 'AR') {
+      throw new BadRequestException(
+        'El catálogo fiscal de receptores sólo está disponible para Argentina y Colombia',
+      );
+    }
+    const limit = Math.min(Math.max(Number.parseInt(String(limitInput ?? '50'), 10) || 50, 1), 100);
+    let query = this.supabaseService
+      .getClient()
+      .from('clientes')
+      .select([
+        'id', 'documento_tipo', 'documento_numero', 'numero_documento', 'ruc', 'codigo',
+        'razon_social', 'nombre', 'nombre_comercial', 'direccion', 'arca_condicion_iva',
+      ].join(','))
+      .eq('tenant_id', tenantId)
+      .not('arca_condicion_iva', 'is', null)
+      .order('razon_social', { ascending: true })
+      .limit(limit);
+    const rawSearch = String(searchInput ?? '')
+      .normalize('NFKC')
+      .replace(/[^\p{L}\p{N}\s.-]/gu, '')
+      .trim()
+      .slice(0, 80);
+    if (rawSearch) {
+      const pattern = `%${rawSearch}%`;
+      query = query.or([
+        `razon_social.ilike.${pattern}`,
+        `nombre.ilike.${pattern}`,
+        `nombre_comercial.ilike.${pattern}`,
+        `ruc.ilike.${pattern}`,
+        `codigo.ilike.${pattern}`,
+      ].join(','));
+    }
+    const { data, error } = await query;
+    if (error) throw new BadRequestException(`No se pudieron listar los receptores ARCA: ${error.message}`);
+    return {
+      data: (data ?? []).map((row: any) => ({
+        id: row.id,
+        documento_tipo: row.documento_tipo,
+        documento_numero: String(
+          row.documento_numero ?? row.numero_documento ?? row.ruc ?? row.codigo ?? '',
+        ),
+        razon_social: String(row.razon_social ?? row.nombre ?? '').trim(),
+        nombre_comercial: row.nombre_comercial,
+        direccion: row.direccion,
+        arca_condicion_iva: row.arca_condicion_iva,
+      })),
+      pagination: { page: 1, limit, total: (data ?? []).length, totalPages: 1 },
     };
   }
 
