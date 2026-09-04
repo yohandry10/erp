@@ -53,6 +53,10 @@ describe('CPEIntegrationService — procedencia persistida para la respuesta com
       label: 'AR real', country: 'AR', tenantIsDemo: false,
       simulatedOrigin: false, authority: 'ARCA', demoWarning: false,
     },
+    {
+      label: 'AR demo', country: 'AR', tenantIsDemo: true,
+      simulatedOrigin: true, authority: 'ARCA', demoWarning: true,
+    },
   ];
 
   it.each(cases)(
@@ -157,9 +161,11 @@ describe('CPEIntegrationService — procedencia persistida para la respuesta com
         total: 119,
       }));
       expect(result.warnings).toEqual(demoWarning
-        ? ['Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN']
+        ? [`Comprobante demo generado localmente: muestra sin transmisión ni validez ${authority}`]
         : [`La factura fue firmada pero debe ser enviada manualmente a ${authority} desde el módulo CPE`]);
-      expect(validateCertificate).toHaveBeenCalledTimes(tenantIsDemo && country === 'CO' ? 0 : 1);
+      expect(validateCertificate).toHaveBeenCalledTimes(
+        tenantIsDemo && ['CO', 'AR'].includes(country) ? 0 : 1,
+      );
       expect(consume).toHaveBeenCalledTimes(country === 'CO' ? 1 : 0);
       expect(recordSuccess).toHaveBeenCalledWith(expect.objectContaining({
         tenantId,
