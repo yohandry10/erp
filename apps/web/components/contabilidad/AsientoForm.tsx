@@ -190,7 +190,7 @@ export default function AsientoForm({
                 type="text"
                 value={formData.referencia}
                 onChange={(e) => setFormData({ ...formData, referencia: e.target.value })}
-                placeholder="Ej: F001-00123"
+                placeholder="Referencia del documento u operación"
                 className={inputClass}
                 disabled={loading}
               />

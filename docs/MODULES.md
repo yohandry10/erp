@@ -539,12 +539,23 @@ Código principal: `apps/erp-api/src/modules/finanzas`,
 
 - Plan de cuentas, períodos, centros de costo y presupuestos son catálogos
   tenant-scoped.
-- Si una operación alcanza un mes todavía no configurado, el backend crea de
-  forma idempotente el período `ABIERTO`; nunca permite el movimiento bajo un
-  estado abierto meramente implícito e invisible para el contador.
+- El alta de asientos manuales exige crear explícitamente el período desde
+  `Contabilidad > Periodos` y que esté `ABIERTO`. Si falta, el formulario
+  conserva los datos y presenta el motivo del rechazo con acceso a períodos
+  en otra pestaña. Los writers operativos que usan la barrera SQL 458 pueden
+  crear el período abierto de forma idempotente; nunca eluden un cierre o
+  bloqueo existente ni trabajan bajo un período abierto invisible.
+- Reabrir un período requiere superadministrador tanto en servidor como en
+  la acción disponible en pantalla. Un rechazo de reapertura conserva el
+  detalle y su estado cerrado, mostrando el motivo sin aparentar éxito.
 - Asientos se originan en eventos de ventas, compras, POS, caja, RRHH y activos.
 - Debe/haber debe cuadrar y el período debe permitir la operación.
 - Libros, estados financieros y materialized views son proyecciones.
+- Las exportaciones Excel de estados conservan importes y porcentajes como
+  números, signos negativos y códigos de cuenta como texto; la moneda se indica
+  en sus columnas. Los PDF usan la moneda y formato regional del tenant,
+  conservan contraste en encabezados y no calculan porcentajes sobre ingresos
+  inexistentes (`No aplica`), evitando `NaN` y un 100% ficticio.
 - El Balance de Comprobación y el Balance General son estados a fecha de cierre:
   conservan el último saldo de cuentas sin movimiento en el mes y respetan la
   naturaleza deudora o acreedora. La pantalla de estados incluye comprobación,
