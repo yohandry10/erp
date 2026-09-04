@@ -116,6 +116,10 @@ export function resolveArcaQrContent(
   options: ArcaQrOptions = {},
 ): string | null {
   const metadata = data?.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+  // Esta opción sólo se usa para representaciones nacidas como demo. Una
+  // muestra no debe construir un QR fiscal ni siquiera si su hash técnico
+  // parece un CAE o conserva aliases históricos con ese nombre.
+  if (options.allowMissingAuthorization) return null;
   const persistedContent = clean(
     data?.arca_qr_content || data?.qr_content || metadata.arca_qr_content
       || metadata.arca_qr_url || metadata.qrUrl || metadata.qr_url,
@@ -126,44 +130,29 @@ export function resolveArcaQrContent(
     throw new Error('No se puede generar el QR ARCA: URL fiscal persistida inválida');
   }
 
-  if (!options.allowMissingAuthorization && clean(metadata.fiscal_country).toUpperCase() !== 'AR') {
+  if (clean(metadata.fiscal_country).toUpperCase() !== 'AR') {
     throw new Error('No se puede generar el QR ARCA: falta evidencia fiscal 524 del país AR');
   }
-  const authorization = clean(
-    options.allowMissingAuthorization
-      ? metadata.arca_cae || data?.arca_cae || data?.cae || metadata.cae || data?.hash
-      : metadata.arca_cae,
-  );
-  if (!authorization && options.allowMissingAuthorization) return null;
+  const authorization = clean(metadata.arca_cae);
   if (!/^\d{14}$/.test(authorization)) {
     throw new Error('No se puede generar el QR ARCA: falta CAE válido de 14 dígitos');
   }
-  if (!options.allowMissingAuthorization && clean(data?.hash) !== authorization) {
+  if (clean(data?.hash) !== authorization) {
     throw new Error('No se puede generar el QR ARCA: el CAE no coincide con el hash autorizado');
   }
-  if (!options.allowMissingAuthorization) {
-    resolveArcaAuthorizationExpiry(metadata.arca_cae_vencimiento);
-  }
+  resolveArcaAuthorizationExpiry(metadata.arca_cae_vencimiento);
 
   const issuerTaxId = requireArcaValue(data?.ruc_emisor || data?.cuit_emisor, 'CUIT del emisor')
     .replace(/\D/g, '');
   if (!/^\d{11}$/.test(issuerTaxId)) {
     throw new Error('No se puede generar el QR ARCA: CUIT del emisor inválido');
   }
-  const pointOfSaleRaw = clean(
-    metadata.arca_punto_venta || (options.allowMissingAuthorization
-      ? metadata.arcaPuntoVenta || metadata.puntoVenta || data?.arca_punto_venta
-        || data?.punto_venta || String(data?.serie || '').replace(/\D/g, '')
-      : ''),
-  );
+  const pointOfSaleRaw = clean(metadata.arca_punto_venta);
   const pointOfSale = Number(pointOfSaleRaw);
   if (!Number.isInteger(pointOfSale) || pointOfSale < 1 || pointOfSale > 99998) {
     throw new Error('No se puede generar el QR ARCA: punto de venta inválido');
   }
-  const documentNumber = Number(requireArcaValue(
-    metadata.arca_cbte_numero || (options.allowMissingAuthorization ? metadata.arcaCbteNumero || data?.numero : ''),
-    'número de comprobante',
-  ));
+  const documentNumber = Number(requireArcaValue(metadata.arca_cbte_numero, 'número de comprobante'));
   if (!Number.isSafeInteger(documentNumber) || documentNumber < 1) {
     throw new Error('No se puede generar el QR ARCA: número de comprobante inválido');
   }

@@ -14,10 +14,12 @@ jest.mock('./fiscal-qr.util', () => ({
     content: 'qr-dian-demo',
     dataUrl: 'data:image/png;base64,RElBTg==',
   })),
-  buildArcaQrRepresentation: jest.fn(async () => ({
-    content: 'qr-arca-demo',
-    dataUrl: 'data:image/png;base64,QVJDQQ==',
-  })),
+  buildArcaQrRepresentation: jest.fn(async (_data, options) => options?.allowMissingAuthorization
+    ? null
+    : {
+        content: 'qr-arca-demo',
+        dataUrl: 'data:image/png;base64,QVJDQQ==',
+      }),
 }));
 
 jest.mock('./pais-del-tenant', () => ({
@@ -336,6 +338,13 @@ describe('CpeDeliveryService - datos de la vista A4', () => {
       .resolves.toMatchObject({
         pais_codigo: 'AR', simulated: true, simulated_origin: true,
         tipo_documento_fiscal: '011',
+        fiscal_qr_content: null,
+        fiscal_qr_data_url: null,
+        fiscal_print_info: expect.objectContaining({
+          isDemo: true,
+          authorizationCode: 'MUESTRA-SIN-CAE',
+          authorizationExpiry: 'No aplica en muestra',
+        }),
       });
     expect(buildArcaQrRepresentation).toHaveBeenLastCalledWith(
       expect.objectContaining({ simulated_origin: true }),
