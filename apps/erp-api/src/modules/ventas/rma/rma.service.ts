@@ -138,14 +138,26 @@ export class RmaService {
 
   async listarCandidatos(tenantId: string) {
     const client = this.supabase.getClient();
-    const { data: pedidos, error: pedidosError } = await client
-      .from('pedidos_venta')
-      .select('id, numero, estado, cliente_id, fecha_pedido, moneda, total, clientes:cliente_id(id, razon_social, nombre, ruc, numero_documento)')
-      .eq('tenant_id', tenantId)
-      .in('estado', ['FACTURADO', 'COMPLETADO', 'DESPACHO_PARCIAL', 'LISTO_FACTURAR'])
-      .order('created_at', { ascending: false })
-      .limit(200);
+    const [configResponse, pedidosResponse] = await Promise.all([
+      client
+        .from('empresa_config')
+        .select('pais, is_demo')
+        .eq('tenant_id', tenantId)
+        .maybeSingle(),
+      client
+        .from('pedidos_venta')
+        .select('id, numero, estado, cliente_id, fecha_pedido, moneda, total, clientes:cliente_id(id, razon_social, nombre, ruc, numero_documento)')
+        .eq('tenant_id', tenantId)
+        .in('estado', ['FACTURADO', 'COMPLETADO', 'DESPACHO_PARCIAL', 'LISTO_FACTURAR'])
+        .order('created_at', { ascending: false })
+        .limit(200),
+    ]);
+    const { data: config, error: configError } = configResponse;
+    const { data: pedidos, error: pedidosError } = pedidosResponse;
+    if (configError) this.throwReadError(configError, 'leer el país fiscal para las RMA');
     if (pedidosError) this.throwReadError(pedidosError, 'listar pedidos elegibles para RMA');
+    const country = String(config?.pais ?? '').trim().toUpperCase();
+    const isRealColombia = country === 'CO' && config?.is_demo === false;
     const pedidoIds = (pedidos ?? []).map((pedido: any) => pedido.id);
     if (pedidoIds.length === 0) return [];
 
@@ -175,7 +187,7 @@ export class RmaService {
         documentoIds.length > 0
           ? client
               .from('cpe')
-              .select('id, documento_id, tipo_documento, estado, sunat_status')
+              .select('id, documento_id, tipo_documento, estado, estado_sunat, sunat_status, simulated_origin, issuer_snapshot, fiscal_authority_evidence')
               .eq('tenant_id', tenantId)
               .in('documento_id', documentoIds)
               .in('tipo_documento', ['01', '03'])
@@ -222,6 +234,23 @@ export class RmaService {
     for (const cpe of cpes ?? []) {
       if (['RECHAZADO', 'ANULADO', 'ERROR'].includes(String((cpe as any).estado).toUpperCase())
           || ['REJECTED', 'ERROR'].includes(String((cpe as any).sunat_status).toUpperCase())) continue;
+      if (isRealColombia) {
+        const evidence = (cpe as any).fiscal_authority_evidence ?? {};
+        const issuer = (cpe as any).issuer_snapshot ?? {};
+        const uniqueCode = String(evidence.unique_code ?? '').trim().toUpperCase();
+        const isAcceptedRealDianInvoice =
+          String((cpe as any).tipo_documento ?? '').trim() === '01'
+          && String((cpe as any).estado ?? '').toUpperCase() === 'ACEPTADO'
+          && String((cpe as any).estado_sunat ?? '').toUpperCase() === 'ACEPTADO'
+          && String((cpe as any).sunat_status ?? '').toUpperCase() === 'ACCEPTED'
+          && (cpe as any).simulated_origin === false
+          && String(issuer.country_code ?? '').toUpperCase() === 'CO'
+          && String(evidence.authority ?? '').toUpperCase() === 'DIAN'
+          && String(evidence.status ?? '').toUpperCase() === 'ACCEPTED'
+          && String(evidence.code_kind ?? '').toUpperCase() === 'CUFE'
+          && /^[0-9A-F]{96}$/.test(uniqueCode);
+        if (!isAcceptedRealDianInvoice) continue;
+      }
       const group = cpesPorDocumento.get((cpe as any).documento_id) ?? [];
       group.push(cpe);
       cpesPorDocumento.set((cpe as any).documento_id, group);
@@ -423,7 +452,7 @@ export class RmaService {
     const client = this.supabase.getClient();
     const { data: tenantConfig, error: tenantConfigError } = await client
       .from('empresa_config')
-      .select('pais')
+      .select('pais, is_demo')
       .eq('tenant_id', tenantId)
       .maybeSingle();
     if (tenantConfigError || !tenantConfig) {
@@ -433,10 +462,21 @@ export class RmaService {
     }
     const fiscalCountry = String((tenantConfig as any).pais ?? '').trim().toUpperCase();
     if (fiscalCountry === 'CO') {
-      throw new BadRequestException({
-        code: 'RMA_DIAN_CREDIT_NOTE_REQUIRES_REFERENCED_NOTE_FLOW',
-        message:
-          'Colombia no usa la nota RMA SUNAT 07. Emite una Nota Crédito DIAN 91 desde CPE > Notas referenciadas; el efecto financiero se aplicará sólo después de la aceptación DIAN.',
+      if ((tenantConfig as any).is_demo !== false) {
+        throw new BadRequestException({
+          code: 'RMA_DIAN_CREDIT_NOTE_REQUIRES_REFERENCED_NOTE_FLOW',
+          message:
+            'La demo Colombia permite probar la devolución física, pero no puede aceptar ni emitir una Nota Crédito DIAN 91 real. Convierte la cuenta y completa la habilitación DIAN para continuar.',
+        });
+      }
+      return this.rpc('emitir_nota_credito_rma_tx', {
+        p_tenant_id: tenantId,
+        p_actor_id: this.requireActor(userId),
+        p_rma_id: rmaId,
+        p_payload: this.normalizePayload({
+          motivo: dto.motivo?.trim() || 'Devolución parcial de bienes o servicios',
+        }),
+        p_idempotency_key: this.requireIdempotencyKey(idempotencyKey),
       });
     }
     if (fiscalCountry === 'AR') {
@@ -560,6 +600,11 @@ export class RmaService {
 
   private throwRpcError(error: any, operation: string): never {
     const message = String(error?.message ?? error ?? 'error desconocido');
+    if (/RMA_DIAN_FISCAL_LINE_BALANCE_(?:EXCEEDED|UNVERIFIABLE)/i.test(message)) {
+      throw new BadRequestException(
+        'La factura ya tiene una nota de crédito que consume total o parcialmente las líneas seleccionadas. Recarga la venta y elige sólo cantidades con saldo fiscal disponible.',
+      );
+    }
     if (error?.code === '42501') throw new ForbiddenException(message);
     if (
       error?.code === '23505' ||

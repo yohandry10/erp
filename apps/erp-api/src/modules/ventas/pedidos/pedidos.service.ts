@@ -12,6 +12,7 @@ import { calcularDesgloseIgv } from '../../../shared/utils/igv-afectacion.util';
 import { canUseRuntimeDemoCertificate } from '../../../shared/utils/demo-certificate.utils';
 import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 import { tieneEntradaPagoPedido } from './pedido-payment.util';
+import { isColombiaDemoRepresentation } from '../../cpe/historical-cpe-country.util';
 
 interface ConfiguracionEmpresa {
   usar_flujo_logistica: boolean;
@@ -1278,7 +1279,14 @@ export class PedidosService {
     id: string,
     tenantId: string,
     userId?: string,
-  ): Promise<{ success: boolean; factura_id?: string; sugerir_gre?: boolean }> {
+  ): Promise<{
+    success: boolean;
+    factura_id?: string;
+    sugerir_gre?: boolean;
+    warnings?: string[];
+    is_demo_representation?: boolean;
+    message?: string;
+  }> {
     const client = this.supabase.getClient();
 
     // 0. VALIDAR CONFIGURACIÓN COMPLETA ANTES DE CONTINUAR
@@ -1300,10 +1308,14 @@ export class PedidosService {
     if (!empresaConfig.razon_social) camposFaltantes.push('Razón Social');
     if (!empresaConfig.direccion_fiscal) camposFaltantes.push('Dirección Fiscal');
     const usaCertificadoDemoRuntime = canUseRuntimeDemoCertificate(empresaConfig);
-    if (!empresaConfig.certificado_pfx && !usaCertificadoDemoRuntime) {
+    const usaRepresentacionDemoColombia = empresaConfig.is_demo === true
+      && String(empresaConfig.pais ?? '').trim().toUpperCase() === 'CO';
+    const noRequiereCertificadoFiscal = usaCertificadoDemoRuntime
+      || usaRepresentacionDemoColombia;
+    if (!empresaConfig.certificado_pfx && !noRequiereCertificadoFiscal) {
       camposFaltantes.push('Certificado Digital');
     }
-    if (!empresaConfig.certificado_password && !usaCertificadoDemoRuntime) {
+    if (!empresaConfig.certificado_password && !noRequiereCertificadoFiscal) {
       camposFaltantes.push('Contraseña del Certificado');
     }
 
@@ -1331,12 +1343,24 @@ export class PedidosService {
 
     if (pedido.factura_id) {
       console.log(`ℹ️ [PedidosService] Pedido ${id} ya tiene factura ${pedido.factura_id}, retornando datos actuales`);
+      const representacionDemoExistente = await this.esRepresentacionDemoCpePersistida(
+        client,
+        pedido.factura_id,
+        tenantId,
+      );
       await this.repararDetalleFacturadoSiEsNecesario(pedido, tenantId);
       const sugerenciaExistente = await this.greIntegrationService.verificarSugerenciaGRE(pedido, tenantId);
       return {
         success: true,
         factura_id: pedido.factura_id,
         sugerir_gre: sugerenciaExistente.sugerir,
+        is_demo_representation: representacionDemoExistente,
+        ...(representacionDemoExistente
+          ? {
+              warnings: ['Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN'],
+              message: 'Muestra demo generada localmente, sin transmisión ni validez DIAN',
+            }
+          : {}),
       };
     }
 
@@ -1403,11 +1427,16 @@ export class PedidosService {
     }
 
     // 9. Notificar
+    const esRepresentacionDemo = facturaResultado.is_demo_representation === true;
+    const mensajeResultado = esRepresentacionDemo
+      ? 'Muestra demo generada localmente, sin transmisión ni validez DIAN'
+      : `La factura para el pedido ${pedido.numero} ha sido emitida exitosamente`;
+
     await this.enviarNotificacion(tenantId, {
       type: 'FACTURA_EMITIDA' as any,
-      severity: 'SUCCESS' as any,
-      title: 'Factura emitida',
-      message: `La factura para el pedido ${pedido.numero} ha sido emitida exitosamente`,
+      severity: (esRepresentacionDemo ? 'WARNING' : 'SUCCESS') as any,
+      title: esRepresentacionDemo ? 'Muestra demo generada' : 'Factura emitida',
+      message: mensajeResultado,
       usuario_id: userId,
     });
 
@@ -1417,7 +1446,44 @@ export class PedidosService {
       success: true,
       factura_id: facturaResultado.factura_id,
       sugerir_gre: sugerenciaGRE.sugerir,
+      is_demo_representation: esRepresentacionDemo,
+      ...(facturaResultado.warnings?.length
+        ? { warnings: facturaResultado.warnings }
+        : {}),
+      ...(esRepresentacionDemo
+        ? {
+            message: mensajeResultado,
+          }
+        : {}),
     };
+  }
+
+  private async esRepresentacionDemoCpePersistida(
+    client: any,
+    facturaId: string,
+    tenantId: string,
+  ): Promise<boolean> {
+    const { data: cpe, error } = await client
+      .from('cpe')
+      .select('id,pais,simulated_origin,issuer_snapshot')
+      .eq('tenant_id', tenantId)
+      .eq('id', facturaId)
+      .maybeSingle();
+
+    if (error) {
+      throw new BadRequestException({
+        message: 'No se pudo verificar la procedencia fiscal del comprobante vinculado al pedido',
+        code: 'PEDIDO_CPE_PROVENANCE_UNAVAILABLE',
+      });
+    }
+    if (!cpe?.id) {
+      throw new BadRequestException({
+        message: 'El pedido referencia un comprobante que no existe en el mismo tenant',
+        code: 'PEDIDO_CPE_LINK_INVALID',
+      });
+    }
+
+    return isColombiaDemoRepresentation(cpe as Record<string, any>);
   }
 
   private async repararDetalleFacturadoSiEsNecesario(

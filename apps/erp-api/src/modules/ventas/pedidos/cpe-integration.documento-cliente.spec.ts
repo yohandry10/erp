@@ -210,6 +210,227 @@ describe('CPEIntegrationService documento de cliente', () => {
     }
   });
 
+  it('omite el certificado sólo para el pedido demo CO y conserva su snapshot local', async () => {
+    const validateCertificate = jest.fn().mockResolvedValue({
+      isValid: false,
+      warnings: [],
+      errors: ['No hay certificado'],
+    });
+    const create = jest.fn().mockResolvedValue({
+      id: 'cpe-demo-co',
+      estado: 'FIRMADO',
+      pais: 'CO',
+      simulated_origin: true,
+      issuer_snapshot: { country_code: 'CO' },
+      serie: 'FE',
+      numero: 1,
+      moneda: 'COP',
+      fecha_emision: '2026-09-03',
+      total_venta: 119,
+      documento_id: 'documento-demo-co',
+    });
+    const service = new CPEIntegrationService(
+      {} as any,
+      { create } as any,
+      { validateCertificate } as any,
+      {} as any,
+      { getTasaIgv: jest.fn().mockResolvedValue(0.19) } as any,
+    );
+    const demoConfig = {
+      ruc: '9001234568',
+      razon_social: 'Empresa Demo Colombia SAS',
+      moneda_defecto: 'COP',
+      pais: 'CO',
+      is_demo: true,
+      dian_resolucion_prefijo: 'FE',
+    };
+    jest.spyOn(service as any, 'obtenerEmpresaConfig').mockResolvedValue(demoConfig);
+    jest.spyOn(service as any, 'congelarPagoDianPedido').mockResolvedValue({
+      pedido,
+      cliente: {
+        documento_tipo: 'NIT',
+        documento_numero: '9001234568',
+        razon_social: 'Cliente Demo Colombia SAS',
+      },
+      empresaConfig: demoConfig,
+    });
+    jest.spyOn(service as any, 'mapearPedidoACPE').mockResolvedValue({
+      tipo_documento: TipoDocumento.FACTURA,
+      serie: 'FE',
+      numero: 1,
+      moneda: 'COP',
+      total_venta: 119,
+      fecha_emision: '2026-09-03',
+      items: [],
+    });
+    jest.spyOn(service as any, 'obtenerCpePersistidoParaRespuesta').mockResolvedValue({
+      id: 'cpe-demo-co',
+      tenant_id: pedido.tenant_id,
+      documento_id: 'documento-demo-co',
+      estado: 'FIRMADO',
+      pais: null,
+      simulated_origin: true,
+      issuer_snapshot: { country_code: 'CO' },
+      serie: 'FE',
+      numero: 1,
+      moneda: 'COP',
+      fecha_emision: '2026-09-03',
+      total_venta: 119,
+    });
+    jest.spyOn(service as any, 'consumirSnapshotDianPedido').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'registrarExitoIntegracion').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'registrarErrorIntegracion').mockResolvedValue(undefined);
+    const key = `ventas.cpe.factura:${pedido.tenant_id}:${pedido.id}`;
+
+    await expect(
+      service.generarFacturaDesdePedido(pedido, pedido.tenant_id, key, 'usuario-demo-co'),
+    ).resolves.toEqual(expect.objectContaining({
+      factura_id: 'cpe-demo-co',
+      documento_id: 'documento-demo-co',
+      moneda: 'COP',
+      total: 119,
+      warnings: [
+        'Comprobante demo generado localmente: muestra sin transmisión ni validez DIAN',
+      ],
+      is_demo_representation: true,
+    }));
+    expect(validateCertificate).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotency_key: key }),
+      pedido.tenant_id,
+      'usuario-demo-co',
+      { pedidoFiscalOwnerId: pedido.id },
+    );
+  });
+
+  it('usa la procedencia del CPE real si el tenant se convierte después de la lectura inicial demo', async () => {
+    const validateCertificate = jest.fn().mockResolvedValue({
+      isValid: false,
+      warnings: [],
+      errors: ['La lectura inicial todavía era demo'],
+    });
+    const create = jest.fn().mockResolvedValue({
+      id: 'cpe-real-tras-conversion',
+      estado: 'FIRMADO',
+      pais: 'CO',
+      simulated_origin: false,
+      issuer_snapshot: { country_code: 'CO' },
+      serie: 'FV',
+      numero: 91,
+      moneda: 'COP',
+      fecha_emision: '2026-09-04',
+      total_venta: 119,
+      documento_id: 'documento-real-tras-conversion',
+    });
+    const service = new CPEIntegrationService(
+      {} as any,
+      { create } as any,
+      { validateCertificate } as any,
+      {} as any,
+      { getTasaIgv: jest.fn().mockResolvedValue(0.19) } as any,
+    );
+    const configInicialDemo = {
+      ruc: '9001234568',
+      razon_social: 'Empresa Demo Colombia SAS',
+      moneda_defecto: 'COP',
+      pais: 'CO',
+      is_demo: true,
+      dian_resolucion_prefijo: 'FE',
+    };
+    const configCongeladaReal = {
+      ...configInicialDemo,
+      ruc: '9012345671',
+      razon_social: 'Empresa Colombia Real SAS',
+      is_demo: false,
+      dian_resolucion_prefijo: 'FV',
+    };
+    jest.spyOn(service as any, 'obtenerEmpresaConfig').mockResolvedValue(configInicialDemo);
+    jest.spyOn(service as any, 'congelarPagoDianPedido').mockResolvedValue({
+      pedido,
+      cliente: {
+        documento_tipo: 'NIT',
+        documento_numero: '9001234568',
+        razon_social: 'Cliente Colombia SAS',
+      },
+      empresaConfig: configCongeladaReal,
+    });
+    jest.spyOn(service as any, 'mapearPedidoACPE').mockResolvedValue({
+      tipo_documento: TipoDocumento.FACTURA,
+      serie: 'FV',
+      numero: 0,
+      moneda: 'COP',
+      total_venta: 119,
+      fecha_emision: '2026-09-04',
+      items: [],
+    });
+    jest.spyOn(service as any, 'obtenerCpePersistidoParaRespuesta').mockResolvedValue({
+      id: 'cpe-real-tras-conversion',
+      tenant_id: pedido.tenant_id,
+      documento_id: 'documento-real-tras-conversion',
+      estado: 'FIRMADO',
+      pais: null,
+      simulated_origin: false,
+      issuer_snapshot: { country_code: 'CO' },
+      serie: 'FV',
+      numero: 91,
+      moneda: 'COP',
+      fecha_emision: '2026-09-04',
+      total_venta: 119,
+    });
+    jest.spyOn(service as any, 'consumirSnapshotDianPedido').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'registrarExitoIntegracion').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'registrarErrorIntegracion').mockResolvedValue(undefined);
+
+    await expect(
+      service.generarFacturaDesdePedido(
+        pedido,
+        pedido.tenant_id,
+        `ventas.cpe.factura:${pedido.tenant_id}:${pedido.id}`,
+        'usuario-real-co',
+      ),
+    ).resolves.toEqual(expect.objectContaining({
+      factura_id: 'cpe-real-tras-conversion',
+      is_demo_representation: false,
+      warnings: [
+        'La factura fue firmada pero debe ser enviada manualmente a DIAN desde el módulo CPE',
+      ],
+    }));
+    expect(validateCertificate).not.toHaveBeenCalled();
+  });
+
+  it('mantiene el certificado obligatorio para una empresa CO real', async () => {
+    const validateCertificate = jest.fn().mockResolvedValue({
+      isValid: false,
+      warnings: [],
+      errors: ['Certificado vencido'],
+    });
+    const create = jest.fn();
+    const service = new CPEIntegrationService(
+      {} as any,
+      { create } as any,
+      { validateCertificate } as any,
+      {} as any,
+      { getTasaIgv: jest.fn().mockResolvedValue(0.19) } as any,
+    );
+    jest.spyOn(service as any, 'obtenerEmpresaConfig').mockResolvedValue({
+      ruc: '9012345671',
+      razon_social: 'Empresa Colombia Real SAS',
+      moneda_defecto: 'COP',
+      pais: 'CO',
+      is_demo: false,
+      dian_resolucion_prefijo: 'FV',
+    });
+    jest.spyOn(service as any, 'registrarErrorIntegracion').mockResolvedValue(undefined);
+
+    await expect(
+      service.generarFacturaDesdePedido(pedido, pedido.tenant_id),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'CERT_VALIDATION_FAILED' }),
+    });
+    expect(validateCertificate).toHaveBeenCalledWith(pedido.tenant_id);
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it('conserva crédito, medio, plazo y fechas calendario del snapshot del pedido CO', async () => {
     const service = buildService();
 
@@ -443,6 +664,9 @@ describe('CPEIntegrationService documento de cliente', () => {
     const create = jest.fn().mockImplementation(async (dto: any) => ({
       id: 'cpe-canonico',
       estado: 'FIRMADO',
+      pais: 'CO',
+      simulated_origin: false,
+      issuer_snapshot: { country_code: 'CO' },
       serie: 'FV',
       numero: 81,
       moneda: dto.moneda,
@@ -472,6 +696,19 @@ describe('CPEIntegrationService documento de cliente', () => {
     });
     const liveTaxProfiles = jest.spyOn(service as any, 'obtenerAfectacionPorProducto');
     const liveCosts = jest.spyOn(service as any, 'obtenerCostoPorProducto');
+    jest.spyOn(service as any, 'obtenerCpePersistidoParaRespuesta').mockResolvedValue({
+      id: 'cpe-canonico',
+      tenant_id: pedido.tenant_id,
+      estado: 'FIRMADO',
+      pais: null,
+      simulated_origin: false,
+      issuer_snapshot: { country_code: 'CO' },
+      serie: 'FV',
+      numero: 81,
+      moneda: 'COP',
+      fecha_emision: paymentSnapshot.fecha_emision,
+      total_venta: 238,
+    });
     jest.spyOn(service as any, 'registrarErrorIntegracion').mockResolvedValue(undefined);
     jest.spyOn(service as any, 'registrarExitoIntegracion').mockResolvedValue(undefined);
 
@@ -706,6 +943,9 @@ describe('CPEIntegrationService documento de cliente', () => {
       return {
         id: 'cpe-co-retry',
         estado: 'FIRMADO',
+        pais: 'CO',
+        simulated_origin: false,
+        issuer_snapshot: { country_code: 'CO' },
         serie: 'FV',
         numero: number,
         moneda: 'COP',
@@ -735,6 +975,21 @@ describe('CPEIntegrationService documento de cliente', () => {
     });
     jest.spyOn(service as any, 'obtenerAfectacionPorProducto').mockResolvedValue(new Map());
     jest.spyOn(service as any, 'obtenerCostoPorProducto').mockResolvedValue(new Map());
+    jest.spyOn(service as any, 'obtenerCpePersistidoParaRespuesta').mockImplementation(
+      async () => ({
+        id: 'cpe-co-retry',
+        tenant_id: pedido.tenant_id,
+        estado: 'FIRMADO',
+        pais: null,
+        simulated_origin: false,
+        issuer_snapshot: { country_code: 'CO' },
+        serie: 'FV',
+        numero: 77,
+        moneda: 'COP',
+        fecha_emision: calls.at(-1)?.fecha,
+        total_venta: 119,
+      }),
+    );
     jest.spyOn(service as any, 'registrarErrorIntegracion').mockResolvedValue(undefined);
     jest.spyOn(service as any, 'registrarExitoIntegracion').mockResolvedValue(undefined);
     const key = 'ventas.cpe.factura:tenant-ruc-text:pedido-ruc-text';

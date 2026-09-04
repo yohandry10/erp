@@ -264,6 +264,9 @@ describe('CPE Integration Verification', () => {
         // 6. CpeService: resultado de la emisión atómica
         const mockCreatedCpe = {
             id: 'cpe-123',
+            pais: 'PE',
+            simulated_origin: false,
+            issuer_snapshot: { country_code: 'PE' },
             tipo_documento: '01',
             serie: 'F001',
             numero: 101,
@@ -356,6 +359,18 @@ describe('CPE Integration Verification', () => {
 
         // 16. CpeService: update CPE (ACEPTADO)
         mockSupabaseClient.update.mockReturnThis();
+
+        // La integración comercial relee la procedencia inmutable porque el
+        // DTO público de CpeService no expone issuer_snapshot/metadata.
+        jest.spyOn(cpeIntegrationService as any, 'obtenerCpePersistidoParaRespuesta')
+            .mockResolvedValue({
+                ...mockCreatedCpe,
+                tenant_id: tenantId,
+                documento_id: 'doc-123',
+                pais: null,
+                simulated_origin: false,
+                issuer_snapshot: { country_code: 'PE' },
+            });
 
         // Execute
         const result = await cpeIntegrationService.generarFacturaDesdePedido(

@@ -15,6 +15,7 @@ interface CpeDocument {
   moneda: string
   estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'ERROR' | 'RECHAZADO' | 'ANULADO'
   estadoSunat?: string
+  isDemoRepresentation?: boolean
   observaciones?: string
   fechaCreacion: string
 }
@@ -33,6 +34,7 @@ interface Props {
 }
 
 const estadoColor: Record<string, string> = {
+  MUESTRA_LOCAL: 'border-amber-300/30 bg-amber-300/10 text-amber-700 dark:text-amber-200',
   ACEPTADO: 'border-cyan-300/30 bg-cyan-300/10 text-primary',
   FIRMADO: 'border-blue-300/30 bg-blue-300/10 text-primary dark:text-blue-200',
   ENVIADO: 'border-sky-300/30 bg-sky-300/10 text-primary dark:text-sky-200',
@@ -70,7 +72,10 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
           {documents.map((doc) => {
             const type = String(doc.tipoDocumento || doc.tipoComprobante).toUpperCase()
             const isNote = ['07', '08', '91', '92'].some((code) => type.includes(code)) || type.includes('NOTA')
-            const canSendDocument = canSend && ['FIRMADO', 'ERROR'].includes(doc.estado)
+            const displayState = doc.isDemoRepresentation ? 'MUESTRA_LOCAL' : doc.estado
+            const canSendDocument = !doc.isDemoRepresentation
+              && canSend
+              && ['FIRMADO', 'ERROR'].includes(doc.estado)
             return (
             <tr key={doc.id} className="bg-card/50 text-foreground/90 transition hover:bg-card/80">
               <td className="p-3 font-semibold text-foreground">{doc.tipoComprobante}</td>
@@ -95,8 +100,11 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
                 {doc.moneda} {Number(doc.total).toFixed(2)}
               </td>
               <td className="p-3">
-                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${estadoColor[doc.estado] || estadoColor.BORRADOR}`}>
-                  {doc.estado}
+                <span
+                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${estadoColor[displayState] || estadoColor.BORRADOR}`}
+                  data-testid={`cpe-status-${doc.id}`}
+                >
+                  {doc.isDemoRepresentation ? 'MUESTRA LOCAL' : doc.estado}
                 </span>
               </td>
               <td className="p-3">
@@ -116,7 +124,9 @@ export function ComprobantesTable({ documents, onView, onPdf, onSend, onSign, on
                   className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-primary dark:text-blue-200 hover:bg-blue-500/15 disabled:opacity-40"
                   onClick={() => canSendDocument && onSend(doc.id)}
                   disabled={!canSendDocument}
-                  title={!canSend
+                  title={doc.isDemoRepresentation
+                    ? 'Las muestras locales nunca se transmiten a la autoridad fiscal'
+                    : !canSend
                     ? `Envío a ${fiscalLabel} no disponible`
                     : doc.estado === 'RECHAZADO'
                       ? 'El rechazo fiscal es definitivo y no se reintenta'

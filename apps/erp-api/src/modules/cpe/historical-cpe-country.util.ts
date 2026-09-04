@@ -27,6 +27,9 @@ export function resolveHistoricalCpeCountry(
     ? resolveExplicitCountry(cpe.issuer_snapshot.country_code, 'issuer_snapshot.country_code')
     : null;
   const persisted = resolveExplicitCountry(cpe?.pais, 'cpe.pais');
+  const metadata = cpe?.metadata && typeof cpe.metadata === 'object'
+    ? resolveExplicitCountry(cpe.metadata.pais, 'cpe.metadata.pais')
+    : null;
   const current = resolveExplicitCountry(currentTenantCountry, 'empresa_config.pais');
 
   if (snapshot && persisted && snapshot !== persisted) {
@@ -35,9 +38,29 @@ export function resolveHistoricalCpeCountry(
     );
   }
 
-  const resolved = snapshot || persisted || current;
+  const canonicalPersisted = snapshot || persisted;
+  if (canonicalPersisted && metadata && canonicalPersisted !== metadata) {
+    throw new Error(
+      `Procedencia fiscal contradictoria: CPE ${canonicalPersisted} no coincide con metadata ${metadata}`,
+    );
+  }
+
+  const resolved = canonicalPersisted || metadata || current;
   if (!resolved) {
     throw new Error('No se puede determinar el país fiscal histórico del CPE');
   }
   return resolved;
+}
+
+/**
+ * La modalidad también pertenece al comprobante ya persistido. Una conversión
+ * posterior del tenant demo a real no puede reetiquetar sus muestras históricas
+ * como documentos fiscales DIAN.
+ */
+export function isColombiaDemoRepresentation(
+  cpe: Record<string, any>,
+  currentTenantCountry?: unknown,
+): boolean {
+  return resolveHistoricalCpeCountry(cpe, currentTenantCountry) === 'CO'
+    && cpe?.simulated_origin !== false;
 }

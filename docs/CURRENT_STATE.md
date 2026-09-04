@@ -1,6 +1,6 @@
 # Estado actual del ERP
 
-Actualizado: 2026-08-31.
+Actualizado: 2026-09-04.
 
 Este archivo contiene únicamente el estado vigente. El historial de auditorías y
 decisiones anteriores se consulta en Git. Si este resumen contradice código o
@@ -8,19 +8,42 @@ migraciones verificados, prevalece la implementación actual.
 
 ## Resumen ejecutivo
 
-- **Estado remoto observado al iniciar el release Colombia el 2026-08-31:**
-  GitHub `main` y Render sirven el commit
-  `8b12bc42bc5f93147faa81b20eabb72147e3a5dc`; PROD registra
-  `schema_version 528`. Readiness devuelve DB, Redis y outbox listos, con cero
-  eventos fallidos o procesándose y siete `dead_letter` históricos. Persiste un
-  desfase de configuración que este release debe cerrar: el proceso de Render
-  informa `required_schema_version 519`, aunque la base ya está en 528. El
-  binario nuevo fija un piso compilado de 532, además de `render.yaml` y CI, por
-  lo que no podrá declararse listo hasta que base y runtime efectivo coincidan
-  en 532.
+- **Candidato Colombia `533..534`, verificado localmente y todavía pre-PR.** La
+  533 convierte cualquier CPE nacido en una demo CO en una representación local
+  autocontenida, sin UBL ni firma DIAN, y falla cerrado ante intentos de
+  `SEND`/`QUERY`, estados o evidencias externas, incluso si el tenant se convierte
+  después a real. La 534 reemplaza el bloqueo provisional del RMA colombiano por
+  el flujo atómico `RMA recibida → Nota Crédito DIAN 91`: sólo admite una factura
+  `01` real y aceptada, calcula las líneas desde lo recibido y mantiene saldo,
+  pago, outbox e inventario sin efecto fiscal hasta la aceptación. Al aceptar,
+  aplica el efecto una sola vez y cierra la RMA; al rechazar, no aplica efecto y
+  libera la RMA para corregir y reintentar. La respuesta comercial reconsulta el
+  CPE persistido por `id + tenant_id` y obtiene de allí país y procedencia; si el
+  mapper público omite `issuer_snapshot`/`metadata`, `pais` es nulo o la
+  procedencia es contradictoria, falla cerrado y no recurre a
+  `empresa_config` mutable.
 
-- **Las migraciones 523-528 ya forman parte de la línea base productiva; el
-  release candidate actual añade 529-532.** La 523 reserva el logo empresarial en Supabase
+  La evidencia **pre-PR** actual es: 283 suites/2693 pruebas API; type-check y
+  builds API/Web; 52 pruebas Playwright más 1 contrato visual móvil; nueve XML
+  DIAN; y una reconstrucción limpia de PostgreSQL 16 con 531 migraciones, 44
+  verificadores vigentes y 67 históricos, hasta la 534. Esto demuestra el
+  candidato local, no producción: PR, CI remoto, promoción DB-first, despliegues
+  Render/Vercel y retest visual autenticado sobre el mismo SHA siguen pendientes.
+  No se afirma 100 % visual ni homologación DIAN.
+
+- **Release Colombia desplegado el 2026-08-31:** el PR
+  [#97](https://github.com/yohandry10/erp/pull/97) quedó fusionado en GitHub
+  `main`; Render y Vercel sirven el commit
+  `f6455355d12c8834a0c77a73b238647119dff04a`. PROD registra
+  `schema_version = required_schema_version = 532` y
+  `required_schema_applied = true`. Readiness devuelve DB y Redis listos, outbox
+  con cero filas claimable, processing, failed o stale y siete `dead_letter`
+  históricos. CI, E2E y Security Scan de `main` terminaron en verde; Vercel
+  producción está `READY`. Falta la revalidación visual autenticada Colombia
+  sobre este mismo SHA y los gates externos del contribuyente ante DIAN.
+
+- **Las migraciones 523-532 ya forman parte de la línea base productiva.** La
+  523 reserva el logo empresarial en Supabase
   Storage con ruta por tenant, idempotencia, RLS y writer canónico; el PDF usa
   A4 físico, QR SUNAT Q en la parte inferior, logo, unidades, bases y leyenda.
   A4 es una elección de salida del ERP, no un tamaño obligatorio impuesto por
@@ -42,8 +65,9 @@ migraciones verificados, prevalece la implementación actual.
   también está verde. La reconstrucción final comprobó además las ocho rutas
   concurrentes 525/527: reserva esperó el advisory lock 3,477 s/3,479 s, terminó
   idempotente y PostgreSQL registró cero deadlocks. La línea base remota es el
-  esquema 528 y el SHA indicado arriba; `render.yaml` y CI ya exigen 532 para el
-  release, pero PR/CI remoto, DB-first y despliegue aún están pendientes.
+  esquema 532 y el SHA indicado arriba. El PR #97, CI remoto, promoción DB-first
+  y despliegues Render/Vercel están cerrados; quedan el retest visual productivo
+  y la homologación real por contribuyente.
 
   La 529 expone notas DIAN `91/92` desde la bandeja con referencia fiscal
   aceptada, motivo y efecto explícitos, sin fabricar aceptación en demos. La 530
@@ -64,7 +88,7 @@ migraciones verificados, prevalece la implementación actual.
   y nunca reutilizar la nota SUNAT `07`.
 
 - **La emisión Colombia y los eventos FEV 030-034 quedan técnicamente
-  implementados en este release candidate, no homologados legalmente.** La
+  implementados en el runtime productivo, no homologados legalmente.** La
   factura electrónica `01` y las notas `91/92` se
   construyen como UBL 2.1 bajo el Anexo Técnico FEV 1.9, calculan CUFE/CUDE
   SHA-384, se firman XAdES-EPES y viajan por SOAP 1.2 con WS-Addressing y
@@ -111,21 +135,25 @@ La cobertura visual indicada aquí usa Chromium real con la UI completa y APIs
 interceptadas o una base local efímera; no se presenta como una transmisión DIAN
 ni sustituye la repetición visible sobre el SHA productivo después del deploy.
 
-| Módulo o flujo crítico | Evidencia ejecutada | Estado antes del deploy |
+| Módulo o flujo crítico | Evidencia ejecutada | Estado vigente |
 | --- | --- | --- |
 | Configuración del emisor y habilitación | DTO/servicio, seguridad de certificado y transporte, wizard y panel de readiness | Auditado por código, API y navegador aislado; demo y configuración incompleta fallan cerradas |
 | Clientes Colombia | Alta/edición de NIT, DV, responsabilidad, régimen y perfil B2B/consumidor final | Dos recorridos visuales Playwright y pruebas API verdes |
-| Cotización → pedido → pago → factura `01` | Roles ADMIN/vendedor/logística, snapshot bajo lock, numeración e idempotencia ligadas al `pedido_id` | Núcleo interno y contratos SQL/API verdes; faltan PR/CI, promoción DB-first, deploy, retest PROD y la homologación con credenciales reales |
-| Centro CPE e historial Documentos | Bandeja, filtros, redirección de acciones fiscales, fecha calendario e identidad fiscal | Auditado visualmente en Chromium aislado; `Documentos` queda sólo lectura para CO |
-| Nota crédito `91` y débito `92` | Origen aceptado, motivos, líneas/saldos, prorrateo explícito, emisor inmutable y demo bloqueada | UI, servicio, entrega y verificador 529 verdes; sin fabricar aceptación externa |
+| Cotización → pedido → pago → factura `01` | Roles ADMIN/vendedor/logística, snapshot bajo lock, numeración e idempotencia ligadas al `pedido_id`; la prueba integrada usa la forma real del mapper y rehidrata procedencia desde el CPE tenant-scoped | La base 531 está en PROD. El hardening de procedencia está verde sólo en el candidato local; faltan PR/CI, despliegue, retest visual autenticado y homologación real |
+| Demo CO → CPE local | 533 prueba clasificación en el mismo `INSERT`, artefacto no UBL/sin firma y bloqueo de transporte o aceptación aunque el tenant cambie luego a real | `CÓDIGO + API/SQL + PLAYWRIGHT AISLADO`; 533 no está en PROD y no existe retest visual productivo |
+| Centro CPE e historial Documentos | Bandeja, filtros, redirección de acciones fiscales, fecha calendario, identidad y procedencia fiscal | La base 532 fue auditada visualmente en Chromium aislado; la clasificación fail-closed 533 está sólo en candidato |
+| Nota crédito `91` y débito `92` | Origen aceptado, motivos, líneas/saldos, prorrateo explícito, emisor inmutable y demo bloqueada | La base 529 está en PROD; sin fabricar aceptación externa |
+| RMA → Nota Crédito DIAN `91` | 534 prueba origen `01` aceptado, líneas recibidas calculadas en servidor, neutralidad previa, aplicación única al aceptar y rechazo sin efecto con reintento | `CÓDIGO + API/SQL`; no se ha ejecutado visualmente contra PROD ni contra DIAN real |
 | Eventos FEV 030-034 | Importación/ancla, secuencia 030→032→033, 034, RBAC, `operationId` y retry | Recorrido visual aislado y contratos API/SQL verdes; no equivale a habilitación RADIAN |
 | Representación A4 y logo | Etiquetas Colombia, identidad exacta, logo tenant-scoped y apertura desde el flujo comercial | PDF/visual automatizado verde; la impresión física y el `.exe` siguen como comprobación operativa separada |
-| CxC, cancelación y RMA | Gate fiscal, saldo/efecto y bloqueo de la nota SUNAT `07` en Colombia | Pruebas API, visual fiscal y verificador 532 verdes |
+| CxC, cancelación y RMA | Gate fiscal, saldo/efecto y bloqueo de la nota SUNAT `07` en Colombia | El guard 532 está en PROD; el reemplazo funcional y atómico 534 sigue pre-PR |
 
-Después de publicar el SHA final todavía debe repetirse visiblemente en PROD el
-login/demo Colombia, cliente, pedido/factura simulada, A4, bandeja CPE, notas y
-eventos bloqueados con su mensaje correcto, además de revisar consola y red. Lo
-único que no puede cerrarse con el repositorio es la homologación de un
+El SHA de la base 532 ya está publicado. El candidato 533-534 todavía no tiene
+PR ni SHA productivo: después de CI, promoción y despliegue debe repetirse
+visiblemente en PROD el login/demo Colombia, cliente, pedido/factura simulada,
+A4, bandeja CPE, RMA, nota `91`, rechazo/reintento y eventos bloqueados con su
+mensaje correcto, además de revisar consola y red. Lo único que no puede
+cerrarse con el repositorio es la homologación de un
 contribuyente real: PFX, Software ID/PIN, resolución/rango, trust/pins, TestSet,
 estado portal `HABILITADO` y smoke oficial. Para RADIAN directo faltan además el
 registro y su Set independiente de 15 eventos.
@@ -1008,28 +1036,35 @@ Cambios recientes principales:
   administrativos y contables descritos arriba. El rango completo está
   promovido en PROD; la evidencia local y el respaldo restaurable conservan el
   ensayo coordinado previo.
-- `491..496`: hardening posterior validado sólo localmente. La promoción debe
-  detenerse si el preflight del backfill `490→492` encuentra un evento laboral
-  sin snapshot contable inequívoco; el runtime nuevo exige esquema `496` y no
-  debe desplegarse antes que la base.
+- `491..496`: aplicadas y registradas en PROD. El preflight del backfill
+  `490→492` conserva la regla de abortar ante un evento laboral sin snapshot
+  contable inequívoco.
 - `497..528`: aplicadas y registradas en PROD. Cubren el respaldo peruano del
   esquema (`500`), las sucursales como establecimiento anexo y su herencia en
   las operaciones (`503..505`), y la auditoría contable por puntos —prorrata del
   crédito fiscal (`507`), retención de cuarta categoría (`508`), estimación de
   cobranza dudosa (`509`) y tasas de detracción con su carga (`510`, `511`)—.
   Cada una con su verificador comprobado en rojo antes de aplicarse.
-  PROD registra actualmente `528`; el proceso de Render observado todavía
-  anunciaba requisito `519`, y el release candidate local mueve
-  `REQUIRED_DATABASE_SCHEMA_VERSION` a `532` en el binario, `render.yaml` y
-  `.github/workflows/ci.yml`. La cadena completa hasta 532 pasa en PostgreSQL 16
-  efímero. Base, runtime y CI deben coincidir en 532 antes de dar el despliegue
-  por cerrado.
+- `529..532`: aplicadas y registradas en PROD mediante promoción DB-first.
+  Cubren notas DIAN `91/92` desde UI, numeración/idempotencia de factura `01`,
+  snapshot transaccional de pedido/pago y guard jurisdiccional RMA. La cadena
+  completa pasó en PostgreSQL 16 efímero y el PR #97 quedó verde antes del
+  merge. PROD, Render y CI coinciden en esquema requerido `532`; API y Web
+  sirven `f6455355d12c8834a0c77a73b238647119dff04a`.
+- `533..534`: candidato local, **no aplicado en PROD**. La 533 sella como
+  simulada toda representación CPE de una demo Colombia y bloquea transporte,
+  consulta y estados/evidencias externas. La 534 enlaza RMA y Nota Crédito DIAN
+  `91` de forma tenant-scoped e idempotente, conserva el efecto financiero
+  pendiente hasta aceptación y resuelve aceptación o rechazo atómicamente. La
+  reconstrucción PostgreSQL 16 aplicó 531 migraciones hasta la 534 y cerró 44
+  verificadores vigentes y 67 históricos; faltan PR/CI, preflight y respaldo
+  PROD, promoción DB-first, deploy y postchecks.
 
 ## Flujos cerrados técnicamente
 
 «Cerrado técnicamente» significa que existe implementación y contrato probado;
 no equivale a un recorrido visual E2E contra producción. La matriz de
-`Cobertura visual vigente del release candidate 529-532` distingue ambos
+`Cobertura visual vigente de Colombia 529-534` distingue ambos
 niveles.
 
 - Auth, sesión HttpOnly, RBAC, RLS y aislamiento tenant.
@@ -1050,7 +1085,9 @@ niveles.
   credencial tenant-scoped, validación técnica reciente o constancia del portal
   `HABILITADO`, trust store o pins oficiales. Este cierre técnico no equivale a
   TestSet aprobado ni a habilitación legal DIAN; tampoco constituye habilitación
-  como participante directo RADIAN ni soporte integral de factoring.
+  como participante directo RADIAN ni soporte integral de factoring. El
+  candidato local 533-534 refuerza la procedencia demo persistida y añade el
+  circuito RMA→NC 91, pero aún no forma parte del runtime productivo.
 - Compras, recepción, inventario, reservas, logística y kardex.
 - Finanzas, CxC, CxP, bancos y conciliación. Contabilidad cubre las siete fases
   auditadas: ciclo de vida, multi-moneda, recurrentes, activos, partidas
@@ -1301,7 +1338,7 @@ sesiones posteriores. «A fondo» significa leer el código del módulo buscando
 fallos de lógica; «barrido» significa que lo cruzó una comprobación de patrón
 pero nadie lo leyó.
 
-### Cobertura visual vigente del release candidate 529-532
+### Cobertura visual vigente de Colombia 529-534
 
 Esta matriz registra la pasada visible más reciente, no todo lo que alguna vez
 se leyó o probó en el repositorio. Se mantienen separados tres niveles:
@@ -1315,21 +1352,23 @@ se leyó o probó en el repositorio. Se mantienen separados tres niveles:
 
 Sólo se marcará `CERRADO VISUAL` cuando el mismo flujo complete
 `reproducir → consola/logs → corregir → test → PR/CI → desplegar → retest` sobre
-el mismo SHA. **Ningún flujo del paquete local 529-532 cumple todavía esa
-cadena completa**, porque sigue en estado pre-PR: faltan CI remoto, promoción
-DB-first, despliegue y retest contra el mismo SHA.
+el mismo SHA. PR/CI, promoción DB-first y despliegues del paquete 529-532 ya
+están cerrados sobre `f6455355`, pero su retest autenticado sigue pendiente. El
+candidato 533-534 sólo cerró la fase local automatizada: no tiene PR/CI,
+promoción, despliegue ni retest productivo. Ningún flujo Colombia se marca como
+`CERRADO VISUAL`.
 
 | Módulo o flujo crítico | Evidencia visual alcanzada | Estado vigente | Qué falta para cierre visual |
 | --- | --- | --- | --- |
 | Demo, autenticación y onboarding PE/AR/CO | Demos y navegación base PE/AR/CO tienen smoke histórico; en esta pasada se usó una sesión administrativa PE y se comprobó login/sesión. | `PARCIAL` | Repetir creación, conversión a real, expiración, cierre de sesión y navegación completa con cada rol en los tres países sobre el SHA final. |
-| Ventas: cotización → aprobación → pedido → logística | Se reprodujo el rechazo de aprobación, se distinguió vendedor de ADMIN y se verificó la aprobación administrativa; Playwright cubre aprobación, sustento, pedido y entrega a Logística. | `PARCIAL + VISUAL AISLADO` | Recorrer en PROD el circuito completo hasta despacho, factura, cobranza, devolución/RMA y nota, con ADMIN, vendedor y aprobador separados. |
+| Ventas: cotización → aprobación → pedido → logística | Se reprodujo el rechazo de aprobación, se distinguió vendedor de ADMIN y se verificó la aprobación administrativa; Playwright cubre aprobación, sustento, pedido y entrega a Logística. La integración pedido→CPE ahora reconsulta el CPE persistido por `id + tenant_id` y sus pruebas usan la salida real del mapper. | `PARCIAL + VISUAL AISLADO`; hardening de procedencia sólo pre-PR | Recorrer en PROD el circuito completo hasta despacho, factura, cobranza, devolución/RMA y nota, con ADMIN, vendedor y aprobador separados; revalidar la procedencia tras desplegar el candidato. |
 | POS y Caja | Se vieron ventas y movimientos de una caja abierta, el botón ilegible de cambio de sesión y su corrección de contraste. Playwright cubre cierre, redondeo, supervisor/PIN y conservación de errores. | `PARCIAL + VISUAL AISLADO` | Cerrar una caja nueva en PROD sobre 518+, cambiar turno de extremo a extremo, cuadrar medios de pago y probar impresora/Tauri físicos. La sesión histórica sin evidencia de redondeo no se fuerza. |
 | Fiscal/CPE Perú | Se abrió una factura/boleta demo, se corrigió el visor blanco y se comprobó A4 `210 × 297 mm`, datos, totales, descarga/impresión y marca sin validez. | `BASE PRODUCTIVA; RETEST PARCIAL` | Subir logo real por Storage y repetir en el SHA final factura, boleta, NC/ND, QR/evidencia, correo/descarga y asiento originado. No se afirma aceptación SUNAT nueva. |
-| Fiscal/CPE Argentina y Colombia | Playwright localiza sus etiquetas y prohíbe QR fiscal falso en demos; API/SQL prueban CAE/evidencia AR. Para CO, Chrome Playwright cubre cliente maestro/perfil, factura demo, readiness, historial bloqueado, auditor, retry por `operationId`, importación, notas `91/92`, 030→032→033 + 034 y el desvío seguro de Documentos al Centro CPE. La suite aislada final pasa 46/46 más 1/1 de tema móvil. La suite API y la reconstrucción limpia hasta SQL 532 cubren el backend; las APIs del recorrido visual están interceptadas. | `VISUAL AISLADO + AUTOMATIZADO LOCAL; NO PR/CI NI PROD` | AR: homologación con certificado/punto real. CO: promover 529-532, configurar trust/pins y contribuyente real, superar TestSet FEV, registrar `HABILITADO` y repetir visualmente emisión, consulta, adjunto, notas y eventos contra DIAN. Participación directa RADIAN requiere además su habilitación y set de 15 eventos. |
+| Fiscal/CPE Argentina y Colombia | Playwright localiza sus etiquetas y prohíbe QR fiscal falso en demos; API/SQL prueban CAE/evidencia AR. Para CO, Chrome Playwright cubre cliente maestro/perfil, factura demo, readiness, historial bloqueado, auditor, retry por `operationId`, importación, notas `91/92`, 030→032→033 + 034 y el desvío seguro de Documentos al Centro CPE. El candidato local pasa 52/52 más 1/1 de tema móvil, 283 suites/2693 pruebas API y el contrato DIAN de nueve XML; las APIs visuales siguen interceptadas. | Base 532 `DESPLEGADA`; candidato 533-534 `AUTOMATIZADO LOCAL, PRE-PR`; retest PROD pendiente | AR: homologación con certificado/punto real. CO: abrir PR, cerrar CI, promover 533-534, desplegar y repetir en PROD demo fail-closed, emisión, historial, RMA→NC 91, aceptación/rechazo, consulta, adjunto, notas y eventos. La emisión legal además exige trust/pins, TestSet y `HABILITADO`; RADIAN directo exige su set de 15 eventos. |
 | Contabilidad: consignaciones | El HTTP 500 y el mensaje visible se reprodujeron, se corrigió el contrato RPC y se volvió a cargar la bandeja. | `PARCIAL` | Alta, venta, devolución y cierre de una consignación real; comprobar stock, tercero, asiento, CxC y mayor en una misma cadena. |
 | Analytics | Se revisaron parcialmente mora/comercial y fechas durante la pasada; el usuario pidió detener este frente para priorizar Caja y fiscal. | `PAUSADO` | Recorrer cada tablero, filtro, exportación y reconciliar sus cifras con Ventas, CxC, inventario y contabilidad. |
 | Configuración, empresa y logo | Hay contrato de API/Storage, validaciones y pruebas de wizard. La API y SQL aplican la misma allowlist al estado temporal; la 528 sanea progreso, auditoría e intenciones históricas y un trigger impide que writers directos reintroduzcan secretos. No existe aún retest visual productivo del upload 523. | `CÓDIGO + TEST` | Wizard real completo, logo subir/reemplazar/eliminar, sucursales/series, credenciales fiscales y persistencia tras relogin en PE/AR/CO. |
-| Inventario y maestros | Playwright aislado cubre alta/edición legacy de productos y algunas reglas de Kardex. | `VISUAL AISLADO` | Flujo real producto → compra/recepción → stock/kardex → reserva/transferencia/despacho/devolución, con lotes/series y dos almacenes. |
+| Inventario y maestros | Playwright aislado cubre alta/edición legacy de productos y algunas reglas de Kardex. La 534 prueba por SQL el efecto de inventario del RMA, no su experiencia visual. | `VISUAL AISLADO + CÓDIGO`; 534 pre-PR | Flujo real producto → compra/recepción → stock/kardex → reserva/transferencia/despacho/devolución, con lotes/series y dos almacenes; repetir RMA→NC 91 tras el deploy. |
 | Finanzas y tesorería | Playwright aislado cubre casos puntuales de Kardex financiero/liquidación; la lógica tiene suites y verificadores. | `VISUAL AISLADO + CÓDIGO` | CxC, CxP, bancos, ingreso/gasto, detracción/retención, multi-moneda, conciliación y cierre contra asientos y estados de cuenta reales. |
 | Usuarios, roles y seguridad | Playwright aislado cubre resumen de roles; guards/RLS tienen pruebas y smokes históricos de aislamiento. | `VISUAL AISLADO + CÓDIGO` | Crear, limitar, revocar y reactivar usuarios por cada rol; probar sesiones revocadas y permisos cruzados entre dos tenants en el SHA final. |
 
@@ -1364,35 +1403,40 @@ en esas pruebas. No reemplaza las suites que requieren API y PostgreSQL reales.
 
 La existencia de una suite `*.spec.ts`, una revisión de código o la etiqueta
 «cerrado técnicamente» **no autoriza a reportar 100 % visual**. Esta lista es el
-punto de reanudación obligatorio después del release 529-532.
+punto de reanudación obligatorio después de publicar el candidato 533-534; nada
+de lo marcado como pendiente quedó cubierto por sus pruebas locales.
 
 #### Matriz específica Colombia DIAN
 
 Esta tabla evita mezclar tres afirmaciones distintas: que el código existe, que
 un contrato automatizado lo comprueba y que un usuario lo completó visualmente
 contra DIAN. En la fecha de corte **ninguna transmisión colombiana real se ha
-ejecutado** y el release candidate todavía no está desplegado. Los recorridos
-Chrome usan APIs interceptadas: prueban UX y contrato HTTP, no DIAN ni el backend
-productivo.
+ejecutado**. La base 529-532 sí está desplegada en PROD; el candidato 533-534
+sigue pre-PR. Los recorridos Chrome con APIs interceptadas prueban UX y contrato
+HTTP, no DIAN ni sustituyen el retest autenticado contra el backend productivo.
 
 | Flujo Colombia | Evidencia automatizada vigente | Evidencia visual vigente | Pendiente externo o de cierre |
 | --- | --- | --- | --- |
-| Alta demo CO, sesión y contexto COP/NIT | Suites de demo, país, impuesto y aislamiento tenant. | Chrome Playwright comprueba que una demo permanece sin escrituras externas aunque su bloque fiscal aparente estar completo. | Crear demo temporal y repetir login/navegación tras desplegar. |
+| Alta demo CO, sesión y contexto COP/NIT | Suites de demo, país, impuesto y aislamiento tenant. La 533 clasifica la procedencia dentro del `INSERT`, valida que el artefacto sea local, no UBL y sin firma, y bloquea `SEND`/`QUERY` y toda evidencia externa aun después de convertir el tenant a real. | Chrome Playwright comprueba con APIs interceptadas que la demo no transmite; la barrera 533 sólo tiene evidencia API/SQL local. | Abrir PR, promover y desplegar 533; luego crear una demo temporal y repetir login, emisión, historial, conversión y bloqueos sobre el mismo SHA productivo. |
 | Configuración y readiness DIAN | API exige tenant CO real y credenciales propias. Una validación técnica de menos de 24 h debe demostrar endpoint accesible, trust listo y coincidencia exacta de resolución, rango, vigencia y prefijo sólo cuando DIAN lo asigna, antes de permitir la primera constancia; producción exige después estado `HABILITADO`. La atestación es ADMIN-only, idempotente e invalida al cambiar identidad/Software ID/TestSet. | Chrome Playwright cubre listo, bloqueado, demo y registro de constancia; no se registró evidencia real del portal. | PFX, Software ID/PIN, TestSet, trust/pins, numeración y estado `HABILITADO` reales. |
 | Perfil tributario del receptor | La migración 526, su verificador y suites de clientes/CPE exigen una elección explícita, cargan el cliente maestro tenant-scoped, rechazan snapshots divergentes y congelan el perfil usado al emitir. | Chrome aislado cubre alta B2B, edición a consumidor final, DV y selección en la factura. | Completar/confirmar los perfiles de clientes reales antes de emitir y repetir en PROD. |
-| Factura `01` desde POS/CPE | Builder y orquestación prueban afectación gravada, exenta y excluida, totales, CUFE y autorización. El gate genera el XML real y ejecuta XSD/Schematron oficial versionado. La 530 reserva la numeración exclusivamente desde servidor y ata el retry al mismo actor; la 531 congela pago y contenido comercial antes de mapear; la creación real persiste UBL DIAN nativo y bloquea XML SUNAT histórico. | Chrome aislado cubre selección de cliente, snapshot read-only, fecha Bogotá, pago, afectación por línea e idempotencia; no hay envío visible real. | Resolución DIAN vigente y TestSet/producción autorizados; repetir contra el backend desplegado y DIAN. |
+| Factura `01` desde POS/CPE | Builder y orquestación prueban afectación gravada, exenta y excluida, totales, CUFE y autorización. El gate genera el XML real y ejecuta XSD/Schematron oficial versionado. La 530 reserva la numeración exclusivamente desde servidor y ata el retry al mismo actor; la 531 congela pago y contenido comercial antes de mapear; la creación real persiste UBL DIAN nativo y bloquea XML SUNAT histórico. La respuesta del pedido reconsulta el CPE por `id + tenant_id` y falla cerrado si su procedencia persistida no es inequívoca; las pruebas usan el mapper público real, que omite los JSON internos y puede devolver `pais = NULL`, y cubren CO demo/real y no regresión PE/AR. | Chrome aislado cubre selección de cliente, snapshot read-only, fecha Bogotá, pago, afectación por línea e idempotencia; no hay envío visible real ni retest del hardening de procedencia. | Publicar el candidato y repetir visualmente contra el backend desplegado; para emisión legal faltan resolución DIAN vigente y TestSet/producción autorizados. |
 | Nota crédito `91` y nota débito `92` | La 529 y sus pruebas exigen CPE aceptado del mismo tenant y conservan CUFE/CUDE, tipo, motivo y discrepancia; XSD/Schematron cubren ambos XML. | Chrome aislado crea una 92 ficticia con APIs interceptadas desde la bandeja y demuestra que una demo permanece bloqueada y vacía; no representa una emisión DIAN real. | Emitir/consultar cada tipo en el TestSet real y guardar respuesta oficial. |
+| RMA → Nota Crédito DIAN `91` | La 534 exige factura `01` real aceptada y tenant-scoped, calcula desde cantidades recibidas, crea y enlaza la nota en estado neutral, aplica inventario/saldo/pago/outbox una sola vez al aceptar y, al rechazar, conserva cero efecto y habilita corrección/reintento. | Sólo API/SQL local; la UI identifica candidatas CO reales por evidencia persistida y mantiene la demo como devolución física, pero no hay recorrido visual productivo. | PR/CI, promoción 534, deploy y retest E2E de recepción → emisión → aceptación/cierre y rechazo/reintento. La aceptación real exige DIAN. |
 | Firma XAdES-EPES, trust y transporte SOAP | Suites criptográficas verifican firma XMLDSig/XAdES, propiedad del PFX y confianza independiente en respuestas DIAN mediante bundle CA y pins SHA-256 de SPKI. SOAP 1.2 firma WS-Security X.509, fija WS-Addressing y rechaza redirecciones/faults/XXE. TLS y el firmante XML son certificados distintos. | Sin llamada visible a DIAN con certificado de cliente. | Obtener un `ApplicationResponse` 02/04 real y reciente, verificar su leaf/cadena con la ECD y ONAC, y sólo entonces instalar bundle/pins y probar rotación. La caja oficial 2026 no publica un leaf o pin vigente; no usar TLS, PFX tenant ni el ejemplo vencido. |
 | Numeración y envío | Contratos cubren `GetNumberingRange`, `SendTestSetAsync`, `SendBillSync` y `SendBillAsync`; el rango y la clave técnica deben coincidir antes de la firma. La 530 reserva correlativo y el prefijo opcional de `01` con actor, fecha e idempotencia, ignora numeración del browser y falla ante demo, rango agotado o resolución fuera de vigencia. El identificador visible es exactamente `prefijo + consecutivo`, sin guion ni relleno; sin prefijo es sólo el consecutivo. `numberingValidated` sólo acredita el rango; `softwarePinValidated` requiere evidencia separada de TestSet/portal. | No revalidado contra el servicio oficial. | Resolución/rango vigentes y prefijo sólo si fue asignado al software real; Software ID/PIN y TestSet del contribuyente. |
 | Offline/Tauri fiscal | Web y Tauri permiten caché/lecturas no sensibles y tickets locales no fiscales, pero bloquean antes de encolar cualquier emisión, nota, firma, numeración o transmisión DIAN. La sincronización purga entradas fiscales legacy y no las reproduce como emisiones reales. | Pruebas automatizadas cubren el bloqueo y la purga; falta ejecutable físico. | Repetir desconexión/reconexión y reinicio en el `.exe` final, comprobando que nunca aparezca un CPE real sin backend en línea. |
 | Consulta, reintento y recuperación | Se distinguen `GetStatus` por CUFE/CUDE, `GetStatusZip` por `ZipKey`, `GetStatusEvent` por CUFE de la factura y `GetXmlByDocumentKey` para recuperar la FEV. Una respuesta incierta se consulta antes de reenviar; retry usa `operationId` persistido. | Chrome comprueba retry sin la clave de `sessionStorage`; no se reprodujo latencia/fault real de DIAN. | Smoke autorizado de timeout, pendiente, aceptado y rechazo fiscal. |
 | `ApplicationResponse`, aceptación 528 y `AttachedDocument` | La 528 exige raíz/namespace UBL exactos, una firma `ds:Signature`, un `DocumentResponse/DocumentReference/UUID` directo con el mismo CUFE/CUDE, hash y trust válidos. El pin DIAN valida el `ApplicationResponse` 02/04 interno; el adjunto sólo nace después y su contenedor exterior se firma con el PFX tenant conservando emisor/receptor del snapshot. | No se descargó un adjunto producido por una aceptación real. | Obtener aceptación DIAN real y comprobar correlación, entrega y descarga al cliente. |
-| Eventos FEV 030-034 | 527/528 y sus verificadores PostgreSQL 16 cubren ancla recibida, RBAC/tenant, reserva-sello-finalización, secuencia, idempotencia, correlación estricta y retry; la suite API completa pasa. El gate firma/valida los cinco XML y exige el `ProfileID` descriptivo exacto. | Chrome aislado importa, recorre 030→032→033 y 034, conserva historial read-only y reconcilia por `operationId`; todo con APIs interceptadas. | PR/CI, esquema 532, deploy y prueba real como adquirente/facturador. No afirmar RADIAN integral. |
+| Eventos FEV 030-034 | 527/528 y sus verificadores PostgreSQL 16 cubren ancla recibida, RBAC/tenant, reserva-sello-finalización, secuencia, idempotencia, correlación estricta y retry; la suite API completa pasa. El gate firma/valida los cinco XML y exige el `ProfileID` descriptivo exacto. | Chrome aislado importa, recorre 030→032→033 y 034, conserva historial read-only y reconcilia por `operationId`; todo con APIs interceptadas. | Retest productivo y prueba real como adquirente/facturador. No afirmar RADIAN integral. |
 | Habilitación directa RADIAN/factoring | No implementada ni demostrada por 030-034. | Sin recorrido ni credenciales reales. | Registro como participante directo, documentos/requisitos, verificación DIAN y Set RADIAN de 15 eventos; luego probar los eventos de circulación/factoring que correspondan. |
-| Impresión A4 y logo | PDF/vista conservan emisor y país del snapshot; el logo usa Storage tenant-scoped. La representación no se presenta como autorización fiscal. | A4 fue comprobado visualmente en el flujo CPE general; logo y documento CO final no se revalidaron juntos en PROD. | Subir logo real y comprobar PDF/impresora física tras desplegar. |
+| Impresión A4 y logo | PDF/vista conservan emisor y país del snapshot; el logo usa Storage tenant-scoped. La representación no se presenta como autorización fiscal. | A4 fue comprobado visualmente en el flujo CPE general; logo y documento CO final no se revalidaron juntos en PROD. | Subir logo real y comprobar PDF/impresora física sobre el SHA desplegado. |
 | PILA y nómina electrónica CO | Cálculo laboral, configuración y bloqueo demo tienen pruebas separadas. | No hay declaración real visual. | Operador PILA, credenciales de nómina, datos patronales y validación legal externa; no forman parte de la homologación FEV. |
 
-El conjunto automatizado demuestra coherencia técnica y regresión local; no
+El candidato local completo pasa 283 suites/2693 pruebas API, type-check y
+builds API/Web, 52 Playwright más 1 contrato visual móvil, nueve XML DIAN y una
+reconstrucción PostgreSQL 16 con 531 migraciones, 44 verificadores vigentes y 67
+históricos hasta la 534. El conjunto automatizado demuestra coherencia técnica y regresión local; no
 demuestra disponibilidad de DIAN, titularidad de credenciales, aceptación del
 TestSet ni habilitación jurídica del contribuyente. El requisito separado de 15
 eventos para un participante directo procede del
@@ -2028,6 +2072,11 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ### Antes de completar el go-live
 
+- Publicar el candidato Colombia 533-534 siguiendo la cadena completa: PR, CI
+  remoto, preflight y respaldo PROD, promoción DB-first, despliegues
+  Render/Vercel, `/health/version`, esquema requerido 534, readiness, logs y
+  retest visual autenticado. Hasta entonces PROD continúa en 532 y no se debe
+  presentar como disponible el cierre RMA→NC 91 ni el hardening 533.
 - Reconciliar el historial consolidado de `003..382` y la deriva previa de 13
   funciones y dos políticas antes de usar un `db push --include-all` sobre todo
   el directorio. La contabilidad `383..394` ya está promovida.
@@ -2055,8 +2104,9 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 - Para una empresa colombiana real, cargar **su** PFX, Software ID/PIN, TestSet,
   resolución/rango, prefijo sólo si DIAN lo asignó y clave técnica; configurar el bundle CA y los pins
   SPKI oficiales, validar numeración, superar el set FEV y confirmar en el portal
-  que el software quedó `HABILITADO`. El transporte SOAP/WS-Security/XAdES ya
-  forma parte del release candidate, pero no existe evidencia de una aceptación
+  que el software quedó `HABILITADO`. El transporte SOAP/WS-Security/XAdES de
+  la base 532 ya forma parte del runtime productivo, pero el refuerzo 533-534
+  continúa pre-PR y no existe evidencia de una aceptación
   real y no se activa por una credencial global del proceso. La primera emisión
   productiva debe ser controlada y cerrar consulta, `ApplicationResponse`,
   `AttachedDocument`, nota y evento FEV con evidencia DIAN antes de declarar
@@ -2105,8 +2155,11 @@ tenants donde tiene los 256 permisos, así que ninguno perdió acceso.
 
 ## Jerarquía de verdad
 
-1. Código y migraciones actuales; estado remoto verificado hasta `528` en PROD
-   y release candidate local verificado hasta `532`, todavía pre-PR.
+1. Código y migraciones actuales. El estado remoto verificado llega a `532`, con
+   `main`, API y Web sobre
+   `f6455355d12c8834a0c77a73b238647119dff04a`; el candidato local verificado
+   llega a `534` y aún no tiene PR/CI, promoción ni despliegue. Quedan el retest
+   visual Colombia y la homologación externa por contribuyente.
 2. Este archivo.
 3. El documento de dominio correspondiente.
 4. Evidencia técnica versionada en `artifacts/`.

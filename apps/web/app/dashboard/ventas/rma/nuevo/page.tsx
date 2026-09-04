@@ -58,6 +58,13 @@ export default function NuevaRmaPage() {
   const [selected, setSelected] = useState<Record<string, { enabled: boolean; cantidad: string; motivo: string }>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const fiscalFlowStep = country.paisCodigo === 'CO'
+    ? 'Nota crédito DIAN 91; CxC tras aceptación'
+    : country.paisCodigo === 'AR'
+      ? 'Nota crédito ARCA; CxC tras CAE'
+      : country.paisCodigo === 'PE'
+        ? 'NC/CPE 07, CxC y asiento'
+        : 'Nota fiscal y efecto financiero'
 
   useEffect(() => {
     void (async () => {
@@ -161,7 +168,7 @@ export default function NuevaRmaPage() {
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm"><div className="flex items-center gap-2 font-bold"><ShieldCheck className="h-5 w-5 text-primary" /> Control del flujo</div><ol className="mt-4 space-y-3 text-sm text-muted-foreground"><Step done label="Crear solicitud" /><Step label="Aprobación por otro usuario" /><Step label="Recepción parcial o completa" /><Step label="NC/CPE 07, CxC y asiento" /></ol></div>
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm"><div className="flex items-center gap-2 font-bold"><ShieldCheck className="h-5 w-5 text-primary" /> Control del flujo</div><ol className="mt-4 space-y-3 text-sm text-muted-foreground"><Step done label="Crear solicitud" /><Step label="Aprobación por otro usuario" /><Step label="Recepción parcial o completa" /><Step label={fiscalFlowStep} /></ol></div>
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100"><strong>No es una anulación total.</strong><p className="mt-1">La nota acredita únicamente las líneas devueltas y conserva vigente el comprobante original.</p></div>
           <Button className="w-full" size="lg" disabled={saving || !pedido} onClick={() => void submit()}>{saving ? 'Creando…' : 'Crear RMA'} <CheckCircle2 className="ml-2 h-4 w-4" /></Button>
         </aside>
