@@ -177,10 +177,18 @@ export function resolveArcaQrContent(
   if (!/^[A-Z]{3}$/.test(currency)) {
     throw new Error('No se puede generar el QR ARCA: moneda inválida');
   }
-  const exchangeRate = Number(data?.tipo_cambio ?? data?.cotizacion_moneda ?? metadata.ctz ?? 1);
+  const exchangeRate = Number(
+    data?.tipo_cambio ?? data?.cotizacion_moneda
+    ?? metadata.arca_cotizacion ?? metadata.cotizacion ?? metadata.ctz ?? 1,
+  );
   if (
     !Number.isFinite(exchangeRate) || exchangeRate <= 0 ||
-    (currency !== 'PES' && data?.tipo_cambio == null && data?.cotizacion_moneda == null && metadata.ctz == null)
+    (currency !== 'PES'
+      && data?.tipo_cambio == null
+      && data?.cotizacion_moneda == null
+      && metadata.arca_cotizacion == null
+      && metadata.cotizacion == null
+      && metadata.ctz == null)
   ) {
     throw new Error('No se puede generar el QR ARCA: cotización de moneda inválida');
   }

@@ -164,6 +164,26 @@ export interface DocumentoElectronico {
   dianContext?: DianGenerationContext;
   /** Modalidad ARCA autorizada. Sólo se admite si existe evidencia fiscal. */
   arcaAuthorizationVariant?: 'NORMAL' | 'A_CBU' | 'A_RETENCION';
+  /** Concepto WSFEv1: 1 productos, 2 servicios, 3 productos y servicios. */
+  arcaConcepto?: 1 | 2 | 3;
+  /** Período y vencimiento obligatorios para conceptos 2/3. */
+  arcaFechaServicioDesde?: Date | string;
+  arcaFechaServicioHasta?: Date | string;
+  arcaFechaVencimientoPago?: Date | string;
+  /** Tributos distintos del IVA declarados en `ImpTrib`/`Tributos`. */
+  arcaTributos?: Array<{
+    id: 1 | 2 | 3 | 4 | 99;
+    descripcion?: string;
+    baseImponible: number;
+    alicuota: number;
+    importe: number;
+  }>;
+  /** Total de tributos distintos del IVA. */
+  totalTributos?: number;
+  /** `CanMisMonExt` de WSFEv1 para operaciones en moneda extranjera. */
+  arcaPagoMismaMoneda?: 'S' | 'N';
+  /** Cotización oficial ARCA persistida antes de reservar el comprobante. */
+  arcaCotizacion?: number;
   items: Array<{
     descripcion: string;
     cantidad: number;

@@ -648,7 +648,7 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
               <div className="mt-4 border-t border-border pt-4">
                 <h3 className="mb-1 text-sm font-semibold text-foreground">Logo de la empresa</h3>
                 <p className="mb-3 text-xs leading-snug text-muted-foreground">
-                  Se usa en facturas, boletas y tickets. Acepta PNG o JPG de hasta 2 MiB.
+                  Se usa en comprobantes y tickets. Acepta PNG o JPG de hasta 2 MiB.
                 </p>
                 <LogoUploader
                   key={logoUploaderVersion}
@@ -843,14 +843,25 @@ export default function ConfigurationOverview({ section = 'resumen' }: { section
         {!hidden('ventas') && (
           <SectionCard title="Ventas y documentos" icon={FileText} ok={checks.sales}>
             <FieldRow label="Modo emisión CPE" value={empresa?.emisionCpeModo} ok={!!empresa?.emisionCpeModo} />
-            <FieldRow label="Serie factura" value={empresa?.serieFactura} ok={!!empresa?.serieFactura} />
-            <FieldRow
-              label={isColombia ? 'Serie documento equivalente' : 'Serie boleta'}
-              value={empresa?.serieBoleta}
-              ok={!!empresa?.serieBoleta}
-            />
-            <FieldRow label="Serie nota crédito" value={empresa?.serieNotaCredito} ok={!!empresa?.serieNotaCredito} />
-            <FieldRow label="Serie nota débito" value={empresa?.serieNotaDebito} />
+            {isArgentina ? (
+              <>
+                <FieldRow label="Punto de venta ARCA" value={empresa?.arcaPuntoVenta} ok={!!empresa?.arcaPuntoVenta} />
+                <FieldRow label="Condición IVA del emisor" value={empresa?.arcaCondicionIva} ok={!!empresa?.arcaCondicionIva} />
+                <FieldRow label="Clase del comprobante" value="Se resuelve A/B/C según emisor y receptor" ok />
+                <FieldRow label="Numeración" value="Correlativo por punto de venta y tipo ARCA" ok />
+              </>
+            ) : (
+              <>
+                <FieldRow label="Serie factura" value={empresa?.serieFactura} ok={!!empresa?.serieFactura} />
+                <FieldRow
+                  label={isColombia ? 'Serie documento equivalente' : 'Serie boleta'}
+                  value={empresa?.serieBoleta}
+                  ok={!!empresa?.serieBoleta}
+                />
+                <FieldRow label="Serie nota crédito" value={empresa?.serieNotaCredito} ok={!!empresa?.serieNotaCredito} />
+                <FieldRow label="Serie nota débito" value={empresa?.serieNotaDebito} />
+              </>
+            )}
           </SectionCard>
         )}
 

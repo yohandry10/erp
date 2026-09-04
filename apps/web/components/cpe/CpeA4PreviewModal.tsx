@@ -298,13 +298,25 @@ function CpeA4Sheet({
     metadata.fiscal_qr_data_url || metadata.dian_qr_data_url || metadata.sunat_qr_data_url || metadata.qr_data_url,
   )
   const taxRate = firstFiniteNumber(metadata.tasa_igv, taxable > 0 ? (tax / taxable) * 100 : profile.defaultTaxRate)
+  const storedMetadata = metadata.metadata && typeof metadata.metadata === 'object'
+    ? metadata.metadata as Record<string, unknown>
+    : {}
+  const arcaTributes = Array.isArray(storedMetadata.arca_tributos)
+    ? storedMetadata.arca_tributos as Array<Record<string, unknown>>
+    : []
+  const argentinaNationalIndirectTaxes = arcaTributes
+    .filter((tribute) => [1, 4].includes(Number(tribute.id)))
+    .reduce((sum, tribute) => sum + firstFiniteNumber(tribute.importe), 0)
+  const otherTaxLabel = profile.countryCode === 'AR'
+    ? 'Otros tributos'
+    : profile.countryCode === 'CO' ? 'INC' : 'ISC'
   const totalRows = [
     { label: 'Op. gravadas', value: taxable },
     { label: 'Op. exoneradas', value: firstFiniteNumber(metadata.total_exoneradas) },
     { label: 'Op. inafectas', value: firstFiniteNumber(metadata.total_inafectas) },
     { label: 'Op. gratuitas', value: firstFiniteNumber(metadata.total_gratuitas) },
     { label: 'Descuentos', value: firstFiniteNumber(metadata.total_descuentos, metadata.descuentos) },
-    { label: 'ISC', value: firstFiniteNumber(metadata.total_isc) },
+    { label: otherTaxLabel, value: firstFiniteNumber(metadata.total_isc) },
     { label: 'ICBPER', value: firstFiniteNumber(metadata.total_icbper) },
     { label: `${profile.taxName} (${Number(taxRate.toFixed(2))}%)`, value: tax },
   ].filter((row) => Math.abs(row.value) >= 0.005)
@@ -437,6 +449,16 @@ function CpeA4Sheet({
         <span className="text-[1.15em] font-black">Importe total:</span>
         <span className="text-[1.15em] font-black">{formatMoney(total)}</span>
       </div>
+
+      {profile.countryCode === 'AR' && (
+        <div className="relative z-10 mt-3 w-[58%] border border-slate-500 bg-slate-50 p-3" data-testid="cpe-arca-tax-transparency">
+          <p className="font-black">Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</p>
+          <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+            <span>IVA Contenido:</span><span className="font-semibold">{formatMoney(tax)}</span>
+            <span>Otros Impuestos Nacionales Indirectos:</span><span className="font-semibold">{formatMoney(argentinaNationalIndirectTaxes)}</span>
+          </div>
+        </div>
+      )}
 
       {profile.countryCode === 'CO' && fiscalPrintInfo && (
         <div className="relative z-10 mt-3 border border-[#64748b] bg-[#f8fafc] p-3" data-testid="cpe-dian-fiscal-info">

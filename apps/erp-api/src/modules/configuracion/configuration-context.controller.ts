@@ -93,6 +93,9 @@ export class ConfigurationContextController {
           'nombre_comercial',
           'moneda_defecto',
           'igv_porcentaje',
+          'is_demo',
+          'arca_punto_venta',
+          'arca_condicion_iva',
           'configuracion_completa',
           'tipo_empresa',
           'usar_flujo_logistica',
@@ -153,6 +156,12 @@ export class ConfigurationContextController {
             empresaConfig.igv_porcentaje === null || empresaConfig.igv_porcentaje === undefined
               ? null
               : Number(empresaConfig.igv_porcentaje),
+          isDemo: empresaConfig.is_demo === true,
+          arcaPuntoVenta:
+            empresaConfig.arca_punto_venta === null || empresaConfig.arca_punto_venta === undefined
+              ? null
+              : Number(empresaConfig.arca_punto_venta),
+          arcaCondicionIva: empresaConfig.arca_condicion_iva ?? null,
           configuracionCompleta: empresaConfig.configuracion_completa === true,
           tipo_empresa: empresaConfig.tipo_empresa,
           usar_flujo_logistica: empresaConfig.usar_flujo_logistica,

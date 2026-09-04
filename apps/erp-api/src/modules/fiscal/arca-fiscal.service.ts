@@ -227,6 +227,121 @@ function resolveArcaVatCode(rate: number): number {
   throw new Error(`Alícuota de IVA no soportada por WSFEv1: ${rate}%`);
 }
 
+export function resolveArcaCurrencyCode(value: unknown): 'PES' | 'DOL' {
+  const normalized = String(value ?? '').trim().toUpperCase();
+  if (normalized === 'ARS' || normalized === 'PES') return 'PES';
+  if (normalized === 'USD' || normalized === 'DOL') return 'DOL';
+  throw new Error('Moneda ARCA no soportada: use ARS o USD');
+}
+
+function resolveArcaPersistedCurrency(document: DocumentoElectronico): {
+  code: 'PES' | 'DOL';
+  exchangeRate: number;
+  sameCurrencyPayment?: 'S' | 'N';
+} {
+  const code = resolveArcaCurrencyCode(document.moneda);
+  if (code === 'PES') return { code, exchangeRate: 1 };
+  const sameCurrencyPayment = String(document.arcaPagoMismaMoneda ?? '').trim().toUpperCase();
+  if (!['S', 'N'].includes(sameCurrencyPayment)) {
+    throw new Error('Moneda extranjera ARCA exige informar CanMisMonExt como S o N');
+  }
+  const exchangeRate = Number(document.arcaCotizacion);
+  if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+    throw new Error('Moneda extranjera ARCA exige una cotización oficial positiva persistida');
+  }
+  return {
+    code,
+    exchangeRate,
+    sameCurrencyPayment: sameCurrencyPayment as 'S' | 'N',
+  };
+}
+
+function resolveArcaConceptDates(document: DocumentoElectronico): {
+  concept: 1 | 2 | 3;
+  serviceFrom?: string;
+  serviceUntil?: string;
+  paymentDue?: string;
+} {
+  const concept = Number(document.arcaConcepto ?? 1);
+  if (![1, 2, 3].includes(concept)) {
+    throw new Error('Concepto ARCA inválido: use 1 productos, 2 servicios o 3 mixto');
+  }
+  const rawDates = [
+    document.arcaFechaServicioDesde,
+    document.arcaFechaServicioHasta,
+    document.arcaFechaVencimientoPago,
+  ];
+  const hasAnyDate = rawDates.some((value) => value !== undefined && value !== null && value !== '');
+  if ((concept === 2 || concept === 3 || hasAnyDate)
+      && rawDates.some((value) => value === undefined || value === null || value === '')) {
+    throw new Error(
+      'Conceptos ARCA de servicios o mixtos exigen FchServDesde, FchServHasta y FchVtoPago',
+    );
+  }
+  if (!hasAnyDate) return { concept: concept as 1 | 2 | 3 };
+
+  const serviceFrom = formatArcaDate(rawDates[0] as Date | string);
+  const serviceUntil = formatArcaDate(rawDates[1] as Date | string);
+  const paymentDue = formatArcaDate(rawDates[2] as Date | string);
+  const issueDate = formatArcaDate(document.fechaEmision);
+  if (serviceFrom > serviceUntil) {
+    throw new Error('FchServDesde no puede ser posterior a FchServHasta');
+  }
+  if (paymentDue < issueDate) {
+    throw new Error('FchVtoPago no puede ser anterior a CbteFch');
+  }
+  return {
+    concept: concept as 1 | 2 | 3,
+    serviceFrom,
+    serviceUntil,
+    paymentDue,
+  };
+}
+
+function resolveArcaTributes(document: DocumentoElectronico): {
+  total: number;
+  rows: NonNullable<DocumentoElectronico['arcaTributos']>;
+} {
+  const rawRows = document.arcaTributos ?? [];
+  if (!Array.isArray(rawRows) || rawRows.length > 20) {
+    throw new Error('Tributos ARCA debe contener hasta 20 registros');
+  }
+  const rows = rawRows.map((row, index) => {
+    const id = Number(row?.id);
+    const description = String(row?.descripcion ?? '').trim();
+    const base = Number(row?.baseImponible);
+    const rate = Number(row?.alicuota);
+    const amount = Number(row?.importe);
+    if (![1, 2, 3, 4, 99].includes(id)) {
+      throw new Error(`Tipo de tributo ARCA inválido en la fila ${index + 1}`);
+    }
+    if (!description || description.length > 80) {
+      throw new Error(`Descripción de tributo ARCA inválida en la fila ${index + 1}`);
+    }
+    if (![base, rate, amount].every(Number.isFinite)
+        || base < 0 || rate < 0 || rate > 999.99 || amount < 0) {
+      throw new Error(`Importes de tributo ARCA inválidos en la fila ${index + 1}`);
+    }
+    const calculated = Math.round(base * rate) / 100;
+    if (Math.abs(calculated - amount) > 0.01) {
+      throw new Error(`El tributo ARCA ${index + 1} no coincide con base por alícuota`);
+    }
+    return {
+      id: id as 1 | 2 | 3 | 4 | 99,
+      descripcion: description,
+      baseImponible: base,
+      alicuota: rate,
+      importe: amount,
+    };
+  });
+  const total = Number(rows.reduce((sum, row) => sum + row.importe, 0).toFixed(2));
+  const declared = Number(document.totalTributos ?? total);
+  if (!Number.isFinite(declared) || declared < 0 || Math.abs(declared - total) > 0.01) {
+    throw new Error('ImpTrib no coincide con la suma del detalle de Tributos');
+  }
+  return { total, rows };
+}
+
 @Injectable()
 export class ArcaFiscalService extends FiscalServiceAbstract {
   private tenantConfig: ArcaTenantConfig | null = null;
@@ -274,6 +389,20 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     }
   }
 
+  async obtenerCotizacionOficial(
+    moneda: string,
+    fecha: Date | string,
+  ): Promise<{ monedaArca: 'PES' | 'DOL'; cotizacion: number; fecha: string }> {
+    const code = resolveArcaCurrencyCode(moneda);
+    const issueDate = formatArcaDate(fecha);
+    if (code === 'PES') return { monedaArca: code, cotizacion: 1, fecha: issueDate };
+    const config = await this.loadTenantConfig();
+    if (!config.activo) throw new Error('La integración ARCA está desactivada');
+    const ticket = await this.getAccessTicket(config);
+    const quote = await this.getOfficialExchangeRate(config, ticket, code, issueDate);
+    return { monedaArca: code, cotizacion: quote, fecha: issueDate };
+  }
+
   async enviarDocumento(documento: DocumentoElectronico): Promise<FiscalResponse> {
     try {
       const validation = await this.validarDocumento(documento);
@@ -318,6 +447,24 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
       }
 
       const requestedIssueDate = formatArcaDate(documento.fechaEmision);
+      const persistedCurrency = resolveArcaPersistedCurrency(documento);
+      const officialExchangeRate = persistedCurrency.code === 'PES'
+        ? 1
+        : await this.getOfficialExchangeRate(
+            config,
+            ticket,
+            persistedCurrency.code,
+            requestedIssueDate,
+          );
+      if (Math.abs(officialExchangeRate - persistedCurrency.exchangeRate) > 0.000001) {
+        throw new Error(
+          'La cotización persistida no coincide con FEParamGetCotizacion de ARCA para la fecha fiscal',
+        );
+      }
+      const currencyContext = {
+        ...persistedCurrency,
+        exchangeRate: officialExchangeRate,
+      };
       const soap = this.buildAuthorizeRequest(
         config,
         ticket,
@@ -326,6 +473,7 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
         requestedNumber,
         fiscalDocument.receiverVatConditionId,
         requestedIssueDate,
+        currencyContext,
       );
       const response = await this.postSoap(
         config.wsfeUrl,
@@ -366,6 +514,7 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
         requestedNumber,
         cae,
         authorizedIssueDate,
+        currencyContext,
       );
       return {
         success: true,
@@ -385,6 +534,9 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
           condicionIvaReceptorId: fiscalDocument.receiverVatConditionId,
           modalidadAutorizacion: fiscalDocument.authorizationVariant,
           fechaFiscalAutorizada: `${authorizedIssueDate.slice(0, 4)}-${authorizedIssueDate.slice(4, 6)}-${authorizedIssueDate.slice(6, 8)}`,
+          moneda: currencyContext.code,
+          cotizacion: currencyContext.exchangeRate,
+          canMisMonExt: currencyContext.sameCurrencyPayment ?? null,
           qrUrl,
         },
       };
@@ -475,10 +627,10 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     } catch (error) {
       errores.push(error instanceof Error ? error.message : String(error));
     }
-    if (String(documento.moneda).toUpperCase() !== 'ARS') {
-      errores.push(
-        'Moneda ARCA soportada en este release: ARS. USD requiere cotización fiscal persistida y no se admite sin ella',
-      );
+    try {
+      resolveArcaPersistedCurrency(documento);
+    } catch (error) {
+      errores.push(error instanceof Error ? error.message : String(error));
     }
     let receiverIdentityType: number | null = null;
     try {
@@ -505,8 +657,21 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
       if (hasVat) errores.push('Comprobante ARCA clase C debe emitirse sin IVA discriminado');
     }
     if (documento.importeTotal <= 0) errores.push('El importe total debe ser mayor que cero');
-    if (Math.abs(documento.subtotal + documento.totalImpuestos - documento.importeTotal) > 0.02) {
-      errores.push('Subtotal + IVA no coincide con el total del comprobante');
+    let tributeTotal = 0;
+    try {
+      tributeTotal = resolveArcaTributes(documento).total;
+    } catch (error) {
+      errores.push(error instanceof Error ? error.message : String(error));
+    }
+    if (Math.abs(
+      documento.subtotal + documento.totalImpuestos + tributeTotal - documento.importeTotal,
+    ) > 0.02) {
+      errores.push('Subtotal + IVA + otros tributos no coincide con el total del comprobante');
+    }
+    try {
+      resolveArcaConceptDates(documento);
+    } catch (error) {
+      errores.push(error instanceof Error ? error.message : String(error));
     }
     try {
       resolveArcaTaxBases(documento);
@@ -540,9 +705,15 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
       receiverVatCondition: documento.receptor.condicionIva,
       authorizationVariant: documento.arcaAuthorizationVariant,
     }).wsfeCode;
+    const conceptDates = resolveArcaConceptDates(documento);
+    const tributes = resolveArcaTributes(documento);
+    const currency = resolveArcaPersistedCurrency(documento);
     return `<ArcaComprobante><Tipo>${type}</Tipo><Numero>${escapeXml(documento.numero)}</Numero>` +
       `<Fecha>${formatArcaDate(documento.fechaEmision)}</Fecha><Moneda>${escapeXml(documento.moneda)}</Moneda>` +
+      `<MonId>${currency.code}</MonId><MonCotiz>${currency.exchangeRate.toFixed(6)}</MonCotiz>` +
+      `${currency.sameCurrencyPayment ? `<CanMisMonExt>${currency.sameCurrencyPayment}</CanMisMonExt>` : ''}` +
       `<Neto>${documento.subtotal.toFixed(2)}</Neto><IVA>${documento.totalImpuestos.toFixed(2)}</IVA>` +
+      `<OtrosTributos>${tributes.total.toFixed(2)}</OtrosTributos><Concepto>${conceptDates.concept}</Concepto>` +
       `<Total>${documento.importeTotal.toFixed(2)}</Total></ArcaComprobante>`;
   }
 
@@ -703,6 +874,43 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     return number;
   }
 
+  private async getOfficialExchangeRate(
+    config: ArcaTenantConfig,
+    ticket: ArcaTicket,
+    currency: 'DOL',
+    issueDate: string,
+  ): Promise<number> {
+    if (!isValidArcaCompactDate(issueDate)) {
+      throw new Error('Fecha de cotización ARCA inválida');
+    }
+    const request = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
+  <soap:Body><ar:FEParamGetCotizacion><ar:Auth>
+    <ar:Token>${escapeXml(ticket.token)}</ar:Token><ar:Sign>${escapeXml(ticket.sign)}</ar:Sign>
+    <ar:Cuit>${config.cuit}</ar:Cuit>
+  </ar:Auth><ar:MonId>${currency}</ar:MonId><ar:FchCotiz>${issueDate}</ar:FchCotiz>
+  </ar:FEParamGetCotizacion></soap:Body>
+</soap:Envelope>`;
+    const response = await this.postSoap(
+      config.wsfeUrl,
+      request,
+      'http://ar.gov.afip.dif.FEV1/FEParamGetCotizacion',
+      config.environment,
+      'wsfe',
+    );
+    const responseCurrency = String(soapValue(response, 'MonId') ?? '').trim().toUpperCase();
+    const responseDate = String(soapValue(response, 'FchCotiz') ?? '').replace(/-/g, '');
+    const exchangeRate = Number(String(soapValue(response, 'MonCotiz') ?? '').replace(',', '.'));
+    if (responseCurrency !== currency || responseDate !== issueDate
+        || !Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      throw new Error(
+        this.extractMessages(response, 'Err')[0]
+        || 'ARCA no devolvió una cotización oficial válida para moneda y fecha solicitadas',
+      );
+    }
+    return exchangeRate;
+  }
+
   private buildAuthorizeRequest(
     config: ArcaTenantConfig,
     ticket: ArcaTicket,
@@ -711,12 +919,15 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
     number: number,
     receiverVatConditionId: number,
     fiscalIssueDate?: string,
+    resolvedCurrency?: ReturnType<typeof resolveArcaPersistedCurrency>,
   ): string {
     const issueDate = fiscalIssueDate ?? formatArcaDate(document.fechaEmision);
     if (!isValidArcaCompactDate(issueDate)) {
       throw new Error('Fecha fiscal inválida para la solicitud ARCA');
     }
     const taxBases = resolveArcaTaxBases(document);
+    const conceptDates = resolveArcaConceptDates(document);
+    const tributeSummary = resolveArcaTributes(document);
     const receptorNumber = normalizeArgentinaTaxId(document.receptor.numeroDocumento);
     const receiverIdentityType = resolveArcaIdentityType(document.receptor.tipoDocumento, receptorNumber);
     if ([1, 2, 3, 51, 52, 53].includes(type) && receiverIdentityType !== 80) {
@@ -750,7 +961,18 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
         `<ar:AlicIva><ar:Id>${code}</ar:Id><ar:BaseImp>${values.base.toFixed(2)}</ar:BaseImp>` +
         `<ar:Importe>${values.tax.toFixed(2)}</ar:Importe></ar:AlicIva>`,
       ).join('');
-    const currency = String(document.moneda).toUpperCase() === 'USD' ? 'DOL' : 'PES';
+    const tributes = tributeSummary.rows.map((tribute) =>
+      `<ar:Tributo><ar:Id>${tribute.id}</ar:Id><ar:Desc>${escapeXml(tribute.descripcion)}</ar:Desc>` +
+      `<ar:BaseImp>${tribute.baseImponible.toFixed(2)}</ar:BaseImp>` +
+      `<ar:Alic>${tribute.alicuota.toFixed(2)}</ar:Alic>` +
+      `<ar:Importe>${tribute.importe.toFixed(2)}</ar:Importe></ar:Tributo>`,
+    ).join('');
+    const serviceDates = conceptDates.serviceFrom
+      ? `<ar:FchServDesde>${conceptDates.serviceFrom}</ar:FchServDesde>` +
+        `<ar:FchServHasta>${conceptDates.serviceUntil}</ar:FchServHasta>` +
+        `<ar:FchVtoPago>${conceptDates.paymentDue}</ar:FchVtoPago>`
+      : '';
+    const currency = resolvedCurrency ?? resolveArcaPersistedCurrency(document);
     const isNote = [2, 3, 7, 8, 12, 13, 52, 53].includes(type);
     if (isNote && !document.documentoReferencia) {
       throw new Error('Nota ARCA sin comprobante asociado autorizado');
@@ -774,14 +996,17 @@ export class ArcaFiscalService extends FiscalServiceAbstract {
 <ar:Token>${escapeXml(ticket.token)}</ar:Token><ar:Sign>${escapeXml(ticket.sign)}</ar:Sign><ar:Cuit>${config.cuit}</ar:Cuit>
 </ar:Auth><ar:FeCAEReq><ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${config.puntoVenta}</ar:PtoVta>
 <ar:CbteTipo>${type}</ar:CbteTipo></ar:FeCabReq><ar:FeDetReq><ar:FECAEDetRequest>
-<ar:Concepto>1</ar:Concepto><ar:DocTipo>${receiverIdentityType}</ar:DocTipo>
+<ar:Concepto>${conceptDates.concept}</ar:Concepto><ar:DocTipo>${receiverIdentityType}</ar:DocTipo>
 <ar:DocNro>${receptorNumber || 0}</ar:DocNro><ar:CondicionIVAReceptorId>${receiverVatConditionId}</ar:CondicionIVAReceptorId>
 <ar:CbteDesde>${number}</ar:CbteDesde><ar:CbteHasta>${number}</ar:CbteHasta>
 <ar:CbteFch>${issueDate}</ar:CbteFch><ar:ImpTotal>${document.importeTotal.toFixed(2)}</ar:ImpTotal>
 <ar:ImpTotConc>${taxBases.nonTaxable.toFixed(2)}</ar:ImpTotConc>
 <ar:ImpNeto>${taxBases.taxable.toFixed(2)}</ar:ImpNeto><ar:ImpOpEx>${taxBases.exempt.toFixed(2)}</ar:ImpOpEx>
-<ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>${(isClassC ? 0 : document.totalImpuestos).toFixed(2)}</ar:ImpIVA>
-<ar:MonId>${currency}</ar:MonId><ar:MonCotiz>1.000000</ar:MonCotiz>${reference}
+<ar:ImpTrib>${tributeSummary.total.toFixed(2)}</ar:ImpTrib><ar:ImpIVA>${(isClassC ? 0 : document.totalImpuestos).toFixed(2)}</ar:ImpIVA>
+${serviceDates}<ar:MonId>${currency.code}</ar:MonId><ar:MonCotiz>${currency.exchangeRate.toFixed(6)}</ar:MonCotiz>${
+  currency.sameCurrencyPayment ? `<ar:CanMisMonExt>${currency.sameCurrencyPayment}</ar:CanMisMonExt>` : ''
+}${reference}
+${tributes ? `<ar:Tributos>${tributes}</ar:Tributos>` : ''}
 ${iva ? `<ar:Iva>${iva}</ar:Iva>` : ''}
 </ar:FECAEDetRequest></ar:FeDetReq></ar:FeCAEReq></ar:FECAESolicitar></soap:Body></soap:Envelope>`;
   }
@@ -793,11 +1018,13 @@ ${iva ? `<ar:Iva>${iva}</ar:Iva>` : ''}
     number: number,
     cae: string,
     authorizedIssueDate?: string,
+    resolvedCurrency?: ReturnType<typeof resolveArcaPersistedCurrency>,
   ): string {
     const issueDate = authorizedIssueDate ?? formatArcaDate(document.fechaEmision);
     if (!isValidArcaCompactDate(issueDate)) {
       throw new Error('Fecha fiscal autorizada inválida para el QR ARCA');
     }
+    const currency = resolvedCurrency ?? resolveArcaPersistedCurrency(document);
     const payload = {
       ver: 1,
       // El QR tiene que declarar la misma fecha que el XML, y por el mismo
@@ -808,8 +1035,8 @@ ${iva ? `<ar:Iva>${iva}</ar:Iva>` : ''}
       tipoCmp: type,
       nroCmp: number,
       importe: Number(document.importeTotal.toFixed(2)),
-      moneda: String(document.moneda).toUpperCase() === 'USD' ? 'DOL' : 'PES',
-      ctz: 1,
+      moneda: currency.code,
+      ctz: currency.exchangeRate,
       tipoDocRec: resolveArcaIdentityType(
         document.receptor.tipoDocumento,
         document.receptor.numeroDocumento,

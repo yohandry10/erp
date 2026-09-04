@@ -46,7 +46,7 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  countryCode: 'PE' | 'CO'
+  countryCode: 'PE' | 'CO' | 'AR'
 }
 
 interface LineDraft {
@@ -88,6 +88,23 @@ const DIAN_DEBIT_REASONS = [
   ['4', 'Otros'],
 ] as const
 
+const ARCA_CREDIT_REASONS = [
+  ['04', 'Descuento global'],
+  ['05', 'Descuento por ítem'],
+  ['08', 'Bonificación'],
+  ['09', 'Disminución en el valor'],
+  ['10', 'Otros conceptos'],
+  ['11', 'Ajuste de operaciones de exportación'],
+  ['12', 'Ajuste fiscal'],
+  ['13', 'Corrección del monto neto pendiente de pago'],
+] as const
+
+const ARCA_DEBIT_REASONS = [
+  ['01', 'Intereses'],
+  ['02', 'Aumento en el valor'],
+  ['03', 'Gastos, penalidades u otros conceptos'],
+] as const
+
 export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }: Props) {
   const { get: apiGet, post: apiPost } = useApiCall({
     throwOnError: true,
@@ -99,6 +116,7 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
   const [originReload, setOriginReload] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const isColombia = countryCode === 'CO'
+  const isArgentina = countryCode === 'AR'
   const creditType: NoteType = isColombia ? '91' : '07'
   const debitType: NoteType = isColombia ? '92' : '08'
   const [type, setType] = useState<NoteType>(creditType)
@@ -113,7 +131,9 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
   const isCredit = type === creditType
   const reasons = isColombia
     ? isCredit ? DIAN_CREDIT_REASONS : DIAN_DEBIT_REASONS
-    : isCredit ? CREDIT_REASONS : DEBIT_REASONS
+    : isArgentina
+      ? isCredit ? ARCA_CREDIT_REASONS : ARCA_DEBIT_REASONS
+      : isCredit ? CREDIT_REASONS : DEBIT_REASONS
   const selected = origins.find((origin) => origin.id === originId)
   const requiresLines = isColombia && (
     (isCredit && ['1', '4'].includes(reason))
@@ -149,7 +169,7 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
     ? lineAmount
     : isFullCancellation ? cancellationBalance : Number(amount)
   const formDisabled = loadingOrigins || origins.length === 0
-  const defaultCurrency = isColombia ? 'COP' : 'PEN'
+  const defaultCurrency = isColombia ? 'COP' : isArgentina ? 'ARS' : 'PEN'
 
   useEffect(() => {
     setType(creditType)
@@ -182,7 +202,7 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
       })
       .finally(() => active && setLoadingOrigins(false))
     return () => { active = false }
-  }, [apiGet, isColombia, isOpen, originReload])
+  }, [apiGet, isArgentina, isColombia, isOpen, originReload])
 
   useEffect(() => {
     setReason(isColombia ? '1' : isCredit ? '04' : '01')
@@ -273,7 +293,13 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
       )
       alert(
         `${isCredit ? 'Nota de crédito' : 'Nota de débito'} ${resultNumber} creada. ` +
-        `Quedó fiscalmente pendiente y sin afectar CxC, saldo a favor ni contabilidad. El efecto se aplicará sólo si ${isColombia ? 'DIAN devuelve una aceptación correlacionada' : 'SUNAT/OSE acepta la nota con CDR'}.`,
+        `Quedó fiscalmente pendiente y sin afectar CxC, saldo a favor ni contabilidad. El efecto se aplicará sólo si ${
+          isColombia
+            ? 'DIAN devuelve una aceptación correlacionada'
+            : isArgentina
+              ? 'ARCA autoriza la nota y devuelve el CAE'
+              : 'SUNAT/OSE acepta la nota con CDR'
+        }.`,
       )
       onSuccess()
       onClose()
@@ -290,10 +316,14 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black text-foreground">
-              {isColombia ? 'Nueva nota DIAN referenciada' : 'Nueva nota referenciada'}
+              {isColombia
+                ? 'Nueva nota DIAN referenciada'
+                : isArgentina
+                  ? 'Nueva nota ARCA referenciada'
+                  : 'Nueva nota referenciada'}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Ajusta una {isColombia ? 'factura electrónica' : 'factura o boleta'} sin mover inventario. Para devoluciones físicas use RMA.
+              Ajusta una {isColombia || isArgentina ? 'factura electrónica' : 'factura o boleta'} sin mover inventario. Para devoluciones físicas use RMA.
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-2xl text-muted-foreground" aria-label="Cerrar">×</button>
@@ -377,7 +407,9 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
             >
               {isColombia
                 ? 'Para emitir NC/ND DIAN necesitas una factura electrónica aceptada por DIAN del mismo contribuyente; la demo no fabrica aceptación fiscal.'
-                : 'No hay facturas o boletas fiscalmente aceptadas disponibles para emitir una nota.'}
+                : isArgentina
+                  ? 'Para emitir NC/ND ARCA necesitas una factura electrónica autorizada con CAE del mismo contribuyente; la demo no fabrica autorización fiscal.'
+                  : 'No hay facturas o boletas fiscalmente aceptadas disponibles para emitir una nota.'}
             </div>
           )}
 
@@ -486,7 +518,9 @@ export function ReferencedNoteModal({ isOpen, onClose, onSuccess, countryCode }:
             saldo a favor ni contabilidad. Esos efectos se aplican una sola vez cuando
             {isColombia
               ? ' DIAN acepte la nota con una respuesta correlacionada; un rechazo queda sin efecto financiero.'
-              : ' SUNAT/OSE acepte la nota y entregue el CDR; un rechazo queda sin efecto financiero.'}
+              : isArgentina
+                ? ' ARCA autorice la nota y entregue el CAE; un rechazo queda sin efecto financiero.'
+                : ' SUNAT/OSE acepte la nota y entregue el CDR; un rechazo queda sin efecto financiero.'}
           </div>
 
           <div className="flex justify-end gap-3">
