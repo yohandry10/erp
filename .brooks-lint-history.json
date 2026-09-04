@@ -9,5 +9,16 @@
       "suggestion": 0
     },
     "scope": "git diff origin/main: Colombia DIAN 533-534"
+  },
+  {
+    "date": "2026-09-04T15:50:00Z",
+    "mode": "pr-review",
+    "score": 100,
+    "findings": {
+      "critical": 0,
+      "warning": 0,
+      "suggestion": 0
+    },
+    "scope": "working tree: Colombia demo series hotfix"
   }
 ]

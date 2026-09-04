@@ -799,10 +799,11 @@ describe('CpeService · creación Colombia', () => {
     );
   });
 
-  it('una demo CO no consume la reserva DIAN y conserva la numeración local simulada', async () => {
+  it('una demo CO sin prefijo usa la serie local DEMO y no consume numeración DIAN', async () => {
     const { service, client } = buildHarness();
     jest.spyOn(service as any, 'getEmpresaEmisorInfoStrict').mockResolvedValue({
       ...REAL_CO_ISSUER,
+      dianResolucionPrefijo: '',
       isDemo: true,
     });
     const fallbackNumberSpy = jest.spyOn(service as any, 'resolveNumeroCpe').mockResolvedValue(44);
@@ -815,9 +816,9 @@ describe('CpeService · creación Colombia', () => {
     }), TENANT_ID, ACTOR_ID);
 
     expect(client.rpc).not.toHaveBeenCalled();
-    expect(fallbackNumberSpy).toHaveBeenCalledWith(TENANT_ID, '01', 'FVCO', 123456);
+    expect(fallbackNumberSpy).toHaveBeenCalledWith(TENANT_ID, '01', 'DEMO', 123456);
     expect(createSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ serie: 'FVCO', numero: 44 }),
+      expect.objectContaining({ serie: 'DEMO', numero: 44 }),
       TENANT_ID,
       ACTOR_ID,
     );
@@ -825,7 +826,11 @@ describe('CpeService · creación Colombia', () => {
 
   it('persiste una representación demo CO sin certificado ni firma fiscal', async () => {
     const { service, client, validation, fiscalAdapter } = buildHarness();
-    const demoIssuer = { ...REAL_CO_ISSUER, isDemo: true };
+    const demoIssuer = {
+      ...REAL_CO_ISSUER,
+      dianResolucionPrefijo: '',
+      isDemo: true,
+    };
     jest.spyOn(service as any, 'loadDianCreationContext').mockResolvedValue({
       emisor: demoIssuer,
       receiver: {
@@ -873,7 +878,10 @@ describe('CpeService · creación Colombia', () => {
     });
 
     const result = await service.create(
-      creationDto({ idempotency_key: 'cpe.co.demo:local-artifact' }),
+      creationDto({
+        serie: '',
+        idempotency_key: 'cpe.co.demo:local-artifact',
+      }),
       TENANT_ID,
       ACTOR_ID,
     );
@@ -882,6 +890,7 @@ describe('CpeService · creación Colombia', () => {
     expect(validation.validateCertificate).not.toHaveBeenCalled();
     expect(signerSpy).not.toHaveBeenCalled();
     expect(fiscalAdapter.generarYFirmarDocumentoSinTransmitir).not.toHaveBeenCalled();
+    expect(persistedPayload.serie).toBe('DEMO');
     expect(persistedPayload.metadata).toEqual(expect.objectContaining({
       dian_is_demo: true,
       dian_simulado: true,

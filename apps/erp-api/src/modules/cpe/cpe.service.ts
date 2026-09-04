@@ -1454,6 +1454,17 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       const isRealDianCreation = paisCodigo === 'CO'
         && dianCreationContext !== null
         && !dianCreationContext.emisor.isDemo;
+      const isColombiaDemoCreation = paisCodigo === 'CO'
+        && dianCreationContext?.emisor.isDemo === true;
+      if (isColombiaDemoCreation) {
+        // La resolución demo puede no declarar prefijo, igual que una
+        // autorización DIAN válida. El escritor atómico heredado exige una
+        // serie operativa no vacía, así que usamos una identidad inequívocamente
+        // local: nunca se presenta como prefijo autorizado ni se transmite.
+        (createFacturaDto as any).serie = this.resolveColombiaDemoSeries(
+          dianCreationContext.emisor.dianResolucionPrefijo ?? '',
+        );
+      }
       if (dianCreationContext) {
         const canonicalReceiver = normalizeDianIdentity(
           dianCreationContext.receiver.documentoTipo,
@@ -1576,9 +1587,6 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
 
       // ===== PRE-EMISSION VALIDATIONS =====
       this.logger.log(`Starting pre-emission validations for tenant: ${tenantId}`);
-
-      const isColombiaDemoCreation = paisCodigo === 'CO'
-        && dianCreationContext?.emisor.isDemo === true;
 
       // 1. Validate certificate. Una demo CO nunca firma ni transmite: sólo
       // persiste un artefacto interno explícitamente no fiscal para alimentar
@@ -2004,9 +2012,12 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
     const configuredSeries = emisor.pais === 'CO'
       ? String((emisor as any).dianResolucionPrefijo ?? '').trim().toUpperCase()
       : '';
+    const localSeries = emisor.pais === 'CO' && emisor.isDemo
+      ? this.resolveColombiaDemoSeries(configuredSeries)
+      : configuredSeries;
     let serie = String(
       existingIntent?.serie
-      ?? (emisor.pais === 'CO' ? configuredSeries : payload?.serie)
+      ?? (emisor.pais === 'CO' ? localSeries : payload?.serie)
       ?? this.defaultSerieForTipo(tipoDocumento),
     ).trim().toUpperCase();
     let numero = existingIntent?.numero ?? 0;
@@ -2767,6 +2778,10 @@ async exportComprobantesCsv(filters: any = {}, tenantId?: string) {
 
 private defaultSerieForTipo(tipoDocumento: string): string {
     return this.registrationService.defaultSerieForTipo(tipoDocumento);
+  }
+
+private resolveColombiaDemoSeries(configuredPrefix: unknown): string {
+    return String(configuredPrefix ?? '').trim().toUpperCase() || 'DEMO';
   }
 
 private resolveNumeroCpe(tenantId: string, tipoDocumento: string, serie: string, provided?: any): Promise<number> {
